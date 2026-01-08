@@ -29,7 +29,7 @@ CREATE TABLE lemline_forks (
     error_stacktrace TEXT,
 
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP,
+    updated_at TIMESTAMP
 );
 
 -- Create index for efficient cleanup queries

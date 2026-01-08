@@ -167,17 +167,17 @@ class ListenerEventRepository : CrudRepository<ListenerEventModel>(),
             // Else: foreach_completed = true, foreach_output = event
             // For ONE/ANY, sort_key is always 0 (only one event per listener ever)
             val columns = """
-                $LISTENER_ID_COLUMN, $EVENT_ID_COLUMN, $FILTER_INDEX_COLUMN, $EVENT_COLUMN,
-                $SORT_KEY_COLUMN, $FOREACH_COMPLETED_COLUMN, $FOREACH_OUTPUT_COLUMN, $OUTBOX_SCHEDULED_FOR_COLUMN
+                $LISTENER_ID_COLUMN, $FILTER_INDEX_COLUMN, $SORT_KEY_COLUMN, $EVENT_ID_COLUMN,
+                $EVENT_COLUMN, $FOREACH_COMPLETED_COLUMN, $FOREACH_OUTPUT_COLUMN, $OUTBOX_SCHEDULED_FOR_COLUMN
             """.trimIndent()
 
             val selectSql = """
                 SELECT
                     l.$ID_COLUMN,                                               /* listener_id */
-                    ?,                                                          /* event_id */
                     0,                                                          /* filter_index = 0 for ONE/ANY */
-                    ?,                                                          /* event */
                     0,                                                          /* sort_key = 0 (only one event per listener) */
+                    ?,                                                          /* event_id */
+                    ?,                                                          /* event */
                     NOT l.$HAS_FOREACH_COLUMN,                                  /* foreach_completed = TRUE if no foreach */
                     CASE WHEN NOT l.$HAS_FOREACH_COLUMN THEN ? END,             /* foreach_output = event if not has foreach */
                     CASE WHEN l.$HAS_FOREACH_COLUMN THEN CURRENT_TIMESTAMP END  /* outbox_scheduled_for = now if has foreach */
@@ -198,10 +198,10 @@ class ListenerEventRepository : CrudRepository<ListenerEventModel>(),
                 stmt.executeUpdate()
             }
 
-            // Mark listeners as completed (first event received = stop collecting)
+            // Mark listeners as closed (first event received = stop collecting)
             // For ONE/ANY, receiving any event completes the listener
             if (insertedCount > 0) {
-                markOneAnyListenersCompleted(eventId, oneAnyKeys, conn)
+                markOneAnyListenersClosed(eventId, oneAnyKeys, conn)
             }
 
             insertedCount
@@ -209,14 +209,14 @@ class ListenerEventRepository : CrudRepository<ListenerEventModel>(),
     }
 
     /**
-     * Marks ONE/ANY listeners as completed when they have received an event.
+     * Marks ONE/ANY listeners as closed when they have received an event.
      * Uses the eventId to precisely target only listeners that received this specific event.
      * Called immediately after inserting events in batchInsertForOneAny.
      *
      * Note: Strategy filtering is done in the INSERT (only ONE/ANY listeners get events),
      * so the eventId check is sufficient to target the right listeners.
      */
-    private fun markOneAnyListenersCompleted(
+    private fun markOneAnyListenersClosed(
         eventId: String,
         keys: List<ListenerQueryKey>,
         conn: Connection
@@ -293,11 +293,16 @@ class ListenerEventRepository : CrudRepository<ListenerEventModel>(),
             // Step 2: Insert with calculated sort_key
             // Build UNION ALL of all filterIndex queries
             // Include has_foreach for completion logic
-            val unionParts = byFilterIndex.map { (filterIndex, queryKeys) ->
+            val filterIndexCast = when (databaseConfig.dbType) {
+                DatabaseType.H2 -> "CAST(? AS INT)"
+                DatabaseType.MYSQL -> "CAST(? AS SIGNED)"
+                DatabaseType.POSTGRESQL -> "?::int"
+            }
+            val unionParts = byFilterIndex.map { (_, queryKeys) ->
                 """
                 SELECT
                     l.$ID_COLUMN as $LISTENER_ID_COLUMN,
-                    $filterIndex as $FILTER_INDEX_COLUMN,
+                    $filterIndexCast as $FILTER_INDEX_COLUMN,
                     l.$HAS_FOREACH_COLUMN
                 FROM $LISTENER_TABLE l
                 WHERE l.$CLOSED_AT_COLUMN IS NULL
@@ -312,8 +317,8 @@ class ListenerEventRepository : CrudRepository<ListenerEventModel>(),
             // Note: outbox_delayed_until is not set (defaults to NULL) - markReadyForForeach will set it
             // Note: created_at uses database default (CURRENT_TIMESTAMP)
             val columns = """
-                $LISTENER_ID_COLUMN, $EVENT_ID_COLUMN, $FILTER_INDEX_COLUMN, $EVENT_COLUMN,
-                $SORT_KEY_COLUMN, $FOREACH_COMPLETED_COLUMN, $FOREACH_OUTPUT_COLUMN, $OUTBOX_SCHEDULED_FOR_COLUMN
+                $LISTENER_ID_COLUMN, $FILTER_INDEX_COLUMN, $SORT_KEY_COLUMN, $EVENT_ID_COLUMN,
+                $EVENT_COLUMN, $FOREACH_COMPLETED_COLUMN, $FOREACH_OUTPUT_COLUMN, $OUTBOX_SCHEDULED_FOR_COLUMN
             """.trimIndent()
 
             val selectSql = buildInsertSelectWithSortKey(unionSql)
@@ -324,10 +329,10 @@ class ListenerEventRepository : CrudRepository<ListenerEventModel>(),
                 var paramIdx = 1
                 stmt.setString(paramIdx++, eventId)
                 stmt.setString(paramIdx++, eventJson)
-                stmt.setString(paramIdx++, eventJson) // foreach_output = event for non-foreach
+                stmt.setString(paramIdx++, eventJson)
 
-                // Bind parameters for all filterIndex groups
-                for ((_, queryKeys) in byFilterIndex) {
+                for ((filterIndex, queryKeys) in byFilterIndex) {
+                    stmt.setObject(paramIdx++, filterIndex, java.sql.Types.INTEGER)
                     paramIdx = ListenerQueryKey.bindAllParameters(queryKeys, stmt, paramIdx)
                 }
 
@@ -342,7 +347,7 @@ class ListenerEventRepository : CrudRepository<ListenerEventModel>(),
 
             // Mark ALL strategy listeners as completed when all filters have events
             if (insertedCount > 0) {
-                markAllListenersCompleted(eventId, keys, conn)
+                markAllListenersClosed(eventId, keys, conn)
             }
 
             insertedCount
@@ -437,13 +442,13 @@ class ListenerEventRepository : CrudRepository<ListenerEventModel>(),
         return """
             SELECT
                 m.$LISTENER_ID_COLUMN,                                      /* listener_id */
-                ?,                                                          /* event_id */
                 m.$FILTER_INDEX_COLUMN,                                     /* filter_index */
-                ?,                                                          /* event */
                 COALESCE(existing.max_sort_key, -1) + ROW_NUMBER() OVER (
                     PARTITION BY m.$LISTENER_ID_COLUMN
                     ORDER BY $rowNumberOrderBy
                 ),                                                          /* sort_key */
+                ?,                                                          /* event_id */
+                ?,                                                          /* event */
                 NOT m.$HAS_FOREACH_COLUMN,                                  /* foreach_completed = TRUE if no foreach */
                 CASE WHEN NOT m.$HAS_FOREACH_COLUMN THEN ? END,             /* foreach_output = event for non-foreach */
                 CASE WHEN m.$HAS_FOREACH_COLUMN THEN CURRENT_TIMESTAMP END  /* outbox_scheduled_for = NULL if not foreach */
@@ -459,14 +464,14 @@ class ListenerEventRepository : CrudRepository<ListenerEventModel>(),
     }
 
     /**
-     * Marks ALL strategy listeners as completed when all filters have at least one event.
+     * Marks ALL strategy listeners as closed when all filters have at least one event.
      * Uses the eventId to precisely target only listeners that received this specific event.
      * Called immediately after inserting events in batchInsertForAccumulating.
      *
      * Note: Only targets ALL strategy. ANY_UNTIL_* strategies have separate completion logic
      * (batchMarkReadyByUntilEvent for ANY_UNTIL_EVENT, markListenerCompleted for ANY_UNTIL_EXPR).
      */
-    private fun markAllListenersCompleted(
+    private fun markAllListenersClosed(
         eventId: String,
         keys: List<ListenerQueryKey>,
         conn: Connection

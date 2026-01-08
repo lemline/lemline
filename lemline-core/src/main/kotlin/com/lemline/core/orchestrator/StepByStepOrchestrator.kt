@@ -412,11 +412,9 @@ object StepByStepOrchestrator {
      * Check if a node is an error boundary.
      * Error boundaries prevent errors from propagating beyond them:
      * - ForkTask: errors in branches are handled by the fork
-     * - ForeachTask: errors in foreach.do are handled by the listen handler
      */
     private fun isErrorBoundary(node: Node<*>): Boolean = when (node.task) {
         is ForkTask -> true
-        is ForeachTask -> true
         else -> false
     }
 

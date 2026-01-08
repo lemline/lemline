@@ -31,7 +31,10 @@ import kotlinx.serialization.json.JsonElement
 internal sealed class CollectResult {
     data class Success(val outputs: List<JsonElement>) : CollectResult()
     data class Failure(val nodeStack: NodeStack, val error: InternalException) : CollectResult()
+    data class EscapedToCompletion(val event: WorkflowEvent.WorkflowCompleted) : CollectResult()
 }
+
+internal class ForeachEscapedException(val event: WorkflowEvent.WorkflowCompleted) : Exception()
 
 @ExperimentalTime
 internal typealias ForeachProcessor = suspend (NodeStack, JsonElement, Int) -> Pair<NodeStack, JsonElement>
@@ -75,6 +78,8 @@ internal object ListenEventCollector {
                 )
             }
             CollectResult.Success(outputs)
+        } catch (e: ForeachEscapedException) {
+            CollectResult.EscapedToCompletion(e.event)
         } catch (e: InternalException) {
             CollectResult.Failure(currentStack, e)
         }
@@ -289,6 +294,11 @@ internal object ListenEventCollector {
             is WorkflowEvent.WorkflowFailed -> {
                 logger.debug { "Foreach iteration $iterationIndex failed with error: ${outcome.error}" }
                 throw InternalException(outcome.error)
+            }
+
+            is WorkflowEvent.WorkflowCompleted -> {
+                logger.debug { "Foreach iteration $iterationIndex escaped to workflow completion (error caught by outer try-catch): ${outcome.output}" }
+                throw ForeachEscapedException(outcome)
             }
 
             else -> throw IllegalStateException("Unexpected outcome from foreach iteration: $outcome")

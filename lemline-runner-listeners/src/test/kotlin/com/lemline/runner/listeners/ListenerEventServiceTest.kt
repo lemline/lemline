@@ -21,6 +21,7 @@ import com.lemline.core.states.TaskState
 import com.lemline.core.states.WorkflowEvent
 import com.lemline.core.workflows.CachedListenTask
 import com.lemline.core.workflows.CachedUntilCondition
+import com.lemline.runner.common.config.DatabaseConfig
 import com.lemline.runner.common.messaging.InstanceMessage
 import io.cloudevents.CloudEvent
 import io.cloudevents.core.builder.CloudEventBuilder
@@ -56,16 +57,22 @@ class ListenerEventServiceTest {
     private val mockedListenerRepository = mockk<ListenerRepository>()
     private val mockedListenerEventRepository = mockk<ListenerEventRepository>()
     private val mockedDefinitionListenService = mockk<DefinitionListenService>()
+    private val mockedDatabaseConfig = mockk<DatabaseConfig>()
 
     private val service = ListenerEventService().apply {
         this.listenerRepository = mockedListenerRepository
         this.listenerEventRepository = mockedListenerEventRepository
         this.definitionListenService = mockedDefinitionListenService
+        this.databaseConfig = mockedDatabaseConfig
     }
 
     @BeforeEach
     fun setup() {
         clearAllMocks()
+        coEvery { mockedDatabaseConfig.withTransaction<Any?>(any(), any()) } coAnswers {
+            val block = secondArg<suspend (java.sql.Connection?) -> Any?>()
+            block(null)
+        }
     }
 
     // ============================================================================

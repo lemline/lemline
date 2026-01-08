@@ -39,12 +39,8 @@ import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.buildJsonObject
 
-/**
- * Full orchestrator for synchronous workflow execution.
- *
- * This orchestrator executes workflows in a single pass, handling all events
- * (activities, waits, forks, child workflows) directly without external coordination.
- */
+internal class EarlyCompletionException(val event: WorkflowEvent.Outcome) : Exception()
+
 @ExperimentalTime
 object FullOrchestrator {
 
@@ -141,10 +137,14 @@ object FullOrchestrator {
             serde, activityExecutor, cloudEventHook, lifecycleHook
         )
 
-        is WorkflowEvent.ListenStarted -> resumeWith(
-            workflow, handleListenStarted(workflow, event, serde, activityExecutor, cloudEventHook, lifecycleHook),
-            serde, activityExecutor, cloudEventHook, lifecycleHook
-        )
+        is WorkflowEvent.ListenStarted -> try {
+            resumeWith(
+                workflow, handleListenStarted(workflow, event, serde, activityExecutor, cloudEventHook, lifecycleHook),
+                serde, activityExecutor, cloudEventHook, lifecycleHook
+            )
+        } catch (e: EarlyCompletionException) {
+            e.event
+        }
 
         is WorkflowEvent.Outcome -> event
     }
@@ -228,6 +228,7 @@ object FullOrchestrator {
             }) {
                 is CollectResult.Success -> listenStarted.resumeCompleted(JsonArray(result.outputs))
                 is CollectResult.Failure -> listenFailed(result.nodeStack, listenStarted.nodePosition, result.error)
+                is CollectResult.EscapedToCompletion -> throw EarlyCompletionException(result.event)
             }
         } catch (_: TimeoutCancellationException) {
             val e = IllegalStateException("Listen timeout: no matching CloudEvent received within ${timeoutMillis}ms")

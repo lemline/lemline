@@ -23,6 +23,7 @@ import com.lemline.runner.common.config.DatabaseConfig
 import com.lemline.runner.common.messaging.InstanceMessage
 import com.lemline.runner.definitions.DefinitionModel
 import com.lemline.runner.definitions.DefinitionRepository
+import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe
 import io.serverlessworkflow.api.types.ListenTaskConfiguration.ListenAndReadAs
 import kotlin.time.Clock
@@ -263,7 +264,7 @@ abstract class ListenerEventRepositoryTestBase {
         val inserted = getEventRepository().insert(events)
 
         inserted shouldBe 2
-        getEventRepository().countAll() shouldBe 2
+        countAllEvents() shouldBe 2
     }
 
     @Test
@@ -279,7 +280,7 @@ abstract class ListenerEventRepositoryTestBase {
 
         getEventRepository().deleteAll()
 
-        getEventRepository().countAll() shouldBe 0
+        countAllEvents() shouldBe 0
     }
 
     @Test
@@ -287,7 +288,6 @@ abstract class ListenerEventRepositoryTestBase {
         val listener = createListener(hasForeach = false, strategy = ListenStrategy.ONE)
         getListenerRepository().insert(listener)
 
-        // Query key with different workflow info
         val queryKey = ListenerQueryKey(
             workflowInfo = WorkflowInfo(
                 WorkflowNamespace("non-existent"),
@@ -305,4 +305,730 @@ abstract class ListenerEventRepositoryTestBase {
         inserted shouldBe 0
     }
 
+    // ========== batchInsertForOneAny tests ==========
+
+    @Test
+    fun `batchInsertForOneAny should insert event for ONE strategy listener`() = runTest {
+        val listener = createListener(hasForeach = false, strategy = ListenStrategy.ONE, filtersCount = 1)
+        getListenerRepository().insert(listener)
+
+        val queryKey = createQueryKey(listener)
+        val inserted = getEventRepository().batchInsertForOneAny(
+            listOf(queryKey),
+            "event-one-123",
+            """{"type":"com.example.Event"}"""
+        )
+
+        inserted shouldBe 1
+        countAllEvents() shouldBe 1
+    }
+
+    @Test
+    fun `batchInsertForOneAny should insert event for ANY strategy listener`() = runTest {
+        val listener = createListener(hasForeach = false, strategy = ListenStrategy.ANY, filtersCount = 2)
+        getListenerRepository().insert(listener)
+
+        val queryKey = createQueryKey(listener)
+        val inserted = getEventRepository().batchInsertForOneAny(
+            listOf(queryKey),
+            "event-any-123",
+            """{"type":"com.example.Event"}"""
+        )
+
+        inserted shouldBe 1
+        countAllEvents() shouldBe 1
+    }
+
+    @Test
+    fun `batchInsertForOneAny should mark listener as completed`() = runTest {
+        val listener = createListener(hasForeach = false, strategy = ListenStrategy.ONE, filtersCount = 1)
+        getListenerRepository().insert(listener)
+
+        val queryKey = createQueryKey(listener)
+        getEventRepository().batchInsertForOneAny(
+            listOf(queryKey),
+            "event-completion-123",
+            """{"type":"com.example.Event"}"""
+        )
+
+        val updated = getListenerRepository().findById(listener.id, null)
+        updated?.closedAt.shouldNotBeNull()
+    }
+
+    @Test
+    fun `batchInsertForOneAny should set foreach_completed false when hasForeach is true`() = runTest {
+        val listener = createListener(hasForeach = true, strategy = ListenStrategy.ONE, filtersCount = 1)
+        getListenerRepository().insert(listener)
+
+        val queryKey = createQueryKey(listener)
+        getEventRepository().batchInsertForOneAny(
+            listOf(queryKey),
+            "event-foreach-123",
+            """{"type":"com.example.Event"}"""
+        )
+
+        val events = findAllEvents()
+        events.size shouldBe 1
+        events.first().foreachCompleted shouldBe false
+        events.first().foreachOutput shouldBe null
+    }
+
+    @Test
+    fun `batchInsertForOneAny should set foreach_completed true when hasForeach is false`() = runTest {
+        val listener = createListener(hasForeach = false, strategy = ListenStrategy.ONE, filtersCount = 1)
+        getListenerRepository().insert(listener)
+
+        val queryKey = createQueryKey(listener)
+        val eventJson = """{"type":"com.example.Event"}"""
+        getEventRepository().batchInsertForOneAny(listOf(queryKey), "event-no-foreach-123", eventJson)
+
+        val events = findAllEvents()
+        events.size shouldBe 1
+        events.first().foreachCompleted shouldBe true
+        events.first().foreachOutput shouldBe eventJson
+    }
+
+    @Test
+    fun `batchInsertForOneAny should be idempotent for duplicate events`() = runTest {
+        val listener = createListener(hasForeach = false, strategy = ListenStrategy.ONE, filtersCount = 1)
+        getListenerRepository().insert(listener)
+
+        val queryKey = createQueryKey(listener)
+        val eventId = "duplicate-event-123"
+        val eventJson = """{"type":"com.example.Event"}"""
+
+        val first = getEventRepository().batchInsertForOneAny(listOf(queryKey), eventId, eventJson)
+        val second = getEventRepository().batchInsertForOneAny(listOf(queryKey), eventId, eventJson)
+
+        first shouldBe 1
+        second shouldBe 0
+        countAllEvents() shouldBe 1
+    }
+
+    @Test
+    fun `batchInsertForOneAny should skip ALL strategy listeners`() = runTest {
+        val listener = createListener(hasForeach = false, strategy = ListenStrategy.ALL, filtersCount = 2)
+        getListenerRepository().insert(listener)
+
+        val queryKey = createQueryKey(listener, filterIndex = 0).copy(listenerStrategy = ListenerStrategy.ALL)
+        val inserted = getEventRepository().batchInsertForOneAny(
+            listOf(queryKey),
+            "event-all-skip-123",
+            """{"type":"com.example.Event"}"""
+        )
+
+        inserted shouldBe 0
+        countAllEvents() shouldBe 0
+    }
+
+    @Test
+    fun `batchInsertForOneAny should skip closed listeners`() = runTest {
+        val listener = createListener(hasForeach = false, strategy = ListenStrategy.ONE, filtersCount = 1)
+        listener.closedAt = Clock.System.now()
+        getListenerRepository().insert(listener)
+
+        val queryKey = createQueryKey(listener)
+        val inserted = getEventRepository().batchInsertForOneAny(
+            listOf(queryKey),
+            "event-closed-123",
+            """{"type":"com.example.Event"}"""
+        )
+
+        inserted shouldBe 0
+    }
+
+    // ========== batchInsertForAllAnyUntil tests ==========
+
+    @Test
+    fun `batchInsertForAllAnyUntil should insert event for ALL strategy listener`() = runTest {
+        val listener = createListener(hasForeach = false, strategy = ListenStrategy.ALL, filtersCount = 2)
+        getListenerRepository().insert(listener)
+
+        val queryKey = createQueryKey(listener, filterIndex = 0).copy(listenerStrategy = ListenerStrategy.ALL)
+        val inserted = getEventRepository().batchInsertForAllAnyUntil(
+            listOf(queryKey),
+            "event-all-123",
+            """{"type":"com.example.Event1"}"""
+        )
+
+        inserted shouldBe 1
+        countAllEvents() shouldBe 1
+    }
+
+    @Test
+    fun `batchInsertForAllAnyUntil should insert events with correct sort_key`() = runTest {
+        val listener = createListener(hasForeach = false, strategy = ListenStrategy.ALL, filtersCount = 2)
+        getListenerRepository().insert(listener)
+
+        val queryKey0 = createQueryKey(listener, filterIndex = 0).copy(listenerStrategy = ListenerStrategy.ALL)
+        val queryKey1 = createQueryKey(listener, filterIndex = 1).copy(listenerStrategy = ListenerStrategy.ALL)
+
+        getEventRepository().batchInsertForAllAnyUntil(
+            listOf(queryKey0),
+            "event-sort-0",
+            """{"type":"com.example.Event1"}"""
+        )
+        getEventRepository().batchInsertForAllAnyUntil(
+            listOf(queryKey1),
+            "event-sort-1",
+            """{"type":"com.example.Event2"}"""
+        )
+
+        val events = findAllEvents().sortedBy { it.sortKey }
+        events.size shouldBe 2
+        events[0].sortKey shouldBe 0
+        events[1].sortKey shouldBe 1
+    }
+
+    @Test
+    fun `batchInsertForAllAnyUntil should mark ALL listener completed when all filters matched`() = runTest {
+        val listener = createListener(hasForeach = false, strategy = ListenStrategy.ALL, filtersCount = 2)
+        getListenerRepository().insert(listener)
+
+        val queryKey0 = createQueryKey(listener, filterIndex = 0).copy(listenerStrategy = ListenerStrategy.ALL)
+        val queryKey1 = createQueryKey(listener, filterIndex = 1).copy(listenerStrategy = ListenerStrategy.ALL)
+
+        getEventRepository().batchInsertForAllAnyUntil(
+            listOf(queryKey0),
+            "event-complete-0",
+            """{"type":"com.example.Event1"}"""
+        )
+
+        var updated = getListenerRepository().findById(listener.id, null)
+        updated?.closedAt shouldBe null
+
+        getEventRepository().batchInsertForAllAnyUntil(
+            listOf(queryKey1),
+            "event-complete-1",
+            """{"type":"com.example.Event2"}"""
+        )
+
+        updated = getListenerRepository().findById(listener.id, null)
+        updated?.closedAt.shouldNotBeNull()
+    }
+
+    @Test
+    fun `batchInsertForAllAnyUntil should skip ONE strategy listeners`() = runTest {
+        val listener = createListener(hasForeach = false, strategy = ListenStrategy.ONE, filtersCount = 1)
+        getListenerRepository().insert(listener)
+
+        val queryKey = createQueryKey(listener).copy(listenerStrategy = ListenerStrategy.ONE)
+        val inserted = getEventRepository().batchInsertForAllAnyUntil(
+            listOf(queryKey),
+            "event-one-skip-123",
+            """{"type":"com.example.Event"}"""
+        )
+
+        inserted shouldBe 0
+    }
+
+    @Test
+    fun `batchInsertForAllAnyUntil should be idempotent for duplicate events`() = runTest {
+        val listener = createListener(hasForeach = false, strategy = ListenStrategy.ALL, filtersCount = 2)
+        getListenerRepository().insert(listener)
+
+        val queryKey = createQueryKey(listener, filterIndex = 0).copy(listenerStrategy = ListenerStrategy.ALL)
+        val eventId = "duplicate-all-event-123"
+        val eventJson = """{"type":"com.example.Event1"}"""
+
+        val first = getEventRepository().batchInsertForAllAnyUntil(listOf(queryKey), eventId, eventJson)
+        val second = getEventRepository().batchInsertForAllAnyUntil(listOf(queryKey), eventId, eventJson)
+
+        first shouldBe 1
+        second shouldBe 0
+        countAllEvents() shouldBe 1
+    }
+
+    @Test
+    fun `batchInsertForAllAnyUntil should insert for ANY_UNTIL_EXPR strategy`() = runTest {
+        val listener = createListenerWithStrategy(ListenerStrategy.ANY_UNTIL_EXPR)
+        getListenerRepository().insert(listener)
+
+        val queryKey = createQueryKey(listener).copy(listenerStrategy = ListenerStrategy.ANY_UNTIL_EXPR)
+        val inserted = getEventRepository().batchInsertForAllAnyUntil(
+            listOf(queryKey),
+            "event-until-expr-123",
+            """{"type":"com.example.Event"}"""
+        )
+
+        inserted shouldBe 1
+    }
+
+    @Test
+    fun `batchInsertForAllAnyUntil should insert for ANY_UNTIL_EVENT strategy`() = runTest {
+        val listener = createListenerWithStrategy(ListenerStrategy.ANY_UNTIL_EVENT)
+        getListenerRepository().insert(listener)
+
+        val queryKey = createQueryKey(listener).copy(listenerStrategy = ListenerStrategy.ANY_UNTIL_EVENT)
+        val inserted = getEventRepository().batchInsertForAllAnyUntil(
+            listOf(queryKey),
+            "event-until-event-123",
+            """{"type":"com.example.Event"}"""
+        )
+
+        inserted shouldBe 1
+    }
+
+    // ========== markForeachCompleted tests ==========
+
+    @Test
+    fun `markForeachCompleted should mark event as completed with output`() = runTest {
+        val listener = createListener(hasForeach = true, strategy = ListenStrategy.ONE, filtersCount = 1)
+        getListenerRepository().insert(listener)
+
+        val queryKey = createQueryKey(listener)
+        getEventRepository().batchInsertForOneAny(
+            listOf(queryKey),
+            "event-foreach-mark-123",
+            """{"type":"com.example.Event"}"""
+        )
+
+        val output = """{"result":"processed"}"""
+        val updated = getEventRepository().markForeachCompleted(listener.id, 0, output)
+
+        updated shouldBe 1
+        val events = findAllEvents()
+        events.first().foreachCompleted shouldBe true
+        events.first().foreachOutput shouldBe output
+    }
+
+    @Test
+    fun `markForeachCompleted should return 0 for already completed event`() = runTest {
+        val listener = createListener(hasForeach = true, strategy = ListenStrategy.ONE, filtersCount = 1)
+        getListenerRepository().insert(listener)
+
+        val queryKey = createQueryKey(listener)
+        getEventRepository().batchInsertForOneAny(
+            listOf(queryKey),
+            "event-double-complete-123",
+            """{"type":"com.example.Event"}"""
+        )
+
+        getEventRepository().markForeachCompleted(listener.id, 0, """{"result":"first"}""")
+        val secondUpdate = getEventRepository().markForeachCompleted(listener.id, 0, """{"result":"second"}""")
+
+        secondUpdate shouldBe 0
+    }
+
+    @Test
+    fun `markForeachCompleted should return 0 for non-existent event`() = runTest {
+        val listener = createListener(hasForeach = true, strategy = ListenStrategy.ONE, filtersCount = 1)
+        getListenerRepository().insert(listener)
+
+        val updated = getEventRepository().markForeachCompleted(listener.id, 999, """{"result":"none"}""")
+
+        updated shouldBe 0
+    }
+
+    @Test
+    fun `markForeachCompleted should handle null output`() = runTest {
+        val listener = createListener(hasForeach = true, strategy = ListenStrategy.ONE, filtersCount = 1)
+        getListenerRepository().insert(listener)
+
+        val queryKey = createQueryKey(listener)
+        getEventRepository().batchInsertForOneAny(
+            listOf(queryKey),
+            "event-null-output-123",
+            """{"type":"com.example.Event"}"""
+        )
+
+        val updated = getEventRepository().markForeachCompleted(listener.id, 0, null)
+
+        updated shouldBe 1
+        val events = findAllEvents()
+        events.first().foreachCompleted shouldBe true
+        events.first().foreachOutput shouldBe null
+    }
+
+    // ========== findCompletedOutputsByListeners tests ==========
+
+    @Test
+    fun `findCompletedOutputsByListeners should return outputs for single listener`() = runTest {
+        val listener = createListener(hasForeach = false, strategy = ListenStrategy.ALL, filtersCount = 2)
+        getListenerRepository().insert(listener)
+
+        val queryKey0 = createQueryKey(listener, filterIndex = 0).copy(listenerStrategy = ListenerStrategy.ALL)
+        val queryKey1 = createQueryKey(listener, filterIndex = 1).copy(listenerStrategy = ListenerStrategy.ALL)
+
+        getEventRepository().batchInsertForAllAnyUntil(
+            listOf(queryKey0),
+            "output-event-0",
+            """{"type":"Event1"}"""
+        )
+        getEventRepository().batchInsertForAllAnyUntil(
+            listOf(queryKey1),
+            "output-event-1",
+            """{"type":"Event2"}"""
+        )
+
+        val outputs = getEventRepository().findCompletedOutputsByListeners(listOf(listener.id))
+
+        outputs.size shouldBe 1
+        outputs[listener.id]?.size shouldBe 2
+    }
+
+    @Test
+    fun `findCompletedOutputsByListeners should return outputs for multiple listeners`() = runTest {
+        val listener1 = createListener(hasForeach = false, strategy = ListenStrategy.ONE, filtersCount = 1)
+        val listener2 = createListenerWithDifferentPosition(hasForeach = false, strategy = ListenStrategy.ONE)
+        getListenerRepository().insert(listener1)
+        getListenerRepository().insert(listener2)
+
+        val queryKey1 = createQueryKey(listener1)
+        val queryKey2 = ListenerQueryKey(
+            workflowInfo = listener2.instanceMessage.workflowInfo,
+            position = listener2.instanceMessage.workflowState.nodePosition,
+            correlationValuesJson = null,
+            filterIndex = null,
+            listenerStrategy = ListenerStrategy.ONE
+        )
+
+        getEventRepository().batchInsertForOneAny(listOf(queryKey1), "multi-event-1", """{"l":"1"}""")
+        getEventRepository().batchInsertForOneAny(listOf(queryKey2), "multi-event-2", """{"l":"2"}""")
+
+        val outputs = getEventRepository().findCompletedOutputsByListeners(listOf(listener1.id, listener2.id))
+
+        outputs.size shouldBe 2
+        outputs[listener1.id]?.size shouldBe 1
+        outputs[listener2.id]?.size shouldBe 1
+    }
+
+    @Test
+    fun `findCompletedOutputsByListeners should return empty map for empty input`() = runTest {
+        val outputs = getEventRepository().findCompletedOutputsByListeners(emptyList())
+
+        outputs shouldBe emptyMap()
+    }
+
+    @Test
+    fun `findCompletedOutputsByListeners should return empty list for listener without events`() = runTest {
+        val listener = createListener(hasForeach = false, strategy = ListenStrategy.ONE, filtersCount = 1)
+        getListenerRepository().insert(listener)
+
+        val outputs = getEventRepository().findCompletedOutputsByListeners(listOf(listener.id))
+
+        outputs[listener.id] shouldBe null
+    }
+
+    @Test
+    fun `findCompletedOutputsByListeners should order outputs by sort_key`() = runTest {
+        val listener = createListener(hasForeach = false, strategy = ListenStrategy.ALL, filtersCount = 3)
+        getListenerRepository().insert(listener)
+
+        val queryKey0 = createQueryKey(listener, filterIndex = 0).copy(listenerStrategy = ListenerStrategy.ALL)
+        val queryKey1 = createQueryKey(listener, filterIndex = 1).copy(listenerStrategy = ListenerStrategy.ALL)
+        val queryKey2 = createQueryKey(listener, filterIndex = 2).copy(listenerStrategy = ListenerStrategy.ALL)
+
+        getEventRepository().batchInsertForAllAnyUntil(listOf(queryKey2), "order-2", """{"order":2}""")
+        getEventRepository().batchInsertForAllAnyUntil(listOf(queryKey0), "order-0", """{"order":0}""")
+        getEventRepository().batchInsertForAllAnyUntil(listOf(queryKey1), "order-1", """{"order":1}""")
+
+        val outputs = getEventRepository().findCompletedOutputsByListeners(listOf(listener.id))
+
+        outputs[listener.id]?.size shouldBe 3
+        outputs[listener.id]?.get(0) shouldBe """{"order":2}"""
+        outputs[listener.id]?.get(1) shouldBe """{"order":0}"""
+        outputs[listener.id]?.get(2) shouldBe """{"order":1}"""
+    }
+
+    @Test
+    fun `findCompletedOutputsByListeners should exclude events without foreach_output`() = runTest {
+        val listener = createListener(hasForeach = true, strategy = ListenStrategy.ONE, filtersCount = 1)
+        getListenerRepository().insert(listener)
+
+        val queryKey = createQueryKey(listener)
+        getEventRepository().batchInsertForOneAny(listOf(queryKey), "no-output-event", """{"type":"Event"}""")
+
+        val outputs = getEventRepository().findCompletedOutputsByListeners(listOf(listener.id))
+
+        outputs[listener.id] shouldBe null
+    }
+
+    // ========== markReadyForForeach tests ==========
+
+    @Test
+    fun `markReadyForForeach should mark head event ready`() = runTest {
+        val listener = createListener(hasForeach = true, strategy = ListenStrategy.ALL, filtersCount = 2)
+        getListenerRepository().insert(listener)
+
+        val queryKey0 = createQueryKey(listener, filterIndex = 0).copy(listenerStrategy = ListenerStrategy.ALL)
+        val queryKey1 = createQueryKey(listener, filterIndex = 1).copy(listenerStrategy = ListenerStrategy.ALL)
+
+        getEventRepository().batchInsertForAllAnyUntil(listOf(queryKey0), "fifo-0", """{"idx":0}""")
+        getEventRepository().batchInsertForAllAnyUntil(listOf(queryKey1), "fifo-1", """{"idx":1}""")
+
+        val marked = getEventRepository().markReadyForForeach(limit = 10)
+
+        marked shouldBe 1
+
+        val ready = getEventRepository().findEntitiesToProcess(maxAttempts = 10, limit = 10, connection = null)
+        ready.size shouldBe 1
+        ready.first().sortKey shouldBe 0
+    }
+
+    @Test
+    fun `markReadyForForeach should skip listeners with event already processing`() = runTest {
+        val listener = createListener(hasForeach = true, strategy = ListenStrategy.ALL, filtersCount = 2)
+        getListenerRepository().insert(listener)
+
+        val queryKey0 = createQueryKey(listener, filterIndex = 0).copy(listenerStrategy = ListenerStrategy.ALL)
+        val queryKey1 = createQueryKey(listener, filterIndex = 1).copy(listenerStrategy = ListenerStrategy.ALL)
+
+        getEventRepository().batchInsertForAllAnyUntil(listOf(queryKey0), "processing-0", """{"idx":0}""")
+        getEventRepository().batchInsertForAllAnyUntil(listOf(queryKey1), "processing-1", """{"idx":1}""")
+
+        getEventRepository().markReadyForForeach(limit = 10)
+
+        val secondMark = getEventRepository().markReadyForForeach(limit = 10)
+
+        secondMark shouldBe 0
+    }
+
+    @Test
+    fun `markReadyForForeach should handle multiple listeners`() = runTest {
+        val listener1 = createListener(hasForeach = true, strategy = ListenStrategy.ONE, filtersCount = 1)
+        val listener2 = createListenerWithDifferentPosition(hasForeach = true, strategy = ListenStrategy.ONE)
+        getListenerRepository().insert(listener1)
+        getListenerRepository().insert(listener2)
+
+        val queryKey1 = createQueryKey(listener1)
+        val queryKey2 = ListenerQueryKey(
+            workflowInfo = listener2.instanceMessage.workflowInfo,
+            position = listener2.instanceMessage.workflowState.nodePosition,
+            correlationValuesJson = null,
+            filterIndex = null,
+            listenerStrategy = ListenerStrategy.ONE
+        )
+
+        getEventRepository().batchInsertForOneAny(listOf(queryKey1), "multi-1", """{"l":"1"}""")
+        getEventRepository().batchInsertForOneAny(listOf(queryKey2), "multi-2", """{"l":"2"}""")
+
+        val marked = getEventRepository().markReadyForForeach(limit = 10)
+
+        marked shouldBe 2
+    }
+
+    @Test
+    fun `markReadyForForeach should respect limit parameter`() = runTest {
+        val listener1 = createListener(hasForeach = true, strategy = ListenStrategy.ONE, filtersCount = 1)
+        val listener2 = createListenerWithDifferentPosition(hasForeach = true, strategy = ListenStrategy.ONE)
+        val listener3 = createListenerWithThirdPosition(hasForeach = true, strategy = ListenStrategy.ONE)
+        getListenerRepository().insert(listener1)
+        getListenerRepository().insert(listener2)
+        getListenerRepository().insert(listener3)
+
+        val queryKey1 = createQueryKey(listener1)
+        val queryKey2 = ListenerQueryKey(
+            workflowInfo = listener2.instanceMessage.workflowInfo,
+            position = listener2.instanceMessage.workflowState.nodePosition,
+            correlationValuesJson = null,
+            filterIndex = null,
+            listenerStrategy = ListenerStrategy.ONE
+        )
+        val queryKey3 = ListenerQueryKey(
+            workflowInfo = listener3.instanceMessage.workflowInfo,
+            position = listener3.instanceMessage.workflowState.nodePosition,
+            correlationValuesJson = null,
+            filterIndex = null,
+            listenerStrategy = ListenerStrategy.ONE
+        )
+
+        getEventRepository().batchInsertForOneAny(listOf(queryKey1), "limit-1", """{"l":"1"}""")
+        getEventRepository().batchInsertForOneAny(listOf(queryKey2), "limit-2", """{"l":"2"}""")
+        getEventRepository().batchInsertForOneAny(listOf(queryKey3), "limit-3", """{"l":"3"}""")
+
+        val marked = getEventRepository().markReadyForForeach(limit = 2)
+
+        marked shouldBe 2
+    }
+
+    @Test
+    fun `markReadyForForeach should mark next pending event after current completes`() = runTest {
+        val listener1 = createListener(hasForeach = true, strategy = ListenStrategy.ONE, filtersCount = 1)
+        val listener2 = createListenerWithDifferentPosition(hasForeach = true, strategy = ListenStrategy.ONE)
+        getListenerRepository().insert(listener1)
+        getListenerRepository().insert(listener2)
+
+        val queryKey1 = createQueryKey(listener1)
+        val queryKey2 = ListenerQueryKey(
+            workflowInfo = listener2.instanceMessage.workflowInfo,
+            position = listener2.instanceMessage.workflowState.nodePosition,
+            correlationValuesJson = null,
+            filterIndex = null,
+            listenerStrategy = ListenerStrategy.ONE
+        )
+
+        getEventRepository().batchInsertForOneAny(listOf(queryKey1), "event-1", """{"idx":1}""")
+        getEventRepository().batchInsertForOneAny(listOf(queryKey2), "event-2", """{"idx":2}""")
+
+        val firstMark = getEventRepository().markReadyForForeach(limit = 10)
+        firstMark shouldBe 2
+
+        getEventRepository().markForeachCompleted(listener1.id, 0, """{"done":1}""")
+
+        val secondMark = getEventRepository().markReadyForForeach(limit = 10)
+        secondMark shouldBe 0
+    }
+
+    @Test
+    fun `markReadyForForeach should return 0 when no pending events`() = runTest {
+        val listener = createListener(hasForeach = false, strategy = ListenStrategy.ONE, filtersCount = 1)
+        getListenerRepository().insert(listener)
+
+        val queryKey = createQueryKey(listener)
+        getEventRepository().batchInsertForOneAny(listOf(queryKey), "no-pending", """{"type":"Event"}""")
+
+        val marked = getEventRepository().markReadyForForeach(limit = 10)
+
+        marked shouldBe 0
+    }
+
+    // ========== findEntitiesToProcess tests ==========
+
+    @Test
+    fun `findEntitiesToProcess should return ready events`() = runTest {
+        val listener = createListener(hasForeach = true, strategy = ListenStrategy.ONE, filtersCount = 1)
+        getListenerRepository().insert(listener)
+
+        val queryKey = createQueryKey(listener)
+        getEventRepository().batchInsertForOneAny(listOf(queryKey), "ready-event", """{"type":"Event"}""")
+        getEventRepository().markReadyForForeach(limit = 10)
+
+        val entities = getEventRepository().findEntitiesToProcess(maxAttempts = 10, limit = 10, connection = null)
+
+        entities.size shouldBe 1
+    }
+
+    @Test
+    fun `findEntitiesToProcess should not return events without outbox_delayed_until`() = runTest {
+        val listener = createListener(hasForeach = true, strategy = ListenStrategy.ALL, filtersCount = 2)
+        getListenerRepository().insert(listener)
+
+        val queryKey0 = createQueryKey(listener, filterIndex = 0).copy(listenerStrategy = ListenerStrategy.ALL)
+        val queryKey1 = createQueryKey(listener, filterIndex = 1).copy(listenerStrategy = ListenerStrategy.ALL)
+
+        getEventRepository().batchInsertForAllAnyUntil(listOf(queryKey0), "not-ready-0", """{"idx":0}""")
+        getEventRepository().batchInsertForAllAnyUntil(listOf(queryKey1), "not-ready-1", """{"idx":1}""")
+
+        val entities = getEventRepository().findEntitiesToProcess(maxAttempts = 10, limit = 10, connection = null)
+
+        entities.size shouldBe 0
+    }
+
+    @Test
+    fun `findEntitiesToProcess should respect limit parameter`() = runTest {
+        val listener1 = createListener(hasForeach = true, strategy = ListenStrategy.ONE, filtersCount = 1)
+        val listener2 = createListenerWithDifferentPosition(hasForeach = true, strategy = ListenStrategy.ONE)
+        getListenerRepository().insert(listener1)
+        getListenerRepository().insert(listener2)
+
+        val queryKey1 = createQueryKey(listener1)
+        val queryKey2 = ListenerQueryKey(
+            workflowInfo = listener2.instanceMessage.workflowInfo,
+            position = listener2.instanceMessage.workflowState.nodePosition,
+            correlationValuesJson = null,
+            filterIndex = null,
+            listenerStrategy = ListenerStrategy.ONE
+        )
+
+        getEventRepository().batchInsertForOneAny(listOf(queryKey1), "limit-test-1", """{"l":"1"}""")
+        getEventRepository().batchInsertForOneAny(listOf(queryKey2), "limit-test-2", """{"l":"2"}""")
+        getEventRepository().markReadyForForeach(limit = 10)
+
+        val entities = getEventRepository().findEntitiesToProcess(maxAttempts = 10, limit = 1, connection = null)
+
+        entities.size shouldBe 1
+    }
+
+    // ========== Helper methods ==========
+
+    private fun createListenerWithStrategy(strategy: ListenerStrategy): ListenerModel {
+        val now = Clock.System.now()
+        val workflowId = WorkflowId(IDV7.random())
+        val workflowInfo = WorkflowInfo(testNamespace, testName, testVersion)
+
+        val nodeStack = NodeStack.fromFrames(
+            listOf(
+                StackFrame(
+                    NodePosition.root, RootState(
+                        startedAt = now,
+                        workflowId = workflowId,
+                        workflowInput = JsonNull
+                    )
+                ),
+                StackFrame(NodePosition("/do"), DoState(startedAt = now)),
+                StackFrame(testNodePosition, TaskState(startedAt = now))
+            )
+        )
+
+        val coreStrategy = when (strategy) {
+            ListenerStrategy.ONE -> ListenStrategy.ONE
+            ListenerStrategy.ANY, ListenerStrategy.ANY_UNTIL_EXPR, ListenerStrategy.ANY_UNTIL_EVENT -> ListenStrategy.ANY
+            ListenerStrategy.ALL -> ListenStrategy.ALL
+        }
+
+        val config = ListenConfig(
+            strategy = coreStrategy,
+            filters = listOf(EventFilter(type = "com.example.Event")),
+            readAs = ListenAndReadAs.DATA,
+            timeoutAt = null
+        )
+
+        val listenStarted = WorkflowEvent.ListenStarted(
+            nodeStack = nodeStack,
+            rawOutput = JsonNull,
+            config = config
+        )
+
+        return ListenerModel(
+            instanceMessage = InstanceMessage(
+                workflowInfo = workflowInfo,
+                workflowState = listenStarted
+            ),
+            id = IDV7.random(),
+            listenerStrategy = strategy,
+            timeoutAt = null,
+        ).also {
+            it.outboxScheduledFor = now
+            it.hasForeach = false
+        }
+    }
+
+    data class EventRecord(
+        val sortKey: Int,
+        val foreachCompleted: Boolean,
+        val foreachOutput: String?
+    )
+
+    private suspend fun findAllEvents(): List<EventRecord> {
+        val results = mutableListOf<EventRecord>()
+        getDatabaseConfig().withConnection { conn ->
+            conn.prepareStatement(
+                "SELECT sort_key, foreach_completed, foreach_output FROM $LISTENER_EVENTS_TABLE ORDER BY sort_key"
+            ).use { stmt ->
+                stmt.executeQuery().use { rs ->
+                    while (rs.next()) {
+                        results.add(
+                            EventRecord(
+                                sortKey = rs.getInt("sort_key"),
+                                foreachCompleted = rs.getBoolean("foreach_completed"),
+                                foreachOutput = rs.getString("foreach_output")
+                            )
+                        )
+                    }
+                }
+            }
+        }
+        return results
+    }
+
+    private suspend fun countAllEvents(): Long {
+        return getDatabaseConfig().withConnection { conn ->
+            conn.prepareStatement("SELECT COUNT(*) FROM $LISTENER_EVENTS_TABLE").use { stmt ->
+                stmt.executeQuery().use { rs ->
+                    if (rs.next()) rs.getLong(1) else 0L
+                }
+            }
+        }
+    }
 }
