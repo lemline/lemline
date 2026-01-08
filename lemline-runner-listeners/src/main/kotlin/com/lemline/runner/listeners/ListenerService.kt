@@ -116,15 +116,15 @@ class ListenerService {
 
         if (expectExpressions.isEmpty()) return null
 
-        // Evaluate each expect expression against the correlation context
         val evaluatedValues = mutableMapOf<String, String>()
         for ((key, expectExpr) in expectExpressions) {
             try {
-                val trimmedExpr = if (ExpressionUtils.isExpr(expectExpr)) {
-                    ExpressionUtils.trimExpr(expectExpr)
-                } else {
-                    expectExpr
+                if (!ExpressionUtils.isExpr(expectExpr)) {
+                    evaluatedValues[key] = expectExpr
+                    continue
                 }
+
+                val trimmedExpr = ExpressionUtils.trimExpr(expectExpr)
 
                 val result = with(LemlineJson) {
                     val inputNode = correlationContext.toJsonNode()
