@@ -4,6 +4,7 @@ package com.lemline.core.cloudevents
 import com.lemline.common.logger.logger
 import io.cloudevents.CloudEvent
 import io.serverlessworkflow.api.types.ListenTaskConfiguration.ListenAndReadAs
+import java.util.*
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
@@ -20,7 +21,7 @@ object CloudEventParser {
     fun CloudEvent.toJsonElement(readAs: ListenAndReadAs): JsonElement = when (readAs) {
         ListenAndReadAs.DATA -> parseDataContent()
         ListenAndReadAs.ENVELOPE -> buildEnvelope()
-        ListenAndReadAs.RAW -> data?.let { JsonPrimitive(String(it.toBytes())) } ?: JsonNull
+        ListenAndReadAs.RAW -> data?.let { JsonPrimitive(Base64.getEncoder().encodeToString(it.toBytes())) } ?: JsonNull
     }
 
     private fun CloudEvent.parseDataContent(): JsonElement =
