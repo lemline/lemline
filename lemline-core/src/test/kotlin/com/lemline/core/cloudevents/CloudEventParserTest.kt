@@ -604,27 +604,29 @@ class CloudEventParserTest {
     @Nested
     inner class ToJsonElementRawMode {
         @Test
-        fun `should return data as raw string primitive`() {
+        fun `should return data as base64-encoded string`() {
             val event = buildEvent(data = """{"orderId":"ORD-123"}""")
 
             val result = event.toJsonElement(ListenAndReadAs.RAW)
 
             assertTrue(result is JsonPrimitive)
-            assertEquals("""{"orderId":"ORD-123"}""", result.jsonPrimitive.content)
+            val decoded = String(java.util.Base64.getDecoder().decode(result.jsonPrimitive.content))
+            assertEquals("""{"orderId":"ORD-123"}""", decoded)
         }
 
         @Test
-        fun `should return plain text as raw string primitive`() {
+        fun `should return plain text as base64-encoded string`() {
             val event = buildEvent(data = "plain text content")
 
             val result = event.toJsonElement(ListenAndReadAs.RAW)
 
             assertTrue(result is JsonPrimitive)
-            assertEquals("plain text content", result.jsonPrimitive.content)
+            val decoded = String(java.util.Base64.getDecoder().decode(result.jsonPrimitive.content))
+            assertEquals("plain text content", decoded)
         }
 
         @Test
-        fun `should return XML as raw string primitive`() {
+        fun `should return XML as base64-encoded string`() {
             val event = buildEvent(
                 data = "<root><item>value</item></root>",
                 dataContentType = "application/xml"
@@ -633,7 +635,8 @@ class CloudEventParserTest {
             val result = event.toJsonElement(ListenAndReadAs.RAW)
 
             assertTrue(result is JsonPrimitive)
-            assertEquals("<root><item>value</item></root>", result.jsonPrimitive.content)
+            val decoded = String(java.util.Base64.getDecoder().decode(result.jsonPrimitive.content))
+            assertEquals("<root><item>value</item></root>", decoded)
         }
 
         @Test
@@ -658,37 +661,41 @@ class CloudEventParserTest {
             val result = event.toJsonElement(ListenAndReadAs.RAW)
 
             assertTrue(result is JsonPrimitive)
-            assertEquals(prettyJson, result.jsonPrimitive.content)
+            val decoded = String(java.util.Base64.getDecoder().decode(result.jsonPrimitive.content))
+            assertEquals(prettyJson, decoded)
         }
 
         @Test
-        fun `should return empty string as raw primitive`() {
+        fun `should return empty string as base64-encoded empty`() {
             val event = buildEvent(data = "")
 
             val result = event.toJsonElement(ListenAndReadAs.RAW)
 
             assertTrue(result is JsonPrimitive)
-            assertEquals("", result.jsonPrimitive.content)
+            val decoded = String(java.util.Base64.getDecoder().decode(result.jsonPrimitive.content))
+            assertEquals("", decoded)
         }
 
         @Test
-        fun `should return whitespace as raw primitive`() {
+        fun `should return whitespace as base64-encoded`() {
             val event = buildEvent(data = "   ")
 
             val result = event.toJsonElement(ListenAndReadAs.RAW)
 
             assertTrue(result is JsonPrimitive)
-            assertEquals("   ", result.jsonPrimitive.content)
+            val decoded = String(java.util.Base64.getDecoder().decode(result.jsonPrimitive.content))
+            assertEquals("   ", decoded)
         }
 
         @Test
-        fun `should return newlines as raw primitive`() {
+        fun `should return newlines as base64-encoded`() {
             val event = buildEvent(data = "line1\nline2\nline3")
 
             val result = event.toJsonElement(ListenAndReadAs.RAW)
 
             assertTrue(result is JsonPrimitive)
-            assertEquals("line1\nline2\nline3", result.jsonPrimitive.content)
+            val decoded = String(java.util.Base64.getDecoder().decode(result.jsonPrimitive.content))
+            assertEquals("line1\nline2\nline3", decoded)
         }
     }
 
