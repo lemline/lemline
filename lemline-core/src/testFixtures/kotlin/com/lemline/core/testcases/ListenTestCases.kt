@@ -23,6 +23,9 @@ import com.lemline.core.testcases.impl.TestMocks.paymentCompletedData
 import com.lemline.core.testcases.impl.TestMocks.reading1Event
 import com.lemline.core.testcases.impl.TestMocks.reading2Event
 import com.lemline.core.testcases.impl.TestMocks.reading3ThresholdEvent
+import com.lemline.core.testcases.impl.TestMocks.readingFloor1Event
+import com.lemline.core.testcases.impl.TestMocks.readingFloor2Event
+import com.lemline.core.testcases.impl.TestMocks.readingRoofEvent
 import com.lemline.core.testcases.impl.TestMocks.sensorReadingCloudEvent
 import com.lemline.core.testcases.impl.TestMocks.stopMonitoringEvent
 import com.lemline.core.testcases.impl.TestMocks.userRegisteredCloudEvent
@@ -781,6 +784,87 @@ object ListenTestCases {
             """.trimIndent(),
             tags = setOf("listen", "read", "data"),
             validate = expectOutput(JsonArray(listOf(orderCreatedData)))
+        ),
+
+        // ─────────────────────────────────────────────────────────────────────────
+        // Read Envelope with Until Expression (envelope field access)
+        // ─────────────────────────────────────────────────────────────────────────
+
+        WorkflowTestCase(
+            name = "listen any with read envelope and until expression accessing envelope source field",
+            cloudEvents = listOf(readingFloor1Event, readingFloor2Event, readingRoofEvent),
+            yaml = $$"""
+                do:
+                  - collectReadings:
+                      listen:
+                        read: envelope
+                        to:
+                          any:
+                            - with:
+                                type: sensor.reading
+                          until: any(.source | contains("roof"))
+            """.trimIndent(),
+            tags = setOf("listen", "any", "until", "read", "envelope", "expression"),
+            validate = expectOutput(
+                JsonArray(
+                    listOf(
+                        readingFloor1Event.toJsonElement(ListenAndReadAs.ENVELOPE),
+                        readingFloor2Event.toJsonElement(ListenAndReadAs.ENVELOPE),
+                        readingRoofEvent.toJsonElement(ListenAndReadAs.ENVELOPE)
+                    )
+                )
+            )
+        ),
+
+        WorkflowTestCase(
+            name = "listen any with read envelope and until expression accessing envelope type field",
+            cloudEvents = listOf(reading1Event, reading2Event, stopMonitoringEvent),
+            yaml = $$"""
+                do:
+                  - collectUntilStop:
+                      listen:
+                        read: envelope
+                        to:
+                          any: []
+                          until: any(.type == "monitoring.stopped")
+            """.trimIndent(),
+            tags = setOf("listen", "any", "until", "read", "envelope", "expression"),
+            validateDefinition = false,
+            validate = expectOutput(
+                JsonArray(
+                    listOf(
+                        reading1Event.toJsonElement(ListenAndReadAs.ENVELOPE),
+                        reading2Event.toJsonElement(ListenAndReadAs.ENVELOPE),
+                        stopMonitoringEvent.toJsonElement(ListenAndReadAs.ENVELOPE)
+                    )
+                )
+            )
+        ),
+
+        WorkflowTestCase(
+            name = "listen any with read envelope and until expression accessing nested data field",
+            cloudEvents = listOf(readingFloor1Event, readingFloor2Event, readingRoofEvent),
+            yaml = $$"""
+                do:
+                  - collectReadings:
+                      listen:
+                        read: envelope
+                        to:
+                          any:
+                            - with:
+                                type: sensor.reading
+                          until: any(.data.value > 40)
+            """.trimIndent(),
+            tags = setOf("listen", "any", "until", "read", "envelope", "expression"),
+            validate = expectOutput(
+                JsonArray(
+                    listOf(
+                        readingFloor1Event.toJsonElement(ListenAndReadAs.ENVELOPE),
+                        readingFloor2Event.toJsonElement(ListenAndReadAs.ENVELOPE),
+                        readingRoofEvent.toJsonElement(ListenAndReadAs.ENVELOPE)
+                    )
+                )
+            )
         ),
 
         // ─────────────────────────────────────────────────────────────────────────

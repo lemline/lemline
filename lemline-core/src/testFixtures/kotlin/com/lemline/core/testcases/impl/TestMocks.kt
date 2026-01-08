@@ -537,4 +537,38 @@ object TestMocks {
             put("value", 150)
         }
     )
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // CloudEvents with Distinct Sources for Envelope-based Expression Tests
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /** Reading from floor-1 sensor */
+    val readingFloor1Event: CloudEvent = buildCloudEvent(
+        type = "sensor.reading",
+        data = buildJsonObject {
+            put("readingId", 101)
+            put("value", 20)
+        },
+        source = URI.create("https://sensors.example.com/floor-1")
+    )
+
+    /** Reading from floor-2 sensor */
+    val readingFloor2Event: CloudEvent = buildCloudEvent(
+        type = "sensor.reading",
+        data = buildJsonObject {
+            put("readingId", 102)
+            put("value", 35)
+        },
+        source = URI.create("https://sensors.example.com/floor-2")
+    )
+
+    /** Reading from roof sensor (termination source) */
+    val readingRoofEvent: CloudEvent = buildCloudEvent(
+        type = "sensor.reading",
+        data = buildJsonObject {
+            put("readingId", 103)
+            put("value", 45)
+        },
+        source = URI.create("https://sensors.example.com/roof")
+    )
 }
