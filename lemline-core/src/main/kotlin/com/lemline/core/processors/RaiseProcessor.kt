@@ -36,7 +36,7 @@ class RaiseProcessor(
     node: Node<RaiseTask>
 ) : NodeProcessor<RaiseTask, RaiseState>(node) {
 
-    override fun stateEnterFromParent(transformedInput: JsonElement, scope: Scope) = RaiseState(
+    override fun stateWhenEnteringFromParent(transformedInput: JsonElement, scope: Scope) = RaiseState(
         startedAt = Clock.System.now()
     )
 
@@ -47,7 +47,7 @@ class RaiseProcessor(
         val error = InternalException.Error(
             type = errorDef.getErrorType(),
             status = errorDef.status,
-            instance = node.position.toString(),
+            position = node.position.toString(),
             title = errorDef.title,
             details = errorDef.detail
         )

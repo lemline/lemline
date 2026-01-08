@@ -14,6 +14,8 @@ import com.lemline.core.states.WorkflowEvent.TaskRetryScheduled
 import com.lemline.core.states.WorkflowEvent.TaskScheduled
 import com.lemline.core.utils.toDuration
 import com.lemline.core.utils.toRandomDuration
+import com.lemline.core.workflows.catchBlock
+import com.lemline.core.workflows.tryBlock
 import io.serverlessworkflow.api.types.ConstantBackoff
 import io.serverlessworkflow.api.types.ErrorFilter
 import io.serverlessworkflow.api.types.ExponentialBackOff
@@ -75,7 +77,7 @@ class TryProcessor(
     /**
      * This state is initialized when entering the TryTask node for the first time
      */
-    override fun stateEnterFromParent(transformedInput: JsonElement, scope: Scope): TryState = TryState(
+    override fun stateWhenEnteringFromParent(transformedInput: JsonElement, scope: Scope): TryState = TryState(
         startedAt = Clock.System.now(),
         transformedInput = transformedInput,  // Store for retries/catch
         attemptIndex = 0,  // Ready for first attempt
@@ -86,7 +88,7 @@ class TryProcessor(
     /**
      * Update state when re-entering from child after successful execution of the try block or the catch block.
      */
-    override fun stateEnterFromChild(
+    override fun stateWhenReEnteringFromChild(
         state: TryState,
         output: JsonElement,
         scope: Scope,
@@ -137,7 +139,7 @@ class TryProcessor(
         catches.errors?.with?.let { filter: ErrorFilter ->
             if (filter.type != null && filter.type != error.type) return false
             if (filter.status > 0 && filter.status != error.status) return false
-            if (filter.instance != null && filter.instance != error.instance) return false
+            if (filter.instance != null && filter.instance != error.position) return false
             if (filter.title != null && filter.title != error.title) return false
             if (filter.details != null && filter.details != error.details) return false
         }
@@ -172,7 +174,6 @@ class TryProcessor(
      * moves to the catch block.
      */
     internal fun handleError(
-        failingNode: Node<*>,
         error: InternalException.Error,
         state: TryState,
         nodeStack: NodeStack
@@ -188,7 +189,7 @@ class TryProcessor(
                     attemptIndex = state.attemptIndex + 1
                 )
                 TaskRetryScheduled(
-                    nodeStack = cleanStateStack(failingNode, updatedState, nodeStack),
+                    nodeStack = cleanStateStack(updatedState, nodeStack),
                     nodePosition = getDoTry().position,
                     rawInput = state.transformedInput,
                     flowDirective = null,
@@ -202,9 +203,9 @@ class TryProcessor(
                     lastError = error
                 )
                 TaskScheduled(
-                    nodeStack = cleanStateStack(failingNode, updatedState, nodeStack),  // Re-enter try body
+                    nodeStack = cleanStateStack(updatedState, nodeStack),
                     nodePosition = getCatchNode().position,
-                    rawInput = state.transformedInput, // Original input
+                    rawInput = state.transformedInput,
                     flowDirective = null,
                 )
             }
@@ -233,28 +234,19 @@ class TryProcessor(
 
     /**
      * Retrieves the "try" child node from the current node's children.
+     * @see com.lemline.core.workflows.tryBlock
      */
-    private fun getDoTry(): Node<*> = node.children?.getOrNull(0)
-        ?: throw IllegalStateException("No try child found in TryTask ${node.position}")
+    private fun getDoTry(): Node<*> = node.tryBlock
 
     /**
      * Retrieves the "catch" child node from the current node's children.
+     * @see com.lemline.core.workflows.catchBlock
      */
-    private fun getCatchNode(): Node<*> = node.children?.getOrNull(1)
+    private fun getCatchNode(): Node<*> = node.catchBlock
         ?: throw IllegalStateException("No catch child found in TryTask ${node.position}")
 
-    /**
-     * Updates the state stack by popping states from failing node up to the try node,
-     * then updating the try state.
-     */
-    private fun cleanStateStack(
-        failingNode: Node<*>,
-        updatedState: TryState,
-        nodeStack: NodeStack
-    ): NodeStack {
-        // Pop all states up to but not including the try node, then update the try state
-        return nodeStack.popExcluding(node.position).push(node.position to updatedState)
-    }
+    private fun cleanStateStack(updatedState: TryState, nodeStack: NodeStack): NodeStack =
+        nodeStack.popUntil(node.position).incrementTopCounter().updateTopState(updatedState)
 
     /**
      * Check if should retry based on retry configuration and current attempt count.

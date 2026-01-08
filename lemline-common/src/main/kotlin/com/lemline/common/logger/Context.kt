@@ -53,9 +53,9 @@ data class WorkflowLoggingContext(
      */
     fun toMDCEntries(): Map<String, String?> = buildMap {
         put(WORKFLOW_ID, workflowId?.toString() ?: "")
-        put(WORKFLOW_NAMESPACE, workflowInfo?.workflowNamespace?.toString() ?: "")
-        put(WORKFLOW_NAME, workflowInfo?.workflowName?.toString() ?: "")
-        put(WORKFLOW_VERSION, workflowInfo?.workflowVersion?.toString() ?: "")
+        put(WORKFLOW_NAMESPACE, workflowInfo?.namespace?.toString() ?: "")
+        put(WORKFLOW_NAME, workflowInfo?.name?.toString() ?: "")
+        put(WORKFLOW_VERSION, workflowInfo?.version?.toString() ?: "")
         putAll(additionalContext)
     }
 
@@ -126,9 +126,9 @@ fun <T> withThreadLoggingContext(
     block: () -> T
 ): T = withThreadMDC(
     WORKFLOW_ID to (workflowId?.toString() ?: ""),
-    WORKFLOW_NAMESPACE to (workflowInfo?.workflowNamespace?.toString() ?: ""),
-    WORKFLOW_NAME to (workflowInfo?.workflowName?.toString() ?: ""),
-    WORKFLOW_VERSION to (workflowInfo?.workflowVersion?.toString() ?: ""),
+    WORKFLOW_NAMESPACE to (workflowInfo?.namespace?.toString() ?: ""),
+    WORKFLOW_NAME to (workflowInfo?.name?.toString() ?: ""),
+    WORKFLOW_VERSION to (workflowInfo?.version?.toString() ?: ""),
     *additional.entries.map { it.key to it.value }.toTypedArray(),
     block = block
 )

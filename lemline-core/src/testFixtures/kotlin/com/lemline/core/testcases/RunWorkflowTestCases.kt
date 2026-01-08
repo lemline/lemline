@@ -1,13 +1,19 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.testcases
 
-import com.lemline.core.testcases.WorkflowTestValidators.expectErrorContaining
-import com.lemline.core.testcases.WorkflowTestValidators.expectOutputMatching
-import com.lemline.core.testcases.WorkflowTestValidators.expectSuccess
+import com.lemline.core.testcases.impl.WorkflowDependency
+import com.lemline.core.testcases.impl.WorkflowTestCase
+import com.lemline.core.testcases.impl.WorkflowTestValidators.expectErrorContaining
+import com.lemline.core.testcases.impl.WorkflowTestValidators.expectOutput
+import com.lemline.core.testcases.impl.WorkflowTestValidators.expectOutput
+import com.lemline.core.testcases.impl.WorkflowTestValidators.expectSuccess
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonArray
+import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.int
 import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.put
 
 /**
  * Test cases for RunWorkflow (sub-workflow) execution.
@@ -40,10 +46,7 @@ object RunWorkflowTestCases {
                     """.trimIndent()
                 )
             ),
-            validate = expectOutputMatching("result=10") { output ->
-                val obj = output as? JsonObject ?: return@expectOutputMatching false
-                obj["result"]?.jsonPrimitive?.int == 10
-            }
+            validate = expectOutput(buildJsonObject { put("result", 10) })
         ),
 
         WorkflowTestCase(
@@ -73,10 +76,7 @@ object RunWorkflowTestCases {
                     """.trimIndent()
                 )
             ),
-            validate = expectOutputMatching("greeting=Hello, Alice!") { output ->
-                val obj = output as? JsonObject ?: return@expectOutputMatching false
-                obj["greeting"]?.jsonPrimitive?.content == "Hello, Alice!"
-            }
+            validate = expectOutput(buildJsonObject { put("greeting", "Hello, Alice!") })
         ),
 
         WorkflowTestCase(
@@ -147,10 +147,7 @@ object RunWorkflowTestCases {
                     """.trimIndent()
                 )
             ),
-            validate = expectOutputMatching("n=120 (5!)") { output ->
-                val obj = output as? JsonObject ?: return@expectOutputMatching false
-                obj["n"]?.jsonPrimitive?.int == 120
-            }
+            validate = expectOutput(buildJsonObject { put("n", 120) })
         ),
 
         WorkflowTestCase(
@@ -195,10 +192,7 @@ object RunWorkflowTestCases {
                     """.trimIndent()
                 )
             ),
-            validate = expectOutputMatching("result=20 ((3+7)*2)") { output ->
-                val obj = output as? JsonObject ?: return@expectOutputMatching false
-                obj["result"]?.jsonPrimitive?.int == 20
-            }
+            validate = expectOutput(buildJsonObject { put("result", 20) })
         ),
 
         WorkflowTestCase(
@@ -230,11 +224,12 @@ object RunWorkflowTestCases {
                     """.trimIndent()
                 )
             ),
-            validate = expectOutputMatching("finalValue=60, wasProcessed=true") { output ->
-                val obj = output as? JsonObject ?: return@expectOutputMatching false
-                obj["finalValue"]?.jsonPrimitive?.int == 60 &&
-                    obj["wasProcessed"]?.jsonPrimitive?.content == "true"
-            }
+            validate = expectOutput(
+                buildJsonObject {
+                    put("finalValue", 60)
+                    put("wasProcessed", true)
+                }
+            )
         ),
 
         WorkflowTestCase(
@@ -262,10 +257,7 @@ object RunWorkflowTestCases {
                     """.trimIndent()
                 )
             ),
-            validate = expectOutputMatching("result=42, no status") { output ->
-                val obj = output as? JsonObject ?: return@expectOutputMatching false
-                obj["result"]?.jsonPrimitive?.int == 42 && !obj.containsKey("status")
-            }
+            validate = expectOutput(buildJsonObject { put("result", 42) })
         ),
 
         WorkflowTestCase(
@@ -295,11 +287,12 @@ object RunWorkflowTestCases {
                     """.trimIndent()
                 )
             ),
-            validate = expectOutputMatching("fullName=John Doe, age=30") { output ->
-                val obj = output as? JsonObject ?: return@expectOutputMatching false
-                obj["fullName"]?.jsonPrimitive?.content == "John Doe" &&
-                    obj["age"]?.jsonPrimitive?.int == 30
-            }
+            validate = expectOutput(
+                buildJsonObject {
+                    put("fullName", "John Doe")
+                    put("age", 30)
+                }
+            )
         ),
 
         WorkflowTestCase(
@@ -354,10 +347,7 @@ object RunWorkflowTestCases {
                     """.trimIndent()
                 )
             ),
-            validate = expectOutputMatching("result=17 (((5+3)*2)+1)") { output ->
-                val obj = output as? JsonObject ?: return@expectOutputMatching false
-                obj["result"]?.jsonPrimitive?.int == 17
-            }
+            validate = expectOutput(buildJsonObject { put("result", 17) })
         ),
 
         WorkflowTestCase(
@@ -382,10 +372,7 @@ object RunWorkflowTestCases {
                     """.trimIndent()
                 )
             ),
-            validate = expectOutputMatching("value=10") { output ->
-                val obj = output as? JsonObject ?: return@expectOutputMatching false
-                obj["value"]?.jsonPrimitive?.int == 10
-            }
+            validate = expectOutput(buildJsonObject { put("value", 10) })
         ),
 
         WorkflowTestCase(
@@ -414,11 +401,7 @@ object RunWorkflowTestCases {
                     """.trimIndent()
                 )
             ),
-            validate = expectOutputMatching("continued=true, no completed") { output ->
-                val obj = output as? JsonObject ?: return@expectOutputMatching false
-                obj["continued"]?.jsonPrimitive?.content == "true" &&
-                    !obj.containsKey("completed")
-            }
+            validate = expectOutput(buildJsonObject { put("continued", true) })
         ),
 
         WorkflowTestCase(
@@ -449,11 +432,12 @@ object RunWorkflowTestCases {
                     """.trimIndent()
                 )
             ),
-            validate = expectOutputMatching("doubled=30, parentValue=15") { output ->
-                val obj = output as? JsonObject ?: return@expectOutputMatching false
-                obj["doubled"]?.jsonPrimitive?.int == 30 &&
-                    obj["parentValue"]?.jsonPrimitive?.int == 15
-            }
+            validate = expectOutput(
+                buildJsonObject {
+                    put("doubled", 30)
+                    put("parentValue", 15)
+                }
+            )
         ),
 
         WorkflowTestCase(
@@ -548,12 +532,60 @@ object RunWorkflowTestCases {
                     """.trimIndent()
                 )
             ),
-            validate = expectOutputMatching("handled=true, errorStatus=404") { output ->
-                val obj = output as? JsonObject ?: return@expectOutputMatching false
-                obj["handled"]?.jsonPrimitive?.content == "true" &&
-                    obj["errorStatus"]?.jsonPrimitive?.int == 404 &&
-                    obj["errorType"]?.jsonPrimitive?.content?.contains("not-found") == true
-            }
+            validate = expectOutput(
+                buildJsonObject {
+                    put("handled", true)
+                    put("errorStatus", 404)
+                    put("errorType", "https://serverlessworkflow.io/errors/not-found")
+                }
+            )
+        ),
+
+        WorkflowTestCase(
+            name = "run workflow inside for loop executes multiple times with distinct results",
+            yaml = $$"""
+                do:
+                  - init:
+                      set:
+                        results: []
+                  - loopWithRunWorkflow:
+                      for:
+                        in: ${ [1, 2, 3] }
+                      do:
+                        - callMultiplier:
+                            run:
+                              workflow:
+                                namespace: test
+                                name: loop-item-multiplier
+                                version: '0.1.0'
+                                input:
+                                  value: ${ $item }
+                            export:
+                              as:
+                                results: ${ $context.results + [.result] }
+                      output:
+                        as: ${ $context }
+            """.trimIndent(),
+            dependencies = listOf(
+                WorkflowDependency(
+                    name = "loop-item-multiplier",
+                    yaml = $$"""
+                        do:
+                          - multiply:
+                              set:
+                                result: ${ .value * 10 }
+                    """.trimIndent()
+                )
+            ),
+            validate = expectOutput(
+                buildJsonObject {
+                    put("results", buildJsonArray {
+                        add(JsonPrimitive(10))
+                        add(JsonPrimitive(20))
+                        add(JsonPrimitive(30))
+                    })
+                }
+            )
         )
     )
 }

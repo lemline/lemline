@@ -12,7 +12,7 @@ internal fun RetryPolicyJitter?.toRandomDuration(): Duration {
 
     return when (to) {
         null -> when (from) {
-            null -> return 0.seconds
+            null -> 0.seconds
             else -> error("Jitter can not be defined from '${from.toDuration()}' to '$to'")
         }
 

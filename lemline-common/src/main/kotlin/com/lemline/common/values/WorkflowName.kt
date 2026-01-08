@@ -10,4 +10,4 @@ value class WorkflowName(private val value: String) {
     override fun toString(): String = value
 }
 
-val Workflow.name: WorkflowName get() = WorkflowName(document.name)
+val Workflow.name get() = WorkflowName(document.name)

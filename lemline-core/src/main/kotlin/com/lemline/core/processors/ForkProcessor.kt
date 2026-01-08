@@ -54,7 +54,7 @@ class ForkProcessor(
 
     override val isAsync = true
 
-    override fun stateEnterFromParent(transformedInput: JsonElement, scope: Scope) = ForkState()
+    override fun stateWhenEnteringFromParent(transformedInput: JsonElement, scope: Scope) = ForkState()
 
     override fun startedEvent(
         nodeStack: NodeStack,

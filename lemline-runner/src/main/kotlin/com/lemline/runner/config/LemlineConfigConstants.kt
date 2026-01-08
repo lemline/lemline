@@ -34,6 +34,7 @@ object LemlineConfigConstants {
     const val COMMANDS_TOPIC_DEFAULT = "lemline-commands"
     const val EVENTS_TOPIC_DEFAULT = "lemline-events"
     const val CLOUDEVENTS_TOPIC_DEFAULT = "lemline-cloudevents"
+    const val LIFECYCLE_EVENTS_TOPIC_DEFAULT = "lemline-lifecycle-events"
 
     // Postgres
     const val POSTGRES_HOST_DEFAULT = "localhost"
@@ -61,6 +62,8 @@ object LemlineConfigConstants {
     const val KAFKA_STRING_DESERIALIZER = "org.apache.kafka.common.serialization.StringDeserializer"
     const val KAFKA_WORKFLOWS_GROUP_ID_DEFAULT = "lemline-group"
     const val KAFKA_DATABASE_GROUP_ID_DEFAULT = "lemline-group"
+    const val KAFKA_CLOUDEVENTS_GROUP_ID_DEFAULT = "lemline-cloudevents-group"
+    const val KAFKA_LIFECYCLE_EVENTS_GROUP_ID_DEFAULT = "lemline-lifecycle-events-group"
 
     // RabbitMQ
     const val RABBITMQ_HOST_DEFAULT = "localhost"

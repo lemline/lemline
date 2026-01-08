@@ -19,7 +19,7 @@ import kotlin.time.toJavaDuration
  */
 @Suppress("PropertyName")
 @ExperimentalTime
-internal abstract class MessageSubscriberMetrics(val registry: MeterRegistry) {
+abstract class MessageSubscriberMetrics(val registry: MeterRegistry) {
 
     // Metric Names
     protected abstract val METRIC_PREFIX: String
@@ -70,8 +70,8 @@ internal abstract class MessageSubscriberMetrics(val registry: MeterRegistry) {
      */
     fun deserializationCompleted(workflowInfo: WorkflowInfo?) = registry.counter(
         METRIC_DESERIALIZATION_COMPLETED_TOTAL,
-        TAG_WORKFLOW_NAME, (workflowInfo?.workflowName ?: UNKNOWN_NAME).toString(),
-        TAG_WORKFLOW_VERSION, (workflowInfo?.workflowVersion ?: UNKNOWN_VERSION).toString()
+        TAG_WORKFLOW_NAME, (workflowInfo?.name ?: UNKNOWN_NAME).toString(),
+        TAG_WORKFLOW_VERSION, (workflowInfo?.version ?: UNKNOWN_VERSION).toString()
     ).increment()
 
     /**
@@ -88,8 +88,8 @@ internal abstract class MessageSubscriberMetrics(val registry: MeterRegistry) {
     fun serializationFailed(workflowInfo: WorkflowInfo?, e: Exception) = registry.counter(
         METRIC_SERIALIZATION_FAILED_TOTAL,
         TAG_REASON, getFailureReason(e),
-        TAG_WORKFLOW_NAME, (workflowInfo?.workflowName ?: UNKNOWN_NAME).toString(),
-        TAG_WORKFLOW_VERSION, (workflowInfo?.workflowVersion ?: UNKNOWN_VERSION).toString()
+        TAG_WORKFLOW_NAME, (workflowInfo?.name ?: UNKNOWN_NAME).toString(),
+        TAG_WORKFLOW_VERSION, (workflowInfo?.version ?: UNKNOWN_VERSION).toString()
     ).increment()
 
     /**
@@ -97,8 +97,8 @@ internal abstract class MessageSubscriberMetrics(val registry: MeterRegistry) {
      */
     fun serializationCompleted(workflowInfo: WorkflowInfo?) = registry.counter(
         METRIC_SERIALIZATION_COMPLETED_TOTAL,
-        TAG_WORKFLOW_NAME, (workflowInfo?.workflowName ?: UNKNOWN_NAME).toString(),
-        TAG_WORKFLOW_VERSION, (workflowInfo?.workflowVersion ?: UNKNOWN_VERSION).toString()
+        TAG_WORKFLOW_NAME, (workflowInfo?.name ?: UNKNOWN_NAME).toString(),
+        TAG_WORKFLOW_VERSION, (workflowInfo?.version ?: UNKNOWN_VERSION).toString()
     ).increment()
 
 
@@ -107,8 +107,8 @@ internal abstract class MessageSubscriberMetrics(val registry: MeterRegistry) {
      */
     fun processingCompleted(workflowInfo: WorkflowInfo?) = registry.counter(
         METRIC_PROCESSING_COMPLETED_TOTAL,
-        TAG_WORKFLOW_NAME, (workflowInfo?.workflowName ?: UNKNOWN_NAME).toString(),
-        TAG_WORKFLOW_VERSION, (workflowInfo?.workflowVersion ?: UNKNOWN_VERSION).toString()
+        TAG_WORKFLOW_NAME, (workflowInfo?.name ?: UNKNOWN_NAME).toString(),
+        TAG_WORKFLOW_VERSION, (workflowInfo?.version ?: UNKNOWN_VERSION).toString()
     ).increment()
 
     /**
@@ -118,8 +118,8 @@ internal abstract class MessageSubscriberMetrics(val registry: MeterRegistry) {
         registry.counter(
             METRIC_PROCESSING_FAILED_TOTAL,
             TAG_REASON, reason,
-            TAG_WORKFLOW_NAME, (workflowInfo?.workflowName ?: UNKNOWN_NAME).toString(),
-            TAG_WORKFLOW_VERSION, (workflowInfo?.workflowVersion ?: UNKNOWN_VERSION).toString()
+            TAG_WORKFLOW_NAME, (workflowInfo?.name ?: UNKNOWN_NAME).toString(),
+            TAG_WORKFLOW_VERSION, (workflowInfo?.version ?: UNKNOWN_VERSION).toString()
         ).increment()
 
     /**
@@ -127,8 +127,8 @@ internal abstract class MessageSubscriberMetrics(val registry: MeterRegistry) {
      */
     fun ackCompleted(workflowInfo: WorkflowInfo?) = registry.counter(
         METRIC_ACK_COMPLETED_TOTAL,
-        TAG_WORKFLOW_NAME, (workflowInfo?.workflowName ?: UNKNOWN_NAME).toString(),
-        TAG_WORKFLOW_VERSION, (workflowInfo?.workflowVersion ?: UNKNOWN_VERSION).toString()
+        TAG_WORKFLOW_NAME, (workflowInfo?.name ?: UNKNOWN_NAME).toString(),
+        TAG_WORKFLOW_VERSION, (workflowInfo?.version ?: UNKNOWN_VERSION).toString()
     ).increment()
 
     /**
@@ -136,8 +136,8 @@ internal abstract class MessageSubscriberMetrics(val registry: MeterRegistry) {
      */
     fun ackFailed(workflowInfo: WorkflowInfo?) = registry.counter(
         METRIC_ACK_FAILED_TOTAL,
-        TAG_WORKFLOW_NAME, (workflowInfo?.workflowName ?: UNKNOWN_NAME).toString(),
-        TAG_WORKFLOW_VERSION, (workflowInfo?.workflowVersion ?: UNKNOWN_VERSION).toString()
+        TAG_WORKFLOW_NAME, (workflowInfo?.name ?: UNKNOWN_NAME).toString(),
+        TAG_WORKFLOW_VERSION, (workflowInfo?.version ?: UNKNOWN_VERSION).toString()
     ).increment()
 
     /**
@@ -145,8 +145,8 @@ internal abstract class MessageSubscriberMetrics(val registry: MeterRegistry) {
      */
     fun nackCompleted(workflowInfo: WorkflowInfo?) = registry.counter(
         METRIC_NACK_COMPLETED_TOTAL,
-        TAG_WORKFLOW_NAME, (workflowInfo?.workflowName ?: UNKNOWN_NAME).toString(),
-        TAG_WORKFLOW_VERSION, (workflowInfo?.workflowVersion ?: UNKNOWN_VERSION).toString()
+        TAG_WORKFLOW_NAME, (workflowInfo?.name ?: UNKNOWN_NAME).toString(),
+        TAG_WORKFLOW_VERSION, (workflowInfo?.version ?: UNKNOWN_VERSION).toString()
     ).increment()
 
     /**
@@ -154,8 +154,8 @@ internal abstract class MessageSubscriberMetrics(val registry: MeterRegistry) {
      */
     fun nackFailed(workflowInfo: WorkflowInfo?) = registry.counter(
         METRIC_NACK_FAILED_TOTAL,
-        TAG_WORKFLOW_NAME, (workflowInfo?.workflowName ?: UNKNOWN_NAME).toString(),
-        TAG_WORKFLOW_VERSION, (workflowInfo?.workflowVersion ?: UNKNOWN_VERSION).toString()
+        TAG_WORKFLOW_NAME, (workflowInfo?.name ?: UNKNOWN_NAME).toString(),
+        TAG_WORKFLOW_VERSION, (workflowInfo?.version ?: UNKNOWN_VERSION).toString()
     ).increment()
 
     /** Returns the current count of active messages. */
@@ -206,9 +206,9 @@ internal abstract class MessageSubscriberMetrics(val registry: MeterRegistry) {
         val timer = registry.timer(
             METRIC_PROCESSING_DURATION,
             TAG_WORKFLOW_NAME,
-            (workflowInfo?.workflowName ?: UNKNOWN_NAME).toString(),
+            (workflowInfo?.name ?: UNKNOWN_NAME).toString(),
             TAG_WORKFLOW_VERSION,
-            (workflowInfo?.workflowVersion ?: UNKNOWN_VERSION).toString()
+            (workflowInfo?.version ?: UNKNOWN_VERSION).toString()
         )
         val start = markNow()
         return try {

@@ -46,7 +46,7 @@ class RootProcessor(
 ) : NodeProcessor<RootTask, RootState>(node) {
 
     // the RootProcessor should not create the root state
-    override fun stateEnterFromParent(
+    override fun stateWhenEnteringFromParent(
         transformedInput: JsonElement,
         scope: Scope
     ): RootState = throw IllegalStateException("RootProcessor does not create state")

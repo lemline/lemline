@@ -5,6 +5,7 @@ package com.lemline.core.states
 
 import com.lemline.common.values.IDV7
 import com.lemline.common.values.NodePosition
+import com.lemline.common.values.WorkflowId
 import com.lemline.core.processors.scope.Scope
 import com.lemline.core.processors.scope.merge
 import kotlin.time.ExperimentalTime
@@ -12,12 +13,28 @@ import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.ListSerializer
-import kotlinx.serialization.builtins.MapSerializer
-import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 import kotlinx.serialization.json.buildJsonObject
+import org.jetbrains.annotations.TestOnly
+
+/**
+ * A single frame in the node stack.
+ *
+ * @property position The node's position in the workflow tree
+ * @property state The node's execution state
+ * @property counter Increments on re-entry (loops, retries, goto). Used for idempotent ID derivation.
+ */
+@Serializable
+data class StackFrame(
+    val position: NodePosition,
+    val state: NodeState,
+    val counter: Int = 0
+) {
+    fun increment() = copy(counter = counter + 1)
+    fun decrement() = copy(counter = counter - 1)
+}
 
 /**
  * A stack-based representation of workflow task states.
@@ -34,166 +51,131 @@ import kotlinx.serialization.json.buildJsonObject
  * - Since the stack is hierarchical, we only store the last segment of each position
  * - Full paths are reconstructed during deserialization
  * - Example: [("/", R), ("/do", D), ("/do/task", T)] → [("", R), ("do", D), ("task", T)]
- *
- * @property frames The list of (NodePosition, NodeState) pairs representing the state stack.
- *                  First element is root, last element is the deepest active node.
  */
 @Serializable(with = NodeStackSerializer::class)
-data class NodeStack(
-    private val frames: List<Pair<NodePosition, NodeState>> = emptyList()
-) {
+class NodeStack internal constructor(
+    private val frames: List<StackFrame> = emptyList()
+) : Iterable<StackFrame> by frames {
 
     val rootState: RootState by lazy {
-        frames.first().second as RootState
+        frames.first().state as RootState
     }
 
-    /**
-     * The current position (top of stack).
-     * Returns root position if stack is empty.
-     */
-    val lastPosition: NodePosition by lazy {
-        frames.last().first
+    val workflowId: WorkflowId by lazy {
+        rootState.workflowId
     }
 
-    /**
-     * The top state of the stack.
-     * Returns null if stack is empty.
-     */
-    val lastState: NodeState by lazy {
-        frames.last().second
+    val currentPosition: NodePosition by lazy {
+        frames.last().position
     }
 
-    /**
-     * The combined scope from all states in the stack.
-     * Scopes are merged from bottom to top, so deeper nodes can override parent scope values.
-     */
+    val currentState: NodeState by lazy {
+        frames.last().state
+    }
+
     val stateScope: Scope by lazy {
-        frames.fold(buildJsonObject {}) { acc: Scope, (_, state) ->
-            acc.merge(state.scope)
+        frames.fold(buildJsonObject {}) { acc: Scope, frame ->
+            acc.merge(frame.state.scope)
         }
     }
 
-    /**
-     * Get the state at a specific position.
-     * Returns null if no state exists at that position.
-     */
-    operator fun get(position: NodePosition): NodeState? =
-        frames.firstOrNull { it.first == position }?.second
+    val executionKey: String by lazy {
+        frames.joinToString("-") { it.counter.toString() }
+    }
 
-    /**
-     * Creates a new StateStack with the workflow step counter incremented.
-     * The step counter is used for generating unique database IDs for outbox tables.
-     *
-     * @return A new StateStack with workflowStep incremented by 1
-     */
-    fun incrementStep(): NodeStack = withRootState(rootState.copy(workflowStep = rootState.workflowStep + 1))
+    operator fun get(position: NodePosition): StackFrame? = frames.firstOrNull { it.position == position }
 
-    /**
-     * Derives a deterministic IDV7 for the current execution context.
-     *
-     * Uses workflowId + position + step to ensure uniqueness across:
-     * - Different positions in the workflow (each task has unique position)
-     * - Multiple executions of the same position (via step counter for loops/retries)
-     * - Parallel fork branches (position contains branch name)
-     *
-     * @param suffix Optional type discriminator (e.g., "-wait", "-retry", "-parent")
-     * @return A deterministic IDV7 unique to this execution context
-     */
-    fun deriveIdempotentId(suffix: String = ""): IDV7 =
-        IDV7.deriveFromPositionAndStep(
-            baseId = rootState.workflowId.value,
-            position = lastPosition,
-            step = rootState.workflowStep,
-            suffix = suffix
-        )
+    fun deriveIdempotentId(suffix: String = ""): IDV7 = IDV7.deriveIdempotentId(
+        baseId = rootState.workflowId.value,
+        position = currentPosition,
+        executionKey = executionKey,
+        suffix = suffix
+    )
 
-    /**
-     * Creates a new TaskStack with updated context in the root state.
-     *
-     * @param newContext The new context to set
-     * @return A new TaskStack with the updated context
-     */
-    fun setContext(newContext: Scope): NodeStack = withRootState(rootState.copyWithContext(newContext))
+    fun incrementTopCounter(): NodeStack = NodeStack(
+        frames.dropLast(1) + frames.last().increment()
+    )
 
-    /**
-     * Creates a new TaskStack with a new root state, replacing the existing one.
-     *
-     * @param newRoot The new root state
-     * @return A new TaskStack with the updated root
-     */
-    fun withRootState(newRoot: RootState): NodeStack =
-        copy(frames = listOf(NodePosition.root to newRoot) + frames.drop(1))
+    fun decrementTopCounter(): NodeStack = NodeStack(
+        frames.dropLast(1) + frames.last().decrement()
+    )
 
-    /**
-     * Push a new frame onto the stack or update an existing frame.
-     */
-    fun push(pair: Pair<NodePosition, NodeState>): NodeStack = NodeStack(frames + pair)
+    fun duplicate(workflowId: WorkflowId): NodeStack = withRootState(rootState.copy(workflowId = workflowId))
 
-    /**
-     * Pop the top frame from the stack.
-     */
-    fun pop(): NodeStack = NodeStack(frames.dropLast(1))
+    /** Creates a new TaskStack with updated context in the root state.*/
+    fun withContext(newContext: Scope): NodeStack = withRootState(rootState.withContext(newContext))
 
-    /**
-     * Returns a new StateStack with frames from root up to and including the position.
-     */
+    /** Push a new frame onto the stack.*/
+    fun push(position: NodePosition, state: NodeState, executionIndex: Int = 0): NodeStack =
+        NodeStack(frames + StackFrame(position, state, executionIndex))
+
+    /** Pop the top frame and increment the new top frame's executionIndex.*/
+    fun pop(): NodeStack = when (frames.size) {
+        1 -> this
+        else -> NodeStack(frames.dropLast(1))
+    }
+
+    /** Returns a new StateStack with frames up to and including position, incrementing new top's executionIndex.*/
     fun popUntil(position: NodePosition): NodeStack {
-        val index = frames.indexOfFirst { it.first == position }
-        return if (index < 0) this else NodeStack(frames.take(index + 1))
+        return NodeStack(frames.take(indexOfFirst(position) + 1))
     }
 
-    /**
-     * Returns a new StateStack with frames from root up to and excluding the position.
-     */
-    fun popExcluding(position: NodePosition): NodeStack {
-        val index = frames.indexOfFirst { it.first == position }
-        return if (index < 0) this else NodeStack(frames.take(index))
+    /** Update the current (top) state in the stack.*/
+    fun updateTopState(newState: NodeState): NodeStack =
+        NodeStack(frames.dropLast(1) + frames.last().copy(state = newState))
+
+    private fun indexOfFirst(position: NodePosition): Int {
+        val index = frames.indexOfFirst { it.position == position }
+        if (index < 0) throw NoSuchElementException("Position $position not found within the stack ${frames.joinToString { it.position.toString() }}.")
+        return index
     }
 
-    /**
-     * Map over all entries (for toString and similar operations).
-     */
-    fun <R> map(transform: (Map.Entry<NodePosition, NodeState>) -> R): List<R> =
-        frames.map { (position, state) ->
-            transform(object : Map.Entry<NodePosition, NodeState> {
-                override val key: NodePosition = position
-                override val value: NodeState = state
-            })
-        }
+    /** Creates a new TaskStack with a new root state, replacing the existing one.*/
+    private fun withRootState(newRoot: RootState): NodeStack =
+        NodeStack(listOf(StackFrame(NodePosition.root, newRoot)) + frames.drop(1))
+
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (other !is NodeStack) return false
+        return frames == other.frames
+    }
+
+    override fun hashCode(): Int = frames.hashCode()
+
+    override fun toString(): String =
+        "[" + frames.joinToString { it.position.toString() + "(" + it.counter + ")=>" + it.state.toString() } + "]"
+
+    companion object {
+        @TestOnly
+        fun fromFrames(frames: List<StackFrame>): NodeStack = NodeStack(frames)
+    }
 }
 
-/**
- * Custom serializer for [NodeStack] that optimizes storage by storing
- * the relative path suffix from the previous position instead of the full path.
- *
- * Serialization format: [{"": RootState}, {"do": DoState}, {"catch/do": DoState}]
- * Each frame is a single-entry object where the key is the relative path suffix.
- *
- * During serialization: [("/", R), ("/do", D), ("/do/task", T)] → [{"": R}, {"do": D}, {"task": T}]
- * For skipped segments: [("/do/tryBlock", T), ("/do/tryBlock/catch/do", D)] → [{"tryBlock": T}, {"catch/do": D}]
- * During deserialization: paths are reconstructed by appending the suffix to the previous position
- */
+@Serializable
+private data class CompactFrame(
+    val p: String,
+    val s: NodeState,
+    val i: Int = 0
+)
+
 @OptIn(ExperimentalSerializationApi::class)
 internal object NodeStackSerializer : KSerializer<NodeStack> {
 
-    // Serialize as List<Map<String, NodeState>> where each map has exactly one entry
-    private val delegateSerializer = ListSerializer(MapSerializer(String.serializer(), NodeState.serializer()))
+    private val delegateSerializer = ListSerializer(CompactFrame.serializer())
 
     override val descriptor: SerialDescriptor = delegateSerializer.descriptor
 
     override fun serialize(encoder: Encoder, value: NodeStack) {
-        // Convert frames to single-entry maps {relativeSuffix: state}
         var previousPath = ""
-        val compactFrames = value.map { entry ->
-            val currentPath = entry.key.toString()
-            // Compute the relative suffix by removing the previous path prefix
+        val compactFrames = value.map { frame ->
+            val currentPath = frame.position.toString()
             val suffix = if (previousPath.isEmpty() || previousPath == "/") {
                 currentPath.removePrefix("/")
             } else {
                 currentPath.removePrefix("$previousPath/")
             }
             previousPath = currentPath
-            mapOf(suffix to entry.value)
+            CompactFrame(p = suffix, s = frame.state, i = frame.counter)
         }
         delegateSerializer.serialize(encoder, compactFrames)
     }
@@ -201,20 +183,15 @@ internal object NodeStackSerializer : KSerializer<NodeStack> {
     override fun deserialize(decoder: Decoder): NodeStack {
         val compactFrames = delegateSerializer.deserialize(decoder)
 
-        // Reconstruct full positions from relative suffixes
         var currentPosition = NodePosition.root
-        val frames = compactFrames.map { singleEntryMap ->
-            val entry = singleEntryMap.entries.first()
-            val suffix = entry.key
-            val state = entry.value
-            currentPosition = if (suffix.isEmpty()) {
+        val frames = compactFrames.map { compact ->
+            currentPosition = if (compact.p.isEmpty()) {
                 NodePosition.root
             } else {
-                // Append suffix to current position
                 val basePath = if (currentPosition.isRoot) "" else currentPosition.toString()
-                NodePosition("$basePath/$suffix")
+                NodePosition("$basePath/${compact.p}")
             }
-            currentPosition to state
+            StackFrame(currentPosition, compact.s, compact.i)
         }
 
         return NodeStack(frames)

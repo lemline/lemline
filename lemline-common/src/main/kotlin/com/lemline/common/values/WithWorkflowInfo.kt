@@ -7,17 +7,17 @@ interface WithOptionalWorkflowInfo {
     /**
      * Represents the namespace of a workflow, if available.
      */
-    val workflowNamespace: WorkflowNamespace? get() = workflowInfo?.workflowNamespace
+    val workflowNamespace: WorkflowNamespace? get() = workflowInfo?.namespace
 
     /**
      * Represents the name of the workflow, if available.
      */
-    val workflowName: WorkflowName? get() = workflowInfo?.workflowName
+    val workflowName: WorkflowName? get() = workflowInfo?.name
 
     /**
      * Represents the version of the workflow, if available.
      */
-    val workflowVersion: WorkflowVersion? get() = workflowInfo?.workflowVersion
+    val workflowVersion: WorkflowVersion? get() = workflowInfo?.version
 }
 
 interface WithDefiniteWorkflowInfo : WithOptionalWorkflowInfo {
@@ -26,15 +26,15 @@ interface WithDefiniteWorkflowInfo : WithOptionalWorkflowInfo {
     /**
      *  workflowNamespace is redefined here to ensure it is always non-null, overriding a nullable version from WithOptionalWorkflowInfo.
      */
-    override val workflowNamespace: WorkflowNamespace get() = workflowInfo.workflowNamespace
+    override val workflowNamespace: WorkflowNamespace get() = workflowInfo.namespace
 
     /**
      *  workflowName is redefined here to ensure it is always non-null, overriding a nullable version from WithOptionalWorkflowInfo.
      */
-    override val workflowName: WorkflowName get() = workflowInfo.workflowName
+    override val workflowName: WorkflowName get() = workflowInfo.name
 
     /**
      *  workflowVersion is redefined here to ensure it is always non-null, overriding a nullable version from WithOptionalWorkflowInfo.
      */
-    override val workflowVersion: WorkflowVersion get() = workflowInfo.workflowVersion
+    override val workflowVersion: WorkflowVersion get() = workflowInfo.version
 }

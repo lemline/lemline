@@ -11,7 +11,12 @@ import com.lemline.common.values.WorkflowName
 import com.lemline.common.values.WorkflowNamespace
 import com.lemline.common.values.WorkflowVersion
 import com.lemline.core.errors.InternalException
+import com.lemline.core.processors.CorrelationDef
+import com.lemline.core.processors.EventFilter
+import com.lemline.core.processors.ListenConfig
+import com.lemline.core.processors.ListenStrategy
 import com.lemline.core.processors.RunWorkflowConfig
+import com.lemline.core.processors.UntilCondition
 import com.lemline.core.processors.WaitConfig
 import com.lemline.core.states.DoState
 import com.lemline.core.states.ForState
@@ -22,6 +27,7 @@ import com.lemline.core.states.RaiseState
 import com.lemline.core.states.RootState
 import com.lemline.core.states.RunState
 import com.lemline.core.states.SetState
+import com.lemline.core.states.StackFrame
 import com.lemline.core.states.SwitchState
 import com.lemline.core.states.TaskState
 import com.lemline.core.states.TryState
@@ -29,9 +35,10 @@ import com.lemline.core.states.WaitState
 import com.lemline.core.states.WorkflowCommand
 import com.lemline.core.states.WorkflowEvent
 import com.lemline.core.states.WorkflowState
-import com.lemline.core.workflows.FlowDirective
-import com.lemline.core.workflows.FlowDirectiveEnum
-import com.lemline.core.workflows.FlowDirectiveGoto
+import com.lemline.core.tasks.FlowDirective
+import com.lemline.core.tasks.FlowDirectiveEnum
+import com.lemline.core.tasks.FlowDirectiveGoto
+import io.serverlessworkflow.api.types.ListenTaskConfiguration.ListenAndReadAs
 import kotlin.random.Random
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.milliseconds
@@ -75,9 +82,9 @@ fun JsonElement.Companion.nullableRandom(): JsonElement {
 fun NodePosition.Companion.random() = NodePosition("/${String.random()}/${String.random()}/${String.random()}")
 
 fun WorkflowInfo.Companion.random() = WorkflowInfo(
-    workflowNamespace = WorkflowNamespace.random(),
-    workflowName = WorkflowName.random(),
-    workflowVersion = WorkflowVersion.random(),
+    namespace = WorkflowNamespace.random(),
+    name = WorkflowName.random(),
+    version = WorkflowVersion.random(),
 )
 
 fun NodeState.Companion.random() = when (Random.nextInt(12)) {
@@ -139,7 +146,7 @@ fun TryState.Companion.random() = TryState(
 fun InternalException.Error.Companion.random() = InternalException.Error(
     type = String.random(),
     status = Random.nextInt(400, 600),
-    instance = String.random(),
+    position = String.random(),
     title = when (Random.nextBoolean()) {
         true -> String.random()
         false -> null
@@ -192,7 +199,7 @@ fun WorkflowCommand.ResumeWithCompletedTask.Companion.random() = WorkflowCommand
 )
 
 fun WorkflowEvent.Companion.random(): WorkflowEvent {
-    return when (Random.nextInt(8)) {
+    return when (Random.nextInt(9)) {
         0 -> WorkflowEvent.WorkflowCompleted.random()
         1 -> WorkflowEvent.WorkflowFailed.random()
         2 -> WorkflowEvent.TaskScheduled.random()
@@ -200,7 +207,8 @@ fun WorkflowEvent.Companion.random(): WorkflowEvent {
         4 -> WorkflowEvent.TaskRetryScheduled.random()
         5 -> WorkflowEvent.RunWorkflowStarted.random()
         6 -> WorkflowEvent.ForkStarted.random()
-        else -> WorkflowEvent.ForkBranchCompleted.random()
+        7 -> WorkflowEvent.ForkBranchCompleted.random()
+        else -> WorkflowEvent.ListenStarted.random()
     }
 }
 
@@ -210,11 +218,11 @@ fun NodeStack.Companion.random(): NodeStack {
     val childPosition = rootPosition.addName(String.random())
     val grandchildPosition = childPosition.addName(String.random())
 
-    return NodeStack(
+    return NodeStack.fromFrames(
         listOf(
-            rootPosition to RootState.random(),
-            childPosition to NodeState.random(),
-            grandchildPosition to NodeState.random()
+            StackFrame(rootPosition, RootState.random()),
+            StackFrame(childPosition, NodeState.random()),
+            StackFrame(grandchildPosition, NodeState.random())
         )
     )
 }
@@ -288,11 +296,93 @@ fun WorkflowEvent.ForkStarted.Companion.random() = WorkflowEvent.ForkStarted(
 fun WorkflowEvent.ForkBranchCompleted.Companion.random() =
     WorkflowEvent.ForkBranchCompleted(
         nodeStack = NodeStack.random(),
-        branchName = String.random(),
-        output = JsonElement.random(),
+        branchPosition = NodePosition.random(),
+        branchOutput = JsonElement.random(),
         completedAt = Clock.System.now(),
-        flowDirective = when (Random.nextBoolean()) {
-            true -> randomFlowDirective()
-            false -> null
-        }
     )
+
+// Listen task random generators
+
+fun randomListenStrategy(): ListenStrategy = ListenStrategy.entries.random()
+
+fun randomListenAndReadAs(): ListenAndReadAs = ListenAndReadAs.entries.toTypedArray().random()
+
+fun randomCorrelationDef() = CorrelationDef(
+    from = "\${ .${String.random()} }",
+    expect = when (Random.nextBoolean()) {
+        true -> "\${ \$input.${String.random()} }"
+        false -> null
+    }
+)
+
+fun randomEventFilter() = EventFilter(
+    type = when (Random.nextBoolean()) {
+        true -> "com.example.${String.random()}"
+        false -> null
+    },
+    source = when (Random.nextBoolean()) {
+        true -> "https://example.com/${String.random()}"
+        false -> null
+    },
+    subject = when (Random.nextBoolean()) {
+        true -> String.random()
+        false -> null
+    },
+    id = when (Random.nextBoolean()) {
+        true -> String.random()
+        false -> null
+    },
+    datacontenttype = when (Random.nextBoolean()) {
+        true -> "application/json"
+        false -> null
+    },
+    dataschema = when (Random.nextBoolean()) {
+        true -> "https://schema.example.com/${String.random()}"
+        false -> null
+    },
+    time = when (Random.nextBoolean()) {
+        true -> Clock.System.now().toString()
+        false -> null
+    },
+    dataFilter = when (Random.nextBoolean()) {
+        true -> ".${String.random()} == true"
+        false -> null
+    },
+    correlations = when (Random.nextBoolean()) {
+        true -> mapOf(String.random() to randomCorrelationDef())
+        false -> null
+    }
+)
+
+fun randomUntilCondition(): UntilCondition = when (Random.nextBoolean()) {
+    true -> UntilCondition.Expression(". | length >= ${Random.nextInt(1, 10)}")
+    false -> UntilCondition.Event(randomEventFilter())
+}
+
+fun randomListenConfig() = ListenConfig(
+    strategy = randomListenStrategy(),
+    filters = List(Random.nextInt(1, 4)) { randomEventFilter() },
+    until = when (Random.nextBoolean()) {
+        true -> randomUntilCondition()
+        false -> null
+    },
+    readAs = randomListenAndReadAs(),
+    timeoutAt = when (Random.nextBoolean()) {
+        true -> Clock.System.now() + Random.nextLong(100, 10000).milliseconds
+        false -> null
+    },
+    correlationContext = when (Random.nextBoolean()) {
+        true -> buildJsonObject {
+            put("input", JsonElement.random())
+            put("context", buildJsonObject { put(String.random(), JsonElement.random()) })
+        }
+
+        false -> null
+    }
+)
+
+fun WorkflowEvent.ListenStarted.Companion.random() = WorkflowEvent.ListenStarted(
+    nodeStack = NodeStack.random(),
+    rawOutput = JsonElement.random(),
+    config = randomListenConfig()
+)

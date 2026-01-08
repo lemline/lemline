@@ -52,7 +52,7 @@ class WaitProcessor(
 
     override val isAsync = true
 
-    override fun stateEnterFromParent(transformedInput: JsonElement, scope: Scope) = WaitState()
+    override fun stateWhenEnteringFromParent(transformedInput: JsonElement, scope: Scope) = WaitState()
 
     /**
      * Handles the "started" event for a workflow by creating a `WaitStarted` event with
@@ -61,7 +61,6 @@ class WaitProcessor(
      * @param nodeStack The current stack of workflow nodes representing the execution state.
      * @param transformedInput The input data transformed for use in this workflow state.
      * @param scope The current scope of the workflow execution, providing environmental context.
-     * @param state The state object representing the current call context for the workflow.
      * @return A `WorkflowEvent` representing the starting state of this segment of the workflow.
      */
     override fun startedEvent(
@@ -70,7 +69,7 @@ class WaitProcessor(
         scope: Scope,
     ): WorkflowEvent {
         val config = WaitConfig(waitUntil = Clock.System.now() + getDelay())
-        logger.debug { "Throwing WaitException for orchestrator to handle: $config" }
+
         return WaitStarted(
             nodeStack = nodeStack,
             rawOutput = transformedInput,

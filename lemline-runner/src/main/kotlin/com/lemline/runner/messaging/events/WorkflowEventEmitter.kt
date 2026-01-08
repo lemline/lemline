@@ -2,7 +2,7 @@
 package com.lemline.runner.messaging.events
 
 import com.lemline.core.states.WorkflowEvent
-import com.lemline.runner.messaging.InstanceMessage
+import com.lemline.runner.common.messaging.InstanceMessage
 import com.lemline.runner.messaging.MessageEmitter
 import io.quarkus.runtime.Startup
 import io.smallrye.reactive.messaging.MutinyEmitter

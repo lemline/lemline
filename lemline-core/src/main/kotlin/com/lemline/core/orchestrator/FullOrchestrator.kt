@@ -2,51 +2,49 @@
 package com.lemline.core.orchestrator
 
 import com.lemline.common.logger.logger
+import com.lemline.common.values.NodePosition
 import com.lemline.common.values.WorkflowId
+import com.lemline.common.values.info
 import com.lemline.core.activities.ActivityExecutor
-import com.lemline.core.activities.DefaultActivityExecutor
-import com.lemline.core.definitions.DefinitionCache
-import com.lemline.core.definitions.getNode
+import com.lemline.core.cloudevents.CloudEventFactory
+import com.lemline.core.cloudevents.CloudEventHook
 import com.lemline.core.errors.InternalException
+import com.lemline.core.lifecycleevents.LifecycleEventHook
 import com.lemline.core.nodes.Node
+import com.lemline.core.orchestrator.full.CollectResult
+import com.lemline.core.orchestrator.full.ForkBranchExecutor
+import com.lemline.core.orchestrator.full.ListenEventCollector
 import com.lemline.core.states.NodeStack
 import com.lemline.core.states.WorkflowCommand
 import com.lemline.core.states.WorkflowEvent
 import com.lemline.core.states.WorkflowState
-import com.lemline.core.utils.mapAwaitAllFailFast
-import com.lemline.core.utils.mapAwaitFirstFailSlow
+import com.lemline.core.workflows.WorkflowCache
+import com.lemline.core.workflows.branches
+import com.lemline.core.workflows.foreachBlock
+import com.lemline.core.workflows.getNode
 import io.serverlessworkflow.api.types.ForkTask
+import io.serverlessworkflow.api.types.ListenTask
 import io.serverlessworkflow.api.types.Workflow
 import kotlin.time.Clock
 import kotlin.time.Duration
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.buildJsonObject
 
-/**
- * Full orchestrator for synchronous workflow execution.
- *
- * This orchestrator executes workflows in a single pass, handling all events
- * (activities, waits, forks, child workflows) directly without external coordination.
- *
- * It manages both compete (race) and cooperative (all) fork modes,
- * coordinating parallel execution of multiple workflow branches.
- *
- * @property activityExecutor Executor for activity tasks (HTTP, scripts, emit, etc.)
- */
+internal class EarlyCompletionException(val event: WorkflowEvent.Outcome) : Exception()
+
 @ExperimentalTime
-internal object FullOrchestrator {
+object FullOrchestrator {
 
     private val logger = logger()
-
-    /** Default activity executor for real I/O operations */
-    private val defaultActivityExecutor = DefaultActivityExecutor()
 
     suspend fun start(
         workflow: Workflow,
@@ -55,56 +53,112 @@ internal object FullOrchestrator {
         hasWaitingParent: Boolean = false,
         startedAt: Instant = Clock.System.now(),
         serde: Boolean = false,
-        activityExecutor: ActivityExecutor = defaultActivityExecutor
+        activityExecutor: ActivityExecutor,
+        cloudEventHook: CloudEventHook,
+        lifecycleHook: LifecycleEventHook,
     ): JsonElement {
         val cmd = StepByStepOrchestrator.initCmd(workflowId, workflowInput, hasWaitingParent, startedAt)
-
-        return resume(workflow, cmd, serde, activityExecutor).value()
+        return resume(workflow, cmd, serde, activityExecutor, cloudEventHook, lifecycleHook).value()
     }
 
     suspend fun resume(
         workflow: Workflow,
         command: WorkflowCommand,
         serde: Boolean,
-        activityExecutor: ActivityExecutor = defaultActivityExecutor
+        activityExecutor: ActivityExecutor,
+        cloudEventHook: CloudEventHook,
+        lifecycleHook: LifecycleEventHook,
     ): WorkflowEvent.Outcome {
+        val serdeCommand = validateSerde(command, serde)
+        val event = StepByStepOrchestrator.runByTask(workflow, serdeCommand, workflow.info, lifecycleHook)
+        val serdeEvent = validateSerde(event, serde)
 
-        val serdeCommand = when (serde) {
-            true -> WorkflowState.fromJsonString(command.toJsonString()) as WorkflowCommand
-            false -> command
-        }
-
-        if (command != serdeCommand)
-            throw IllegalStateException("Command mismatch\ncommand     : $command\nserdeCommand: $serdeCommand")
-
-        val event = StepByStepOrchestrator.runByTask(workflow, serdeCommand)
-
-        val serdeEvent = when (serde) {
-            true -> WorkflowState.fromJsonString(event.toJsonString()) as WorkflowEvent
-            false -> event
-        }
-
-        if (event != serdeEvent)
-            throw IllegalStateException("Event mismatch\nevent     : $event\nserdeEvent: $serdeEvent")
-
-        return when (serdeEvent) {
-            is WorkflowEvent.ActivityStarted -> resume(workflow, handle(serdeEvent, activityExecutor), serde, activityExecutor)
-            is WorkflowEvent.WaitStarted -> resume(workflow, handle(serdeEvent), serde, activityExecutor)
-            is WorkflowEvent.TaskScheduled -> resume(workflow, handle(serdeEvent), serde, activityExecutor)
-            is WorkflowEvent.TaskRetryScheduled -> resume(workflow, handle(serdeEvent), serde, activityExecutor)
-            is WorkflowEvent.RunWorkflowStarted -> resume(workflow, handle(serdeEvent, serde, activityExecutor), serde, activityExecutor)
-            is WorkflowEvent.ForkStarted -> resume(workflow, handle(workflow, serdeEvent, serde, activityExecutor), serde, activityExecutor)
-            is WorkflowEvent.Outcome -> serdeEvent
-        }
+        return handleEvent(serdeEvent, workflow, serde, activityExecutor, cloudEventHook, lifecycleHook)
     }
 
-    /**
-     * Handles an ActivityStarted event by executing the activity and resuming with the result.
-     *
-     * Activities are executed via the ActivityExecutor interface, which allows for
-     * different implementations (real I/O vs mocks for testing).
-     */
-    private suspend fun handle(
+    private fun validateSerde(command: WorkflowCommand, serde: Boolean): WorkflowCommand {
+        if (!serde) return command
+        val roundTripped = WorkflowState.fromJsonString(command.toJsonString()) as WorkflowCommand
+        if (command != roundTripped) {
+            throw IllegalStateException("Command mismatch\ncommand     : $command\nserdeCommand: $roundTripped")
+        }
+        return roundTripped
+    }
+
+    private fun validateSerde(event: WorkflowEvent, serde: Boolean): WorkflowEvent {
+        if (!serde) return event
+        val roundTripped = WorkflowState.fromJsonString(event.toJsonString()) as WorkflowEvent
+        if (event != roundTripped) {
+            throw IllegalStateException("Event mismatch\nevent     : $event\nserdeEvent: $roundTripped")
+        }
+        return roundTripped
+    }
+
+    private suspend fun handleEvent(
+        event: WorkflowEvent,
+        workflow: Workflow,
+        serde: Boolean,
+        activityExecutor: ActivityExecutor,
+        cloudEventHook: CloudEventHook,
+        lifecycleHook: LifecycleEventHook,
+    ): WorkflowEvent.Outcome = when (event) {
+        is WorkflowEvent.ActivityStarted -> resumeWith(
+            workflow, handleActivityStarted(event, activityExecutor),
+            serde, activityExecutor, cloudEventHook, lifecycleHook
+        )
+
+        is WorkflowEvent.EmitStarted -> resumeWith(
+            workflow, handleEmitStarted(event, cloudEventHook),
+            serde, activityExecutor, cloudEventHook, lifecycleHook
+        )
+
+        is WorkflowEvent.WaitStarted -> resumeWith(
+            workflow, handleWaitStarted(event),
+            serde, activityExecutor, cloudEventHook, lifecycleHook
+        )
+
+        is WorkflowEvent.TaskScheduled -> resumeWith(
+            workflow, event.resume(),
+            serde, activityExecutor, cloudEventHook, lifecycleHook
+        )
+
+        is WorkflowEvent.TaskRetryScheduled -> resumeWith(
+            workflow, handleTaskRetryScheduled(event),
+            serde, activityExecutor, cloudEventHook, lifecycleHook
+        )
+
+        is WorkflowEvent.RunWorkflowStarted -> resumeWith(
+            workflow, handleRunWorkflowStarted(event, serde, activityExecutor, cloudEventHook, lifecycleHook),
+            serde, activityExecutor, cloudEventHook, lifecycleHook
+        )
+
+        is WorkflowEvent.ForkStarted -> resumeWith(
+            workflow, handleForkStarted(workflow, event, serde, activityExecutor, cloudEventHook, lifecycleHook),
+            serde, activityExecutor, cloudEventHook, lifecycleHook
+        )
+
+        is WorkflowEvent.ListenStarted -> try {
+            resumeWith(
+                workflow, handleListenStarted(workflow, event, serde, activityExecutor, cloudEventHook, lifecycleHook),
+                serde, activityExecutor, cloudEventHook, lifecycleHook
+            )
+        } catch (e: EarlyCompletionException) {
+            e.event
+        }
+
+        is WorkflowEvent.Outcome -> event
+    }
+
+    private suspend fun resumeWith(
+        workflow: Workflow,
+        command: WorkflowCommand,
+        serde: Boolean,
+        activityExecutor: ActivityExecutor,
+        cloudEventHook: CloudEventHook,
+        lifecycleHook: LifecycleEventHook,
+    ): WorkflowEvent.Outcome = resume(workflow, command, serde, activityExecutor, cloudEventHook, lifecycleHook)
+
+    private suspend fun handleActivityStarted(
         event: WorkflowEvent.ActivityStarted,
         activityExecutor: ActivityExecutor
     ): WorkflowCommand {
@@ -119,11 +173,7 @@ internal object FullOrchestrator {
         }
     }
 
-    /**
-     * Handles a retry event by delaying execution until the scheduled retry time
-     * and then resuming the workflow from the specified task.
-     */
-    private suspend fun handle(event: WorkflowEvent.TaskRetryScheduled): WorkflowCommand {
+    private suspend fun handleTaskRetryScheduled(event: WorkflowEvent.TaskRetryScheduled): WorkflowCommand {
         val delayDuration = event.retryAt - Clock.System.now()
         logger.debug { "Retrying in $delayDuration" }
         if (delayDuration > Duration.ZERO) delay(delayDuration)
@@ -131,17 +181,77 @@ internal object FullOrchestrator {
         return event.resume()
     }
 
-    /**
-     * Handles a `RunWorkflowStarted` event by initiating the corresponding child workflow either
-     * synchronously or asynchronously, depending on its configuration.
-     */
-    private suspend fun handle(
+    private suspend fun handleEmitStarted(
+        event: WorkflowEvent.EmitStarted,
+        cloudEventHook: CloudEventHook
+    ): WorkflowCommand {
+        logger.debug { "Emitting CloudEvent: type=${event.config.type} source=${event.config.source}" }
+        val cloudEvent = CloudEventFactory.build(event.config)
+        cloudEventHook.emit(cloudEvent)
+        return event.resume()
+    }
+
+    private suspend fun handleWaitStarted(event: WorkflowEvent.WaitStarted): WorkflowCommand {
+        val delayDuration = event.config.waitUntil - Clock.System.now()
+        logger.debug { "Waiting for $delayDuration" }
+        if (delayDuration > Duration.ZERO) delay(delayDuration)
+        logger.debug { "Waiting completed" }
+        return event.resume()
+    }
+
+    private suspend fun handleListenStarted(
+        workflow: Workflow,
+        listenStarted: WorkflowEvent.ListenStarted,
+        serde: Boolean,
+        activityExecutor: ActivityExecutor,
+        cloudEventHook: CloudEventHook,
+        lifecycleHook: LifecycleEventHook,
+    ): WorkflowCommand {
+        logger.debug { "Listening for CloudEvents: strategy=${listenStarted.config.strategy} filters=${listenStarted.config.filters} until=${listenStarted.config.until}" }
+
+        @Suppress("UNCHECKED_CAST")
+        val listenNode = workflow.getNode(listenStarted.nodePosition) as Node<ListenTask>
+
+        val foreachProcessor = listenNode.foreachBlock?.let { foreachBlock ->
+            ListenEventCollector.createForeachProcessor(foreachBlock.position, foreachBlock.task) { cmd ->
+                resume(workflow, cmd, serde, activityExecutor, cloudEventHook, lifecycleHook)
+            }
+        }
+
+        val timeoutMillis = listenStarted.config.timeoutAt?.let {
+            (it - Clock.System.now()).inWholeMilliseconds.coerceAtLeast(0)
+        } ?: Long.MAX_VALUE
+
+        return try {
+            when (val result = withTimeout(timeoutMillis) {
+                ListenEventCollector.collect(listenStarted, cloudEventHook.receive(), foreachProcessor)
+            }) {
+                is CollectResult.Success -> listenStarted.resumeCompleted(JsonArray(result.outputs))
+                is CollectResult.Failure -> listenFailed(result.nodeStack, listenStarted.nodePosition, result.error)
+                is CollectResult.EscapedToCompletion -> throw EarlyCompletionException(result.event)
+            }
+        } catch (_: TimeoutCancellationException) {
+            val e = IllegalStateException("Listen timeout: no matching CloudEvent received within ${timeoutMillis}ms")
+            listenFailed(listenStarted.nodeStack, listenStarted.nodePosition, e)
+        }
+    }
+
+    private fun listenFailed(nodeStack: NodeStack, position: NodePosition, e: Exception): WorkflowCommand {
+        logger.debug(e) { "Listen failed" }
+        return WorkflowCommand.ResumeWithFailedTask(
+            nodeStack = nodeStack.popUntil(position).incrementTopCounter(),
+            error = InternalException.Error.from(e, position)
+        )
+    }
+
+    private suspend fun handleRunWorkflowStarted(
         event: WorkflowEvent.RunWorkflowStarted,
         serde: Boolean,
-        activityExecutor: ActivityExecutor
+        activityExecutor: ActivityExecutor,
+        cloudEventHook: CloudEventHook,
+        lifecycleHook: LifecycleEventHook,
     ): WorkflowCommand {
-        // Retrieve child workflow definition
-        val childWorkflow = DefinitionCache.getWorkflow(
+        val childWorkflow = WorkflowCache.getWorkflow(
             namespace = event.config.namespace,
             name = event.config.name,
             version = event.config.version
@@ -149,84 +259,61 @@ internal object FullOrchestrator {
 
         return when (event.config.sync) {
             true -> {
-                // synchronous execution
                 val initCmd = StepByStepOrchestrator.initCmd(
                     workflowInput = event.config.input,
                     hasWaitingParent = true
                 )
-                val result = resume(childWorkflow, initCmd, serde, activityExecutor)
+                val result = resume(childWorkflow, initCmd, serde, activityExecutor, cloudEventHook, lifecycleHook)
                 logger.debug { "Child workflow completed" }
                 when (result) {
                     is WorkflowEvent.WorkflowCompleted -> event.resumeAsCompleted(result.output)
-                    is WorkflowEvent.ForkBranchCompleted -> event.resumeAsCompleted(result.output)
                     is WorkflowEvent.WorkflowFailed -> event.resumeAsFailed(result.error)
-                    is WorkflowEvent.ForkBranchFailed -> event.resumeAsFailed(result.error)
+                    else -> throw IllegalStateException("Child workflow returned unexpected outcome: $result")
                 }
             }
 
             false -> {
-                // asynchronous execution
                 CoroutineScope(currentCoroutineContext()).launch {
                     val initCmd = StepByStepOrchestrator.initCmd(
                         workflowInput = event.config.input,
                         hasWaitingParent = false
                     )
-                    resume(childWorkflow, initCmd, serde, activityExecutor) // <= output is not handled
+                    resume(childWorkflow, initCmd, serde, activityExecutor, cloudEventHook, lifecycleHook)
                     logger.debug { "Child workflow completed" }
                 }
-                // Immediate resuming
                 event.resumeAsync()
             }
         }
     }
 
-    /**
-     * Handles the provided `TaskScheduled` event by resuming the workflow from the next task.
-     */
-    private fun handle(event: WorkflowEvent.TaskScheduled): WorkflowCommand = event.resume()
-
-    /**
-     * Handles the provided `WaitStarted` event by waiting until the specified time
-     * and then resumes the workflow from the started task.
-     */
-    private suspend fun handle(event: WorkflowEvent.WaitStarted): WorkflowCommand {
-        val delayDuration = event.config.waitUntil - Clock.System.now()
-        logger.debug { "Waiting for $delayDuration" }
-        if (delayDuration > Duration.ZERO) delay(delayDuration)
-        logger.debug { "Waiting completed" }
-
-        return event.resume()
-    }
-
-    /**
-     * Handles the `ForkStarted` event during workflow execution by determining the type of fork
-     * operation (compete or cooperative), executing the corresponding branches, and resuming
-     * the workflow with the computed output.
-     */
-    private suspend fun handle(
+    @Suppress("UNCHECKED_CAST")
+    private suspend fun handleForkStarted(
         workflow: Workflow,
         event: WorkflowEvent.ForkStarted,
         serde: Boolean,
-        activityExecutor: ActivityExecutor
+        activityExecutor: ActivityExecutor,
+        cloudEventHook: CloudEventHook,
+        lifecycleHook: LifecycleEventHook,
     ): WorkflowCommand {
-        @Suppress("UNCHECKED_CAST")
         val forkNode = workflow.getNode(event.nodePosition) as Node<ForkTask>
+        val branches = forkNode.branches.ifEmpty {
+            throw IllegalStateException("Fork node in ${forkNode.position} has no branches")
+        }
 
-        val branches = forkNode.children
-            ?: throw IllegalStateException("Fork node in ${forkNode.position} has no branches")
-
-        // Execute branches and get the result
         return try {
             val output = if (forkNode.task.fork.isCompete) {
-                workflow.executeCompete(event.nodeStack, branches, event.rawInput, serde, activityExecutor)
+                ForkBranchExecutor.executeCompete(
+                    workflow, event.nodeStack, branches, event.rawInput,
+                    serde, activityExecutor, cloudEventHook, lifecycleHook, ::resume
+                )
             } else {
-                workflow.executeCooperative(event.nodeStack, branches, event.rawInput, serde, activityExecutor)
+                ForkBranchExecutor.executeCooperative(
+                    workflow, event.nodeStack, branches, event.rawInput,
+                    serde, activityExecutor, cloudEventHook, lifecycleHook, ::resume
+                )
             }
             logger.debug { "Fork completed: output=$output" }
-            WorkflowCommand.ResumeWithCompletedTask(
-                nodeStack = event.nodeStack,
-                rawOutput = output,
-            )
+            WorkflowCommand.ResumeWithCompletedTask(nodeStack = event.nodeStack, rawOutput = output)
         } catch (e: InternalException) {
             logger.error { "Fork failed: error=$e" }
             WorkflowCommand.ResumeWithFailedTask(
@@ -236,62 +323,5 @@ internal object FullOrchestrator {
         }
     }
 
-    /**
-     * Execute fork branches in compete mode (race for first completion).
-     *
-     * Returns the output from the first branch to complete successfully.
-     * Throws an exception if all branches fail.
-     */
-    private suspend fun Workflow.executeCompete(
-        nodeStack: NodeStack,
-        branches: List<Node<*>>,
-        rawInput: JsonElement,
-        serde: Boolean,
-        activityExecutor: ActivityExecutor
-    ): JsonElement {
-        // Get the first success - if all branches failed, the last exception will be rethrown from here
-        return branches.mapAwaitFirstFailSlow { branchNode ->
-            resume(
-                workflow = this,
-                command = WorkflowCommand.ResumeFromTask(
-                    nodeStack = nodeStack,
-                    nodePosition = branchNode.position,
-                    rawInput = rawInput,
-                    flowDirective = null
-                ),
-                serde = serde,
-                activityExecutor = activityExecutor
-            ).value()
-        }
-    }
 
-    /**
-     * Execute fork branches in cooperative mode (wait for all).
-     *
-     * Returns an array containing outputs from all branches.
-     * Throws an exception for the first branch failing.
-     */
-    private suspend fun Workflow.executeCooperative(
-        nodeStack: NodeStack,
-        branches: List<Node<*>>,
-        rawInput: JsonElement,
-        serde: Boolean,
-        activityExecutor: ActivityExecutor
-    ): JsonArray {
-        // Get all results - If a branch failed, the first exception will be rethrown from here
-        return JsonArray(
-            branches.mapAwaitAllFailFast { branchNode ->
-                resume(
-                    workflow = this,
-                    command = WorkflowCommand.ResumeFromTask(
-                        nodeStack = nodeStack,
-                        nodePosition = branchNode.position,
-                        rawInput = rawInput,
-                        flowDirective = null
-                    ),
-                    serde = serde,
-                    activityExecutor = activityExecutor
-                ).value()
-            })
-    }
 }

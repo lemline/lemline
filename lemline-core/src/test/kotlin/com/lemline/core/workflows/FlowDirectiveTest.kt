@@ -2,6 +2,11 @@
 package com.lemline.core.workflows
 
 import com.lemline.common.json.LemlineJson
+import com.lemline.core.tasks.FlowDirective
+import com.lemline.core.tasks.FlowDirectiveEnum
+import com.lemline.core.tasks.FlowDirectiveGoto
+import com.lemline.core.tasks.toJava
+import com.lemline.core.tasks.toKotlin
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertNotEquals
@@ -306,57 +311,6 @@ class FlowDirectiveTest {
             val convertedBack = javaDirective.toKotlin()
             assertEquals(kotlinDirective, convertedBack)
         }
-    }
-
-    // ========================================
-    // Type Hierarchy and Equality Tests
-    // ========================================
-
-    @Test
-    fun `FlowDirectiveEnum types should be instances of FlowDirective`() {
-        // Given/When/Then
-        assertTrue(FlowDirectiveEnum.Continue is FlowDirective)
-        assertTrue(FlowDirectiveEnum.Exit is FlowDirective)
-        assertTrue(FlowDirectiveEnum.End is FlowDirective)
-    }
-
-    @Test
-    fun `FlowDirectiveGoto should be instance of FlowDirective`() {
-        // Given
-        val goto = FlowDirectiveGoto("task")
-
-        // When/Then
-        assertTrue(goto is FlowDirective)
-    }
-
-    @Test
-    fun `FlowDirectiveEnum Continue should be singleton`() {
-        // Given/When
-        val continue1 = FlowDirectiveEnum.Continue
-        val continue2 = FlowDirectiveEnum.Continue
-
-        // Then
-        assertTrue(continue1 === continue2)
-    }
-
-    @Test
-    fun `FlowDirectiveEnum Exit should be singleton`() {
-        // Given/When
-        val exit1 = FlowDirectiveEnum.Exit
-        val exit2 = FlowDirectiveEnum.Exit
-
-        // Then
-        assertTrue(exit1 === exit2)
-    }
-
-    @Test
-    fun `FlowDirectiveEnum End should be singleton`() {
-        // Given/When
-        val end1 = FlowDirectiveEnum.End
-        val end2 = FlowDirectiveEnum.End
-
-        // Then
-        assertTrue(end1 === end2)
     }
 
     @Test

@@ -1,10 +1,13 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.testcases
 
-import com.lemline.core.testcases.WorkflowTestValidators.expectOutputMatching
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.int
-import kotlinx.serialization.json.jsonPrimitive
+import com.lemline.core.testcases.impl.WorkflowTestCase
+import com.lemline.core.testcases.impl.WorkflowTestValidators.expectOutput
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
+import kotlinx.serialization.json.putJsonObject
 
 /**
  * Test cases for SetTask execution.
@@ -23,12 +26,13 @@ object SetTaskTestCases {
                         text: "hello"
                         flag: true
             """.trimIndent(),
-            validate = expectOutputMatching("number=42, text=hello, flag=true") { output ->
-                val obj = output as? JsonObject ?: return@expectOutputMatching false
-                obj["number"]?.jsonPrimitive?.int == 42 &&
-                    obj["text"]?.jsonPrimitive?.content == "hello" &&
-                    obj["flag"]?.jsonPrimitive?.content == "true"
-            }
+            validate = expectOutput(
+                buildJsonObject {
+                    put("number", 42)
+                    put("text", "hello")
+                    put("flag", true)
+                }
+            )
         ),
 
         WorkflowTestCase(
@@ -39,10 +43,7 @@ object SetTaskTestCases {
                       set:
                         result: ${ 10 + 20 }
             """.trimIndent(),
-            validate = expectOutputMatching("result=30") { output ->
-                val obj = output as? JsonObject ?: return@expectOutputMatching false
-                obj["result"]?.jsonPrimitive?.int == 30
-            }
+            validate = expectOutput(buildJsonObject { put("result", 30) })
         ),
 
         WorkflowTestCase(
@@ -56,10 +57,7 @@ object SetTaskTestCases {
                       set:
                         value: 20
             """.trimIndent(),
-            validate = expectOutputMatching("value=20") { output ->
-                val obj = output as? JsonObject ?: return@expectOutputMatching false
-                obj["value"]?.jsonPrimitive?.int == 20
-            }
+            validate = expectOutput(buildJsonObject { put("value", 20) })
         ),
 
         WorkflowTestCase(
@@ -72,12 +70,14 @@ object SetTaskTestCases {
                           name: Alice
                           age: 30
             """.trimIndent(),
-            validate = expectOutputMatching("user.name=Alice, user.age=30") { output ->
-                val obj = output as? JsonObject ?: return@expectOutputMatching false
-                val user = obj["user"] as? JsonObject ?: return@expectOutputMatching false
-                user["name"]?.jsonPrimitive?.content == "Alice" &&
-                    user["age"]?.jsonPrimitive?.int == 30
-            }
+            validate = expectOutput(
+                buildJsonObject {
+                    putJsonObject("user") {
+                        put("name", "Alice")
+                        put("age", 30)
+                    }
+                }
+            )
         ),
 
         WorkflowTestCase(
@@ -89,10 +89,28 @@ object SetTaskTestCases {
                         numbers: [1, 2, 3]
                         strings: ["a", "b", "c"]
             """.trimIndent(),
-            validate = expectOutputMatching("arrays created") { output ->
-                val obj = output as? JsonObject ?: return@expectOutputMatching false
-                obj.containsKey("numbers") && obj.containsKey("strings")
-            }
+            validate = expectOutput(
+                buildJsonObject {
+                    put(
+                        "numbers", JsonArray(
+                            listOf(
+                                JsonPrimitive(1),
+                                JsonPrimitive(2),
+                                JsonPrimitive(3)
+                            )
+                        )
+                    )
+                    put(
+                        "strings", JsonArray(
+                            listOf(
+                                JsonPrimitive("a"),
+                                JsonPrimitive("b"),
+                                JsonPrimitive("c")
+                            )
+                        )
+                    )
+                }
+            )
         )
     )
 }

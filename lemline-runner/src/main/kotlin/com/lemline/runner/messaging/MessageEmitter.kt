@@ -16,7 +16,7 @@ import org.eclipse.microprofile.reactive.messaging.Message
  * Generic type T must be JsonSerializable to support toJsonString() method.
  */
 @ExperimentalTime
-internal abstract class MessageEmitter<T : JsonSerializable> {
+abstract class MessageEmitter<T : JsonSerializable> {
 
     protected abstract val emitter: MutinyEmitter<String>
 

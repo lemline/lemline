@@ -200,14 +200,11 @@ This project is licensed under the [Business Source License 1.1](LICENSE.md).
 
 - [x] PostgreSQL
 - [x] MySQL
-- [ ] Oracle
-- [ ] SQL Server
 
 ### Message Brokers
 
 - [x] Kafka
 - [x] RabbitMQ
-- [ ] Pulsar
 - [ ] Amazon SQS
 - [ ] Google Pub/Sub
 - [ ] Azure Service Bus
@@ -219,8 +216,8 @@ This project is licensed under the [Business Source License 1.1](LICENSE.md).
 - [x] Do
 - [x] Raise
 - [x] For
-- [ ] Listen
-- [ ] Emit
+- [x] Listen
+- [x] Emit
 - [x] Fork
 
 - Try:
@@ -272,12 +269,14 @@ This project is licensed under the [Business Source License 1.1](LICENSE.md).
     - [ ] Workflow
     - [ ] Task
 
+- [ ] Pause/Resume workflows
+
 - [x] Schedule
 
 ### Lifecycle events
 
-- [ ] Workflow
-- [ ] Tasks
+- [x] Workflow
+- [x] Tasks
 
 ### Others
 

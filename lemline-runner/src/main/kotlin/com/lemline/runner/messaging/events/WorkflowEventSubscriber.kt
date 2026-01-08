@@ -4,7 +4,7 @@ package com.lemline.runner.messaging.events
 import com.lemline.core.states.WorkflowEvent
 import com.lemline.runner.config.EVENTS_CONSUMER_CONCURRENCY
 import com.lemline.runner.config.EVENTS_CONSUMER_ENABLED
-import com.lemline.runner.messaging.InstanceMessage
+import com.lemline.runner.common.messaging.InstanceMessage
 import com.lemline.runner.messaging.MessageSubscriber
 import io.quarkus.runtime.Startup
 import jakarta.enterprise.context.ApplicationScoped

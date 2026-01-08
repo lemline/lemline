@@ -1,11 +1,17 @@
 // SPDX-License-Identifier: BUSL-1.1
+@file:OptIn(ExperimentalTime::class)
+
 package com.lemline.runner.testcases.rabbitmq
 
+import com.lemline.runner.config.CLOUDEVENTS_CONSUMER_ENABLED
+import com.lemline.runner.config.CLOUDEVENTS_PRODUCER_ENABLED
 import com.lemline.runner.config.COMMANDS_CONSUMER_ENABLED
+import kotlin.time.ExperimentalTime
 import com.lemline.runner.config.COMMANDS_PRODUCER_ENABLED
 import com.lemline.runner.config.DATABASE_TYPE
 import com.lemline.runner.config.EVENTS_CONSUMER_ENABLED
 import com.lemline.runner.config.EVENTS_PRODUCER_ENABLED
+import com.lemline.runner.config.LIFECYCLE_EVENTS_PRODUCER_ENABLED
 import com.lemline.runner.config.LemlineConfigConstants
 import com.lemline.runner.config.MESSAGING_TYPE
 import com.lemline.runner.config.ORCHESTRATOR_MODE
@@ -21,6 +27,7 @@ import io.quarkus.test.junit.QuarkusTestProfile
  * This profile configures:
  * - H2 (in-memory) database for persistence
  * - RabbitMQ channels with loopback via shared exchanges
+ * - Lifecycle events with loopback for test verification
  * - Outbox schedulers enabled with fast polling for Wait/Fork/Retry tests
  */
 class RabbitMQTestCaseProfile : QuarkusTestProfile {
@@ -35,6 +42,11 @@ class RabbitMQTestCaseProfile : QuarkusTestProfile {
             COMMANDS_PRODUCER_ENABLED to "true",
             EVENTS_CONSUMER_ENABLED to "true",
             EVENTS_PRODUCER_ENABLED to "true",
+            CLOUDEVENTS_CONSUMER_ENABLED to "true",
+            CLOUDEVENTS_PRODUCER_ENABLED to "true",
+
+            // Enable lifecycle events producer so events flow through the broker
+            LIFECYCLE_EVENTS_PRODUCER_ENABLED to "true",
 
             // Orchestrator mode: ALL generates more messages for thorough end-to-end testing
             ORCHESTRATOR_MODE to "all",
@@ -54,15 +66,33 @@ class RabbitMQTestCaseProfile : QuarkusTestProfile {
             "mp.messaging.outgoing.events-out.exchange.name" to "lemline-events-exchange",
             "mp.messaging.outgoing.events-out.exchange.type" to "fanout",
 
+            // Lifecycle events loopback - same exchange for producer and test listener
+            "mp.messaging.outgoing.lifecycleevents-out.exchange.name" to "lemline-lifecycle-exchange",
+            "mp.messaging.outgoing.lifecycleevents-out.exchange.type" to "fanout",
+            "mp.messaging.incoming.lifecycleevents-in.connector" to "smallrye-rabbitmq",
+            "mp.messaging.incoming.lifecycleevents-in.queue.name" to "lemline-lifecycle-test",
+            "mp.messaging.incoming.lifecycleevents-in.exchange.name" to "lemline-lifecycle-exchange",
+            "mp.messaging.incoming.lifecycleevents-in.exchange.type" to "fanout",
+
+            // CloudEvents loopback - same exchange for in/out
+            "mp.messaging.incoming.cloudevents-in.queue.name" to "lemline-cloudevents",
+            "mp.messaging.incoming.cloudevents-in.exchange.name" to "lemline-cloudevents-exchange",
+            "mp.messaging.incoming.cloudevents-in.exchange.type" to "fanout",
+            "mp.messaging.outgoing.cloudevents-out.exchange.name" to "lemline-cloudevents-exchange",
+            "mp.messaging.outgoing.cloudevents-out.exchange.type" to "fanout",
+
             // Enable outbox schedulers for Wait/Fork/Retry tests
             "lemline.outbox.enabled" to "true",
-            // Fast polling for tests (1s interval, no initial delay)
+            // Fast polling for tests (no jitter - start immediately for deterministic testing)
             "lemline.outbox.wait.outbox.every" to "1s",
-            "lemline.outbox.wait.outbox.initial-delay" to "1s",
+            "lemline.outbox.wait.outbox.initial-jitter" to "0s",
             "lemline.outbox.retry.outbox.every" to "1s",
-            "lemline.outbox.retry.outbox.initial-delay" to "1s",
+            "lemline.outbox.retry.outbox.initial-jitter" to "0s",
             "lemline.outbox.schedule.outbox.every" to "1s",
-            "lemline.outbox.schedule.outbox.initial-delay" to "1s"
+            "lemline.outbox.schedule.outbox.initial-jitter" to "0s",
+            // Listener outbox config (for listen task tests)
+            "lemline.outbox.listener.outbox.every" to "1s",
+            "lemline.outbox.listener.outbox.initial-jitter" to "0s"
         )
     }
 

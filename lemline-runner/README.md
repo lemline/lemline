@@ -182,7 +182,8 @@ lemline:
         outbox:
             every: "10s"
             batch-size: 1000
-            initial-delay: "30s"
+            initial-jitter: "3s"   # Random delay before first poll (0 to this value)
+            retry-delay: "30s"     # Base delay for exponential backoff on failures
             max-attempts: 5
         cleanup:
             every: "1h"
@@ -194,7 +195,8 @@ lemline:
         outbox:
             every: "10s"
             batch-size: 1000
-            initial-delay: "30s"
+            initial-jitter: "3s"
+            retry-delay: "30s"
             max-attempts: 5
         cleanup:
             every: "1h"

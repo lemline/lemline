@@ -2,8 +2,20 @@
 package com.lemline.core.orchestrator
 
 import com.lemline.common.values.WorkflowId
-import com.lemline.core.definitions.DefinitionCache
+import com.lemline.core.activities.ActivityExecutor
+import com.lemline.core.activities.mock.HttpMockMatcher
+import com.lemline.core.activities.mock.HttpMockResponse
+import com.lemline.core.activities.mock.HttpMockRule
+import com.lemline.core.activities.mock.MockActivityExecutor
+import com.lemline.core.activities.mock.MockConfiguration
+import com.lemline.core.activities.mock.ShellMockMatcher
+import com.lemline.core.activities.mock.ShellMockResponse
+import com.lemline.core.activities.mock.ShellMockRule
+import com.lemline.core.cloudevents.CloudEventHook
+import com.lemline.core.cloudevents.InMemoryCloudEventHook
 import com.lemline.core.getWorkflowToTest
+import com.lemline.core.lifecycleevents.LifecycleEventHook
+import com.lemline.core.workflows.WorkflowCache
 import io.kotest.core.spec.style.FunSpec
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -20,6 +32,7 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.int
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.put
 
 /**
  * Abstract base class providing shared test scenarios for workflow orchestrators.
@@ -64,6 +77,8 @@ class OrchestratorTest : FunSpec() {
         namespace: String = "default",
         name: String = "test",
         version: String = "0.1.0",
+        activityExecutor: ActivityExecutor = MockActivityExecutor.empty(),
+        cloudEventHook: CloudEventHook = InMemoryCloudEventHook(),
     ): JsonElement {
         val workflow = getWorkflowToTest(yaml, namespace, name, version)
 
@@ -78,6 +93,9 @@ class OrchestratorTest : FunSpec() {
             workflow = workflow,
             command = startState,
             serde = true,
+            activityExecutor = activityExecutor,
+            cloudEventHook = cloudEventHook,
+            lifecycleHook = LifecycleEventHook.NOOP,
         )
 
         return outcome.value()
@@ -85,7 +103,7 @@ class OrchestratorTest : FunSpec() {
 
     init {
         afterEach {
-            DefinitionCache.clear()
+            WorkflowCache.clear()
         }
 
         // ========================================
@@ -138,6 +156,20 @@ class OrchestratorTest : FunSpec() {
         // ========================================
 
         test("should execute HTTP call activity completely") {
+            val mockExecutor = MockActivityExecutor(
+                MockConfiguration(
+                    httpMocks = listOf(
+                        HttpMockRule(
+                            match = HttpMockMatcher(url = "*jsonplaceholder*", method = "GET"),
+                            response = HttpMockResponse(body = buildJsonObject {
+                                put("id", 1)
+                                put("title", "Test Post")
+                                put("body", "Test Body")
+                            })
+                        )
+                    )
+                )
+            )
             val yaml = """
                 do:
                   - getPost:
@@ -146,15 +178,25 @@ class OrchestratorTest : FunSpec() {
                         method: GET
                         endpoint: https://jsonplaceholder.typicode.com/posts/1
             """
-            val output = executeWorkflow(yaml, JsonObject(emptyMap())) as JsonObject
+            val output = executeWorkflow(yaml, JsonObject(emptyMap()), activityExecutor = mockExecutor) as JsonObject
 
-            // Should complete the HTTP call and return the result
+            // Should complete the HTTP call and return the mocked result
             assertEquals(1, output["id"]?.jsonPrimitive?.int)
             assertTrue(output.containsKey("title"))
             assertTrue(output.containsKey("body"))
         }
 
         test("should execute shell command activity completely") {
+            val mockExecutor = MockActivityExecutor(
+                MockConfiguration(
+                    shellMocks = listOf(
+                        ShellMockRule(
+                            match = ShellMockMatcher(command = "echo*"),
+                            response = ShellMockResponse(stdout = "Hello World")
+                        )
+                    )
+                )
+            )
             val yaml = """
                 do:
                   - echoCommand:
@@ -162,13 +204,27 @@ class OrchestratorTest : FunSpec() {
                         shell:
                           command: echo "Hello World"
             """
-            val output = executeWorkflow(yaml, JsonObject(emptyMap()))
+            val output = executeWorkflow(yaml, JsonObject(emptyMap()), activityExecutor = mockExecutor)
 
             // Should complete the shell command and return stdout as JsonPrimitive
             assertEquals("Hello World", (output as JsonPrimitive).content)
         }
 
         test("should execute multiple activities in sequence") {
+            val mockExecutor = MockActivityExecutor(
+                MockConfiguration(
+                    httpMocks = listOf(
+                        HttpMockRule(
+                            match = HttpMockMatcher(url = "*posts/1"),
+                            response = HttpMockResponse(body = buildJsonObject { put("id", 1) })
+                        ),
+                        HttpMockRule(
+                            match = HttpMockMatcher(url = "*posts/2"),
+                            response = HttpMockResponse(body = buildJsonObject { put("id", 2) })
+                        )
+                    )
+                )
+            )
             val yaml = """
                 do:
                   - firstCall:
@@ -182,9 +238,9 @@ class OrchestratorTest : FunSpec() {
                         method: GET
                         endpoint: https://jsonplaceholder.typicode.com/posts/2
             """
-            val output = executeWorkflow(yaml, JsonObject(emptyMap())) as JsonObject
+            val output = executeWorkflow(yaml, JsonObject(emptyMap()), activityExecutor = mockExecutor) as JsonObject
 
-            // Should complete both HTTP calls
+            // Should complete both HTTP calls (last one wins as output)
             assertEquals(2, output["id"]?.jsonPrimitive?.int)
         }
 
@@ -535,6 +591,7 @@ class OrchestratorTest : FunSpec() {
         // ========================================
 
         test("should execute emit task and continue workflow") {
+            val cloudEventHook = InMemoryCloudEventHook()
             val yaml = $$"""
                 do:
                   - setValue:
@@ -553,41 +610,46 @@ class OrchestratorTest : FunSpec() {
                         status: "order_emitted"
                         orderId: ${ .orderId }
             """
-            val output = executeWorkflow(yaml, JsonObject(emptyMap())) as JsonObject
+            val output = executeWorkflow(yaml, JsonObject(emptyMap()), cloudEventHook = cloudEventHook) as JsonObject
 
             // Should continue execution after emit task (fire-and-forget)
             assertEquals("order_emitted", output["status"]?.jsonPrimitive?.content)
             assertEquals("12345", output["orderId"]?.jsonPrimitive?.content)
+
+            // Verify CloudEvent was emitted via hook
+            assertEquals(1, cloudEventHook.emittedEvents.size)
+            assertEquals("com.petstore.order.placed.v1", cloudEventHook.emittedEvents[0].type)
         }
 
-        test("should emit CloudEvent with expression-evaluated properties") {
-            val yaml = $$"""
+        test("should emit CloudEvent with literal properties") {
+            val cloudEventHook = InMemoryCloudEventHook()
+            val yaml = """
                 do:
-                  - prepareEvent:
-                      set:
-                        eventType: "com.example.test"
-                        eventSource: "https://example.com"
-                        payload:
-                          key: "value"
                   - emitEvent:
                       emit:
                         event:
                           with:
-                            source: ${ .eventSource }
-                            type: ${ .eventType }
-                            subject: "test-subject"
-                            data: ${ .payload }
+                            source: https://example.com
+                            type: com.example.test
+                            subject: test-subject
                   - setComplete:
                       set:
                         completed: true
             """
-            val output = executeWorkflow(yaml, JsonObject(emptyMap())) as JsonObject
+            val output = executeWorkflow(yaml, JsonObject(emptyMap()), cloudEventHook = cloudEventHook) as JsonObject
 
             // Should complete after emitting
             assertEquals(true, output["completed"]?.jsonPrimitive?.boolean)
+
+            // Verify CloudEvent properties
+            assertEquals(1, cloudEventHook.emittedEvents.size)
+            assertEquals("com.example.test", cloudEventHook.emittedEvents[0].type)
+            assertEquals("https://example.com", cloudEventHook.emittedEvents[0].source.toString())
+            assertEquals("test-subject", cloudEventHook.emittedEvents[0].subject)
         }
 
         test("should execute multiple emit tasks in sequence") {
+            val cloudEventHook = InMemoryCloudEventHook()
             val yaml = """
                 do:
                   - emit1:
@@ -606,13 +668,19 @@ class OrchestratorTest : FunSpec() {
                       set:
                         eventCount: 2
             """
-            val output = executeWorkflow(yaml, JsonObject(emptyMap())) as JsonObject
+            val output = executeWorkflow(yaml, JsonObject(emptyMap()), cloudEventHook = cloudEventHook) as JsonObject
 
             // Both emit tasks should complete
             assertEquals(2, output["eventCount"]?.jsonPrimitive?.int)
+
+            // Verify both events were emitted
+            assertEquals(2, cloudEventHook.emittedEvents.size)
+            assertEquals("com.example.event1", cloudEventHook.emittedEvents[0].type)
+            assertEquals("com.example.event2", cloudEventHook.emittedEvents[1].type)
         }
 
         test("should emit task in a loop") {
+            val cloudEventHook = InMemoryCloudEventHook()
             val yaml = $$"""
                 do:
                   - initialize:
@@ -637,10 +705,13 @@ class OrchestratorTest : FunSpec() {
                       output:
                         as: ${ . }
             """
-            val output = executeWorkflow(yaml, JsonObject(emptyMap())) as JsonObject
+            val output = executeWorkflow(yaml, JsonObject(emptyMap()), cloudEventHook = cloudEventHook) as JsonObject
 
             // Should emit for each item
             assertEquals(3, output["count"]?.jsonPrimitive?.int)
+
+            // Verify 3 events were emitted
+            assertEquals(3, cloudEventHook.emittedEvents.size)
         }
     }
 }

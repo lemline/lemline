@@ -1,11 +1,14 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.testcases
 
-import com.lemline.core.testcases.WorkflowTestValidators.expectErrorContaining
-import com.lemline.core.testcases.WorkflowTestValidators.expectOutputMatching
+import com.lemline.core.testcases.impl.WorkflowTestCase
+import com.lemline.core.testcases.impl.WorkflowTestValidators.expectErrorContaining
+import com.lemline.core.testcases.impl.WorkflowTestValidators.expectOutput
+
 import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.int
+import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.put
 
 /**
  * Test cases for TryTask execution.
@@ -32,11 +35,12 @@ object TryTaskTestCases {
                                 caught: true
                                 errorHandled: "yes"
             """.trimIndent(),
-            validate = expectOutputMatching("caught=true, errorHandled=yes") { output ->
-                val obj = output as? JsonObject ?: return@expectOutputMatching false
-                obj["caught"]?.jsonPrimitive?.content == "true" &&
-                    obj["errorHandled"]?.jsonPrimitive?.content == "yes"
-            }
+            validate = expectOutput(
+                buildJsonObject {
+                    put("caught", true)
+                    put("errorHandled", "yes")
+                }
+            )
         ),
 
         WorkflowTestCase(
@@ -82,10 +86,7 @@ object TryTaskTestCases {
                               set:
                                 caught: true
             """.trimIndent(),
-            validate = expectOutputMatching("caught=true") { output ->
-                val obj = output as? JsonObject ?: return@expectOutputMatching false
-                obj["caught"]?.jsonPrimitive?.content == "true"
-            }
+            validate = expectOutput(buildJsonObject { put("caught", true) })
         ),
 
         WorkflowTestCase(
@@ -131,10 +132,7 @@ object TryTaskTestCases {
                               set:
                                 caught: true
             """.trimIndent(),
-            validate = expectOutputMatching("caught=true") { output ->
-                val obj = output as? JsonObject ?: return@expectOutputMatching false
-                obj["caught"]?.jsonPrimitive?.content == "true"
-            }
+            validate = expectOutput(buildJsonObject { put("caught", true) })
         ),
 
         WorkflowTestCase(
@@ -155,11 +153,12 @@ object TryTaskTestCases {
                                 errorType: ${ $error.type }
                                 errorStatus: ${ $error.status }
             """.trimIndent(),
-            validate = expectOutputMatching("errorType and errorStatus set") { output ->
-                val obj = output as? JsonObject ?: return@expectOutputMatching false
-                obj["errorType"]?.jsonPrimitive?.content == "https://serverlessworkflow.io/spec/1.0.0/errors/runtime" &&
-                    obj["errorStatus"]?.jsonPrimitive?.int == 500
-            }
+            validate = expectOutput(
+                buildJsonObject {
+                    put("errorType", "https://serverlessworkflow.io/spec/1.0.0/errors/runtime")
+                    put("errorStatus", 500)
+                }
+            )
         ),
 
         WorkflowTestCase(
@@ -181,11 +180,12 @@ object TryTaskTestCases {
                                 issueType: ${ $issue.type }
                                 issueStatus: ${ $issue.status }
             """.trimIndent(),
-            validate = expectOutputMatching("issueType and issueStatus set") { output ->
-                val obj = output as? JsonObject ?: return@expectOutputMatching false
-                obj["issueType"]?.jsonPrimitive?.content == "https://serverlessworkflow.io/spec/1.0.0/errors/runtime" &&
-                    obj["issueStatus"]?.jsonPrimitive?.int == 500
-            }
+            validate = expectOutput(
+                buildJsonObject {
+                    put("issueType", "https://serverlessworkflow.io/spec/1.0.0/errors/runtime")
+                    put("issueStatus", 500)
+                }
+            )
         ),
 
         WorkflowTestCase(
@@ -206,10 +206,7 @@ object TryTaskTestCases {
                               set:
                                 caught: true
             """.trimIndent(),
-            validate = expectOutputMatching("caught=true") { output ->
-                val obj = output as? JsonObject ?: return@expectOutputMatching false
-                obj["caught"]?.jsonPrimitive?.content == "true"
-            }
+            validate = expectOutput(buildJsonObject { put("caught", true) })
         ),
 
         WorkflowTestCase(
@@ -251,11 +248,7 @@ object TryTaskTestCases {
                       set:
                         final: ${ .success }
             """.trimIndent(),
-            validate = expectOutputMatching("final=true, no caught") { output ->
-                val obj = output as? JsonObject ?: return@expectOutputMatching false
-                obj["final"]?.jsonPrimitive?.content == "true" &&
-                    !obj.containsKey("caught")
-            }
+            validate = expectOutput(buildJsonObject { put("final", true) })
         ),
 
         WorkflowTestCase(
@@ -279,10 +272,7 @@ object TryTaskTestCases {
                               set:
                                 caught: true
             """.trimIndent(),
-            validate = expectOutputMatching("caught=true") { output ->
-                val obj = output as? JsonObject ?: return@expectOutputMatching false
-                obj["caught"]?.jsonPrimitive?.content == "true"
-            }
+            validate = expectOutput(buildJsonObject { put("caught", true) })
         ),
 
         WorkflowTestCase(
@@ -308,10 +298,7 @@ object TryTaskTestCases {
                               set:
                                 receivedValue: ${ .initialValue }
             """.trimIndent(),
-            validate = expectOutputMatching("receivedValue=42") { output ->
-                val obj = output as? JsonObject ?: return@expectOutputMatching false
-                obj["receivedValue"]?.jsonPrimitive?.int == 42
-            }
+            validate = expectOutput(buildJsonObject { put("receivedValue", 42) })
         )
     )
 }

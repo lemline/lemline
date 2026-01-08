@@ -62,7 +62,7 @@ class RunWorkflowProcessor(
 
     override val isAsync = true
 
-    override fun stateEnterFromParent(transformedInput: JsonElement, scope: Scope) = RunState()
+    override fun stateWhenEnteringFromParent(transformedInput: JsonElement, scope: Scope) = RunState()
 
     /**
      * Prepares and handles the event for starting a sub-workflow.

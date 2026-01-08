@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.tests.resources
 
+import com.lemline.runner.common.test.DockerAvailability
 import io.quarkus.test.common.QuarkusTestResourceLifecycleManager
 import org.testcontainers.containers.Network
 import org.testcontainers.containers.RabbitMQContainer
@@ -12,6 +13,10 @@ class RabbitMQTestResource : QuarkusTestResourceLifecycleManager {
     private lateinit var network: Network
 
     override fun start(): Map<String, String> {
+        if (!DockerAvailability.isAvailable) {
+            return emptyMap()
+        }
+
         // Create a network for RabbitMQ
         network = Network.newNetwork()
 

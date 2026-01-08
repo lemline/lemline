@@ -7,6 +7,8 @@ import io.serverlessworkflow.api.types.Workflow
 import io.serverlessworkflow.impl.expressions.DateTimeDescriptor
 import org.eclipse.microprofile.config.Config
 import org.flywaydb.core.Flyway
+import kotlin.reflect.KTypeProjection
+import kotlin.reflect.KVariance
 
 /**
  * The @RegisterForReflection annotation is used to ensure that the specified classes and their hierarchies
@@ -27,7 +29,12 @@ import org.flywaydb.core.Flyway
         DateTimeDescriptor::class,
         Config::class,
         AgroalDataSource::class,
-        Flyway::class
+        Flyway::class,
+        KTypeProjection::class,
+        KVariance::class
+    ],
+    classNames = [
+        "[Lkotlin.reflect.KTypeProjection;"  // Array of KTypeProjection
     ],
     registerFullHierarchy = true
 )

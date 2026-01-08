@@ -42,6 +42,10 @@ const val EVENTS_CONSUMER_ENABLED = "lemline.messaging.events.consumer.enabled"
 const val EVENTS_CONSUMER_CONCURRENCY = "lemline.messaging.events.consumer.concurrency"
 
 const val CLOUDEVENTS_PRODUCER_ENABLED = "lemline.messaging.cloudevents.producer.enabled"
+const val CLOUDEVENTS_CONSUMER_ENABLED = "lemline.messaging.cloudevents.consumer.enabled"
+const val CLOUDEVENTS_CONSUMER_CONCURRENCY = "lemline.messaging.cloudevents.consumer.concurrency"
+
+const val LIFECYCLE_EVENTS_PRODUCER_ENABLED = "lemline.messaging.lifecycleevents.producer.enabled"
 
 const val ORCHESTRATOR_MODE = "lemline.orchestrator.mode"
 
@@ -79,6 +83,7 @@ interface LemlineConfiguration {
     fun orchestrator(): OrchestratorConfig
     fun outbox(): OutboxConfig
     fun metrics(): MetricsConfig
+    fun definitions(): Optional<DefinitionsConfig>
 
     /**
      * Database configuration mapping.
@@ -173,6 +178,8 @@ interface LemlineConfiguration {
 
         fun cloudevents(): Optional<CloudEventsChannelConfig>
 
+        fun lifecycleevents(): Optional<LifecycleEventsChannelConfig>
+
         /**
          * Optional Kafka configuration
          */
@@ -203,10 +210,20 @@ interface LemlineConfiguration {
     }
 
     /**
-     * CloudEvents channel configuration (producer-only).
-     * Used for emitting CloudEvents to external consumers.
+     * CloudEvents channel configuration.
+     * Used for emitting CloudEvents to external systems and consuming CloudEvents for listen tasks.
      */
     interface CloudEventsChannelConfig {
+        fun producer(): ProducerConfig
+        fun consumer(): ConsumerConfig
+    }
+
+    /**
+     * Lifecycle events channel configuration.
+     * Used for emitting workflow and task lifecycle events as CloudEvents to external systems.
+     * This is a producer-only channel - lifecycle events are for external consumption.
+     */
+    interface LifecycleEventsChannelConfig {
         fun producer(): ProducerConfig
     }
 
@@ -223,18 +240,29 @@ interface LemlineConfiguration {
         fun saslUsername(): Optional<String>
         fun saslPassword(): Optional<String>
 
-        fun workflows(): KafkaWorkflowsConfig
-        fun database(): KafkaIngestionConfig
+        fun commands(): KafkaCommandsConfig
+        fun events(): KafkaEventsConfig
+        fun lifecycleevents(): Optional<KafkaLifecycleEventsConfig>
     }
 
-    interface KafkaWorkflowsConfig {
+    /**
+     * Kafka lifecycle events configuration.
+     * Producer-only configuration for emitting lifecycle events.
+     */
+    interface KafkaLifecycleEventsConfig {
+        @WithDefault(LemlineConfigConstants.LIFECYCLE_EVENTS_TOPIC_DEFAULT)
+        fun topic(): String
+        fun producer(): KafkaProducerConfig
+    }
+
+    interface KafkaCommandsConfig {
         @WithDefault(COMMANDS_TOPIC_DEFAULT)
         fun topic(): String
         fun consumer(): KafkaConsumerWorkflowsConfig
         fun producer(): KafkaProducerConfig
     }
 
-    interface KafkaIngestionConfig {
+    interface KafkaEventsConfig {
         @WithDefault(EVENTS_TOPIC_DEFAULT)
         fun topic(): String
         fun consumer(): KafkaConsumerDatabaseConfig
@@ -290,11 +318,22 @@ interface LemlineConfiguration {
         fun sslEnabled(): Optional<Boolean>
         fun virtualHost(): Optional<String>
 
-        fun workflows(): RabbitWorkflowsConfig
-        fun database(): RabbitIngestionConfig
+        fun commands(): RabbitCommandsConfig
+        fun events(): RabbitEventsConfig
+        fun lifecycleevents(): Optional<RabbitLifecycleEventsConfig>
     }
 
-    interface RabbitWorkflowsConfig {
+    /**
+     * RabbitMQ lifecycle events configuration.
+     * Producer-only configuration for emitting lifecycle events.
+     */
+    interface RabbitLifecycleEventsConfig {
+        @WithDefault(LemlineConfigConstants.LIFECYCLE_EVENTS_TOPIC_DEFAULT)
+        fun queue(): String
+        fun producer(): RabbitProducerConfig
+    }
+
+    interface RabbitCommandsConfig {
         @WithDefault(RABBITMQ_VHOST_DEFAULT)
         fun virtualHost(): Optional<String>
 
@@ -304,7 +343,7 @@ interface LemlineConfiguration {
         fun producer(): RabbitProducerConfig
     }
 
-    interface RabbitIngestionConfig {
+    interface RabbitEventsConfig {
         @WithDefault(RABBITMQ_VHOST_DEFAULT)
         fun virtualHost(): Optional<String>
 
@@ -327,27 +366,26 @@ interface LemlineConfiguration {
 
     interface OutboxConfig {
         fun enabled(): Optional<Boolean>
-        fun wait(): ProcessOutboxConfig
-        fun retry(): ProcessOutboxConfig
-        fun schedule(): ProcessOutboxConfig
-        fun parent(): CleanupOutboxConfig
-        fun fork(): CleanupOutboxConfig
+        fun wait(): Optional<ProcessOutboxConfig>
+        fun retry(): Optional<ProcessOutboxConfig>
+        fun schedule(): Optional<ProcessOutboxConfig>
+        fun listener(): Optional<ProcessOutboxConfig>
+        fun parent(): Optional<CleanupOutboxConfig>
+        fun fork(): Optional<CleanupOutboxConfig>
     }
 
-    /**
-     * Process and cleanup configuration.
-     */
     interface ProcessOutboxConfig {
-        fun enabled(): Optional<Boolean>
+        @WithDefault("true")
+        fun enabled(): Boolean
+
         fun outbox(): OutboxProcessingConfig
         fun cleanup(): OutboxCleanupConfig
     }
 
-    /**
-     * Only cleanup configuration.
-     */
     interface CleanupOutboxConfig {
-        fun enabled(): Optional<Boolean>
+        @WithDefault("true")
+        fun enabled(): Boolean
+
         fun cleanup(): OutboxCleanupConfig
     }
 
@@ -370,10 +408,18 @@ interface LemlineConfiguration {
         fun batchSize(): Int
 
         /**
-         * Initial delay before starting processing
+         * Maximum random delay before first scheduled poll (0 to this value).
+         * Desynchronizes workers to prevent thundering herd on database.
+         */
+        @WithDefault("3s")
+        fun initialJitter(): String
+
+        /**
+         * Base delay for exponential backoff on failed messages.
+         * Each retry doubles: retry-delay * 2^(attempt-1) with ±20% jitter.
          */
         @WithDefault("30s")
-        fun initialDelay(): String
+        fun retryDelay(): String
 
         /**
          * Maximum number of processing attempts
@@ -385,7 +431,8 @@ interface LemlineConfiguration {
 
         val every get() = every().toDuration()
         val batchSize get() = batchSize()
-        val initialDelay get() = initialDelay().toDuration()
+        val initialJitter get() = initialJitter().toDuration()
+        val retryDelay get() = retryDelay().toDuration()
         val maxAttempts get() = maxAttempts()
     }
 
@@ -399,6 +446,13 @@ interface LemlineConfiguration {
          */
         @WithDefault("1h")
         fun every(): String
+
+        /**
+         * Maximum random delay before first scheduled cleanup (0 to this value).
+         * Desynchronizes workers to prevent thundering herd on database.
+         */
+        @WithDefault("3s")
+        fun initialJitter(): String
 
         /**
          * Age of messages to clean up
@@ -415,6 +469,7 @@ interface LemlineConfiguration {
         fun batchSize(): Int
 
         val every get() = every().toDuration()
+        val initialJitter get() = initialJitter().toDuration()
         val after get() = after().toDuration()
         val batchSize get() = batchSize()
     }
@@ -452,7 +507,30 @@ interface LemlineConfiguration {
     enum class OrchestratorMode {
         /** Batches control flow nodes, emits message only for action tasks (call, run, emit, etc.) */
         ACTION,
+
         /** Emits a message for every task including control flow nodes */
         ALL
+    }
+
+    /**
+     * Definitions management configuration.
+     */
+    interface DefinitionsConfig {
+        fun cache(): Optional<DefinitionsCacheConfig>
+    }
+
+    /**
+     * Definition cache configuration.
+     * Controls behavior of the definition cache sync process.
+     */
+    interface DefinitionsCacheConfig {
+        /**
+         * Interval for syncing definitions from database to cache.
+         * Default: 10s
+         */
+        @WithDefault("10s")
+        fun syncEvery(): String
+
+        val syncEvery get() = syncEvery().toDuration()
     }
 }

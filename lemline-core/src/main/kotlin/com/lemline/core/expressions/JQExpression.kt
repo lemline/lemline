@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.node.ArrayNode
 import com.fasterxml.jackson.databind.node.ObjectNode
 import io.serverlessworkflow.impl.json.JsonUtils
+import net.thisptr.jackson.jq.BuiltinFunctionLoader
 import net.thisptr.jackson.jq.Output
 import net.thisptr.jackson.jq.Scope as JQScope
 import net.thisptr.jackson.jq.Versions
@@ -18,6 +19,13 @@ object JQExpression : ExpressionEvaluator {
 
     // The jqVersion of JQ being used.
     private val jqVersion = Versions.JQ_1_6
+
+    // Root scope with built-in functions loaded (shared across threads in read-only manner)
+    private val rootScope: JQScope by lazy {
+        JQScope.newEmptyScope().also { scope ->
+            BuiltinFunctionLoader.getInstance().loadFunctions(jqVersion, scope)
+        }
+    }
 
     /**
      * Evaluates a JQ expression against a given JSON node within a specified scope.
@@ -34,6 +42,26 @@ object JQExpression : ExpressionEvaluator {
         output.result!!
     } catch (e: JsonQueryException) {
         throw IllegalArgumentException("Unable to evaluate content $input using expr $expr", e)
+    }
+
+    /**
+     * Evaluates a JQ expression, returning null on any error instead of throwing.
+     *
+     * Useful for conditional expressions where type mismatches or missing fields
+     * should result in a falsy value rather than propagating an exception.
+     * For example, `.source | contains("roof")` returns null if `.source` is missing.
+     *
+     * @param input The JSON node to evaluate the expression against.
+     * @param expr The JQ expression to evaluate.
+     * @param scope The scope in which to evaluate the expression.
+     * @return The result of the evaluation as a JsonNode, or null on any error.
+     */
+    fun evalOrNull(input: JsonNode, expr: String, scope: ObjectNode): JsonNode? = try {
+        val output = JsonNodeOutput()
+        ExpressionParser.compile(expr, jqVersion).apply(scope.toJQScope(), input, output)
+        output.result
+    } catch (_: JsonQueryException) {
+        null
     }
 
     /**
@@ -59,10 +87,12 @@ object JQExpression : ExpressionEvaluator {
         }
     }
 
-    /**`
-     * Converts an object JSON to a JQScope
+    /**
+     * Converts an object JSON to a JQScope with built-in functions available.
+     * Creates a child scope from rootScope to allow setting variables without
+     * modifying the shared root scope.
      */
-    private fun ObjectNode.toJQScope() = JQScope.newEmptyScope().apply {
+    private fun ObjectNode.toJQScope(): JQScope = JQScope.newChildScope(rootScope).apply {
         properties().forEach { field -> setValue(field.key, field.value) }
     }
 }

@@ -1,9 +1,11 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.config
 
+import com.lemline.common.info
 import com.lemline.common.logger
 import com.lemline.runner.config.LemlineConfigConstants.DB_TYPE_IN_MEMORY
 import io.quarkus.runtime.StartupEvent
+import jakarta.annotation.Priority
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.enterprise.event.Observes
 import jakarta.inject.Inject
@@ -24,12 +26,13 @@ class FlywayMigration(
     @param:ConfigProperty(name = MIGRATE_AT_START)
     val migrateAtStart: Boolean,
 ) {
-    private val log = logger()
+    private val logger = logger()
 
     @Inject
     lateinit var databaseManager: DatabaseManager
 
-    fun onStart(@Observes event: StartupEvent) {
+    @Suppress("unused")
+    fun onStart(@Observes @Priority(1) event: StartupEvent) {
         // Run migrations:
         // - if the profile is "test" - as databases are recreated for each test
         // - if the database type is in-memory - as it is provided by the app
@@ -37,7 +40,7 @@ class FlywayMigration(
         if (profile == "test" || db == DB_TYPE_IN_MEMORY || migrateAtStart) {
             // migrate custom Flyway
             databaseManager.flyway.migrate()
-            log.info("Flyway migrations applied successfully on ${databaseManager.dbType} database.")
+            logger.info { "Flyway migrations applied successfully on ${databaseManager.dbType} database." }
         }
     }
 }

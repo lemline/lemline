@@ -32,6 +32,61 @@ class NodePositionTest {
         assertEquals("/do/run/custom", pos.toString())
     }
 
+    @Test
+    fun `building path with addIndex for RFC 6901 compliance`() {
+        val pos = root
+            .addToken(Token.DO)
+            .addIndex(0)
+            .addName("taskA")
+
+        assertEquals("/do/0/taskA", pos.toString())
+    }
+
+    @Test
+    fun `nested path with indices`() {
+        val pos = root
+            .addToken(Token.DO)
+            .addIndex(0)
+            .addName("outer")
+            .addToken(Token.TRY)
+            .addToken(Token.DO)
+            .addIndex(1)
+            .addName("inner")
+
+        assertEquals("/do/0/outer/try/do/1/inner", pos.toString())
+    }
+
+    @Test
+    fun `fork branches with indices`() {
+        val pos = root
+            .addToken(Token.DO)
+            .addIndex(0)
+            .addName("forkTask")
+            .addToken(Token.FORK)
+            .addToken(Token.BRANCHES)
+            .addIndex(2)
+            .addName("branchC")
+
+        assertEquals("/do/0/forkTask/fork/branches/2/branchC", pos.toString())
+    }
+
+    @Nested
+    inner class AddIndexValidation {
+        @Test
+        fun `index must be non-negative`() {
+            val ex = assertThrows(IllegalArgumentException::class.java) {
+                root.addIndex(-1)
+            }
+            assertTrue(ex.message!!.contains("non-negative"))
+        }
+
+        @Test
+        fun `zero index is valid`() {
+            val pos = root.addIndex(0)
+            assertEquals("/0", pos.toString())
+        }
+    }
+
     @Nested
     inner class AddNameValidation {
         @Test

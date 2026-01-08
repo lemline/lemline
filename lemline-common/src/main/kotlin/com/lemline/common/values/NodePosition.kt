@@ -35,6 +35,19 @@ data class NodePosition(private val path: String) {
     val isRoot: Boolean by lazy { path == root.path }
 
     /**
+     * Check if this position is a parent of another position.
+     * Example: "/do" is parent of "/do/taskA", "/" is parent of "/do"
+     *
+     * @param other The position to check
+     * @return true if this position is a parent of the other position
+     */
+    fun isParentOf(other: NodePosition): Boolean {
+        val otherPath = other.toString()
+        return otherPath.startsWith(path) && otherPath.length > path.length &&
+            (path == "/" || otherPath[path.length] == '/')
+    }
+
+    /**
      * Get the node name (last segment of path).
      * Example: "/do/taskA" → "taskA", "/" → ""
      */
@@ -57,6 +70,21 @@ data class NodePosition(private val path: String) {
             require(!it.contains(name)) { "Task name $name must not be one of ${it.joinToString()}" }
         }
         return NodePosition(if (isRoot) "/$name" else "$path/$name")
+    }
+
+    /**
+     * Adds an array index to the JSON pointer path.
+     *
+     * Per RFC 6901, array elements are referenced by their zero-based index.
+     * Example: "/do" + index 0 → "/do/0"
+     *
+     * @param index The zero-based array index to add
+     * @return A new NodePosition with the added index
+     * @throws IllegalArgumentException if the index is negative
+     */
+    fun addIndex(index: Int): NodePosition {
+        require(index >= 0) { "Index must be non-negative, got: $index" }
+        return NodePosition(if (isRoot) "/$index" else "$path/$index")
     }
 
     /**

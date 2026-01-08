@@ -44,6 +44,11 @@ dependencies {
     implementation(libs.serverlessworkflow.api)
     implementation(libs.serverlessworkflow.impl.core)
 
+    // Override networknt json-schema-validator to fix oneOf validation bug with format
+    // SDK uses 1.5.5 which has issues with oneOf + format: date-time
+    // Using 1.5.9 (latest 1.5.x) for API compatibility with SDK
+    implementation("com.networknt:json-schema-validator:1.5.9")
+
     // Ktor client for native Kotlin HTTP client with coroutine support
     implementation(platform(libs.ktor.bom))
     implementation("io.ktor:ktor-client-core")
@@ -88,4 +93,6 @@ dependencies {
     testFixturesImplementation(testFixtures(project(":lemline-common")))
     // Required for FullOrchestratorExecutor
     testFixturesImplementation(libs.serverlessworkflow.api)
+    // Required for CloudEvent test data
+    testFixturesImplementation(libs.cloudevents.core)
 }

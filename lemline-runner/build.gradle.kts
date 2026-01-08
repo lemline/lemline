@@ -12,7 +12,7 @@ plugins {
 }
 
 group = "com.lemline"
-val baseVersion = "0.4.0"
+val baseVersion = "0.4.1"
 
 // Determine the version dynamically: use Git tag if present (CI), otherwise nightly suffix for main branch builds
 val envRef = System.getenv("GITHUB_REF") ?: ""
@@ -44,6 +44,16 @@ dependencies {
     // Our modules
     implementation(project(":lemline-common"))
     implementation(project(":lemline-core"))
+    implementation(project(":lemline-runner-common"))
+    implementation(project(":lemline-runner-waits"))
+    implementation(project(":lemline-runner-retries"))
+    implementation(project(":lemline-runner-schedules"))
+    implementation(project(":lemline-runner-parents"))
+    implementation(project(":lemline-runner-forks"))
+    implementation(project(":lemline-runner-listeners"))
+    implementation(project(":lemline-runner-failures"))
+    implementation(project(":lemline-runner-definitions"))
+    implementation(project(":lemline-runner-cli"))
 
     // KotlinX ecosystem
     implementation(libs.bundles.kotlinxEcosystem)
@@ -76,10 +86,18 @@ dependencies {
     implementation(libs.javaSemver)
     implementation("com.cronutils:cron-utils:9.2.1")
 
+    // Ktor client for HTTP execution in DefaultActivityExecutor
+    implementation(platform(libs.ktor.bom))
+    implementation("io.ktor:ktor-client-core")
+    implementation("io.ktor:ktor-client-cio")
+    implementation("io.ktor:ktor-client-content-negotiation")
+    implementation("io.ktor:ktor-serialization-kotlinx-json")
+
     // Jackson for JSON serialization/deserialization
     implementation(libs.jackson.bom)
     implementation("com.fasterxml.jackson.core:jackson-databind")
     implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-yaml")
+    implementation("com.fasterxml.jackson.module:jackson-module-kotlin")
 
     // CloudEvents SDK with Jackson serialization for emitting CloudEvents
     implementation(libs.cloudevents.core)
@@ -116,6 +134,8 @@ dependencies {
     // ─────────────────────────────────────────────────────────────────────────
     testImplementation(testFixtures(project(":lemline-common")))
     testImplementation(testFixtures(project(":lemline-core")))
+    testImplementation(testFixtures(project(":lemline-runner-common")))
+    testImplementation(project(":lemline-runner-definitions"))
 
     testImplementation(kotlin("test"))
     testImplementation(enforcedPlatform(libs.kotest.bom))
@@ -139,6 +159,18 @@ dependencies {
     testFixturesImplementation(libs.bundles.kotlinxEcosystem)
     testFixturesImplementation(testFixtures(project(":lemline-common")))
     testFixturesImplementation(testFixtures(project(":lemline-core")))
+    // QuarkusTestProfile for InMemoryProfile
+    testFixturesImplementation(enforcedPlatform(libs.quarkus.bom))
+    testFixturesImplementation("io.quarkus:quarkus-junit5")
+    testFixturesImplementation(libs.serverlessworkflow.api)
+    testFixturesImplementation(project(":lemline-runner-common"))
+    testFixturesImplementation(project(":lemline-runner-failures"))
+    testFixturesImplementation(project(":lemline-runner-waits"))
+    testFixturesImplementation(project(":lemline-runner-retries"))
+    testFixturesImplementation(project(":lemline-runner-schedules"))
+    testFixturesImplementation(project(":lemline-runner-parents"))
+    testFixturesImplementation(project(":lemline-runner-forks"))
+    testFixturesImplementation(project(":lemline-runner-listeners"))
 }
 
 // ────────────────────────────────────────────────────────────────────────────

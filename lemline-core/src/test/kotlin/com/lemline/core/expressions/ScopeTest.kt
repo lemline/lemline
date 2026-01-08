@@ -3,11 +3,11 @@ package com.lemline.core.expressions
 
 import com.lemline.common.json.LemlineJson
 import com.lemline.common.values.WorkflowId
+import com.lemline.core.expressions.scopes.RuntimeDescriptor
 import com.lemline.core.expressions.scopes.TaskDescriptor
 import com.lemline.core.expressions.scopes.WorkflowDescriptor
 import com.lemline.core.loadWorkflowFromYaml
 import com.lemline.core.set
-import com.lemline.core.workflows.RuntimeDescriptor
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.shouldBe
 import io.serverlessworkflow.api.types.Workflow

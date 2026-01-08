@@ -54,8 +54,8 @@ class WorkflowInfoTest {
         }
 
         val decoded = LemlineJson.decodeFromElement<WorkflowInfo>(legacyElement)
-        assertEquals(WorkflowNamespace("space"), decoded.workflowNamespace)
-        assertEquals(WorkflowName("orders"), decoded.workflowName)
-        assertEquals(WorkflowVersion("v1"), decoded.workflowVersion)
+        assertEquals(WorkflowNamespace("space"), decoded.namespace)
+        assertEquals(WorkflowName("orders"), decoded.name)
+        assertEquals(WorkflowVersion("v1"), decoded.version)
     }
 }

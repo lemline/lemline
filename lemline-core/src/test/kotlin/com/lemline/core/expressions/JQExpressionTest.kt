@@ -88,4 +88,68 @@ class JQExpressionTest {
         // Ensure the concat value is returned
         assertEquals(JsonPrimitive("valueScopedValue"), result)
     }
+
+    @Test
+    fun `test contains function on string`() {
+        // Test contains on a string input
+        val input = JsonPrimitive("https://orders.example.com/api")
+
+        assertEquals(
+            JsonPrimitive(true),
+            JQExpression.eval(input, JsonPrimitive("contains(\"orders\")"), emptyScope, true),
+        )
+
+        assertEquals(
+            JsonPrimitive(false),
+            JQExpression.eval(input, JsonPrimitive("contains(\"users\")"), emptyScope, true),
+        )
+    }
+
+    @Test
+    fun `test startswith function on string`() {
+        // Test startswith on a string input
+        val input = JsonPrimitive("https://orders.example.com/api")
+
+        assertEquals(
+            JsonPrimitive(true),
+            JQExpression.eval(input, JsonPrimitive("startswith(\"https://\")"), emptyScope, true),
+        )
+
+        assertEquals(
+            JsonPrimitive(false),
+            JQExpression.eval(input, JsonPrimitive("startswith(\"http://\")"), emptyScope, true),
+        )
+    }
+
+    @Test
+    fun `test endswith function on string`() {
+        // Test endswith on a string input
+        val input = JsonPrimitive("https://orders.example.com/api")
+
+        assertEquals(
+            JsonPrimitive(true),
+            JQExpression.eval(input, JsonPrimitive("endswith(\"/api\")"), emptyScope, true),
+        )
+
+        assertEquals(
+            JsonPrimitive(false),
+            JQExpression.eval(input, JsonPrimitive("endswith(\"/v1\")"), emptyScope, true),
+        )
+    }
+
+    @Test
+    fun `test string comparison operators`() {
+        // Test string comparison
+        val input = JsonPrimitive("2024-06-15")
+
+        assertEquals(
+            JsonPrimitive(true),
+            JQExpression.eval(input, JsonPrimitive(". > \"2024-01-01\""), emptyScope, true),
+        )
+
+        assertEquals(
+            JsonPrimitive(false),
+            JQExpression.eval(input, JsonPrimitive(". < \"2024-01-01\""), emptyScope, true),
+        )
+    }
 }

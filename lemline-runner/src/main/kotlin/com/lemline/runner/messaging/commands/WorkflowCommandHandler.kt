@@ -4,28 +4,31 @@ package com.lemline.runner.messaging.commands
 import com.lemline.common.logger.logger
 import com.lemline.common.values.IDV7
 import com.lemline.core.activities.ActivityExecutor
-import com.lemline.core.definitions.DefinitionCache
-import com.lemline.core.definitions.getNode
+import com.lemline.core.cloudevents.CloudEventFactory
 import com.lemline.core.errors.InternalException
+import com.lemline.core.lifecycleevents.LifecycleEventHook
 import com.lemline.core.orchestrator.StepByStepOrchestrator
 import com.lemline.core.states.WorkflowCommand
 import com.lemline.core.states.WorkflowEvent
-import com.lemline.runner.activities.RunnerActivityExecutor
+import com.lemline.core.workflows.WorkflowCache
+import com.lemline.core.workflows.getNode
+import com.lemline.runner.common.messaging.InstanceMessage
 import com.lemline.runner.config.LemlineConfiguration
+import com.lemline.runner.definitions.DefinitionRepository
+import com.lemline.runner.failures.FailureModel
 import com.lemline.runner.failures.FailureReasons.DEFINITION_MISSING
 import com.lemline.runner.failures.FailureReasons.DESERIALIZATION_FAILURE
 import com.lemline.runner.failures.FailureReasons.SERIALIZATION_FAILURE
 import com.lemline.runner.failures.FailureReasons.getFailureReason
+import com.lemline.runner.failures.FailureRepository
 import com.lemline.runner.messaging.CompensationException
-import com.lemline.runner.messaging.InstanceMessage
 import com.lemline.runner.messaging.MessageHandler
+import com.lemline.runner.messaging.cloudevents.CloudEventsEmitter
 import com.lemline.runner.messaging.events.WorkflowEventEmitter
 import com.lemline.runner.messaging.toLogString
-import com.lemline.runner.models.FailureModel
-import com.lemline.runner.repositories.DefinitionRepository
-import com.lemline.runner.repositories.FailureRepository
 import io.serverlessworkflow.api.types.Workflow
 import jakarta.enterprise.context.ApplicationScoped
+import jakarta.enterprise.inject.Instance
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 import kotlinx.serialization.ExperimentalSerializationApi
@@ -50,7 +53,9 @@ internal class WorkflowCommandHandler(
     private val failureRepository: FailureRepository,
     override val metrics: WorkflowCommandSubscriberMetrics,
     private val config: LemlineConfiguration,
-    private val activityExecutor: RunnerActivityExecutor,
+    private val activityExecutor: ActivityExecutor,
+    private val lifecycleHook: LifecycleEventHook,
+    private val cloudEventsEmitter: Instance<CloudEventsEmitter>,
 ) : MessageHandler<InstanceMessage<WorkflowCommand>> {
     override var logger = logger()
 
@@ -137,7 +142,7 @@ internal class WorkflowCommandHandler(
         val error = InternalException.Error(
             type = exception::class.qualifiedName ?: "Unknown",
             status = 500,
-            instance = workflowId.toString(),
+            position = workflowId.toString(),
             title = exception.message,
             details = exception.stackTraceToString()
         )
@@ -203,7 +208,7 @@ internal class WorkflowCommandHandler(
      */
     private suspend fun InstanceMessage<WorkflowCommand>.findWorkflowDefinition(): Workflow {
         // Try cache first
-        DefinitionCache.getWorkflow(
+        WorkflowCache.getWorkflow(
             namespace = workflowNamespace,
             name = workflowName,
             version = workflowVersion
@@ -217,7 +222,7 @@ internal class WorkflowCommandHandler(
                 workflowVersion
             )
                 ?.definition
-                ?.let { DefinitionCache.parseAndPut(it) }
+                ?.let { WorkflowCache.parseYamlAndPut(it) }
         } catch (e: Exception) {
             logger.error(e) { "Error during workflow definition retrieval" }
 
@@ -264,14 +269,21 @@ internal class WorkflowCommandHandler(
      * @return InstanceMessage to emit for next step, or null if paused/terminal
      */
     private suspend fun InstanceMessage<WorkflowCommand>.executeStep(workflow: Workflow): InstanceMessage<WorkflowCommand>? {
-
         // Execute using StepByStepOrchestrator
         logger.debug { "resumeFromTask state=$workflowState" }
         val event = when (config.orchestrator().mode()) {
-            LemlineConfiguration.OrchestratorMode.ALL -> StepByStepOrchestrator.runByTask(workflow, workflowState)
+            LemlineConfiguration.OrchestratorMode.ALL -> StepByStepOrchestrator.runByTask(
+                workflow,
+                workflowState,
+                workflowInfo,
+                lifecycleHook,
+            )
+
             LemlineConfiguration.OrchestratorMode.ACTION -> StepByStepOrchestrator.runByActivity(
                 workflow,
-                workflowState
+                workflowState,
+                workflowInfo,
+                lifecycleHook,
             )
         }
 
@@ -302,7 +314,7 @@ internal class WorkflowCommandHandler(
                     event.resume()
                 } else {
                     // Send to the database for persistence
-                    sendToDatabase(this, event)
+                    sendToEventChannel(this, event)
                     null  // Paused
                 }
             }
@@ -314,14 +326,14 @@ internal class WorkflowCommandHandler(
                     event.resume()
                 } else {
                     // Send to the database for persistence
-                    sendToDatabase(this, event)
+                    sendToEventChannel(this, event)
                     null  // Paused
                 }
             }
 
             is WorkflowEvent.RunWorkflowStarted -> {
                 // Send to the database for parent storage + child creation
-                sendToDatabase(this, event)
+                sendToEventChannel(this, event)
 
                 when (event.config.sync) {
                     // waiting for synchronous completion
@@ -333,8 +345,21 @@ internal class WorkflowCommandHandler(
 
             is WorkflowEvent.ForkStarted -> {
                 // Send to the database for fork persistence + branch scheduling
-                sendToDatabase(this, event)
+                sendToEventChannel(this, event)
                 null  // Paused - waiting for branches to complete
+            }
+
+            is WorkflowEvent.EmitStarted -> {
+                // Emit CloudEvent and resume immediately (fire-and-forget)
+                emitCloudEvent(this, event)
+                event.resume()
+            }
+
+            is WorkflowEvent.ListenStarted -> {
+                // Send to the database for listener persistence
+                // The listener will be stored and CloudEvents will be matched against it
+                sendToEventChannel(this, event)
+                null  // Paused - waiting for matching CloudEvents
             }
 
             is WorkflowEvent.ActivityStarted -> {
@@ -351,7 +376,7 @@ internal class WorkflowCommandHandler(
 
                 // Determine if this workflow has a parent or need to be scheduled after completion
                 if (event.hasWaitingParent || workflow.schedule?.after != null) {
-                    sendToDatabase(this, event)
+                    sendToEventChannel(this, event)
                 }
                 null  // Terminal
             }
@@ -361,19 +386,26 @@ internal class WorkflowCommandHandler(
                 onEventProducedTest(this, event)
 
                 // Send to database for failure persistence
-                sendToDatabase(this, event)
+                sendToEventChannel(this, event)
                 null  // Terminal
             }
 
             is WorkflowEvent.ForkBranchCompleted -> {
                 // Send to database for branch completion tracking
-                sendToDatabase(this, event)
+                sendToEventChannel(this, event)
                 null  // Terminal
             }
 
             is WorkflowEvent.ForkBranchFailed -> {
                 // Send to database for branch failure tracking
-                sendToDatabase(this, event)
+                sendToEventChannel(this, event)
+                null  // Terminal
+            }
+
+            is WorkflowEvent.ForEachCompleted -> {
+                // Send to database for foreach iteration completion handling
+                // The database handler will check for next event or complete the listener
+                sendToEventChannel(this, event)
                 null  // Terminal
             }
         }?.let {
@@ -384,7 +416,7 @@ internal class WorkflowCommandHandler(
     /**
      * Sends a workflow event to the database channel for persistence.
      */
-    private suspend fun sendToDatabase(message: InstanceMessage<WorkflowCommand>, event: WorkflowEvent) {
+    private suspend fun sendToEventChannel(message: InstanceMessage<WorkflowCommand>, event: WorkflowEvent) {
         logger.debug { "Sending event to database: $event" }
         eventEmitter.send(
             InstanceMessage(
@@ -410,5 +442,29 @@ internal class WorkflowCommandHandler(
             logger.error(e) { "Activity failed: ${event::class.simpleName}" }
             event.resumeFailed(InternalException.Error.from(e, event.nodePosition))
         }
+    }
+
+    /**
+     * Emits a CloudEvent based on EmitStarted event configuration.
+     *
+     * This is fire-and-forget: errors are logged but don't fail the workflow.
+     * If CloudEventsEmitter is not available (disabled), the event is silently skipped.
+     */
+    private suspend fun emitCloudEvent(message: InstanceMessage<WorkflowCommand>, event: WorkflowEvent.EmitStarted) {
+        if (!cloudEventsEmitter.isResolvable) {
+            logger.debug { "CloudEventsEmitter not available, skipping emit task" }
+            return
+        }
+
+        val cloudEvent = CloudEventFactory.build(event.config)
+        logger.debug { "Emitting CloudEvent: type=${event.config.type} source=${event.config.source}" }
+
+        cloudEventsEmitter.get().send(
+            cloudEvent = cloudEvent,
+            workflowId = message.workflowId.toString(),
+            workflowNamespace = message.workflowNamespace.toString(),
+            workflowName = message.workflowName.toString(),
+            workflowVersion = message.workflowVersion.toString()
+        )
     }
 }

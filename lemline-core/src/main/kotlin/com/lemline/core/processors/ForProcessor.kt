@@ -6,6 +6,7 @@ package com.lemline.core.processors
 import com.lemline.core.nodes.Node
 import com.lemline.core.processors.scope.Scope
 import com.lemline.core.states.ForState
+import com.lemline.core.workflows.forBlock
 import io.serverlessworkflow.api.types.ForTask
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
@@ -57,7 +58,7 @@ class ForProcessor(
     node: Node<ForTask>
 ) : NodeProcessor<ForTask, ForState>(node) {
 
-    override fun stateEnterFromParent(transformedInput: JsonElement, scope: Scope) = ForState(
+    override fun stateWhenEnteringFromParent(transformedInput: JsonElement, scope: Scope) = ForState(
         startedAt = Clock.System.now(),
         collection = evalForIn(transformedInput, scope),
         index = 0,  // Start at first iteration
@@ -65,7 +66,7 @@ class ForProcessor(
         forAt = node.task.`for`.at ?: "index"
     )
 
-    override fun stateEnterFromChild(
+    override fun stateWhenReEnteringFromChild(
         state: ForState,
         output: JsonElement,
         scope: Scope,
@@ -95,7 +96,7 @@ class ForProcessor(
             )
 
             true -> NavigationInfo(
-                nextNode = getDoNode(),
+                nextNode = node.forBlock,
                 nextDirective = null
             )
         }
@@ -113,6 +114,4 @@ class ForProcessor(
         // For.in is evaluated during createState, before the full context exists
         return evalList(dataset, node.task.`for`.`in`, "for.in", scope)
     }
-
-    private fun getDoNode() = node.children?.firstOrNull() ?: throw NoSuchElementException("ForTask has no do task")
 }

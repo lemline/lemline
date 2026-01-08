@@ -1,11 +1,10 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.testcases
 
-import com.lemline.core.testcases.WorkflowTestValidators.expectOutputMatching
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.int
-import kotlinx.serialization.json.jsonPrimitive
+import com.lemline.core.testcases.impl.WorkflowTestCase
+import com.lemline.core.testcases.impl.WorkflowTestValidators.expectOutput
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 
 /**
  * Test cases for if condition execution.
@@ -23,10 +22,7 @@ object IfConditionTestCases {
                       set:
                         executed: true
             """.trimIndent(),
-            validate = expectOutputMatching("executed=true") { output ->
-                val obj = output as? JsonObject ?: return@expectOutputMatching false
-                obj["executed"]?.jsonPrimitive?.content == "true"
-            }
+            validate = expectOutput(buildJsonObject { put("executed", true) })
         ),
 
         WorkflowTestCase(
@@ -41,10 +37,7 @@ object IfConditionTestCases {
                       set:
                         executed: true
             """.trimIndent(),
-            validate = expectOutputMatching("executed not set, initial=1") { output ->
-                val obj = output as? JsonObject ?: return@expectOutputMatching false
-                !obj.containsKey("executed") && obj["initial"]?.jsonPrimitive?.int == 1
-            }
+            validate = expectOutput(buildJsonObject { put("initial", 1) })
         ),
 
         WorkflowTestCase(
@@ -59,11 +52,8 @@ object IfConditionTestCases {
                       set:
                         result: "greater"
             """.trimIndent(),
-            input = JsonObject(emptyMap()),
-            validate = expectOutputMatching("result=greater") { output ->
-                val obj = output as? JsonObject ?: return@expectOutputMatching false
-                obj["result"]?.jsonPrimitive?.content == "greater"
-            }
+            input = buildJsonObject { },
+            validate = expectOutput(buildJsonObject { put("result", "greater") })
         ),
 
         WorkflowTestCase(
@@ -75,11 +65,8 @@ object IfConditionTestCases {
                       set:
                         result: "flag was true"
             """.trimIndent(),
-            input = JsonObject(mapOf("flag" to JsonPrimitive(true))),
-            validate = expectOutputMatching("result=flag was true") { output ->
-                val obj = output as? JsonObject ?: return@expectOutputMatching false
-                obj["result"]?.jsonPrimitive?.content == "flag was true"
-            }
+            input = buildJsonObject { put("flag", true) },
+            validate = expectOutput(buildJsonObject { put("result", "flag was true") })
         ),
 
         WorkflowTestCase(
@@ -99,11 +86,12 @@ object IfConditionTestCases {
                       set:
                         pass2: true
             """.trimIndent(),
-            validate = expectOutputMatching("pass1=true, pass2 not set") { output ->
-                val obj = output as? JsonObject ?: return@expectOutputMatching false
-                obj["pass1"]?.jsonPrimitive?.content == "true" &&
-                    !obj.containsKey("pass2")
-            }
+            validate = expectOutput(
+                buildJsonObject {
+                    put("pass1", true)
+                    put("value", 15)
+                }
+            )
         ),
 
         WorkflowTestCase(
@@ -135,10 +123,7 @@ object IfConditionTestCases {
                       set:
                         grade: ${ .grade }
             """.trimIndent(),
-            validate = expectOutputMatching("grade=C") { output ->
-                val obj = output as? JsonObject ?: return@expectOutputMatching false
-                obj["grade"]?.jsonPrimitive?.content == "C"
-            }
+            validate = expectOutput(buildJsonObject { put("grade", "C") })
         )
     )
 }

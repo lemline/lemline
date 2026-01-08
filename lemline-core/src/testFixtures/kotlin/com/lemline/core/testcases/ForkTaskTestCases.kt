@@ -1,14 +1,19 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.testcases
 
-import com.lemline.core.testcases.WorkflowTestValidators.expectErrorContaining
-import com.lemline.core.testcases.WorkflowTestValidators.expectOutputMatching
+import com.lemline.core.testcases.impl.WorkflowTestCase
+import com.lemline.core.testcases.impl.WorkflowTestValidators.expectErrorContaining
+import com.lemline.core.testcases.impl.WorkflowTestValidators.expectOutput
+
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonArray
+import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.int
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.put
 
 /**
  * Test cases for ForkTask execution.
@@ -32,12 +37,12 @@ object ForkTaskTestCases {
                               set:
                                 result: "B"
             """.trimIndent(),
-            validate = expectOutputMatching("array with 2 results") { output ->
-                val arr = output as? JsonArray ?: return@expectOutputMatching false
-                arr.size == 2 &&
-                    arr[0].jsonObject["result"]?.jsonPrimitive?.content == "A" &&
-                    arr[1].jsonObject["result"]?.jsonPrimitive?.content == "B"
-            }
+            validate = expectOutput(
+                buildJsonArray {
+                    add(buildJsonObject { put("result", "A") })
+                    add(buildJsonObject { put("result", "B") })
+                }
+            )
         ),
 
         WorkflowTestCase(
@@ -60,10 +65,7 @@ object ForkTaskTestCases {
                               set:
                                 winner: "second"
             """.trimIndent(),
-            validate = expectOutputMatching("single result with winner") { output ->
-                val obj = output as? JsonObject ?: return@expectOutputMatching false
-                obj["winner"]?.jsonPrimitive?.content == "second"
-            }
+            validate = expectOutput(buildJsonObject { put("winner", "second") })
         ),
 
         WorkflowTestCase(
@@ -83,12 +85,12 @@ object ForkTaskTestCases {
                               set:
                                 fromInput: ${ .value }
             """.trimIndent(),
-            validate = expectOutputMatching("both branches got value=42") { output ->
-                val arr = output as? JsonArray ?: return@expectOutputMatching false
-                arr.size == 2 &&
-                    arr[0].jsonObject["fromInput"]?.jsonPrimitive?.int == 42 &&
-                    arr[1].jsonObject["fromInput"]?.jsonPrimitive?.int == 42
-            }
+            validate = expectOutput(
+                buildJsonArray {
+                    add(buildJsonObject { put("fromInput", 42) })
+                    add(buildJsonObject { put("fromInput", 42) })
+                }
+            )
         ),
 
         WorkflowTestCase(
@@ -108,13 +110,13 @@ object ForkTaskTestCases {
                               set:
                                 order: 3
             """.trimIndent(),
-            validate = expectOutputMatching("ordered results [1,2,3]") { output ->
-                val arr = output as? JsonArray ?: return@expectOutputMatching false
-                arr.size == 3 &&
-                    arr[0].jsonObject["order"]?.jsonPrimitive?.int == 1 &&
-                    arr[1].jsonObject["order"]?.jsonPrimitive?.int == 2 &&
-                    arr[2].jsonObject["order"]?.jsonPrimitive?.int == 3
-            }
+            validate = expectOutput(
+                buildJsonArray {
+                    add(buildJsonObject { put("order", 1) })
+                    add(buildJsonObject { put("order", 2) })
+                    add(buildJsonObject { put("order", 3) })
+                }
+            )
         ),
 
         WorkflowTestCase(
@@ -134,10 +136,7 @@ object ForkTaskTestCases {
                         as:
                           total: ${ .[0].value + .[1].value }
             """.trimIndent(),
-            validate = expectOutputMatching("total=30") { output ->
-                val obj = output as? JsonObject ?: return@expectOutputMatching false
-                obj["total"]?.jsonPrimitive?.int == 30
-            }
+            validate = expectOutput(buildJsonObject { put("total", 30) })
         ),
 
         WorkflowTestCase(
@@ -159,12 +158,12 @@ object ForkTaskTestCases {
                               set:
                                 c: 3
             """.trimIndent(),
-            validate = expectOutputMatching("nested results") { output ->
-                val arr = output as? JsonArray ?: return@expectOutputMatching false
-                arr.size == 2 &&
-                    arr[0].jsonObject["b"]?.jsonPrimitive?.int == 2 &&
-                    arr[1].jsonObject["c"]?.jsonPrimitive?.int == 3
-            }
+            validate = expectOutput(
+                buildJsonArray {
+                    add(buildJsonObject { put("b", 2) })
+                    add(buildJsonObject { put("c", 3) })
+                }
+            )
         ),
 
         WorkflowTestCase(
@@ -180,10 +179,11 @@ object ForkTaskTestCases {
                                 executed: true
             """.trimIndent(),
             input = JsonObject(mapOf("shouldRun" to JsonPrimitive(true))),
-            validate = expectOutputMatching("fork executed") { output ->
-                val arr = output as? JsonArray ?: return@expectOutputMatching false
-                arr.size == 1 && arr[0].jsonObject["executed"]?.jsonPrimitive?.content == "true"
-            }
+            validate = expectOutput(
+                buildJsonArray {
+                    add(buildJsonObject { put("executed", true) })
+                }
+            )
         ),
 
         WorkflowTestCase(
@@ -199,10 +199,7 @@ object ForkTaskTestCases {
                                 executed: true
             """.trimIndent(),
             input = JsonObject(mapOf("shouldRun" to JsonPrimitive(false))),
-            validate = expectOutputMatching("fork skipped") { output ->
-                val obj = output as? JsonObject ?: return@expectOutputMatching false
-                obj["shouldRun"]?.jsonPrimitive?.content == "false"
-            }
+            validate = expectOutput(buildJsonObject { put("shouldRun", false) })
         ),
 
         WorkflowTestCase(
@@ -216,10 +213,11 @@ object ForkTaskTestCases {
                               set:
                                 result: "solo"
             """.trimIndent(),
-            validate = expectOutputMatching("single result") { output ->
-                val arr = output as? JsonArray ?: return@expectOutputMatching false
-                arr.size == 1 && arr[0].jsonObject["result"]?.jsonPrimitive?.content == "solo"
-            }
+            validate = expectOutput(
+                buildJsonArray {
+                    add(buildJsonObject { put("result", "solo") })
+                }
+            )
         ),
 
         WorkflowTestCase(
@@ -242,10 +240,7 @@ object ForkTaskTestCases {
                       set:
                         total: ${ $context.forkResults[0].value + $context.forkResults[1].value }
             """.trimIndent(),
-            validate = expectOutputMatching("total=30 from context") { output ->
-                val obj = output as? JsonObject ?: return@expectOutputMatching false
-                obj["total"]?.jsonPrimitive?.int == 30
-            }
+            validate = expectOutput(buildJsonObject { put("total", 30) })
         ),
 
         WorkflowTestCase(
@@ -262,9 +257,12 @@ object ForkTaskTestCases {
                               set:
                                 mode: "cooperative2"
             """.trimIndent(),
-            validate = expectOutputMatching("returns array (cooperative)") { output ->
-                output is JsonArray && output.size == 2
-            }
+            validate = expectOutput(
+                buildJsonArray {
+                    add(buildJsonObject { put("mode", "cooperative1") })
+                    add(buildJsonObject { put("mode", "cooperative2") })
+                }
+            )
         ),
 
         WorkflowTestCase(
@@ -289,10 +287,7 @@ object ForkTaskTestCases {
                                     type: https://serverlessworkflow.io/spec/1.0.0/errors/communication
                                     status: 500
             """.trimIndent(),
-            validate = expectOutputMatching("winner=success") { output ->
-                val obj = output as? JsonObject ?: return@expectOutputMatching false
-                obj["winner"]?.jsonPrimitive?.content == "success"
-            }
+            validate = expectOutput(buildJsonObject { put("winner", "success") })
         ),
 
         WorkflowTestCase(
@@ -373,11 +368,84 @@ object ForkTaskTestCases {
                                   caught: true
                                   errorType: ${ $failure.type }
             """.trimIndent(),
-            validate = expectOutputMatching("caught=true, errorType contains catchableError") { output ->
-                val obj = output as? JsonObject ?: return@expectOutputMatching false
-                obj["caught"]?.jsonPrimitive?.content == "true" &&
-                    obj["errorType"]?.jsonPrimitive?.content?.contains("catchableError") == true
-            }
+            validate = expectOutput(
+                buildJsonObject {
+                    put("caught", true)
+                    put("errorType", "https://serverlessworkflow.io/spec/1.0.0/errors/catchableError")
+                }
+            )
+        ),
+
+        WorkflowTestCase(
+            name = "fork task inside for loop executes multiple times with distinct results",
+            yaml = $$"""
+                do:
+                  - init:
+                      set:
+                        results: []
+                  - loopWithFork:
+                      for:
+                        in: ${ [1, 2, 3] }
+                      do:
+                        - parallelInLoop:
+                            fork:
+                              branches:
+                                - branchA:
+                                    set:
+                                      value: ${ $item * 10 }
+                                - branchB:
+                                    set:
+                                      value: ${ $item * 100 }
+                            export:
+                              as:
+                                results: ${ $context.results + [.] }
+                      output:
+                        as: ${ $context }
+            """.trimIndent(),
+            validate = expectOutput(
+                buildJsonObject {
+                    put("results", buildJsonArray {
+                        add(buildJsonArray {
+                            add(buildJsonObject { put("value", 10) })
+                            add(buildJsonObject { put("value", 100) })
+                        })
+                        add(buildJsonArray {
+                            add(buildJsonObject { put("value", 20) })
+                            add(buildJsonObject { put("value", 200) })
+                        })
+                        add(buildJsonArray {
+                            add(buildJsonObject { put("value", 30) })
+                            add(buildJsonObject { put("value", 300) })
+                        })
+                    })
+                }
+            )
+        ),
+
+        WorkflowTestCase(
+            name = "fork task with duplicate branch names executes all branches",
+            yaml = """
+                do:
+                  - forkWithDuplicateNames:
+                      fork:
+                        branches:
+                          - sameName:
+                              set:
+                                value: 1
+                          - sameName:
+                              set:
+                                value: 2
+                          - sameName:
+                              set:
+                                value: 3
+            """.trimIndent(),
+            validate = expectOutput(
+                buildJsonArray {
+                    add(buildJsonObject { put("value", 1) })
+                    add(buildJsonObject { put("value", 2) })
+                    add(buildJsonObject { put("value", 3) })
+                }
+            )
         )
     )
 }

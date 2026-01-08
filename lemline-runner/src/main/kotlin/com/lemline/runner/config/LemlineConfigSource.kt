@@ -2,25 +2,27 @@
 package com.lemline.runner.config
 
 import com.lemline.common.logger.logger
-import com.lemline.runner.LemlineApplication
+import com.lemline.runner.cli.config.ConfigPathHolder
+import com.lemline.runner.config.LemlineConfigConstants.CLOUDEVENTS_TOPIC_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.COMMANDS_TOPIC_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.CONSUMER_CONCURRENCY_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.DB_TYPE_IN_MEMORY
 import com.lemline.runner.config.LemlineConfigConstants.DB_TYPE_MYSQL
 import com.lemline.runner.config.LemlineConfigConstants.DB_TYPE_POSTGRESQL
-import com.lemline.runner.config.LemlineConfigConstants.CLOUDEVENTS_TOPIC_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.EVENTS_TOPIC_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.H2_DB_NAME_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.H2_PASSWORD_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.H2_USERNAME_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.IN_MEMORY_CONNECTOR
 import com.lemline.runner.config.LemlineConfigConstants.KAFKA_BROKERS_DEFAULT
+import com.lemline.runner.config.LemlineConfigConstants.KAFKA_CLOUDEVENTS_GROUP_ID_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.KAFKA_CONNECTOR
 import com.lemline.runner.config.LemlineConfigConstants.KAFKA_DATABASE_GROUP_ID_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.KAFKA_OFFSET_RESET_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.KAFKA_STRING_DESERIALIZER
 import com.lemline.runner.config.LemlineConfigConstants.KAFKA_STRING_SERIALIZER
 import com.lemline.runner.config.LemlineConfigConstants.KAFKA_WORKFLOWS_GROUP_ID_DEFAULT
+import com.lemline.runner.config.LemlineConfigConstants.LIFECYCLE_EVENTS_TOPIC_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.METRICS_PATH_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.METRICS_PORT_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.MSG_TYPE_IN_MEMORY
@@ -43,13 +45,20 @@ import com.lemline.runner.config.LemlineConfigConstants.RABBITMQ_PORT_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.RABBITMQ_STRING_SERIALIZER
 import com.lemline.runner.config.LemlineConfigConstants.RABBITMQ_USER_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.RABBITMQ_VHOST_DEFAULT
+import com.lemline.runner.messaging.cloudevents.CLOUDEVENTS_IN_CHANNEL
+import com.lemline.runner.messaging.cloudevents.CLOUDEVENTS_OUT_CHANNEL
 import com.lemline.runner.messaging.commands.COMMANDS_IN_CHANNEL
 import com.lemline.runner.messaging.commands.COMMANDS_OUT_CHANNEL
-import com.lemline.runner.messaging.cloudevents.CLOUDEVENTS_OUT_CHANNEL
 import com.lemline.runner.messaging.events.EVENTS_IN_CHANNEL
 import com.lemline.runner.messaging.events.EVENTS_OUT_CHANNEL
 import io.smallrye.config.PropertiesConfigSource
 import kotlinx.serialization.ExperimentalSerializationApi
+
+/**
+ * Channel name for lifecycle events output.
+ * Lifecycle events are producer-only (no consumer) for external observability.
+ */
+internal const val LIFECYCLEEVENTS_OUT_CHANNEL = "lifecycleevents-out"
 
 enum class TopicType(
     val type: String,
@@ -61,6 +70,8 @@ enum class TopicType(
     val consumerConcurrency: String,
     val consumerGroupDefault: String,
 ) {
+    // Note: 'type' values must match LemlineConfiguration.KafkaConfig interface method names
+    // (commands, events) for config validation to pass
     COMMANDS(
         "commands",
         COMMANDS_TOPIC_DEFAULT,
@@ -96,7 +107,7 @@ class LemlineConfigSource : PropertiesConfigSource(
             val lemlineProps = mutableMapOf<String, String>()
 
             // Load user properties from file
-            LemlineApplication.configPath?.let { path ->
+            ConfigPathHolder.configPath?.let { path ->
                 ExtraFileConfigFactory().getConfig(path).properties.forEach { (name, value) ->
                     if (name.startsWith("lemline.")) {
                         lemlineProps[name] = value.split("#").first().trim()
@@ -175,7 +186,7 @@ class LemlineConfigSource : PropertiesConfigSource(
                     val h2 = "quarkus.datasource" // <- default datasource
                     generated["$h2.username"] = H2_USERNAME_DEFAULT
                     generated["$h2.password"] = H2_PASSWORD_DEFAULT
-                    generated["$h2.jdbc.url"] = "jdbc:h2:mem:$H2_DB_NAME_DEFAULT;DB_CLOSE_DELAY=-1;MODE=PostgreSQL"
+                    generated["$h2.jdbc.url"] = "jdbc:h2:mem:$H2_DB_NAME_DEFAULT;DB_CLOSE_DELAY=-1;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE"
                 }
             }
 
@@ -229,6 +240,7 @@ class LemlineConfigSource : PropertiesConfigSource(
             configureKafkaTopic(props, TopicType.COMMANDS)
             configureKafkaTopic(props, TopicType.EVENTS)
             configureKafkaCloudEventsTopic(props)
+            configureKafkaLifecycleEventsTopic(props)
         }
 
         private fun MutableMap<String, String>.configureKafkaTopic(
@@ -264,21 +276,57 @@ class LemlineConfigSource : PropertiesConfigSource(
         }
 
         /**
-         * Configures the CloudEvents Kafka topic (producer-only).
-         * CloudEvents are emitted to external consumers and don't need a consumer.
+         * Configures the CloudEvents Kafka topic.
+         * - Consumer: Receives CloudEvents from external sources for listen tasks
+         * - Producer: Emits CloudEvents from emit tasks
          */
         private fun MutableMap<String, String>.configureKafkaCloudEventsTopic(props: Map<String, String>) {
-            if (!props[CLOUDEVENTS_PRODUCER_ENABLED].toBoolean()) return
-
             val type = "lemline.messaging.kafka.cloudevents"
             val topic = props["$type.topic"] ?: CLOUDEVENTS_TOPIC_DEFAULT
 
-            val producer = "$type.producer"
-            val outgoing = "mp.messaging.outgoing.$CLOUDEVENTS_OUT_CHANNEL"
-            set("$outgoing.connector", KAFKA_CONNECTOR)
-            set("$outgoing.topic", props["$producer.topic-out"] ?: topic)
-            set("$outgoing.value.serializer", KAFKA_STRING_SERIALIZER)
-            set("$outgoing.acks", "all")
+            // Consumer configuration for listen tasks
+            if (props[CLOUDEVENTS_CONSUMER_ENABLED].toBoolean()) {
+                val consumer = "$type.consumer"
+                val incoming = "mp.messaging.incoming.$CLOUDEVENTS_IN_CHANNEL"
+                val topicDLQ = props["$consumer.topic-dlq"] ?: "$topic.dlq"
+                set("$incoming.connector", KAFKA_CONNECTOR)
+                set("$incoming.topic", topic)
+                set("$incoming.group.id", props["$consumer.group-id"] ?: KAFKA_CLOUDEVENTS_GROUP_ID_DEFAULT)
+                set("$incoming.auto.offset.reset", props["$consumer.offset-reset"] ?: KAFKA_OFFSET_RESET_DEFAULT)
+                set("$incoming.value.deserializer", KAFKA_STRING_DESERIALIZER)
+                set("$incoming.failure-strategy", "dead-letter-queue")
+                set("$incoming.dead-letter-queue.topic", topicDLQ)
+                set(CLOUDEVENTS_CONSUMER_CONCURRENCY, props["$consumer.concurrency"] ?: CONSUMER_CONCURRENCY_DEFAULT)
+            }
+
+            // Producer configuration for emit tasks
+            if (props[CLOUDEVENTS_PRODUCER_ENABLED].toBoolean()) {
+                val producer = "$type.producer"
+                val outgoing = "mp.messaging.outgoing.$CLOUDEVENTS_OUT_CHANNEL"
+                set("$outgoing.connector", KAFKA_CONNECTOR)
+                set("$outgoing.topic", props["$producer.topic-out"] ?: topic)
+                set("$outgoing.value.serializer", KAFKA_STRING_SERIALIZER)
+                set("$outgoing.acks", "all")
+            }
+        }
+
+        /**
+         * Configures the Lifecycle Events Kafka topic.
+         * Producer-only: Emits workflow and task lifecycle events for external observability.
+         */
+        private fun MutableMap<String, String>.configureKafkaLifecycleEventsTopic(props: Map<String, String>) {
+            val type = "lemline.messaging.kafka.lifecycleevents"
+            val topic = props["$type.topic"] ?: LIFECYCLE_EVENTS_TOPIC_DEFAULT
+
+            // Producer configuration for lifecycle events (producer-only, no consumer)
+            if (props[LIFECYCLE_EVENTS_PRODUCER_ENABLED].toBoolean()) {
+                val producer = "$type.producer"
+                val outgoing = "mp.messaging.outgoing.$LIFECYCLEEVENTS_OUT_CHANNEL"
+                set("$outgoing.connector", KAFKA_CONNECTOR)
+                set("$outgoing.topic", props["$producer.topic-out"] ?: topic)
+                set("$outgoing.value.serializer", KAFKA_STRING_SERIALIZER)
+                set("$outgoing.acks", "all")
+            }
         }
 
         private fun MutableMap<String, String>.configureRabbit(props: Map<String, String>) {
@@ -295,6 +343,7 @@ class LemlineConfigSource : PropertiesConfigSource(
             configureRabbitQueue(props, TopicType.COMMANDS)
             configureRabbitQueue(props, TopicType.EVENTS)
             configureRabbitCloudEventsQueue(props)
+            configureRabbitLifecycleEventsQueue(props)
         }
 
         private fun MutableMap<String, String>.configureRabbitQueue(
@@ -336,22 +385,64 @@ class LemlineConfigSource : PropertiesConfigSource(
         }
 
         /**
-         * Configures the CloudEvents RabbitMQ queue (producer-only).
-         * CloudEvents are emitted to external consumers and don't need a consumer.
+         * Configures the CloudEvents RabbitMQ queue.
+         * - Consumer: Receives CloudEvents from external sources for listen tasks
+         * - Producer: Emits CloudEvents from emit tasks
          */
         private fun MutableMap<String, String>.configureRabbitCloudEventsQueue(props: Map<String, String>) {
-            if (!props[CLOUDEVENTS_PRODUCER_ENABLED].toBoolean()) return
-
             val type = "lemline.messaging.rabbitmq.cloudevents"
             val queue = props["$type.queue"] ?: CLOUDEVENTS_TOPIC_DEFAULT
 
-            val producer = "$type.producer"
-            val outgoing = "mp.messaging.outgoing.$CLOUDEVENTS_OUT_CHANNEL"
-            set("$outgoing.connector", RABBITMQ_CONNECTOR)
-            set("$outgoing.queue.name", props["$producer.queue-out"] ?: queue)
-            set("$outgoing.serializer", RABBITMQ_STRING_SERIALIZER)
-            set("$outgoing.delivery-mode", "persistent")
-            props["$producer.exchange-name"]?.let { set("$outgoing.exchange.name", it) }
+            // Consumer configuration for listen tasks
+            if (props[CLOUDEVENTS_CONSUMER_ENABLED].toBoolean()) {
+                val consumer = "$type.consumer"
+                val incoming = "mp.messaging.incoming.$CLOUDEVENTS_IN_CHANNEL"
+                val queueDLQ = props["$consumer.queue-dlq"] ?: "$queue.dlq"
+                set("$incoming.connector", RABBITMQ_CONNECTOR)
+                set("$incoming.queue.name", queue)
+                set("$incoming.queue.durable", "true")
+                set("$incoming.auto-ack", "false")
+                set("$incoming.deserializer", RABBITMQ_STRING_SERIALIZER)
+                set("$incoming.failure-strategy", "reject")
+                set("$incoming.auto-bind-dlq", "true")
+                set("$incoming.dlx.declare", "true")
+                set("$incoming.dead-letter-queue-name", queueDLQ)
+                set("$incoming.dead-letter-exchange", "$CLOUDEVENTS_IN_CHANNEL.dlx")
+                set("$incoming.dead-letter-exchange-type", "direct")
+                set("$incoming.dead-letter-routing-key", queueDLQ)
+                set(CLOUDEVENTS_CONSUMER_CONCURRENCY, props["$consumer.concurrency"] ?: CONSUMER_CONCURRENCY_DEFAULT)
+            }
+
+            // Producer configuration for emit tasks
+            if (props[CLOUDEVENTS_PRODUCER_ENABLED].toBoolean()) {
+                val producer = "$type.producer"
+                val outgoing = "mp.messaging.outgoing.$CLOUDEVENTS_OUT_CHANNEL"
+                set("$outgoing.connector", RABBITMQ_CONNECTOR)
+                set("$outgoing.queue.name", props["$producer.queue-out"] ?: queue)
+                set("$outgoing.serializer", RABBITMQ_STRING_SERIALIZER)
+                set("$outgoing.delivery-mode", "persistent")
+                props["$producer.exchange-name"]?.let { set("$outgoing.exchange.name", it) }
+            }
+        }
+
+        /**
+         * Configures the Lifecycle Events RabbitMQ queue.
+         * Producer-only: Emits workflow and task lifecycle events for external observability.
+         */
+        private fun MutableMap<String, String>.configureRabbitLifecycleEventsQueue(props: Map<String, String>) {
+            val type = "lemline.messaging.rabbitmq.lifecycleevents"
+            val queue = props["$type.queue"] ?: LIFECYCLE_EVENTS_TOPIC_DEFAULT
+
+            // Producer configuration for lifecycle events (producer-only, no consumer)
+            if (props[LIFECYCLE_EVENTS_PRODUCER_ENABLED].toBoolean()) {
+                val producer = "$type.producer"
+                val outgoing = "mp.messaging.outgoing.$LIFECYCLEEVENTS_OUT_CHANNEL"
+                set("$outgoing.connector", RABBITMQ_CONNECTOR)
+                set("$outgoing.queue.name", props["$producer.queue-out"] ?: queue)
+                set("$outgoing.serializer", RABBITMQ_STRING_SERIALIZER)
+                set("$outgoing.delivery-mode", "persistent")
+                props["$producer.exchange-name"]?.let { set("$outgoing.exchange.name", it) }
+            }
         }
 
         private fun MutableMap<String, String>.configureInMemory() {
@@ -361,8 +452,12 @@ class LemlineConfigSource : PropertiesConfigSource(
             set("mp.messaging.incoming.$EVENTS_IN_CHANNEL.connector", IN_MEMORY_CONNECTOR)
             set("mp.messaging.outgoing.$EVENTS_OUT_CHANNEL.connector", IN_MEMORY_CONNECTOR)
 
-            // CloudEvents channel (producer-only, for emit task)
+            // CloudEvents channels (consumer for listen tasks, producer for emit tasks)
+            set("mp.messaging.incoming.$CLOUDEVENTS_IN_CHANNEL.connector", IN_MEMORY_CONNECTOR)
             set("mp.messaging.outgoing.$CLOUDEVENTS_OUT_CHANNEL.connector", IN_MEMORY_CONNECTOR)
+
+            // Lifecycle events channel (producer-only for external observability)
+            set("mp.messaging.outgoing.$LIFECYCLEEVENTS_OUT_CHANNEL.connector", IN_MEMORY_CONNECTOR)
         }
 
         private fun generateMetricsProperties(props: Map<String, String>): Map<String, String> {

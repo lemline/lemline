@@ -1,13 +1,16 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.testcases
 
-import com.lemline.core.testcases.WorkflowTestValidators.expectOutputMatching
+import com.lemline.core.testcases.impl.WorkflowTestCase
+import com.lemline.core.testcases.impl.WorkflowTestValidators.expectOutput
+
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.int
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonArray
+import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonArray
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.put
 
 /**
  * Test cases for ForTask execution.
@@ -33,10 +36,7 @@ object ForTaskTestCases {
                       output:
                         as: ${ . }
             """.trimIndent(),
-            validate = expectOutputMatching("sum=15") { output ->
-                val obj = output as? JsonObject ?: return@expectOutputMatching false
-                obj["sum"]?.jsonPrimitive?.int == 15
-            }
+            validate = expectOutput(buildJsonObject { put("sum", 15) })
         ),
 
         WorkflowTestCase(
@@ -56,15 +56,15 @@ object ForTaskTestCases {
                       output:
                         as: ${ . }
             """.trimIndent(),
-            validate = expectOutputMatching("items array with value/index pairs") { output ->
-                val obj = output as? JsonObject ?: return@expectOutputMatching false
-                val items = obj["items"]?.jsonArray ?: return@expectOutputMatching false
-                items.size == 3 &&
-                    items[0].jsonObject["value"]?.jsonPrimitive?.content == "a" &&
-                    items[0].jsonObject["index"]?.jsonPrimitive?.int == 0 &&
-                    items[2].jsonObject["value"]?.jsonPrimitive?.content == "c" &&
-                    items[2].jsonObject["index"]?.jsonPrimitive?.int == 2
-            }
+            validate = expectOutput(
+                buildJsonObject {
+                    put("items", buildJsonArray {
+                        add(buildJsonObject { put("value", "a"); put("index", 0) })
+                        add(buildJsonObject { put("value", "b"); put("index", 1) })
+                        add(buildJsonObject { put("value", "c"); put("index", 2) })
+                    })
+                }
+            )
         ),
 
         WorkflowTestCase(
@@ -85,14 +85,11 @@ object ForTaskTestCases {
                       output:
                         as: ${ . }
             """.trimIndent(),
-            validate = expectOutputMatching("evens=[2,4,6]") { output ->
-                val obj = output as? JsonObject ?: return@expectOutputMatching false
-                val evens = obj["evens"]?.jsonArray ?: return@expectOutputMatching false
-                evens.size == 3 &&
-                    evens[0].jsonPrimitive.int == 2 &&
-                    evens[1].jsonPrimitive.int == 4 &&
-                    evens[2].jsonPrimitive.int == 6
-            }
+            validate = expectOutput(
+                buildJsonObject {
+                    put("evens", JsonArray(listOf(JsonPrimitive(2), JsonPrimitive(4), JsonPrimitive(6))))
+                }
+            )
         ),
 
         WorkflowTestCase(
@@ -114,10 +111,7 @@ object ForTaskTestCases {
                       output:
                         as: ${ . }
             """.trimIndent(),
-            validate = expectOutputMatching("total=60") { output ->
-                val obj = output as? JsonObject ?: return@expectOutputMatching false
-                obj["total"]?.jsonPrimitive?.int == 60
-            }
+            validate = expectOutput(buildJsonObject { put("total", 60) })
         ),
 
         WorkflowTestCase(
@@ -137,14 +131,11 @@ object ForTaskTestCases {
                       output:
                         as: ${ . }
             """.trimIndent(),
-            validate = expectOutputMatching("doubled=[2,4,6]") { output ->
-                val obj = output as? JsonObject ?: return@expectOutputMatching false
-                val doubled = obj["doubled"]?.jsonArray ?: return@expectOutputMatching false
-                doubled.size == 3 &&
-                    doubled[0].jsonPrimitive.int == 2 &&
-                    doubled[1].jsonPrimitive.int == 4 &&
-                    doubled[2].jsonPrimitive.int == 6
-            }
+            validate = expectOutput(
+                buildJsonObject {
+                    put("doubled", JsonArray(listOf(JsonPrimitive(2), JsonPrimitive(4), JsonPrimitive(6))))
+                }
+            )
         ),
 
         WorkflowTestCase(
@@ -173,11 +164,16 @@ object ForTaskTestCases {
                       output:
                         as: ${ . }
             """.trimIndent(),
-            validate = expectOutputMatching("pairs has 4 items") { output ->
-                val obj = output as? JsonObject ?: return@expectOutputMatching false
-                val pairs = obj["pairs"]?.jsonArray ?: return@expectOutputMatching false
-                pairs.size == 4
-            }
+            validate = expectOutput(
+                buildJsonObject {
+                    put("pairs", buildJsonArray {
+                        add(buildJsonObject { put("num", "a"); put("letter", "a") })
+                        add(buildJsonObject { put("num", "b"); put("letter", "b") })
+                        add(buildJsonObject { put("num", "a"); put("letter", "a") })
+                        add(buildJsonObject { put("num", "b"); put("letter", "b") })
+                    })
+                }
+            )
         ),
 
         WorkflowTestCase(
@@ -197,13 +193,11 @@ object ForTaskTestCases {
                       output:
                         as: ${ . }
             """.trimIndent(),
-            validate = expectOutputMatching("names=[Alice, Bob]") { output ->
-                val obj = output as? JsonObject ?: return@expectOutputMatching false
-                val names = obj["names"]?.jsonArray ?: return@expectOutputMatching false
-                names.size == 2 &&
-                    names[0].jsonPrimitive.content == "Alice" &&
-                    names[1].jsonPrimitive.content == "Bob"
-            }
+            validate = expectOutput(
+                buildJsonObject {
+                    put("names", JsonArray(listOf(JsonPrimitive("Alice"), JsonPrimitive("Bob"))))
+                }
+            )
         ),
 
         WorkflowTestCase(
@@ -223,13 +217,11 @@ object ForTaskTestCases {
                       output:
                         as: ${ . }
             """.trimIndent(),
-            validate = expectOutputMatching("taskNames=[capture, capture]") { output ->
-                val obj = output as? JsonObject ?: return@expectOutputMatching false
-                val taskNames = obj["taskNames"]?.jsonArray ?: return@expectOutputMatching false
-                taskNames.size == 2 &&
-                    taskNames[0].jsonPrimitive.content == "capture" &&
-                    taskNames[1].jsonPrimitive.content == "capture"
-            }
+            validate = expectOutput(
+                buildJsonObject {
+                    put("taskNames", JsonArray(listOf(JsonPrimitive("capture"), JsonPrimitive("capture"))))
+                }
+            )
         )
     )
 }

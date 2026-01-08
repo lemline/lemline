@@ -5,9 +5,9 @@ package com.lemline.core.states
 
 import com.lemline.common.json.LemlineJson
 import com.lemline.common.values.WorkflowId
+import com.lemline.core.expressions.scopes.RuntimeDescriptor
 import com.lemline.core.expressions.scopes.WorkflowDescriptor
 import com.lemline.core.processors.scope.Scope
-import com.lemline.core.workflows.RuntimeDescriptor
 import io.serverlessworkflow.impl.expressions.DateTimeDescriptor
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
@@ -26,7 +26,6 @@ data class RootState(
     val workflowInput: JsonElement = buildJsonObject {},
     val context: Scope = buildJsonObject {},
     val hasWaitingParent: Boolean = false,
-    val workflowStep: Int = 0,
 ) : NodeState() {
 
     @Transient
@@ -56,7 +55,7 @@ data class RootState(
      * @param newContext The new context to use
      * @return A new RootState with the updated context
      */
-    fun copyWithContext(newContext: Scope): RootState {
+    fun withContext(newContext: Scope): RootState {
         val state = copy(context = newContext)
         // copy also transient fields
         if (this::secrets.isInitialized) state.secrets = this.secrets

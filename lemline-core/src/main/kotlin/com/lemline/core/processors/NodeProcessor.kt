@@ -5,11 +5,14 @@ import com.lemline.common.json.LemlineJson
 import com.lemline.common.json.LemlineJson.toJsonElement
 import com.lemline.common.logger.logger
 import com.lemline.common.values.NodePosition
+import com.lemline.common.values.WorkflowInfo
 import com.lemline.core.errors.InternalException
 import com.lemline.core.errors.WorkflowErrorType
 import com.lemline.core.errors.WorkflowErrorType.EXPRESSION
 import com.lemline.core.errors.WorkflowErrorType.VALIDATION
 import com.lemline.core.expressions.JQExpression
+import com.lemline.core.lifecycleevents.LifecycleEventHook
+import com.lemline.core.nodes.ForeachTask
 import com.lemline.core.nodes.Node
 import com.lemline.core.nodes.RootTask
 import com.lemline.core.processors.scope.Scope
@@ -18,14 +21,15 @@ import com.lemline.core.processors.scope.withTask
 import com.lemline.core.processors.scope.withTransformedInput
 import com.lemline.core.processors.scope.withTransformedOutput
 import com.lemline.core.schemas.SchemaValidator
-import com.lemline.core.states.ForkState
 import com.lemline.core.states.NodeStack
 import com.lemline.core.states.NodeState
 import com.lemline.core.states.WorkflowEvent
+import com.lemline.core.states.WorkflowEvent.ForEachCompleted
 import com.lemline.core.states.WorkflowEvent.ForkBranchCompleted
 import com.lemline.core.states.WorkflowEvent.TaskScheduled
 import com.lemline.core.states.WorkflowEvent.WorkflowCompleted
-import com.lemline.core.workflows.toKotlin
+import com.lemline.core.tasks.toKotlin
+import com.lemline.core.workflows.branches
 import io.serverlessworkflow.api.types.ExportAs
 import io.serverlessworkflow.api.types.FlowDirective
 import io.serverlessworkflow.api.types.FlowDirectiveEnum
@@ -55,16 +59,13 @@ abstract class NodeProcessor<T : TaskBase, S : NodeState>(
     // Task-Specific Actions
     // ========================================
 
-
     /**
      * Create the initial state for this node.
      * Subclasses override to create their specific state type.
      */
-    abstract fun stateEnterFromParent(transformedInput: JsonElement, scope: Scope): S
+    abstract fun stateWhenEnteringFromParent(transformedInput: JsonElement, scope: Scope): S
 
-    /**
-     * Execute node action (for activity tasks).
-     */
+    /** Execute node action (for activity tasks).*/
     open suspend fun execute(
         transformedInput: JsonElement,
         scope: Scope,
@@ -73,9 +74,7 @@ abstract class NodeProcessor<T : TaskBase, S : NodeState>(
 
     open val isAsync: Boolean = false
 
-    /**
-     * return started event for activities
-     */
+    /** return started event for activities*/
     open fun startedEvent(
         nodeStack: NodeStack,
         transformedInput: JsonElement,
@@ -93,42 +92,39 @@ abstract class NodeProcessor<T : TaskBase, S : NodeState>(
         rootNode.task.use
     }
 
-    /**
-     * Update state when re-entering from child.
-     * Default: just increment visitCount.
-     */
-    open fun stateEnterFromChild(
+    /** Update state when re-entering from child.*/
+    open fun stateWhenReEnteringFromChild(
         state: S,
         output: JsonElement,
         scope: Scope,
         nodeName: String? = null
     ): S {
         // Default implementation for leaf nodes - just increment visitCount
-        @Suppress("UNCHECKED_CAST")
         return state
     }
 
     /**
-     * Determine where to go next based on current state.
+     * Determine where to go next based on current state. Overridden in control flow nodes.
      * Default: go to parent (leaf node behavior - activities, switch, etc.)
      */
     open fun getNextNode(
         state: S,
         dataset: JsonElement,
         scope: Scope,
-    ): NavigationInfo {
-        return NavigationInfo(
-            nextNode = node.parent,
-            nextDirective = getFlowDirective()
-        )
-    }
+    ) = NavigationInfo(
+        nextNode = node.parent,
+        nextDirective = getFlowDirective()
+    )
 
     // ========================================
     // Entering a Node for the first time
     // ========================================
+
     suspend fun enterFromParent(
         nodeStack: NodeStack,
-        rawInput: JsonElement
+        workflowInfo: WorkflowInfo,
+        rawInput: JsonElement,
+        lifecycleHook: LifecycleEventHook,
     ): WorkflowEvent {
         logger.debug { "Entering Down  node=${node.position} - ${node.task::class.simpleName}(input=$rawInput)" }
 
@@ -145,12 +141,23 @@ abstract class NodeProcessor<T : TaskBase, S : NodeState>(
         scope = scope.withTask(node, startedAt, rawInput)
 
         // if this node is conditional, check if it should be executed, if not return to parent
-        if (!checkIf(rawInput, scope)) return getNextEvent(
-            nodeStack = nodeStack,
-            nextNode = node.parent,
-            nextInput = rawInput,
-            nextDirective = null, // Continue to next sibling
-        )
+        if (!checkIf(rawInput, scope)) {
+            // Emit task completed (there is not skipped type)
+            lifecycleHook.onTaskCompleted(
+                workflowInfo = workflowInfo,
+                nodeStack = nodeStack,
+                nodePosition = node.position,
+                output = rawInput,
+                completedAt = Clock.System.now(),
+            )
+
+            return getNextEvent(
+                nodeStack = nodeStack,
+                nextNode = node.parent,
+                nextInput = rawInput,
+                nextDirective = null, // Continue to next sibling
+            )
+        }
 
         // Apply input transformation (throws ExpressionException)
         val transformedInput = transformInput(rawInput, scope)
@@ -158,14 +165,12 @@ abstract class NodeProcessor<T : TaskBase, S : NodeState>(
         // Update context with transformed input
         scope = scope.withTransformedInput(transformedInput)
 
-        // state creation
-        val state = stateEnterFromParent(transformedInput, scope)
+        val nodeState = stateWhenEnteringFromParent(transformedInput, scope)
 
-        // push the state to the stack
-        val updatedStack = nodeStack.push(node.position to state)
+        val updatedStack = nodeStack.push(node.position, nodeState)
 
         // get the next node and an updated state for the current node
-        return continueTo(state, transformedInput, scope, updatedStack)
+        return continueTo(updatedStack, workflowInfo, transformedInput, scope, lifecycleHook)
     }
 
     // ========================================
@@ -179,49 +184,60 @@ abstract class NodeProcessor<T : TaskBase, S : NodeState>(
         }
 
     // here we process the current node, knowing that we come from a child node that output dataset and flow directive
-    internal suspend fun enterFromChild(
+    internal suspend fun reEnterFromChild(
         nodeStack: NodeStack,
+        workflowInfo: WorkflowInfo,
         output: JsonElement,
-        flowDirective: FlowDirective?
+        flowDirective: FlowDirective?,
+        lifecycleHook: LifecycleEventHook,
     ): WorkflowEvent {
         logger.debug {
             "ReEntering Up  node=${node.position} - ${node.task::class.simpleName}(input=$output${
                 flowDirective?.get()?.let { ", directive=$it" } ?: ""
-            }), state=${nodeStack.lastState}"
+            }), state=${nodeStack.currentState}"
         }
         @Suppress("UNCHECKED_CAST")
-        val state = nodeStack.lastState as S
+        val state = nodeStack.currentState as S
         val scope = nodeStack.stateScope.withTask(node, state.startedAt)
 
-        val updatedState = stateEnterFromChild(state, output, scope, flowDirective.nodeName)
+        val updatedState: S = stateWhenReEnteringFromChild(state, output, scope, flowDirective.nodeName)
+        val updatedStack = nodeStack.updateTopState(updatedState).incrementTopCounter()
 
         return when (val directive = flowDirective?.get()) {
             is FlowDirectiveEnum -> when (directive) {
                 // END: Workflow complete - recursive unwinding
-                FlowDirectiveEnum.END -> continueToEnd(output = output, nodeStack = nodeStack)
+                FlowDirectiveEnum.END -> continueToEnd(
+                    nodeStack = updatedStack,
+                    workflowInfo = workflowInfo,
+                    output = output,
+                    lifecycleHook = lifecycleHook
+                )
                 // EXIT: exit current node
                 FlowDirectiveEnum.EXIT -> continueToParent(
-                    state = updatedState,
+                    nodeStack = updatedStack,
+                    workflowInfo = workflowInfo,
                     transformedInput = output,
                     currentFlowDirective = getFlowDirective(),
                     scope = scope,
-                    nodeStack = nodeStack
+                    lifecycleHook = lifecycleHook,
                 )
                 // CONTINUE: continue
                 FlowDirectiveEnum.CONTINUE -> continueTo(
-                    state = updatedState,
+                    nodeStack = updatedStack,
+                    workflowInfo = workflowInfo,
                     transformedInput = output,
                     scope = scope,
-                    nodeStack = nodeStack
+                    lifecycleHook = lifecycleHook
                 )
             }
 
             // Goto named sibling or null
             is String, null -> continueTo(
-                state = updatedState,
+                nodeStack = updatedStack,
+                workflowInfo = workflowInfo,
                 transformedInput = output,
                 scope = scope,
-                nodeStack = nodeStack
+                lifecycleHook = lifecycleHook
             )
 
             else -> throw IllegalArgumentException("Unknown flow directive: $directive")
@@ -232,42 +248,47 @@ abstract class NodeProcessor<T : TaskBase, S : NodeState>(
     // CONTINUE
     // ========================================
     private suspend fun continueTo(
-        state: S,
+        nodeStack: NodeStack,
+        workflowInfo: WorkflowInfo,
         transformedInput: JsonElement,
         scope: Scope,
-        nodeStack: NodeStack
+        lifecycleHook: LifecycleEventHook,
     ): WorkflowEvent {
         // Pure navigation - determine where to go next
-        val (nextNode, nextDirective) = getNextNode(state, transformedInput, scope)
+        val (nextNode, nextDirective) = @Suppress("UNCHECKED_CAST") getNextNode(
+            nodeStack.currentState as S,
+            transformedInput,
+            scope
+        )
 
         // check if we should return to parent
+        @Suppress("UNCHECKED_CAST")
         return when (nextNode == node.parent) {
             // case of leaf (activities, switch, ...) OR end of a control flow
             true -> continueToParent(
-                state = state,
+                nodeStack = nodeStack,
+                workflowInfo = workflowInfo,
                 transformedInput = transformedInput,
                 currentFlowDirective = nextDirective,
                 scope = scope,
-                nodeStack = nodeStack
+                lifecycleHook = lifecycleHook,
             )
 
             // control flows that are not completed (do, for, ...), going to a child
             false -> continueToChild(
                 childNode = nextNode,
                 childRawInput = transformedInput,
-                updatedState = state,
                 nodeStack = nodeStack
             )
         }
     }
 
-    internal fun continueToChild(
+    private fun continueToChild(
         childNode: Node<*>?,
         childRawInput: JsonElement,
-        updatedState: NodeState,
         nodeStack: NodeStack
     ) = getNextEvent(
-        nodeStack = nodeStack.pop().push(node.position to updatedState),
+        nodeStack = nodeStack,
         nextNode = childNode,
         nextInput = childRawInput,
         nextDirective = null,
@@ -276,22 +297,25 @@ abstract class NodeProcessor<T : TaskBase, S : NodeState>(
     // ========================================
     // EXIT
     // ========================================
-    internal suspend fun continueToParent(
-        state: S,
+    private suspend fun continueToParent(
+        nodeStack: NodeStack,
+        workflowInfo: WorkflowInfo,
         transformedInput: JsonElement,
         currentFlowDirective: FlowDirective?,
         scope: Scope,
-        nodeStack: NodeStack
+        lifecycleHook: LifecycleEventHook,
     ): WorkflowEvent {
 
+        // it the task is async, return started event
         if (isAsync) return startedEvent(nodeStack, transformedInput, scope)
 
         // Execute action (e.g., HTTP call, set data)
         // For flow tasks, this just returns input unchanged
-        val rawOutput = execute(transformedInput, scope, state)
+        @Suppress("UNCHECKED_CAST")
+        val rawOutput = execute(transformedInput, scope, nodeStack.currentState as S)
 
         // Complete the task with the raw output
-        return completeTask(rawOutput, currentFlowDirective, scope, nodeStack)
+        return completeTask(rawOutput, currentFlowDirective, scope, nodeStack, workflowInfo, lifecycleHook)
     }
 
     /**
@@ -300,11 +324,13 @@ abstract class NodeProcessor<T : TaskBase, S : NodeState>(
      * This is separated from continueToParent to allow the orchestrator to
      * complete tasks that were executed externally (e.g., child workflows).
      */
-    internal fun completeTask(
+    internal suspend fun completeTask(
         rawOutput: JsonElement,
         currentFlowDirective: FlowDirective?,
         currentScope: Scope,
-        nodeStack: NodeStack
+        nodeStack: NodeStack,
+        workflowInfo: WorkflowInfo,
+        lifecycleHook: LifecycleEventHook,
     ): WorkflowEvent {
         // Update scope with raw output
         var scope = currentScope.withRawOutput(rawOutput)
@@ -321,12 +347,21 @@ abstract class NodeProcessor<T : TaskBase, S : NodeState>(
         // Export to context if export.as is defined (throws ExpressionException or ValidationException)
         val exportedContext = exportToContext(transformedOutput, scope)
 
+        // Emit task completed events
+        if (node.position != NodePosition.root) {
+            lifecycleHook.onTaskCompleted(
+                workflowInfo = workflowInfo,
+                nodeStack = nodeStack,
+                nodePosition = node.position,
+                output = transformedOutput,
+                completedAt = Clock.System.now(),
+            )
+        }
+
         // Build the updated state stack: pop the current node's state (but never root)
         // State was pushed in enterFromParent, so it's always on the stack
-        var updatedStack = if (node.position == NodePosition.root) nodeStack else nodeStack.pop()
-        if (exportedContext != null) {
-            updatedStack = updatedStack.setContext(exportedContext)
-        }
+        var updatedStack = nodeStack.pop().incrementTopCounter()
+        exportedContext?.let { updatedStack = updatedStack.withContext(it) }
 
         return getNextEvent(
             nodeStack = updatedStack,
@@ -340,19 +375,38 @@ abstract class NodeProcessor<T : TaskBase, S : NodeState>(
     // END
     // ========================================
 
-    internal fun continueToEnd(output: JsonElement, nodeStack: NodeStack) = getNextEvent(
-        // Pop the current node's state (but never root) - state was pushed in enterFromParent
-        nodeStack = if (node.position == NodePosition.root) nodeStack else nodeStack.pop(),
-        nextNode = node.parent,
-        nextInput = output,
-        nextDirective = FlowDirective().apply { setFlowDirectiveEnum(FlowDirectiveEnum.END) } // Pass END up the chain
-    )
+    private suspend fun continueToEnd(
+        nodeStack: NodeStack,
+        workflowInfo: WorkflowInfo,
+        output: JsonElement,
+        lifecycleHook: LifecycleEventHook
+    ): WorkflowEvent {
+
+        // Emit task completed events
+        if (node.position != NodePosition.root) {
+            lifecycleHook.onTaskCompleted(
+                workflowInfo = workflowInfo,
+                nodeStack = nodeStack,
+                nodePosition = node.position,
+                output = output,
+                completedAt = Clock.System.now(),
+            )
+        }
+
+        return getNextEvent(
+            // Pop the current node's state (but never root) - state was pushed in enterFromParent
+            nodeStack = if (node.position == NodePosition.root) nodeStack else nodeStack.pop().incrementTopCounter(),
+            nextNode = node.parent,
+            nextInput = output,
+            nextDirective = FlowDirective().apply { flowDirectiveEnum = FlowDirectiveEnum.END } // Pass END up the chain
+        )
+    }
 
     // ========================================
     // Next Event
     // ========================================
 
-    internal fun getNextEvent(
+    private fun getNextEvent(
         nodeStack: NodeStack,
         nextNode: Node<*>?,
         nextInput: JsonElement,
@@ -370,7 +424,10 @@ abstract class NodeProcessor<T : TaskBase, S : NodeState>(
         }
 
         // Are we now completing a fork branch?
-        forkBranchCompleted(nodeStack, nextNode, nextInput, nextDirective)?.let { return it }
+        forkBranchCompleted(nodeStack, nextNode, nextInput)?.let { return it }
+
+        // Are we now completing a foreach subscription?
+        forEachCompleted(nodeStack, nextNode, nextInput)?.let { return it }
 
         // Next Task
         return TaskScheduled(
@@ -382,29 +439,53 @@ abstract class NodeProcessor<T : TaskBase, S : NodeState>(
 
     }
 
+    /**
+     * Determines if a fork branch has completed successfully based on the current node, its stack, and directive,
+     * and returns the corresponding `ForkBranchCompleted` event if applicable.
+     */
     private fun forkBranchCompleted(
         nodeStack: NodeStack,
         nextNode: Node<*>,
         nextInput: JsonElement,
-        nextDirective: FlowDirective?,
     ): ForkBranchCompleted? {
-        val nextState = nodeStack[nextNode.position]
-        // Is NextNode a fork? Do we enter from Child?
-        if (nextNode.task is ForkTask && nextState != null && nextState is ForkState) {
-            // Find the branch name
-            val branchName = nextNode.children?.find { it.name == node.name }?.name
-                ?: throw IllegalStateException("Fork - can not find ${node.name} in ${nextNode.children?.joinToString { it.name }}")
+        val nextFrame = nodeStack[nextNode.position]
 
-            return ForkBranchCompleted(
-                nodeStack = nodeStack,
-                branchName = branchName,
-                output = nextInput,
-                completedAt = Clock.System.now(),
-                flowDirective = nextDirective?.toKotlin(),
-            )
-        }
+        // if nextNode is not a fork task, or if we are entering for the first time
+        if (nextNode.task !is ForkTask || nextFrame == null) return null
 
-        return null
+        // Find the branch name using typed accessor
+        @Suppress("UNCHECKED_CAST")
+        val forkNode = nextNode as Node<ForkTask>
+        val branchPosition = forkNode.branches.find { it.position == node.position }?.position
+            ?: error("Fork - can not find ${node.name} in [${forkNode.branches.joinToString { it.name }}]")
+
+        return ForkBranchCompleted(
+            nodeStack = nodeStack,
+            branchPosition = branchPosition,
+            branchOutput = nextInput,
+            completedAt = Clock.System.now(),
+        )
+    }
+
+    /**
+     * Handles the completion of a "foreach" iteration in a node processing workflow. It verifies whether
+     * the provided node represents a [ForeachTask] and whether the node is being re-entered with an existing
+     * state. If these conditions are met, it creates and returns a [ForEachCompleted] event.
+     */
+    private fun forEachCompleted(
+        nodeStack: NodeStack,
+        nextNode: Node<*>,
+        nextInput: JsonElement,
+    ): ForEachCompleted? {
+        val nextFrame = nodeStack[nextNode.position]
+
+        // if nextNode is not a foreach task, or if we are entering for the first time
+        if (nextNode.task !is ForeachTask || nextFrame == null) return null
+
+        return ForEachCompleted(
+            nodeStack = nodeStack,
+            output = nextInput,
+        )
     }
 
     // ========================================
@@ -414,9 +495,9 @@ abstract class NodeProcessor<T : TaskBase, S : NodeState>(
     /**
      * Check if condition for conditional execution.
      */
-    fun checkIf(rawInput: JsonElement, scope: Scope): Boolean {
+    private fun checkIf(rawInput: JsonElement, scope: Scope): Boolean {
         val ifCondition = node.task.`if` ?: return true
-        return evalBoolean(rawInput, ifCondition, ".if", scope)
+        return evalBoolean(rawInput, ifCondition, "if", scope)
     }
 
     /**
@@ -462,7 +543,7 @@ abstract class NodeProcessor<T : TaskBase, S : NodeState>(
     /**
      * Validate output against schema.
      */
-    fun validateOutput(transformedOutput: JsonElement) {
+    private fun validateOutput(transformedOutput: JsonElement) {
         node.task.output?.schema?.let { schema ->
             validate(transformedOutput, schema)
         }
@@ -471,7 +552,7 @@ abstract class NodeProcessor<T : TaskBase, S : NodeState>(
     /**
      * Get flow directive from definition.
      */
-    fun getFlowDirective(): FlowDirective? {
+    internal fun getFlowDirective(): FlowDirective? {
         return node.task.then
     }
 
@@ -506,7 +587,7 @@ abstract class NodeProcessor<T : TaskBase, S : NodeState>(
     internal fun runWorkflowInput(data: JsonElement, subFlowInput: SubflowInput?, scope: JsonObject): JsonElement =
         subFlowInput?.let { eval(data, it.additionalProperties.toJsonElement(), scope, false) } ?: data
 
-    protected fun evalBoolean(
+    internal fun evalBoolean(
         data: JsonElement,
         expr: String,
         name: String,
@@ -514,7 +595,19 @@ abstract class NodeProcessor<T : TaskBase, S : NodeState>(
     ): Boolean = eval(data, expr, scope).let {
         when (it is JsonPrimitive && it.booleanOrNull != null) {
             true -> it.boolean
-            false -> raiseError(EXPRESSION, "'$name' expression must be a boolean, but is '$it'")
+            false -> raiseError(EXPRESSION, "'.$name' expression must be a boolean, but is '$it'")
+        }
+    }
+
+    internal fun evalString(
+        data: JsonElement,
+        expr: String,
+        name: String,
+        scope: JsonObject
+    ): String = eval(data, expr, scope).let {
+        when (it is JsonPrimitive) {
+            true -> it.content
+            false -> raiseError(EXPRESSION, "'.$name' expression must be a String, but is '$it'")
         }
     }
 

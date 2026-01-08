@@ -1,0 +1,307 @@
+// SPDX-License-Identifier: BUSL-1.1
+package com.lemline.core.orchestrator.full
+
+import com.lemline.common.logger.logger
+import com.lemline.common.values.NodePosition
+import com.lemline.core.cloudevents.CloudEventMatcher
+import com.lemline.core.cloudevents.CloudEventParser.toJsonElement
+import com.lemline.core.errors.InternalException
+import com.lemline.core.nodes.ForeachTask
+import com.lemline.core.processors.EventFilter
+import com.lemline.core.processors.ListenStrategy
+import com.lemline.core.processors.UntilCondition
+import com.lemline.core.states.ForeachState
+import com.lemline.core.states.NodeStack
+import com.lemline.core.states.WorkflowCommand
+import com.lemline.core.states.WorkflowEvent
+import io.cloudevents.CloudEvent
+import io.serverlessworkflow.api.types.ListenTaskConfiguration.ListenAndReadAs
+import kotlin.time.ExperimentalTime
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.channels.ReceiveChannel
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.produceIn
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
+
+@ExperimentalTime
+internal sealed class CollectResult {
+    data class Success(val outputs: List<JsonElement>) : CollectResult()
+    data class Failure(val nodeStack: NodeStack, val error: InternalException) : CollectResult()
+    data class EscapedToCompletion(val event: WorkflowEvent.WorkflowCompleted) : CollectResult()
+}
+
+internal class ForeachEscapedException(val event: WorkflowEvent.WorkflowCompleted) : Exception()
+
+@ExperimentalTime
+internal typealias ForeachProcessor = suspend (NodeStack, JsonElement, Int) -> Pair<NodeStack, JsonElement>
+
+@ExperimentalTime
+internal object ListenEventCollector {
+
+    private val logger = logger()
+
+    suspend fun collect(
+        event: WorkflowEvent.ListenStarted,
+        eventFlow: Flow<CloudEvent>,
+        foreachProcessor: ForeachProcessor?,
+    ): CollectResult {
+        var currentStack = event.nodeStack
+
+        val processEvent: suspend (CloudEvent, Int) -> JsonElement = { cloudEvent, index ->
+            val eventJson = cloudEvent.toJsonElement(event.config.readAs)
+            if (foreachProcessor != null) {
+                val (updatedStack, output) = foreachProcessor(currentStack, eventJson, index)
+                currentStack = updatedStack
+                output
+            } else {
+                eventJson
+            }
+        }
+
+        val correlationContext = event.config.correlationContext
+        val establishedCorrelations = mutableMapOf<String, String>()
+
+        return try {
+            val outputs = when (event.config.strategy) {
+                ListenStrategy.ONE -> collectFirst(
+                    eventFlow, event.config.filters, correlationContext, establishedCorrelations, processEvent
+                )
+                ListenStrategy.ANY -> collectAny(
+                    eventFlow, event, correlationContext, establishedCorrelations, processEvent
+                )
+                ListenStrategy.ALL -> collectAll(
+                    eventFlow, event.config.filters, correlationContext, establishedCorrelations, processEvent
+                )
+            }
+            CollectResult.Success(outputs)
+        } catch (e: ForeachEscapedException) {
+            CollectResult.EscapedToCompletion(e.event)
+        } catch (e: InternalException) {
+            CollectResult.Failure(currentStack, e)
+        }
+    }
+
+    private suspend fun collectFirst(
+        eventFlow: Flow<CloudEvent>,
+        filters: List<EventFilter>,
+        correlationContext: JsonElement?,
+        establishedCorrelations: MutableMap<String, String>,
+        processEvent: suspend (CloudEvent, Int) -> JsonElement,
+    ): List<JsonElement> {
+        val cloudEvent = eventFlow
+            .filter { CloudEventMatcher.matchesFilters(it, filters, correlationContext, establishedCorrelations) }
+            .first()
+        return listOf(processEvent(cloudEvent, 0))
+    }
+
+    private suspend fun collectAny(
+        eventFlow: Flow<CloudEvent>,
+        event: WorkflowEvent.ListenStarted,
+        correlationContext: JsonElement?,
+        establishedCorrelations: MutableMap<String, String>,
+        processEvent: suspend (CloudEvent, Int) -> JsonElement,
+    ): List<JsonElement> = when (val until = event.config.until) {
+        null -> collectFirst(
+            eventFlow, event.config.filters, correlationContext, establishedCorrelations, processEvent
+        )
+
+        is UntilCondition.Expression -> collectUntilExpression(
+            eventFlow, event.config.filters, until.expression, event.config.readAs,
+            correlationContext, establishedCorrelations, processEvent
+        )
+
+        is UntilCondition.Event -> collectUntilTermination(
+            eventFlow, event.config.filters, until.filter,
+            correlationContext, establishedCorrelations, processEvent
+        )
+    }
+
+    /**
+     * Collect events for ALL strategy: waits until each filter has at least one match.
+     * One event can satisfy multiple filters. Returns unique matched events sorted by
+     * the index of their first matching filter.
+     */
+    private suspend fun collectAll(
+        eventFlow: Flow<CloudEvent>,
+        filters: List<EventFilter>,
+        correlationContext: JsonElement?,
+        establishedCorrelations: MutableMap<String, String>,
+        processEvent: suspend (CloudEvent, Int) -> JsonElement,
+    ): List<JsonElement> {
+        data class MatchedEvent(val firstFilterIndex: Int, val result: JsonElement)
+
+        val matchedEvents = mutableListOf<MatchedEvent>()
+        val unsatisfiedIndices = filters.indices.toMutableSet()
+
+        val channel = eventFlow.toChannel()
+        try {
+            for (cloudEvent in channel) {
+                val matchingIndices = unsatisfiedIndices.filter { index ->
+                    CloudEventMatcher.matchesFilters(
+                        cloudEvent, listOf(filters[index]), correlationContext, establishedCorrelations
+                    )
+                }
+
+                if (matchingIndices.isNotEmpty()) {
+                    val firstMatchingIndex = matchingIndices.min()
+                    val processedResult = processEvent(cloudEvent, firstMatchingIndex)
+                    matchedEvents.add(MatchedEvent(firstMatchingIndex, processedResult))
+
+                    for (index in matchingIndices) {
+                        unsatisfiedIndices.remove(index)
+                        logger.debug { "Filter $index satisfied by event type=${cloudEvent.type}" }
+                    }
+                }
+
+                if (unsatisfiedIndices.isEmpty()) {
+                    logger.debug { "All ${filters.size} filters satisfied" }
+                    break
+                }
+            }
+        } finally {
+            channel.cancel()
+        }
+
+        return matchedEvents.map { it.result }
+    }
+
+    private suspend fun collectUntilExpression(
+        eventFlow: Flow<CloudEvent>,
+        filters: List<EventFilter>,
+        expression: String,
+        readAs: ListenAndReadAs,
+        correlationContext: JsonElement?,
+        establishedCorrelations: MutableMap<String, String>,
+        processEvent: suspend (CloudEvent, Int) -> JsonElement,
+    ): List<JsonElement> {
+        val rawEvents = mutableListOf<JsonElement>()
+        val outputs = mutableListOf<JsonElement>()
+
+        val channel = eventFlow.filtered(filters, correlationContext, establishedCorrelations)
+        try {
+            for (cloudEvent in channel) {
+                rawEvents.add(cloudEvent.toJsonElement(readAs))
+                outputs.add(processEvent(cloudEvent, outputs.size))
+
+                logger.debug { "Accumulated event (count=${rawEvents.size}): type=${cloudEvent.type}" }
+
+                if (CloudEventMatcher.evaluateExpressionAsBoolean(expression, JsonArray(rawEvents))) {
+                    logger.debug { "Until expression evaluated to true after ${rawEvents.size} events" }
+                    break
+                }
+            }
+        } finally {
+            channel.cancel()
+        }
+        return outputs
+    }
+
+    private suspend fun collectUntilTermination(
+        eventFlow: Flow<CloudEvent>,
+        filters: List<EventFilter>,
+        terminationFilter: EventFilter,
+        correlationContext: JsonElement?,
+        establishedCorrelations: MutableMap<String, String>,
+        processEvent: suspend (CloudEvent, Int) -> JsonElement,
+    ): List<JsonElement> {
+        val outputs = mutableListOf<JsonElement>()
+
+        val channel = eventFlow.toChannel()
+        try {
+            for (cloudEvent in channel) {
+                if (CloudEventMatcher.matchesFilters(cloudEvent, listOf(terminationFilter))) {
+                    logger.debug { "Termination event received: type=${cloudEvent.type}, returning ${outputs.size} accumulated events" }
+                    break
+                }
+                if (CloudEventMatcher.matchesFilters(
+                        cloudEvent, filters, correlationContext, establishedCorrelations
+                    )) {
+                    outputs.add(processEvent(cloudEvent, outputs.size))
+                    logger.debug { "Accumulated event (count=${outputs.size}): type=${cloudEvent.type}" }
+                }
+            }
+        } finally {
+            channel.cancel()
+        }
+        return outputs
+    }
+
+    private suspend fun Flow<CloudEvent>.filtered(
+        filters: List<EventFilter>,
+        correlationContext: JsonElement?,
+        establishedCorrelations: MutableMap<String, String>
+    ): ReceiveChannel<CloudEvent> {
+        val scope = CoroutineScope(currentCoroutineContext())
+        return this.filter {
+            CloudEventMatcher.matchesFilters(it, filters, correlationContext, establishedCorrelations)
+        }.produceIn(scope)
+    }
+
+    private suspend fun Flow<CloudEvent>.toChannel(): ReceiveChannel<CloudEvent> {
+        val scope = CoroutineScope(currentCoroutineContext())
+        return this.produceIn(scope)
+    }
+
+    fun createForeachProcessor(
+        foreachPosition: NodePosition,
+        foreachTask: ForeachTask,
+        resumeFn: suspend (WorkflowCommand) -> WorkflowEvent.Outcome,
+    ): ForeachProcessor = { nodeStack, eventData, iterationIndex ->
+        logger.debug { "Processing foreach iteration $iterationIndex with event: $eventData" }
+
+        val updatedNodeStack: NodeStack
+        val updatedState: ForeachState
+
+        when (iterationIndex) {
+            0 -> {
+                // as we come from the listen node, the foreach state is not yet on the stack
+                updatedState = ForeachState(
+                    item = eventData,
+                    index = iterationIndex,
+                    itemVar = foreachTask.itemVar,
+                    indexVar = foreachTask.indexVar
+                )
+                updatedNodeStack = nodeStack.push(foreachPosition, updatedState)
+            }
+
+            else -> {
+                // we come from the previous iteration, so the foreach state is already on the stack
+                val foreachState = nodeStack.currentState as ForeachState
+                updatedState = foreachState.copy(
+                    item = eventData,
+                    index = iterationIndex
+                )
+                updatedNodeStack = nodeStack.updateTopState(updatedState)
+            }
+        }
+
+        val foreachCommand = WorkflowCommand.ResumeFromTask(
+            nodeStack = updatedNodeStack,
+            nodePosition = foreachPosition,
+            rawInput = eventData,
+        )
+
+        when (val outcome = resumeFn(foreachCommand)) {
+            is WorkflowEvent.ForEachCompleted -> {
+                logger.debug { "Foreach iteration $iterationIndex completed with output: ${outcome.output}" }
+                outcome.nodeStack to outcome.output
+            }
+
+            is WorkflowEvent.WorkflowFailed -> {
+                logger.debug { "Foreach iteration $iterationIndex failed with error: ${outcome.error}" }
+                throw InternalException(outcome.error)
+            }
+
+            is WorkflowEvent.WorkflowCompleted -> {
+                logger.debug { "Foreach iteration $iterationIndex escaped to workflow completion (error caught by outer try-catch): ${outcome.output}" }
+                throw ForeachEscapedException(outcome)
+            }
+
+            else -> throw IllegalStateException("Unexpected outcome from foreach iteration: $outcome")
+        }
+    }
+}

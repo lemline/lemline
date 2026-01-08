@@ -1,9 +1,10 @@
 ---
 name: core-dev
-description: Development guide for the lemline-core module. Use when working with workflow execution (orchestrators,
-processors), node tree navigation (Node, NodePosition), task states (TaskState, WorkflowCommand, WorkflowEvent),
-expression evaluation (JQ, scope), error handling (TryTask, retry, catch), parallel execution (Fork), or DSL parsing.
-Covers the step-by-step execution model, exception-driven control flow, and stateless architecture.
+description: >
+  Development guide for the lemline-core module. Use when working with workflow execution (orchestrators,
+  processors), node tree navigation (Node, NodePosition), task states (TaskState, WorkflowCommand, WorkflowEvent),
+  expression evaluation (JQ, scope), error handling (TryTask, retry, catch), parallel execution (Fork), or DSL parsing.
+  Covers the step-by-step execution model, exception-driven control flow, and stateless architecture.
 ---
 
 # Lemline Core Development Guide

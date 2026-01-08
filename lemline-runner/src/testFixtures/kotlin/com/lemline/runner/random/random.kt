@@ -18,16 +18,22 @@ import com.lemline.core.processors.WaitConfig
 import com.lemline.core.random.random
 import com.lemline.core.states.NodeStack
 import com.lemline.core.states.RootState
+import com.lemline.core.states.StackFrame
 import com.lemline.core.states.WorkflowCommand
 import com.lemline.core.states.WorkflowEvent
 import com.lemline.core.states.WorkflowState
-import com.lemline.runner.messaging.InstanceMessage
-import com.lemline.runner.models.FailureModel
-import com.lemline.runner.models.OutboxModel
-import com.lemline.runner.models.ParentModel
-import com.lemline.runner.models.RetryModel
-import com.lemline.runner.models.ScheduleModel
-import com.lemline.runner.models.WaitModel
+import com.lemline.runner.common.messaging.InstanceMessage
+import com.lemline.runner.common.models.WithOutbox
+import com.lemline.runner.failures.FailureModel
+import com.lemline.runner.forks.ForkBranchModel
+import com.lemline.runner.forks.ForkModel
+import com.lemline.runner.listeners.ListenerEventModel
+import com.lemline.runner.listeners.ListenerModel
+import com.lemline.runner.listeners.ListenerStrategy
+import com.lemline.runner.parents.ParentModel
+import com.lemline.runner.retries.RetryModel
+import com.lemline.runner.schedules.ScheduleModel
+import com.lemline.runner.waits.WaitModel
 import kotlin.random.Random
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
@@ -35,21 +41,22 @@ import kotlin.time.Instant
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.JsonElement
 
-// Helper function to create state stack with RootState
-private fun NodeStack.Companion.random(): NodeStack = NodeStack(
+private fun NodeStack.Companion.random(): NodeStack = NodeStack.fromFrames(
     listOf(
-        NodePosition.root to RootState(
-            startedAt = Clock.System.now(),
-            workflowId = WorkflowId.random(),
-            workflowInput = JsonElement.random()
+        StackFrame(
+            NodePosition.root, RootState(
+                startedAt = Clock.System.now(),
+                workflowId = WorkflowId.random(),
+                workflowInput = JsonElement.random()
+            )
         )
     )
 )
 
 fun WorkflowInfo.Companion.random() = WorkflowInfo(
-    workflowNamespace = WorkflowNamespace.random(),
-    workflowName = WorkflowName.random(),
-    workflowVersion = WorkflowVersion.random()
+    namespace = WorkflowNamespace.random(),
+    name = WorkflowName.random(),
+    version = WorkflowVersion.random()
 )
 
 fun WorkflowCommand.Companion.random() = when (Random.nextBoolean()) {
@@ -77,7 +84,7 @@ fun WorkflowEvent.WorkflowFailed.Companion.random() = WorkflowEvent.WorkflowFail
     error = InternalException.Error(
         type = "TestError",
         status = 500,
-        instance = "test-instance",
+        position = "test-instance",
         title = "Test error",
         details = "Test error details"
     ),
@@ -133,7 +140,7 @@ fun FailureModel.Companion.random() = FailureModel(
     errorStackTrace = String.random(),
 )
 
-fun OutboxModel.randomize(nullableDelayed: Boolean = false) = apply {
+fun WithOutbox.randomize(nullableDelayed: Boolean = false) = apply {
     outboxDelayedUntil = if (nullableDelayed) Instant.nullableRandom() else Instant.random()
     outboxAttemptCount = Int.random()
     outboxErrorClass = String.nullableRandom()
@@ -192,4 +199,58 @@ fun WaitModel.Companion.random() = WaitModel(
     it.outboxAttemptCount = Int.random()
     it.outboxErrorClass = String.nullableRandom()
     it.outboxErrorMessage = String.nullableRandom()
+}
+
+fun ForkModel.Companion.random() = ForkModel(
+    instanceMessage = InstanceMessage(
+        workflowInfo = WorkflowInfo.random(),
+        workflowState = WorkflowEvent.ForkStarted.random(),
+    ),
+    compete = Random.nextBoolean(),
+    id = IDV7.random(),
+    position = NodePosition.random().toString()
+)
+
+fun ForkBranchModel.Companion.random(forkId: IDV7 = IDV7.random()) = ForkBranchModel(
+    forkId = forkId,
+    branchPosition = String.random()
+)
+
+fun ListenerEventModel.Companion.random(
+    listenerId: IDV7 = IDV7.random(),
+    filterIndex: Int = Random.nextInt(0, 10)
+) = ListenerEventModel(
+    listenerId = listenerId,
+    eventId = IDV7.random().toString(),
+    filterIndex = filterIndex,
+    event = """{"type":"com.example.${String.random()}","data":{"value":${Random.nextInt()}}}""",
+    outboxScheduledFor = Instant.random()
+)
+
+fun ListenerModel.Companion.random(): ListenerModel {
+    val workflowInfo = WorkflowInfo.random()
+    val listenStarted = WorkflowEvent.ListenStarted.random()
+    val config = listenStarted.config
+
+    return ListenerModel(
+        instanceMessage = InstanceMessage(
+            workflowInfo = workflowInfo,
+            workflowState = listenStarted,
+        ),
+        id = IDV7.random(),
+        listenerStrategy = ListenerStrategy.from(config),
+        timeoutAt = config.timeoutAt,
+    ).also {
+        // Don't call randomize() as outboxDelayedUntil starts as null for ListenerModel
+        it.outboxScheduledFor = Instant.random()
+        it.outboxAttemptCount = Int.random()
+        it.outboxErrorClass = String.nullableRandom()
+        it.outboxErrorMessage = String.nullableRandom()
+        it.correlationValues = when (Random.nextBoolean()) {
+            true -> """{"${String.random()}":"${String.random()}"}"""
+            false -> null
+        }
+        it.hasUntil = Random.nextBoolean()
+        it.hasForeach = Random.nextBoolean()
+    }
 }

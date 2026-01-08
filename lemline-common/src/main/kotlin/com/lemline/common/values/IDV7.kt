@@ -3,7 +3,7 @@ package com.lemline.common.values
 
 import com.lemline.common.ids.IdGenerator
 import java.nio.ByteBuffer
-import java.util.UUID
+import java.util.*
 import kotlinx.serialization.Contextual
 import kotlinx.serialization.Serializable
 
@@ -37,28 +37,28 @@ value class IDV7(val value: @Contextual UUID) {
         fun from(str: String): IDV7 = IDV7(UUID.fromString(str))
 
         /**
-         * Derives a deterministic IDV7 from a base ID, position, step, and optional suffix.
+         * Derives a deterministic IDV7 from a base ID, position, execution key, and optional suffix.
          * Used for generating idempotent message and database IDs.
          *
          * The derivation uses SHA-256 to create a unique but reproducible ID from:
          * - baseId: The workflow instance ID (provides workflow-level uniqueness)
          * - position: The node position in the workflow tree (provides task-level uniqueness)
-         * - step: The workflow step counter (provides iteration/retry uniqueness)
+         * - executionKey: Concatenated execution indices from the stack (e.g., "0-0-2-0")
          * - suffix: Optional type discriminator (e.g., "-wait", "-retry", "-parent")
          *
          * @param baseId The source IDV7 (typically workflowId)
          * @param position The node position in the workflow
-         * @param step The workflow step counter
+         * @param executionKey The execution key from NodeStack.deriveExecutionKey()
          * @param suffix Optional suffix for type differentiation
          * @return A deterministic IDV7 unique to this execution context
          */
-        fun deriveFromPositionAndStep(
+        fun deriveIdempotentId(
             baseId: IDV7,
             position: NodePosition,
-            step: Int,
+            executionKey: String,
             suffix: String = ""
         ): IDV7 {
-            val salt = "$position:$step$suffix"
+            val salt = "$position:$executionKey$suffix"
             return IDV7(IdGenerator.deriveUuidV7FromV7(baseId.value, salt))
         }
 
