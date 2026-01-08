@@ -76,7 +76,7 @@ class ListenerEventRepository : CrudRepository<ListenerEventModel>(),
         const val EVENT_ID_COLUMN = "event_id"
         const val FILTER_INDEX_COLUMN = "filter_index"
         const val EVENT_COLUMN = "event"
-        const val SORT_KEY_COLUMN = "sort_key"
+        const val EVENT_INDEX_COLUMN = "event_index"
         const val FOREACH_COMPLETED_COLUMN = "foreach_completed"
         const val FOREACH_OUTPUT_COLUMN = "foreach_output"
     }
@@ -99,7 +99,7 @@ class ListenerEventRepository : CrudRepository<ListenerEventModel>(),
 
             // Core columns
             column(EVENT_COLUMN) { stmt, entity, idx -> stmt.setString(idx, entity.event) }
-            column(SORT_KEY_COLUMN) { stmt, entity, idx -> stmt.setInt(idx, entity.sortKey) }
+            column(EVENT_INDEX_COLUMN) { stmt, entity, idx -> stmt.setInt(idx, entity.sortKey) }
             column(FOREACH_COMPLETED_COLUMN) { stmt, entity, idx ->
                 stmt.setBoolean(idx, entity.foreachCompleted)
             }
@@ -116,7 +116,7 @@ class ListenerEventRepository : CrudRepository<ListenerEventModel>(),
         event = rs.getString(EVENT_COLUMN),
         outboxScheduledFor = rs.getInstant(OUTBOX_SCHEDULED_FOR_COLUMN),
     ).apply {
-        sortKey = rs.getInt(SORT_KEY_COLUMN)
+        sortKey = rs.getInt(EVENT_INDEX_COLUMN)
         foreachCompleted = rs.getBoolean(FOREACH_COMPLETED_COLUMN)
         foreachOutput = rs.getString(FOREACH_OUTPUT_COLUMN)
         createdAt = rs.getInstant(CREATED_AT_COLUMN)
@@ -165,9 +165,9 @@ class ListenerEventRepository : CrudRepository<ListenerEventModel>(),
             // Insert event, but only the first one per listener due to UNIQUE(listener_id, filter_index)
             // If has_foreach: foreach_completed = false, foreach_output = null, outbox_delayed_until is not set (defaults to NULL) - markReadyForForeach will set it
             // Else: foreach_completed = true, foreach_output = event
-            // For ONE/ANY, sort_key is always 0 (only one event per listener ever)
+            // For ONE/ANY, event_index is always 0 (only one event per listener ever)
             val columns = """
-                $LISTENER_ID_COLUMN, $FILTER_INDEX_COLUMN, $SORT_KEY_COLUMN, $EVENT_ID_COLUMN,
+                $LISTENER_ID_COLUMN, $FILTER_INDEX_COLUMN, $EVENT_INDEX_COLUMN, $EVENT_ID_COLUMN,
                 $EVENT_COLUMN, $FOREACH_COMPLETED_COLUMN, $FOREACH_OUTPUT_COLUMN, $OUTBOX_SCHEDULED_FOR_COLUMN
             """.trimIndent()
 
@@ -175,7 +175,7 @@ class ListenerEventRepository : CrudRepository<ListenerEventModel>(),
                 SELECT
                     l.$ID_COLUMN,                                               /* listener_id */
                     0,                                                          /* filter_index = 0 for ONE/ANY */
-                    0,                                                          /* sort_key = 0 (only one event per listener) */
+                    0,                                                          /* event_index = 0 (only one event per listener) */
                     ?,                                                          /* event_id */
                     ?,                                                          /* event */
                     NOT l.$HAS_FOREACH_COLUMN,                                  /* foreach_completed = TRUE if no foreach */
@@ -250,11 +250,11 @@ class ListenerEventRepository : CrudRepository<ListenerEventModel>(),
      *
      * Uses `(listener_id, event_id, filter_index)` as composite PK for natural idempotency.
      *
-     * FIFO ordering is enforced using per-listener sort_key (0, 1, 2...). The foreach outbox
-     * processor uses MIN(sort_key) to pick the first unprocessed event per listener.
+     * FIFO ordering is enforced using per-listener event_index (0, 1, 2...). The foreach outbox
+     * processor uses MIN(event_index) to pick the first unprocessed event per listener.
      *
      * Uses FOR UPDATE to lock matching listeners and prevent race conditions when
-     * calculating the per-listener sort_key.
+     * calculating the per-listener event_index.
      *
      * Completion is determined by:
      * - For foreach listeners: foreach_output IS NOT NULL (set after foreach.do completes)
@@ -287,10 +287,10 @@ class ListenerEventRepository : CrudRepository<ListenerEventModel>(),
 
         return databaseConfig.withTransaction(connection) { conn ->
             // Step 1: Lock matching listeners with FOR UPDATE to prevent race conditions
-            // when calculating sort_key
+            // when calculating event_index
             lockMatchingListeners(accumulatingKeys, conn)
 
-            // Step 2: Insert with calculated sort_key
+            // Step 2: Insert with calculated event_index
             // Build UNION ALL of all filterIndex queries
             // Include has_foreach for completion logic
             val filterIndexCast = when (databaseConfig.dbType) {
@@ -312,12 +312,12 @@ class ListenerEventRepository : CrudRepository<ListenerEventModel>(),
 
             val unionSql = unionParts.joinToString("\nUNION ALL\n")
 
-            // Single INSERT...SELECT with calculated sort_key
-            // sort_key = COALESCE(max existing sort_key, -1) + ROW_NUMBER within batch
+            // Single INSERT...SELECT with calculated event_index
+            // event_index = COALESCE(max existing event_index, -1) + ROW_NUMBER within batch
             // Note: outbox_delayed_until is not set (defaults to NULL) - markReadyForForeach will set it
             // Note: created_at uses database default (CURRENT_TIMESTAMP)
             val columns = """
-                $LISTENER_ID_COLUMN, $FILTER_INDEX_COLUMN, $SORT_KEY_COLUMN, $EVENT_ID_COLUMN,
+                $LISTENER_ID_COLUMN, $FILTER_INDEX_COLUMN, $EVENT_INDEX_COLUMN, $EVENT_ID_COLUMN,
                 $EVENT_COLUMN, $FOREACH_COMPLETED_COLUMN, $FOREACH_OUTPUT_COLUMN, $OUTBOX_SCHEDULED_FOR_COLUMN
             """.trimIndent()
 
@@ -407,7 +407,7 @@ class ListenerEventRepository : CrudRepository<ListenerEventModel>(),
 
     /**
      * Locks matching listeners with FOR UPDATE to prevent race conditions
-     * when calculating sort_key for new events.
+     * when calculating event_index for new events.
      */
     private fun lockMatchingListeners(keys: List<ListenerQueryKey>, conn: Connection) {
         val lockSql = """
@@ -425,10 +425,10 @@ class ListenerEventRepository : CrudRepository<ListenerEventModel>(),
     }
 
     /**
-     * Builds the SELECT statement for insert with calculated sort_key.
-     * sort_key = COALESCE(max existing sort_key for listener, -1) + ROW_NUMBER within batch
+     * Builds the SELECT statement for insert with calculated event_index.
+     * event_index = COALESCE(max existing event_index for listener, -1) + ROW_NUMBER within batch
      *
-     * Uses LEFT JOIN to get the current max sort_key per listener, then adds
+     * Uses LEFT JOIN to get the current max event_index per listener, then adds
      * ROW_NUMBER() OVER (PARTITION BY listener_id) to assign sequential values
      * for multiple rows being inserted for the same listener in one batch.
      */
@@ -443,10 +443,10 @@ class ListenerEventRepository : CrudRepository<ListenerEventModel>(),
             SELECT
                 m.$LISTENER_ID_COLUMN,                                      /* listener_id */
                 m.$FILTER_INDEX_COLUMN,                                     /* filter_index */
-                COALESCE(existing.max_sort_key, -1) + ROW_NUMBER() OVER (
+                COALESCE(existing.max_event_index, -1) + ROW_NUMBER() OVER (
                     PARTITION BY m.$LISTENER_ID_COLUMN
                     ORDER BY $rowNumberOrderBy
-                ),                                                          /* sort_key */
+                ),                                                          /* event_index */
                 ?,                                                          /* event_id */
                 ?,                                                          /* event */
                 NOT m.$HAS_FOREACH_COLUMN,                                  /* foreach_completed = TRUE if no foreach */
@@ -456,7 +456,7 @@ class ListenerEventRepository : CrudRepository<ListenerEventModel>(),
                 $unionSql
             ) m
             LEFT JOIN (
-                SELECT $LISTENER_ID_COLUMN, MAX($SORT_KEY_COLUMN) as max_sort_key
+                SELECT $LISTENER_ID_COLUMN, MAX($EVENT_INDEX_COLUMN) as max_event_index
                 FROM $tableName
                 GROUP BY $LISTENER_ID_COLUMN
             ) existing ON existing.$LISTENER_ID_COLUMN = m.$LISTENER_ID_COLUMN
@@ -549,7 +549,7 @@ class ListenerEventRepository : CrudRepository<ListenerEventModel>(),
             $FOREACH_OUTPUT_COLUMN = ?,
             $UPDATED_AT_COLUMN = ?
         WHERE $LISTENER_ID_COLUMN = ?
-          AND $SORT_KEY_COLUMN = ?
+          AND $EVENT_INDEX_COLUMN = ?
           AND $FOREACH_COMPLETED_COLUMN = FALSE
         """.trimIndent()
     }
@@ -558,7 +558,7 @@ class ListenerEventRepository : CrudRepository<ListenerEventModel>(),
      * Batch-loads completed outputs for multiple listeners in a single query.
      *
      * Returns a map of listener ID to list of completed outputs (foreach_output for foreach listeners,
-     * event JSON for non-foreach listeners). Outputs are ordered by sort_key for deterministic ordering.
+     * event JSON for non-foreach listeners). Outputs are ordered by event_index for deterministic ordering.
      *
      * This method is optimized for outbox completion processing to avoid N+1 queries.
      *
@@ -580,7 +580,7 @@ class ListenerEventRepository : CrudRepository<ListenerEventModel>(),
                 FROM $tableName
                 WHERE $LISTENER_ID_COLUMN IN ($placeholders)
                   AND $FOREACH_OUTPUT_COLUMN IS NOT NULL
-                ORDER BY $LISTENER_ID_COLUMN, $SORT_KEY_COLUMN
+                ORDER BY $LISTENER_ID_COLUMN, $EVENT_INDEX_COLUMN
             """.trimIndent()
 
             conn.prepareStatement(sql).use { stmt ->
@@ -611,13 +611,13 @@ class ListenerEventRepository : CrudRepository<ListenerEventModel>(),
     /**
      * Marks listener events as ready for foreach processing.
      *
-     * This method finds the head (oldest by sort_key) pending event for each listener
+     * This method finds the head (oldest by event_index) pending event for each listener
      * that has pending events but no event currently being processed, and marks it
      * as ready by setting outbox_delayed_until = NOW.
      *
      * ## FIFO Ordering
      *
-     * FIFO ordering is enforced using the `sort_key` column (auto-increment).
+     * FIFO ordering is enforced using the `event_index` column (auto-increment).
      * - **Pending events**: `foreach_completed = FALSE AND outbox_delayed_until IS NULL`
      * - **Processing events**: `foreach_completed = FALSE AND outbox_delayed_until IS NOT NULL`
      *
@@ -625,7 +625,7 @@ class ListenerEventRepository : CrudRepository<ListenerEventModel>(),
      *
      * Each database uses different syntax for the same logical operation:
      * - PostgreSQL: CTEs with `DISTINCT ON` for head selection
-     * - MySQL: `UPDATE...JOIN` with derived tables and `MIN(sort_key)`
+     * - MySQL: `UPDATE...JOIN` with derived tables and `MIN(event_index)`
      * - H2: `UPDATE...WHERE EXISTS` with correlated subqueries
      *
      * @param limit Maximum number of listeners to process
@@ -699,7 +699,7 @@ class ListenerEventRepository : CrudRepository<ListenerEventModel>(),
     }
 
     /**
-     * Builds the subquery to find the head (oldest by sort_key) pending event per listener.
+     * Builds the subquery to find the head (oldest by event_index) pending event per listener.
      * Used by MySQL and H2 which don't support PostgreSQL's DISTINCT ON.
      *
      * Note: MySQL aliases the column as 'lid', H2 keeps it as-is for simpler join syntax.
@@ -710,7 +710,7 @@ class ListenerEventRepository : CrudRepository<ListenerEventModel>(),
             else -> LISTENER_ID_COLUMN
         }
         return """
-            SELECT e2.$lidColumn, MIN(e2.$SORT_KEY_COLUMN) AS min_sort_key
+            SELECT e2.$lidColumn, MIN(e2.$EVENT_INDEX_COLUMN) AS min_event_index
             FROM $tableName e2
             WHERE e2.$pendingEventCondition
             GROUP BY e2.$LISTENER_ID_COLUMN
@@ -731,7 +731,7 @@ class ListenerEventRepository : CrudRepository<ListenerEventModel>(),
             FROM $tableName e
             JOIN locked_listeners ll ON ll.listener_id = e.$LISTENER_ID_COLUMN
             WHERE e.$pendingEventCondition
-            ORDER BY e.$LISTENER_ID_COLUMN, e.$SORT_KEY_COLUMN
+            ORDER BY e.$LISTENER_ID_COLUMN, e.$EVENT_INDEX_COLUMN
         )
         UPDATE $tableName t
         SET $OUTBOX_SCHEDULED_FOR_COLUMN = now(),
@@ -750,7 +750,7 @@ class ListenerEventRepository : CrudRepository<ListenerEventModel>(),
                 JOIN (${buildEligibleListenersSubquery(limit)}) ll
                     ON ll.listener_id = e.$LISTENER_ID_COLUMN
                 JOIN (${buildHeadPerListenerSubquery()}) m
-                    ON m.lid = e.$LISTENER_ID_COLUMN AND m.min_sort_key = e.$SORT_KEY_COLUMN
+                    ON m.lid = e.$LISTENER_ID_COLUMN AND m.min_event_index = e.$EVENT_INDEX_COLUMN
                 WHERE e.$pendingEventCondition
             ) derived_heads
         ) h
@@ -771,7 +771,7 @@ class ListenerEventRepository : CrudRepository<ListenerEventModel>(),
             JOIN (${buildEligibleListenersSubquery(limit)}) ll
                 ON ll.listener_id = e.$LISTENER_ID_COLUMN
             JOIN (${buildHeadPerListenerSubquery()}) m
-                ON m.$LISTENER_ID_COLUMN = e.$LISTENER_ID_COLUMN AND m.min_sort_key = e.$SORT_KEY_COLUMN
+                ON m.$LISTENER_ID_COLUMN = e.$LISTENER_ID_COLUMN AND m.min_event_index = e.$EVENT_INDEX_COLUMN
             WHERE e.$LISTENER_ID_COLUMN = t.$LISTENER_ID_COLUMN
               AND e.$EVENT_ID_COLUMN = t.$EVENT_ID_COLUMN
               AND (e.$FILTER_INDEX_COLUMN = t.$FILTER_INDEX_COLUMN

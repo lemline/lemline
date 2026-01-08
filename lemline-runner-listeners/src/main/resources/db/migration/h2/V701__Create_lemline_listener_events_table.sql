@@ -11,11 +11,10 @@ CREATE TABLE lemline_listener_events
     -- Part of composite PK to allow same event to match multiple filters
     filter_index            INT,
 
-    -- Per-listener sort key for deterministic FIFO ordering (0, 1, 2... per listener)
-    sort_key                BIGINT                   NOT NULL DEFAULT 0,
+    -- Per-listener order/index at which events are received (0, 1, 2... per listener)
+    event_index             BIGINT                   NOT NULL DEFAULT 0,
 
     -- CloudEvent ID (from the CloudEvent spec 'id' field)
-    -- Part of composite PK for natural idempotency
     event_id                VARCHAR(255)             NOT NULL,
 
     -- CloudEvent data as JSON string
@@ -58,13 +57,13 @@ CREATE UNIQUE INDEX idx_lemline_listener_events_filter_unique
 CREATE INDEX idx_lemline_listener_events_cleanup
     ON lemline_listener_events (cleanup_after);
 
--- Unique constraint on (listener_id, sort_key) for FIFO ordering per listener
-CREATE UNIQUE INDEX idx_lemline_listener_events_listener_sort_key
-    ON lemline_listener_events (listener_id, sort_key);
+-- Unique constraint on (listener_id, event_index) for FIFO ordering per listener
+CREATE UNIQUE INDEX idx_lemline_listener_events_listener_event_index
+    ON lemline_listener_events (listener_id, event_index);
 
 -- For markReadyForForeach FIFO queue processing
 CREATE INDEX idx_lemline_listener_events_pending_head
-    ON lemline_listener_events (listener_id, foreach_completed, outbox_delayed_until, sort_key);
+    ON lemline_listener_events (listener_id, foreach_completed, outbox_delayed_until, event_index);
 
 -- For findEntitiesToProcess outbox polling
 CREATE INDEX idx_lemline_listener_events_outbox_poll

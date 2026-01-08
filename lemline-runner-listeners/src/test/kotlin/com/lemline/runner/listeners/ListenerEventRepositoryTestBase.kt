@@ -231,7 +231,7 @@ abstract class ListenerEventRepositoryTestBase {
             event = eventData,
             outboxScheduledFor = Clock.System.now()
         ).apply {
-            // Use auto-incrementing sort_key if not explicitly provided
+            // Use auto-incrementing event_index if not explicitly provided
             this.sortKey = sortKey ?: counter
         }
     }
@@ -456,7 +456,7 @@ abstract class ListenerEventRepositoryTestBase {
     }
 
     @Test
-    fun `batchInsertForAllAnyUntil should insert events with correct sort_key`() = runTest {
+    fun `batchInsertForAllAnyUntil should insert events with correct event_index`() = runTest {
         val listener = createListener(hasForeach = false, strategy = ListenStrategy.ALL, filtersCount = 2)
         getListenerRepository().insert(listener)
 
@@ -711,7 +711,7 @@ abstract class ListenerEventRepositoryTestBase {
     }
 
     @Test
-    fun `findCompletedOutputsByListeners should order outputs by sort_key`() = runTest {
+    fun `findCompletedOutputsByListeners should order outputs by event_index`() = runTest {
         val listener = createListener(hasForeach = false, strategy = ListenStrategy.ALL, filtersCount = 3)
         getListenerRepository().insert(listener)
 
@@ -1004,13 +1004,13 @@ abstract class ListenerEventRepositoryTestBase {
         val results = mutableListOf<EventRecord>()
         getDatabaseConfig().withConnection { conn ->
             conn.prepareStatement(
-                "SELECT sort_key, foreach_completed, foreach_output FROM $LISTENER_EVENTS_TABLE ORDER BY sort_key"
+                "SELECT event_index, foreach_completed, foreach_output FROM $LISTENER_EVENTS_TABLE ORDER BY event_index"
             ).use { stmt ->
                 stmt.executeQuery().use { rs ->
                     while (rs.next()) {
                         results.add(
                             EventRecord(
-                                sortKey = rs.getInt("sort_key"),
+                                sortKey = rs.getInt("event_index"),
                                 foreachCompleted = rs.getBoolean("foreach_completed"),
                                 foreachOutput = rs.getString("foreach_output")
                             )

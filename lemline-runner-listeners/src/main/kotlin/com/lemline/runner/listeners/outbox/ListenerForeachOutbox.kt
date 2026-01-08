@@ -80,7 +80,7 @@ class ListenerForeachOutbox : AbstractOutbox<ListenerEventModel>() {
     /**
      * Override to mark pending events as ready before processing.
      *
-     * This calls [ListenerEventRepository.markReadyForForeach] to find the head (oldest by sort_key)
+     * This calls [ListenerEventRepository.markReadyForForeach] to find the head (oldest by event_index)
      * pending event for each listener that has pending events but no event currently being processed,
      * and marks it as ready by setting outbox_delayed_until = NOW.
      */

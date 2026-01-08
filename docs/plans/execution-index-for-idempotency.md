@@ -115,7 +115,7 @@ fun deriveIdempotentId(suffix: String = ""): IDV7 =
 | Scenario | Where | When |
 |----------|-------|------|
 | For loop | `ForProcessor` | Before each iteration |
-| Listen foreach | `ListenerForeachOutbox` | For each event (use event's sort_key) |
+| Listen foreach | `ListenerForeachOutbox` | For each event (use event's event_index) |
 | Retry | `TryProcessor` / `RetryOutbox` | Before each retry attempt |
 | Goto re-entry | `DoProcessor` | When jumping backward |
 

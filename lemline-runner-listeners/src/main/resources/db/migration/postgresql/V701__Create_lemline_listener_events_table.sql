@@ -11,11 +11,10 @@ CREATE TABLE lemline_listener_events
     -- Part of composite PK to allow same event to match multiple filters
     filter_index            INT,
 
-    -- Per-listener sort key for deterministic FIFO ordering (0, 1, 2... per listener)
-    sort_key                BIGINT         NOT NULL DEFAULT 0,
+    -- Per-listener order/index at which events are received (0, 1, 2... per listener)
+    event_index                BIGINT         NOT NULL DEFAULT 0,
 
     -- CloudEvent ID (from the CloudEvent spec 'id' field)
-    -- Part of composite PK for natural idempotency
     event_id                VARCHAR(255)   NOT NULL,
 
     -- CloudEvent data as JSON string
@@ -59,13 +58,13 @@ CREATE INDEX idx_lemline_listener_events_cleanup
     ON lemline_listener_events (cleanup_after)
     WHERE cleanup_after IS NOT NULL;
 
--- Unique constraint on (listener_id, sort_key) for FIFO ordering per listener
-CREATE UNIQUE INDEX idx_lemline_listener_events_listener_sort_key
-    ON lemline_listener_events (listener_id, sort_key);
+-- Unique constraint on (listener_id, event_index) for FIFO ordering per listener
+CREATE UNIQUE INDEX idx_lemline_listener_events_listener_event_index
+    ON lemline_listener_events (listener_id, event_index);
 
 -- Partial indexes for markReadyForForeach FIFO queue processing
 CREATE INDEX idx_lemline_listener_events_pending
-    ON lemline_listener_events (listener_id, sort_key)
+    ON lemline_listener_events (listener_id, event_index)
     WHERE foreach_completed = FALSE AND outbox_delayed_until IS NULL;
 
 CREATE INDEX idx_lemline_listener_events_processing
@@ -80,7 +79,7 @@ CREATE INDEX idx_lemline_listener_events_outbox_poll
 -- Comments for documentation
 COMMENT ON TABLE lemline_listener_events IS 'CloudEvents for listeners with foreach outbox support';
 COMMENT ON COLUMN lemline_listener_events.filter_index IS 'Filter index that matched (part of PK, defaults to 0)';
-COMMENT ON COLUMN lemline_listener_events.sort_key IS 'Auto-increment sort key for deterministic ordering';
+COMMENT ON COLUMN lemline_listener_events.event_index IS 'Index per listener for deterministic ordering';
 COMMENT ON COLUMN lemline_listener_events.event_id IS 'CloudEvent ID (part of composite PK)';
 COMMENT ON COLUMN lemline_listener_events.event IS 'CloudEvent data (JSON)';
 COMMENT ON COLUMN lemline_listener_events.foreach_completed IS 'Whether foreach.do has completed (for efficient indexing)';

@@ -202,7 +202,7 @@ The listener record contains all information needed to:
 └─────────────────────────────────────────────────────┘
                     ↓
    markReadyForForeach() - per listener:
-     SELECT oldest event (by sort_key)
+     SELECT oldest event (by event_index)
      WHERE outbox_completed_at IS NULL
        AND no event currently processing
      SET outbox_delayed_until = NOW()
@@ -381,7 +381,7 @@ CREATE TABLE lemline_listener_events (
     output        TEXT,                    -- Foreach.do output (set by ListenForEachCompleted)
     
     -- Ordering (for FIFO foreach processing)
-    sort_key      INT          NOT NULL,  -- Insertion order per listener
+    event_index      INT          NOT NULL,  -- Insertion order per listener
     
     -- Outbox Pattern (for ListenerForeachOutbox)
     outbox_scheduled_for   TIMESTAMP NOT NULL,
@@ -403,7 +403,7 @@ CREATE TABLE lemline_listener_events (
 
 -- Index for foreach outbox processing (FIFO head per listener)
 CREATE INDEX idx_listener_events_foreach
-    ON lemline_listener_events (listener_id, sort_key)
+    ON lemline_listener_events (listener_id, event_index)
     WHERE outbox_completed_at IS NULL;
 ```
 

@@ -3,8 +3,6 @@ package com.lemline.runner.forks
 
 import com.lemline.common.logger.logger
 import com.lemline.common.values.IDV7
-import com.lemline.common.values.NodePosition
-import com.lemline.common.values.WorkflowId
 import com.lemline.core.states.WorkflowEvent
 import com.lemline.runner.common.config.DatabaseConfig
 import com.lemline.runner.common.repositories.helpers.ColumnBindings
@@ -13,7 +11,6 @@ import com.lemline.runner.common.repositories.ops.CleanerRepository
 import com.lemline.runner.common.repositories.ops.CrudRepository
 import com.lemline.runner.common.repositories.ops.ID_COLUMN
 import com.lemline.runner.common.repositories.ops.IdRepository
-import com.lemline.runner.common.repositories.ops.WORKFLOW_ID_COLUMN
 import com.lemline.runner.common.repositories.ops.cleanupColumns
 import com.lemline.runner.common.repositories.ops.completionColumns
 import com.lemline.runner.common.repositories.ops.getInstanceMessage
@@ -177,7 +174,7 @@ class ForkRepository : CrudRepository<ForkModel>(),
         Pair(fork, branches)
     }
 
-    private suspend fun findByIdForUpdate(
+    private fun findByIdForUpdate(
         id: IDV7,
         connection: Connection
     ): ForkModel? {
