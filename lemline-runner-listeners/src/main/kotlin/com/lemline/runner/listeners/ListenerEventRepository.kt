@@ -334,12 +334,69 @@ class ListenerEventRepository : CrudRepository<ListenerEventModel>(),
                 stmt.executeUpdate()
             }
 
+            // Establish auto-correlation: update listeners with NULL correlation_values
+            // to the event's correlation values (first event establishes the baseline)
+            if (insertedCount > 0) {
+                establishAutoCorrelation(eventId, accumulatingKeys, conn)
+            }
+
             // Mark ALL strategy listeners as completed when all filters have events
             if (insertedCount > 0) {
                 markAllListenersCompleted(eventId, keys, conn)
             }
 
             insertedCount
+        }
+    }
+
+    /**
+     * Establishes auto-correlation values for listeners with NULL correlation_values.
+     *
+     * When the first event is inserted for a listener without pre-defined correlation values
+     * (auto-correlation mode), this method updates the listener's correlation_values to
+     * the event's correlation values. Subsequent events must then match these established values.
+     *
+     * @param eventId The event ID that was just inserted
+     * @param keys Query keys containing correlation values from the event
+     * @param conn Database connection (within transaction)
+     */
+    private fun establishAutoCorrelation(
+        eventId: String,
+        keys: List<ListenerQueryKey>,
+        conn: Connection
+    ) {
+        // Group keys by correlation values - we need to update listeners that:
+        // 1. Received this event (have the eventId in their events)
+        // 2. Have NULL correlation_values
+        // 3. Event has non-null correlation values
+        val keysWithCorrelation = keys.filter { it.correlationValuesJson != null }
+        if (keysWithCorrelation.isEmpty()) return
+
+        // For each distinct correlation value, update matching listeners
+        val distinctCorrelations = keysWithCorrelation.map { it.correlationValuesJson }.distinct()
+
+        for (correlationJson in distinctCorrelations) {
+            val matchingKeys = keysWithCorrelation.filter { it.correlationValuesJson == correlationJson }
+
+            val updateSql = """
+                UPDATE $LISTENER_TABLE l
+                SET ${ListenerRepository.CORRELATION_VALUES_COLUMN} = ?,
+                    $UPDATED_AT_COLUMN = CURRENT_TIMESTAMP
+                WHERE l.${ListenerRepository.CORRELATION_VALUES_COLUMN} IS NULL
+                  AND EXISTS (
+                      SELECT 1 FROM $tableName e
+                      WHERE e.$LISTENER_ID_COLUMN = l.$ID_COLUMN
+                        AND e.$EVENT_ID_COLUMN = ?
+                  )
+                  AND (${ListenerQueryKey.buildWhereClauseWithoutCorrelation(matchingKeys, "l")})
+            """.trimIndent()
+
+            conn.prepareStatement(updateSql).use { stmt ->
+                stmt.setString(1, correlationJson)
+                stmt.setString(2, eventId)
+                ListenerQueryKey.bindAllParametersWithoutCorrelation(matchingKeys, stmt, 3)
+                stmt.executeUpdate()
+            }
         }
     }
 

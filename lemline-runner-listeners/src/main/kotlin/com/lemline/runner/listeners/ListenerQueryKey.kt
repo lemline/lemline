@@ -60,17 +60,11 @@ data class ListenerQueryKey(
         return idx
     }
 
-    /**
-     * Builds SQL WHERE condition without correlation check (used for termination events).
-     */
     fun toSqlConditionWithoutCorrelation(tableAlias: String = ""): String {
         val prefix = if (tableAlias.isNotEmpty()) "$tableAlias." else ""
-        return "($prefix${WORKFLOW_NAMESPACE_COLUMN} = ? AND $prefix$WORKFLOW_NAME_COLUMN = ? AND $prefix$WORKFLOW_VERSION_COLUMN = ? AND $prefix${WORKFLOW_POSITION_COLUMN} = ?)"
+        return "($prefix$WORKFLOW_NAMESPACE_COLUMN = ? AND $prefix$WORKFLOW_NAME_COLUMN = ? AND $prefix$WORKFLOW_VERSION_COLUMN = ? AND $prefix${WORKFLOW_POSITION_COLUMN} = ?)"
     }
 
-    /**
-     * Binds parameters without correlation value (used for termination events).
-     */
     fun bindParametersWithoutCorrelation(stmt: PreparedStatement, startIndex: Int): Int {
         var idx = startIndex
         stmt.setString(idx++, workflowInfo.namespace.toString())
@@ -81,19 +75,28 @@ data class ListenerQueryKey(
     }
 
     companion object {
-        /**
-         * Builds combined WHERE clause for multiple keys using OR.
-         */
         fun buildWhereClause(keys: List<ListenerQueryKey>, tableAlias: String = ""): String =
             keys.joinToString(" OR ") { it.toSqlCondition(tableAlias) }
 
-        /**
-         * Binds parameters for all keys to a PreparedStatement.
-         */
         fun bindAllParameters(keys: List<ListenerQueryKey>, stmt: PreparedStatement, startIndex: Int): Int {
             var idx = startIndex
             for (key in keys) {
                 idx = key.bindParameters(stmt, idx)
+            }
+            return idx
+        }
+
+        fun buildWhereClauseWithoutCorrelation(keys: List<ListenerQueryKey>, tableAlias: String = ""): String =
+            keys.joinToString(" OR ") { it.toSqlConditionWithoutCorrelation(tableAlias) }
+
+        fun bindAllParametersWithoutCorrelation(
+            keys: List<ListenerQueryKey>,
+            stmt: PreparedStatement,
+            startIndex: Int
+        ): Int {
+            var idx = startIndex
+            for (key in keys) {
+                idx = key.bindParametersWithoutCorrelation(stmt, idx)
             }
             return idx
         }
