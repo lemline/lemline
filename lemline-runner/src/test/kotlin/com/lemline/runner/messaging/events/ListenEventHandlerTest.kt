@@ -30,6 +30,7 @@ import jakarta.inject.Inject
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.ExperimentalTime
+import kotlin.time.Instant
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.JsonNull
@@ -117,7 +118,8 @@ internal class ListenEventHandlerTest {
     fun `ListenStarted with timeout sets timeoutAt`() = runTest {
         // Given
         cacheWorkflowDefinition()
-        val timeoutAt = Clock.System.now() + 10.minutes
+        // Truncate to seconds to avoid flaky tests from sub-second rounding differences across databases
+        val timeoutAt = Instant.fromEpochSeconds((Clock.System.now() + 10.minutes).epochSeconds)
 
         val instance = createListenStartedInstance(
             strategy = ListenStrategy.ONE,
@@ -134,8 +136,7 @@ internal class ListenEventHandlerTest {
         val listeners = listenerRepository.listAll().filter { it.workflowId == instance.workflowId }
 
         listeners.size shouldBe 1
-        listeners.first().timeoutAt shouldNotBe null
-        listeners.first().timeoutAt!!.epochSeconds shouldBe timeoutAt.epochSeconds
+        listeners.first().timeoutAt shouldBe timeoutAt
     }
 
     @Test

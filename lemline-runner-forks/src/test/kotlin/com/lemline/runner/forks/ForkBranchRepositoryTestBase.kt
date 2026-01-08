@@ -12,6 +12,7 @@ import io.kotest.matchers.collections.shouldHaveSize
 import io.kotest.matchers.shouldBe
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
+import kotlin.time.Instant
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.ExperimentalSerializationApi
@@ -55,7 +56,7 @@ abstract class ForkBranchRepositoryTestBase {
     private fun modifyEntity(entity: ForkBranchModel): ForkBranchModel {
         return entity.copy(
             branchOutput = """{"modified": true}""",
-            completedAt = Clock.System.now()
+            completedAt = Instant.fromEpochSeconds(Clock.System.now().epochSeconds)
         )
     }
 
@@ -198,7 +199,8 @@ abstract class ForkBranchRepositoryTestBase {
         )
         getBranchRepository().insert(branch)
 
-        val completedAt = Clock.System.now()
+        // Truncate to seconds to avoid flaky tests from sub-second rounding differences across databases
+        val completedAt = Instant.fromEpochSeconds(Clock.System.now().epochSeconds)
         val updated = branch.copy(
             branchOutput = """{"result": "success"}""",
             completedAt = completedAt
@@ -208,8 +210,7 @@ abstract class ForkBranchRepositoryTestBase {
         updateCount shouldBe 1
         val retrieved = getBranchRepository().findByForkId(fork.id).first()
         retrieved.branchOutput shouldBe """{"result": "success"}"""
-        // Compare truncated to seconds for MySQL compatibility (MySQL DATETIME lacks microsecond precision)
-        retrieved.completedAt?.epochSeconds shouldBe completedAt.epochSeconds
+        retrieved.completedAt shouldBe completedAt
     }
 
     @Test
@@ -225,7 +226,7 @@ abstract class ForkBranchRepositoryTestBase {
         )
         getBranchRepository().insert(branch)
 
-        val failedAt = Clock.System.now()
+        val failedAt = Instant.fromEpochSeconds(Clock.System.now().epochSeconds)
         val updated = branch.copy(
             failedAt = failedAt,
             errorReason = "TaskFailed",
@@ -237,8 +238,7 @@ abstract class ForkBranchRepositoryTestBase {
 
         updateCount shouldBe 1
         val retrieved = getBranchRepository().findByForkId(fork.id).first()
-        // Compare truncated to seconds for MySQL compatibility (MySQL DATETIME lacks microsecond precision)
-        retrieved.failedAt?.epochSeconds shouldBe failedAt.epochSeconds
+        retrieved.failedAt shouldBe failedAt
         retrieved.errorReason shouldBe "TaskFailed"
         retrieved.errorClass shouldBe "java.lang.RuntimeException"
         retrieved.errorMessage shouldBe "Something went wrong"
