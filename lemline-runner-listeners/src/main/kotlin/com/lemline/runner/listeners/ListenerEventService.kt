@@ -266,7 +266,7 @@ class ListenerEventService {
                 val untilExpr = listener.untilExpression ?: return@mapNotNull null
 
                 val eventsArray = JsonArray(accumulatedEvents.map {
-                    CloudEventService.parseStringAsData(it)
+                    CloudEventService.parseStringAsData(it, listener.readAs)
                 })
 
                 val shouldComplete = try {
@@ -291,21 +291,13 @@ class ListenerEventService {
         }
     }
 
-    /**
-     * Evaluates an until expression against accumulated events.
-     * The expression should return a boolean.
-     */
     internal fun evaluateUntilExpression(expression: String, events: JsonArray): Boolean {
-        return try {
-            with(LemlineJson) {
-                val inputNode = events.toJsonNode()
-                val scope = JsonObject(emptyMap()).toJsonNode() as ObjectNode
-                val result = JQExpression.eval(inputNode, expression, scope).toJsonElement()
-                (result as? JsonPrimitive)?.booleanOrNull == true
-            }
-        } catch (e: Exception) {
-            logger.warn(e) { "Failed to evaluate until expression: $expression" }
-            false
+        with(LemlineJson) {
+            val inputNode = events.toJsonNode()
+            val scope = JsonObject(emptyMap()).toJsonNode() as ObjectNode
+            val result = JQExpression.evalOrNull(inputNode, expression, scope)?.toJsonElement()
+                ?: return false
+            return (result as? JsonPrimitive)?.booleanOrNull == true
         }
     }
 

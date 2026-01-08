@@ -45,6 +45,26 @@ object JQExpression : ExpressionEvaluator {
     }
 
     /**
+     * Evaluates a JQ expression, returning null on any error instead of throwing.
+     *
+     * Useful for conditional expressions where type mismatches or missing fields
+     * should result in a falsy value rather than propagating an exception.
+     * For example, `.source | contains("roof")` returns null if `.source` is missing.
+     *
+     * @param input The JSON node to evaluate the expression against.
+     * @param expr The JQ expression to evaluate.
+     * @param scope The scope in which to evaluate the expression.
+     * @return The result of the evaluation as a JsonNode, or null on any error.
+     */
+    fun evalOrNull(input: JsonNode, expr: String, scope: ObjectNode): JsonNode? = try {
+        val output = JsonNodeOutput()
+        ExpressionParser.compile(expr, jqVersion).apply(scope.toJQScope(), input, output)
+        output.result
+    } catch (_: JsonQueryException) {
+        null
+    }
+
+    /**
      * Custom Output implementation to capture the result of the JQ expression evaluation.
      */
     private class JsonNodeOutput : Output {

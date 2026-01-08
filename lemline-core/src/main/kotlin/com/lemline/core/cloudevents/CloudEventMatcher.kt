@@ -207,19 +207,24 @@ object CloudEventMatcher {
         }
     }
 
-    fun evaluateExpressionAsBoolean(expression: String, input: JsonElement): Boolean =
-        runCatching {
-            val trimmedExpr = ExpressionUtils.trimExpr(expression)
-            (evaluateJQ(trimmedExpr, input) as? JsonPrimitive)?.booleanOrNull == true
-        }.onFailure { e ->
-            logger.warn(e) { "Failed to evaluate expression: $expression" }
-        }.getOrDefault(false)
+    fun evaluateExpressionAsBoolean(expression: String, input: JsonElement): Boolean {
+        val trimmedExpr = ExpressionUtils.trimExpr(expression)
+        val result = evaluateJQOrNull(trimmedExpr, input) ?: return false
+        return (result as? JsonPrimitive)?.booleanOrNull == true
+    }
 
     private fun evaluateJQ(jqExpression: String, input: JsonElement): JsonElement =
         with(LemlineJson) {
             val inputNode = input.toJsonNode()
             val scope = LemlineJson.jacksonMapper.createObjectNode()
             JQExpression.eval(inputNode, jqExpression, scope).toJsonElement()
+        }
+
+    private fun evaluateJQOrNull(jqExpression: String, input: JsonElement): JsonElement? =
+        with(LemlineJson) {
+            val inputNode = input.toJsonNode()
+            val scope = LemlineJson.jacksonMapper.createObjectNode()
+            JQExpression.evalOrNull(inputNode, jqExpression, scope)?.toJsonElement()
         }
 
     private fun JsonElement.toStringOrNull(): String? = when (this) {
