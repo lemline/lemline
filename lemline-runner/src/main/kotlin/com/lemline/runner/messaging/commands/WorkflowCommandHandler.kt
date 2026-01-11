@@ -84,7 +84,7 @@ internal class WorkflowCommandHandler(
     override suspend fun Message<String>.deserialize(): InstanceMessage<WorkflowCommand> = try {
         InstanceMessage.fromMessage(this)
     } catch (e: Exception) {
-        logger.info { "Failed to deserialize message ${toLogString()} $payload: ${e.message}" }
+        logger.warn { "Failed to deserialize message ${toLogString()} $payload: ${e.message}" }
 
         // Store deserialization failure directly (we don't have a valid InstanceMessage to work with)
         throw CompensationException(DESERIALIZATION_FAILURE) {
