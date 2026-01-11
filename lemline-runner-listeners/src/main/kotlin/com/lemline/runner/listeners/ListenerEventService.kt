@@ -234,7 +234,7 @@ class ListenerEventService {
 
         val markedCompleted = listenerRepository.markListenerCompletedByUntilEvent(queryKeys)
         if (markedCompleted > 0) {
-            logger.info { "Marked $markedCompleted listeners as completed (termination event received)" }
+            logger.debug { "Marked $markedCompleted listeners as completed (termination event received)" }
         }
 
         return markedCompleted
@@ -311,7 +311,7 @@ class ListenerEventService {
 
         val listener = listenerRepository.findById(listenerId)
 
-        logger.info { "ListenForEachCompleted: listener=$listener, closedAt = ${listener?.closedAt}" }
+        logger.debug { "ListenForEachCompleted: listener=$listener, closedAt = ${listener?.closedAt}" }
 
         if (listener == null) {
             logger.warn { "Listener not found for $listenerId - message=$message" }

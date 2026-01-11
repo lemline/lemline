@@ -83,7 +83,7 @@ internal class WorkflowEventHandler(
     override suspend fun Message<String>.deserialize(): InstanceMessage<WorkflowEvent> = try {
         InstanceMessage.fromJsonString(payload)
     } catch (e: Exception) {
-        logger.info { "Failed to deserialize message ${toLogString()} $payload: ${e.message}" }
+        logger.warn { "Failed to deserialize message ${toLogString()} $payload: ${e.message}" }
         throw CompensationException(DESERIALIZATION_FAILURE) {
             val failure = FailureModel.from(
                 payload = payload,

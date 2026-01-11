@@ -82,6 +82,9 @@ class LemlineApplication : QuarkusApplication {
                 // Set the logging level
                 setLoggingLevel(parseResults)
 
+                // Set JSON logging mode
+                setJsonLogging(parseResults)
+
                 // Set the config path
                 setConfigPath(parseResults)
 
@@ -156,6 +159,21 @@ class LemlineApplication : QuarkusApplication {
                 listOf(pr) + pr.subcommands().flatMap { collectAllSubcommands(it) }
 
             return collectAllSubcommands(mainParseResult)
+        }
+
+        /**
+         * Sets JSON logging mode for the application based on the parsed command-line arguments.
+         *
+         * This function checks for the `--json` flag option across the entire command chain.
+         * If the JSON logging flag is specified, it enables JSON-formatted console output.
+         *
+         * @param parseResults A list of `ParseResult` objects containing parsed command-line arguments.
+         */
+        private fun setJsonLogging(parseResults: List<ParseResult>) {
+            val jsonMode = parseResults.any { it.hasMatchedOption("--json") }
+            if (jsonMode) {
+                System.setProperty("quarkus.log.console.json", "true")
+            }
         }
 
         /**

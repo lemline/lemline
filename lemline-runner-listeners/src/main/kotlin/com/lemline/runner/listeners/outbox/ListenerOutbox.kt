@@ -155,7 +155,7 @@ class ListenerOutbox : AbstractOutbox<ListenerModel>() {
 
         commandEmitter.send(resumeMessage, messageId)
 
-        logger.info { "Listen completion sent for listener ${entity.id}" }
+        logger.debug { "Listen completion sent for listener ${entity.id}" }
 
         entity.cleanupAfter = Clock.System.now()
     }

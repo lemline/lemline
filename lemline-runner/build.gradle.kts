@@ -12,7 +12,7 @@ plugins {
 }
 
 group = "com.lemline"
-val baseVersion = "0.4.1"
+val baseVersion = "0.5.1"
 
 // Determine the version dynamically: use Git tag if present (CI), otherwise nightly suffix for main branch builds
 val envRef = System.getenv("GITHUB_REF") ?: ""
@@ -72,6 +72,7 @@ dependencies {
     implementation("io.quarkus:quarkus-micrometer")
     implementation("io.quarkus:quarkus-micrometer-registry-prometheus")
     implementation("io.quarkus:quarkus-smallrye-health")
+    implementation("io.quarkus:quarkus-logging-json")
 
     // Messaging
     implementation("io.quarkus:quarkus-messaging-kafka")
