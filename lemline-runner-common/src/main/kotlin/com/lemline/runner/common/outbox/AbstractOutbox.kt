@@ -1,10 +1,12 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.common.outbox
 
+import com.lemline.common.logger.withSuspendLoggingContext
 import com.lemline.runner.common.config.DatabaseConfig
 import com.lemline.runner.common.config.OutboxConfig
 import java.sql.Connection
 import com.lemline.runner.common.messaging.CommandEmitter
+import com.lemline.runner.common.models.WithInstanceMessage
 import com.lemline.runner.common.models.WithOutbox
 import com.lemline.runner.common.repositories.with.WithCrudRepository
 import com.lemline.runner.common.repositories.with.WithOutboxRepository
@@ -190,36 +192,47 @@ abstract class AbstractOutbox<T : WithOutbox> : AbstractScheduledTask() {
 
     /**
      * Processes an entity using the provided processor function with retry handling.
+     *
+     * If the entity implements [WithInstanceMessage], MDC logging context is set up
+     * with workflow ID and info for log correlation.
      */
     private suspend fun processEntityWith(
         entity: T,
         maxAttempts: Int,
         retryDelay: Duration,
         processor: suspend (T) -> Unit
-    ): Boolean = try {
-        entity.outboxAttemptCount++
-        processor(entity)
-        // Mark as completed on success and schedule for cleanup
-        entity.outboxCompletedAt = Clock.System.now()
-        true // <- return true (success)
-    } catch (e: Exception) {
-        logger.info(e) { "Failed to process $entity" }
-        entity.outboxErrorClass = e::class.qualifiedName
-        entity.outboxErrorMessage = e.message
-        entity.outboxErrorStackTrace = e.stackTraceToString()
+    ): Boolean {
+        // Extract workflow context from entity if available (for MDC logging)
+        val workflowId = (entity as? WithInstanceMessage)?.workflowId
+        val workflowInfo = (entity as? WithInstanceMessage)?.workflowInfo
 
-        if (entity.outboxAttemptCount >= maxAttempts) {
-            // Mark as permanently failed and schedule for cleanup
-            val now = Clock.System.now()
-            entity.outboxFailedAt = now
-            logger.error { "Reached maximum retry attempts, marking as failed: $entity" }
-        } else {
-            // Schedule for retry with exponential backoff
-            val nextDelay = calculateNextAttemptDelay(entity.outboxAttemptCount, retryDelay)
-            entity.outboxDelayedUntil = Clock.System.now() + nextDelay
-            logger.debug { "Failing processing outbox, retrying in ${nextDelay}ms (attempt ${entity.outboxAttemptCount}): $entity" }
+        return withSuspendLoggingContext(workflowId, workflowInfo) {
+            try {
+                entity.outboxAttemptCount++
+                processor(entity)
+                // Mark as completed on success and schedule for cleanup
+                entity.outboxCompletedAt = Clock.System.now()
+                true // <- return true (success)
+            } catch (e: Exception) {
+                logger.warn(e) { "Failed to process $entity" }
+                entity.outboxErrorClass = e::class.qualifiedName
+                entity.outboxErrorMessage = e.message
+                entity.outboxErrorStackTrace = e.stackTraceToString()
+
+                if (entity.outboxAttemptCount >= maxAttempts) {
+                    // Mark as permanently failed and schedule for cleanup
+                    val now = Clock.System.now()
+                    entity.outboxFailedAt = now
+                    logger.error { "Reached maximum retry attempts, marking as failed: $entity" }
+                } else {
+                    // Schedule for retry with exponential backoff
+                    val nextDelay = calculateNextAttemptDelay(entity.outboxAttemptCount, retryDelay)
+                    entity.outboxDelayedUntil = Clock.System.now() + nextDelay
+                    logger.debug { "Failing processing outbox, retrying in ${nextDelay}ms (attempt ${entity.outboxAttemptCount}): $entity" }
+                }
+                false // <- return false (failure)
+            }
         }
-        false // <- return false (failure)
     }
 
     @VisibleForTesting

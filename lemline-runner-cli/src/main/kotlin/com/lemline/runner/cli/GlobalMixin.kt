@@ -20,6 +20,12 @@ class GlobalMixin {
     var logLevelGroup: LogLevelGroup? = null
 
     @Option(
+        names = ["--json"],
+        description = ["Output logs in JSON format"],
+    )
+    var jsonMode: Boolean = false
+
+    @Option(
         names = ["-c", "--config"],
         description = ["Specify configuration file location"],
         paramLabel = "<config>",

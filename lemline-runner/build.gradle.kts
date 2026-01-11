@@ -72,6 +72,7 @@ dependencies {
     implementation("io.quarkus:quarkus-micrometer")
     implementation("io.quarkus:quarkus-micrometer-registry-prometheus")
     implementation("io.quarkus:quarkus-smallrye-health")
+    implementation("io.quarkus:quarkus-logging-json")
 
     // Messaging
     implementation("io.quarkus:quarkus-messaging-kafka")
