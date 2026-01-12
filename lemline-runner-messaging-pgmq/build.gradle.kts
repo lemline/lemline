@@ -30,10 +30,8 @@ dependencies {
     implementation("io.smallrye.reactive:mutiny")
     implementation("io.smallrye.reactive:mutiny-kotlin")
 
-    // Vert.x for async PostgreSQL client
-    implementation("io.vertx:vertx-pg-client")
-    implementation("io.vertx:vertx-sql-client")
-    implementation("io.smallrye.reactive:smallrye-mutiny-vertx-pg-client")
+    // Quarkus reactive PostgreSQL client (handles native image configuration)
+    implementation("io.quarkus:quarkus-reactive-pg-client")
 
     // PostgreSQL JDBC driver (for configuration validation)
     implementation("org.postgresql:postgresql")
