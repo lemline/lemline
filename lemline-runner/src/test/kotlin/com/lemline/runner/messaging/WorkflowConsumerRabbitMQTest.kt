@@ -20,8 +20,11 @@ import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.TimeUnit
 import kotlin.time.ExperimentalTime
 import kotlinx.serialization.ExperimentalSerializationApi
-import org.eclipse.microprofile.config.inject.ConfigProperty
+import org.eclipse.microprofile.config.ConfigProvider
+import org.junit.jupiter.api.AfterAll
+import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.Tag
+import org.junit.jupiter.api.TestInstance
 
 
 /**
@@ -33,31 +36,13 @@ import org.junit.jupiter.api.Tag
 @RequiresDocker
 @ExperimentalTime
 @ExperimentalSerializationApi
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 internal class WorkflowConsumerRabbitMQTest : WorkflowConsumerTest() {
 
-    @ConfigProperty(name = "rabbitmq-host")
-    lateinit var rabbitmqHost: String
-
-    @ConfigProperty(name = "rabbitmq-port")
-    lateinit var rabbitmqPort: String
-
-    @ConfigProperty(name = "rabbitmq-username")
-    lateinit var rabbitmqUsername: String
-
-    @ConfigProperty(name = "rabbitmq-password")
-    lateinit var rabbitmqPassword: String
-
-    @ConfigProperty(name = "mp.messaging.incoming.$COMMANDS_IN_CHANNEL.queue.name")
-    lateinit var instanceQueueIn: String
-
-    @ConfigProperty(name = "mp.messaging.outgoing.$COMMANDS_OUT_CHANNEL.queue.name")
-    lateinit var instanceQueueOut: String
-
-    @ConfigProperty(name = "mp.messaging.incoming.$EVENTS_IN_CHANNEL.queue.name")
-    lateinit var databaseQueueIn: String
-
-    @ConfigProperty(name = "mp.messaging.outgoing.$EVENTS_OUT_CHANNEL.queue.name")
-    lateinit var databaseQueueOut: String
+    private lateinit var instanceQueueIn: String
+    private lateinit var instanceQueueOut: String
+    private lateinit var databaseQueueIn: String
+    private lateinit var databaseQueueOut: String
 
     private lateinit var connection: Connection
     private lateinit var instanceChannel: Channel
@@ -65,7 +50,28 @@ internal class WorkflowConsumerRabbitMQTest : WorkflowConsumerTest() {
     private val instanceDeliveries = LinkedBlockingQueue<Delivery>()
     private val databaseDeliveries = LinkedBlockingQueue<Delivery>()
 
-    override fun setupMessaging() {
+    @BeforeAll
+    fun initClients() {
+        val config = ConfigProvider.getConfig()
+
+        val rabbitmqHost = config.getValue("rabbitmq-host", String::class.java)
+        val rabbitmqPort = config.getValue("rabbitmq-port", String::class.java)
+        val rabbitmqUsername = config.getValue("rabbitmq-username", String::class.java)
+        val rabbitmqPassword = config.getValue("rabbitmq-password", String::class.java)
+
+        instanceQueueIn = config.getValue("mp.messaging.incoming.$COMMANDS_IN_CHANNEL.queue.name", String::class.java)
+        instanceQueueOut = config.getValue("mp.messaging.outgoing.$COMMANDS_OUT_CHANNEL.queue.name", String::class.java)
+        databaseQueueIn = config.getValue("mp.messaging.incoming.$EVENTS_IN_CHANNEL.queue.name", String::class.java)
+        databaseQueueOut = config.getValue("mp.messaging.outgoing.$EVENTS_OUT_CHANNEL.queue.name", String::class.java)
+
+        // In testing, queues In and Out must be different
+        require(instanceQueueIn != instanceQueueOut) {
+            "For RabbitMQ *testing*, queues In ($instanceQueueIn) and Out ($instanceQueueOut) must be different"
+        }
+        require(databaseQueueIn != databaseQueueOut) {
+            "For RabbitMQ *testing*, queues In ($databaseQueueIn) and Out ($databaseQueueOut) must be different"
+        }
+
         // Setup RabbitMQ connection
         val factory = ConnectionFactory().apply {
             host = rabbitmqHost
@@ -76,14 +82,6 @@ internal class WorkflowConsumerRabbitMQTest : WorkflowConsumerTest() {
         connection = factory.newConnection()
         instanceChannel = connection.createChannel()
         databaseChannel = connection.createChannel()
-
-        // In testing, queues In and Out must be different
-        require(instanceQueueIn != instanceQueueOut) {
-            "For RabbitMQ *testing*, queues In ($instanceQueueIn) and Out ($instanceQueueOut) must be different"
-        }
-        require(databaseQueueIn != databaseQueueOut) {
-            "For RabbitMQ *testing*, queues In ($databaseQueueIn) and Out ($databaseQueueOut) must be different"
-        }
 
         // Declare the incoming queue
         val instanceArgs = mapOf(
@@ -110,13 +108,7 @@ internal class WorkflowConsumerRabbitMQTest : WorkflowConsumerTest() {
         instanceChannel.queueBind(instanceQueueOut, COMMANDS_OUT_CHANNEL, "") // routingKey = ""
         databaseChannel.queueBind(databaseQueueOut, EVENTS_OUT_CHANNEL, "") // routingKey = ""
 
-        // Purge queues
-        instanceChannel.queuePurge(instanceQueueIn)
-        instanceChannel.queuePurge(instanceQueueOut)
-        databaseChannel.queuePurge(databaseQueueIn)
-        databaseChannel.queuePurge(databaseQueueOut)
-
-        // Setup consumer
+        // Setup consumer callbacks
         val instanceCallback = DeliverCallback { _, delivery ->
             println("Received message on output queue: ${String(delivery.body)}")
             instanceDeliveries.offer(delivery)
@@ -129,10 +121,27 @@ internal class WorkflowConsumerRabbitMQTest : WorkflowConsumerTest() {
         databaseChannel.basicConsume(databaseQueueOut, true, databaseCallback) { }
     }
 
-    override fun cleanupMessaging() {
+    @AfterAll
+    fun closeClients() {
         if (::instanceChannel.isInitialized) instanceChannel.close()
         if (::databaseChannel.isInitialized) databaseChannel.close()
         if (::connection.isInitialized) connection.close()
+    }
+
+    override fun setupMessaging() {
+        // Purge queues to ensure clean state between tests
+        instanceChannel.queuePurge(instanceQueueIn)
+        instanceChannel.queuePurge(instanceQueueOut)
+        databaseChannel.queuePurge(databaseQueueIn)
+        databaseChannel.queuePurge(databaseQueueOut)
+
+        // Clear in-memory delivery queues
+        instanceDeliveries.clear()
+        databaseDeliveries.clear()
+    }
+
+    override fun cleanupMessaging() {
+        // No-op - clients are closed in @AfterAll
     }
 
     override fun sendInstanceMessage(message: String) {

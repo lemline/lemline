@@ -17,8 +17,10 @@ import kotlin.time.ExperimentalTime
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.ExperimentalSerializationApi
 import org.eclipse.microprofile.config.ConfigProvider
-import org.eclipse.microprofile.config.inject.ConfigProperty
+import org.junit.jupiter.api.AfterAll
+import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.Tag
+import org.junit.jupiter.api.TestInstance
 
 /**
  * Runs the WorkflowConsumerTest suite against a PGMQ (PostgreSQL Message Queue) broker.
@@ -29,26 +31,23 @@ import org.junit.jupiter.api.Tag
 @RequiresDocker
 @ExperimentalTime
 @ExperimentalSerializationApi
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 internal class WorkflowConsumerPgmqTest : WorkflowConsumerTest() {
-
-    @ConfigProperty(name = "mp.messaging.incoming.$COMMANDS_IN_CHANNEL.queue")
-    lateinit var commandsQueueIn: String
-
-    @ConfigProperty(name = "mp.messaging.outgoing.$COMMANDS_OUT_CHANNEL.queue")
-    lateinit var commandsQueueOut: String
-
-    @ConfigProperty(name = "mp.messaging.incoming.$EVENTS_IN_CHANNEL.queue")
-    lateinit var eventsQueueIn: String
-
-    @ConfigProperty(name = "mp.messaging.outgoing.$EVENTS_OUT_CHANNEL.queue")
-    lateinit var eventsQueueOut: String
 
     private lateinit var commandsInClient: PgmqClient
     private lateinit var commandsOutClient: PgmqClient
     private lateinit var eventsInClient: PgmqClient
     private lateinit var eventsOutClient: PgmqClient
 
-    override fun setupMessaging() {
+    @BeforeAll
+    fun initClients() {
+        val config = ConfigProvider.getConfig()
+
+        val commandsQueueIn = config.getValue("mp.messaging.incoming.$COMMANDS_IN_CHANNEL.queue", String::class.java)
+        val commandsQueueOut = config.getValue("mp.messaging.outgoing.$COMMANDS_OUT_CHANNEL.queue", String::class.java)
+        val eventsQueueIn = config.getValue("mp.messaging.incoming.$EVENTS_IN_CHANNEL.queue", String::class.java)
+        val eventsQueueOut = config.getValue("mp.messaging.outgoing.$EVENTS_OUT_CHANNEL.queue", String::class.java)
+
         require(commandsQueueIn != commandsQueueOut) {
             "For *testing*, queues In ($commandsQueueIn) and Out ($commandsQueueOut) must be different"
         }
@@ -56,22 +55,32 @@ internal class WorkflowConsumerPgmqTest : WorkflowConsumerTest() {
             "For *testing*, queues In ($eventsQueueIn) and Out ($eventsQueueOut) must be different"
         }
 
-        val config = ConfigProvider.getConfig()
-
         // Create PGMQ clients for each queue
         commandsInClient = PgmqClient(PgmqConnectorConfig(config, COMMANDS_IN_CHANNEL))
         commandsOutClient = PgmqClient(PgmqConnectorConfig(config, COMMANDS_OUT_CHANNEL))
         eventsInClient = PgmqClient(PgmqConnectorConfig(config, EVENTS_IN_CHANNEL))
         eventsOutClient = PgmqClient(PgmqConnectorConfig(config, EVENTS_OUT_CHANNEL))
 
-        // Initialize queues and purge any existing messages
+        // Initialize queues once
         runBlocking {
             commandsInClient.initialize()
             commandsOutClient.initialize()
             eventsInClient.initialize()
             eventsOutClient.initialize()
+        }
+    }
 
-            // Purge queues to ensure clean state
+    @AfterAll
+    fun closeClients() {
+        if (::commandsInClient.isInitialized) commandsInClient.close()
+        if (::commandsOutClient.isInitialized) commandsOutClient.close()
+        if (::eventsInClient.isInitialized) eventsInClient.close()
+        if (::eventsOutClient.isInitialized) eventsOutClient.close()
+    }
+
+    override fun setupMessaging() {
+        // Purge queues to ensure clean state between tests
+        runBlocking {
             commandsInClient.purge()
             commandsOutClient.purge()
             eventsInClient.purge()
@@ -80,10 +89,7 @@ internal class WorkflowConsumerPgmqTest : WorkflowConsumerTest() {
     }
 
     override fun cleanupMessaging() {
-        if (::commandsInClient.isInitialized) commandsInClient.close()
-        if (::commandsOutClient.isInitialized) commandsOutClient.close()
-        if (::eventsInClient.isInitialized) eventsInClient.close()
-        if (::eventsOutClient.isInitialized) eventsOutClient.close()
+        // No-op - clients are closed in @AfterAll
     }
 
     override fun sendInstanceMessage(message: String) {

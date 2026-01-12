@@ -22,8 +22,11 @@ import org.apache.kafka.clients.producer.ProducerConfig
 import org.apache.kafka.clients.producer.ProducerRecord
 import org.apache.kafka.common.serialization.StringDeserializer
 import org.apache.kafka.common.serialization.StringSerializer
-import org.eclipse.microprofile.config.inject.ConfigProperty
+import org.eclipse.microprofile.config.ConfigProvider
+import org.junit.jupiter.api.AfterAll
+import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.Tag
+import org.junit.jupiter.api.TestInstance
 
 /**
  * Runs the WorkflowConsumerTest suite against a Kafka broker.
@@ -34,32 +37,36 @@ import org.junit.jupiter.api.Tag
 @RequiresDocker
 @ExperimentalTime
 @ExperimentalSerializationApi
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 internal class WorkflowConsumerKafkaTest : WorkflowConsumerTest() {
 
-    @ConfigProperty(name = "kafka.bootstrap.servers")
-    lateinit var bootstrapServers: String
-
-    @ConfigProperty(name = "mp.messaging.incoming.$COMMANDS_IN_CHANNEL.topic")
-    lateinit var instanceTopicIn: String
-
-    @ConfigProperty(name = "mp.messaging.outgoing.$COMMANDS_OUT_CHANNEL.topic")
-    lateinit var instanceTopicOut: String
-
-    @ConfigProperty(name = "mp.messaging.incoming.$EVENTS_IN_CHANNEL.topic")
-    lateinit var databaseTopicIn: String
-
-    @ConfigProperty(name = "mp.messaging.outgoing.$EVENTS_OUT_CHANNEL.topic")
-    lateinit var databaseTopicOut: String
+    private lateinit var bootstrapServers: String
+    private lateinit var instanceTopicIn: String
+    private lateinit var instanceTopicOut: String
+    private lateinit var databaseTopicIn: String
+    private lateinit var databaseTopicOut: String
 
     private lateinit var instanceProducer: KafkaProducer<String, String>
     private lateinit var instanceConsumer: KafkaConsumer<String, String>
-
     private lateinit var databaseProducer: KafkaProducer<String, String>
     private lateinit var databaseConsumer: KafkaConsumer<String, String>
 
-    override fun setupMessaging() {
-        require(instanceTopicIn != instanceTopicOut) { "For *testing*, topics In ($instanceTopicIn) and Out ($instanceTopicOut) must be different" }
-        require(databaseTopicIn != databaseTopicOut) { "For *testing*, topics In ($databaseTopicIn) and Out ($databaseTopicOut) must be different" }
+    @BeforeAll
+    fun initClients() {
+        val config = ConfigProvider.getConfig()
+
+        bootstrapServers = config.getValue("kafka.bootstrap.servers", String::class.java)
+        instanceTopicIn = config.getValue("mp.messaging.incoming.$COMMANDS_IN_CHANNEL.topic", String::class.java)
+        instanceTopicOut = config.getValue("mp.messaging.outgoing.$COMMANDS_OUT_CHANNEL.topic", String::class.java)
+        databaseTopicIn = config.getValue("mp.messaging.incoming.$EVENTS_IN_CHANNEL.topic", String::class.java)
+        databaseTopicOut = config.getValue("mp.messaging.outgoing.$EVENTS_OUT_CHANNEL.topic", String::class.java)
+
+        require(instanceTopicIn != instanceTopicOut) {
+            "For *testing*, topics In ($instanceTopicIn) and Out ($instanceTopicOut) must be different"
+        }
+        require(databaseTopicIn != databaseTopicOut) {
+            "For *testing*, topics In ($databaseTopicIn) and Out ($databaseTopicOut) must be different"
+        }
 
         // Setup Kafka producer
         val producerProps = mapOf(
@@ -85,13 +92,24 @@ internal class WorkflowConsumerKafkaTest : WorkflowConsumerTest() {
 
         databaseConsumer = KafkaConsumer(baseConsumerProps + (ConsumerConfig.GROUP_ID_CONFIG to "test-group-database"))
         databaseConsumer.subscribe(listOf(databaseTopicOut))
+    }
 
+    @AfterAll
+    fun closeClients() {
+        if (::instanceProducer.isInitialized) instanceProducer.close()
+        if (::instanceConsumer.isInitialized) instanceConsumer.close()
+        if (::databaseProducer.isInitialized) databaseProducer.close()
+        if (::databaseConsumer.isInitialized) databaseConsumer.close()
+    }
+
+    override fun setupMessaging() {
         // Flush instance topic by consuming all messages
         var records: ConsumerRecords<String?, String?>?
         do {
             records = instanceConsumer.poll(Duration.ofMillis(100))
         } while (records.count() > 0)
         instanceConsumer.commitSync()
+
         // Flush database topic by consuming all messages
         do {
             records = databaseConsumer.poll(Duration.ofMillis(100))
@@ -100,10 +118,7 @@ internal class WorkflowConsumerKafkaTest : WorkflowConsumerTest() {
     }
 
     override fun cleanupMessaging() {
-        if (::instanceProducer.isInitialized) instanceProducer.close()
-        if (::instanceConsumer.isInitialized) instanceConsumer.close()
-        if (::databaseProducer.isInitialized) databaseProducer.close()
-        if (::databaseConsumer.isInitialized) databaseConsumer.close()
+        // No-op - clients are closed in @AfterAll
     }
 
     override fun sendInstanceMessage(message: String) {
