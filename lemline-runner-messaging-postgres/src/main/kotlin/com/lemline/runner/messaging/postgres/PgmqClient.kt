@@ -20,18 +20,22 @@ import kotlinx.serialization.json.Json
  *
  * Implements a message queue on top of PostgreSQL using the PGMQ SQL-only pattern.
  * The PGMQ schema and functions are created via Flyway migrations (V800, V801).
+ * Based on PGMQ v1.8.1.
  *
  * Features:
  * - Messages are stored in a queue table with visibility timeout
  * - Consumers read messages and mark them as invisible for a period
  * - Messages are deleted on acknowledgment or moved to DLQ on rejection
  * - Supports message headers for metadata
+ * - Long polling support via [readWithPoll] (v1.8.1)
+ * - Batch operations: [sendBatch], [deleteBatch], [archiveBatch], [setVisibilityTimeoutBatch] (v1.8.1)
+ * - Unlogged queues via [createUnloggedQueue] for high-performance non-critical workloads (v1.8.1)
  *
  * Queue tables (created by pgmq.create):
  * - pgmq.q_{queue_name}: Main queue table
  * - pgmq.a_{queue_name}: Archive table for processed messages
  *
- * @see <a href="https://github.com/pgmq/pgmq">PGMQ</a>
+ * @see <a href="https://github.com/tembo-io/pgmq">PGMQ</a>
  */
 class PgmqClient(
     private val config: PgmqConnectorConfig,
@@ -69,6 +73,21 @@ class PgmqClient(
         private const val LIST_QUEUES = "SELECT * FROM pgmq.list_queues()"
 
         private const val GET_METRICS = $$"SELECT * FROM pgmq.metrics($1)"
+
+        // v1.8.1 additions
+        private const val CREATE_UNLOGGED_QUEUE = $$"SELECT pgmq.create_unlogged($1)"
+
+        private const val READ_WITH_POLL = $$"SELECT * FROM pgmq.read_with_poll($1, $2, $3, $4, $5)"
+
+        private const val SEND_BATCH = $$"SELECT * FROM pgmq.send_batch($1, $2::jsonb[])"
+
+        private const val SEND_BATCH_WITH_DELAY = $$"SELECT * FROM pgmq.send_batch($1, $2::jsonb[], $3)"
+
+        private const val DELETE_BATCH = $$"SELECT * FROM pgmq.delete($1, $2::bigint[])"
+
+        private const val ARCHIVE_BATCH = $$"SELECT * FROM pgmq.archive($1, $2::bigint[])"
+
+        private const val SET_VT_BATCH = $$"SELECT * FROM pgmq.set_vt($1, $2::bigint[], $3)"
     }
 
     private val poolKey = "${config.host}:${config.port}/${config.database}"
@@ -110,13 +129,18 @@ class PgmqClient(
 
     /**
      * Creates a PGMQ queue using pgmq.create() function.
+     *
+     * @param queueName Name of the queue to create
+     * @param unlogged If true, creates an unlogged queue (faster but not crash-safe) (v1.8.1)
      */
-    private suspend fun createQueue(queueName: String) {
+    private suspend fun createQueue(queueName: String, unlogged: Boolean = false) {
         try {
-            pool.preparedQuery(CREATE_QUEUE)
+            val query = if (unlogged) CREATE_UNLOGGED_QUEUE else CREATE_QUEUE
+            pool.preparedQuery(query)
                 .execute(Tuple.of(queueName))
                 .awaitSuspending()
-            logger.info { "Created PGMQ queue: $queueName" }
+            val queueType = if (unlogged) "unlogged " else ""
+            logger.info { "Created ${queueType}PGMQ queue: $queueName" }
         } catch (e: Exception) {
             // Queue might already exist, which is fine
             if (!e.message.orEmpty().contains("already exists")) {
@@ -124,6 +148,18 @@ class PgmqClient(
             }
             logger.debug { "Queue $queueName already exists" }
         }
+    }
+
+    /**
+     * Creates an unlogged PGMQ queue (v1.8.1).
+     *
+     * Unlogged queues are faster but not crash-safe - data may be lost on crash.
+     * Use for temporary or non-critical message queues where performance is priority.
+     *
+     * @param queueName Name of the queue to create
+     */
+    suspend fun createUnloggedQueue(queueName: String) {
+        createQueue(queueName, unlogged = true)
     }
 
     /**
@@ -167,6 +203,35 @@ class PgmqClient(
     }
 
     /**
+     * Sends multiple messages to the queue in a single batch (v1.8.1).
+     *
+     * More efficient than multiple individual sends as it uses a single database round-trip.
+     *
+     * @param messages List of message payloads as JSON strings
+     * @param delaySeconds Optional delay before messages become visible
+     * @return List of message IDs
+     */
+    suspend fun sendBatch(messages: List<String>, delaySeconds: Int = 0): List<Long> {
+        if (messages.isEmpty()) return emptyList()
+
+        val messagesArray = messages.toTypedArray()
+
+        val result = if (delaySeconds > 0) {
+            pool.preparedQuery(SEND_BATCH_WITH_DELAY)
+                .execute(Tuple.of(config.queue, messagesArray, delaySeconds))
+                .awaitSuspending()
+        } else {
+            pool.preparedQuery(SEND_BATCH)
+                .execute(Tuple.of(config.queue, messagesArray))
+                .awaitSuspending()
+        }
+
+        val msgIds = result.map { it.getLong(0) }
+        logger.debug { "Sent ${msgIds.size} messages to queue ${config.queue}" }
+        return msgIds
+    }
+
+    /**
      * Reads messages from the queue.
      *
      * Messages are marked as invisible for the visibility timeout period.
@@ -188,6 +253,59 @@ class PgmqClient(
     fun readReactive(batchSize: Int = config.batchSize): Uni<List<PgmqMessage>> {
         return pool.preparedQuery(READ_MESSAGES)
             .execute(Tuple.of(config.queue, config.visibilityTimeout, batchSize))
+            .map { rowSet -> rowSet.map { it.toPgmqMessage() } }
+    }
+
+    /**
+     * Reads messages with long polling (v1.8.1).
+     *
+     * This is more efficient than client-side polling as the database handles
+     * the wait loop, reducing round-trips and returning messages as soon as
+     * they become available.
+     *
+     * @param batchSize Maximum number of messages to read
+     * @param maxPollSeconds Maximum time to wait for messages (default: 5 seconds)
+     * @param pollIntervalMs Interval between poll attempts in milliseconds (default: 100ms)
+     * @return List of PGMQ messages
+     */
+    suspend fun readWithPoll(
+        batchSize: Int = config.batchSize,
+        maxPollSeconds: Int = 5,
+        pollIntervalMs: Int = 100,
+    ): List<PgmqMessage> {
+        val result = pool.preparedQuery(READ_WITH_POLL)
+            .execute(
+                Tuple.of(
+                    config.queue,
+                    config.visibilityTimeout,
+                    batchSize,
+                    maxPollSeconds,
+                    pollIntervalMs
+                )
+            )
+            .awaitSuspending()
+
+        return result.map { row -> row.toPgmqMessage() }
+    }
+
+    /**
+     * Reads messages with long polling reactively using Mutiny (v1.8.1).
+     */
+    fun readWithPollReactive(
+        batchSize: Int = config.batchSize,
+        maxPollSeconds: Int = 5,
+        pollIntervalMs: Int = 100,
+    ): Uni<List<PgmqMessage>> {
+        return pool.preparedQuery(READ_WITH_POLL)
+            .execute(
+                Tuple.of(
+                    config.queue,
+                    config.visibilityTimeout,
+                    batchSize,
+                    maxPollSeconds,
+                    pollIntervalMs
+                )
+            )
             .map { rowSet -> rowSet.map { it.toPgmqMessage() } }
     }
 
@@ -230,6 +348,24 @@ class PgmqClient(
     }
 
     /**
+     * Deletes multiple messages from the queue in a single batch (v1.8.1).
+     *
+     * @param msgIds List of message IDs to delete
+     * @return List of successfully deleted message IDs
+     */
+    suspend fun deleteBatch(msgIds: List<Long>): List<Long> {
+        if (msgIds.isEmpty()) return emptyList()
+
+        val result = pool.preparedQuery(DELETE_BATCH)
+            .execute(Tuple.of(config.queue, msgIds.toLongArray()))
+            .awaitSuspending()
+
+        val deletedIds = result.map { it.getLong(0) }
+        logger.debug { "Deleted ${deletedIds.size} messages from queue ${config.queue}" }
+        return deletedIds
+    }
+
+    /**
      * Archives a message (moves it to the archive table).
      */
     suspend fun archive(msgId: Long): Boolean {
@@ -254,6 +390,24 @@ class PgmqClient(
     }
 
     /**
+     * Archives multiple messages in a single batch (v1.8.1).
+     *
+     * @param msgIds List of message IDs to archive
+     * @return List of successfully archived message IDs
+     */
+    suspend fun archiveBatch(msgIds: List<Long>): List<Long> {
+        if (msgIds.isEmpty()) return emptyList()
+
+        val result = pool.preparedQuery(ARCHIVE_BATCH)
+            .execute(Tuple.of(config.queue, msgIds.toLongArray()))
+            .awaitSuspending()
+
+        val archivedIds = result.map { it.getLong(0) }
+        logger.debug { "Archived ${archivedIds.size} messages from queue ${config.queue}" }
+        return archivedIds
+    }
+
+    /**
      * Extends the visibility timeout for a message.
      */
     suspend fun setVisibilityTimeout(msgId: Long, vtSeconds: Int): PgmqMessage? {
@@ -266,6 +420,23 @@ class PgmqClient(
         } else {
             null
         }
+    }
+
+    /**
+     * Extends the visibility timeout for multiple messages (v1.8.1).
+     *
+     * @param msgIds List of message IDs to update
+     * @param vtSeconds New visibility timeout in seconds
+     * @return List of updated messages
+     */
+    suspend fun setVisibilityTimeoutBatch(msgIds: List<Long>, vtSeconds: Int): List<PgmqMessage> {
+        if (msgIds.isEmpty()) return emptyList()
+
+        val result = pool.preparedQuery(SET_VT_BATCH)
+            .execute(Tuple.of(config.queue, msgIds.toLongArray(), vtSeconds))
+            .awaitSuspending()
+
+        return result.map { it.toPgmqMessage() }
     }
 
     /**

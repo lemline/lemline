@@ -36,7 +36,8 @@ import java.util.concurrent.atomic.AtomicBoolean
  * SmallRye Reactive Messaging incoming connector for PGMQ.
  *
  * This connector consumes messages from a PostgreSQL-based message queue using the PGMQ pattern.
- * It polls the queue at regular intervals and provides messages to reactive streams.
+ * Uses long polling (PGMQ v1.8.1) for efficient message consumption - the database handles
+ * the wait loop, reducing round-trips and returning messages as soon as they arrive.
  *
  * Configuration properties (prefixed with mp.messaging.incoming.{channel}):
  * - host: PostgreSQL host
@@ -46,7 +47,7 @@ import java.util.concurrent.atomic.AtomicBoolean
  * - password: Database password
  * - queue: PGMQ queue name
  * - visibility-timeout: Seconds before unacknowledged message becomes visible again
- * - poll-interval: Milliseconds between polls
+ * - poll-interval: Maximum wait time for long polling (converted to seconds, minimum 1s)
  * - batch-size: Messages to fetch per poll
  *
  * @see PgmqConnectorConfig for all configuration options
@@ -115,14 +116,23 @@ class PgmqIncomingConnector : InboundConnector {
         client: PgmqClient,
         config: PgmqConnectorConfig
     ) = flow {
+        // Convert pollInterval to seconds for long polling (minimum 1 second)
+        val maxPollSeconds = (config.pollInterval.toMillis() / 1000).toInt().coerceAtLeast(1)
+
         while (running[channelName]?.get() == true) {
             try {
-                val messages = client.read(config.batchSize)
+                // Use long polling - DB handles the wait, returns immediately when messages arrive
+                val messages = client.readWithPoll(
+                    batchSize = config.batchSize,
+                    maxPollSeconds = maxPollSeconds,
+                    pollIntervalMs = 100
+                )
                 messages.forEach { emit(it) }
             } catch (t: Throwable) {
                 logger.error(t) { "Error polling PGMQ queue ${config.queue}" }
+                // On error, add a small delay before retrying to avoid tight error loops
+                delay(1000)
             }
-            delay(config.pollInterval.toMillis())
         }
     }
 
