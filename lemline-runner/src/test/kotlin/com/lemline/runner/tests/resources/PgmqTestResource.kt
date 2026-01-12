@@ -76,6 +76,20 @@ class PgmqTestResource : QuarkusTestResourceLifecycleManager {
     }
 
     override fun stop() {
+        // Clear system properties to prevent conflicts with other test profiles
+        System.clearProperty("lemline.database.postgresql.host")
+        System.clearProperty("lemline.database.postgresql.port")
+        System.clearProperty("lemline.database.postgresql.name")
+        System.clearProperty("lemline.database.postgresql.username")
+        System.clearProperty("lemline.database.postgresql.password")
+        System.clearProperty("lemline.messaging.pgmq.host")
+        System.clearProperty("lemline.messaging.pgmq.port")
+        System.clearProperty("lemline.messaging.pgmq.database")
+        System.clearProperty("lemline.messaging.pgmq.username")
+        System.clearProperty("lemline.messaging.pgmq.password")
+        System.clearProperty("test.workflow.timeout.seconds")
+        System.clearProperty("test.workflow.cloudevent-send-interval-ms")
+
         if (::postgres.isInitialized) {
             postgres.stop()
             postgres.close()

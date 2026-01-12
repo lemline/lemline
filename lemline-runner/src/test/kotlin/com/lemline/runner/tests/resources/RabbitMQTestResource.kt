@@ -46,6 +46,12 @@ class RabbitMQTestResource : QuarkusTestResourceLifecycleManager {
     }
 
     override fun stop() {
+        // Clear system properties to prevent conflicts with other test profiles
+        System.clearProperty("rabbitmq-host")
+        System.clearProperty("rabbitmq-port")
+        System.clearProperty("rabbitmq-username")
+        System.clearProperty("rabbitmq-password")
+
         if (::rabbitmq.isInitialized) {
             rabbitmq.stop()
             rabbitmq.close()

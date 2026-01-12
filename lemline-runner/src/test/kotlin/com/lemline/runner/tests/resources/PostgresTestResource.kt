@@ -37,6 +37,14 @@ class PostgresTestResource : QuarkusTestResourceLifecycleManager {
     }
 
     override fun stop() {
+        // Clear system properties to prevent conflicts with other test profiles
+        System.clearProperty("lemline.database.type")
+        System.clearProperty("lemline.database.postgresql.host")
+        System.clearProperty("lemline.database.postgresql.port")
+        System.clearProperty("lemline.database.postgresql.name")
+        System.clearProperty("lemline.database.postgresql.username")
+        System.clearProperty("lemline.database.postgresql.password")
+
         if (::postgres.isInitialized) {
             postgres.stop()
         }

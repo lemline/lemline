@@ -38,6 +38,13 @@ class MySQLTestResource : QuarkusTestResourceLifecycleManager {
     }
 
     override fun stop() {
+        // Clear system properties to prevent conflicts with other test profiles
+        System.clearProperty("lemline.database.mysql.host")
+        System.clearProperty("lemline.database.mysql.port")
+        System.clearProperty("lemline.database.mysql.name")
+        System.clearProperty("lemline.database.mysql.username")
+        System.clearProperty("lemline.database.mysql.password")
+
         if (::mysql.isInitialized) {
             mysql.stop()
         }

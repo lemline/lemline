@@ -43,6 +43,9 @@ class KafkaTestResource : QuarkusTestResourceLifecycleManager {
     }
 
     override fun stop() {
+        // Clear system properties to prevent conflicts with other test profiles
+        System.clearProperty("kafka.bootstrap.servers")
+
         if (::kafka.isInitialized) {
             kafka.stop()
             kafka.close()
