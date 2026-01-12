@@ -74,6 +74,9 @@ class PgmqClient(
 
         private const val GET_METRICS = $$"SELECT * FROM pgmq.metrics($1)"
 
+        // Lemline-specific: Message deduplication index (see V802 migration)
+        private const val CREATE_DEDUP_INDEX = $$"SELECT lemline.create_dedup_index($1)"
+
         // v1.8.1 additions
         private const val CREATE_UNLOGGED_QUEUE = $$"SELECT pgmq.create_unlogged($1)"
 
@@ -130,6 +133,9 @@ class PgmqClient(
     /**
      * Creates a PGMQ queue using pgmq.create() function.
      *
+     * Also creates a Lemline-specific deduplication index on headers->>'messageId'
+     * to prevent duplicate messages from being enqueued.
+     *
      * @param queueName Name of the queue to create
      * @param unlogged If true, creates an unlogged queue (faster but not crash-safe) (v1.8.1)
      */
@@ -141,12 +147,40 @@ class PgmqClient(
                 .awaitSuspending()
             val queueType = if (unlogged) "unlogged " else ""
             logger.info { "Created ${queueType}PGMQ queue: $queueName" }
+
+            // Create Lemline-specific deduplication index (see V802 migration)
+            createDedupIndex(queueName)
         } catch (e: Exception) {
             // Queue might already exist, which is fine
             if (!e.message.orEmpty().contains("already exists")) {
                 throw e
             }
             logger.debug { "Queue $queueName already exists" }
+
+            // Ensure dedup index exists even for pre-existing queues
+            createDedupIndex(queueName)
+        }
+    }
+
+    /**
+     * Creates the Lemline-specific deduplication index for a queue.
+     *
+     * This index ensures that messages with the same messageId in headers
+     * cannot be enqueued twice, providing send-side deduplication.
+     *
+     * @param queueName Name of the queue
+     */
+    private suspend fun createDedupIndex(queueName: String) {
+        try {
+            pool.preparedQuery(CREATE_DEDUP_INDEX)
+                .execute(Tuple.of(queueName))
+                .awaitSuspending()
+            logger.debug { "Created deduplication index for queue: $queueName" }
+        } catch (e: Exception) {
+            // Index might already exist, which is fine
+            if (!e.message.orEmpty().contains("already exists")) {
+                logger.warn(e) { "Failed to create deduplication index for queue: $queueName" }
+            }
         }
     }
 

@@ -147,7 +147,8 @@ class PgmqIncomingConnector : InboundConnector {
             readCount = pgmqMessage.readCt,
             enqueuedAt = pgmqMessage.enqueuedAt,
             visibilityTimeout = pgmqMessage.vt,
-            queue = config.queue
+            queue = config.queue,
+            headers = pgmqMessage.headers
         )
 
         return Message.of(pgmqMessage.message, PgmqMetadataContainer(metadata))

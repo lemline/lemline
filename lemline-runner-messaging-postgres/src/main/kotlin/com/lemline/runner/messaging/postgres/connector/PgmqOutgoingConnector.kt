@@ -133,15 +133,21 @@ class PgmqOutgoingConnector : OutboundConnector {
                 else -> p.toString()
             }
 
-            // Extract delay from metadata if present
-            val delaySeconds = message.metadata.firstOrNull { it is PgmqOutgoingMetadata }
-                ?.let { (it as PgmqOutgoingMetadata).delaySeconds }
-                ?: 0
+            // Extract metadata if present
+            val pgmqMetadata = message.metadata.firstOrNull { it is PgmqOutgoingMetadata }
+                as? PgmqOutgoingMetadata
+
+            val delaySeconds = pgmqMetadata?.delaySeconds ?: 0
+
+            // Create headers JSON with messageId for deduplication
+            val headersJson = pgmqMetadata?.messageId?.let { messageId ->
+                """{"messageId":"$messageId"}"""
+            }
 
             // Send the message using coroutines
             scope.launch {
                 try {
-                    val msgId = client.send(payload, delaySeconds)
+                    val msgId = client.send(payload, delaySeconds, headersJson)
                     logger.debug { "Sent message $msgId to queue ${config.queue}" }
                     message.ack().whenComplete { _, error ->
                         if (error != null) {
@@ -151,10 +157,21 @@ class PgmqOutgoingConnector : OutboundConnector {
                         subscription?.request(1)
                     }
                 } catch (error: Throwable) {
-                    logger.error(error) { "Failed to send message to queue ${config.queue}" }
-                    message.nack(error).whenComplete { _, _ ->
-                        // Request next message even on failure
-                        subscription?.request(1)
+                    // Check if this is a duplicate message (unique constraint violation)
+                    // This is expected behavior for idempotent sends - treat as success
+                    if (error.message?.contains("unique constraint") == true ||
+                        error.message?.contains("duplicate key") == true
+                    ) {
+                        logger.debug { "Duplicate message detected (idempotent send), treating as success" }
+                        message.ack().whenComplete { _, _ ->
+                            subscription?.request(1)
+                        }
+                    } else {
+                        logger.error(error) { "Failed to send message to queue ${config.queue}" }
+                        message.nack(error).whenComplete { _, _ ->
+                            // Request next message even on failure
+                            subscription?.request(1)
+                        }
                     }
                 }
             }
