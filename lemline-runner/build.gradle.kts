@@ -54,7 +54,7 @@ dependencies {
     implementation(project(":lemline-runner-failures"))
     implementation(project(":lemline-runner-definitions"))
     implementation(project(":lemline-runner-cli"))
-    implementation(project(":lemline-runner-messaging-postgres"))
+    implementation(project(":lemline-runner-messaging-pgmq"))
 
     // KotlinX ecosystem
     implementation(libs.bundles.kotlinxEcosystem)
