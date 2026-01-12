@@ -57,10 +57,14 @@ class PgmqConnectorConfig(
     }
 
     private fun getProperty(key: String): String? {
+        // Check channel-specific properties first (incoming, then outgoing)
         return config.getOptionalValue("mp.messaging.incoming.$channelName.$key", String::class.java)
             .orElseGet {
                 config.getOptionalValue("mp.messaging.outgoing.$channelName.$key", String::class.java)
-                    .orElse(null)
+                    .orElseGet {
+                        // Fall back to global connector defaults (pgmq.host, pgmq.port, etc.)
+                        config.getOptionalValue("pgmq.$key", String::class.java).orElse(null)
+                    }
             }
     }
 

@@ -53,18 +53,12 @@ class PgmqTestResource : QuarkusTestResourceLifecycleManager {
             "lemline.database.postgresql.username" to username,
             "lemline.database.postgresql.password" to password,
             // PGMQ messaging connection (uses same PostgreSQL with pgmq schema)
+            // LemlineConfigSource will translate these to pgmq.* global connector defaults
             "lemline.messaging.pgmq.host" to host,
             "lemline.messaging.pgmq.port" to port,
             "lemline.messaging.pgmq.database" to database,
             "lemline.messaging.pgmq.username" to username,
             "lemline.messaging.pgmq.password" to password,
-            // Test-only: lifecycleevents-in channel for TestLifecycleEventListener
-            // This channel is not configured by LemlineConfigSource, so we add connection properties directly
-            "mp.messaging.incoming.lifecycleevents-in.host" to host,
-            "mp.messaging.incoming.lifecycleevents-in.port" to port,
-            "mp.messaging.incoming.lifecycleevents-in.database" to database,
-            "mp.messaging.incoming.lifecycleevents-in.username" to username,
-            "mp.messaging.incoming.lifecycleevents-in.password" to password,
         )
 
         // Set as system properties so that LemlineConfigSource can see them

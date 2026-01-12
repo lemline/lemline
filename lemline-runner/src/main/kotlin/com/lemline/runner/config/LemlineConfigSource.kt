@@ -476,6 +476,13 @@ class LemlineConfigSource : PropertiesConfigSource(
             val username = props["$pgmq.username"] ?: POSTGRES_USERNAME_DEFAULT
             val password = props["$pgmq.password"] ?: POSTGRES_PASSWORD_DEFAULT
 
+            // Set global PGMQ connector defaults - channels can inherit these
+            set("pgmq.host", host)
+            set("pgmq.port", port)
+            set("pgmq.database", database)
+            set("pgmq.username", username)
+            set("pgmq.password", password)
+
             configurePgmqQueue(props, TopicType.COMMANDS, host, port, database, username, password)
             configurePgmqQueue(props, TopicType.EVENTS, host, port, database, username, password)
             configurePgmqCloudEventsQueue(props, host, port, database, username, password)
