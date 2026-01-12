@@ -6,15 +6,6 @@ description: Intelligent refactoring with context-aware strategies
 
 Parse arguments as: /refactor [scope]
 
-## Quick Rules:
-
-1. If scope starts with "/" — treat as package path
-   Example: `/refactor /processor` → refactor Processor-related code
-2. If scope starts with "@" — treat as file path
-   Example: `/refactor @lemline-core/src/main/kotlin/com/lemline/core/processor/Processor.kt`
-3. If no scope - refactor current files based on your recent changes since last commit
-   Example: `/refactor` → analyze git diff and refactor changed files
-
 ## Objectives:
 
 - Extract reusable components from duplicated code
@@ -59,7 +50,7 @@ When refactoring, apply these Kotlin idioms to improve code quality:
 - Prefer `?.let { }` over `if (x != null)`
 - Use `?:` (Elvis) for defaults: `value ?: defaultValue`
 - Use `?.also { }` for side effects on nullable values
-- Avoid `!!` except in tests or when failure is truly impossible
+- Avoid double-bang (!!) except in tests or when failure is truly impossible
 
 ### Scope Functions
 | Function | Use Case |
