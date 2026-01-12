@@ -31,6 +31,10 @@ class RabbitMQTestResource : QuarkusTestResourceLifecycleManager {
         // Start RabbitMQ
         rabbitmq.start()
 
+        // RabbitMQ with concurrent consumers can process CloudEvents out of order.
+        // Increase delay between events to ensure each event completes processing
+        System.setProperty("test.workflow.cloudevent-send-interval-ms", "50")
+
         // Return the RabbitMQ connection configuration
         val properties = mapOf(
             "rabbitmq-host" to rabbitmq.host,
