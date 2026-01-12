@@ -65,8 +65,10 @@ internal abstract class AbstractWorkflowTestExecutor : WorkflowTestExecutor {
     protected abstract val listenerRepository: ListenerRepository
     protected abstract val testModeConfiguration: TestModeConfiguration
 
-    /** Default timeout for workflow completion in seconds */
-    protected open val defaultTimeoutSeconds: Long = 5L
+    /** Default timeout for workflow completion in seconds (configurable via system property) */
+    protected open val defaultTimeoutSeconds: Long by lazy {
+        System.getProperty("test.workflow.timeout.seconds")?.toLongOrNull() ?: 5L
+    }
 
     /** Timeout for listen task tests with CloudEvents */
     protected open val listenTimeoutSeconds: Long = 10L

@@ -64,6 +64,9 @@ class PgmqTestResource : QuarkusTestResourceLifecycleManager {
         // Set as system properties so that LemlineConfigSource can see them
         properties.forEach { (k, v) -> System.setProperty(k, v) }
 
+        // PGMQ is database-based and slower than dedicated brokers - increase test timeout
+        System.setProperty("test.workflow.timeout.seconds", "10")
+
         return properties
     }
 
