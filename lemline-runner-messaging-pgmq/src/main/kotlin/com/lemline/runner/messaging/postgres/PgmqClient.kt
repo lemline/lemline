@@ -5,14 +5,16 @@ import com.lemline.common.logger.logger
 import com.lemline.runner.messaging.postgres.config.PgmqConnectorConfig
 import io.smallrye.mutiny.Uni
 import io.smallrye.mutiny.coroutines.awaitSuspending
-import io.vertx.mutiny.pgclient.PgPool
+import io.vertx.mutiny.pgclient.PgBuilder
+import io.vertx.mutiny.sqlclient.Pool
 import io.vertx.mutiny.sqlclient.Row
 import io.vertx.mutiny.sqlclient.Tuple
 import io.vertx.pgclient.PgConnectOptions
 import io.vertx.sqlclient.PoolOptions
 import java.time.Instant
+import java.time.LocalDateTime
+import java.time.ZoneOffset
 import java.util.concurrent.ConcurrentHashMap
-import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
 /**
@@ -42,7 +44,7 @@ class PgmqClient(
 ) {
     companion object {
         private val logger = logger()
-        private val pools = ConcurrentHashMap<String, PgPool>()
+        private val pools = ConcurrentHashMap<String, Pool>()
 
         // PGMQ SQL statements (using functions from V801 migration)
         private const val CREATE_QUEUE = $$"SELECT pgmq.create($1)"
@@ -95,7 +97,7 @@ class PgmqClient(
 
     private val poolKey = "${config.host}:${config.port}/${config.database}"
 
-    private val pool: PgPool by lazy {
+    private val pool: Pool by lazy {
         pools.computeIfAbsent(poolKey) {
             val connectOptions = PgConnectOptions()
                 .setHost(config.host)
@@ -108,7 +110,10 @@ class PgmqClient(
                 .setMaxSize(config.maxPoolSize)
 
             logger.info { "Creating PGMQ connection pool for $poolKey" }
-            PgPool.pool(connectOptions, poolOptions)
+            PgBuilder.pool()
+                .with(poolOptions)
+                .connectingTo(connectOptions)
+                .build()
         }
     }
 
@@ -140,26 +145,21 @@ class PgmqClient(
      * @param unlogged If true, creates an unlogged queue (faster but not crash-safe) (v1.8.1)
      */
     private suspend fun createQueue(queueName: String, unlogged: Boolean = false) {
-        try {
-            val query = if (unlogged) CREATE_UNLOGGED_QUEUE else CREATE_QUEUE
-            pool.preparedQuery(query)
-                .execute(Tuple.of(queueName))
-                .awaitSuspending()
-            val queueType = if (unlogged) "unlogged " else ""
-            logger.info { "Created ${queueType}PGMQ queue: $queueName" }
+        val query = if (unlogged) CREATE_UNLOGGED_QUEUE else CREATE_QUEUE
+        val queueType = if (unlogged) "unlogged " else ""
 
-            // Create Lemline-specific deduplication index (see V802 migration)
-            createDedupIndex(queueName)
-        } catch (e: Exception) {
-            // Queue might already exist, which is fine
-            if (!e.message.orEmpty().contains("already exists")) {
-                throw e
-            }
-            logger.debug { "Queue $queueName already exists" }
+        runIgnoringAlreadyExists(
+            action = {
+                pool.preparedQuery(query)
+                    .execute(Tuple.of(queueName))
+                    .awaitSuspending()
+                logger.info { "Created ${queueType}PGMQ queue: $queueName" }
+            },
+            onAlreadyExists = { logger.debug { "Queue $queueName already exists" } }
+        )
 
-            // Ensure dedup index exists even for pre-existing queues
-            createDedupIndex(queueName)
-        }
+        // Ensure dedup index exists (whether queue was just created or already existed)
+        createDedupIndex(queueName)
     }
 
     /**
@@ -171,15 +171,36 @@ class PgmqClient(
      * @param queueName Name of the queue
      */
     private suspend fun createDedupIndex(queueName: String) {
+        runIgnoringAlreadyExists(
+            action = {
+                pool.preparedQuery(CREATE_DEDUP_INDEX)
+                    .execute(Tuple.of(queueName))
+                    .awaitSuspending()
+                logger.debug { "Created deduplication index for queue: $queueName" }
+            },
+            onError = { e -> logger.warn(e) { "Failed to create deduplication index for queue: $queueName" } }
+        )
+    }
+
+    /**
+     * Executes an action, ignoring "already exists" errors.
+     *
+     * @param action The action to execute
+     * @param onAlreadyExists Optional callback when the resource already exists
+     * @param onError Optional callback for other errors (if null, the error is rethrown)
+     */
+    private inline fun runIgnoringAlreadyExists(
+        action: () -> Unit,
+        onAlreadyExists: () -> Unit = {},
+        noinline onError: ((Exception) -> Unit)? = null,
+    ) {
         try {
-            pool.preparedQuery(CREATE_DEDUP_INDEX)
-                .execute(Tuple.of(queueName))
-                .awaitSuspending()
-            logger.debug { "Created deduplication index for queue: $queueName" }
+            action()
         } catch (e: Exception) {
-            // Index might already exist, which is fine
-            if (!e.message.orEmpty().contains("already exists")) {
-                logger.warn(e) { "Failed to create deduplication index for queue: $queueName" }
+            if (e.message.orEmpty().contains("already exists")) {
+                onAlreadyExists()
+            } else {
+                onError?.invoke(e) ?: throw e
             }
         }
     }
@@ -283,16 +304,6 @@ class PgmqClient(
     }
 
     /**
-     * Reads messages reactively using Mutiny.
-     */
-    fun readReactive(batchSize: Int = config.batchSize): Uni<List<PgmqMessage>> {
-        return pool.preparedQuery(READ_MESSAGES)
-            .execute(Tuple.of(config.queue, config.visibilityTimeout, batchSize))
-            // Sort by msgId to ensure FIFO order (UPDATE...RETURNING doesn't guarantee order)
-            .map { rowSet -> rowSet.map { it.toPgmqMessage() }.sortedBy { it.msgId } }
-    }
-
-    /**
      * Reads messages with long polling (v1.8.1).
      *
      * This is more efficient than client-side polling as the database handles
@@ -326,28 +337,6 @@ class PgmqClient(
     }
 
     /**
-     * Reads messages with long polling reactively using Mutiny (v1.8.1).
-     */
-    fun readWithPollReactive(
-        batchSize: Int = config.batchSize,
-        maxPollSeconds: Int = 5,
-        pollIntervalMs: Int = 100,
-    ): Uni<List<PgmqMessage>> {
-        return pool.preparedQuery(READ_WITH_POLL)
-            .execute(
-                Tuple.of(
-                    config.queue,
-                    config.visibilityTimeout,
-                    batchSize,
-                    maxPollSeconds,
-                    pollIntervalMs
-                )
-            )
-            // Sort by msgId to ensure FIFO order (UPDATE...RETURNING doesn't guarantee order)
-            .map { rowSet -> rowSet.map { it.toPgmqMessage() }.sortedBy { it.msgId } }
-    }
-
-    /**
      * Pops messages from the queue (read and delete in one operation).
      *
      * @param batchSize Maximum number of messages to pop
@@ -363,17 +352,18 @@ class PgmqClient(
 
     /**
      * Deletes a message from the queue (acknowledges it).
+     *
+     * @param msgId The message ID to delete
+     * @return true if the message was deleted, false if not found
      */
     suspend fun delete(msgId: Long): Boolean {
-        val result = pool.preparedQuery(DELETE_MESSAGE)
+        return pool.preparedQuery(DELETE_MESSAGE)
             .execute(Tuple.of(config.queue, msgId))
             .awaitSuspending()
-
-        val deleted = result.iterator().next().getBoolean(0)
-        if (deleted) {
-            logger.debug { "Deleted message $msgId from queue ${config.queue}" }
-        }
-        return deleted
+            .iterator().next().getBoolean(0)
+            .also { deleted ->
+                if (deleted) logger.debug { "Deleted message $msgId from queue ${config.queue}" }
+            }
     }
 
     /**
@@ -405,26 +395,18 @@ class PgmqClient(
 
     /**
      * Archives a message (moves it to the archive table).
+     *
+     * @param msgId The message ID to archive
+     * @return true if the message was archived, false if not found
      */
     suspend fun archive(msgId: Long): Boolean {
-        val result = pool.preparedQuery(ARCHIVE_MESSAGE)
-            .execute(Tuple.of(config.queue, msgId))
-            .awaitSuspending()
-
-        val archived = result.iterator().next().getBoolean(0)
-        if (archived) {
-            logger.debug { "Archived message $msgId from queue ${config.queue}" }
-        }
-        return archived
-    }
-
-    /**
-     * Archives a message reactively.
-     */
-    fun archiveReactive(msgId: Long): Uni<Boolean> {
         return pool.preparedQuery(ARCHIVE_MESSAGE)
             .execute(Tuple.of(config.queue, msgId))
-            .map { it.iterator().next().getBoolean(0) }
+            .awaitSuspending()
+            .iterator().next().getBoolean(0)
+            .also { archived ->
+                if (archived) logger.debug { "Archived message $msgId from queue ${config.queue}" }
+            }
     }
 
     /**
@@ -447,17 +429,17 @@ class PgmqClient(
 
     /**
      * Extends the visibility timeout for a message.
+     *
+     * @param msgId The message ID to update
+     * @param vtSeconds New visibility timeout in seconds
+     * @return The updated message, or null if not found
      */
     suspend fun setVisibilityTimeout(msgId: Long, vtSeconds: Int): PgmqMessage? {
-        val result = pool.preparedQuery(SET_VT)
+        return pool.preparedQuery(SET_VT)
             .execute(Tuple.of(config.queue, msgId, vtSeconds))
             .awaitSuspending()
-
-        return if (result.rowCount() > 0) {
-            result.iterator().next().toPgmqMessage()
-        } else {
-            null
-        }
+            .takeIf { it.rowCount() > 0 }
+            ?.iterator()?.next()?.toPgmqMessage()
     }
 
     /**
@@ -510,28 +492,26 @@ class PgmqClient(
      * @return Number of messages purged
      */
     suspend fun purge(): Long {
-        val result = pool.preparedQuery(PURGE_QUEUE)
+        return pool.preparedQuery(PURGE_QUEUE)
             .execute(Tuple.of(config.queue))
             .awaitSuspending()
-
-        val purged = result.iterator().next().getLong(0)
-        logger.info { "Purged $purged messages from queue ${config.queue}" }
-        return purged
+            .iterator().next().getLong(0)
+            .also { purged -> logger.info { "Purged $purged messages from queue ${config.queue}" } }
     }
 
     /**
      * Drops the queue and its archive table.
+     *
+     * @return true if the queue was dropped, false if not found
      */
     suspend fun drop(): Boolean {
-        val result = pool.preparedQuery(DROP_QUEUE)
+        return pool.preparedQuery(DROP_QUEUE)
             .execute(Tuple.of(config.queue))
             .awaitSuspending()
-
-        val dropped = result.iterator().next().getBoolean(0)
-        if (dropped) {
-            logger.info { "Dropped queue ${config.queue}" }
-        }
-        return dropped
+            .iterator().next().getBoolean(0)
+            .also { dropped ->
+                if (dropped) logger.info { "Dropped queue ${config.queue}" }
+            }
     }
 
     /**
@@ -544,41 +524,12 @@ class PgmqClient(
     private fun Row.toPgmqMessage(): PgmqMessage = PgmqMessage(
         msgId = getLong("msg_id"),
         readCt = getInteger("read_ct"),
-        enqueuedAt = getLocalDateTime("enqueued_at")?.let { Instant.from(it.atOffset(java.time.ZoneOffset.UTC)) }
-            ?: Instant.now(),
-        vt = getLocalDateTime("vt")?.let { Instant.from(it.atOffset(java.time.ZoneOffset.UTC)) }
-            ?: Instant.now(),
+        enqueuedAt = getLocalDateTime("enqueued_at").toInstantUtc(),
+        vt = getLocalDateTime("vt").toInstantUtc(),
         message = getString("message") ?: getJsonObject("message")?.encode() ?: "",
         headers = getString("headers") ?: getJsonObject("headers")?.encode()
     )
+
+    private fun LocalDateTime?.toInstantUtc(): Instant =
+        this?.toInstant(ZoneOffset.UTC) ?: Instant.now()
 }
-
-/**
- * Represents a message from PGMQ.
- */
-data class PgmqMessage(
-    /** Unique message identifier */
-    val msgId: Long,
-    /** Number of times this message has been read */
-    val readCt: Int,
-    /** When the message was enqueued */
-    val enqueuedAt: Instant,
-    /** Visibility timeout - message becomes visible again after this time */
-    val vt: Instant,
-    /** The message payload */
-    val message: String,
-    /** Optional message headers */
-    val headers: String? = null,
-)
-
-/**
- * Message format for dead-letter queue.
- */
-@Serializable
-data class DlqMessage(
-    val originalMessageId: Long,
-    val originalQueue: String,
-    val payload: String,
-    val error: String,
-    val timestamp: String,
-)

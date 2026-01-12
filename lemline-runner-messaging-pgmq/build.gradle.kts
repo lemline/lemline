@@ -45,6 +45,7 @@ dependencies {
     testImplementation("io.kotest:kotest-assertions-core")
     testImplementation(libs.mockk)
     testImplementation(testFixtures(project(":lemline-common")))
+    testImplementation(testFixtures(project(":lemline-runner-common")))
     testImplementation(platform(libs.testcontainers.bom))
     testImplementation("org.testcontainers:testcontainers")
     testImplementation("org.testcontainers:postgresql")
