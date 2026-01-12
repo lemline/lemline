@@ -56,10 +56,6 @@ internal class BrokerWorkflowTestExecutor : AbstractWorkflowTestExecutor() {
         private const val OUTBOX_PROCESSING_DELAY_MS = 1_500L
     }
 
-    // Override timeout values for broker testing (network latency considerations)
-    override val listenTimeoutSeconds: Long = 8L
-    override val cloudEventSendIntervalMs: Long = 20L
-
     @Inject
     override lateinit var definitionRepository: DefinitionRepository
 

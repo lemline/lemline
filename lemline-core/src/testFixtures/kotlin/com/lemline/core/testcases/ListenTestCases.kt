@@ -793,7 +793,7 @@ object ListenTestCases {
         WorkflowTestCase(
             name = "listen any with read envelope and until expression accessing envelope source field",
             cloudEvents = listOf(readingFloor1Event, readingFloor2Event, readingRoofEvent),
-            yaml = $$"""
+            yaml = """
                 do:
                   - collectReadings:
                       listen:
@@ -819,7 +819,7 @@ object ListenTestCases {
         WorkflowTestCase(
             name = "listen any with read envelope and until expression accessing envelope type field",
             cloudEvents = listOf(reading1Event, reading2Event, stopMonitoringEvent),
-            yaml = $$"""
+            yaml = """
                 do:
                   - collectUntilStop:
                       listen:
@@ -844,7 +844,7 @@ object ListenTestCases {
         WorkflowTestCase(
             name = "listen any with read envelope and until expression accessing nested data field",
             cloudEvents = listOf(readingFloor1Event, readingFloor2Event, readingRoofEvent),
-            yaml = $$"""
+            yaml = """
                 do:
                   - collectReadings:
                       listen:

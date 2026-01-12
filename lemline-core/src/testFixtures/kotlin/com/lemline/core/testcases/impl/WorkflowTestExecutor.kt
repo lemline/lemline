@@ -15,7 +15,7 @@ interface WorkflowTestExecutor {
         name: String = "test",
         version: String = "0.1.0",
         dependencies: List<WorkflowDependency> = emptyList(),
-        mockConfig: MockConfiguration = MockConfiguration.Companion.empty(),
+        mockConfig: MockConfiguration = MockConfiguration.empty(),
         cloudEvents: List<CloudEvent> = emptyList(),
         validateDefinition: Boolean = true
     ): WorkflowTestResult

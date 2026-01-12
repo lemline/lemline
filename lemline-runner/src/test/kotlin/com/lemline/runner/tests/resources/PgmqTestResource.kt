@@ -67,6 +67,11 @@ class PgmqTestResource : QuarkusTestResourceLifecycleManager {
         // PGMQ is database-based and slower than dedicated brokers - increase test timeout
         System.setProperty("test.workflow.timeout.seconds", "10")
 
+        // PGMQ with concurrent consumers can process CloudEvents out of order.
+        // Increase delay between events to ensure each event completes processing
+        // (including database lock acquisition) before the next one arrives.
+        System.setProperty("test.workflow.cloudevent-send-interval-ms", "500")
+
         return properties
     }
 

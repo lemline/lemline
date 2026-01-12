@@ -278,7 +278,8 @@ class PgmqClient(
             .execute(Tuple.of(config.queue, config.visibilityTimeout, batchSize))
             .awaitSuspending()
 
-        return result.map { row -> row.toPgmqMessage() }
+        // Sort by msgId to ensure FIFO order (UPDATE...RETURNING doesn't guarantee order)
+        return result.map { row -> row.toPgmqMessage() }.sortedBy { it.msgId }
     }
 
     /**
@@ -287,7 +288,8 @@ class PgmqClient(
     fun readReactive(batchSize: Int = config.batchSize): Uni<List<PgmqMessage>> {
         return pool.preparedQuery(READ_MESSAGES)
             .execute(Tuple.of(config.queue, config.visibilityTimeout, batchSize))
-            .map { rowSet -> rowSet.map { it.toPgmqMessage() } }
+            // Sort by msgId to ensure FIFO order (UPDATE...RETURNING doesn't guarantee order)
+            .map { rowSet -> rowSet.map { it.toPgmqMessage() }.sortedBy { it.msgId } }
     }
 
     /**
@@ -319,7 +321,8 @@ class PgmqClient(
             )
             .awaitSuspending()
 
-        return result.map { row -> row.toPgmqMessage() }
+        // Sort by msgId to ensure FIFO order (UPDATE...RETURNING doesn't guarantee order)
+        return result.map { row -> row.toPgmqMessage() }.sortedBy { it.msgId }
     }
 
     /**
@@ -340,7 +343,8 @@ class PgmqClient(
                     pollIntervalMs
                 )
             )
-            .map { rowSet -> rowSet.map { it.toPgmqMessage() } }
+            // Sort by msgId to ensure FIFO order (UPDATE...RETURNING doesn't guarantee order)
+            .map { rowSet -> rowSet.map { it.toPgmqMessage() }.sortedBy { it.msgId } }
     }
 
     /**
