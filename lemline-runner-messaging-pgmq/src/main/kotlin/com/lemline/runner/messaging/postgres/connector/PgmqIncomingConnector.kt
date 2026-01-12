@@ -5,11 +5,13 @@ import com.lemline.common.logger.logger
 import com.lemline.runner.messaging.postgres.PgmqClient
 import com.lemline.runner.messaging.postgres.PgmqMessage
 import com.lemline.runner.messaging.postgres.config.PgmqConnectorConfig
+import io.quarkus.runtime.ShutdownEvent
 import io.smallrye.reactive.messaging.connector.InboundConnector
 import io.smallrye.reactive.messaging.providers.connectors.ExecutionHolder
 import jakarta.annotation.PostConstruct
 import jakarta.annotation.PreDestroy
 import jakarta.enterprise.context.ApplicationScoped
+import jakarta.enterprise.event.Observes
 import jakarta.inject.Inject
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -70,14 +72,26 @@ class PgmqIncomingConnector : InboundConnector {
 
     private val clients = ConcurrentHashMap<String, PgmqClient>()
     private val running = ConcurrentHashMap<String, AtomicBoolean>()
+    private val isShutdown = AtomicBoolean(false)
 
     @PostConstruct
     fun init() {
         logger.info { "PGMQ Incoming Connector initialized" }
     }
 
+    /**
+     * Handle Quarkus shutdown event - this is called early in the shutdown process,
+     * before SmallRye Reactive Messaging starts cancelling channels.
+     */
+    fun onQuarkusShutdown(@Observes event: ShutdownEvent) {
+        logger.info { "PGMQ Incoming Connector received shutdown event" }
+        isShutdown.set(true)
+        stopAll()
+    }
+
     @PreDestroy
     fun destroy() {
+        // stopAll() may have already been called by onQuarkusShutdown, but it's idempotent
         stopAll()
         scope.cancel()
         logger.info { "PGMQ Incoming Connector destroyed" }
@@ -129,9 +143,24 @@ class PgmqIncomingConnector : InboundConnector {
                 )
                 messages.forEach { emit(it) }
             } catch (t: Throwable) {
-                logger.error(t) { "Error polling PGMQ queue ${config.queue}" }
-                // On error, add a small delay before retrying to avoid tight error loops
-                delay(1000)
+                // Check if we're shutting down - either via our flag, channel stopped,
+                // or cancellation exception (which happens during shutdown)
+                val isCancellation = t is kotlinx.coroutines.CancellationException ||
+                    t.cause is kotlinx.coroutines.CancellationException ||
+                    t.message?.contains("cancelled", ignoreCase = true) == true
+
+                val isShuttingDown = isShutdown.get() ||
+                    running[channelName]?.get() != true ||
+                    isCancellation
+
+                if (!isShuttingDown) {
+                    logger.error(t) { "Error polling PGMQ queue ${config.queue}" }
+                    // On error, add a small delay before retrying to avoid tight error loops
+                    delay(1000)
+                } else {
+                    logger.debug { "PGMQ polling stopped for queue ${config.queue} (shutdown)" }
+                    break
+                }
             }
         }
     }

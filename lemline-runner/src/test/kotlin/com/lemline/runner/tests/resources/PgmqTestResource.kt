@@ -8,10 +8,15 @@ import org.testcontainers.containers.wait.strategy.Wait
 import org.testcontainers.utility.DockerImageName
 
 /**
- * Test resource that starts a PostgreSQL container with PGMQ extension for messaging tests.
+ * Test resource that starts a PostgreSQL container for PGMQ testing.
  *
- * Uses the official tembo-io/pgmq image which has PGMQ pre-installed.
- * Falls back to standard PostgreSQL if PGMQ image is unavailable.
+ * Uses standard PostgreSQL since we use SQL-only PGMQ installation (no extension required).
+ * The same PostgreSQL container is used for both:
+ * - Main database (workflow state persistence) - Flyway runs all migrations
+ * - PGMQ messaging - uses the pgmq schema created by Flyway migrations (V800, V801, V802)
+ *
+ * This approach lets Flyway automatically initialize the PGMQ schema as part of normal
+ * database migration, just like it would in production.
  */
 class PgmqTestResource : QuarkusTestResourceLifecycleManager {
     private lateinit var postgres: PostgreSQLContainer<*>
@@ -21,21 +26,14 @@ class PgmqTestResource : QuarkusTestResourceLifecycleManager {
             return emptyMap()
         }
 
-        // Use PostgreSQL with PGMQ extension
-        // The tembo-io/pgmq image has PGMQ pre-installed
-        // Fallback to standard postgres if needed (tests requiring PGMQ will be skipped)
-        postgres = try {
-            PostgreSQLContainer(DockerImageName.parse("quay.io/tembo/pgmq-pg:latest"))
-        } catch (e: Exception) {
-            // Fallback to standard PostgreSQL for basic testing
-            PostgreSQLContainer(DockerImageName.parse("postgres:16-alpine"))
-        }
+        // Use standard PostgreSQL - we use SQL-only PGMQ installation (no extension required)
+        postgres = PostgreSQLContainer(DockerImageName.parse("postgres:16-alpine"))
 
         postgres
             .withDatabaseName("lemline_pgmq_test")
             .withUsername("test")
             .withPassword("test")
-            .waitingFor(Wait.forLogMessage(".*database system is ready to accept connections.*", 1))
+            .waitingFor(Wait.forListeningPort())
 
         postgres.start()
 
@@ -45,14 +43,28 @@ class PgmqTestResource : QuarkusTestResourceLifecycleManager {
         val username = postgres.username
         val password = postgres.password
 
-        // Return PGMQ connection properties
+        // Return both database and PGMQ connection properties
+        // Using the same PostgreSQL container for both lets Flyway run PGMQ migrations
         val properties = mapOf(
-            // PGMQ messaging connection settings
+            // PostgreSQL main database connection (Flyway runs migrations here)
+            "lemline.database.postgresql.host" to host,
+            "lemline.database.postgresql.port" to port,
+            "lemline.database.postgresql.name" to database,
+            "lemline.database.postgresql.username" to username,
+            "lemline.database.postgresql.password" to password,
+            // PGMQ messaging connection (uses same PostgreSQL with pgmq schema)
             "lemline.messaging.pgmq.host" to host,
             "lemline.messaging.pgmq.port" to port,
             "lemline.messaging.pgmq.database" to database,
             "lemline.messaging.pgmq.username" to username,
             "lemline.messaging.pgmq.password" to password,
+            // Test-only: lifecycleevents-in channel for TestLifecycleEventListener
+            // This channel is not configured by LemlineConfigSource, so we add connection properties directly
+            "mp.messaging.incoming.lifecycleevents-in.host" to host,
+            "mp.messaging.incoming.lifecycleevents-in.port" to port,
+            "mp.messaging.incoming.lifecycleevents-in.database" to database,
+            "mp.messaging.incoming.lifecycleevents-in.username" to username,
+            "mp.messaging.incoming.lifecycleevents-in.password" to password,
         )
 
         // Set as system properties so that LemlineConfigSource can see them

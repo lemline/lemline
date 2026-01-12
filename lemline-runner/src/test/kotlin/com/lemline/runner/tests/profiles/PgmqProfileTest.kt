@@ -2,7 +2,7 @@
 package com.lemline.runner.tests.profiles
 
 import com.lemline.runner.common.test.RequiresDocker
-import com.lemline.runner.config.LemlineConfigConstants.DB_TYPE_IN_MEMORY
+import com.lemline.runner.config.LemlineConfigConstants.DB_TYPE_POSTGRESQL
 import com.lemline.runner.config.LemlineConfigConstants.MSG_TYPE_PGMQ
 import com.lemline.runner.config.LemlineConfiguration
 import io.quarkus.test.junit.QuarkusTest
@@ -15,7 +15,7 @@ import org.junit.jupiter.api.Test
  * Tests for the PGMQ (PostgreSQL Message Queue) profile.
  *
  * Verifies that the profile correctly configures:
- * - H2 in-memory database for workflow state
+ * - PostgreSQL database for workflow state (shared with PGMQ messaging)
  * - PGMQ messaging type for message broker
  */
 @RequiresDocker
@@ -29,7 +29,8 @@ class PgmqProfileTest {
     @Test
     fun `check the PgmqProfile profile`() {
         // Check the default values of the configuration
-        assertEquals(DB_TYPE_IN_MEMORY, lemlineConfig.database().type())
+        // PostgreSQL is used for both database and PGMQ messaging
+        assertEquals(DB_TYPE_POSTGRESQL, lemlineConfig.database().type())
         assertEquals(MSG_TYPE_PGMQ, lemlineConfig.messaging().type())
     }
 
