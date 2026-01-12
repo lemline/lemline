@@ -4,7 +4,6 @@ package com.lemline.runner.messaging.postgres.connector
 import com.lemline.common.logger.logger
 import com.lemline.runner.messaging.postgres.PgmqClient
 import com.lemline.runner.messaging.postgres.config.PgmqConnectorConfig
-import io.smallrye.mutiny.Uni
 import io.smallrye.reactive.messaging.connector.OutboundConnector
 import io.smallrye.reactive.messaging.providers.connectors.ExecutionHolder
 import jakarta.annotation.PostConstruct
@@ -14,14 +13,14 @@ import jakarta.inject.Inject
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.future.future
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
 import org.eclipse.microprofile.config.Config
 import org.eclipse.microprofile.reactive.messaging.Message
 import org.eclipse.microprofile.reactive.messaging.spi.Connector
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Flow
 import java.util.concurrent.atomic.AtomicBoolean
-import java.util.concurrent.atomic.AtomicLong
 
 /**
  * SmallRye Reactive Messaging outgoing connector for PGMQ.
@@ -44,8 +43,9 @@ class PgmqOutgoingConnector : OutboundConnector {
 
     companion object {
         private val logger = logger()
-        private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     }
+
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     @Inject
     lateinit var config: Config
@@ -64,6 +64,8 @@ class PgmqOutgoingConnector : OutboundConnector {
     @PreDestroy
     fun destroy() {
         stopAll()
+        scope.cancel()
+        logger.info { "PGMQ Outgoing Connector destroyed" }
     }
 
     override fun getSubscriber(cfg: Config): Flow.Subscriber<out Message<*>> {
@@ -75,17 +77,17 @@ class PgmqOutgoingConnector : OutboundConnector {
         val client = PgmqClient(connectorConfig)
         clients[channelName] = client
 
-        // Initialize the client asynchronously
-        Uni.createFrom().completionStage<Unit> {
-            scope.future {
+        // Initialize the client asynchronously using coroutines
+        scope.launch {
+            try {
                 client.initialize()
+                logger.info { "PGMQ outgoing channel $channelName initialized" }
+            } catch (t: Throwable) {
+                logger.error(t) { "Failed to initialize PGMQ outgoing channel: $channelName" }
             }
-        }.subscribe().with(
-            { logger.info { "PGMQ outgoing channel $channelName initialized" } },
-            { t -> logger.error(t) { "Failed to initialize PGMQ outgoing channel: $channelName" } }
-        )
+        }
 
-        val subscriber = PgmqSubscriber(channelName, client, connectorConfig)
+        val subscriber = PgmqSubscriber(channelName, client, connectorConfig, scope)
         subscribers[channelName] = subscriber
         return subscriber
     }
@@ -107,6 +109,7 @@ class PgmqOutgoingConnector : OutboundConnector {
         private val channelName: String,
         private val client: PgmqClient,
         private val config: PgmqConnectorConfig,
+        private val scope: CoroutineScope,
     ) : Flow.Subscriber<Message<*>> {
 
         private val running = AtomicBoolean(true)
@@ -131,37 +134,30 @@ class PgmqOutgoingConnector : OutboundConnector {
             }
 
             // Extract delay from metadata if present
-            val delay = message.metadata.firstOrNull { it is PgmqOutgoingMetadata }
+            val delaySeconds = message.metadata.firstOrNull { it is PgmqOutgoingMetadata }
                 ?.let { (it as PgmqOutgoingMetadata).delaySeconds }
                 ?: 0
 
-            // Send the message
-            Uni.createFrom().completionStage<Long> {
-                scope.future {
-                    client.send(payload, delay)
+            // Send the message using coroutines
+            scope.launch {
+                try {
+                    val msgId = client.send(payload, delaySeconds)
+                    logger.debug { "Sent message $msgId to queue ${config.queue}" }
+                    message.ack().whenComplete { _, error ->
+                        if (error != null) {
+                            logger.error(error) { "Failed to ack message after send" }
+                        }
+                        // Request next message
+                        subscription?.request(1)
+                    }
+                } catch (error: Throwable) {
+                    logger.error(error) { "Failed to send message to queue ${config.queue}" }
+                    message.nack(error).whenComplete { _, _ ->
+                        // Request next message even on failure
+                        subscription?.request(1)
+                    }
                 }
             }
-                .subscribe().with(
-                    { msgId ->
-                        logger.debug { "Sent message $msgId to queue ${config.queue}" }
-                        message.ack()
-                            .whenComplete { _, error ->
-                                if (error != null) {
-                                    logger.error(error) { "Failed to ack message after send" }
-                                }
-                                // Request next message
-                                subscription?.request(1)
-                            }
-                    },
-                    { error ->
-                        logger.error(error) { "Failed to send message to queue ${config.queue}" }
-                        message.nack(error)
-                            .whenComplete { _, _ ->
-                                // Request next message even on failure
-                                subscription?.request(1)
-                            }
-                    }
-                )
         }
 
         override fun onError(t: Throwable) {

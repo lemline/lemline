@@ -14,6 +14,7 @@ dependencies {
 
     // KotlinX ecosystem
     implementation(libs.bundles.kotlinxEcosystem)
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-reactive:1.10.2")
 
     // Quarkus core (for CDI annotations)
     implementation(enforcedPlatform(libs.quarkus.bom))

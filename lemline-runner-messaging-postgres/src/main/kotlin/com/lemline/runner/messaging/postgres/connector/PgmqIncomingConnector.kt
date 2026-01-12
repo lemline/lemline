@@ -5,20 +5,29 @@ import com.lemline.common.logger.logger
 import com.lemline.runner.messaging.postgres.PgmqClient
 import com.lemline.runner.messaging.postgres.PgmqMessage
 import com.lemline.runner.messaging.postgres.config.PgmqConnectorConfig
-import io.smallrye.mutiny.Multi
-import io.smallrye.mutiny.Uni
 import io.smallrye.reactive.messaging.connector.InboundConnector
 import io.smallrye.reactive.messaging.providers.connectors.ExecutionHolder
 import jakarta.annotation.PostConstruct
+import jakarta.annotation.PreDestroy
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.future.future
+import kotlinx.coroutines.reactive.asPublisher
+import mutiny.zero.flow.adapters.AdaptersToFlow
 import org.eclipse.microprofile.config.Config
 import org.eclipse.microprofile.reactive.messaging.Message
 import org.eclipse.microprofile.reactive.messaging.spi.Connector
+import java.util.concurrent.CompletableFuture
+import java.util.concurrent.CompletionStage
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Flow
 import java.util.concurrent.atomic.AtomicBoolean
@@ -48,8 +57,9 @@ class PgmqIncomingConnector : InboundConnector {
 
     companion object {
         private val logger = logger()
-        private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     }
+
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     @Inject
     lateinit var config: Config
@@ -65,6 +75,13 @@ class PgmqIncomingConnector : InboundConnector {
         logger.info { "PGMQ Incoming Connector initialized" }
     }
 
+    @PreDestroy
+    fun destroy() {
+        stopAll()
+        scope.cancel()
+        logger.info { "PGMQ Incoming Connector destroyed" }
+    }
+
     override fun getPublisher(cfg: Config): Flow.Publisher<out Message<*>> {
         val channelName = cfg.getValue("channel-name", String::class.java)
         val connectorConfig = PgmqConnectorConfig(config, channelName)
@@ -75,56 +92,38 @@ class PgmqIncomingConnector : InboundConnector {
         clients[channelName] = client
         running[channelName] = AtomicBoolean(true)
 
-        // Initialize the client (create extension and queue)
-        val initUni = Uni.createFrom().item { }
-            .chain<Unit> { _ ->
-                Uni.createFrom().completionStage<Unit> {
-                    scope.future {
-                        client.initialize()
-                    }
-                }
+        // Create polling flow using Kotlin coroutines, convert to Publisher only at the end
+        val reactivePublisher = createPollingFlow(channelName, client, connectorConfig)
+            .onStart { client.initialize() }
+            .map { pgmqMessage -> createMessage(channelName, client, connectorConfig, pgmqMessage) }
+            .catch { t ->
+                logger.error(t) { "Failed in PGMQ incoming channel: $channelName" }
+                // On failure, wait and retry by re-emitting from a new polling flow
+                delay(connectorConfig.pollInterval.toMillis())
+                createPollingFlow(channelName, client, connectorConfig)
+                    .map { pgmqMessage -> createMessage(channelName, client, connectorConfig, pgmqMessage) }
+                    .collect { emit(it) }
             }
+            .asPublisher(scope.coroutineContext)
 
-        // Create a polling multi that fetches messages
-        return initUni
-            .onItem().transformToMulti<Message<String>> { _ ->
-                createPollingMulti(channelName, client, connectorConfig)
-            }
-            .onFailure().invoke { t ->
-                logger.error(t) { "Failed to initialize PGMQ incoming channel: $channelName" }
-            }.convert().toPublisher()
+        // Convert Reactive Streams Publisher to JDK Flow Publisher
+        return AdaptersToFlow.publisher(reactivePublisher)
     }
 
-    private fun createPollingMulti(
+    private fun createPollingFlow(
         channelName: String,
         client: PgmqClient,
         config: PgmqConnectorConfig
-    ): Multi<Message<String>> {
-        return Multi.createFrom().ticks().every(config.pollInterval)
-            .onItem().transformToMultiAndConcatenate { _ ->
-                if (!running[channelName]?.get()!!) {
-                    return@transformToMultiAndConcatenate Multi.createFrom().empty()
-                }
-
-                client.readReactive(config.batchSize)
-                    .onItem().transformToMulti { messages ->
-                        Multi.createFrom().iterable(messages)
-                    }
-                    .map { pgmqMessage ->
-                        createMessage(channelName, client, config, pgmqMessage)
-                    }
-            }
-            .onFailure().invoke { t ->
+    ) = flow {
+        while (running[channelName]?.get() == true) {
+            try {
+                val messages = client.read(config.batchSize)
+                messages.forEach { emit(it) }
+            } catch (t: Throwable) {
                 logger.error(t) { "Error polling PGMQ queue ${config.queue}" }
             }
-            .onFailure().recoverWithMulti { _ ->
-                // On failure, wait and retry
-                Multi.createFrom().ticks().every(config.pollInterval)
-                    .skip().first()
-                    .onItem().transformToMultiAndConcatenate { _ ->
-                        createPollingMulti(channelName, client, config)
-                    }
-            }
+            delay(config.pollInterval.toMillis())
+        }
     }
 
     private fun createMessage(
@@ -144,12 +143,10 @@ class PgmqIncomingConnector : InboundConnector {
         return Message.of(pgmqMessage.message, PgmqMetadataContainer(metadata))
             .withAck {
                 // Acknowledge: delete the message
-                client.deleteReactive(pgmqMessage.msgId)
-                    .replaceWithVoid()
-                    .invoke { _ ->
-                        logger.debug { "Acknowledged message ${pgmqMessage.msgId} from queue ${config.queue}" }
-                    }
-                    .subscribeAsCompletionStage()
+                scope.future {
+                    client.delete(pgmqMessage.msgId)
+                    logger.debug { "Acknowledged message ${pgmqMessage.msgId} from queue ${config.queue}" }
+                }.thenApply { null as Void? }
             }
             .withNack { reason ->
                 // Negative acknowledge: handle based on retry count
@@ -162,29 +159,19 @@ class PgmqIncomingConnector : InboundConnector {
         config: PgmqConnectorConfig,
         message: PgmqMessage,
         reason: Throwable?
-    ): java.util.concurrent.CompletionStage<Void> {
-        val errorMessage = reason?.message ?: "Unknown error"
-
+    ): CompletionStage<Void> {
         return if (message.readCt >= config.maxRetries) {
             // Max retries exceeded, move to DLQ
-            Uni.createFrom().completionStage<Unit> {
-                scope.future {
-                    client.moveToDeadLetterQueue(message.msgId, message.message, errorMessage)
-                }
-            }
-                .replaceWithVoid()
-                .invoke { _ ->
-                    logger.warn { "Message ${message.msgId} exceeded max retries, moved to DLQ" }
-                }
-                .subscribeAsCompletionStage()
+            val errorMessage = reason?.message ?: "Unknown error"
+            scope.future {
+                client.moveToDeadLetterQueue(message.msgId, message.message, errorMessage)
+                logger.warn { "Message ${message.msgId} exceeded max retries, moved to DLQ" }
+            }.thenApply { null as Void? }
         } else {
             // Message will become visible again after visibility timeout
             // Just log the nack, the message will be redelivered automatically
-            Uni.createFrom().voidItem()
-                .invoke { _ ->
-                    logger.debug { "Nacked message ${message.msgId}, will be redelivered (attempt ${message.readCt}/${config.maxRetries})" }
-                }
-                .subscribeAsCompletionStage()
+            logger.debug { "Nacked message ${message.msgId}, will be redelivered (attempt ${message.readCt}/${config.maxRetries})" }
+            CompletableFuture.completedFuture(null)
         }
     }
 
@@ -202,6 +189,6 @@ class PgmqIncomingConnector : InboundConnector {
 /**
  * Container for PGMQ metadata to be attached to messages.
  */
-class PgmqMetadataContainer(val metadata: PgmqIncomingMetadata) : Iterable<Any> {
+data class PgmqMetadataContainer(val metadata: PgmqIncomingMetadata) : Iterable<Any> {
     override fun iterator(): Iterator<Any> = listOf(metadata).iterator()
 }
