@@ -77,10 +77,11 @@ class PgmqClientTest : FunSpec({
 
     test("PgmqConnectorConfig should generate correct JDBC URL") {
         val config = mockk<Config>()
+        // Order matters: any() first, specific matchers after to override
+        every { config.getOptionalValue(any(), String::class.java) } returns Optional.empty()
         every { config.getOptionalValue("mp.messaging.incoming.test.host", String::class.java) } returns Optional.of("myhost")
         every { config.getOptionalValue("mp.messaging.incoming.test.port", String::class.java) } returns Optional.of("5433")
         every { config.getOptionalValue("mp.messaging.incoming.test.database", String::class.java) } returns Optional.of("mydb")
-        every { config.getOptionalValue(any(), String::class.java) } returns Optional.empty()
 
         val connectorConfig = PgmqConnectorConfig(config, "test")
 

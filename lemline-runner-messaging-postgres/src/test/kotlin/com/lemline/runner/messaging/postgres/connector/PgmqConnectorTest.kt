@@ -9,15 +9,18 @@ import io.kotest.matchers.types.shouldBeInstanceOf
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
+import io.mockk.just
 import io.mockk.mockk
+import io.mockk.Runs
 import io.mockk.slot
 import io.smallrye.mutiny.Uni
 import org.eclipse.microprofile.config.Config
 import org.eclipse.microprofile.reactive.messaging.Message
-import org.reactivestreams.Subscription
+import org.eclipse.microprofile.reactive.messaging.Metadata
 import java.time.Instant
 import java.util.Optional
 import java.util.concurrent.CompletableFuture
+import java.util.concurrent.Flow
 
 class PgmqConnectorTest : FunSpec({
 
@@ -96,9 +99,9 @@ class PgmqConnectorTest : FunSpec({
 
     context("PgmqOutgoingConnector Subscriber") {
         test("should request messages on subscription") {
-            val subscription = mockk<Subscription>(relaxed = true)
+            val subscription = mockk<Flow.Subscription>(relaxed = true)
             val requestSlot = slot<Long>()
-            every { subscription.request(capture(requestSlot)) } returns Unit
+            every { subscription.request(capture(requestSlot)) } just Runs
 
             // The subscriber requests 1 message at a time
             subscription.request(1)
@@ -123,9 +126,9 @@ class PgmqConnectorTest : FunSpec({
         }
 
         test("should extract delay from outgoing metadata") {
-            val metadata = PgmqOutgoingMetadata(delaySeconds = 30)
+            val outgoingMetadata = PgmqOutgoingMetadata(delaySeconds = 30)
             val message = mockk<Message<String>>(relaxed = true)
-            every { message.metadata } returns listOf(metadata)
+            every { message.metadata } returns Metadata.of(outgoingMetadata)
 
             val extractedDelay = message.metadata
                 .filterIsInstance<PgmqOutgoingMetadata>()
@@ -137,7 +140,7 @@ class PgmqConnectorTest : FunSpec({
 
         test("should default to 0 delay when no metadata") {
             val message = mockk<Message<String>>(relaxed = true)
-            every { message.metadata } returns emptyList()
+            every { message.metadata } returns Metadata.empty()
 
             val extractedDelay = message.metadata
                 .filterIsInstance<PgmqOutgoingMetadata>()

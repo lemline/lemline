@@ -53,9 +53,10 @@ class PgmqConfigurationTest : FunSpec({
     context("PgmqConnectorConfig property retrieval") {
         test("should read from incoming channel first") {
             val config = mockk<Config>()
+            // Order matters: any() first, specific matchers after to override
+            every { config.getOptionalValue(any(), String::class.java) } returns Optional.empty()
             every { config.getOptionalValue("mp.messaging.incoming.test-channel.host", String::class.java) } returns Optional.of("incoming-host")
             every { config.getOptionalValue("mp.messaging.outgoing.test-channel.host", String::class.java) } returns Optional.of("outgoing-host")
-            every { config.getOptionalValue(any(), String::class.java) } returns Optional.empty()
 
             val connectorConfig = PgmqConnectorConfig(config, "test-channel")
 
@@ -64,9 +65,10 @@ class PgmqConfigurationTest : FunSpec({
 
         test("should fallback to outgoing channel when incoming not found") {
             val config = mockk<Config>()
+            // Order matters: any() first, specific matchers after to override
+            every { config.getOptionalValue(any(), String::class.java) } returns Optional.empty()
             every { config.getOptionalValue("mp.messaging.incoming.test-channel.host", String::class.java) } returns Optional.empty()
             every { config.getOptionalValue("mp.messaging.outgoing.test-channel.host", String::class.java) } returns Optional.of("outgoing-host")
-            every { config.getOptionalValue(any(), String::class.java) } returns Optional.empty()
 
             val connectorConfig = PgmqConnectorConfig(config, "test-channel")
 
@@ -133,10 +135,11 @@ class PgmqConfigurationTest : FunSpec({
     context("PgmqConnectorConfig JDBC URL generation") {
         test("should generate standard JDBC URL") {
             val config = mockk<Config>()
+            // Order matters: any() first, specific matchers after to override
+            every { config.getOptionalValue(any(), String::class.java) } returns Optional.empty()
             every { config.getOptionalValue("mp.messaging.incoming.ch.host", String::class.java) } returns Optional.of("db.example.com")
             every { config.getOptionalValue("mp.messaging.incoming.ch.port", String::class.java) } returns Optional.of("5432")
             every { config.getOptionalValue("mp.messaging.incoming.ch.database", String::class.java) } returns Optional.of("testdb")
-            every { config.getOptionalValue(any(), String::class.java) } returns Optional.empty()
 
             val connectorConfig = PgmqConnectorConfig(config, "ch")
 
@@ -145,10 +148,11 @@ class PgmqConfigurationTest : FunSpec({
 
         test("should generate JDBC URL with custom port") {
             val config = mockk<Config>()
+            // Order matters: any() first, specific matchers after to override
+            every { config.getOptionalValue(any(), String::class.java) } returns Optional.empty()
             every { config.getOptionalValue("mp.messaging.incoming.ch.host", String::class.java) } returns Optional.of("localhost")
             every { config.getOptionalValue("mp.messaging.incoming.ch.port", String::class.java) } returns Optional.of("15432")
             every { config.getOptionalValue("mp.messaging.incoming.ch.database", String::class.java) } returns Optional.of("lemline")
-            every { config.getOptionalValue(any(), String::class.java) } returns Optional.empty()
 
             val connectorConfig = PgmqConnectorConfig(config, "ch")
 
@@ -159,12 +163,13 @@ class PgmqConfigurationTest : FunSpec({
     context("PgmqConnectorConfig connection options") {
         test("should generate connection options map") {
             val config = mockk<Config>()
+            // Order matters: any() first, specific matchers after to override
+            every { config.getOptionalValue(any(), String::class.java) } returns Optional.empty()
             every { config.getOptionalValue("mp.messaging.incoming.ch.host", String::class.java) } returns Optional.of("myhost")
             every { config.getOptionalValue("mp.messaging.incoming.ch.port", String::class.java) } returns Optional.of("5433")
             every { config.getOptionalValue("mp.messaging.incoming.ch.database", String::class.java) } returns Optional.of("mydb")
             every { config.getOptionalValue("mp.messaging.incoming.ch.username", String::class.java) } returns Optional.of("myuser")
             every { config.getOptionalValue("mp.messaging.incoming.ch.password", String::class.java) } returns Optional.of("mypass")
-            every { config.getOptionalValue(any(), String::class.java) } returns Optional.empty()
 
             val connectorConfig = PgmqConnectorConfig(config, "ch")
             val options = connectorConfig.toConnectionOptions()
@@ -189,8 +194,9 @@ class PgmqConfigurationTest : FunSpec({
 
         test("should handle empty password") {
             val config = mockk<Config>()
-            every { config.getOptionalValue("mp.messaging.incoming.ch.password", String::class.java) } returns Optional.of("")
+            // Order matters: any() first, specific matchers after to override
             every { config.getOptionalValue(any(), String::class.java) } returns Optional.empty()
+            every { config.getOptionalValue("mp.messaging.incoming.ch.password", String::class.java) } returns Optional.of("")
 
             val connectorConfig = PgmqConnectorConfig(config, "ch")
 
@@ -208,8 +214,9 @@ class PgmqConfigurationTest : FunSpec({
 
         test("should handle zero poll interval") {
             val config = mockk<Config>()
-            every { config.getOptionalValue("mp.messaging.incoming.ch.poll-interval", String::class.java) } returns Optional.of("0")
+            // Order matters: any() first, specific matchers after to override
             every { config.getOptionalValue(any(), String::class.java) } returns Optional.empty()
+            every { config.getOptionalValue("mp.messaging.incoming.ch.poll-interval", String::class.java) } returns Optional.of("0")
 
             val connectorConfig = PgmqConnectorConfig(config, "ch")
 
@@ -218,8 +225,9 @@ class PgmqConfigurationTest : FunSpec({
 
         test("should handle negative values gracefully") {
             val config = mockk<Config>()
-            every { config.getOptionalValue("mp.messaging.incoming.ch.batch-size", String::class.java) } returns Optional.of("-5")
+            // Order matters: any() first, specific matchers after to override
             every { config.getOptionalValue(any(), String::class.java) } returns Optional.empty()
+            every { config.getOptionalValue("mp.messaging.incoming.ch.batch-size", String::class.java) } returns Optional.of("-5")
 
             val connectorConfig = PgmqConnectorConfig(config, "ch")
 

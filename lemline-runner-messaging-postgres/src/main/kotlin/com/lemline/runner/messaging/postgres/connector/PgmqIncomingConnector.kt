@@ -7,16 +7,20 @@ import com.lemline.runner.messaging.postgres.PgmqMessage
 import com.lemline.runner.messaging.postgres.config.PgmqConnectorConfig
 import io.smallrye.mutiny.Multi
 import io.smallrye.mutiny.Uni
+import io.smallrye.reactive.messaging.connector.InboundConnector
 import io.smallrye.reactive.messaging.providers.connectors.ExecutionHolder
 import jakarta.annotation.PostConstruct
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.future.future
 import org.eclipse.microprofile.config.Config
 import org.eclipse.microprofile.reactive.messaging.Message
 import org.eclipse.microprofile.reactive.messaging.spi.Connector
-import org.eclipse.microprofile.reactive.messaging.spi.IncomingConnectorFactory
-import org.reactivestreams.Publisher
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.Flow
 import java.util.concurrent.atomic.AtomicBoolean
 
 /**
@@ -40,10 +44,11 @@ import java.util.concurrent.atomic.AtomicBoolean
  */
 @ApplicationScoped
 @Connector(PgmqConnectorConfig.CONNECTOR_NAME)
-class PgmqIncomingConnector : IncomingConnectorFactory {
+class PgmqIncomingConnector : InboundConnector {
 
     companion object {
         private val logger = logger()
+        private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     }
 
     @Inject
@@ -60,7 +65,7 @@ class PgmqIncomingConnector : IncomingConnectorFactory {
         logger.info { "PGMQ Incoming Connector initialized" }
     }
 
-    override fun getPublisher(cfg: org.eclipse.microprofile.reactive.messaging.spi.ConnectorConfig): Publisher<out Message<*>> {
+    override fun getPublisher(cfg: Config): Flow.Publisher<out Message<*>> {
         val channelName = cfg.getValue("channel-name", String::class.java)
         val connectorConfig = PgmqConnectorConfig(config, channelName)
 
@@ -72,9 +77,9 @@ class PgmqIncomingConnector : IncomingConnectorFactory {
 
         // Initialize the client (create extension and queue)
         val initUni = Uni.createFrom().item { }
-            .chain { _ ->
-                Uni.createFrom().completionStage {
-                    kotlinx.coroutines.future.future(kotlinx.coroutines.Dispatchers.IO) {
+            .chain<Unit> { _ ->
+                Uni.createFrom().completionStage<Unit> {
+                    scope.future {
                         client.initialize()
                     }
                 }
@@ -82,12 +87,12 @@ class PgmqIncomingConnector : IncomingConnectorFactory {
 
         // Create a polling multi that fetches messages
         return initUni
-            .onItem().transformToMulti { _ ->
+            .onItem().transformToMulti<Message<String>> { _ ->
                 createPollingMulti(channelName, client, connectorConfig)
             }
             .onFailure().invoke { t ->
                 logger.error(t) { "Failed to initialize PGMQ incoming channel: $channelName" }
-            }
+            }.convert().toPublisher()
     }
 
     private fun createPollingMulti(
@@ -162,8 +167,8 @@ class PgmqIncomingConnector : IncomingConnectorFactory {
 
         return if (message.readCt >= config.maxRetries) {
             // Max retries exceeded, move to DLQ
-            Uni.createFrom().completionStage {
-                kotlinx.coroutines.future.future(kotlinx.coroutines.Dispatchers.IO) {
+            Uni.createFrom().completionStage<Unit> {
+                scope.future {
                     client.moveToDeadLetterQueue(message.msgId, message.message, errorMessage)
                 }
             }

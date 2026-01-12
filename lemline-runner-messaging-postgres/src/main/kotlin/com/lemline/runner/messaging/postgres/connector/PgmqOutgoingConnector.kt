@@ -5,20 +5,21 @@ import com.lemline.common.logger.logger
 import com.lemline.runner.messaging.postgres.PgmqClient
 import com.lemline.runner.messaging.postgres.config.PgmqConnectorConfig
 import io.smallrye.mutiny.Uni
+import io.smallrye.reactive.messaging.connector.OutboundConnector
 import io.smallrye.reactive.messaging.providers.connectors.ExecutionHolder
 import jakarta.annotation.PostConstruct
 import jakarta.annotation.PreDestroy
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.future.future
 import org.eclipse.microprofile.config.Config
 import org.eclipse.microprofile.reactive.messaging.Message
 import org.eclipse.microprofile.reactive.messaging.spi.Connector
-import org.eclipse.microprofile.reactive.messaging.spi.OutgoingConnectorFactory
-import org.reactivestreams.Subscriber
-import org.reactivestreams.Subscription
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.Flow
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
 
@@ -39,10 +40,11 @@ import java.util.concurrent.atomic.AtomicLong
  */
 @ApplicationScoped
 @Connector(PgmqConnectorConfig.CONNECTOR_NAME)
-class PgmqOutgoingConnector : OutgoingConnectorFactory {
+class PgmqOutgoingConnector : OutboundConnector {
 
     companion object {
         private val logger = logger()
+        private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     }
 
     @Inject
@@ -64,7 +66,7 @@ class PgmqOutgoingConnector : OutgoingConnectorFactory {
         stopAll()
     }
 
-    override fun getSubscriber(cfg: org.eclipse.microprofile.reactive.messaging.spi.ConnectorConfig): Subscriber<out Message<*>> {
+    override fun getSubscriber(cfg: Config): Flow.Subscriber<out Message<*>> {
         val channelName = cfg.getValue("channel-name", String::class.java)
         val connectorConfig = PgmqConnectorConfig(config, channelName)
 
@@ -74,8 +76,8 @@ class PgmqOutgoingConnector : OutgoingConnectorFactory {
         clients[channelName] = client
 
         // Initialize the client asynchronously
-        Uni.createFrom().completionStage {
-            future(Dispatchers.IO) {
+        Uni.createFrom().completionStage<Unit> {
+            scope.future {
                 client.initialize()
             }
         }.subscribe().with(
@@ -105,13 +107,12 @@ class PgmqOutgoingConnector : OutgoingConnectorFactory {
         private val channelName: String,
         private val client: PgmqClient,
         private val config: PgmqConnectorConfig,
-    ) : Subscriber<Message<*>> {
+    ) : Flow.Subscriber<Message<*>> {
 
         private val running = AtomicBoolean(true)
-        private val requested = AtomicLong(0)
-        private var subscription: Subscription? = null
+        private var subscription: Flow.Subscription? = null
 
-        override fun onSubscribe(s: Subscription) {
+        override fun onSubscribe(s: Flow.Subscription) {
             this.subscription = s
             // Request messages one at a time for backpressure control
             s.request(1)
@@ -135,8 +136,8 @@ class PgmqOutgoingConnector : OutgoingConnectorFactory {
                 ?: 0
 
             // Send the message
-            Uni.createFrom().completionStage {
-                future(Dispatchers.IO) {
+            Uni.createFrom().completionStage<Long> {
+                scope.future {
                     client.send(payload, delay)
                 }
             }

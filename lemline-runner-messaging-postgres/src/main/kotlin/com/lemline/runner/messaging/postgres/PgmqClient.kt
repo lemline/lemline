@@ -10,10 +10,10 @@ import io.vertx.mutiny.sqlclient.Row
 import io.vertx.mutiny.sqlclient.Tuple
 import io.vertx.pgclient.PgConnectOptions
 import io.vertx.sqlclient.PoolOptions
-import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.Json
 import java.time.Instant
 import java.util.concurrent.ConcurrentHashMap
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
 
 /**
  * PGMQ (PostgreSQL Message Queue) client.
@@ -41,33 +41,34 @@ class PgmqClient(
         private val pools = ConcurrentHashMap<String, PgPool>()
 
         // PGMQ SQL statements (using functions from V801 migration)
-        private const val CREATE_QUEUE = "SELECT pgmq.create(\$1)"
+        private const val CREATE_QUEUE = $$"SELECT pgmq.create($1)"
 
-        private const val SEND_MESSAGE = "SELECT * FROM pgmq.send(\$1, \$2::jsonb)"
+        private const val SEND_MESSAGE = $$"SELECT * FROM pgmq.send($1, $2::jsonb)"
 
-        private const val SEND_MESSAGE_WITH_DELAY = "SELECT * FROM pgmq.send(\$1, \$2::jsonb, \$3)"
+        private const val SEND_MESSAGE_WITH_DELAY = $$"SELECT * FROM pgmq.send($1, $2::jsonb, $3)"
 
-        private const val SEND_MESSAGE_WITH_HEADERS = "SELECT * FROM pgmq.send(\$1, \$2::jsonb, \$3::jsonb)"
+        private const val SEND_MESSAGE_WITH_HEADERS = $$"SELECT * FROM pgmq.send($1, $2::jsonb, $3::jsonb)"
 
-        private const val SEND_MESSAGE_WITH_HEADERS_AND_DELAY = "SELECT * FROM pgmq.send(\$1, \$2::jsonb, \$3::jsonb, \$4)"
+        private const val SEND_MESSAGE_WITH_HEADERS_AND_DELAY =
+            $$"SELECT * FROM pgmq.send($1, $2::jsonb, $3::jsonb, $4)"
 
-        private const val READ_MESSAGES = "SELECT * FROM pgmq.read(\$1, \$2, \$3)"
+        private const val READ_MESSAGES = $$"SELECT * FROM pgmq.read($1, $2, $3)"
 
-        private const val DELETE_MESSAGE = "SELECT pgmq.delete(\$1, \$2)"
+        private const val DELETE_MESSAGE = $$"SELECT pgmq.delete($1, $2)"
 
-        private const val ARCHIVE_MESSAGE = "SELECT pgmq.archive(\$1, \$2)"
+        private const val ARCHIVE_MESSAGE = $$"SELECT pgmq.archive($1, $2)"
 
-        private const val SET_VT = "SELECT * FROM pgmq.set_vt(\$1, \$2, \$3)"
+        private const val SET_VT = $$"SELECT * FROM pgmq.set_vt($1, $2, $3)"
 
-        private const val POP_MESSAGE = "SELECT * FROM pgmq.pop(\$1, \$2)"
+        private const val POP_MESSAGE = $$"SELECT * FROM pgmq.pop($1, $2)"
 
-        private const val PURGE_QUEUE = "SELECT pgmq.purge_queue(\$1)"
+        private const val PURGE_QUEUE = $$"SELECT pgmq.purge_queue($1)"
 
-        private const val DROP_QUEUE = "SELECT pgmq.drop_queue(\$1)"
+        private const val DROP_QUEUE = $$"SELECT pgmq.drop_queue($1)"
 
         private const val LIST_QUEUES = "SELECT * FROM pgmq.list_queues()"
 
-        private const val GET_METRICS = "SELECT * FROM pgmq.metrics(\$1)"
+        private const val GET_METRICS = $$"SELECT * FROM pgmq.metrics($1)"
     }
 
     private val poolKey = "${config.host}:${config.port}/${config.database}"
@@ -140,16 +141,19 @@ class PgmqClient(
                     .execute(Tuple.of(config.queue, message, headers, delaySeconds))
                     .awaitSuspending()
             }
+
             headers != null -> {
                 pool.preparedQuery(SEND_MESSAGE_WITH_HEADERS)
                     .execute(Tuple.of(config.queue, message, headers))
                     .awaitSuspending()
             }
+
             delaySeconds > 0 -> {
                 pool.preparedQuery(SEND_MESSAGE_WITH_DELAY)
                     .execute(Tuple.of(config.queue, message, delaySeconds))
                     .awaitSuspending()
             }
+
             else -> {
                 pool.preparedQuery(SEND_MESSAGE)
                     .execute(Tuple.of(config.queue, message))
