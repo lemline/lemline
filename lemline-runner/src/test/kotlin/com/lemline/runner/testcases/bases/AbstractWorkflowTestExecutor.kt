@@ -65,11 +65,15 @@ internal abstract class AbstractWorkflowTestExecutor : WorkflowTestExecutor {
     protected abstract val listenerRepository: ListenerRepository
     protected abstract val testModeConfiguration: TestModeConfiguration
 
-    /** Default timeout for workflow completion in seconds */
-    protected open val defaultTimeoutSeconds: Long = 5L
+    /** Default timeout for workflow completion in seconds (configurable via system property) */
+    protected open val defaultTimeoutSeconds: Long by lazy {
+        System.getProperty("test.workflow.timeout.seconds")?.toLongOrNull() ?: 5L
+    }
 
-    /** Timeout for listen task tests with CloudEvents */
-    protected open val listenTimeoutSeconds: Long = 10L
+    /** Timeout for listen task tests with CloudEvents (configurable via system property) */
+    protected open val listenTimeoutSeconds: Long by lazy {
+        System.getProperty("test.workflow.listen-timeout.seconds")?.toLongOrNull() ?: 10L
+    }
 
     /** Delay between polling for listener registration */
     protected open val listenerPollIntervalMs: Long = 20L
@@ -77,8 +81,10 @@ internal abstract class AbstractWorkflowTestExecutor : WorkflowTestExecutor {
     /** Maximum time to wait for listener registration */
     protected open val listenerWaitTimeoutMs: Long = 3_000L
 
-    /** Delay between CloudEvents to ensure ordering */
-    protected open val cloudEventSendIntervalMs: Long = 50L
+    /** Delay between CloudEvents to ensure ordering (configurable via system property) */
+    protected open val cloudEventSendIntervalMs: Long? by lazy {
+        System.getProperty("test.workflow.cloudevent-send-interval-ms")?.toLongOrNull()
+    }
 
     /**
      * Sends the initial command to start workflow execution.
@@ -243,7 +249,7 @@ internal abstract class AbstractWorkflowTestExecutor : WorkflowTestExecutor {
 
             // Small delay between events to ensure ordering
             if (index < events.lastIndex) {
-                delay(cloudEventSendIntervalMs)
+                cloudEventSendIntervalMs?.let { delay(it) }
             }
         }
 

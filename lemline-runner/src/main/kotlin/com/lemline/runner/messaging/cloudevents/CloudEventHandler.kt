@@ -34,7 +34,7 @@ internal class CloudEventHandler(
     override val logger: Logger = logger()
 
     @Inject
-    private lateinit var listenerEventService: ListenerEventService
+    internal lateinit var listenerEventService: ListenerEventService
 
     // Test hooks
     override var onCompleteTest: (Message<String>, CloudEvent?) -> Unit = { _, _ -> }

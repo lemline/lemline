@@ -23,7 +23,7 @@ abstract class MessageEmitter<T : JsonSerializable> {
     protected abstract val metrics: MessageSubscriberMetrics
 
     @Inject
-    private lateinit var messageMetaData: MessageMetaData
+    internal lateinit var messageMetaData: MessageMetaData
 
     private val logger = logger()
 

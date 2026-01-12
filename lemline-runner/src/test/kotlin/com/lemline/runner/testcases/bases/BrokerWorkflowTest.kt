@@ -32,7 +32,7 @@ internal abstract class BrokerWorkflowTest(
 ) : AbstractWorkflowTest(testCases, excludeTags) {
 
     @Inject
-    private lateinit var executor: BrokerWorkflowTestExecutor
+    internal lateinit var executor: BrokerWorkflowTestExecutor
 
     override fun getExecutor(): WorkflowTestExecutor = executor
 }

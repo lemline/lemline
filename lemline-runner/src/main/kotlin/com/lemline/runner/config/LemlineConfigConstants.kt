@@ -22,6 +22,7 @@ object LemlineConfigConstants {
     const val MSG_TYPE_IN_MEMORY = "in-memory"
     const val MSG_TYPE_KAFKA = "kafka"
     const val MSG_TYPE_RABBITMQ = "rabbitmq"
+    const val MSG_TYPE_PGMQ = "pgmq"
 
     // Consumer concurrency
     const val CONSUMER_CONCURRENCY_DEFAULT = "64"
@@ -30,6 +31,7 @@ object LemlineConfigConstants {
     const val IN_MEMORY_CONNECTOR = "smallrye-in-memory"
     const val KAFKA_CONNECTOR = "smallrye-kafka"
     const val RABBITMQ_CONNECTOR = "smallrye-rabbitmq"
+    const val PGMQ_CONNECTOR = "smallrye-pgmq"
 
     const val COMMANDS_TOPIC_DEFAULT = "lemline-commands"
     const val EVENTS_TOPIC_DEFAULT = "lemline-events"
@@ -76,4 +78,13 @@ object LemlineConfigConstants {
     // Metrics
     const val METRICS_PORT_DEFAULT = "8080"
     const val METRICS_PATH_DEFAULT = "/q/metrics"
+
+    // PGMQ (PostgreSQL Message Queue)
+    const val PGMQ_VISIBILITY_TIMEOUT_DEFAULT = "30"
+    const val PGMQ_POLL_INTERVAL_DEFAULT = "100"
+    const val PGMQ_BATCH_SIZE_DEFAULT = "10"
+    const val PGMQ_MAX_POOL_SIZE_DEFAULT = "5"
+    const val PGMQ_MAX_RETRIES_DEFAULT = "3"
+    const val PGMQ_COMMANDS_GROUP_ID_DEFAULT = "lemline-commands-group"
+    const val PGMQ_EVENTS_GROUP_ID_DEFAULT = "lemline-events-group"
 }

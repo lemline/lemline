@@ -32,7 +32,7 @@ internal class WorkflowConsumerInMemoryTest : WorkflowConsumerTest() {
 
     @Inject
     @Any
-    private lateinit var connector: InMemoryConnector
+    internal lateinit var connector: InMemoryConnector
 
     private lateinit var instanceSource: InMemorySource<String>
     private lateinit var instanceSink: InMemorySink<String>

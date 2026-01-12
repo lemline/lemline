@@ -12,7 +12,7 @@ plugins {
 }
 
 group = "com.lemline"
-val baseVersion = "0.5.1"
+val baseVersion = "0.5.2"
 
 // Determine the version dynamically: use Git tag if present (CI), otherwise nightly suffix for main branch builds
 val envRef = System.getenv("GITHUB_REF") ?: ""
@@ -54,6 +54,7 @@ dependencies {
     implementation(project(":lemline-runner-failures"))
     implementation(project(":lemline-runner-definitions"))
     implementation(project(":lemline-runner-cli"))
+    implementation(project(":lemline-runner-messaging-pgmq"))
 
     // KotlinX ecosystem
     implementation(libs.bundles.kotlinxEcosystem)

@@ -41,15 +41,15 @@ class DatabaseManager : DatabaseConfig, MigrationManager {
 
     @Inject
     @IfBuildProfile("test")
-    private lateinit var h2DataSource: Instance<AgroalDataSource>
+    internal lateinit var h2DataSource: Instance<AgroalDataSource>
 
     @Inject
     @DataSource("postgresql")
-    private lateinit var postgresDataSource: Instance<AgroalDataSource>
+    internal lateinit var postgresDataSource: Instance<AgroalDataSource>
 
     @Inject
     @DataSource("mysql")
-    private lateinit var mysqlDataSource: Instance<AgroalDataSource>
+    internal lateinit var mysqlDataSource: Instance<AgroalDataSource>
 
     val datasource: AgroalDataSource by lazy {
         log.debug { "Resolving datasource for type: $dbType" }
@@ -77,15 +77,15 @@ class DatabaseManager : DatabaseConfig, MigrationManager {
 
     @Inject
     @IfBuildProfile("test")
-    private lateinit var h2Flyway: Instance<Flyway>
+    internal lateinit var h2Flyway: Instance<Flyway>
 
     @Inject
     @FlywayDataSource("postgresql")
-    private lateinit var postgresqlFlyway: Instance<Flyway>
+    internal lateinit var postgresqlFlyway: Instance<Flyway>
 
     @Inject
     @FlywayDataSource("mysql")
-    private lateinit var mysqlFlyway: Instance<Flyway>
+    internal lateinit var mysqlFlyway: Instance<Flyway>
 
     val flyway: Flyway by lazy {
         log.debug { "Resolving flyway for type: $dbType" }
