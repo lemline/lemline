@@ -29,6 +29,7 @@ include(":lemline-runner-listeners")
 include(":lemline-runner-failures")
 include(":lemline-runner-definitions")
 include(":lemline-runner-cli")
+include(":lemline-runner-messaging-postgres")
 include(":lemline-runner")
 
 rootProject.name = "lemline"

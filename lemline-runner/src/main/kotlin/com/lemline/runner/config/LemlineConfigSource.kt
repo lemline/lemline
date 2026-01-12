@@ -27,7 +27,13 @@ import com.lemline.runner.config.LemlineConfigConstants.METRICS_PATH_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.METRICS_PORT_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.MSG_TYPE_IN_MEMORY
 import com.lemline.runner.config.LemlineConfigConstants.MSG_TYPE_KAFKA
+import com.lemline.runner.config.LemlineConfigConstants.MSG_TYPE_PGMQ
 import com.lemline.runner.config.LemlineConfigConstants.MSG_TYPE_RABBITMQ
+import com.lemline.runner.config.LemlineConfigConstants.PGMQ_BATCH_SIZE_DEFAULT
+import com.lemline.runner.config.LemlineConfigConstants.PGMQ_CONNECTOR
+import com.lemline.runner.config.LemlineConfigConstants.PGMQ_MAX_RETRIES_DEFAULT
+import com.lemline.runner.config.LemlineConfigConstants.PGMQ_POLL_INTERVAL_DEFAULT
+import com.lemline.runner.config.LemlineConfigConstants.PGMQ_VISIBILITY_TIMEOUT_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.MYSQL_HOST_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.MYSQL_NAME_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.MYSQL_PASSWORD_DEFAULT
@@ -197,12 +203,23 @@ class LemlineConfigSource : PropertiesConfigSource(
             val generated = mutableMapOf<String, String>()
             val useKafka = props.keys.any { it.startsWith("lemline.messaging.kafka.") }
             val useRabbit = props.keys.any { it.startsWith("lemline.messaging.rabbitmq.") }
+            val usePgmq = props.keys.any { it.startsWith("lemline.messaging.pgmq.") }
+
+            val messagingTypes = listOfNotNull(
+                if (useKafka) MSG_TYPE_KAFKA else null,
+                if (useRabbit) MSG_TYPE_RABBITMQ else null,
+                if (usePgmq) MSG_TYPE_PGMQ else null
+            )
 
             val type = props[MESSAGING_TYPE] ?: run {
                 when {
-                    useKafka && useRabbit -> throw IllegalArgumentException("Both properties 'kafka' and 'rabbitmq' are defined. Explicitly set '$MESSAGING_TYPE' to '$MSG_TYPE_KAFKA' or '$MSG_TYPE_RABBITMQ'.")
+                    messagingTypes.size > 1 -> throw IllegalArgumentException(
+                        "Multiple messaging types defined: ${messagingTypes.joinToString()}. " +
+                            "Explicitly set '$MESSAGING_TYPE' to one of: $MSG_TYPE_KAFKA, $MSG_TYPE_RABBITMQ, $MSG_TYPE_PGMQ."
+                    )
                     useKafka -> MSG_TYPE_KAFKA
                     useRabbit -> MSG_TYPE_RABBITMQ
+                    usePgmq -> MSG_TYPE_PGMQ
                     else -> MSG_TYPE_IN_MEMORY
                 }
             }
@@ -211,6 +228,7 @@ class LemlineConfigSource : PropertiesConfigSource(
             when (type) {
                 MSG_TYPE_KAFKA -> generated.configureKafka(props)
                 MSG_TYPE_RABBITMQ -> generated.configureRabbit(props)
+                MSG_TYPE_PGMQ -> generated.configurePgmq(props)
                 MSG_TYPE_IN_MEMORY -> generated.configureInMemory()
                 else -> error("Unknown messaging type: $type")
             }
@@ -442,6 +460,157 @@ class LemlineConfigSource : PropertiesConfigSource(
                 set("$outgoing.serializer", RABBITMQ_STRING_SERIALIZER)
                 set("$outgoing.delivery-mode", "persistent")
                 props["$producer.exchange-name"]?.let { set("$outgoing.exchange.name", it) }
+            }
+        }
+
+        /**
+         * Configures PGMQ (PostgreSQL Message Queue) channels.
+         * Uses PostgreSQL as a message broker via the PGMQ extension.
+         */
+        private fun MutableMap<String, String>.configurePgmq(props: Map<String, String>) {
+            val pgmq = "lemline.messaging.pgmq"
+            // PostgreSQL connection settings (reuses database config or can be overridden)
+            val host = props["$pgmq.host"] ?: POSTGRES_HOST_DEFAULT
+            val port = props["$pgmq.port"] ?: POSTGRES_PORT_DEFAULT
+            val database = props["$pgmq.database"] ?: POSTGRES_NAME_DEFAULT
+            val username = props["$pgmq.username"] ?: POSTGRES_USERNAME_DEFAULT
+            val password = props["$pgmq.password"] ?: POSTGRES_PASSWORD_DEFAULT
+
+            configurePgmqQueue(props, TopicType.COMMANDS, host, port, database, username, password)
+            configurePgmqQueue(props, TopicType.EVENTS, host, port, database, username, password)
+            configurePgmqCloudEventsQueue(props, host, port, database, username, password)
+            configurePgmqLifecycleEventsQueue(props, host, port, database, username, password)
+        }
+
+        private fun MutableMap<String, String>.configurePgmqQueue(
+            props: Map<String, String>,
+            topicType: TopicType,
+            host: String,
+            port: String,
+            database: String,
+            username: String,
+            password: String
+        ) {
+            val type = "lemline.messaging.pgmq.${topicType.type}"
+            val queue = props["$type.queue"] ?: topicType.defaultTopicName
+
+            if (props[topicType.consumerEnabled].toBoolean()) {
+                val consumer = "$type.consumer"
+                val incoming = "mp.messaging.incoming.${topicType.incomingChannel}"
+                val queueDLQ = props["$consumer.queue-dlq"] ?: "$queue.dlq"
+
+                set("$incoming.connector", PGMQ_CONNECTOR)
+                set("$incoming.queue", queue)
+                set("$incoming.host", host)
+                set("$incoming.port", port)
+                set("$incoming.database", database)
+                set("$incoming.username", username)
+                set("$incoming.password", password)
+                set("$incoming.visibility-timeout", props["$consumer.visibility-timeout"] ?: PGMQ_VISIBILITY_TIMEOUT_DEFAULT)
+                set("$incoming.poll-interval", props["$consumer.poll-interval"] ?: PGMQ_POLL_INTERVAL_DEFAULT)
+                set("$incoming.batch-size", props["$consumer.batch-size"] ?: PGMQ_BATCH_SIZE_DEFAULT)
+                set("$incoming.max-retries", props["$consumer.max-retries"] ?: PGMQ_MAX_RETRIES_DEFAULT)
+                set("$incoming.dead-letter-queue", queueDLQ)
+                set("$incoming.auto-create-queue", "true")
+                // Set consumer concurrency
+                set(topicType.consumerConcurrency, props["$consumer.concurrency"] ?: CONSUMER_CONCURRENCY_DEFAULT)
+            }
+
+            if (props[topicType.producerEnabled].toBoolean()) {
+                val producer = "$type.producer"
+                val outgoing = "mp.messaging.outgoing.${topicType.outgoingChannel}"
+
+                set("$outgoing.connector", PGMQ_CONNECTOR)
+                set("$outgoing.queue", props["$producer.queue-out"] ?: queue)
+                set("$outgoing.host", host)
+                set("$outgoing.port", port)
+                set("$outgoing.database", database)
+                set("$outgoing.username", username)
+                set("$outgoing.password", password)
+                set("$outgoing.auto-create-queue", "true")
+            }
+        }
+
+        /**
+         * Configures the CloudEvents PGMQ queue.
+         */
+        private fun MutableMap<String, String>.configurePgmqCloudEventsQueue(
+            props: Map<String, String>,
+            host: String,
+            port: String,
+            database: String,
+            username: String,
+            password: String
+        ) {
+            val type = "lemline.messaging.pgmq.cloudevents"
+            val queue = props["$type.queue"] ?: CLOUDEVENTS_TOPIC_DEFAULT
+
+            // Consumer configuration for listen tasks
+            if (props[CLOUDEVENTS_CONSUMER_ENABLED].toBoolean()) {
+                val consumer = "$type.consumer"
+                val incoming = "mp.messaging.incoming.$CLOUDEVENTS_IN_CHANNEL"
+                val queueDLQ = props["$consumer.queue-dlq"] ?: "$queue.dlq"
+
+                set("$incoming.connector", PGMQ_CONNECTOR)
+                set("$incoming.queue", queue)
+                set("$incoming.host", host)
+                set("$incoming.port", port)
+                set("$incoming.database", database)
+                set("$incoming.username", username)
+                set("$incoming.password", password)
+                set("$incoming.visibility-timeout", props["$consumer.visibility-timeout"] ?: PGMQ_VISIBILITY_TIMEOUT_DEFAULT)
+                set("$incoming.poll-interval", props["$consumer.poll-interval"] ?: PGMQ_POLL_INTERVAL_DEFAULT)
+                set("$incoming.batch-size", props["$consumer.batch-size"] ?: PGMQ_BATCH_SIZE_DEFAULT)
+                set("$incoming.max-retries", props["$consumer.max-retries"] ?: PGMQ_MAX_RETRIES_DEFAULT)
+                set("$incoming.dead-letter-queue", queueDLQ)
+                set("$incoming.auto-create-queue", "true")
+                set(CLOUDEVENTS_CONSUMER_CONCURRENCY, props["$consumer.concurrency"] ?: CONSUMER_CONCURRENCY_DEFAULT)
+            }
+
+            // Producer configuration for emit tasks
+            if (props[CLOUDEVENTS_PRODUCER_ENABLED].toBoolean()) {
+                val producer = "$type.producer"
+                val outgoing = "mp.messaging.outgoing.$CLOUDEVENTS_OUT_CHANNEL"
+
+                set("$outgoing.connector", PGMQ_CONNECTOR)
+                set("$outgoing.queue", props["$producer.queue-out"] ?: queue)
+                set("$outgoing.host", host)
+                set("$outgoing.port", port)
+                set("$outgoing.database", database)
+                set("$outgoing.username", username)
+                set("$outgoing.password", password)
+                set("$outgoing.auto-create-queue", "true")
+            }
+        }
+
+        /**
+         * Configures the Lifecycle Events PGMQ queue.
+         * Producer-only: Emits workflow and task lifecycle events for external observability.
+         */
+        private fun MutableMap<String, String>.configurePgmqLifecycleEventsQueue(
+            props: Map<String, String>,
+            host: String,
+            port: String,
+            database: String,
+            username: String,
+            password: String
+        ) {
+            val type = "lemline.messaging.pgmq.lifecycleevents"
+            val queue = props["$type.queue"] ?: LIFECYCLE_EVENTS_TOPIC_DEFAULT
+
+            // Producer configuration for lifecycle events (producer-only, no consumer)
+            if (props[LIFECYCLE_EVENTS_PRODUCER_ENABLED].toBoolean()) {
+                val producer = "$type.producer"
+                val outgoing = "mp.messaging.outgoing.$LIFECYCLEEVENTS_OUT_CHANNEL"
+
+                set("$outgoing.connector", PGMQ_CONNECTOR)
+                set("$outgoing.queue", props["$producer.queue-out"] ?: queue)
+                set("$outgoing.host", host)
+                set("$outgoing.port", port)
+                set("$outgoing.database", database)
+                set("$outgoing.username", username)
+                set("$outgoing.password", password)
+                set("$outgoing.auto-create-queue", "true")
             }
         }
 

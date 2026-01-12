@@ -169,7 +169,7 @@ interface LemlineConfiguration {
          * Messaging type.
          * If not provided, it will be set in [LemlineConfigSource]
          */
-        @Pattern(regexp = "in-memory|kafka|rabbitmq")
+        @Pattern(regexp = "in-memory|kafka|rabbitmq|pgmq")
         fun type(): String
 
         fun commands(): Optional<ChannelConfig>
@@ -189,6 +189,11 @@ interface LemlineConfiguration {
          * Optional RabbitMQ configuration
          */
         fun rabbitmq(): Optional<RabbitMQConfig>
+
+        /**
+         * Optional PGMQ (PostgreSQL Message Queue) configuration
+         */
+        fun pgmq(): Optional<PgmqConfig>
     }
 
     interface ChannelConfig {
@@ -362,6 +367,82 @@ interface LemlineConfiguration {
     interface RabbitProducerConfig {
         fun queueOut(): Optional<String>
         fun exchangeName(): Optional<String>
+    }
+
+    /**
+     * PGMQ (PostgreSQL Message Queue) configuration.
+     * Uses PostgreSQL as a message broker via the PGMQ extension.
+     */
+    interface PgmqConfig {
+        @WithDefault(POSTGRES_HOST_DEFAULT)
+        fun host(): String
+
+        @WithDefault(POSTGRES_PORT_DEFAULT)
+        fun port(): Int
+
+        @WithDefault(POSTGRES_NAME_DEFAULT)
+        fun database(): String
+
+        @WithDefault(POSTGRES_USERNAME_DEFAULT)
+        fun username(): String
+
+        @WithDefault(POSTGRES_PASSWORD_DEFAULT)
+        fun password(): Optional<String>
+
+        fun commands(): PgmqChannelConfig
+        fun events(): PgmqChannelConfig
+        fun cloudevents(): Optional<PgmqChannelConfig>
+        fun lifecycleevents(): Optional<PgmqLifecycleEventsConfig>
+    }
+
+    /**
+     * PGMQ channel configuration.
+     */
+    interface PgmqChannelConfig {
+        @WithDefault(COMMANDS_TOPIC_DEFAULT)
+        fun queue(): String
+
+        fun consumer(): PgmqConsumerConfig
+        fun producer(): PgmqProducerConfig
+    }
+
+    /**
+     * PGMQ lifecycle events configuration.
+     * Producer-only configuration for emitting lifecycle events.
+     */
+    interface PgmqLifecycleEventsConfig {
+        @WithDefault(LemlineConfigConstants.LIFECYCLE_EVENTS_TOPIC_DEFAULT)
+        fun queue(): String
+        fun producer(): PgmqProducerConfig
+    }
+
+    /**
+     * PGMQ consumer configuration.
+     */
+    interface PgmqConsumerConfig {
+        @WithDefault(CONSUMER_CONCURRENCY_DEFAULT)
+        fun concurrency(): Int
+
+        @WithDefault(LemlineConfigConstants.PGMQ_VISIBILITY_TIMEOUT_DEFAULT)
+        fun visibilityTimeout(): Int
+
+        @WithDefault(LemlineConfigConstants.PGMQ_POLL_INTERVAL_DEFAULT)
+        fun pollInterval(): Long
+
+        @WithDefault(LemlineConfigConstants.PGMQ_BATCH_SIZE_DEFAULT)
+        fun batchSize(): Int
+
+        @WithDefault(LemlineConfigConstants.PGMQ_MAX_RETRIES_DEFAULT)
+        fun maxRetries(): Int
+
+        fun queueDlq(): Optional<String>
+    }
+
+    /**
+     * PGMQ producer configuration.
+     */
+    interface PgmqProducerConfig {
+        fun queueOut(): Optional<String>
     }
 
     interface OutboxConfig {
