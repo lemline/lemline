@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.messaging.postgres
 
+import com.lemline.runner.common.test.RequiresDocker
 import com.lemline.runner.messaging.postgres.config.PgmqConnectorConfig
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.collections.shouldHaveSize
@@ -21,6 +22,7 @@ import java.util.Optional
  * These tests verify the actual PGMQ functionality with a real PostgreSQL database
  * using the SQL-only PGMQ implementation (no extension required).
  */
+@RequiresDocker
 class PgmqIntegrationTest : FunSpec({
 
     // Standard PostgreSQL image - SQL-only PGMQ doesn't require extension
