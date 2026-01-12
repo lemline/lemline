@@ -24,19 +24,19 @@ dependencies {
     implementation(libs.smallrye.reactive.messaging.api)
 
     // SmallRye Reactive Messaging provider (for base connector classes)
-    implementation("io.smallrye.reactive:smallrye-reactive-messaging-provider:4.27.0")
+    implementation("io.smallrye.reactive:smallrye-reactive-messaging-provider")
 
     // Mutiny for reactive streams
-    implementation("io.smallrye.reactive:mutiny:2.7.0")
-    implementation("io.smallrye.reactive:mutiny-kotlin:2.7.0")
+    implementation("io.smallrye.reactive:mutiny")
+    implementation("io.smallrye.reactive:mutiny-kotlin")
 
     // Vert.x for async PostgreSQL client
-    implementation("io.vertx:vertx-pg-client:4.5.12")
-    implementation("io.vertx:vertx-sql-client:4.5.12")
-    implementation("io.smallrye.reactive:smallrye-mutiny-vertx-pg-client:3.17.0")
+    implementation("io.vertx:vertx-pg-client")
+    implementation("io.vertx:vertx-sql-client")
+    implementation("io.smallrye.reactive:smallrye-mutiny-vertx-pg-client")
 
     // PostgreSQL JDBC driver (for configuration validation)
-    implementation("org.postgresql:postgresql:42.7.2")
+    implementation("org.postgresql:postgresql")
 
     // Testing
     testImplementation(kotlin("test"))

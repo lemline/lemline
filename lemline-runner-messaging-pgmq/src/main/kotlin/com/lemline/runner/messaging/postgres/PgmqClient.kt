@@ -49,20 +49,20 @@ class PgmqClient(
 
         private const val SEND_MESSAGE = $$"SELECT * FROM pgmq.send($1, $2::jsonb)"
 
-        private const val SEND_MESSAGE_WITH_DELAY = $$"SELECT * FROM pgmq.send($1, $2::jsonb, $3)"
+        private const val SEND_MESSAGE_WITH_DELAY = $$"SELECT * FROM pgmq.send($1, $2::jsonb, $3::integer)"
 
         private const val SEND_MESSAGE_WITH_HEADERS = $$"SELECT * FROM pgmq.send($1, $2::jsonb, $3::jsonb)"
 
         private const val SEND_MESSAGE_WITH_HEADERS_AND_DELAY =
-            $$"SELECT * FROM pgmq.send($1, $2::jsonb, $3::jsonb, $4)"
+            $$"SELECT * FROM pgmq.send($1, $2::jsonb, $3::jsonb, $4::integer)"
 
         private const val READ_MESSAGES = $$"SELECT * FROM pgmq.read($1, $2, $3)"
 
-        private const val DELETE_MESSAGE = $$"SELECT pgmq.delete($1, $2)"
+        private const val DELETE_MESSAGE = $$"SELECT pgmq.delete($1, $2::bigint)"
 
-        private const val ARCHIVE_MESSAGE = $$"SELECT pgmq.archive($1, $2)"
+        private const val ARCHIVE_MESSAGE = $$"SELECT pgmq.archive($1, $2::bigint)"
 
-        private const val SET_VT = $$"SELECT * FROM pgmq.set_vt($1, $2, $3)"
+        private const val SET_VT = $$"SELECT * FROM pgmq.set_vt($1, $2::bigint, $3::integer)"
 
         private const val POP_MESSAGE = $$"SELECT * FROM pgmq.pop($1, $2)"
 
@@ -84,13 +84,13 @@ class PgmqClient(
 
         private const val SEND_BATCH = $$"SELECT * FROM pgmq.send_batch($1, $2::jsonb[])"
 
-        private const val SEND_BATCH_WITH_DELAY = $$"SELECT * FROM pgmq.send_batch($1, $2::jsonb[], $3)"
+        private const val SEND_BATCH_WITH_DELAY = $$"SELECT * FROM pgmq.send_batch($1, $2::jsonb[], $3::integer)"
 
         private const val DELETE_BATCH = $$"SELECT * FROM pgmq.delete($1, $2::bigint[])"
 
         private const val ARCHIVE_BATCH = $$"SELECT * FROM pgmq.archive($1, $2::bigint[])"
 
-        private const val SET_VT_BATCH = $$"SELECT * FROM pgmq.set_vt($1, $2::bigint[], $3)"
+        private const val SET_VT_BATCH = $$"SELECT * FROM pgmq.set_vt($1, $2::bigint[], $3::integer)"
     }
 
     private val poolKey = "${config.host}:${config.port}/${config.database}"

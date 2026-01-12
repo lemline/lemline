@@ -12,18 +12,18 @@ import kotlinx.coroutines.delay
 import org.eclipse.microprofile.config.Config
 import org.testcontainers.containers.PostgreSQLContainer
 import org.testcontainers.utility.DockerImageName
+import java.sql.DriverManager
 import java.util.Optional
 
 /**
  * Integration tests for PGMQ client using Testcontainers.
  *
  * These tests verify the actual PGMQ functionality with a real PostgreSQL database
- * including the PGMQ extension.
+ * using the SQL-only PGMQ implementation (no extension required).
  */
 class PgmqIntegrationTest : FunSpec({
 
-    // Use a PostgreSQL image with PGMQ extension pre-installed
-    // Note: In production, you would use the official tembo-io/pgmq image
+    // Standard PostgreSQL image - SQL-only PGMQ doesn't require extension
     val postgres = PostgreSQLContainer(DockerImageName.parse("postgres:16-alpine"))
         .withDatabaseName("testdb")
         .withUsername("test")
@@ -31,6 +31,27 @@ class PgmqIntegrationTest : FunSpec({
 
     beforeSpec {
         postgres.start()
+
+        // Run SQL-only PGMQ migrations
+        DriverManager.getConnection(postgres.jdbcUrl, postgres.username, postgres.password).use { conn ->
+            // Load and execute V800 (schema)
+            val v800 = PgmqIntegrationTest::class.java.classLoader
+                .getResourceAsStream("db/migration/postgresql/V800__Create_pgmq_schema.sql")!!
+                .bufferedReader().readText()
+            conn.createStatement().execute(v800)
+
+            // Load and execute V801 (functions)
+            val v801 = PgmqIntegrationTest::class.java.classLoader
+                .getResourceAsStream("db/migration/postgresql/V801__Create_pgmq_functions.sql")!!
+                .bufferedReader().readText()
+            conn.createStatement().execute(v801)
+
+            // Load and execute V802 (Lemline deduplication)
+            val v802 = PgmqIntegrationTest::class.java.classLoader
+                .getResourceAsStream("db/migration/postgresql/V802__Lemline_pgmq_deduplication.sql")!!
+                .bufferedReader().readText()
+            conn.createStatement().execute(v802)
+        }
     }
 
     afterSpec {
@@ -58,21 +79,18 @@ class PgmqIntegrationTest : FunSpec({
         return PgmqConnectorConfig(config, queueName)
     }
 
-    xtest("should initialize PGMQ extension and create queue") {
-        // This test is disabled by default as it requires the PGMQ extension
-        // Run with: ./gradlew :lemline-runner-messaging-postgres:test --tests "*should initialize*"
+    test("should initialize PGMQ and create queue") {
         val config = createConfig("init-test-queue")
         val client = PgmqClient(config)
 
-        // Initialize should create the extension and queue
+        // Initialize should create the queue using SQL-only PGMQ functions
         client.initialize()
 
         // If we got here without exception, initialization succeeded
         client.close()
     }
 
-    xtest("should send and receive messages") {
-        // This test is disabled by default as it requires the PGMQ extension
+    test("should send and receive messages") {
         val config = createConfig("send-receive-queue")
         val client = PgmqClient(config)
         client.initialize()
@@ -101,8 +119,7 @@ class PgmqIntegrationTest : FunSpec({
         client.close()
     }
 
-    xtest("should handle message visibility timeout") {
-        // This test is disabled by default as it requires the PGMQ extension
+    test("should handle message visibility timeout") {
         val config = createConfig("vt-test-queue")
         val client = PgmqClient(config)
         client.initialize()
@@ -124,8 +141,7 @@ class PgmqIntegrationTest : FunSpec({
         client.close()
     }
 
-    xtest("should archive messages") {
-        // This test is disabled by default as it requires the PGMQ extension
+    test("should archive messages") {
         val config = createConfig("archive-test-queue")
         val client = PgmqClient(config)
         client.initialize()
@@ -144,8 +160,7 @@ class PgmqIntegrationTest : FunSpec({
         client.close()
     }
 
-    xtest("should send messages with delay") {
-        // This test is disabled by default as it requires the PGMQ extension
+    test("should send messages with delay") {
         val config = createConfig("delay-test-queue")
         val client = PgmqClient(config)
         client.initialize()
@@ -171,8 +186,7 @@ class PgmqIntegrationTest : FunSpec({
         client.close()
     }
 
-    xtest("should move messages to dead letter queue after max retries") {
-        // This test is disabled by default as it requires the PGMQ extension
+    test("should move messages to dead letter queue after max retries") {
         val config = createConfig("dlq-test-queue")
         val client = PgmqClient(config)
         client.initialize()
