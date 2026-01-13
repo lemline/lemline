@@ -21,7 +21,7 @@ import org.eclipse.microprofile.config.inject.ConfigProperty
  * Provides clear, actionable error messages when the broker is unreachable.
  */
 @ApplicationScoped
-class BrokerStartupValidator {
+class MessagingStartupValidator {
     private val logger = logger()
 
     @ConfigProperty(name = MESSAGING_TYPE)
