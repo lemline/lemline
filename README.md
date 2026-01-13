@@ -205,6 +205,7 @@ This project is licensed under the [Business Source License 1.1](LICENSE.md).
 
 - [x] Kafka
 - [x] RabbitMQ
+- [x] PGMQ (PostgreSQL-based)
 - [ ] Amazon SQS
 - [ ] Google Pub/Sub
 - [ ] Azure Service Bus
