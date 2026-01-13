@@ -65,6 +65,21 @@ class DefinitionRepository : CrudRepository<DefinitionModel>() {
     )
 
     /**
+     * Retrieves all workflow definitions across all namespaces, sorted by namespace, name, version.
+     */
+    override suspend fun listAll(
+        connection: Connection?
+    ): List<DefinitionModel> = databaseConfig.withConnection(connection) {
+        it.prepareStatement(listAllSql).use { stmt ->
+            stmt.executeQuery().use { rs -> rs.toModels() }
+        }
+    }
+
+    private val listAllSql by lazy {
+        "SELECT * FROM $tableName ORDER BY $NAMESPACE_COLUMN, $NAME_COLUMN, $VERSION_COLUMN"
+    }
+
+    /**
      * Retrieves all workflow definitions within the specified namespace.
      */
     suspend fun listAllInNamespace(

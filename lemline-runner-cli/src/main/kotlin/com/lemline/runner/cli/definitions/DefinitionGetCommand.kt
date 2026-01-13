@@ -48,8 +48,8 @@ class DefinitionGetCommand : Runnable {
 
     @Parameters(
         index = "0",
-        arity = "1",
-        description = ["Namespace of the workflow to get."]
+        arity = "0..1",
+        description = ["Optional namespace of the workflow to get. If omitted, lists all workflows."]
     )
     var namespace: String? = null
 
@@ -74,9 +74,7 @@ class DefinitionGetCommand : Runnable {
     )
     var format: OutputFormat = OutputFormat.YAML
 
-    val workflowNamespace by lazy {
-        namespace?.let { WorkflowNamespace(it) } ?: cliError("Workflow namespace must be provided")
-    }
+    val workflowNamespace by lazy { namespace?.let { WorkflowNamespace(it) } }
 
     val workflowName by lazy { name?.let { WorkflowName(it) } }
 
@@ -85,10 +83,10 @@ class DefinitionGetCommand : Runnable {
     override fun run() = runBlocking {
 
         try {
-            if (workflowName != null && workflowVersion != null) {
-                // Direct fetch: Both name and version provided - runs once and exits
+            if (workflowNamespace != null && workflowName != null && workflowVersion != null) {
+                // Direct fetch: Namespace, name, and version all provided - runs once and exits
                 val selectedWorkflow =
-                    definitionService.findByNameAndVersion(workflowNamespace, workflowName!!, workflowVersion!!)
+                    definitionService.findByNameAndVersion(workflowNamespace!!, workflowName!!, workflowVersion!!)
                 if (selectedWorkflow == null) {
                     System.err.println("ERROR: Workflow '$workflowName' version '$workflowVersion' not found in namespace '$workflowNamespace'.")
                     return@runBlocking // Exit if direct fetch fails

@@ -14,7 +14,7 @@ This tutorial walks you through setting up Lemline for local development. By the
 
 ## 1. Start the Infrastructure
 
-This tutorial uses **PostgreSQL** and **Kafka** for local development. You can substitute with other supported databases (MySQL) or message brokers (RabbitMQ, PGMQ) that mirror your infrastructure. See [Configure Message Brokers](lemline-howto-brokers.md) for alternatives.
+This tutorial uses **PostgreSQL** with **PGMQ** (PostgreSQL Message Queue) for local development. PGMQ runs in SQL-only mode, requiring no extensions—just a standard PostgreSQL instance handles both data persistence and message brokering. You can substitute with other supported databases (MySQL) or message brokers (Kafka, RabbitMQ) that mirror your production infrastructure. See [Configure Message Brokers](lemline-howto-brokers.md) for alternatives.
 
 Create a project directory and add a `docker-compose.yaml` file:
 
@@ -23,7 +23,7 @@ mkdir lemline-project
 cd lemline-project
 ```
 
-Create `docker-compose.yaml` with PostgreSQL and Kafka:
+Create `docker-compose.yaml` with PostgreSQL:
 
 ```yaml
 services:
@@ -35,36 +35,21 @@ services:
       POSTGRES_PASSWORD: postgres
     ports:
       - "5432:5432"
-
-  kafka:
-    image: apache/kafka:latest
-    environment:
-      KAFKA_NODE_ID: 1
-      KAFKA_PROCESS_ROLES: broker,controller
-      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
-      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
-      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
-      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
-      CLUSTER_ID: lemline-local-cluster
-    ports:
-      - "9092:9092"
 ```
 
-Start the services:
+Start the service:
 
 ```bash
 docker-compose up -d
 ```
 
-Verify the services are running:
+Verify the service is running:
 
 ```bash
 docker-compose ps
 ```
 
-You should see both `postgres` and `kafka` containers running.
+You should see the `postgres` container running.
 
 ## 2. Create the Configuration File
 
@@ -82,13 +67,7 @@ lemline:
       password: postgres
 
   messaging:
-    type: kafka
-    kafka:
-      brokers: localhost:9092
-      commands:
-        topic: lemline-commands
-      events:
-        topic: lemline-events
+    type: pgmq
 ```
 
 ## 3. Download Lemline
@@ -143,7 +122,6 @@ curl -L https://github.com/lemline/lemline/releases/download/v%version%/lemline-
 java -jar lemline.jar --version
 ```
 
-> **Tip**: The Java JAR version supports in-memory mode for quick experimentation without Docker. See [Alternative: In-Memory Mode](#alternative-in-memory-mode-java-only) below.
 
 </tab>
 </tabs>
@@ -185,14 +163,14 @@ java -jar lemline.jar migrate
 </tab>
 </tabs>
 
-You should see output indicating successful migration. This creates the necessary tables for workflow definitions, instances, retries, waits, and other operational data.
+You should see output indicating successful migration. This creates the necessary tables for workflow definitions, instances, retries, waits, and other operational data—as well as the PGMQ schema and functions for message brokering. The actual message queue tables are created automatically when Lemline first starts.
 
 ## Your Environment is Ready!
 
 You now have:
 - PostgreSQL database for workflow state persistence
-- Kafka message broker for workflow execution
-- Lemline binary configured to use both services
+- PGMQ message broker for workflow execution (built into PostgreSQL)
+- Lemline binary configured and ready to run workflows
 
 ## Next Steps
 

@@ -11,14 +11,15 @@ In this tutorial, you'll build and run your first workflow with Lemline using `s
 By completing this tutorial, you will learn:
 
 - How to create a basic workflow definition
+- How to register a workflow definition with Lemline
+- How to start a workflow instance
 - How to use the `set` task to manipulate data
 - How to use a function to log information
-- How to run and verify workflow execution
 
 ## Prerequisites
 
 - Basic familiarity with YAML syntax
-- A working Lemline environment (complete the [Setting Up Your Environment](lemline-tutorial-setup.md) tutorial first)
+- A working Lemline environment (complete the [Setting Up A Local Environment](lemline-tutorial-setup.md) tutorial first)
 
 ## 1. Creating Your First Workflow
 
@@ -47,44 +48,84 @@ Let's break down what this workflow does:
 - **setGreeting**: Uses `set` to create a `message` variable
 - **logMessage**: Calls the standard log function to output the message
 
-## 2. Running Your Workflow
+## 2. Registering the Workflow Definition
 
-Now, let's run the workflow:
+Before running a workflow, you need to register it with Lemline. This stores the workflow definition in the database:
+
+<tabs group="platform">
+<tab id="macos-post" title="macOS (ARM64)" group-key="macos">
+
+```bash
+bin/lemline definition post -f hello.yaml
+```
+
+</tab>
+<tab id="linux-post" title="Linux (x86_64)" group-key="linux">
+
+```bash
+bin/lemline definition post -f hello.yaml
+```
+
+</tab>
+<tab id="windows-post" title="Windows (x86_64)" group-key="windows">
+
+```powershell
+bin\lemline.exe definition post -f hello.yaml
+```
+
+</tab>
+<tab id="java-post" title="Java (Any OS)" group-key="java">
+
+```bash
+java -jar lemline.jar definition post -f hello.yaml
+```
+
+</tab>
+</tabs>
+
+You should see output confirming the workflow was created:
+```
+  -> Workflow successfully created: 'hello-workflow' (version '0.1.0')
+```
+
+## 3. Running Your Workflow
+
+Now, let's start an instance of the workflow. You need to specify the namespace and name from your workflow definition:
 
 <tabs group="platform">
 <tab id="macos-run" title="macOS (ARM64)" group-key="macos">
 
 ```bash
-bin/lemline workflow run hello.yaml
+bin/lemline instance start tutorial hello-workflow
 ```
 
 </tab>
 <tab id="linux-run" title="Linux (x86_64)" group-key="linux">
 
 ```bash
-bin/lemline workflow run hello.yaml
+bin/lemline instance start tutorial hello-workflow
 ```
 
 </tab>
 <tab id="windows-run" title="Windows (x86_64)" group-key="windows">
 
 ```powershell
-bin\lemline.exe workflow run workflows\hello.yaml
+bin\lemline.exe instance start tutorial hello-workflow
 ```
 
 </tab>
 <tab id="java-run" title="Java (Any OS)" group-key="java">
 
 ```bash
-java -jar lemline.jar workflow run hello.yaml
+java -jar lemline.jar instance start tutorial hello-workflow
 ```
 
 </tab>
 </tabs>
 
-You should see output that includes your "Hello, Lemline!" message along with workflow execution details.
+You should see output confirming the instance was started, including the workflow ID.
 
-## 3. Enhancing Your Workflow
+## 4. Enhancing Your Workflow
 
 Let's make this workflow more interesting by adding more variables and string manipulation.
 
@@ -115,40 +156,44 @@ This enhanced workflow:
 2. Constructs a personalized greeting using string concatenation
 3. Logs the final message
 
-Run the enhanced workflow:
+Update the definition (use `--force` to overwrite the existing version) and run it:
 
 <tabs group="platform">
 <tab id="macos-run2" title="macOS (ARM64)" group-key="macos">
 
 ```bash
-bin/lemline workflow run hello.yaml
+bin/lemline definition post -f hello.yaml --force
+bin/lemline instance start tutorial hello-workflow
 ```
 
 </tab>
 <tab id="linux-run2" title="Linux (x86_64)" group-key="linux">
 
 ```bash
-bin/lemline workflow run hello.yaml
+bin/lemline definition post -f hello.yaml --force
+bin/lemline instance start tutorial hello-workflow
 ```
 
 </tab>
 <tab id="windows-run2" title="Windows (x86_64)" group-key="windows">
 
 ```powershell
-bin\lemline.exe workflow run hello.yaml
+bin\lemline.exe definition post -f hello.yaml --force
+bin\lemline.exe instance start tutorial hello-workflow
 ```
 
 </tab>
 <tab id="java-run2" title="Java (Any OS)" group-key="java">
 
 ```bash
-java -jar lemline.jar workflow run hello.yaml
+java -jar lemline.jar definition post -f hello.yaml --force
+java -jar lemline.jar instance start tutorial hello-workflow
 ```
 
 </tab>
 </tabs>
 
-## 4. Adding User Input
+## 5. Adding User Input
 
 Let's modify the workflow to accept user input. Create a file named `input.json`:
 
@@ -182,40 +227,44 @@ do:
         message: ${ .message }
 ```
 
-Run the workflow with your input:
+Update the definition and run the workflow with your input:
 
 <tabs group="platform">
 <tab id="macos-run3" title="macOS (ARM64)" group-key="macos">
 
 ```bash
-bin/lemline workflow run hello.yaml --input input.json
+bin/lemline definition post -f hello.yaml --force
+bin/lemline instance start tutorial hello-workflow --input '{"name": "Your Name"}'
 ```
 
 </tab>
 <tab id="linux-run3" title="Linux (x86_64)" group-key="linux">
 
 ```bash
-bin/lemline workflow run hello.yaml --input input.json
+bin/lemline definition post -f hello.yaml --force
+bin/lemline instance start tutorial hello-workflow --input '{"name": "Your Name"}'
 ```
 
 </tab>
 <tab id="windows-run3" title="Windows (x86_64)" group-key="windows">
 
 ```powershell
-bin\lemline.exe workflow run hello.yaml --input input.json
+bin\lemline.exe definition post -f hello.yaml --force
+bin\lemline.exe instance start tutorial hello-workflow --input '{\"name\": \"Your Name\"}'
 ```
 
 </tab>
 <tab id="java-run3" title="Java (Any OS)" group-key="java">
 
 ```bash
-java -jar lemline.jar workflow run hello.yaml --input input.json
+java -jar lemline.jar definition post -f hello.yaml --force
+java -jar lemline.jar instance start tutorial hello-workflow --input '{"name": "Your Name"}'
 ```
 
 </tab>
 </tabs>
 
-## 5. Adding Conditional Logic
+## 6. Adding Conditional Logic
 
 Let's add a conditional greeting based on the time of day using a `switch` task:
 
@@ -260,43 +309,38 @@ do:
         message: ${ .message }
 ```
 
-Update `input.json` with an hour value:
-
-```json
-{
-  "name": "Your Name",
-  "hour": 10
-}
-```
-
-Run the workflow:
+Update the definition and run the workflow with a morning hour:
 
 <tabs group="platform">
 <tab id="macos-run4" title="macOS (ARM64)" group-key="macos">
 
 ```bash
-bin/lemline workflow run hello.yaml --input input.json
+bin/lemline definition post -f hello.yaml --force
+bin/lemline instance start tutorial hello-workflow --input '{"name": "Your Name", "hour": 10}'
 ```
 
 </tab>
 <tab id="linux-run4" title="Linux (x86_64)" group-key="linux">
 
 ```bash
-bin/lemline workflow run hello.yaml --input input.json
+bin/lemline definition post -f hello.yaml --force
+bin/lemline instance start tutorial hello-workflow --input '{"name": "Your Name", "hour": 10}'
 ```
 
 </tab>
 <tab id="windows-run4" title="Windows (x86_64)" group-key="windows">
 
 ```powershell
-bin\lemline.exe workflow run hello.yaml --input input.json
+bin\lemline.exe definition post -f hello.yaml --force
+bin\lemline.exe instance start tutorial hello-workflow --input '{\"name\": \"Your Name\", \"hour\": 10}'
 ```
 
 </tab>
 <tab id="java-run4" title="Java (Any OS)" group-key="java">
 
 ```bash
-java -jar lemline.jar workflow run hello.yaml --input input.json
+java -jar lemline.jar definition post -f hello.yaml --force
+java -jar lemline.jar instance start tutorial hello-workflow --input '{"name": "Your Name", "hour": 10}'
 ```
 
 </tab>
@@ -307,10 +351,12 @@ java -jar lemline.jar workflow run hello.yaml --input input.json
 In this tutorial, you've learned how to:
 
 - Create workflow definitions using the Serverless Workflow DSL v1.0
+- Register workflow definitions with `definition post`
+- Start workflow instances with `instance start`
 - Use the `set` task to create and manipulate variables
 - Use expressions with `${ }` for dynamic values
 - Call external functions (like the log function)
-- Pass input to a workflow using JSON files
+- Pass input to a workflow instance
 - Use `switch` for conditional branching
 
 ## Next Steps

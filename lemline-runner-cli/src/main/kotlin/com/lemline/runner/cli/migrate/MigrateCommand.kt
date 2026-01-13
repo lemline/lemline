@@ -48,9 +48,9 @@ class MigrateCommand : Runnable {
         }
 
         if (!force) {
-            print("Are you sure you want to apply the pending migrations? (yes/no): ")
-            val input = readlnOrNull()
-            if (input?.equals("yes", ignoreCase = true) != true) {
+            print("Are you sure you want to apply the pending migrations? [y/N]: ")
+            val input = readlnOrNull()?.trim()?.lowercase()
+            if (input != "y" && input != "yes") {
                 println("Migration cancelled.")
                 return
             }

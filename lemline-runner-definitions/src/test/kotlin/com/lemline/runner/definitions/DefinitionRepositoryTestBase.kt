@@ -351,7 +351,7 @@ abstract class DefinitionRepositoryTestBase {
     }
 
     @Test
-    fun `should retrieve all workflows`() = runTest {
+    fun `should retrieve all workflows in namespace`() = runTest {
         val repository = getRepository()
         val namespace = WorkflowNamespace("test")
         val workflows = List(3) { i ->
@@ -368,6 +368,94 @@ abstract class DefinitionRepositoryTestBase {
 
         retrieved shouldHaveSize workflows.size
         retrieved.toSet() shouldBe workflows.toSet()
+    }
+
+    @Test
+    fun `listAll should retrieve workflows across all namespaces`() = runTest {
+        val repository = getRepository()
+        val namespace1 = WorkflowNamespace("namespace1")
+        val namespace2 = WorkflowNamespace("namespace2")
+        val namespace3 = WorkflowNamespace("namespace3")
+
+        val workflow1 = DefinitionModel(
+            namespace = namespace1,
+            name = WorkflowName("workflow-a"),
+            version = WorkflowVersion("1.0.0"),
+            definition = "def1"
+        )
+        val workflow2 = DefinitionModel(
+            namespace = namespace2,
+            name = WorkflowName("workflow-b"),
+            version = WorkflowVersion("1.0.0"),
+            definition = "def2"
+        )
+        val workflow3 = DefinitionModel(
+            namespace = namespace3,
+            name = WorkflowName("workflow-c"),
+            version = WorkflowVersion("1.0.0"),
+            definition = "def3"
+        )
+        repository.insert(listOf(workflow1, workflow2, workflow3))
+
+        val retrieved = repository.listAll()
+
+        retrieved shouldHaveSize 3
+        retrieved.map { it.namespace } shouldBe listOf(namespace1, namespace2, namespace3)
+    }
+
+    @Test
+    fun `listAll should return empty list when no workflows exist`() = runTest {
+        val repository = getRepository()
+
+        val retrieved = repository.listAll()
+
+        retrieved shouldHaveSize 0
+    }
+
+    @Test
+    fun `listAll should return workflows sorted by namespace, name, version`() = runTest {
+        val repository = getRepository()
+        val namespaceA = WorkflowNamespace("a-namespace")
+        val namespaceB = WorkflowNamespace("b-namespace")
+
+        val workflows = listOf(
+            DefinitionModel(namespaceB, WorkflowName("workflow-z"), WorkflowVersion("1.0.0"), "def1"),
+            DefinitionModel(namespaceA, WorkflowName("workflow-b"), WorkflowVersion("2.0.0"), "def2"),
+            DefinitionModel(namespaceA, WorkflowName("workflow-a"), WorkflowVersion("1.0.0"), "def3"),
+            DefinitionModel(namespaceA, WorkflowName("workflow-b"), WorkflowVersion("1.0.0"), "def4"),
+        )
+        repository.insert(workflows)
+
+        val retrieved = repository.listAll()
+
+        retrieved shouldHaveSize 4
+        // Should be sorted: a-namespace/workflow-a/1.0.0, a-namespace/workflow-b/1.0.0, a-namespace/workflow-b/2.0.0, b-namespace/workflow-z/1.0.0
+        retrieved[0].namespace shouldBe namespaceA
+        retrieved[0].name shouldBe WorkflowName("workflow-a")
+        retrieved[1].namespace shouldBe namespaceA
+        retrieved[1].name shouldBe WorkflowName("workflow-b")
+        retrieved[1].version shouldBe WorkflowVersion("1.0.0")
+        retrieved[2].namespace shouldBe namespaceA
+        retrieved[2].name shouldBe WorkflowName("workflow-b")
+        retrieved[2].version shouldBe WorkflowVersion("2.0.0")
+        retrieved[3].namespace shouldBe namespaceB
+    }
+
+    @Test
+    fun `listAllInNamespace should only return workflows from specified namespace`() = runTest {
+        val repository = getRepository()
+        val namespace1 = WorkflowNamespace("namespace1")
+        val namespace2 = WorkflowNamespace("namespace2")
+
+        val workflow1 = DefinitionModel(namespace1, WorkflowName("workflow-a"), WorkflowVersion("1.0.0"), "def1")
+        val workflow2 = DefinitionModel(namespace1, WorkflowName("workflow-b"), WorkflowVersion("1.0.0"), "def2")
+        val workflow3 = DefinitionModel(namespace2, WorkflowName("workflow-c"), WorkflowVersion("1.0.0"), "def3")
+        repository.insert(listOf(workflow1, workflow2, workflow3))
+
+        val retrieved = repository.listAllInNamespace(namespace1)
+
+        retrieved shouldHaveSize 2
+        retrieved.all { it.namespace == namespace1 } shouldBe true
     }
 
     @Test
