@@ -4,10 +4,8 @@ package com.lemline.runner.messaging.lifecycle
 import com.lemline.common.logger.logger
 import com.lemline.core.lifecycleevents.LifecycleEventEmitter
 import com.lemline.runner.config.LIFECYCLEEVENTS_OUT_CHANNEL
-import com.lemline.runner.config.LIFECYCLE_EVENTS_PRODUCER_ENABLED
 import com.lemline.runner.listeners.CloudEventService
 import io.cloudevents.CloudEvent
-import io.quarkus.arc.properties.IfBuildProperty
 import io.quarkus.runtime.Startup
 import io.smallrye.mutiny.coroutines.awaitSuspending
 import io.smallrye.reactive.messaging.MutinyEmitter
@@ -32,7 +30,6 @@ import org.eclipse.microprofile.reactive.messaging.Message
 @ExperimentalTime
 @Startup
 @ApplicationScoped
-@IfBuildProperty(name = LIFECYCLE_EVENTS_PRODUCER_ENABLED, stringValue = "true", enableIfMissing = false)
 class LifecycleEventEmitterImpl : LifecycleEventEmitter {
     private val logger = logger()
 

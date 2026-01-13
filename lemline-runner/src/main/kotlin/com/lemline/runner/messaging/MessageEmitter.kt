@@ -7,6 +7,7 @@ import com.lemline.common.values.IDV7
 import com.lemline.common.values.WithOptionalWorkflowInfo
 import io.smallrye.mutiny.coroutines.awaitSuspending
 import io.smallrye.reactive.messaging.MutinyEmitter
+import jakarta.annotation.PostConstruct
 import jakarta.inject.Inject
 import kotlin.time.ExperimentalTime
 import org.eclipse.microprofile.reactive.messaging.Message
@@ -22,10 +23,21 @@ abstract class MessageEmitter<T : JsonSerializable> {
 
     protected abstract val metrics: MessageSubscriberMetrics
 
+    protected abstract val enabled: Boolean
+
     @Inject
     internal lateinit var messageMetaData: MessageMetaData
 
     private val logger = logger()
+
+    @PostConstruct
+    fun init() {
+        if (enabled) {
+            logger.info { "✅ Emitter enabled" }
+        } else {
+            logger.info { "❌ Emitter disabled" }
+        }
+    }
 
     // Retrieve workflowInfo if present
     private val T?.workflowInfo get() = (this as? WithOptionalWorkflowInfo)?.workflowInfo
@@ -38,6 +50,10 @@ abstract class MessageEmitter<T : JsonSerializable> {
      *                      If null, a random IDV7 is generated.
      */
     suspend fun sendPayload(payload: String, idempotentKey: IDV7? = null) {
+        if (!enabled) {
+            logger.warn { "Producer is disabled, message will not be sent" }
+            return
+        }
         val md = MetaData(messageId = idempotentKey ?: IDV7.random())
         retry(
             logger = logger,

@@ -24,7 +24,7 @@ import org.eclipse.microprofile.config.inject.ConfigProperty
 class MessagingStartupValidator {
     private val logger = logger()
 
-    @ConfigProperty(name = MESSAGING_TYPE)
+    @ConfigProperty(name = MESSAGING_TYPE, defaultValue = "in-memory")
     private lateinit var _messagingTypeConfig: String
 
     private val messagingType: MessagingType by lazy {

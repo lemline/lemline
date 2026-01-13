@@ -2,15 +2,17 @@
 package com.lemline.runner.messaging.cloudevents
 
 import com.lemline.common.logger.logger
+import com.lemline.runner.config.CLOUDEVENTS_PRODUCER_ENABLED
 import com.lemline.runner.listeners.CloudEventService
 import io.cloudevents.CloudEvent
 import io.cloudevents.core.builder.CloudEventBuilder
-import io.quarkus.arc.properties.IfBuildProperty
 import io.quarkus.runtime.Startup
 import io.smallrye.mutiny.coroutines.awaitSuspending
 import io.smallrye.reactive.messaging.MutinyEmitter
+import jakarta.annotation.PostConstruct
 import jakarta.enterprise.context.ApplicationScoped
 import kotlin.time.ExperimentalTime
+import org.eclipse.microprofile.config.inject.ConfigProperty
 import org.eclipse.microprofile.reactive.messaging.Channel
 import org.eclipse.microprofile.reactive.messaging.Message
 
@@ -29,9 +31,19 @@ internal const val CLOUDEVENTS_OUT_CHANNEL = "cloudevents-out"
 @ExperimentalTime
 @Startup
 @ApplicationScoped
-@IfBuildProperty(name = "lemline.messaging.cloudevents.producer.enabled", stringValue = "true", enableIfMissing = false)
-internal class CloudEventsEmitter {
+internal class CloudEventsEmitter(
+    @param:ConfigProperty(name = CLOUDEVENTS_PRODUCER_ENABLED) private val enabled: Boolean
+) {
     private val logger = logger()
+
+    @PostConstruct
+    fun init() {
+        if (enabled) {
+            logger.info { "✅ CloudEvents emitter enabled" }
+        } else {
+            logger.info { "❌ CloudEvents emitter disabled" }
+        }
+    }
 
     @Channel(CLOUDEVENTS_OUT_CHANNEL)
     private lateinit var emitter: MutinyEmitter<String>
@@ -55,6 +67,11 @@ internal class CloudEventsEmitter {
         workflowName: String? = null,
         workflowVersion: String? = null,
     ) {
+        if (!enabled) {
+            logger.warn { "CloudEvents emitter is disabled, event will not be sent: id=${cloudEvent.id}" }
+            return
+        }
+
         // Add Lemline extension attributes for workflow traceability
         val builder = CloudEventBuilder.from(cloudEvent)
         workflowId?.let { builder.withExtension("lemlineworkflowid", it) }

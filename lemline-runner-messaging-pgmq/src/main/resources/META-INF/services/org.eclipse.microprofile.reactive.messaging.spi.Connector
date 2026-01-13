@@ -1,2 +1,0 @@
-com.lemline.runner.messaging.postgres.connector.PgmqIncomingConnector
-com.lemline.runner.messaging.postgres.connector.PgmqOutgoingConnector

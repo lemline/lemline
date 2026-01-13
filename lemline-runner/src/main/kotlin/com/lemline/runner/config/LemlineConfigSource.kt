@@ -4,6 +4,7 @@ package com.lemline.runner.config
 import com.lemline.common.logger.logger
 import com.lemline.runner.cli.config.ConfigPathHolder
 import com.lemline.runner.common.config.DatabaseType
+import com.lemline.runner.common.config.MessagingType
 import com.lemline.runner.config.LemlineConfigConstants.CLOUDEVENTS_TOPIC_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.COMMANDS_TOPIC_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.CONSUMER_CONCURRENCY_DEFAULT
@@ -23,17 +24,16 @@ import com.lemline.runner.config.LemlineConfigConstants.KAFKA_WORKFLOWS_GROUP_ID
 import com.lemline.runner.config.LemlineConfigConstants.LIFECYCLE_EVENTS_TOPIC_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.METRICS_PATH_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.METRICS_PORT_DEFAULT
-import com.lemline.runner.common.config.MessagingType
-import com.lemline.runner.config.LemlineConfigConstants.PGMQ_BATCH_SIZE_DEFAULT
-import com.lemline.runner.config.LemlineConfigConstants.PGMQ_CONNECTOR
-import com.lemline.runner.config.LemlineConfigConstants.PGMQ_MAX_RETRIES_DEFAULT
-import com.lemline.runner.config.LemlineConfigConstants.PGMQ_POLL_INTERVAL_DEFAULT
-import com.lemline.runner.config.LemlineConfigConstants.PGMQ_VISIBILITY_TIMEOUT_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.MYSQL_HOST_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.MYSQL_NAME_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.MYSQL_PASSWORD_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.MYSQL_PORT_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.MYSQL_USERNAME_DEFAULT
+import com.lemline.runner.config.LemlineConfigConstants.PGMQ_BATCH_SIZE_DEFAULT
+import com.lemline.runner.config.LemlineConfigConstants.PGMQ_CONNECTOR
+import com.lemline.runner.config.LemlineConfigConstants.PGMQ_MAX_RETRIES_DEFAULT
+import com.lemline.runner.config.LemlineConfigConstants.PGMQ_POLL_INTERVAL_DEFAULT
+import com.lemline.runner.config.LemlineConfigConstants.PGMQ_VISIBILITY_TIMEOUT_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.POSTGRES_HOST_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.POSTGRES_NAME_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.POSTGRES_PASSWORD_DEFAULT
@@ -152,6 +152,7 @@ class LemlineConfigSource : PropertiesConfigSource(
                         "Both properties 'postgresql' and 'mysql' are defined. " +
                             "Explicitly set '$DATABASE_TYPE' to '${DatabaseType.POSTGRESQL.configValue}' or '${DatabaseType.MYSQL.configValue}'."
                     )
+
                     usePostgres -> DatabaseType.POSTGRESQL
                     useMysql -> DatabaseType.MYSQL
                     else -> DatabaseType.H2
@@ -190,7 +191,8 @@ class LemlineConfigSource : PropertiesConfigSource(
                     val h2 = "quarkus.datasource" // <- default datasource
                     generated["$h2.username"] = H2_USERNAME_DEFAULT
                     generated["$h2.password"] = H2_PASSWORD_DEFAULT
-                    generated["$h2.jdbc.url"] = "jdbc:h2:mem:$H2_DB_NAME_DEFAULT;DB_CLOSE_DELAY=-1;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE"
+                    generated["$h2.jdbc.url"] =
+                        "jdbc:h2:mem:$H2_DB_NAME_DEFAULT;DB_CLOSE_DELAY=-1;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE"
                 }
             }
 
@@ -215,6 +217,7 @@ class LemlineConfigSource : PropertiesConfigSource(
                         "Multiple messaging types defined: ${messagingTypes.joinToString { it.configValue }}. " +
                             "Explicitly set '$MESSAGING_TYPE' to one of: ${MessagingType.KAFKA.configValue}, ${MessagingType.RABBITMQ.configValue}, ${MessagingType.PGMQ.configValue}."
                     )
+
                     useKafka -> MessagingType.KAFKA
                     useRabbit -> MessagingType.RABBITMQ
                     usePgmq -> MessagingType.PGMQ
@@ -510,12 +513,15 @@ class LemlineConfigSource : PropertiesConfigSource(
                 set("$incoming.database", database)
                 set("$incoming.username", username)
                 set("$incoming.password", password)
-                set("$incoming.visibility-timeout", props["$consumer.visibility-timeout"] ?: PGMQ_VISIBILITY_TIMEOUT_DEFAULT)
+                set(
+                    "$incoming.visibility-timeout",
+                    props["$consumer.visibility-timeout"] ?: PGMQ_VISIBILITY_TIMEOUT_DEFAULT
+                )
                 set("$incoming.poll-interval", props["$consumer.poll-interval"] ?: PGMQ_POLL_INTERVAL_DEFAULT)
                 set("$incoming.batch-size", props["$consumer.batch-size"] ?: PGMQ_BATCH_SIZE_DEFAULT)
                 set("$incoming.max-retries", props["$consumer.max-retries"] ?: PGMQ_MAX_RETRIES_DEFAULT)
                 set("$incoming.dead-letter-queue", queueDLQ)
-                set("$incoming.auto-create-queue", "true")
+                set("$incoming.auto-create-queue", "false")
                 // Set consumer concurrency
                 set(topicType.consumerConcurrency, props["$consumer.concurrency"] ?: CONSUMER_CONCURRENCY_DEFAULT)
             }
@@ -531,7 +537,7 @@ class LemlineConfigSource : PropertiesConfigSource(
                 set("$outgoing.database", database)
                 set("$outgoing.username", username)
                 set("$outgoing.password", password)
-                set("$outgoing.auto-create-queue", "true")
+                set("$outgoing.auto-create-queue", "false")
             }
         }
 
@@ -562,12 +568,15 @@ class LemlineConfigSource : PropertiesConfigSource(
                 set("$incoming.database", database)
                 set("$incoming.username", username)
                 set("$incoming.password", password)
-                set("$incoming.visibility-timeout", props["$consumer.visibility-timeout"] ?: PGMQ_VISIBILITY_TIMEOUT_DEFAULT)
+                set(
+                    "$incoming.visibility-timeout",
+                    props["$consumer.visibility-timeout"] ?: PGMQ_VISIBILITY_TIMEOUT_DEFAULT
+                )
                 set("$incoming.poll-interval", props["$consumer.poll-interval"] ?: PGMQ_POLL_INTERVAL_DEFAULT)
                 set("$incoming.batch-size", props["$consumer.batch-size"] ?: PGMQ_BATCH_SIZE_DEFAULT)
                 set("$incoming.max-retries", props["$consumer.max-retries"] ?: PGMQ_MAX_RETRIES_DEFAULT)
                 set("$incoming.dead-letter-queue", queueDLQ)
-                set("$incoming.auto-create-queue", "true")
+                set("$incoming.auto-create-queue", "false")
                 set(CLOUDEVENTS_CONSUMER_CONCURRENCY, props["$consumer.concurrency"] ?: CONSUMER_CONCURRENCY_DEFAULT)
             }
 
@@ -583,7 +592,7 @@ class LemlineConfigSource : PropertiesConfigSource(
                 set("$outgoing.database", database)
                 set("$outgoing.username", username)
                 set("$outgoing.password", password)
-                set("$outgoing.auto-create-queue", "true")
+                set("$outgoing.auto-create-queue", "false")
             }
         }
 
@@ -614,7 +623,7 @@ class LemlineConfigSource : PropertiesConfigSource(
                 set("$outgoing.database", database)
                 set("$outgoing.username", username)
                 set("$outgoing.password", password)
-                set("$outgoing.auto-create-queue", "true")
+                set("$outgoing.auto-create-queue", "false")
             }
         }
 

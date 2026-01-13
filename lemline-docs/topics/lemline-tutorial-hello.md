@@ -88,6 +88,41 @@ You should see output confirming the workflow was created:
   -> Workflow successfully created: 'hello-workflow' (version '0.1.0')
 ```
 
+You can verify the definition was registered by listing all workflows:
+
+<tabs group="platform">
+<tab id="macos-get" title="macOS (ARM64)" group-key="macos">
+
+```bash
+bin/lemline definition get
+```
+
+</tab>
+<tab id="linux-get" title="Linux (x86_64)" group-key="linux">
+
+```bash
+bin/lemline definition get
+```
+
+</tab>
+<tab id="windows-get" title="Windows (x86_64)" group-key="windows">
+
+```powershell
+bin\lemline.exe definition get
+```
+
+</tab>
+<tab id="java-get" title="Java (Any OS)" group-key="java">
+
+```bash
+java -jar lemline.jar definition get
+```
+
+</tab>
+</tabs>
+
+This displays all registered workflows with their namespace, name, and version.
+
 ## 3. Running Your Workflow
 
 Now, let's start an instance of the workflow. You need to specify the namespace and name from your workflow definition:

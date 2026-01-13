@@ -124,12 +124,13 @@ class PgmqClient(
      * This method only creates the queue tables using pgmq.create().
      */
     suspend fun initialize() {
-        logger.info { "Initializing PGMQ for queue: ${config.queue}" }
 
         // Create queue if auto-create is enabled
         if (config.autoCreateQueue) {
+            logger.info { "Initializing PGMQ for queue: ${config.queue}" }
             createQueue(config.queue)
             config.deadLetterQueue?.let { dlq ->
+                logger.info { "Initializing PGMQ for queue: $dlq" }
                 createQueue(dlq)
             }
         }
