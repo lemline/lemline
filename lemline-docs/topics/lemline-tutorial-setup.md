@@ -1,8 +1,8 @@
 ---
-title: "Tutorial: Setting Up Your Environment"
+title: Setting Up A Local Environment
 ---
 
-# Tutorial: Setting Up Your Environment
+# Setting Up A Local Environment
 
 This tutorial walks you through setting up Lemline for local development. By the end, you'll have a fully working environment ready to run workflows.
 
@@ -14,7 +14,7 @@ This tutorial walks you through setting up Lemline for local development. By the
 
 ## 1. Start the Infrastructure
 
-This tutorial uses **PostgreSQL** and **Kafka** for local development. You can substitute with other supported databases (MySQL) or message brokers (RabbitMQ, PGMQ). See [Configure Message Brokers](lemline-howto-brokers.md) for alternatives.
+This tutorial uses **PostgreSQL** and **Kafka** for local development. You can substitute with other supported databases (MySQL) or message brokers (RabbitMQ, PGMQ) that mirror your infrastructure. See [Configure Message Brokers](lemline-howto-brokers.md) for alternatives.
 
 Create a project directory and add a `docker-compose.yaml` file:
 
@@ -150,42 +150,42 @@ java -jar lemline.jar --version
 
 You should see output showing the Lemline version (e.g., `%version%`).
 
-## 4. Verify the Setup
+## 4. Run Database Migrations
 
-Test that Lemline can connect to your infrastructure:
+Lemline requires database tables for workflow state persistence. Run the migration command to create them:
 
 <tabs group="platform">
-<tab id="macos-verify" title="macOS (ARM64)" group-key="macos">
+<tab id="macos-migrate" title="macOS (ARM64)" group-key="macos">
 
 ```bash
-bin/lemline config
+bin/lemline migrate
 ```
 
 </tab>
-<tab id="linux-verify" title="Linux (x86_64)" group-key="linux">
+<tab id="linux-migrate" title="Linux (x86_64)" group-key="linux">
 
 ```bash
-bin/lemline config
+bin/lemline migrate
 ```
 
 </tab>
-<tab id="windows-verify" title="Windows (x86_64)" group-key="windows">
+<tab id="windows-migrate" title="Windows (x86_64)" group-key="windows">
 
 ```powershell
-bin\lemline.exe config
+bin\lemline.exe migrate
 ```
 
 </tab>
-<tab id="java-verify" title="Java (Any OS)" group-key="java">
+<tab id="java-migrate" title="Java (Any OS)" group-key="java">
 
 ```bash
-java -jar lemline.jar config
+java -jar lemline.jar migrate
 ```
 
 </tab>
 </tabs>
 
-This displays the resolved configuration. Verify the database and messaging settings match your `docker-compose.yaml`.
+You should see output indicating successful migration. This creates the necessary tables for workflow definitions, instances, retries, waits, and other operational data.
 
 ## Your Environment is Ready!
 
@@ -197,28 +197,3 @@ You now have:
 ## Next Steps
 
 Continue with the [Hello, Workflow!](lemline-tutorial-hello.md) tutorial to create and run your first workflow.
-
----
-
-## Alternative: In-Memory Mode (Java Only)
-
-If you want to quickly experiment without Docker, the Java JAR version supports in-memory mode:
-
-Create a minimal `.lemline.yaml`:
-
-```yaml
-lemline:
-  database:
-    type: in-memory
-  messaging:
-    type: in-memory
-```
-
-Then run workflows directly:
-
-```bash
-java -jar lemline.jar workflow run your-workflow.yaml
-```
-
-> **Note**: In-memory mode is only available with the Java JAR. Native binaries require PostgreSQL.
-
