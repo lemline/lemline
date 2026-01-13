@@ -48,6 +48,7 @@ const val CLOUDEVENTS_CONSUMER_CONCURRENCY = "lemline.messaging.cloudevents.cons
 const val LIFECYCLE_EVENTS_PRODUCER_ENABLED = "lemline.messaging.lifecycleevents.producer.enabled"
 
 const val DATABASE_ENABLED = "lemline.database.enabled"
+const val SCHEDULED_ENABLED = "lemline.scheduled.enabled"
 
 const val ORCHESTRATOR_MODE = "lemline.orchestrator.mode"
 
@@ -82,6 +83,7 @@ interface LemlineConfiguration {
     fun config(): Optional<String>
     fun database(): DatabaseConfig
     fun messaging(): MessagingConfig
+    fun scheduled(): ScheduledConfig
     fun orchestrator(): OrchestratorConfig
     fun outbox(): OutboxConfig
     fun metrics(): MetricsConfig
@@ -127,6 +129,20 @@ interface LemlineConfiguration {
          * Optional MySQL configuration
          */
         fun mysql(): Optional<MySQLConfig>
+    }
+
+    /**
+     * Scheduled tasks configuration.
+     * Controls whether background scheduled tasks (outbox processors, cleaners) run.
+     */
+    interface ScheduledConfig {
+        /**
+         * Whether scheduled tasks are enabled.
+         * Set to false for non-listen commands (migrate, config, etc.) to prevent
+         * background tasks from running during administrative operations.
+         */
+        @WithDefault("true")
+        fun enabled(): Boolean
     }
 
     /**

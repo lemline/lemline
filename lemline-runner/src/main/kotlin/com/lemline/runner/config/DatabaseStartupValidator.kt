@@ -9,14 +9,14 @@ import jakarta.annotation.Priority
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.enterprise.event.Observes
 import jakarta.inject.Inject
-import org.eclipse.microprofile.config.inject.ConfigProperty
 import java.sql.SQLException
+import org.eclipse.microprofile.config.inject.ConfigProperty
 
 /**
  * Validates database connectivity during application startup.
  * Provides clear, actionable error messages when the database is unreachable.
  *
- * Runs at priority 0, before FlywayMigration (priority 1) and BrokerStartupValidator (priority 2).
+ * Runs at priority 0, before FlywayMigration (priority 1) and MessagingStartupValidator (priority 2).
  */
 @ApplicationScoped
 class DatabaseStartupValidator(

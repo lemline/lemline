@@ -42,21 +42,11 @@ class MessagingStartupValidator {
         // Skip validation if database is disabled (e.g., for --help or --version)
         if (!databaseEnabled) return
 
-        // Skip validation for in-memory messaging
-        if (messagingType == MessagingType.IN_MEMORY) {
-            logger.info { "Using in-memory messaging - skipping broker connectivity check." }
-            return
-        }
-
-        verifyBrokerConnectivity()
-    }
-
-    private fun verifyBrokerConnectivity() {
         when (messagingType) {
             MessagingType.KAFKA -> verifyKafkaConnectivity()
             MessagingType.RABBITMQ -> verifyRabbitMQConnectivity()
             MessagingType.PGMQ -> verifyPgmqConnectivity()
-            MessagingType.IN_MEMORY -> {} // Already handled above
+            MessagingType.IN_MEMORY -> Unit
         }
     }
 

@@ -13,6 +13,7 @@ import com.lemline.runner.config.COMMANDS_PRODUCER_ENABLED
 import com.lemline.runner.config.DATABASE_ENABLED
 import com.lemline.runner.config.EVENTS_CONSUMER_ENABLED
 import com.lemline.runner.config.EVENTS_PRODUCER_ENABLED
+import com.lemline.runner.config.SCHEDULED_ENABLED
 import io.quarkus.picocli.runtime.annotations.TopCommand
 import io.quarkus.runtime.Quarkus
 import io.quarkus.runtime.QuarkusApplication
@@ -101,7 +102,7 @@ class LemlineApplication : QuarkusApplication {
 
                 if (helpOrVersion) {
                     disableMetricsEndpoint()
-                    disableBroker()
+                    disableMessaging()
                     disableDatabase()
                 } else {
                     // The listen command, if any
@@ -109,10 +110,11 @@ class LemlineApplication : QuarkusApplication {
 
                     if (listen == null) {
                         disableMetricsEndpoint()
-                        disableBroker()
+                        disableMessaging()
+                        disableScheduled()
                     } else {
                         listen.port?.let { setMetricsEndpointPort(it) }
-                        enableBroker()
+                        enableMessaging()
                     }
 
                     // the instance start command, if any
@@ -269,14 +271,14 @@ private fun disableMetricsEndpoint() {
     System.setProperty("quarkus.micrometer.export.prometheus.enabled", "false")
 }
 
-private fun enableBroker() {
+private fun enableMessaging() {
     System.setProperty(EVENTS_CONSUMER_ENABLED, "true")
     System.setProperty(COMMANDS_CONSUMER_ENABLED, "true")
     System.setProperty(EVENTS_PRODUCER_ENABLED, "true")
     System.setProperty(COMMANDS_PRODUCER_ENABLED, "true")
 }
 
-private fun disableBroker() {
+private fun disableMessaging() {
     System.setProperty(EVENTS_CONSUMER_ENABLED, "false")
     System.setProperty(COMMANDS_CONSUMER_ENABLED, "false")
     System.setProperty(EVENTS_PRODUCER_ENABLED, "false")
@@ -285,6 +287,10 @@ private fun disableBroker() {
 
 private fun disableDatabase() {
     System.setProperty(DATABASE_ENABLED, "false")
+}
+
+private fun disableScheduled() {
+    System.setProperty(SCHEDULED_ENABLED, "false")
 }
 
 private fun setLogLevel(level: Level) = level.name.let {

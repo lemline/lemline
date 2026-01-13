@@ -74,7 +74,6 @@ Create a `.lemline.yaml` configuration file in your project directory:
 lemline:
   database:
     type: postgresql
-    migrate-at-start: true
     postgresql:
       host: localhost
       port: 5432

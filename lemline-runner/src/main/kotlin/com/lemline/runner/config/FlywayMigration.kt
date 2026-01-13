@@ -3,6 +3,7 @@ package com.lemline.runner.config
 
 import com.lemline.common.info
 import com.lemline.common.logger
+import com.lemline.common.warn
 import com.lemline.runner.common.config.DatabaseType
 import io.quarkus.runtime.StartupEvent
 import jakarta.annotation.Priority
@@ -54,41 +55,30 @@ class FlywayMigration(
     }
 
     /**
-     * Verifies that all migrations have been applied.
-     * Throws a clear error message if pending migrations are found.
+     * Checks if all migrations have been applied.
+     * Logs a warning if pending migrations are found, allowing the app to continue.
      */
     private fun verifyMigrationsApplied() {
         val pendingMigrations = databaseManager.flyway.info().pending()
 
         if (pendingMigrations.isNotEmpty()) {
             val migrationList = pendingMigrations.joinToString("\n") { migration ->
-                "    • ${migration.version}: ${migration.description}"
+                "  - ${migration.version}: ${migration.description}"
             }
 
-            throw DatabaseStartupException(
+            logger.warn {
                 """
                 |
-                |═══════════════════════════════════════════════════════════════════════════════
-                |  DATABASE MIGRATIONS REQUIRED
-                |═══════════════════════════════════════════════════════════════════════════════
-                |
-                |  The database schema is not up to date. ${pendingMigrations.size} migration(s) pending:
-                |
+                |Database schema is not up to date. ${pendingMigrations.size} migration(s) pending:
                 |$migrationList
                 |
-                |  To apply migrations, either:
-                |    • Run: lemline migrate
-                |    • Or set 'migrate-at-start: true' in your .lemline.yaml:
-                |
-                |      lemline:
-                |        database:
-                |          migrate-at-start: true
-                |
-                |═══════════════════════════════════════════════════════════════════════════════
+                |To apply migrations, either:
+                |  - Run: lemline migrate
+                |  - Or set 'migrate-at-start: true' in your .lemline.yaml
                 """.trimMargin()
-            )
+            }
+        } else {
+            logger.info { "Database schema is up to date." }
         }
-
-        logger.info { "Database schema is up to date." }
     }
 }
