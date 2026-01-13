@@ -3,12 +3,10 @@ package com.lemline.runner.config
 
 import com.lemline.common.logger.logger
 import com.lemline.runner.cli.config.ConfigPathHolder
+import com.lemline.runner.common.config.DatabaseType
 import com.lemline.runner.config.LemlineConfigConstants.CLOUDEVENTS_TOPIC_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.COMMANDS_TOPIC_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.CONSUMER_CONCURRENCY_DEFAULT
-import com.lemline.runner.config.LemlineConfigConstants.DB_TYPE_IN_MEMORY
-import com.lemline.runner.config.LemlineConfigConstants.DB_TYPE_MYSQL
-import com.lemline.runner.config.LemlineConfigConstants.DB_TYPE_POSTGRESQL
 import com.lemline.runner.config.LemlineConfigConstants.EVENTS_TOPIC_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.H2_DB_NAME_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.H2_PASSWORD_DEFAULT
@@ -25,10 +23,7 @@ import com.lemline.runner.config.LemlineConfigConstants.KAFKA_WORKFLOWS_GROUP_ID
 import com.lemline.runner.config.LemlineConfigConstants.LIFECYCLE_EVENTS_TOPIC_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.METRICS_PATH_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.METRICS_PORT_DEFAULT
-import com.lemline.runner.config.LemlineConfigConstants.MSG_TYPE_IN_MEMORY
-import com.lemline.runner.config.LemlineConfigConstants.MSG_TYPE_KAFKA
-import com.lemline.runner.config.LemlineConfigConstants.MSG_TYPE_PGMQ
-import com.lemline.runner.config.LemlineConfigConstants.MSG_TYPE_RABBITMQ
+import com.lemline.runner.common.config.MessagingType
 import com.lemline.runner.config.LemlineConfigConstants.PGMQ_BATCH_SIZE_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.PGMQ_CONNECTOR
 import com.lemline.runner.config.LemlineConfigConstants.PGMQ_MAX_RETRIES_DEFAULT
@@ -151,18 +146,21 @@ class LemlineConfigSource : PropertiesConfigSource(
             val usePostgres = props.keys.any { it.startsWith("lemline.database.postgresql.") }
             val useMysql = props.keys.any { it.startsWith("lemline.database.mysql.") }
 
-            val type = props[DATABASE_TYPE] ?: run {
+            val type = props[DATABASE_TYPE]?.let { DatabaseType.fromConfigValue(it) } ?: run {
                 when {
-                    usePostgres && useMysql -> throw IllegalArgumentException("Both properties 'postgresql' and 'mysql' are defined. Explicitly set '$DATABASE_TYPE' to '$DB_TYPE_POSTGRESQL' or '$DB_TYPE_MYSQL'.")
-                    usePostgres -> DB_TYPE_POSTGRESQL
-                    useMysql -> DB_TYPE_MYSQL
-                    else -> DB_TYPE_IN_MEMORY
+                    usePostgres && useMysql -> throw IllegalArgumentException(
+                        "Both properties 'postgresql' and 'mysql' are defined. " +
+                            "Explicitly set '$DATABASE_TYPE' to '${DatabaseType.POSTGRESQL.configValue}' or '${DatabaseType.MYSQL.configValue}'."
+                    )
+                    usePostgres -> DatabaseType.POSTGRESQL
+                    useMysql -> DatabaseType.MYSQL
+                    else -> DatabaseType.H2
                 }
             }
-            generated[DATABASE_TYPE] = type
+            generated[DATABASE_TYPE] = type.configValue
 
             when (type) {
-                DB_TYPE_POSTGRESQL -> {
+                DatabaseType.POSTGRESQL -> {
                     val db = "lemline.database.postgresql"
                     val host = props["$db.host"] ?: POSTGRES_HOST_DEFAULT
                     val port = props["$db.port"] ?: POSTGRES_PORT_DEFAULT
@@ -173,7 +171,7 @@ class LemlineConfigSource : PropertiesConfigSource(
                     generated["$postgres.jdbc.url"] = "jdbc:postgresql://$host:$port/$name"
                 }
 
-                DB_TYPE_MYSQL -> {
+                DatabaseType.MYSQL -> {
                     val db = "lemline.database.mysql"
                     val host = props["$db.host"] ?: MYSQL_HOST_DEFAULT
                     val port = props["$db.port"] ?: MYSQL_PORT_DEFAULT
@@ -188,7 +186,7 @@ class LemlineConfigSource : PropertiesConfigSource(
                         "&continueBatchOnError=false"
                 }
 
-                DB_TYPE_IN_MEMORY -> {
+                DatabaseType.H2 -> {
                     val h2 = "quarkus.datasource" // <- default datasource
                     generated["$h2.username"] = H2_USERNAME_DEFAULT
                     generated["$h2.password"] = H2_PASSWORD_DEFAULT
@@ -206,31 +204,30 @@ class LemlineConfigSource : PropertiesConfigSource(
             val usePgmq = props.keys.any { it.startsWith("lemline.messaging.pgmq.") }
 
             val messagingTypes = listOfNotNull(
-                if (useKafka) MSG_TYPE_KAFKA else null,
-                if (useRabbit) MSG_TYPE_RABBITMQ else null,
-                if (usePgmq) MSG_TYPE_PGMQ else null
+                if (useKafka) MessagingType.KAFKA else null,
+                if (useRabbit) MessagingType.RABBITMQ else null,
+                if (usePgmq) MessagingType.PGMQ else null
             )
 
-            val type = props[MESSAGING_TYPE] ?: run {
+            val type = props[MESSAGING_TYPE]?.let { MessagingType.fromConfigValue(it) } ?: run {
                 when {
                     messagingTypes.size > 1 -> throw IllegalArgumentException(
-                        "Multiple messaging types defined: ${messagingTypes.joinToString()}. " +
-                            "Explicitly set '$MESSAGING_TYPE' to one of: $MSG_TYPE_KAFKA, $MSG_TYPE_RABBITMQ, $MSG_TYPE_PGMQ."
+                        "Multiple messaging types defined: ${messagingTypes.joinToString { it.configValue }}. " +
+                            "Explicitly set '$MESSAGING_TYPE' to one of: ${MessagingType.KAFKA.configValue}, ${MessagingType.RABBITMQ.configValue}, ${MessagingType.PGMQ.configValue}."
                     )
-                    useKafka -> MSG_TYPE_KAFKA
-                    useRabbit -> MSG_TYPE_RABBITMQ
-                    usePgmq -> MSG_TYPE_PGMQ
-                    else -> MSG_TYPE_IN_MEMORY
+                    useKafka -> MessagingType.KAFKA
+                    useRabbit -> MessagingType.RABBITMQ
+                    usePgmq -> MessagingType.PGMQ
+                    else -> MessagingType.IN_MEMORY
                 }
             }
-            generated[MESSAGING_TYPE] = type
+            generated[MESSAGING_TYPE] = type.configValue
 
             when (type) {
-                MSG_TYPE_KAFKA -> generated.configureKafka(props)
-                MSG_TYPE_RABBITMQ -> generated.configureRabbit(props)
-                MSG_TYPE_PGMQ -> generated.configurePgmq(props)
-                MSG_TYPE_IN_MEMORY -> generated.configureInMemory()
-                else -> error("Unknown messaging type: $type")
+                MessagingType.KAFKA -> generated.configureKafka(props)
+                MessagingType.RABBITMQ -> generated.configureRabbit(props)
+                MessagingType.PGMQ -> generated.configurePgmq(props)
+                MessagingType.IN_MEMORY -> generated.configureInMemory()
             }
 
             return generated

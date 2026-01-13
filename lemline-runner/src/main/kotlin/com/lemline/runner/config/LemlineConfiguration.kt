@@ -47,6 +47,8 @@ const val CLOUDEVENTS_CONSUMER_CONCURRENCY = "lemline.messaging.cloudevents.cons
 
 const val LIFECYCLE_EVENTS_PRODUCER_ENABLED = "lemline.messaging.lifecycleevents.producer.enabled"
 
+const val DATABASE_ENABLED = "lemline.database.enabled"
+
 const val ORCHESTRATOR_MODE = "lemline.orchestrator.mode"
 
 /**
@@ -89,6 +91,13 @@ interface LemlineConfiguration {
      * Database configuration mapping.
      */
     interface DatabaseConfig {
+
+        /**
+         * Whether database is enabled.
+         * Set to false for commands that don't need database (e.g., --help, --version).
+         */
+        @WithDefault("true")
+        fun enabled(): Boolean
 
         /**
          * Database type.

@@ -10,19 +10,8 @@ object LemlineConfigConstants {
     const val CONFIG_ORDINAL = 275
     const val CONFIG_SOURCE_NAME = "LemlineConfigSource"
 
-    // Database types
-    const val DB_TYPE_IN_MEMORY = "in-memory"
-    const val DB_TYPE_POSTGRESQL = "postgresql"
-    const val DB_TYPE_MYSQL = "mysql"
-
     const val DB_MIGRATE_AT_START_DEFAULT = "false"
     const val DB_BASELINE_ON_MIGRATE_DEFAULT = "false"
-
-    // Messaging types
-    const val MSG_TYPE_IN_MEMORY = "in-memory"
-    const val MSG_TYPE_KAFKA = "kafka"
-    const val MSG_TYPE_RABBITMQ = "rabbitmq"
-    const val MSG_TYPE_PGMQ = "pgmq"
 
     // Consumer concurrency
     const val CONSUMER_CONCURRENCY_DEFAULT = "64"

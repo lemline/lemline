@@ -8,7 +8,7 @@ import com.lemline.runner.config.COMMANDS_PRODUCER_ENABLED
 import com.lemline.runner.config.EVENTS_CONSUMER_ENABLED
 import com.lemline.runner.config.EVENTS_PRODUCER_ENABLED
 import com.lemline.runner.config.LIFECYCLE_EVENTS_PRODUCER_ENABLED
-import com.lemline.runner.config.LemlineConfigConstants.MSG_TYPE_PGMQ
+import com.lemline.runner.common.config.MessagingType
 import com.lemline.runner.config.MESSAGING_TYPE
 import com.lemline.runner.tests.resources.PgmqTestResource
 import io.quarkus.test.junit.QuarkusTestProfile
@@ -36,7 +36,7 @@ class PgmqProfile : QuarkusTestProfile {
         return mapOf(
             // Database configuration is provided by PgmqTestResource via lemline.database.postgresql.*
             // Messaging configuration (use PGMQ for message broker)
-            MESSAGING_TYPE to MSG_TYPE_PGMQ,
+            MESSAGING_TYPE to MessagingType.PGMQ.configValue,
             // Commands and events channels
             COMMANDS_CONSUMER_ENABLED to "true",
             COMMANDS_PRODUCER_ENABLED to "true",
@@ -94,6 +94,6 @@ class PgmqProfile : QuarkusTestProfile {
      * Specifies tags for this profile.
      */
     override fun tags(): Set<String> {
-        return setOf(MSG_TYPE_PGMQ)
+        return setOf(MessagingType.PGMQ.configValue)
     }
 }

@@ -10,7 +10,6 @@ In this tutorial, you'll build and run your first workflow with Lemline using `s
 
 By completing this tutorial, you will learn:
 
-- How to install and set up the Lemline runtime
 - How to create a basic workflow definition
 - How to use the `set` task to manipulate data
 - How to use a function to log information
@@ -19,240 +18,300 @@ By completing this tutorial, you will learn:
 ## Prerequisites
 
 - Basic familiarity with YAML syntax
-- JDK 17 or higher installed
-- Command-line terminal access
-- No prior experience with Lemline or workflow engines required
+- A working Lemline environment (complete the [Setting Up Your Environment](lemline-tutorial-setup.md) tutorial first)
 
-## 1. Setting Up Your Environment
+## 1. Creating Your First Workflow
 
-First, let's install Lemline and prepare your workspace.
-
-```bash
-# Create a project directory
-mkdir hello-lemline
-cd hello-lemline
-
-# Download the Lemline runner
-curl -L https://github.com/lemline/lemline/releases/latest/download/lemline-runner-VERSION-runner.jar -o lemline-runner.jar
-
-# Make it executable
-chmod +x lemline-runner.jar
-
-# Create a directory for your workflows
-mkdir workflows
-```
-
-## 2. Creating Your First Workflow
-
-Create a file named `workflows/hello.yaml` with the following content:
+Create a file named `hello.yaml` with the following content:
 
 ```yaml
-id: hello-workflow
-name: Hello Workflow
-version: '1.0'
-specVersion: '1.0'
-start: Greeting
-functions:
-  - name: logFunction
-    type: custom
-    operation: log
-tasks:
-  - name: Greeting
-    type: set
-    data:
-      message: "Hello, Lemline!"
-    next: LogMessage
-  - name: LogMessage
-    type: call
-    function: logFunction
-    data:
-      log: ".message"
-    end: true
+document:
+  dsl: '1.0.0'
+  namespace: tutorial
+  name: hello-workflow
+  version: '0.1.0'
+do:
+  - setGreeting:
+      set:
+        message: Hello, Lemline!
+  - logMessage:
+      call: https://raw.githubusercontent.com/serverlessworkflow/catalog/main/functions/log/1.0.0/function.yaml
+      with:
+        message: ${ .message }
 ```
 
 Let's break down what this workflow does:
 
-- It defines a unique `id` and human-readable `name`
-- It specifies the workflow and spec versions
-- It sets the starting task as `Greeting`
-- It defines a `logFunction` that will be used to output information
-- It creates two tasks:
-  - `Greeting`: Sets a `message` variable with a greeting
-  - `LogMessage`: Calls the log function to output the message
+- **document**: Defines metadata (DSL version, namespace, name, version)
+- **do**: Contains the list of tasks to execute sequentially
+- **setGreeting**: Uses `set` to create a `message` variable
+- **logMessage**: Calls the standard log function to output the message
 
-## 3. Running Your Workflow
+## 2. Running Your Workflow
 
 Now, let's run the workflow:
 
+<tabs group="platform">
+<tab id="macos-run" title="macOS (ARM64)" group-key="macos">
+
 ```bash
-java -jar lemline-runner.jar workflow run workflows/hello.yaml
+bin/lemline workflow run hello.yaml
 ```
+
+</tab>
+<tab id="linux-run" title="Linux (x86_64)" group-key="linux">
+
+```bash
+bin/lemline workflow run hello.yaml
+```
+
+</tab>
+<tab id="windows-run" title="Windows (x86_64)" group-key="windows">
+
+```powershell
+bin\lemline.exe workflow run workflows\hello.yaml
+```
+
+</tab>
+<tab id="java-run" title="Java (Any OS)" group-key="java">
+
+```bash
+java -jar lemline.jar workflow run hello.yaml
+```
+
+</tab>
+</tabs>
 
 You should see output that includes your "Hello, Lemline!" message along with workflow execution details.
 
-## 4. Enhancing Your Workflow
+## 3. Enhancing Your Workflow
 
-Let's make this workflow more interesting by adding data manipulation and conditional logic.
+Let's make this workflow more interesting by adding more variables and string manipulation.
 
-Update `workflows/hello.yaml` to the following:
+Update `hello.yaml` to the following:
 
 ```yaml
-id: hello-workflow
-name: Hello Workflow
-version: '1.0'
-specVersion: '1.0'
-start: GetUserName
-functions:
-  - name: logFunction
-    type: custom
-    operation: log
-tasks:
-  - name: GetUserName
-    type: set
-    data:
-      user: "Workflow Author"
-      time: "$WORKFLOW.startTime"
-    next: CreateGreeting
-  - name: CreateGreeting
-    type: set
-    data:
-      morning: ".time < '12:00'"
-      greeting: ".morning ? 'Good morning' : 'Hello'"
-      message: ".greeting + ', ' + .user + '!'"
-    next: LogMessage
-  - name: LogMessage
-    type: call
-    function: logFunction
-    data:
-      log: ".message"
-    end: true
+document:
+  dsl: '1.0.0'
+  namespace: tutorial
+  name: hello-workflow
+  version: '0.1.0'
+do:
+  - setUserInfo:
+      set:
+        user: Workflow Author
+        role: Developer
+  - createGreeting:
+      set:
+        message: ${ "Hello, " + .user + "! Welcome, " + .role + "." }
+  - logMessage:
+      call: https://raw.githubusercontent.com/serverlessworkflow/catalog/main/functions/log/1.0.0/function.yaml
+      with:
+        message: ${ .message }
 ```
 
 This enhanced workflow:
-1. Sets a `user` variable and captures the workflow start time
-2. Creates a conditional greeting based on the time
-3. Constructs a personalized message
-4. Logs the message to the console
+1. Sets `user` and `role` variables
+2. Constructs a personalized greeting using string concatenation
+3. Logs the final message
 
 Run the enhanced workflow:
 
+<tabs group="platform">
+<tab id="macos-run2" title="macOS (ARM64)" group-key="macos">
+
 ```bash
-java -jar lemline-runner.jar workflow run workflows/hello.yaml
+bin/lemline workflow run hello.yaml
 ```
 
-## 5. Adding User Input
+</tab>
+<tab id="linux-run2" title="Linux (x86_64)" group-key="linux">
+
+```bash
+bin/lemline workflow run hello.yaml
+```
+
+</tab>
+<tab id="windows-run2" title="Windows (x86_64)" group-key="windows">
+
+```powershell
+bin\lemline.exe workflow run hello.yaml
+```
+
+</tab>
+<tab id="java-run2" title="Java (Any OS)" group-key="java">
+
+```bash
+java -jar lemline.jar workflow run hello.yaml
+```
+
+</tab>
+</tabs>
+
+## 4. Adding User Input
 
 Let's modify the workflow to accept user input. Create a file named `input.json`:
 
 ```json
 {
-  "user": "Your Name"
+  "name": "Your Name"
 }
 ```
 
 Update your workflow to use this input:
 
 ```yaml
-id: hello-workflow
-name: Hello Workflow
-version: '1.0'
-specVersion: '1.0'
-start: GetUserName
+document:
+  dsl: '1.0.0'
+  namespace: tutorial
+  name: hello-workflow
+  version: '0.1.0'
 input:
-  - $WORKFLOW.input.user
-functions:
-  - name: logFunction
-    type: custom
-    operation: log
-tasks:
-  - name: GetUserName
-    type: set
-    data:
-      user: "$WORKFLOW.input.user || 'Workflow Author'"
-      time: "$WORKFLOW.startTime"
-    next: CreateGreeting
-  - name: CreateGreeting
-    type: set
-    data:
-      morning: ".time < '12:00'"
-      greeting: ".morning ? 'Good morning' : 'Hello'"
-      message: ".greeting + ', ' + .user + '!'"
-    next: LogMessage
-  - name: LogMessage
-    type: call
-    function: logFunction
-    data:
-      log: ".message"
-    end: true
+  schema:
+    type: object
+    properties:
+      name:
+        type: string
+do:
+  - createGreeting:
+      set:
+        message: ${ "Hello, " + .name + "!" }
+  - logMessage:
+      call: https://raw.githubusercontent.com/serverlessworkflow/catalog/main/functions/log/1.0.0/function.yaml
+      with:
+        message: ${ .message }
 ```
 
 Run the workflow with your input:
 
+<tabs group="platform">
+<tab id="macos-run3" title="macOS (ARM64)" group-key="macos">
+
 ```bash
-java -jar lemline-runner.jar workflow run workflows/hello.yaml --input input.json
+bin/lemline workflow run hello.yaml --input input.json
 ```
 
-## 6. Exploring the Results
+</tab>
+<tab id="linux-run3" title="Linux (x86_64)" group-key="linux">
 
-Let's add a final task to output all the workflow data for inspection:
+```bash
+bin/lemline workflow run hello.yaml --input input.json
+```
+
+</tab>
+<tab id="windows-run3" title="Windows (x86_64)" group-key="windows">
+
+```powershell
+bin\lemline.exe workflow run hello.yaml --input input.json
+```
+
+</tab>
+<tab id="java-run3" title="Java (Any OS)" group-key="java">
+
+```bash
+java -jar lemline.jar workflow run hello.yaml --input input.json
+```
+
+</tab>
+</tabs>
+
+## 5. Adding Conditional Logic
+
+Let's add a conditional greeting based on the time of day using a `switch` task:
 
 ```yaml
-id: hello-workflow
-name: Hello Workflow
-version: '1.0'
-specVersion: '1.0'
-start: GetUserName
+document:
+  dsl: '1.0.0'
+  namespace: tutorial
+  name: hello-workflow
+  version: '0.1.0'
 input:
-  - $WORKFLOW.input.user
-functions:
-  - name: logFunction
-    type: custom
-    operation: log
-tasks:
-  - name: GetUserName
-    type: set
-    data:
-      user: "$WORKFLOW.input.user || 'Workflow Author'"
-      time: "$WORKFLOW.startTime"
-    next: CreateGreeting
-  - name: CreateGreeting
-    type: set
-    data:
-      morning: ".time < '12:00'"
-      greeting: ".morning ? 'Good morning' : 'Hello'"
-      message: ".greeting + ', ' + .user + '!'"
-    next: LogMessage
-  - name: LogMessage
-    type: call
-    function: logFunction
-    data:
-      log: ".message"
-    next: ShowState
-  - name: ShowState
-    type: call
-    function: logFunction
-    data:
-      log: "$WORKFLOW"
-    end: true
+  schema:
+    type: object
+    properties:
+      name:
+        type: string
+      hour:
+        type: integer
+do:
+  - chooseGreeting:
+      switch:
+        - when: ${ .hour < 12 }
+          then: setMorningGreeting
+        - when: ${ .hour < 18 }
+          then: setAfternoonGreeting
+        - otherwise:
+          then: setEveningGreeting
+  - setMorningGreeting:
+      set:
+        greeting: Good morning
+  - setAfternoonGreeting:
+      set:
+        greeting: Good afternoon
+  - setEveningGreeting:
+      set:
+        greeting: Good evening
+  - createMessage:
+      set:
+        message: ${ .greeting + ", " + .name + "!" }
+  - logMessage:
+      call: https://raw.githubusercontent.com/serverlessworkflow/catalog/main/functions/log/1.0.0/function.yaml
+      with:
+        message: ${ .message }
 ```
 
-Run this final version to see the complete workflow state:
+Update `input.json` with an hour value:
+
+```json
+{
+  "name": "Your Name",
+  "hour": 10
+}
+```
+
+Run the workflow:
+
+<tabs group="platform">
+<tab id="macos-run4" title="macOS (ARM64)" group-key="macos">
 
 ```bash
-java -jar lemline-runner.jar workflow run workflows/hello.yaml --input input.json
+bin/lemline workflow run hello.yaml --input input.json
 ```
+
+</tab>
+<tab id="linux-run4" title="Linux (x86_64)" group-key="linux">
+
+```bash
+bin/lemline workflow run hello.yaml --input input.json
+```
+
+</tab>
+<tab id="windows-run4" title="Windows (x86_64)" group-key="windows">
+
+```powershell
+bin\lemline.exe workflow run hello.yaml --input input.json
+```
+
+</tab>
+<tab id="java-run4" title="Java (Any OS)" group-key="java">
+
+```bash
+java -jar lemline.jar workflow run hello.yaml --input input.json
+```
+
+</tab>
+</tabs>
 
 ## What You've Learned
 
 In this tutorial, you've learned how to:
 
-- Set up and run the Lemline workflow engine
-- Create a basic workflow definition file
-- Use the `set` task to manage data
-- Create conditional logic in your workflow
-- Use functions to perform actions
-- Pass input to a workflow
-- Inspect workflow state
+- Create workflow definitions using the Serverless Workflow DSL v1.0
+- Use the `set` task to create and manipulate variables
+- Use expressions with `${ }` for dynamic values
+- Call external functions (like the log function)
+- Pass input to a workflow using JSON files
+- Use `switch` for conditional branching
 
 ## Next Steps
 

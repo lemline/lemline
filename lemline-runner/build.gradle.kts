@@ -249,3 +249,28 @@ tasks.named("processResources") {
 // quarkus.native.resources.includes=version.properties
 // to the application.properties.
 
+// ────────────────────────────────────────────────────────────────────────────
+// 7) Sync Version to Documentation
+// ────────────────────────────────────────────────────────────────────────────
+tasks.register("syncDocsVersion") {
+    group = "documentation"
+    description = "Syncs the baseVersion to Writerside v.list for use in documentation"
+
+    val vListFile = rootProject.file("lemline-docs/v.list")
+    outputs.file(vListFile)
+
+    doLast {
+        vListFile.writeText(
+            """
+            |<?xml version="1.0" encoding="UTF-8"?>
+            |<!DOCTYPE vars SYSTEM "https://resources.jetbrains.com/writerside/1.0/vars.dtd">
+            |<vars>
+            |    <var name="product" value="Lemline"/>
+            |    <var name="version" value="$baseVersion"/>
+            |</vars>
+            """.trimMargin() + "\n"
+        )
+        println("Updated v.list with version: $baseVersion")
+    }
+}
+

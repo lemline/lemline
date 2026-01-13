@@ -2,8 +2,8 @@
 package com.lemline.runner.tests.profiles
 
 import com.lemline.runner.common.test.RequiresDocker
-import com.lemline.runner.config.LemlineConfigConstants.DB_TYPE_IN_MEMORY
-import com.lemline.runner.config.LemlineConfigConstants.MSG_TYPE_RABBITMQ
+import com.lemline.runner.common.config.DatabaseType
+import com.lemline.runner.common.config.MessagingType
 import com.lemline.runner.config.LemlineConfiguration
 import io.quarkus.test.junit.QuarkusTest
 import io.quarkus.test.junit.TestProfile
@@ -22,7 +22,7 @@ class RabbitMQProfileTest {
     @Test
     fun `check the RabbitMQProfile profile`() {
         // Check the default values of the configuration
-        assertEquals(DB_TYPE_IN_MEMORY, lemlineConfig.database().type())
-        assertEquals(MSG_TYPE_RABBITMQ, lemlineConfig.messaging().type())
+        assertEquals(DatabaseType.H2.configValue, lemlineConfig.database().type())
+        assertEquals(MessagingType.RABBITMQ.configValue, lemlineConfig.messaging().type())
     }
 }
