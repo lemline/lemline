@@ -1,0 +1,21 @@
+# Lemline Configuration: Kafka + PostgreSQL
+#
+# Start infrastructure:
+#   docker compose --profile kafka-pg up -d
+#
+# Run Lemline:
+#   LEMLINE_CONFIG=./examples/lemline-kafka-pg.yaml java -jar lemline-runner.jar listen
+
+lemline:
+  database:
+    postgresql:
+      host: localhost
+      port: 5432
+      database: lemline
+      username: postgres
+      password: postgres
+
+  messaging:
+    kafka:
+      brokers: localhost:9092
+

@@ -45,10 +45,10 @@ internal class WorkflowConsumerRabbitMQTest : WorkflowConsumerTest() {
     private lateinit var databaseQueueOut: String
 
     private lateinit var connection: Connection
-    private lateinit var instanceChannel: Channel
-    private lateinit var databaseChannel: Channel
-    private val instanceDeliveries = LinkedBlockingQueue<Delivery>()
-    private val databaseDeliveries = LinkedBlockingQueue<Delivery>()
+    private lateinit var commandsChannel: Channel
+    private lateinit var eventsChannel: Channel
+    private val commandsDeliveries = LinkedBlockingQueue<Delivery>()
+    private val eventsDeliveries = LinkedBlockingQueue<Delivery>()
 
     @BeforeAll
     fun initClients() {
@@ -80,72 +80,81 @@ internal class WorkflowConsumerRabbitMQTest : WorkflowConsumerTest() {
             password = rabbitmqPassword
         }
         connection = factory.newConnection()
-        instanceChannel = connection.createChannel()
-        databaseChannel = connection.createChannel()
+        commandsChannel = connection.createChannel()
+        eventsChannel = connection.createChannel()
 
-        // Declare the incoming queue
-        val instanceArgs = mapOf(
-            "x-dead-letter-exchange" to "$COMMANDS_IN_CHANNEL.dlx",
-            "x-dead-letter-routing-key" to "lemline-commands.dlq"
+        // Declare the incoming queue with DLQ settings matching LemlineConfigSource
+        val commandsDlx =
+            config.getValue("mp.messaging.incoming.$COMMANDS_IN_CHANNEL.dead-letter-exchange", String::class.java)
+        val commandsDlq =
+            config.getValue("mp.messaging.incoming.$COMMANDS_IN_CHANNEL.dead-letter-routing-key", String::class.java)
+        val commandsArgs = mapOf(
+            "x-dead-letter-exchange" to commandsDlx,
+            "x-dead-letter-routing-key" to commandsDlq
         )
-        instanceChannel.queueDeclare(instanceQueueIn, true, false, false, instanceArgs)
-        val databaseArgs = mapOf(
-            "x-dead-letter-exchange" to "$EVENTS_IN_CHANNEL.dlx",
-            "x-dead-letter-routing-key" to "lemline-events.dlq"
+        commandsChannel.queueDeclare(instanceQueueIn, true, false, false, commandsArgs)
+
+        val eventsDlx =
+            config.getValue("mp.messaging.incoming.$EVENTS_IN_CHANNEL.dead-letter-exchange", String::class.java)
+        val eventsDlq =
+            config.getValue("mp.messaging.incoming.$EVENTS_IN_CHANNEL.dead-letter-routing-key", String::class.java)
+        val eventsArgs = mapOf(
+            "x-dead-letter-exchange" to eventsDlx,
+            "x-dead-letter-routing-key" to eventsDlq
         )
-        databaseChannel.queueDeclare(databaseQueueIn, true, false, false, databaseArgs)
+        eventsChannel.queueDeclare(databaseQueueIn, true, false, false, eventsArgs)
 
         // Explicitly declare the exchange that SmallRye will default to
-        instanceChannel.exchangeDeclare(COMMANDS_OUT_CHANNEL, "topic", true)
-        databaseChannel.exchangeDeclare(EVENTS_OUT_CHANNEL, "topic", true)
+        commandsChannel.exchangeDeclare(COMMANDS_OUT_CHANNEL, "topic", true)
+        eventsChannel.exchangeDeclare(EVENTS_OUT_CHANNEL, "topic", true)
 
         // Declare the outgoing queue (where this test consumes)
-        instanceChannel.queueDeclare(instanceQueueOut, true, false, false, null)
-        databaseChannel.queueDeclare(databaseQueueOut, true, false, false, null)
+        commandsChannel.queueDeclare(instanceQueueOut, true, false, false, null)
+        eventsChannel.queueDeclare(databaseQueueOut, true, false, false, null)
 
         // Bind the outgoing queue to the exchange with an EMPTY routing key,
         // matching the default behavior observed in the logs.
-        instanceChannel.queueBind(instanceQueueOut, COMMANDS_OUT_CHANNEL, "") // routingKey = ""
-        databaseChannel.queueBind(databaseQueueOut, EVENTS_OUT_CHANNEL, "") // routingKey = ""
+        commandsChannel.queueBind(instanceQueueOut, COMMANDS_OUT_CHANNEL, "") // routingKey = ""
+        eventsChannel.queueBind(databaseQueueOut, EVENTS_OUT_CHANNEL, "") // routingKey = ""
 
         // Setup consumer callbacks
         val instanceCallback = DeliverCallback { _, delivery ->
             println("Received message on output queue: ${String(delivery.body)}")
-            instanceDeliveries.offer(delivery)
+            commandsDeliveries.offer(delivery)
         }
-        instanceChannel.basicConsume(instanceQueueOut, true, instanceCallback) { }
+        commandsChannel.basicConsume(instanceQueueOut, true, instanceCallback) { }
         val databaseCallback = DeliverCallback { _, delivery ->
             println("Received message on output queue: ${String(delivery.body)}")
-            databaseDeliveries.offer(delivery)
+            eventsDeliveries.offer(delivery)
         }
-        databaseChannel.basicConsume(databaseQueueOut, true, databaseCallback) { }
+        eventsChannel.basicConsume(databaseQueueOut, true, databaseCallback) { }
     }
 
     @AfterAll
     fun closeClients() {
-        if (::instanceChannel.isInitialized) instanceChannel.close()
-        if (::databaseChannel.isInitialized) databaseChannel.close()
+        if (::commandsChannel.isInitialized) commandsChannel.close()
+        if (::eventsChannel.isInitialized) eventsChannel.close()
         if (::connection.isInitialized) connection.close()
     }
 
     override fun setupMessaging() {
         // Purge queues to ensure clean state between tests
-        instanceChannel.queuePurge(instanceQueueIn)
-        instanceChannel.queuePurge(instanceQueueOut)
-        databaseChannel.queuePurge(databaseQueueIn)
-        databaseChannel.queuePurge(databaseQueueOut)
+        commandsChannel.queuePurge(instanceQueueIn)
+        commandsChannel.queuePurge(instanceQueueOut)
+        eventsChannel.queuePurge(databaseQueueIn)
+        eventsChannel.queuePurge(databaseQueueOut)
 
         // Clear in-memory delivery queues
-        instanceDeliveries.clear()
-        databaseDeliveries.clear()
+        commandsDeliveries.clear()
+        eventsDeliveries.clear()
     }
 
     override fun cleanupMessaging() {
         // No-op - clients are closed in @AfterAll
     }
 
-    override fun sendInstanceMessage(message: String) {
-        instanceChannel.basicPublish(
+    override fun sendCommand(message: String) {
+        commandsChannel.basicPublish(
             "",
             instanceQueueIn,
             MessageProperties.PERSISTENT_TEXT_PLAIN,
@@ -153,9 +162,9 @@ internal class WorkflowConsumerRabbitMQTest : WorkflowConsumerTest() {
         )
     }
 
-    override suspend fun receiveInstanceMessage(timeout: Long, unit: TimeUnit): String? =
-        instanceDeliveries.poll(timeout, unit)?.let { String(it.body) }
+    override suspend fun receiveCommand(timeout: Long, unit: TimeUnit): String? =
+        commandsDeliveries.poll(timeout, unit)?.let { String(it.body) }
 
-    override suspend fun receivedEvent(timeout: Long, unit: TimeUnit): String? =
-        databaseDeliveries.poll(timeout, unit)?.let { String(it.body) }
+    override suspend fun receiveEvent(timeout: Long, unit: TimeUnit): String? =
+        eventsDeliveries.poll(timeout, unit)?.let { String(it.body) }
 }

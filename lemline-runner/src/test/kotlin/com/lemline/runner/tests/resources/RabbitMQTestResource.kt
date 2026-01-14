@@ -36,7 +36,15 @@ class RabbitMQTestResource : QuarkusTestResourceLifecycleManager {
         System.setProperty("test.workflow.cloudevent-send-interval-ms", "50")
 
         // Return the RabbitMQ connection configuration
+        // Set both lemline.* properties (for LemlineConfiguration/MessagingStartupValidator)
+        // and rabbitmq-* properties (for SmallRye RabbitMQ connector)
         val properties = mapOf(
+            // Lemline config properties (read by MessagingStartupValidator via LemlineConfiguration)
+            "lemline.messaging.rabbitmq.hostname" to rabbitmq.host,
+            "lemline.messaging.rabbitmq.port" to rabbitmq.getMappedPort(5672).toString(),
+            "lemline.messaging.rabbitmq.username" to rabbitmq.adminUsername,
+            "lemline.messaging.rabbitmq.password" to rabbitmq.adminPassword,
+            // SmallRye connector properties (used by reactive messaging)
             "rabbitmq-host" to rabbitmq.host,
             "rabbitmq-port" to rabbitmq.getMappedPort(5672).toString(),
             "rabbitmq-username" to rabbitmq.adminUsername,
@@ -51,6 +59,10 @@ class RabbitMQTestResource : QuarkusTestResourceLifecycleManager {
 
     override fun stop() {
         // Clear system properties to prevent conflicts with other test profiles
+        System.clearProperty("lemline.messaging.rabbitmq.hostname")
+        System.clearProperty("lemline.messaging.rabbitmq.port")
+        System.clearProperty("lemline.messaging.rabbitmq.username")
+        System.clearProperty("lemline.messaging.rabbitmq.password")
         System.clearProperty("rabbitmq-host")
         System.clearProperty("rabbitmq-port")
         System.clearProperty("rabbitmq-username")

@@ -10,19 +10,8 @@ object LemlineConfigConstants {
     const val CONFIG_ORDINAL = 275
     const val CONFIG_SOURCE_NAME = "LemlineConfigSource"
 
-    // Database types
-    const val DB_TYPE_IN_MEMORY = "in-memory"
-    const val DB_TYPE_POSTGRESQL = "postgresql"
-    const val DB_TYPE_MYSQL = "mysql"
-
     const val DB_MIGRATE_AT_START_DEFAULT = "false"
     const val DB_BASELINE_ON_MIGRATE_DEFAULT = "false"
-
-    // Messaging types
-    const val MSG_TYPE_IN_MEMORY = "in-memory"
-    const val MSG_TYPE_KAFKA = "kafka"
-    const val MSG_TYPE_RABBITMQ = "rabbitmq"
-    const val MSG_TYPE_PGMQ = "pgmq"
 
     // Consumer concurrency
     const val CONSUMER_CONCURRENCY_DEFAULT = "64"
@@ -41,14 +30,14 @@ object LemlineConfigConstants {
     // Postgres
     const val POSTGRES_HOST_DEFAULT = "localhost"
     const val POSTGRES_PORT_DEFAULT = "5432"
-    const val POSTGRES_NAME_DEFAULT = "lemline"
+    const val POSTGRES_DATABASE_DEFAULT = "lemline"
     const val POSTGRES_USERNAME_DEFAULT = "postgres"
     const val POSTGRES_PASSWORD_DEFAULT = "postgres"
 
     // MySQL
     const val MYSQL_HOST_DEFAULT = "localhost"
     const val MYSQL_PORT_DEFAULT = "3306"
-    const val MYSQL_NAME_DEFAULT = "lemline"
+    const val MYSQL_DATABASE_DEFAULT = "lemline"
     const val MYSQL_USERNAME_DEFAULT = "mysql"
     const val MYSQL_PASSWORD_DEFAULT = "mysql"
 

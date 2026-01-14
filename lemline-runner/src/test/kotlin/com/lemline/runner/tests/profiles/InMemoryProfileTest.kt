@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.tests.profiles
 
-import com.lemline.runner.config.LemlineConfigConstants.DB_TYPE_IN_MEMORY
-import com.lemline.runner.config.LemlineConfigConstants.MSG_TYPE_IN_MEMORY
+import com.lemline.runner.common.config.DatabaseType
+import com.lemline.runner.common.config.MessagingType
 import com.lemline.runner.config.LemlineConfiguration
 import io.quarkus.test.junit.QuarkusTest
 import io.quarkus.test.junit.TestProfile
@@ -20,7 +20,7 @@ class InMemoryProfileTest {
     @Test
     fun `check the InMemoryProfile profile`() {
         // Check the default values of the configuration
-        assertEquals(DB_TYPE_IN_MEMORY, lemlineConfig.database().type())
-        assertEquals(MSG_TYPE_IN_MEMORY, lemlineConfig.messaging().type())
+        assertEquals(DatabaseType.H2.configValue, lemlineConfig.database().type())
+        assertEquals(MessagingType.IN_MEMORY.configValue, lemlineConfig.messaging().type())
     }
 }

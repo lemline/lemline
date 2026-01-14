@@ -9,14 +9,14 @@ reliable way to orchestrate tasks and services in distributed environments.
 
 ## Core Features
 
-* **Serverless Workflow DSL Implementation**: Implements a growing subset of the Serverless Workflow DSL 1.0 standard, a
+* **Serverless Workflow DSL Implementation**: Implements the Serverless Workflow DSL 1.0 standard, a
   CNCF project for workflow definitions (see [Supported Features](lemline-ref-supported-features.md) for details)
 * **Event-Driven Architecture**: Built from the ground up with event-driven principles
 * **Database-Optional Design**: Can operate without a central database for many workflow types
 * **Distributed by Nature**: Designed for cloud-native, distributed environments
 * **Highly Resilient**: Built-in error handling, retries, and compensation strategies
 * **Protocol Agnostic**: Integrates with HTTP, and soon with gRPC, OpenAPI, AsyncAPI
-* **Message Broker Support**: Works with Kafka, RabbitMQ, and soon with other messaging systems
+* **Message Broker Support**: Works with Kafka, RabbitMQ, PGMQ (Postgres-based) and soon with other messaging systems
 * **Scalable**: Horizontally scale workflow execution across multiple nodes
 * **Lightweight**: Minimal footprint with fast startup time
 

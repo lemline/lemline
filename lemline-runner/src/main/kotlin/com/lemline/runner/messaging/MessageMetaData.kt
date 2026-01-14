@@ -3,13 +3,10 @@ package com.lemline.runner.messaging
 
 import com.lemline.common.logger.logger
 import com.lemline.common.values.IDV7
-import com.lemline.runner.config.LemlineConfigConstants.MSG_TYPE_IN_MEMORY
-import com.lemline.runner.config.LemlineConfigConstants.MSG_TYPE_KAFKA
-import com.lemline.runner.config.LemlineConfigConstants.MSG_TYPE_PGMQ
-import com.lemline.runner.config.LemlineConfigConstants.MSG_TYPE_RABBITMQ
+import com.lemline.runner.common.config.MessagingType
 import com.lemline.runner.config.MESSAGING_TYPE
-import com.lemline.runner.messaging.postgres.connector.PgmqIncomingMetadata
-import com.lemline.runner.messaging.postgres.connector.PgmqOutgoingMetadata
+import com.lemline.runner.messaging.pgmq.connector.PgmqIncomingMetadata
+import com.lemline.runner.messaging.pgmq.connector.PgmqOutgoingMetadata
 import io.smallrye.reactive.messaging.kafka.api.IncomingKafkaRecordMetadata
 import io.smallrye.reactive.messaging.kafka.api.OutgoingKafkaRecordMetadata
 import io.smallrye.reactive.messaging.rabbitmq.IncomingRabbitMQMetadata
@@ -26,8 +23,12 @@ import org.eclipse.microprofile.reactive.messaging.Message
 @ApplicationScoped
 class MessageMetaData {
 
-    @ConfigProperty(name = MESSAGING_TYPE)
-    private lateinit var messagingType: String
+    @ConfigProperty(name = MESSAGING_TYPE, defaultValue = "in-memory")
+    private lateinit var _messagingTypeConfig: String
+
+    private val messagingType: MessagingType by lazy {
+        MessagingType.fromConfigValue(_messagingTypeConfig)
+    }
 
     private val logger = logger()
 
@@ -41,11 +42,10 @@ class MessageMetaData {
 
     private val getMetaDataFunction by lazy {
         when (messagingType) {
-            MSG_TYPE_KAFKA -> { message: Message<*> -> message.kafkaMeta }
-            MSG_TYPE_RABBITMQ -> { message: Message<*> -> message.rabbitMeta }
-            MSG_TYPE_PGMQ -> { message: Message<*> -> message.pgmqMeta }
-            MSG_TYPE_IN_MEMORY -> { message: Message<*> -> message.inMemoryMeta }
-            else -> error("Unknown messaging type: $messagingType")
+            MessagingType.KAFKA -> { message: Message<*> -> message.kafkaMeta }
+            MessagingType.RABBITMQ -> { message: Message<*> -> message.rabbitMeta }
+            MessagingType.PGMQ -> { message: Message<*> -> message.pgmqMeta }
+            MessagingType.IN_MEMORY -> { message: Message<*> -> message.inMemoryMeta }
         }
     }
 
@@ -96,11 +96,10 @@ class MessageMetaData {
 
     private val addMetaDataFunction by lazy {
         when (messagingType) {
-            MSG_TYPE_KAFKA -> { message: Message<*>, metaData: MetaData -> message.addKafkaMetaData(metaData) }
-            MSG_TYPE_RABBITMQ -> { message: Message<*>, metaData: MetaData -> message.addRabbitMQMeta(metaData) }
-            MSG_TYPE_PGMQ -> { message: Message<*>, metaData: MetaData -> message.addPgmqMeta(metaData) }
-            MSG_TYPE_IN_MEMORY -> { message: Message<*>, metaData: MetaData -> message.addInMemoryMeta(metaData) }
-            else -> error("Unknown messaging type: $messagingType")
+            MessagingType.KAFKA -> { message: Message<*>, metaData: MetaData -> message.addKafkaMetaData(metaData) }
+            MessagingType.RABBITMQ -> { message: Message<*>, metaData: MetaData -> message.addRabbitMQMeta(metaData) }
+            MessagingType.PGMQ -> { message: Message<*>, metaData: MetaData -> message.addPgmqMeta(metaData) }
+            MessagingType.IN_MEMORY -> { message: Message<*>, metaData: MetaData -> message.addInMemoryMeta(metaData) }
         }
     }
 

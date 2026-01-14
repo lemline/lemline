@@ -121,12 +121,10 @@ Lemline uses a database only when absolutely necessary. For workflows that don't
 Lemline can operate entirely without database interactions, using only message brokers for communication and state
 management.
 
-Only time-based operations like waits and timeouts are offloaded to a
-database.
+Only time-based operations like waits and timeouts are offloaded to a database.
 
 The system implements the outbox pattern to ensure reliable message delivery with transactional guarantees.
-When a
-database is used, operations are batched and optimized to minimize transactions and contention.
+When a database is used, operations are batched and optimized to minimize transactions and contention.
 
 The database schema is designed specifically for minimal contention, with careful attention to read/write patterns that
 occur in workflow processing. This prevents the database from becoming a bottleneck even when it is used.

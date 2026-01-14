@@ -3,12 +3,11 @@ package com.lemline.runner.config
 
 import com.lemline.common.logger.logger
 import com.lemline.runner.cli.config.ConfigPathHolder
+import com.lemline.runner.common.config.DatabaseType
+import com.lemline.runner.common.config.MessagingType
 import com.lemline.runner.config.LemlineConfigConstants.CLOUDEVENTS_TOPIC_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.COMMANDS_TOPIC_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.CONSUMER_CONCURRENCY_DEFAULT
-import com.lemline.runner.config.LemlineConfigConstants.DB_TYPE_IN_MEMORY
-import com.lemline.runner.config.LemlineConfigConstants.DB_TYPE_MYSQL
-import com.lemline.runner.config.LemlineConfigConstants.DB_TYPE_POSTGRESQL
 import com.lemline.runner.config.LemlineConfigConstants.EVENTS_TOPIC_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.H2_DB_NAME_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.H2_PASSWORD_DEFAULT
@@ -25,22 +24,18 @@ import com.lemline.runner.config.LemlineConfigConstants.KAFKA_WORKFLOWS_GROUP_ID
 import com.lemline.runner.config.LemlineConfigConstants.LIFECYCLE_EVENTS_TOPIC_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.METRICS_PATH_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.METRICS_PORT_DEFAULT
-import com.lemline.runner.config.LemlineConfigConstants.MSG_TYPE_IN_MEMORY
-import com.lemline.runner.config.LemlineConfigConstants.MSG_TYPE_KAFKA
-import com.lemline.runner.config.LemlineConfigConstants.MSG_TYPE_PGMQ
-import com.lemline.runner.config.LemlineConfigConstants.MSG_TYPE_RABBITMQ
+import com.lemline.runner.config.LemlineConfigConstants.MYSQL_HOST_DEFAULT
+import com.lemline.runner.config.LemlineConfigConstants.MYSQL_DATABASE_DEFAULT
+import com.lemline.runner.config.LemlineConfigConstants.MYSQL_PASSWORD_DEFAULT
+import com.lemline.runner.config.LemlineConfigConstants.MYSQL_PORT_DEFAULT
+import com.lemline.runner.config.LemlineConfigConstants.MYSQL_USERNAME_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.PGMQ_BATCH_SIZE_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.PGMQ_CONNECTOR
 import com.lemline.runner.config.LemlineConfigConstants.PGMQ_MAX_RETRIES_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.PGMQ_POLL_INTERVAL_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.PGMQ_VISIBILITY_TIMEOUT_DEFAULT
-import com.lemline.runner.config.LemlineConfigConstants.MYSQL_HOST_DEFAULT
-import com.lemline.runner.config.LemlineConfigConstants.MYSQL_NAME_DEFAULT
-import com.lemline.runner.config.LemlineConfigConstants.MYSQL_PASSWORD_DEFAULT
-import com.lemline.runner.config.LemlineConfigConstants.MYSQL_PORT_DEFAULT
-import com.lemline.runner.config.LemlineConfigConstants.MYSQL_USERNAME_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.POSTGRES_HOST_DEFAULT
-import com.lemline.runner.config.LemlineConfigConstants.POSTGRES_NAME_DEFAULT
+import com.lemline.runner.config.LemlineConfigConstants.POSTGRES_DATABASE_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.POSTGRES_PASSWORD_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.POSTGRES_PORT_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.POSTGRES_USERNAME_DEFAULT
@@ -112,6 +107,9 @@ class LemlineConfigSource : PropertiesConfigSource(
         private fun buildProperties(): Map<String, String> {
             val lemlineProps = mutableMapOf<String, String>()
 
+            logger.info { "LemlineConfigSource.buildProperties() starting..." }
+            logger.info { "ConfigPathHolder.configPath = ${ConfigPathHolder.configPath}" }
+
             // Load user properties from file
             ConfigPathHolder.configPath?.let { path ->
                 ExtraFileConfigFactory().getConfig(path).properties.forEach { (name, value) ->
@@ -121,7 +119,13 @@ class LemlineConfigSource : PropertiesConfigSource(
                 }
             }
 
-            logger.info { "Lemline user properties:\n${lemlineProps.toPrint()}" }
+            logger.info { "Lemline file properties:\n${lemlineProps.toPrint()}" }
+
+            // Log lemline-related system properties before reading
+            val lemlineSysProps = System.getProperties()
+                .filter { (k, _) -> k.toString().startsWith("lemline.") }
+                .map { (k, v) -> "$k=$v" }
+            logger.info { "Lemline system properties: $lemlineSysProps" }
 
             // Override with system properties, as they have higher priority,
             // This includes properties defined in [LemlineApplication]
@@ -130,6 +134,8 @@ class LemlineConfigSource : PropertiesConfigSource(
                     lemlineProps[key.toString()] = value.toString()
                 }
             }
+
+            logger.info { "Lemline merged properties:\n${lemlineProps.toPrint()}" }
 
             // Generate and merge transformed properties
             val generatedProps = mutableMapOf<String, String>()
@@ -151,48 +157,53 @@ class LemlineConfigSource : PropertiesConfigSource(
             val usePostgres = props.keys.any { it.startsWith("lemline.database.postgresql.") }
             val useMysql = props.keys.any { it.startsWith("lemline.database.mysql.") }
 
-            val type = props[DATABASE_TYPE] ?: run {
+            val type = props[DATABASE_TYPE]?.let { DatabaseType.fromConfigValue(it) } ?: run {
                 when {
-                    usePostgres && useMysql -> throw IllegalArgumentException("Both properties 'postgresql' and 'mysql' are defined. Explicitly set '$DATABASE_TYPE' to '$DB_TYPE_POSTGRESQL' or '$DB_TYPE_MYSQL'.")
-                    usePostgres -> DB_TYPE_POSTGRESQL
-                    useMysql -> DB_TYPE_MYSQL
-                    else -> DB_TYPE_IN_MEMORY
+                    usePostgres && useMysql -> throw IllegalArgumentException(
+                        "Both properties 'postgresql' and 'mysql' are defined. " +
+                            "Explicitly set '$DATABASE_TYPE' to '${DatabaseType.POSTGRESQL.configValue}' or '${DatabaseType.MYSQL.configValue}'."
+                    )
+
+                    usePostgres -> DatabaseType.POSTGRESQL
+                    useMysql -> DatabaseType.MYSQL
+                    else -> DatabaseType.H2
                 }
             }
-            generated[DATABASE_TYPE] = type
+            generated[DATABASE_TYPE] = type.configValue
 
             when (type) {
-                DB_TYPE_POSTGRESQL -> {
+                DatabaseType.POSTGRESQL -> {
                     val db = "lemline.database.postgresql"
                     val host = props["$db.host"] ?: POSTGRES_HOST_DEFAULT
                     val port = props["$db.port"] ?: POSTGRES_PORT_DEFAULT
-                    val name = props["$db.name"] ?: POSTGRES_NAME_DEFAULT
+                    val database = props["$db.database"] ?: POSTGRES_DATABASE_DEFAULT
                     val postgres = "quarkus.datasource.postgresql"
                     generated["$postgres.username"] = props["$db.username"] ?: POSTGRES_USERNAME_DEFAULT
                     generated["$postgres.password"] = props["$db.password"] ?: POSTGRES_PASSWORD_DEFAULT
-                    generated["$postgres.jdbc.url"] = "jdbc:postgresql://$host:$port/$name"
+                    generated["$postgres.jdbc.url"] = "jdbc:postgresql://$host:$port/$database"
                 }
 
-                DB_TYPE_MYSQL -> {
+                DatabaseType.MYSQL -> {
                     val db = "lemline.database.mysql"
                     val host = props["$db.host"] ?: MYSQL_HOST_DEFAULT
                     val port = props["$db.port"] ?: MYSQL_PORT_DEFAULT
-                    val name = props["$db.name"] ?: MYSQL_NAME_DEFAULT
+                    val database = props["$db.database"] ?: MYSQL_DATABASE_DEFAULT
                     val mysql = "quarkus.datasource.mysql"
                     generated["$mysql.username"] = props["$db.username"] ?: MYSQL_USERNAME_DEFAULT
                     generated["$mysql.password"] = props["$db.password"] ?: MYSQL_PASSWORD_DEFAULT
-                    generated["$mysql.jdbc.url"] = "jdbc:mysql://$host:$port/$name" +
+                    generated["$mysql.jdbc.url"] = "jdbc:mysql://$host:$port/$database" +
                         "?useSSL=false" +
                         "&allowPublicKeyRetrieval=true" +
                         "&sessionVariables=sql_mode='STRICT_ALL_TABLES,ERROR_FOR_DIVISION_BY_ZERO,NO_ZERO_DATE,NO_ZERO_IN_DATE,NO_ENGINE_SUBSTITUTION'" +
                         "&continueBatchOnError=false"
                 }
 
-                DB_TYPE_IN_MEMORY -> {
+                DatabaseType.H2 -> {
                     val h2 = "quarkus.datasource" // <- default datasource
                     generated["$h2.username"] = H2_USERNAME_DEFAULT
                     generated["$h2.password"] = H2_PASSWORD_DEFAULT
-                    generated["$h2.jdbc.url"] = "jdbc:h2:mem:$H2_DB_NAME_DEFAULT;DB_CLOSE_DELAY=-1;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE"
+                    generated["$h2.jdbc.url"] =
+                        "jdbc:h2:mem:$H2_DB_NAME_DEFAULT;DB_CLOSE_DELAY=-1;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE"
                 }
             }
 
@@ -206,31 +217,31 @@ class LemlineConfigSource : PropertiesConfigSource(
             val usePgmq = props.keys.any { it.startsWith("lemline.messaging.pgmq.") }
 
             val messagingTypes = listOfNotNull(
-                if (useKafka) MSG_TYPE_KAFKA else null,
-                if (useRabbit) MSG_TYPE_RABBITMQ else null,
-                if (usePgmq) MSG_TYPE_PGMQ else null
+                if (useKafka) MessagingType.KAFKA else null,
+                if (useRabbit) MessagingType.RABBITMQ else null,
+                if (usePgmq) MessagingType.PGMQ else null
             )
 
-            val type = props[MESSAGING_TYPE] ?: run {
+            val type = props[MESSAGING_TYPE]?.let { MessagingType.fromConfigValue(it) } ?: run {
                 when {
                     messagingTypes.size > 1 -> throw IllegalArgumentException(
-                        "Multiple messaging types defined: ${messagingTypes.joinToString()}. " +
-                            "Explicitly set '$MESSAGING_TYPE' to one of: $MSG_TYPE_KAFKA, $MSG_TYPE_RABBITMQ, $MSG_TYPE_PGMQ."
+                        "Multiple messaging types defined: ${messagingTypes.joinToString { it.configValue }}. " +
+                            "Explicitly set '$MESSAGING_TYPE' to one of: ${MessagingType.KAFKA.configValue}, ${MessagingType.RABBITMQ.configValue}, ${MessagingType.PGMQ.configValue}."
                     )
-                    useKafka -> MSG_TYPE_KAFKA
-                    useRabbit -> MSG_TYPE_RABBITMQ
-                    usePgmq -> MSG_TYPE_PGMQ
-                    else -> MSG_TYPE_IN_MEMORY
+
+                    useKafka -> MessagingType.KAFKA
+                    useRabbit -> MessagingType.RABBITMQ
+                    usePgmq -> MessagingType.PGMQ
+                    else -> MessagingType.IN_MEMORY
                 }
             }
-            generated[MESSAGING_TYPE] = type
+            generated[MESSAGING_TYPE] = type.configValue
 
             when (type) {
-                MSG_TYPE_KAFKA -> generated.configureKafka(props)
-                MSG_TYPE_RABBITMQ -> generated.configureRabbit(props)
-                MSG_TYPE_PGMQ -> generated.configurePgmq(props)
-                MSG_TYPE_IN_MEMORY -> generated.configureInMemory()
-                else -> error("Unknown messaging type: $type")
+                MessagingType.KAFKA -> generated.configureKafka(props)
+                MessagingType.RABBITMQ -> generated.configureRabbit(props)
+                MessagingType.PGMQ -> generated.configurePgmq(props)
+                MessagingType.IN_MEMORY -> generated.configureInMemory()
             }
 
             return generated
@@ -253,6 +264,15 @@ class LemlineConfigSource : PropertiesConfigSource(
                         "password=\"${props["$kafka.sasl-password"]}\";"
                 )
                 if (!containsKey("kafka.sasl.mechanism")) set("kafka.sasl.mechanism", "PLAIN")
+            }
+
+            // Log the enabled flags for debugging
+            logger.info {
+                "Kafka channel enabled flags: " +
+                    "commands.consumer=${props[COMMANDS_CONSUMER_ENABLED]}, " +
+                    "commands.producer=${props[COMMANDS_PRODUCER_ENABLED]}, " +
+                    "events.consumer=${props[EVENTS_CONSUMER_ENABLED]}, " +
+                    "events.producer=${props[EVENTS_PRODUCER_ENABLED]}"
             }
 
             configureKafkaTopic(props, TopicType.COMMANDS)
@@ -472,7 +492,7 @@ class LemlineConfigSource : PropertiesConfigSource(
             // PostgreSQL connection settings (reuses database config or can be overridden)
             val host = props["$pgmq.host"] ?: POSTGRES_HOST_DEFAULT
             val port = props["$pgmq.port"] ?: POSTGRES_PORT_DEFAULT
-            val database = props["$pgmq.database"] ?: POSTGRES_NAME_DEFAULT
+            val database = props["$pgmq.database"] ?: POSTGRES_DATABASE_DEFAULT
             val username = props["$pgmq.username"] ?: POSTGRES_USERNAME_DEFAULT
             val password = props["$pgmq.password"] ?: POSTGRES_PASSWORD_DEFAULT
 
@@ -513,12 +533,15 @@ class LemlineConfigSource : PropertiesConfigSource(
                 set("$incoming.database", database)
                 set("$incoming.username", username)
                 set("$incoming.password", password)
-                set("$incoming.visibility-timeout", props["$consumer.visibility-timeout"] ?: PGMQ_VISIBILITY_TIMEOUT_DEFAULT)
+                set(
+                    "$incoming.visibility-timeout",
+                    props["$consumer.visibility-timeout"] ?: PGMQ_VISIBILITY_TIMEOUT_DEFAULT
+                )
                 set("$incoming.poll-interval", props["$consumer.poll-interval"] ?: PGMQ_POLL_INTERVAL_DEFAULT)
                 set("$incoming.batch-size", props["$consumer.batch-size"] ?: PGMQ_BATCH_SIZE_DEFAULT)
                 set("$incoming.max-retries", props["$consumer.max-retries"] ?: PGMQ_MAX_RETRIES_DEFAULT)
                 set("$incoming.dead-letter-queue", queueDLQ)
-                set("$incoming.auto-create-queue", "true")
+                set("$incoming.auto-create-queue", "false")
                 // Set consumer concurrency
                 set(topicType.consumerConcurrency, props["$consumer.concurrency"] ?: CONSUMER_CONCURRENCY_DEFAULT)
             }
@@ -534,7 +557,7 @@ class LemlineConfigSource : PropertiesConfigSource(
                 set("$outgoing.database", database)
                 set("$outgoing.username", username)
                 set("$outgoing.password", password)
-                set("$outgoing.auto-create-queue", "true")
+                set("$outgoing.auto-create-queue", "false")
             }
         }
 
@@ -565,12 +588,15 @@ class LemlineConfigSource : PropertiesConfigSource(
                 set("$incoming.database", database)
                 set("$incoming.username", username)
                 set("$incoming.password", password)
-                set("$incoming.visibility-timeout", props["$consumer.visibility-timeout"] ?: PGMQ_VISIBILITY_TIMEOUT_DEFAULT)
+                set(
+                    "$incoming.visibility-timeout",
+                    props["$consumer.visibility-timeout"] ?: PGMQ_VISIBILITY_TIMEOUT_DEFAULT
+                )
                 set("$incoming.poll-interval", props["$consumer.poll-interval"] ?: PGMQ_POLL_INTERVAL_DEFAULT)
                 set("$incoming.batch-size", props["$consumer.batch-size"] ?: PGMQ_BATCH_SIZE_DEFAULT)
                 set("$incoming.max-retries", props["$consumer.max-retries"] ?: PGMQ_MAX_RETRIES_DEFAULT)
                 set("$incoming.dead-letter-queue", queueDLQ)
-                set("$incoming.auto-create-queue", "true")
+                set("$incoming.auto-create-queue", "false")
                 set(CLOUDEVENTS_CONSUMER_CONCURRENCY, props["$consumer.concurrency"] ?: CONSUMER_CONCURRENCY_DEFAULT)
             }
 
@@ -586,7 +612,7 @@ class LemlineConfigSource : PropertiesConfigSource(
                 set("$outgoing.database", database)
                 set("$outgoing.username", username)
                 set("$outgoing.password", password)
-                set("$outgoing.auto-create-queue", "true")
+                set("$outgoing.auto-create-queue", "false")
             }
         }
 
@@ -617,7 +643,7 @@ class LemlineConfigSource : PropertiesConfigSource(
                 set("$outgoing.database", database)
                 set("$outgoing.username", username)
                 set("$outgoing.password", password)
-                set("$outgoing.auto-create-queue", "true")
+                set("$outgoing.auto-create-queue", "false")
             }
         }
 

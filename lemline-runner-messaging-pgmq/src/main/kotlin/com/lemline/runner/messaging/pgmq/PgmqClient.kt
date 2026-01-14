@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
-package com.lemline.runner.messaging.postgres
+package com.lemline.runner.messaging.pgmq
 
 import com.lemline.common.logger.logger
-import com.lemline.runner.messaging.postgres.config.PgmqConnectorConfig
+import com.lemline.runner.messaging.pgmq.config.PgmqConnectorConfig
 import io.smallrye.mutiny.Uni
 import io.smallrye.mutiny.coroutines.awaitSuspending
 import io.vertx.mutiny.pgclient.PgBuilder
@@ -124,12 +124,13 @@ class PgmqClient(
      * This method only creates the queue tables using pgmq.create().
      */
     suspend fun initialize() {
-        logger.info { "Initializing PGMQ for queue: ${config.queue}" }
 
         // Create queue if auto-create is enabled
         if (config.autoCreateQueue) {
+            logger.info { "Initializing PGMQ for queue: ${config.queue}" }
             createQueue(config.queue)
             config.deadLetterQueue?.let { dlq ->
+                logger.info { "Initializing PGMQ for queue: $dlq" }
                 createQueue(dlq)
             }
         }

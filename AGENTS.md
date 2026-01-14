@@ -23,7 +23,7 @@ lemline/
 ├── lemline-docs/            # Writerside documentation
 ├── docs/adr/                # Architecture Decision Records
 ├── buildSrc/                # Convention plugins
-└── docker/                  # Docker compose files for dev
+└── examples/                # Docker compose and config examples for dev
 ```
 
 ## Where to Look

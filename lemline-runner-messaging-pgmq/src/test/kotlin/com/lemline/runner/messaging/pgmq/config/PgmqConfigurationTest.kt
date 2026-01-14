@@ -1,14 +1,13 @@
 // SPDX-License-Identifier: BUSL-1.1
-package com.lemline.runner.messaging.postgres.config
+package com.lemline.runner.messaging.pgmq.config
 
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.shouldBe
-import io.kotest.matchers.string.shouldContain
 import io.mockk.every
 import io.mockk.mockk
-import org.eclipse.microprofile.config.Config
 import java.time.Duration
-import java.util.Optional
+import java.util.*
+import org.eclipse.microprofile.config.Config
 
 class PgmqConfigurationTest : FunSpec({
 
@@ -55,8 +54,18 @@ class PgmqConfigurationTest : FunSpec({
             val config = mockk<Config>()
             // Order matters: any() first, specific matchers after to override
             every { config.getOptionalValue(any(), String::class.java) } returns Optional.empty()
-            every { config.getOptionalValue("mp.messaging.incoming.test-channel.host", String::class.java) } returns Optional.of("incoming-host")
-            every { config.getOptionalValue("mp.messaging.outgoing.test-channel.host", String::class.java) } returns Optional.of("outgoing-host")
+            every {
+                config.getOptionalValue(
+                    "mp.messaging.incoming.test-channel.host",
+                    String::class.java
+                )
+            } returns Optional.of("incoming-host")
+            every {
+                config.getOptionalValue(
+                    "mp.messaging.outgoing.test-channel.host",
+                    String::class.java
+                )
+            } returns Optional.of("outgoing-host")
 
             val connectorConfig = PgmqConnectorConfig(config, "test-channel")
 
@@ -67,8 +76,18 @@ class PgmqConfigurationTest : FunSpec({
             val config = mockk<Config>()
             // Order matters: any() first, specific matchers after to override
             every { config.getOptionalValue(any(), String::class.java) } returns Optional.empty()
-            every { config.getOptionalValue("mp.messaging.incoming.test-channel.host", String::class.java) } returns Optional.empty()
-            every { config.getOptionalValue("mp.messaging.outgoing.test-channel.host", String::class.java) } returns Optional.of("outgoing-host")
+            every {
+                config.getOptionalValue(
+                    "mp.messaging.incoming.test-channel.host",
+                    String::class.java
+                )
+            } returns Optional.empty()
+            every {
+                config.getOptionalValue(
+                    "mp.messaging.outgoing.test-channel.host",
+                    String::class.java
+                )
+            } returns Optional.of("outgoing-host")
 
             val connectorConfig = PgmqConnectorConfig(config, "test-channel")
 
@@ -90,20 +109,90 @@ class PgmqConfigurationTest : FunSpec({
             val config = mockk<Config>()
             val channel = "full-channel"
 
-            every { config.getOptionalValue("mp.messaging.incoming.$channel.host", String::class.java) } returns Optional.of("pg.example.com")
-            every { config.getOptionalValue("mp.messaging.incoming.$channel.port", String::class.java) } returns Optional.of("5433")
-            every { config.getOptionalValue("mp.messaging.incoming.$channel.database", String::class.java) } returns Optional.of("mydb")
-            every { config.getOptionalValue("mp.messaging.incoming.$channel.username", String::class.java) } returns Optional.of("admin")
-            every { config.getOptionalValue("mp.messaging.incoming.$channel.password", String::class.java) } returns Optional.of("secret123")
-            every { config.getOptionalValue("mp.messaging.incoming.$channel.queue", String::class.java) } returns Optional.of("my-queue")
-            every { config.getOptionalValue("mp.messaging.incoming.$channel.visibility-timeout", String::class.java) } returns Optional.of("60")
-            every { config.getOptionalValue("mp.messaging.incoming.$channel.poll-interval", String::class.java) } returns Optional.of("200")
-            every { config.getOptionalValue("mp.messaging.incoming.$channel.batch-size", String::class.java) } returns Optional.of("25")
-            every { config.getOptionalValue("mp.messaging.incoming.$channel.max-pool-size", String::class.java) } returns Optional.of("10")
-            every { config.getOptionalValue("mp.messaging.incoming.$channel.auto-create-queue", String::class.java) } returns Optional.of("false")
-            every { config.getOptionalValue("mp.messaging.incoming.$channel.dead-letter-queue", String::class.java) } returns Optional.of("my-dlq")
-            every { config.getOptionalValue("mp.messaging.incoming.$channel.max-retries", String::class.java) } returns Optional.of("5")
-            every { config.getOptionalValue(match { !it.startsWith("mp.messaging.incoming.$channel.") }, String::class.java) } returns Optional.empty()
+            every {
+                config.getOptionalValue(
+                    "mp.messaging.incoming.$channel.host",
+                    String::class.java
+                )
+            } returns Optional.of("pg.example.com")
+            every {
+                config.getOptionalValue(
+                    "mp.messaging.incoming.$channel.port",
+                    String::class.java
+                )
+            } returns Optional.of("5433")
+            every {
+                config.getOptionalValue(
+                    "mp.messaging.incoming.$channel.database",
+                    String::class.java
+                )
+            } returns Optional.of("mydb")
+            every {
+                config.getOptionalValue(
+                    "mp.messaging.incoming.$channel.username",
+                    String::class.java
+                )
+            } returns Optional.of("admin")
+            every {
+                config.getOptionalValue(
+                    "mp.messaging.incoming.$channel.password",
+                    String::class.java
+                )
+            } returns Optional.of("secret123")
+            every {
+                config.getOptionalValue(
+                    "mp.messaging.incoming.$channel.queue",
+                    String::class.java
+                )
+            } returns Optional.of("my-queue")
+            every {
+                config.getOptionalValue(
+                    "mp.messaging.incoming.$channel.visibility-timeout",
+                    String::class.java
+                )
+            } returns Optional.of("60")
+            every {
+                config.getOptionalValue(
+                    "mp.messaging.incoming.$channel.poll-interval",
+                    String::class.java
+                )
+            } returns Optional.of("200")
+            every {
+                config.getOptionalValue(
+                    "mp.messaging.incoming.$channel.batch-size",
+                    String::class.java
+                )
+            } returns Optional.of("25")
+            every {
+                config.getOptionalValue(
+                    "mp.messaging.incoming.$channel.max-pool-size",
+                    String::class.java
+                )
+            } returns Optional.of("10")
+            every {
+                config.getOptionalValue(
+                    "mp.messaging.incoming.$channel.auto-create-queue",
+                    String::class.java
+                )
+            } returns Optional.of("false")
+            every {
+                config.getOptionalValue(
+                    "mp.messaging.incoming.$channel.dead-letter-queue",
+                    String::class.java
+                )
+            } returns Optional.of("my-dlq")
+            every {
+                config.getOptionalValue(
+                    "mp.messaging.incoming.$channel.max-retries",
+                    String::class.java
+                )
+            } returns Optional.of("5")
+            every {
+                config.getOptionalValue(
+                    match { !it.startsWith("mp.messaging.incoming.$channel.") },
+                    String::class.java
+                )
+            } returns Optional.empty()
 
             return PgmqConnectorConfig(config, channel)
         }
@@ -137,9 +226,24 @@ class PgmqConfigurationTest : FunSpec({
             val config = mockk<Config>()
             // Order matters: any() first, specific matchers after to override
             every { config.getOptionalValue(any(), String::class.java) } returns Optional.empty()
-            every { config.getOptionalValue("mp.messaging.incoming.ch.host", String::class.java) } returns Optional.of("db.example.com")
-            every { config.getOptionalValue("mp.messaging.incoming.ch.port", String::class.java) } returns Optional.of("5432")
-            every { config.getOptionalValue("mp.messaging.incoming.ch.database", String::class.java) } returns Optional.of("testdb")
+            every {
+                config.getOptionalValue(
+                    "mp.messaging.incoming.ch.host",
+                    String::class.java
+                )
+            } returns Optional.of("db.example.com")
+            every {
+                config.getOptionalValue(
+                    "mp.messaging.incoming.ch.port",
+                    String::class.java
+                )
+            } returns Optional.of("5432")
+            every {
+                config.getOptionalValue(
+                    "mp.messaging.incoming.ch.database",
+                    String::class.java
+                )
+            } returns Optional.of("testdb")
 
             val connectorConfig = PgmqConnectorConfig(config, "ch")
 
@@ -150,9 +254,24 @@ class PgmqConfigurationTest : FunSpec({
             val config = mockk<Config>()
             // Order matters: any() first, specific matchers after to override
             every { config.getOptionalValue(any(), String::class.java) } returns Optional.empty()
-            every { config.getOptionalValue("mp.messaging.incoming.ch.host", String::class.java) } returns Optional.of("localhost")
-            every { config.getOptionalValue("mp.messaging.incoming.ch.port", String::class.java) } returns Optional.of("15432")
-            every { config.getOptionalValue("mp.messaging.incoming.ch.database", String::class.java) } returns Optional.of("lemline")
+            every {
+                config.getOptionalValue(
+                    "mp.messaging.incoming.ch.host",
+                    String::class.java
+                )
+            } returns Optional.of("localhost")
+            every {
+                config.getOptionalValue(
+                    "mp.messaging.incoming.ch.port",
+                    String::class.java
+                )
+            } returns Optional.of("15432")
+            every {
+                config.getOptionalValue(
+                    "mp.messaging.incoming.ch.database",
+                    String::class.java
+                )
+            } returns Optional.of("lemline")
 
             val connectorConfig = PgmqConnectorConfig(config, "ch")
 
@@ -165,11 +284,36 @@ class PgmqConfigurationTest : FunSpec({
             val config = mockk<Config>()
             // Order matters: any() first, specific matchers after to override
             every { config.getOptionalValue(any(), String::class.java) } returns Optional.empty()
-            every { config.getOptionalValue("mp.messaging.incoming.ch.host", String::class.java) } returns Optional.of("myhost")
-            every { config.getOptionalValue("mp.messaging.incoming.ch.port", String::class.java) } returns Optional.of("5433")
-            every { config.getOptionalValue("mp.messaging.incoming.ch.database", String::class.java) } returns Optional.of("mydb")
-            every { config.getOptionalValue("mp.messaging.incoming.ch.username", String::class.java) } returns Optional.of("myuser")
-            every { config.getOptionalValue("mp.messaging.incoming.ch.password", String::class.java) } returns Optional.of("mypass")
+            every {
+                config.getOptionalValue(
+                    "mp.messaging.incoming.ch.host",
+                    String::class.java
+                )
+            } returns Optional.of("myhost")
+            every {
+                config.getOptionalValue(
+                    "mp.messaging.incoming.ch.port",
+                    String::class.java
+                )
+            } returns Optional.of("5433")
+            every {
+                config.getOptionalValue(
+                    "mp.messaging.incoming.ch.database",
+                    String::class.java
+                )
+            } returns Optional.of("mydb")
+            every {
+                config.getOptionalValue(
+                    "mp.messaging.incoming.ch.username",
+                    String::class.java
+                )
+            } returns Optional.of("myuser")
+            every {
+                config.getOptionalValue(
+                    "mp.messaging.incoming.ch.password",
+                    String::class.java
+                )
+            } returns Optional.of("mypass")
 
             val connectorConfig = PgmqConnectorConfig(config, "ch")
             val options = connectorConfig.toConnectionOptions()
@@ -196,7 +340,12 @@ class PgmqConfigurationTest : FunSpec({
             val config = mockk<Config>()
             // Order matters: any() first, specific matchers after to override
             every { config.getOptionalValue(any(), String::class.java) } returns Optional.empty()
-            every { config.getOptionalValue("mp.messaging.incoming.ch.password", String::class.java) } returns Optional.of("")
+            every {
+                config.getOptionalValue(
+                    "mp.messaging.incoming.ch.password",
+                    String::class.java
+                )
+            } returns Optional.of("")
 
             val connectorConfig = PgmqConnectorConfig(config, "ch")
 
@@ -216,7 +365,12 @@ class PgmqConfigurationTest : FunSpec({
             val config = mockk<Config>()
             // Order matters: any() first, specific matchers after to override
             every { config.getOptionalValue(any(), String::class.java) } returns Optional.empty()
-            every { config.getOptionalValue("mp.messaging.incoming.ch.poll-interval", String::class.java) } returns Optional.of("0")
+            every {
+                config.getOptionalValue(
+                    "mp.messaging.incoming.ch.poll-interval",
+                    String::class.java
+                )
+            } returns Optional.of("0")
 
             val connectorConfig = PgmqConnectorConfig(config, "ch")
 
@@ -227,7 +381,12 @@ class PgmqConfigurationTest : FunSpec({
             val config = mockk<Config>()
             // Order matters: any() first, specific matchers after to override
             every { config.getOptionalValue(any(), String::class.java) } returns Optional.empty()
-            every { config.getOptionalValue("mp.messaging.incoming.ch.batch-size", String::class.java) } returns Optional.of("-5")
+            every {
+                config.getOptionalValue(
+                    "mp.messaging.incoming.ch.batch-size",
+                    String::class.java
+                )
+            } returns Optional.of("-5")
 
             val connectorConfig = PgmqConnectorConfig(config, "ch")
 

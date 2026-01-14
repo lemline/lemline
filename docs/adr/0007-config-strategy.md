@@ -364,25 +364,18 @@ Example configuration file:
 
 ```yaml
 lemline:
-    database:
-        type: postgresql
-        migrate-at-start: true
-        postgresql:
-            host: db.example.com
-            port: 5432
-            username: lemline
-            password: secure-password
-            name: lemline_db
+  database:
+    migrate-at-start: true
+    postgresql:
+      host: db.example.com
+      port: 5432
+      username: lemline
+      password: secure-password
+      database: lemline_db
 
     messaging:
-        type: kafka
-        producer:
-            enabled: true
-        consumer:
-            enabled: true
-        kafka:
-            brokers: kafka.example.com:9092
-            topic: commands-in
+      kafka:
+        brokers: kafka.example.com:9092
 ```
 
 ## Message Consumer and Producer Activation
@@ -410,10 +403,8 @@ Lemline supports selectively enabling or disabling message consumers and produce
    ```yaml
    lemline:
      messaging:
-       consumer:
-         enabled: true
-       producer:
-         enabled: false
+       kafka:
+         brokers: kafka.example.com:9092
    ```
 
 ## Native Executable Support

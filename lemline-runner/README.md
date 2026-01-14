@@ -224,7 +224,7 @@ You can override settings for specific Quarkus profiles (e.g., prod, dev, test) 
                 host: prod-db.example.com
                 username: ${LEMLINE_PROD_PG_USER}
                 password: ${LEMLINE_PROD_PG_PASSWORD}
-                name: lemline_production_db
+                database: lemline_production_db
 ```
 
 Activate a profile by starting Lemline with the system property: `-Dquarkus.profile=prod`
@@ -232,18 +232,22 @@ Activate a profile by starting Lemline with the system property: `-Dquarkus.prof
 ### Local Development Setup (Docker Examples)
 
 For local development, you can use Docker Compose to quickly start database and message broker instances. Example files
-might be provided in the project root or `/docker` directory (e.g., `docker-compose-postgres.yaml`,
-`docker-compose-kafka.yaml`).
+are provided in the `/examples` directory with a unified `docker-compose.yml` using profiles.
 
-*Example commands (adjust paths as needed):*
+*Example commands (run from project root):*
 
 ```bash
-# Start PostgreSQL
-docker-compose -f ./docker/docker-compose-postgres.yaml up -d
+# Start Kafka + PostgreSQL
+docker compose -f ./examples/docker-compose.yml --profile kafka-pg up -d
 
-# Start Kafka
-docker-compose -f ./docker/docker-compose-kafka.yaml up -d
+# Start RabbitMQ + PostgreSQL
+docker compose -f ./examples/docker-compose.yml --profile rabbit-pg up -d
+
+# Start PGMQ (PostgreSQL for both DB and messaging)
+docker compose -f ./examples/docker-compose.yml --profile pgmq up -d
 ```
+
+See `/examples/README.md` for all available profiles and configuration options.
 
 Remember to align the connection details in your configuration file with your running Docker containers.
 

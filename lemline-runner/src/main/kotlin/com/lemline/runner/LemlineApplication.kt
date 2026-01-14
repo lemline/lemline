@@ -4,14 +4,16 @@
 package com.lemline.runner
 
 import com.lemline.runner.cli.MainCommand
-import com.lemline.runner.cli.setup
 import com.lemline.runner.cli.config.ConfigPathHolder
 import com.lemline.runner.cli.instances.InstanceStartCommand
 import com.lemline.runner.cli.listen.ListenCommand
+import com.lemline.runner.cli.setup
 import com.lemline.runner.config.COMMANDS_CONSUMER_ENABLED
 import com.lemline.runner.config.COMMANDS_PRODUCER_ENABLED
+import com.lemline.runner.config.DATABASE_ENABLED
 import com.lemline.runner.config.EVENTS_CONSUMER_ENABLED
 import com.lemline.runner.config.EVENTS_PRODUCER_ENABLED
+import com.lemline.runner.config.SCHEDULED_ENABLED
 import io.quarkus.picocli.runtime.annotations.TopCommand
 import io.quarkus.runtime.Quarkus
 import io.quarkus.runtime.QuarkusApplication
@@ -100,33 +102,25 @@ class LemlineApplication : QuarkusApplication {
 
                 if (helpOrVersion) {
                     disableMetricsEndpoint()
-                    System.setProperty(EVENTS_CONSUMER_ENABLED, "false")
-                    System.setProperty(COMMANDS_CONSUMER_ENABLED, "false")
-                    System.setProperty(EVENTS_PRODUCER_ENABLED, "false")
-                    System.setProperty(COMMANDS_PRODUCER_ENABLED, "false")
+                    disableMessaging()
+                    disableDatabase()
                 } else {
                     // The listen command, if any
                     val listen = parseResults.command<ListenCommand>()
 
                     if (listen == null) {
                         disableMetricsEndpoint()
-                        System.setProperty(EVENTS_CONSUMER_ENABLED, "false")
-                        System.setProperty(COMMANDS_CONSUMER_ENABLED, "false")
-                        System.setProperty(EVENTS_PRODUCER_ENABLED, "false")
-                        System.setProperty(COMMANDS_PRODUCER_ENABLED, "false")
+                        disableMessaging()
+                        disableScheduled()
                     } else {
                         listen.port?.let { setMetricsEndpointPort(it) }
-                        System.setProperty(EVENTS_CONSUMER_ENABLED, "true")
-                        System.setProperty(COMMANDS_CONSUMER_ENABLED, "true")
-                        System.setProperty(EVENTS_PRODUCER_ENABLED, "true")
-                        System.setProperty(COMMANDS_PRODUCER_ENABLED, "true")
+                        enableMessaging()
                     }
 
                     // the instance start command, if any
                     val start = parseResults.command<InstanceStartCommand>()
                     if (start != null) {
                         System.setProperty(COMMANDS_PRODUCER_ENABLED, "true")
-                        System.setProperty(EVENTS_PRODUCER_ENABLED, "true")
                     }
                 }
             } catch (ex: Exception) {
@@ -275,6 +269,28 @@ private fun disableMetricsEndpoint() {
     System.setProperty("quarkus.http.ssl-port", "0")
     System.setProperty("quarkus.micrometer.enabled", "false")
     System.setProperty("quarkus.micrometer.export.prometheus.enabled", "false")
+}
+
+private fun enableMessaging() {
+    System.setProperty(EVENTS_CONSUMER_ENABLED, "true")
+    System.setProperty(COMMANDS_CONSUMER_ENABLED, "true")
+    System.setProperty(EVENTS_PRODUCER_ENABLED, "true")
+    System.setProperty(COMMANDS_PRODUCER_ENABLED, "true")
+}
+
+private fun disableMessaging() {
+    System.setProperty(EVENTS_CONSUMER_ENABLED, "false")
+    System.setProperty(COMMANDS_CONSUMER_ENABLED, "false")
+    System.setProperty(EVENTS_PRODUCER_ENABLED, "false")
+    System.setProperty(COMMANDS_PRODUCER_ENABLED, "false")
+}
+
+private fun disableDatabase() {
+    System.setProperty(DATABASE_ENABLED, "false")
+}
+
+private fun disableScheduled() {
+    System.setProperty(SCHEDULED_ENABLED, "false")
 }
 
 private fun setLogLevel(level: Level) = level.name.let {

@@ -118,7 +118,7 @@ open class DefinitionDeleteCommand : Runnable {
                 println("  #${num}: Name: ${wf.name} Version: ${wf.version}")
                 print("Delete this last workflow? [y/N]: ")
                 val confirmation = readlnOrNull()?.trim()?.lowercase()
-                if (confirmation == "y") {
+                if (confirmation == "y" || confirmation == "yes") {
                     // Pass full details to deleteSpecificVersion, which handles confirmation again
                     deleteSpecificVersion(wf.name, wf.version)
                 }
@@ -283,7 +283,7 @@ open class DefinitionDeleteCommand : Runnable {
 
         print("Are you sure you want to delete $subjectDescription? [y/N]: ")
         val confirmation = readUserInput()?.trim()?.lowercase()
-        if (confirmation != "y") {
+        if (confirmation != "y" && confirmation != "yes") {
             println("Deletion cancelled.")
             return false
         }

@@ -2,12 +2,11 @@
 package com.lemline.runner.messaging.lifecycle
 
 import com.lemline.common.logger.logger
+import com.lemline.core.cloudevents.CloudEventParser.toReadableString
 import com.lemline.core.lifecycleevents.LifecycleEventEmitter
 import com.lemline.runner.config.LIFECYCLEEVENTS_OUT_CHANNEL
-import com.lemline.runner.config.LIFECYCLE_EVENTS_PRODUCER_ENABLED
 import com.lemline.runner.listeners.CloudEventService
 import io.cloudevents.CloudEvent
-import io.quarkus.arc.properties.IfBuildProperty
 import io.quarkus.runtime.Startup
 import io.smallrye.mutiny.coroutines.awaitSuspending
 import io.smallrye.reactive.messaging.MutinyEmitter
@@ -32,7 +31,6 @@ import org.eclipse.microprofile.reactive.messaging.Message
 @ExperimentalTime
 @Startup
 @ApplicationScoped
-@IfBuildProperty(name = LIFECYCLE_EVENTS_PRODUCER_ENABLED, stringValue = "true", enableIfMissing = false)
 class LifecycleEventEmitterImpl : LifecycleEventEmitter {
     private val logger = logger()
 
@@ -42,14 +40,14 @@ class LifecycleEventEmitterImpl : LifecycleEventEmitter {
     override suspend fun emit(cloudEvent: CloudEvent) {
         val payload = CloudEventService.serialize(cloudEvent)
 
-        logger.trace { "Emitting lifecycle event: $cloudEvent" }
+        logger.trace { "Emitting lifecycle event: ${cloudEvent.toReadableString()}" }
         try {
             emitter.sendMessage(Message.of(payload)).awaitSuspending()
-            logger.debug { "Lifecycle event sent: $cloudEvent" }
+            logger.debug { "Lifecycle event sent: ${cloudEvent.toReadableString()}" }
         } catch (e: Exception) {
             // Fire-and-forget: log warning but never throw
             // Lifecycle events are observability data - failures should not impact workflow execution
-            logger.warn(e) { "Failed to emit lifecycle event: $cloudEvent" }
+            logger.warn(e) { "Failed to emit lifecycle event: ${cloudEvent.toReadableString()}" }
         }
     }
 }

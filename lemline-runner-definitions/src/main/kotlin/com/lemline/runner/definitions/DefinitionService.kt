@@ -100,6 +100,16 @@ class DefinitionService {
     // ==================== Read Operations ====================
 
     /**
+     * Lists all workflow definitions across all namespaces, sorted by namespace, name, version.
+     *
+     * @param connection Optional database connection for transaction support
+     * @return List of all definition models
+     */
+    suspend fun listAll(
+        connection: Connection? = null
+    ): List<DefinitionModel> = definitionRepository.listAll(connection)
+
+    /**
      * Finds a specific workflow definition by namespace, name, and version.
      *
      * @param namespace The workflow namespace

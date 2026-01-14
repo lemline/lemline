@@ -16,6 +16,7 @@
         
         <!-- Tutorials section -->
         <toc-element toc-title="Tutorials">
+            <toc-element topic="lemline-tutorial-setup.md"/>
             <toc-element topic="lemline-tutorial-hello.md"/>
             <toc-element topic="lemline-tutorial-order-processing.md"/>
             <toc-element topic="lemline-tutorial-waits.md"/>
@@ -64,6 +65,7 @@
             </toc-element>
             <toc-element toc-title="Runner Configuration">
                 <toc-element topic="lemline-howto-config.md"/>
+                <toc-element topic="lemline-howto-docker.md"/>
                 <toc-element topic="lemline-howto-brokers.md"/>
                 <toc-element topic="lemline-howto-observability.md"/>
                 <toc-element topic="lemline-howto-scaling.md"/>

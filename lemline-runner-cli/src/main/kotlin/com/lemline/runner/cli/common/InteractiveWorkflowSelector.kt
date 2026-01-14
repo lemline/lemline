@@ -20,19 +20,22 @@ class InteractiveWorkflowSelector @Inject constructor(
     private val definitionService: DefinitionService
 ) {
     /**
-     * Fetches workflows (optionally filtered by name), sorts them, formats them into
-     * a numbered list grouped by name, prints the list, stores the formatted list,
+     * Fetches workflows (optionally filtered by namespace and/or name), sorts them, formats them into
+     * a numbered list grouped by namespace and name, prints the list, stores the formatted list,
      * and returns the list of pairs (number, WorkflowModel) for selection.
      * Returns null if no workflows are found.
      */
     suspend fun prepareSelection(
-        workflowNamespace: WorkflowNamespace,
+        workflowNamespace: WorkflowNamespace? = null,
         filterName: WorkflowName? = null
     ): List<Pair<Int, DefinitionModel>>? {
-        val workflows = if (filterName != null) {
-            definitionService.listByName(workflowNamespace, filterName)
-        } else {
-            definitionService.listAllInNamespace(workflowNamespace)
+        val workflows = when {
+            workflowNamespace != null && filterName != null ->
+                definitionService.listByName(workflowNamespace, filterName)
+            workflowNamespace != null ->
+                definitionService.listAllInNamespace(workflowNamespace)
+            else ->
+                definitionService.listAll()
         }
 
         if (workflows.isEmpty()) {
@@ -40,13 +43,13 @@ class InteractiveWorkflowSelector @Inject constructor(
             return null
         }
 
-        // Group by name and sort versions using SemVer within each group
+        // Group by namespace+name and sort versions using SemVer within each group
         val groupedAndSorted = workflows
-            .groupBy { it.name.toString() }
+            .groupBy { "${it.namespace}/${it.name}" }
             .entries
-            .sortedBy { it.key } // Sort groups by name
-            .associate { (name, versions) -> // Use associate for Map<String, List<WorkflowModel>>
-                name to versions.sortedWith(compareBy { runCatching { Version.parse(it.version.toString()) }.getOrNull() })
+            .sortedBy { it.key } // Sort groups by namespace/name
+            .associate { (key, versions) ->
+                key to versions.sortedWith(compareBy { runCatching { Version.parse(it.version.toString()) }.getOrNull() })
             }
 
         // Generate the selection list (needed for return value)
@@ -81,27 +84,35 @@ class InteractiveWorkflowSelector @Inject constructor(
         selectionList: List<Pair<Int, DefinitionModel>>
     ) {
         val output = StringBuilder()
-        val maxNameWidth = (groupedData.keys.maxOfOrNull { it.length } ?: 10).coerceAtLeast(4)
+
+        // Calculate column widths based on actual data
+        val allWorkflows = groupedData.values.flatten()
+        val maxNamespaceWidth = (allWorkflows.maxOfOrNull { it.namespace.toString().length } ?: 9).coerceAtLeast(9)
+        val maxNameWidth = (allWorkflows.maxOfOrNull { it.name.toString().length } ?: 4).coerceAtLeast(4)
+
+        val namespaceHeader = "Namespace"
         val nameHeader = "Name"
         val versionHeader = "Version"
         val numberHeader = "#"
         val numWidth = selectionList.size.toString().length.coerceAtLeast(1)
         val paddedNumHeader = numberHeader.padStart(numWidth)
+        val paddedNamespaceHeader = namespaceHeader.padEnd(maxNamespaceWidth)
         val paddedNameHeader = nameHeader.padEnd(maxNameWidth)
 
         output.appendLine() // Blank line before header
-        output.appendLine("$paddedNumHeader  $paddedNameHeader  $versionHeader")
-        output.appendLine("${"-".repeat(numWidth)}  ${"-".repeat(maxNameWidth)}  ${"-".repeat(versionHeader.length)}")
+        output.appendLine("$paddedNumHeader  $paddedNamespaceHeader  $paddedNameHeader  $versionHeader")
+        output.appendLine("${"-".repeat(numWidth)}  ${"-".repeat(maxNamespaceWidth)}  ${"-".repeat(maxNameWidth)}  ${"-".repeat(versionHeader.length)}")
 
         var itemIndex = 0 // Use index from selectionList to get correct number
-        groupedData.forEach { (name, versionsList) ->
+        groupedData.forEach { (_, versionsList) ->
             versionsList.forEachIndexed { index, workflow ->
                 val (currentNumber, _) = selectionList[itemIndex]
                 val versionPart = workflow.version
                 val numberPart = currentNumber.toString().padStart(numWidth)
                 itemIndex++
 
-                val namePart = if (index == 0) name.padEnd(maxNameWidth) else " ".repeat(maxNameWidth)
+                val namespacePart = if (index == 0) workflow.namespace.toString().padEnd(maxNamespaceWidth) else " ".repeat(maxNamespaceWidth)
+                val namePart = if (index == 0) workflow.name.toString().padEnd(maxNameWidth) else " ".repeat(maxNameWidth)
                 val prefix = when {
                     versionsList.size == 1 -> ""
                     index == versionsList.size - 1 -> "└─"
@@ -109,7 +120,7 @@ class InteractiveWorkflowSelector @Inject constructor(
                     else -> ""
                 }
 
-                output.appendLine("$numberPart  $namePart  $prefix $versionPart")
+                output.appendLine("$numberPart  $namespacePart  $namePart  $prefix $versionPart")
             }
         }
 

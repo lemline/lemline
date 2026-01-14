@@ -6,6 +6,7 @@ import io.quarkus.runtime.ShutdownEvent
 import io.quarkus.runtime.StartupEvent
 import jakarta.annotation.Priority
 import jakarta.enterprise.event.Observes
+import jakarta.inject.Inject
 import java.util.concurrent.Executors
 import java.util.concurrent.ScheduledExecutorService
 import java.util.concurrent.TimeUnit
@@ -21,6 +22,7 @@ import kotlinx.coroutines.job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
+import org.eclipse.microprofile.config.inject.ConfigProperty
 
 /**
  * Abstract base class for scheduled background tasks.
@@ -62,6 +64,11 @@ import kotlinx.coroutines.withTimeout
 abstract class AbstractScheduledTask {
     protected val logger by lazy { logger() }
 
+    /** Global kill switch for all scheduled tasks (set to false for non-listen commands) */
+    @Inject
+    @ConfigProperty(name = "lemline.scheduled.enabled", defaultValue = "true")
+    lateinit var scheduledEnabled: String
+
     /** Coroutine scope for async work */
     protected val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
@@ -96,8 +103,15 @@ abstract class AbstractScheduledTask {
      */
     @Suppress("unused")
     fun onStart(@Observes @Priority(100) event: StartupEvent) {
+        // Global kill switch - disabled for non-listen commands (migrate, config, etc.)
+        if (scheduledEnabled != "true") {
+            logger.debug { "$jobName disabled globally (scheduled tasks off)" }
+            return
+        }
+
+        // Feature-specific enabled flag
         if (!enabled) {
-            logger.debug { "$jobName disabled by config" }
+            logger.info { "$jobName disabled by config" }
             return
         }
 

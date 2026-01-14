@@ -26,7 +26,7 @@ class MySQLTestResource : QuarkusTestResourceLifecycleManager {
         val properties = mapOf(
             "lemline.database.mysql.host" to mysql.host,
             "lemline.database.mysql.port" to mysql.firstMappedPort.toString(),
-            "lemline.database.mysql.name" to mysql.databaseName,
+            "lemline.database.mysql.database" to mysql.databaseName,
             "lemline.database.mysql.username" to mysql.username,
             "lemline.database.mysql.password" to mysql.password,
         )
@@ -41,7 +41,7 @@ class MySQLTestResource : QuarkusTestResourceLifecycleManager {
         // Clear system properties to prevent conflicts with other test profiles
         System.clearProperty("lemline.database.mysql.host")
         System.clearProperty("lemline.database.mysql.port")
-        System.clearProperty("lemline.database.mysql.name")
+        System.clearProperty("lemline.database.mysql.database")
         System.clearProperty("lemline.database.mysql.username")
         System.clearProperty("lemline.database.mysql.password")
 

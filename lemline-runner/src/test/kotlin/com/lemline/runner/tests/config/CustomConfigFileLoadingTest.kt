@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.tests.config
 
-import com.lemline.runner.config.LemlineConfigConstants.DB_TYPE_IN_MEMORY
-import com.lemline.runner.config.LemlineConfigConstants.MSG_TYPE_IN_MEMORY
+import com.lemline.runner.common.config.DatabaseType
+import com.lemline.runner.common.config.MessagingType
 import com.lemline.runner.config.LemlineConfiguration
 import com.lemline.runner.tests.profiles.CustomConfigFileProfile
 import io.quarkus.test.junit.QuarkusTest
@@ -21,7 +21,7 @@ class CustomConfigFileLoadingTest {
 
     @Test
     fun `config file database type is loaded`() {
-        assertEquals(DB_TYPE_IN_MEMORY, config.database().type())
+        assertEquals(DatabaseType.H2.configValue, config.database().type())
     }
 
     @Test
@@ -36,7 +36,7 @@ class CustomConfigFileLoadingTest {
 
     @Test
     fun `config file messaging type is loaded`() {
-        assertEquals(MSG_TYPE_IN_MEMORY, config.messaging().type())
+        assertEquals(MessagingType.IN_MEMORY.configValue, config.messaging().type())
     }
 
     @Test

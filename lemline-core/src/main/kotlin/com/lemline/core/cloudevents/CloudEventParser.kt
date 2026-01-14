@@ -24,6 +24,12 @@ object CloudEventParser {
         ListenAndReadAs.RAW -> data?.let { JsonPrimitive(Base64.getEncoder().encodeToString(it.toBytes())) } ?: JsonNull
     }
 
+    /**
+     * Formats a CloudEvent as a human-readable string for logging.
+     * Uses the envelope format with data rendered as JSON string.
+     */
+    fun CloudEvent.toReadableString(): String = Json.encodeToString(buildEnvelope())
+
     private fun CloudEvent.parseDataContent(): JsonElement =
         data?.let { parseJsonOrPrimitive(String(it.toBytes())) } ?: JsonNull
 
@@ -37,6 +43,19 @@ object CloudEventParser {
         dataSchema?.let { put("dataschema", JsonPrimitive(it.toString())) }
         dataContentType?.let { put("datacontenttype", JsonPrimitive(it)) }
         data?.let { put("data", parseJsonOrPrimitive(String(it.toBytes()))) }
+        // Include extension attributes
+        extensionNames.forEach { name ->
+            getExtension(name)?.let { value ->
+                put(name, value.toJsonPrimitive())
+            }
+        }
+    }
+
+    private fun Any.toJsonPrimitive(): JsonPrimitive = when (this) {
+        is String -> JsonPrimitive(this)
+        is Number -> JsonPrimitive(this)
+        is Boolean -> JsonPrimitive(this)
+        else -> JsonPrimitive(toString())
     }
 
     private fun parseJsonOrNull(content: String): JsonElement =

@@ -1,0 +1,24 @@
+# Lemline Configuration: RabbitMQ + MySQL
+#
+# Start infrastructure:
+#   docker compose --profile rabbit-mysql up -d
+#
+# Run Lemline:
+#   LEMLINE_CONFIG=./examples/lemline-rabbit-mysql.yaml java -jar lemline-runner.jar listen
+
+lemline:
+  database:
+    mysql:
+      host: localhost
+      port: 3306
+      database: lemline
+      username: lemline
+      password: lemline
+
+  messaging:
+    rabbitmq:
+      hostname: localhost
+      port: 5672
+      username: guest
+      password: guest
+

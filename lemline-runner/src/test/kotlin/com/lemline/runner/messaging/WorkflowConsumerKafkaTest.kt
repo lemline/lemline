@@ -15,7 +15,6 @@ import java.util.concurrent.TimeUnit
 import kotlin.time.ExperimentalTime
 import kotlinx.serialization.ExperimentalSerializationApi
 import org.apache.kafka.clients.consumer.ConsumerConfig
-import org.apache.kafka.clients.consumer.ConsumerRecords
 import org.apache.kafka.clients.consumer.KafkaConsumer
 import org.apache.kafka.clients.producer.KafkaProducer
 import org.apache.kafka.clients.producer.ProducerConfig
@@ -41,31 +40,31 @@ import org.junit.jupiter.api.TestInstance
 internal class WorkflowConsumerKafkaTest : WorkflowConsumerTest() {
 
     private lateinit var bootstrapServers: String
-    private lateinit var instanceTopicIn: String
-    private lateinit var instanceTopicOut: String
-    private lateinit var databaseTopicIn: String
-    private lateinit var databaseTopicOut: String
+    private lateinit var commandsTopicIn: String
+    private lateinit var commandsTopicOut: String
+    private lateinit var eventsTopicIn: String
+    private lateinit var eventsTopicOut: String
 
-    private lateinit var instanceProducer: KafkaProducer<String, String>
-    private lateinit var instanceConsumer: KafkaConsumer<String, String>
-    private lateinit var databaseProducer: KafkaProducer<String, String>
-    private lateinit var databaseConsumer: KafkaConsumer<String, String>
+    private lateinit var commandsProducer: KafkaProducer<String, String>
+    private lateinit var commandsConsumer: KafkaConsumer<String, String>
+    private lateinit var eventsProducer: KafkaProducer<String, String>
+    private lateinit var eventsConsumer: KafkaConsumer<String, String>
 
     @BeforeAll
     fun initClients() {
         val config = ConfigProvider.getConfig()
 
         bootstrapServers = config.getValue("kafka.bootstrap.servers", String::class.java)
-        instanceTopicIn = config.getValue("mp.messaging.incoming.$COMMANDS_IN_CHANNEL.topic", String::class.java)
-        instanceTopicOut = config.getValue("mp.messaging.outgoing.$COMMANDS_OUT_CHANNEL.topic", String::class.java)
-        databaseTopicIn = config.getValue("mp.messaging.incoming.$EVENTS_IN_CHANNEL.topic", String::class.java)
-        databaseTopicOut = config.getValue("mp.messaging.outgoing.$EVENTS_OUT_CHANNEL.topic", String::class.java)
+        commandsTopicIn = config.getValue("mp.messaging.incoming.$COMMANDS_IN_CHANNEL.topic", String::class.java)
+        commandsTopicOut = config.getValue("mp.messaging.outgoing.$COMMANDS_OUT_CHANNEL.topic", String::class.java)
+        eventsTopicIn = config.getValue("mp.messaging.incoming.$EVENTS_IN_CHANNEL.topic", String::class.java)
+        eventsTopicOut = config.getValue("mp.messaging.outgoing.$EVENTS_OUT_CHANNEL.topic", String::class.java)
 
-        require(instanceTopicIn != instanceTopicOut) {
-            "For *testing*, topics In ($instanceTopicIn) and Out ($instanceTopicOut) must be different"
+        require(commandsTopicIn != commandsTopicOut) {
+            "For *testing*, topics In ($commandsTopicIn) and Out ($commandsTopicOut) must be different"
         }
-        require(databaseTopicIn != databaseTopicOut) {
-            "For *testing*, topics In ($databaseTopicIn) and Out ($databaseTopicOut) must be different"
+        require(eventsTopicIn != eventsTopicOut) {
+            "For *testing*, topics In ($eventsTopicIn) and Out ($eventsTopicOut) must be different"
         }
 
         // Setup Kafka producer
@@ -74,64 +73,67 @@ internal class WorkflowConsumerKafkaTest : WorkflowConsumerTest() {
             ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG to StringSerializer::class.java.name,
             ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG to StringSerializer::class.java.name,
         )
-        instanceProducer = KafkaProducer(producerProps)
-        databaseProducer = KafkaProducer(producerProps)
+        commandsProducer = KafkaProducer(producerProps)
+        eventsProducer = KafkaProducer(producerProps)
 
-        // Set up Kafka consumer
+        // Set up Kafka consumer with unique group IDs per test run to avoid offset issues
         val baseConsumerProps = mapOf(
             ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG to bootstrapServers,
-            ConsumerConfig.AUTO_OFFSET_RESET_CONFIG to "earliest",
+            ConsumerConfig.AUTO_OFFSET_RESET_CONFIG to "latest",
             ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG to StringDeserializer::class.java.name,
             ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG to StringDeserializer::class.java.name,
             // Disable auto commit and rely on explicit commit
             ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG to "false",
         )
 
-        instanceConsumer = KafkaConsumer(baseConsumerProps + (ConsumerConfig.GROUP_ID_CONFIG to "test-group-instance"))
-        instanceConsumer.subscribe(listOf(instanceTopicOut))
+        // Use unique group IDs to avoid offset conflicts
+        val uniqueSuffix = System.currentTimeMillis()
+        commandsConsumer =
+            KafkaConsumer(baseConsumerProps + (ConsumerConfig.GROUP_ID_CONFIG to "test-commands-$uniqueSuffix"))
+        commandsConsumer.subscribe(listOf(commandsTopicOut))
 
-        databaseConsumer = KafkaConsumer(baseConsumerProps + (ConsumerConfig.GROUP_ID_CONFIG to "test-group-database"))
-        databaseConsumer.subscribe(listOf(databaseTopicOut))
+        eventsConsumer =
+            KafkaConsumer(baseConsumerProps + (ConsumerConfig.GROUP_ID_CONFIG to "test-events-$uniqueSuffix"))
+        eventsConsumer.subscribe(listOf(eventsTopicOut))
+
+        // Initial poll to trigger partition assignment
+        commandsConsumer.poll(Duration.ofMillis(100))
+        eventsConsumer.poll(Duration.ofMillis(100))
     }
 
     @AfterAll
     fun closeClients() {
-        if (::instanceProducer.isInitialized) instanceProducer.close()
-        if (::instanceConsumer.isInitialized) instanceConsumer.close()
-        if (::databaseProducer.isInitialized) databaseProducer.close()
-        if (::databaseConsumer.isInitialized) databaseConsumer.close()
+        if (::commandsProducer.isInitialized) commandsProducer.close()
+        if (::commandsConsumer.isInitialized) commandsConsumer.close()
+        if (::eventsProducer.isInitialized) eventsProducer.close()
+        if (::eventsConsumer.isInitialized) eventsConsumer.close()
     }
 
     override fun setupMessaging() {
-        // Flush instance topic by consuming all messages
-        var records: ConsumerRecords<String?, String?>?
-        do {
-            records = instanceConsumer.poll(Duration.ofMillis(100))
-        } while (records.count() > 0)
-        instanceConsumer.commitSync()
+        // Wait and drain again to catch any stragglers
+        Thread.sleep(100)
+        drainMessages(commandsConsumer)
+        drainMessages(eventsConsumer)
+    }
 
-        // Flush database topic by consuming all messages
-        do {
-            records = databaseConsumer.poll(Duration.ofMillis(100))
-        } while (records.count() > 0)
-        databaseConsumer.commitSync()
+    private fun drainMessages(consumer: KafkaConsumer<String, String>) {
+        var records = consumer.poll(Duration.ofMillis(100))
+        while (records.count() > 0) {
+            records = consumer.poll(Duration.ofMillis(100))
+        }
     }
 
     override fun cleanupMessaging() {
         // No-op - clients are closed in @AfterAll
     }
 
-    override fun sendInstanceMessage(message: String) {
-        instanceProducer.send(ProducerRecord(instanceTopicIn, message)).get()
+    override fun sendCommand(message: String) {
+        commandsProducer.send(ProducerRecord(commandsTopicIn, message)).get()
     }
 
-    override suspend fun receiveInstanceMessage(timeout: Long, unit: TimeUnit): String? {
-        val records = instanceConsumer.poll(Duration.ofMillis(unit.toMillis(timeout)))
-        return records.firstOrNull()?.value()
-    }
+    override suspend fun receiveCommand(timeout: Long, unit: TimeUnit): String? =
+        commandsConsumer.poll(Duration.ofMillis(unit.toMillis(timeout))).firstOrNull()?.value()
 
-    override suspend fun receivedEvent(timeout: Long, unit: TimeUnit): String? {
-        val records = databaseConsumer.poll(Duration.ofMillis(unit.toMillis(timeout)))
-        return records.firstOrNull()?.value()
-    }
+    override suspend fun receiveEvent(timeout: Long, unit: TimeUnit): String? =
+        eventsConsumer.poll(Duration.ofMillis(unit.toMillis(timeout))).firstOrNull()?.value()
 }

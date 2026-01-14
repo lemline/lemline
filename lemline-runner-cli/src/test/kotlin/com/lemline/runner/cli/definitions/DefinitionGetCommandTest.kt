@@ -190,7 +190,7 @@ class DefinitionGetCommandTest {
     @Nested
     inner class InteractiveSelectionTests {
         @Test
-        fun `should use selector when only name is provided`() {
+        fun `should use selector when only namespace and name are provided`() {
             // Given
             val selectionList = listOf(1 to workflowDefinition)
             coEvery {
@@ -210,7 +210,7 @@ class DefinitionGetCommandTest {
         }
 
         @Test
-        fun `should use selector when no parameters are provided`() {
+        fun `should use selector when only namespace is provided`() {
             // Given
             val selectionList = listOf(1 to workflowDefinition)
             coEvery { mockedSelector.prepareSelection(workflowNamespace, filterName = null) } returns selectionList
@@ -225,7 +225,36 @@ class DefinitionGetCommandTest {
         }
 
         @Test
-        fun `should handle empty selection list`() {
+        fun `should list all workflows across namespaces when no parameters are provided`() {
+            // Given
+            val selectionList = listOf(1 to workflowDefinition)
+            coEvery { mockedSelector.prepareSelection(null, filterName = null) } returns selectionList
+
+            // When
+            val exitCode = cmd.execute()
+
+            // Then
+            exitCode shouldBe 0
+            outStream.toString() shouldContain workflowDefinition.definition
+            coVerify { mockedSelector.prepareSelection(null, filterName = null) }
+        }
+
+        @Test
+        fun `should handle empty selection list when no namespace provided`() {
+            // Given
+            coEvery { mockedSelector.prepareSelection(null, filterName = null) } returns null
+
+            // When
+            val exitCode = cmd.execute()
+
+            // Then
+            exitCode shouldBe 0
+            // No output expected as selector already prints the "No workflows found" message
+            coVerify { mockedSelector.prepareSelection(null, filterName = null) }
+        }
+
+        @Test
+        fun `should handle empty selection list when namespace provided`() {
             // Given
             coEvery { mockedSelector.prepareSelection(workflowNamespace, filterName = null) } returns null
 

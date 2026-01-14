@@ -13,12 +13,12 @@ import com.lemline.runner.config.LemlineConfigConstants.KAFKA_WORKFLOWS_GROUP_ID
 import com.lemline.runner.config.LemlineConfigConstants.METRICS_PATH_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.METRICS_PORT_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.MYSQL_HOST_DEFAULT
-import com.lemline.runner.config.LemlineConfigConstants.MYSQL_NAME_DEFAULT
+import com.lemline.runner.config.LemlineConfigConstants.MYSQL_DATABASE_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.MYSQL_PASSWORD_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.MYSQL_PORT_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.MYSQL_USERNAME_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.POSTGRES_HOST_DEFAULT
-import com.lemline.runner.config.LemlineConfigConstants.POSTGRES_NAME_DEFAULT
+import com.lemline.runner.config.LemlineConfigConstants.POSTGRES_DATABASE_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.POSTGRES_PASSWORD_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.POSTGRES_PORT_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.POSTGRES_USERNAME_DEFAULT
@@ -46,6 +46,9 @@ const val CLOUDEVENTS_CONSUMER_ENABLED = "lemline.messaging.cloudevents.consumer
 const val CLOUDEVENTS_CONSUMER_CONCURRENCY = "lemline.messaging.cloudevents.consumer.concurrency"
 
 const val LIFECYCLE_EVENTS_PRODUCER_ENABLED = "lemline.messaging.lifecycleevents.producer.enabled"
+
+const val DATABASE_ENABLED = "lemline.database.enabled"
+const val SCHEDULED_ENABLED = "lemline.scheduled.enabled"
 
 const val ORCHESTRATOR_MODE = "lemline.orchestrator.mode"
 
@@ -80,6 +83,7 @@ interface LemlineConfiguration {
     fun config(): Optional<String>
     fun database(): DatabaseConfig
     fun messaging(): MessagingConfig
+    fun scheduled(): ScheduledConfig
     fun orchestrator(): OrchestratorConfig
     fun outbox(): OutboxConfig
     fun metrics(): MetricsConfig
@@ -89,6 +93,13 @@ interface LemlineConfiguration {
      * Database configuration mapping.
      */
     interface DatabaseConfig {
+
+        /**
+         * Whether database is enabled.
+         * Set to false for commands that don't need database (e.g., --help, --version).
+         */
+        @WithDefault("true")
+        fun enabled(): Boolean
 
         /**
          * Database type.
@@ -121,6 +132,20 @@ interface LemlineConfiguration {
     }
 
     /**
+     * Scheduled tasks configuration.
+     * Controls whether background scheduled tasks (outbox processors, cleaners) run.
+     */
+    interface ScheduledConfig {
+        /**
+         * Whether scheduled tasks are enabled.
+         * Set to false for non-listen commands (migrate, config, etc.) to prevent
+         * background tasks from running during administrative operations.
+         */
+        @WithDefault("true")
+        fun enabled(): Boolean
+    }
+
+    /**
      * PostgresSQL-specific configuration.
      */
     interface PostgreSQLConfig {
@@ -136,8 +161,8 @@ interface LemlineConfiguration {
         @WithDefault(POSTGRES_PASSWORD_DEFAULT)
         fun password(): Optional<String>
 
-        @WithDefault(POSTGRES_NAME_DEFAULT)
-        fun name(): Optional<String>
+        @WithDefault(POSTGRES_DATABASE_DEFAULT)
+        fun database(): Optional<String>
     }
 
     /**
@@ -156,8 +181,8 @@ interface LemlineConfiguration {
         @WithDefault(MYSQL_PASSWORD_DEFAULT)
         fun password(): Optional<String>
 
-        @WithDefault(MYSQL_NAME_DEFAULT)
-        fun name(): Optional<String>
+        @WithDefault(MYSQL_DATABASE_DEFAULT)
+        fun database(): Optional<String>
     }
 
     /**
@@ -380,7 +405,7 @@ interface LemlineConfiguration {
         @WithDefault(POSTGRES_PORT_DEFAULT)
         fun port(): Int
 
-        @WithDefault(POSTGRES_NAME_DEFAULT)
+        @WithDefault(POSTGRES_DATABASE_DEFAULT)
         fun database(): String
 
         @WithDefault(POSTGRES_USERNAME_DEFAULT)

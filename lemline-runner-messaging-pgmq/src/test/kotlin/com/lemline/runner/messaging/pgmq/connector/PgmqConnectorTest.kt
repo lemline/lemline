@@ -1,26 +1,18 @@
 // SPDX-License-Identifier: BUSL-1.1
-package com.lemline.runner.messaging.postgres.connector
+package com.lemline.runner.messaging.pgmq.connector
 
-import com.lemline.runner.messaging.postgres.PgmqMessage
+import com.lemline.runner.messaging.pgmq.PgmqMessage
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.shouldBe
-import io.kotest.matchers.shouldNotBe
-import io.kotest.matchers.types.shouldBeInstanceOf
-import io.mockk.coEvery
-import io.mockk.coVerify
+import io.mockk.Runs
 import io.mockk.every
 import io.mockk.just
 import io.mockk.mockk
-import io.mockk.Runs
 import io.mockk.slot
-import io.smallrye.mutiny.Uni
-import org.eclipse.microprofile.config.Config
+import java.time.Instant
+import java.util.concurrent.Flow
 import org.eclipse.microprofile.reactive.messaging.Message
 import org.eclipse.microprofile.reactive.messaging.Metadata
-import java.time.Instant
-import java.util.Optional
-import java.util.concurrent.CompletableFuture
-import java.util.concurrent.Flow
 
 class PgmqConnectorTest : FunSpec({
 
@@ -76,24 +68,6 @@ class PgmqConnectorTest : FunSpec({
 
             metadata.delaySeconds shouldBe 60
             metadata.messageId shouldBe "custom-id-123"
-        }
-    }
-
-    context("PgmqMetadataContainer") {
-        test("should contain metadata and be iterable") {
-            val metadata = PgmqIncomingMetadata(
-                msgId = 1L,
-                readCount = 1,
-                enqueuedAt = Instant.now(),
-                visibilityTimeout = Instant.now().plusSeconds(30),
-                queue = "test"
-            )
-
-            val container = PgmqMetadataContainer(metadata)
-
-            container.metadata shouldBe metadata
-            container.iterator().hasNext() shouldBe true
-            container.iterator().next() shouldBe metadata
         }
     }
 

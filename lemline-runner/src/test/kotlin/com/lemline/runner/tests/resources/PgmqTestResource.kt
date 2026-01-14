@@ -49,7 +49,7 @@ class PgmqTestResource : QuarkusTestResourceLifecycleManager {
             // PostgreSQL main database connection (Flyway runs migrations here)
             "lemline.database.postgresql.host" to host,
             "lemline.database.postgresql.port" to port,
-            "lemline.database.postgresql.name" to database,
+            "lemline.database.postgresql.database" to database,
             "lemline.database.postgresql.username" to username,
             "lemline.database.postgresql.password" to password,
             // PGMQ messaging connection (uses same PostgreSQL with pgmq schema)
@@ -79,7 +79,7 @@ class PgmqTestResource : QuarkusTestResourceLifecycleManager {
         // Clear system properties to prevent conflicts with other test profiles
         System.clearProperty("lemline.database.postgresql.host")
         System.clearProperty("lemline.database.postgresql.port")
-        System.clearProperty("lemline.database.postgresql.name")
+        System.clearProperty("lemline.database.postgresql.database")
         System.clearProperty("lemline.database.postgresql.username")
         System.clearProperty("lemline.database.postgresql.password")
         System.clearProperty("lemline.messaging.pgmq.host")

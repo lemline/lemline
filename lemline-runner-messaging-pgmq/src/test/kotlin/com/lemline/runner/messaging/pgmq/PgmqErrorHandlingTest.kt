@@ -1,17 +1,16 @@
 // SPDX-License-Identifier: BUSL-1.1
-package com.lemline.runner.messaging.postgres
+package com.lemline.runner.messaging.pgmq
 
-import com.lemline.runner.messaging.postgres.config.PgmqConnectorConfig
-import io.kotest.assertions.throwables.shouldThrow
+import com.lemline.runner.messaging.pgmq.config.PgmqConnectorConfig
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
 import io.mockk.every
 import io.mockk.mockk
+import java.time.Instant
+import java.util.*
 import kotlinx.serialization.json.Json
 import org.eclipse.microprofile.config.Config
-import java.time.Instant
-import java.util.Optional
 
 class PgmqErrorHandlingTest : FunSpec({
 
@@ -27,7 +26,12 @@ class PgmqErrorHandlingTest : FunSpec({
 
         test("should handle invalid port gracefully with default") {
             val config = mockk<Config>()
-            every { config.getOptionalValue("mp.messaging.incoming.test.port", String::class.java) } returns Optional.of("invalid")
+            every {
+                config.getOptionalValue(
+                    "mp.messaging.incoming.test.port",
+                    String::class.java
+                )
+            } returns Optional.of("invalid")
             every { config.getOptionalValue(any(), String::class.java) } returns Optional.empty()
 
             val connectorConfig = PgmqConnectorConfig(config, "test")
@@ -38,7 +42,12 @@ class PgmqErrorHandlingTest : FunSpec({
 
         test("should handle invalid batch size with default") {
             val config = mockk<Config>()
-            every { config.getOptionalValue("mp.messaging.incoming.test.batch-size", String::class.java) } returns Optional.of("not-a-number")
+            every {
+                config.getOptionalValue(
+                    "mp.messaging.incoming.test.batch-size",
+                    String::class.java
+                )
+            } returns Optional.of("not-a-number")
             every { config.getOptionalValue(any(), String::class.java) } returns Optional.empty()
 
             val connectorConfig = PgmqConnectorConfig(config, "test")
@@ -48,7 +57,12 @@ class PgmqErrorHandlingTest : FunSpec({
 
         test("should handle invalid visibility timeout with default") {
             val config = mockk<Config>()
-            every { config.getOptionalValue("mp.messaging.incoming.test.visibility-timeout", String::class.java) } returns Optional.of("abc")
+            every {
+                config.getOptionalValue(
+                    "mp.messaging.incoming.test.visibility-timeout",
+                    String::class.java
+                )
+            } returns Optional.of("abc")
             every { config.getOptionalValue(any(), String::class.java) } returns Optional.empty()
 
             val connectorConfig = PgmqConnectorConfig(config, "test")
@@ -58,7 +72,12 @@ class PgmqErrorHandlingTest : FunSpec({
 
         test("should handle invalid max retries with default") {
             val config = mockk<Config>()
-            every { config.getOptionalValue("mp.messaging.incoming.test.max-retries", String::class.java) } returns Optional.of("xyz")
+            every {
+                config.getOptionalValue(
+                    "mp.messaging.incoming.test.max-retries",
+                    String::class.java
+                )
+            } returns Optional.of("xyz")
             every { config.getOptionalValue(any(), String::class.java) } returns Optional.empty()
 
             val connectorConfig = PgmqConnectorConfig(config, "test")
@@ -68,7 +87,12 @@ class PgmqErrorHandlingTest : FunSpec({
 
         test("should handle invalid auto-create-queue with default") {
             val config = mockk<Config>()
-            every { config.getOptionalValue("mp.messaging.incoming.test.auto-create-queue", String::class.java) } returns Optional.of("maybe")
+            every {
+                config.getOptionalValue(
+                    "mp.messaging.incoming.test.auto-create-queue",
+                    String::class.java
+                )
+            } returns Optional.of("maybe")
             every { config.getOptionalValue(any(), String::class.java) } returns Optional.empty()
 
             val connectorConfig = PgmqConnectorConfig(config, "test")
@@ -97,7 +121,8 @@ class PgmqErrorHandlingTest : FunSpec({
         }
 
         test("should deserialize DlqMessage correctly") {
-            val json = """{"originalMessageId":456,"originalQueue":"q1","payload":"test","error":"err","timestamp":"2024-01-01T00:00:00Z"}"""
+            val json =
+                """{"originalMessageId":456,"originalQueue":"q1","payload":"test","error":"err","timestamp":"2024-01-01T00:00:00Z"}"""
 
             val dlqMessage = Json.decodeFromString(DlqMessage.serializer(), json)
 

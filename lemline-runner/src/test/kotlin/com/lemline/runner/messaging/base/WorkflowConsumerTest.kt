@@ -7,13 +7,13 @@ import com.lemline.common.values.WorkflowNamespace
 import com.lemline.common.values.WorkflowVersion
 import com.lemline.core.orchestrator.StepByStepOrchestrator
 import com.lemline.core.states.WorkflowEvent
-import com.lemline.runner.failures.FailureReasons.DESERIALIZATION_FAILURE
-import com.lemline.runner.messaging.CompensationException
 import com.lemline.runner.common.messaging.InstanceMessage
-import com.lemline.runner.messaging.commands.WorkflowCommandHandler
-import com.lemline.runner.messaging.events.WorkflowEventHandler
 import com.lemline.runner.definitions.DefinitionModel
 import com.lemline.runner.definitions.DefinitionRepository
+import com.lemline.runner.failures.FailureReasons.DESERIALIZATION_FAILURE
+import com.lemline.runner.messaging.CompensationException
+import com.lemline.runner.messaging.commands.WorkflowCommandHandler
+import com.lemline.runner.messaging.events.WorkflowEventHandler
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe
@@ -47,8 +47,8 @@ import org.junit.jupiter.api.Test
  * It defines tests covering various workflow execution scenarios:
  * - Successful task execution.
  * - Handling of invalid input messages.
- * - Storing instances requiring retry logic.
- * - Storing instances requiring a wait state.
+ * - Storing commandss requiring retry logic.
+ * - Storing commandss requiring a wait state.
  * - Handling workflows that complete without further output.
  */
 @ExperimentalTime
@@ -58,14 +58,14 @@ internal abstract class WorkflowConsumerTest {
     lateinit var definitionRepository: DefinitionRepository
 
     @Inject
-    lateinit var instanceMessageHandler: WorkflowCommandHandler
+    lateinit var commandsMessageHandler: WorkflowCommandHandler
 
     @Inject
-    lateinit var databaseMessageHandler: WorkflowEventHandler
+    lateinit var eventsMessageHandler: WorkflowEventHandler
 
     val processingMessages = ConcurrentHashMap<String, CompletableFuture<InstanceMessage<*>?>>()
 
-    val databaseMessages = ConcurrentHashMap<String, CompletableFuture<InstanceMessage<WorkflowEvent>?>>()
+    val eventsMessages = ConcurrentHashMap<String, CompletableFuture<InstanceMessage<WorkflowEvent>?>>()
 
     private val workflowInfo = WorkflowInfo(
         WorkflowNamespace("test"),
@@ -75,25 +75,25 @@ internal abstract class WorkflowConsumerTest {
 
     @BeforeEach
     fun setup() = runTest {
-        // Clear the database
+        // Clear the events
         definitionRepository.deleteAll()
 
         processingMessages.clear()
 
-        instanceMessageHandler.onFailureTest = { msg: Message<String>, e: Throwable? ->
+        commandsMessageHandler.onFailureTest = { msg: Message<String>, e: Throwable? ->
             processingMessages.remove(msg.payload)?.completeExceptionally(e)
         }
 
-        instanceMessageHandler.onCompleteTest = { msg: Message<String>, o: InstanceMessage<*>? ->
+        commandsMessageHandler.onCompleteTest = { msg: Message<String>, o: InstanceMessage<*>? ->
             processingMessages.remove(msg.payload)?.complete(o)
         }
 
-        databaseMessageHandler.onFailureTest = { msg: Message<String>, e: Throwable? ->
-            databaseMessages.remove(msg.payload)?.completeExceptionally(e)
+        eventsMessageHandler.onFailureTest = { msg: Message<String>, e: Throwable? ->
+            eventsMessages.remove(msg.payload)?.completeExceptionally(e)
         }
 
-        databaseMessageHandler.onCompleteTest = { msg: Message<String>, o: InstanceMessage<WorkflowEvent>? ->
-            databaseMessages.remove(msg.payload)?.complete(o)
+        eventsMessageHandler.onCompleteTest = { msg: Message<String>, o: InstanceMessage<WorkflowEvent>? ->
+            eventsMessages.remove(msg.payload)?.complete(o)
         }
 
         // Create test workflow definition
@@ -165,18 +165,21 @@ internal abstract class WorkflowConsumerTest {
 
     protected abstract fun cleanupMessaging()
 
-    protected abstract fun sendInstanceMessage(message: String)
+    protected abstract fun sendCommand(message: String)
 
-    protected abstract suspend fun receiveInstanceMessage(timeout: Long = 1, unit: TimeUnit = SECONDS): String?
+    protected abstract suspend fun receiveCommand(timeout: Long = 1, unit: TimeUnit = SECONDS): String?
 
-    protected abstract suspend fun receivedEvent(timeout: Long = 1, unit: TimeUnit = SECONDS): String?
+    protected abstract suspend fun receiveEvent(timeout: Long = 1, unit: TimeUnit = SECONDS): String?
 
     private fun sendMessageFuture(messageJson: String): CompletableFuture<InstanceMessage<*>?> {
-        // Send the message to the input topic
-        sendInstanceMessage(messageJson)
+        // Register the future BEFORE sending to avoid race condition where the callback
+        // fires before the future is in the map (can happen with fast brokers like Kafka)
+        val future = processingMessages.computeIfAbsent(messageJson) { CompletableFuture<InstanceMessage<*>?>() }
 
-        // returns the corresponding future
-        return processingMessages.computeIfAbsent(messageJson) { CompletableFuture<InstanceMessage<*>?>() }
+        // Send the message to the input topic
+        sendCommand(messageJson)
+
+        return future
     }
 
     /**
@@ -196,24 +199,22 @@ internal abstract class WorkflowConsumerTest {
     @Test
     fun `should process valid workflow message and send to output topic`() = runTest {
         // Given
-        val instanceMessage = InstanceMessage(
+        val commandsMessage = InstanceMessage(
             workflowInfo = workflowInfo,
             workflowState = StepByStepOrchestrator.initCmd(workflowInput = JsonPrimitive("task")),
         )
 
         // When
-        val future = sendMessageFuture(instanceMessage.toJsonString())
+        val future = sendMessageFuture(commandsMessage.toJsonString())
 
         // Then
         // Wait for the message to be processed
-        println("output = ${future.get(1, SECONDS)}")
+        future.get(5, SECONDS)
 
-        receiveInstanceMessage().shouldNotBeNull {
-            println("i=$this")
-        }
+        receiveCommand().shouldNotBeNull()
 
-        // Verify that no message was sent to the database topic
-        receivedEvent() shouldBe null
+        // Verify that no message was sent to the events topic
+        receiveEvent() shouldBe null
     }
 
     /**
@@ -227,10 +228,10 @@ internal abstract class WorkflowConsumerTest {
      *
      * **Then: **
      * - Asserts that waiting for the processing future throws an exception (as processing fails).
-     * - Verifies that no message was sent to the database topic (deserialization failures are stored directly).
+     * - Verifies that no message was sent to the events topic (deserialization failures are stored directly).
      */
     @Test
-    fun `invalid message should be handled without sending to database topic`() = runTest {
+    fun `invalid message should be handled without sending to events topic`() = runTest {
         // Given
         val invalidMessage = "invalid json message"
 
@@ -241,8 +242,8 @@ internal abstract class WorkflowConsumerTest {
         val cause = shouldThrow<ExecutionException> { future.get(1, SECONDS) }.cause
         (cause is CompensationException && cause.reason == DESERIALIZATION_FAILURE) shouldBe true
 
-        // Check that no message was sent to the database topic (deserialization failures are stored directly in the repository)
-        receivedEvent() shouldBe null
+        // Check that no message was sent to the events topic (deserialization failures are stored directly in the repository)
+        receiveEvent() shouldBe null
     }
 
     /**
@@ -256,29 +257,29 @@ internal abstract class WorkflowConsumerTest {
      * - Sends the message using `sendMessageFuture` and waits for processing.
      *
      * **Then: **
-     * - Verifies that a message corresponding to the workflow instance is stored in the *retry* repository.
+     * - Verifies that a message corresponding to the workflow commands is stored in the *retry* repository.
      * - Asserts the status of the stored message is `PENDING` (awaiting retry attempt).
      * - Asserts the attempt count is 0 initially.
      */
     @Test
-    fun `retry should trigger sending a RetryOutboxModel to the database topic`() = runTest {
+    fun `retry should trigger sending a RetryOutboxModel to the events topic`() = runTest {
         // Given
-        val instanceMessage = InstanceMessage(
+        val commandsMessage = InstanceMessage(
             workflowInfo = workflowInfo,
             workflowState = StepByStepOrchestrator.initCmd(workflowInput = JsonPrimitive("retry")),
         )
 
         // When
-        val future = sendMessageFuture(instanceMessage.toJsonString())
+        val future = sendMessageFuture(commandsMessage.toJsonString())
 
-        // Then
-        future.get(1, SECONDS) shouldBe null
+        // Then - use longer timeout for Kafka which has higher latency
+        future.get(5, SECONDS) shouldBe null
 
-        // Check that a message was sent to the database topic
-        receivedEvent().shouldNotBeNull {
-            val instance = InstanceMessage.fromJsonString<WorkflowEvent>(this)
-            instance.workflowState.nodePosition.toString() shouldBe "/do/3/retryCase/try"
-            val retryingState = instance.workflowState as WorkflowEvent.TaskRetryScheduled
+        // Check that a message was sent to the events topic
+        receiveEvent().shouldNotBeNull {
+            val commands = InstanceMessage.fromJsonString<WorkflowEvent>(this)
+            commands.workflowState.nodePosition.toString() shouldBe "/do/3/retryCase/try"
+            val retryingState = commands.workflowState as WorkflowEvent.TaskRetryScheduled
             retryingState.retryAt shouldNotBe null
         }
     }
@@ -294,33 +295,33 @@ internal abstract class WorkflowConsumerTest {
      * - Sends the message using `sendMessageFuture` and waits for processing.
      *
      * **Then: **
-     * - Verifies that a message corresponding to the workflow instance is stored in the *wait* repository.
+     * - Verifies that a message corresponding to the workflow commands is stored in the *wait* repository.
      * - Asserts the status of the stored message is `PENDING`.
      * - Asserts the attempt count is 0.
      * - Asserts that the `delayedUntil` timestamp is set correctly (approximately 30 seconds in the future, based on the test workflow definition).
      */
     @Test
-    fun `should store waiting instance in wait repository`() = runTest {
+    fun `should store waiting commands in wait repository`() = runTest {
         // Given
-        val instanceMessage = InstanceMessage(
+        val commandsMessage = InstanceMessage(
             workflowInfo = workflowInfo,
             workflowState = StepByStepOrchestrator.initCmd(workflowInput = JsonPrimitive("wait")),
         )
 
         // When
-        val scheduleWaitCommand = sendMessageFuture(instanceMessage.toJsonString()).get(5, SECONDS)
+        val scheduleWaitCommand = sendMessageFuture(commandsMessage.toJsonString()).get(5, SECONDS)
 
         // Then
         scheduleWaitCommand shouldNotBe null
-        receivedEvent().shouldBe(null)
+        receiveEvent().shouldBe(null)
 
-        sendMessageFuture(scheduleWaitCommand!!.toJsonString()).get(1, SECONDS)
+        sendMessageFuture(scheduleWaitCommand!!.toJsonString()).get(5, SECONDS)
 
-        // Check that a message was sent to the database topic
-        receivedEvent().shouldNotBeNull {
-            val instance = InstanceMessage.fromJsonString<WorkflowEvent>(this)
-            instance.workflowState.nodePosition.toString() shouldBe "/do/2/waitCase"
-            val waitState = instance.workflowState as WorkflowEvent.WaitStarted
+        // Check that a message was sent to the events topic
+        receiveEvent().shouldNotBeNull {
+            val commands = InstanceMessage.fromJsonString<WorkflowEvent>(this)
+            commands.workflowState.nodePosition.toString() shouldBe "/do/2/waitCase"
+            val waitState = commands.workflowState as WorkflowEvent.WaitStarted
             waitState.config.waitUntil shouldNotBe null
         }
     }
@@ -342,17 +343,17 @@ internal abstract class WorkflowConsumerTest {
     @Test
     fun `should handle completed workflow without sending message`() = runTest {
         // Given
-        val instanceMessage = InstanceMessage(
+        val commandsMessage = InstanceMessage(
             workflowInfo = workflowInfo,
             workflowState = StepByStepOrchestrator.initCmd(workflowInput = JsonPrimitive("completed")),
         )
 
         // When
-        val future = sendMessageFuture(instanceMessage.toJsonString())
+        val future = sendMessageFuture(commandsMessage.toJsonString())
 
         // Then
         future.get(5, SECONDS) shouldBe null
 
-        receivedEvent() shouldBe null
+        receiveEvent() shouldBe null
     }
 }

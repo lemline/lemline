@@ -7,8 +7,8 @@ import com.lemline.runner.messaging.commands.COMMANDS_IN_CHANNEL
 import com.lemline.runner.messaging.commands.COMMANDS_OUT_CHANNEL
 import com.lemline.runner.messaging.events.EVENTS_IN_CHANNEL
 import com.lemline.runner.messaging.events.EVENTS_OUT_CHANNEL
-import com.lemline.runner.messaging.postgres.PgmqClient
-import com.lemline.runner.messaging.postgres.config.PgmqConnectorConfig
+import com.lemline.runner.messaging.pgmq.PgmqClient
+import com.lemline.runner.messaging.pgmq.config.PgmqConnectorConfig
 import com.lemline.runner.tests.profiles.PgmqProfile
 import io.quarkus.test.junit.QuarkusTest
 import io.quarkus.test.junit.TestProfile
@@ -92,13 +92,13 @@ internal class WorkflowConsumerPgmqTest : WorkflowConsumerTest() {
         // No-op - clients are closed in @AfterAll
     }
 
-    override fun sendInstanceMessage(message: String) {
+    override fun sendCommand(message: String) {
         runBlocking {
             commandsInClient.send(message)
         }
     }
 
-    override suspend fun receiveInstanceMessage(timeout: Long, unit: TimeUnit): String? {
+    override suspend fun receiveCommand(timeout: Long, unit: TimeUnit): String? {
         val timeoutMs = unit.toMillis(timeout)
         val pollIntervalMs = 100
         val maxPollSeconds = (timeoutMs / 1000).coerceAtLeast(1).toInt()
@@ -117,7 +117,7 @@ internal class WorkflowConsumerPgmqTest : WorkflowConsumerTest() {
         }
     }
 
-    override suspend fun receivedEvent(timeout: Long, unit: TimeUnit): String? {
+    override suspend fun receiveEvent(timeout: Long, unit: TimeUnit): String? {
         val timeoutMs = unit.toMillis(timeout)
         val pollIntervalMs = 100
         val maxPollSeconds = (timeoutMs / 1000).coerceAtLeast(1).toInt()

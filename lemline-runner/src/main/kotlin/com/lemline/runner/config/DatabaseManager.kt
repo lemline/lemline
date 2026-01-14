@@ -7,9 +7,6 @@ import com.lemline.common.trace
 import com.lemline.runner.common.config.DatabaseConfig
 import com.lemline.runner.common.config.DatabaseType
 import com.lemline.runner.common.config.MigrationManager
-import com.lemline.runner.config.LemlineConfigConstants.DB_TYPE_IN_MEMORY
-import com.lemline.runner.config.LemlineConfigConstants.DB_TYPE_MYSQL
-import com.lemline.runner.config.LemlineConfigConstants.DB_TYPE_POSTGRESQL
 import io.agroal.api.AgroalDataSource
 import io.quarkus.agroal.DataSource
 import io.quarkus.arc.profile.IfBuildProfile
@@ -31,12 +28,7 @@ class DatabaseManager : DatabaseConfig, MigrationManager {
     private lateinit var _dbTypeConfig: String
 
     override val dbType: DatabaseType by lazy {
-        when (_dbTypeConfig) {
-            DB_TYPE_POSTGRESQL -> DatabaseType.POSTGRESQL
-            DB_TYPE_MYSQL -> DatabaseType.MYSQL
-            DB_TYPE_IN_MEMORY -> DatabaseType.H2
-            else -> throw IllegalStateException("Unknown database type '$_dbTypeConfig'")
-        }
+        DatabaseType.fromConfigValue(_dbTypeConfig)
     }
 
     @Inject
