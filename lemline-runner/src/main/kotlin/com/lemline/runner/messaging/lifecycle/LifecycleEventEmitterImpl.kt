@@ -2,6 +2,7 @@
 package com.lemline.runner.messaging.lifecycle
 
 import com.lemline.common.logger.logger
+import com.lemline.core.cloudevents.CloudEventParser.toReadableString
 import com.lemline.core.lifecycleevents.LifecycleEventEmitter
 import com.lemline.runner.config.LIFECYCLEEVENTS_OUT_CHANNEL
 import com.lemline.runner.listeners.CloudEventService
@@ -39,14 +40,14 @@ class LifecycleEventEmitterImpl : LifecycleEventEmitter {
     override suspend fun emit(cloudEvent: CloudEvent) {
         val payload = CloudEventService.serialize(cloudEvent)
 
-        logger.trace { "Emitting lifecycle event: $cloudEvent" }
+        logger.trace { "Emitting lifecycle event: ${cloudEvent.toReadableString()}" }
         try {
             emitter.sendMessage(Message.of(payload)).awaitSuspending()
-            logger.debug { "Lifecycle event sent: $cloudEvent" }
+            logger.debug { "Lifecycle event sent: ${cloudEvent.toReadableString()}" }
         } catch (e: Exception) {
             // Fire-and-forget: log warning but never throw
             // Lifecycle events are observability data - failures should not impact workflow execution
-            logger.warn(e) { "Failed to emit lifecycle event: $cloudEvent" }
+            logger.warn(e) { "Failed to emit lifecycle event: ${cloudEvent.toReadableString()}" }
         }
     }
 }

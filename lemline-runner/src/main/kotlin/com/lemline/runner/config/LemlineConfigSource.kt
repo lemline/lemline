@@ -107,6 +107,9 @@ class LemlineConfigSource : PropertiesConfigSource(
         private fun buildProperties(): Map<String, String> {
             val lemlineProps = mutableMapOf<String, String>()
 
+            logger.info { "LemlineConfigSource.buildProperties() starting..." }
+            logger.info { "ConfigPathHolder.configPath = ${ConfigPathHolder.configPath}" }
+
             // Load user properties from file
             ConfigPathHolder.configPath?.let { path ->
                 ExtraFileConfigFactory().getConfig(path).properties.forEach { (name, value) ->
@@ -116,7 +119,13 @@ class LemlineConfigSource : PropertiesConfigSource(
                 }
             }
 
-            logger.info { "Lemline user properties:\n${lemlineProps.toPrint()}" }
+            logger.info { "Lemline file properties:\n${lemlineProps.toPrint()}" }
+
+            // Log lemline-related system properties before reading
+            val lemlineSysProps = System.getProperties()
+                .filter { (k, _) -> k.toString().startsWith("lemline.") }
+                .map { (k, v) -> "$k=$v" }
+            logger.info { "Lemline system properties: $lemlineSysProps" }
 
             // Override with system properties, as they have higher priority,
             // This includes properties defined in [LemlineApplication]
@@ -125,6 +134,8 @@ class LemlineConfigSource : PropertiesConfigSource(
                     lemlineProps[key.toString()] = value.toString()
                 }
             }
+
+            logger.info { "Lemline merged properties:\n${lemlineProps.toPrint()}" }
 
             // Generate and merge transformed properties
             val generatedProps = mutableMapOf<String, String>()
@@ -253,6 +264,15 @@ class LemlineConfigSource : PropertiesConfigSource(
                         "password=\"${props["$kafka.sasl-password"]}\";"
                 )
                 if (!containsKey("kafka.sasl.mechanism")) set("kafka.sasl.mechanism", "PLAIN")
+            }
+
+            // Log the enabled flags for debugging
+            logger.info {
+                "Kafka channel enabled flags: " +
+                    "commands.consumer=${props[COMMANDS_CONSUMER_ENABLED]}, " +
+                    "commands.producer=${props[COMMANDS_PRODUCER_ENABLED]}, " +
+                    "events.consumer=${props[EVENTS_CONSUMER_ENABLED]}, " +
+                    "events.producer=${props[EVENTS_PRODUCER_ENABLED]}"
             }
 
             configureKafkaTopic(props, TopicType.COMMANDS)
