@@ -20,15 +20,4 @@ lemline:
     type: kafka
     kafka:
       brokers: localhost:9092
-      commands:
-        topic: lemline-commands
-        consumer:
-          concurrency: 4
-          group-id: lemline-commands-group
-          offset-reset: earliest
-      events:
-        topic: lemline-events
-        consumer:
-          concurrency: 2
-          group-id: lemline-events-group
-          offset-reset: earliest
+

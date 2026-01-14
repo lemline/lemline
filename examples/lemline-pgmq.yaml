@@ -27,17 +27,4 @@ lemline:
       database: lemline
       username: postgres
       password: postgres
-      commands:
-        queue: lemline_commands
-        consumer:
-          concurrency: 4
-          visibility-timeout: 30
-          poll-interval: 100
-          batch-size: 10
-      events:
-        queue: lemline_events
-        consumer:
-          concurrency: 2
-          visibility-timeout: 30
-          poll-interval: 100
-          batch-size: 10
+
