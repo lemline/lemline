@@ -67,18 +67,26 @@ class PgmqProfile : QuarkusTestProfile {
             "mp.messaging.incoming.commands-in.visibility-timeout" to "30",
             "mp.messaging.incoming.commands-in.poll-interval" to "100",
             "mp.messaging.incoming.commands-in.batch-size" to "10",
+            "mp.messaging.incoming.commands-in.auto-create-queue" to "true",
+            "mp.messaging.outgoing.commands-out.auto-create-queue" to "true",
             // PGMQ-specific settings for testing - events
             "mp.messaging.incoming.events-in.visibility-timeout" to "30",
             "mp.messaging.incoming.events-in.poll-interval" to "100",
             "mp.messaging.incoming.events-in.batch-size" to "10",
+            "mp.messaging.incoming.events-in.auto-create-queue" to "true",
+            "mp.messaging.outgoing.events-out.auto-create-queue" to "true",
             // PGMQ-specific settings for testing - CloudEvents
             "mp.messaging.incoming.cloudevents-in.visibility-timeout" to "30",
             "mp.messaging.incoming.cloudevents-in.poll-interval" to "100",
             "mp.messaging.incoming.cloudevents-in.batch-size" to "10",
+            "mp.messaging.incoming.cloudevents-in.auto-create-queue" to "true",
+            "mp.messaging.outgoing.cloudevents-out.auto-create-queue" to "true",
             // PGMQ-specific settings for testing - Lifecycle events (test listener)
             "mp.messaging.incoming.lifecycleevents-in.visibility-timeout" to "30",
             "mp.messaging.incoming.lifecycleevents-in.poll-interval" to "100",
             "mp.messaging.incoming.lifecycleevents-in.batch-size" to "10",
+            "mp.messaging.incoming.lifecycleevents-in.auto-create-queue" to "true",
+            "mp.messaging.outgoing.lifecycleevents-out.auto-create-queue" to "true",
         )
     }
 
