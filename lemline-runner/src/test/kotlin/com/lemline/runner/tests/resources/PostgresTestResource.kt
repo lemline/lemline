@@ -25,7 +25,7 @@ class PostgresTestResource : QuarkusTestResourceLifecycleManager {
             "lemline.database.type" to "postgresql",
             "lemline.database.postgresql.host" to postgres.host,
             "lemline.database.postgresql.port" to postgres.firstMappedPort.toString(),
-            "lemline.database.postgresql.name" to postgres.databaseName,
+            "lemline.database.postgresql.database" to postgres.databaseName,
             "lemline.database.postgresql.username" to postgres.username,
             "lemline.database.postgresql.password" to postgres.password
         )
@@ -41,7 +41,7 @@ class PostgresTestResource : QuarkusTestResourceLifecycleManager {
         System.clearProperty("lemline.database.type")
         System.clearProperty("lemline.database.postgresql.host")
         System.clearProperty("lemline.database.postgresql.port")
-        System.clearProperty("lemline.database.postgresql.name")
+        System.clearProperty("lemline.database.postgresql.database")
         System.clearProperty("lemline.database.postgresql.username")
         System.clearProperty("lemline.database.postgresql.password")
 

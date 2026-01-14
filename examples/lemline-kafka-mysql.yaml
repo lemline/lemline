@@ -8,16 +8,14 @@
 
 lemline:
   database:
-    type: mysql
     mysql:
       host: localhost
       port: 3306
-      name: lemline
+      database: lemline
       username: lemline
       password: lemline
 
   messaging:
-    type: kafka
     kafka:
       brokers: localhost:9092
       commands:

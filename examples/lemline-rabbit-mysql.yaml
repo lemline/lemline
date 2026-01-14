@@ -8,26 +8,17 @@
 
 lemline:
   database:
-    type: mysql
     mysql:
       host: localhost
       port: 3306
-      name: lemline
+      database: lemline
       username: lemline
       password: lemline
 
   messaging:
-    type: rabbitmq
     rabbitmq:
       hostname: localhost
       port: 5672
       username: guest
       password: guest
-      commands:
-        queue: lemline-commands
-        consumer:
-          concurrency: 4
-      events:
-        queue: lemline-events
-        consumer:
-          concurrency: 2
+

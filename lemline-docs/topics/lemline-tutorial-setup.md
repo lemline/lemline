@@ -58,16 +58,20 @@ Create a `.lemline.yaml` configuration file in your project directory:
 ```yaml
 lemline:
   database:
-    type: postgresql
     postgresql:
       host: localhost
       port: 5432
-      name: lemline
+      database: lemline
       username: postgres
       password: postgres
 
   messaging:
-    type: pgmq
+    pgmq:
+      host: localhost
+      port: 5432
+      database: lemline
+      username: postgres
+      password: postgres
 ```
 
 ## 3. Download Lemline

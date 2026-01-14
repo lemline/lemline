@@ -30,14 +30,14 @@ object LemlineConfigConstants {
     // Postgres
     const val POSTGRES_HOST_DEFAULT = "localhost"
     const val POSTGRES_PORT_DEFAULT = "5432"
-    const val POSTGRES_NAME_DEFAULT = "lemline"
+    const val POSTGRES_DATABASE_DEFAULT = "lemline"
     const val POSTGRES_USERNAME_DEFAULT = "postgres"
     const val POSTGRES_PASSWORD_DEFAULT = "postgres"
 
     // MySQL
     const val MYSQL_HOST_DEFAULT = "localhost"
     const val MYSQL_PORT_DEFAULT = "3306"
-    const val MYSQL_NAME_DEFAULT = "lemline"
+    const val MYSQL_DATABASE_DEFAULT = "lemline"
     const val MYSQL_USERNAME_DEFAULT = "mysql"
     const val MYSQL_PASSWORD_DEFAULT = "mysql"
 

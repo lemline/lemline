@@ -25,7 +25,7 @@ import com.lemline.runner.config.LemlineConfigConstants.LIFECYCLE_EVENTS_TOPIC_D
 import com.lemline.runner.config.LemlineConfigConstants.METRICS_PATH_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.METRICS_PORT_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.MYSQL_HOST_DEFAULT
-import com.lemline.runner.config.LemlineConfigConstants.MYSQL_NAME_DEFAULT
+import com.lemline.runner.config.LemlineConfigConstants.MYSQL_DATABASE_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.MYSQL_PASSWORD_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.MYSQL_PORT_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.MYSQL_USERNAME_DEFAULT
@@ -35,7 +35,7 @@ import com.lemline.runner.config.LemlineConfigConstants.PGMQ_MAX_RETRIES_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.PGMQ_POLL_INTERVAL_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.PGMQ_VISIBILITY_TIMEOUT_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.POSTGRES_HOST_DEFAULT
-import com.lemline.runner.config.LemlineConfigConstants.POSTGRES_NAME_DEFAULT
+import com.lemline.runner.config.LemlineConfigConstants.POSTGRES_DATABASE_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.POSTGRES_PASSWORD_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.POSTGRES_PORT_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.POSTGRES_USERNAME_DEFAULT
@@ -176,22 +176,22 @@ class LemlineConfigSource : PropertiesConfigSource(
                     val db = "lemline.database.postgresql"
                     val host = props["$db.host"] ?: POSTGRES_HOST_DEFAULT
                     val port = props["$db.port"] ?: POSTGRES_PORT_DEFAULT
-                    val name = props["$db.name"] ?: POSTGRES_NAME_DEFAULT
+                    val database = props["$db.database"] ?: POSTGRES_DATABASE_DEFAULT
                     val postgres = "quarkus.datasource.postgresql"
                     generated["$postgres.username"] = props["$db.username"] ?: POSTGRES_USERNAME_DEFAULT
                     generated["$postgres.password"] = props["$db.password"] ?: POSTGRES_PASSWORD_DEFAULT
-                    generated["$postgres.jdbc.url"] = "jdbc:postgresql://$host:$port/$name"
+                    generated["$postgres.jdbc.url"] = "jdbc:postgresql://$host:$port/$database"
                 }
 
                 DatabaseType.MYSQL -> {
                     val db = "lemline.database.mysql"
                     val host = props["$db.host"] ?: MYSQL_HOST_DEFAULT
                     val port = props["$db.port"] ?: MYSQL_PORT_DEFAULT
-                    val name = props["$db.name"] ?: MYSQL_NAME_DEFAULT
+                    val database = props["$db.database"] ?: MYSQL_DATABASE_DEFAULT
                     val mysql = "quarkus.datasource.mysql"
                     generated["$mysql.username"] = props["$db.username"] ?: MYSQL_USERNAME_DEFAULT
                     generated["$mysql.password"] = props["$db.password"] ?: MYSQL_PASSWORD_DEFAULT
-                    generated["$mysql.jdbc.url"] = "jdbc:mysql://$host:$port/$name" +
+                    generated["$mysql.jdbc.url"] = "jdbc:mysql://$host:$port/$database" +
                         "?useSSL=false" +
                         "&allowPublicKeyRetrieval=true" +
                         "&sessionVariables=sql_mode='STRICT_ALL_TABLES,ERROR_FOR_DIVISION_BY_ZERO,NO_ZERO_DATE,NO_ZERO_IN_DATE,NO_ENGINE_SUBSTITUTION'" +
@@ -492,7 +492,7 @@ class LemlineConfigSource : PropertiesConfigSource(
             // PostgreSQL connection settings (reuses database config or can be overridden)
             val host = props["$pgmq.host"] ?: POSTGRES_HOST_DEFAULT
             val port = props["$pgmq.port"] ?: POSTGRES_PORT_DEFAULT
-            val database = props["$pgmq.database"] ?: POSTGRES_NAME_DEFAULT
+            val database = props["$pgmq.database"] ?: POSTGRES_DATABASE_DEFAULT
             val username = props["$pgmq.username"] ?: POSTGRES_USERNAME_DEFAULT
             val password = props["$pgmq.password"] ?: POSTGRES_PASSWORD_DEFAULT
 

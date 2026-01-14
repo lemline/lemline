@@ -224,7 +224,7 @@ You can override settings for specific Quarkus profiles (e.g., prod, dev, test) 
                 host: prod-db.example.com
                 username: ${LEMLINE_PROD_PG_USER}
                 password: ${LEMLINE_PROD_PG_PASSWORD}
-                name: lemline_production_db
+                database: lemline_production_db
 ```
 
 Activate a profile by starting Lemline with the system property: `-Dquarkus.profile=prod`

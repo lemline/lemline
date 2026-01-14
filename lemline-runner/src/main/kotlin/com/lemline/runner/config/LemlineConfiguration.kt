@@ -13,12 +13,12 @@ import com.lemline.runner.config.LemlineConfigConstants.KAFKA_WORKFLOWS_GROUP_ID
 import com.lemline.runner.config.LemlineConfigConstants.METRICS_PATH_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.METRICS_PORT_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.MYSQL_HOST_DEFAULT
-import com.lemline.runner.config.LemlineConfigConstants.MYSQL_NAME_DEFAULT
+import com.lemline.runner.config.LemlineConfigConstants.MYSQL_DATABASE_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.MYSQL_PASSWORD_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.MYSQL_PORT_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.MYSQL_USERNAME_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.POSTGRES_HOST_DEFAULT
-import com.lemline.runner.config.LemlineConfigConstants.POSTGRES_NAME_DEFAULT
+import com.lemline.runner.config.LemlineConfigConstants.POSTGRES_DATABASE_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.POSTGRES_PASSWORD_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.POSTGRES_PORT_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.POSTGRES_USERNAME_DEFAULT
@@ -161,8 +161,8 @@ interface LemlineConfiguration {
         @WithDefault(POSTGRES_PASSWORD_DEFAULT)
         fun password(): Optional<String>
 
-        @WithDefault(POSTGRES_NAME_DEFAULT)
-        fun name(): Optional<String>
+        @WithDefault(POSTGRES_DATABASE_DEFAULT)
+        fun database(): Optional<String>
     }
 
     /**
@@ -181,8 +181,8 @@ interface LemlineConfiguration {
         @WithDefault(MYSQL_PASSWORD_DEFAULT)
         fun password(): Optional<String>
 
-        @WithDefault(MYSQL_NAME_DEFAULT)
-        fun name(): Optional<String>
+        @WithDefault(MYSQL_DATABASE_DEFAULT)
+        fun database(): Optional<String>
     }
 
     /**
@@ -405,7 +405,7 @@ interface LemlineConfiguration {
         @WithDefault(POSTGRES_PORT_DEFAULT)
         fun port(): Int
 
-        @WithDefault(POSTGRES_NAME_DEFAULT)
+        @WithDefault(POSTGRES_DATABASE_DEFAULT)
         fun database(): String
 
         @WithDefault(POSTGRES_USERNAME_DEFAULT)

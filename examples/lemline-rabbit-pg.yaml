@@ -8,26 +8,17 @@
 
 lemline:
   database:
-    type: postgresql
     postgresql:
       host: localhost
       port: 5432
-      name: lemline
+      database: lemline
       username: postgres
       password: postgres
 
   messaging:
-    type: rabbitmq
     rabbitmq:
       hostname: localhost
       port: 5672
       username: guest
       password: guest
-      commands:
-        queue: lemline-commands
-        consumer:
-          concurrency: 4
-      events:
-        queue: lemline-events
-        consumer:
-          concurrency: 2
+
