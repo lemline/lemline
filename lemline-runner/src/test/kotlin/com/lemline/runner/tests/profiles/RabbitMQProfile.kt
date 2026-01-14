@@ -20,7 +20,11 @@ import io.quarkus.test.junit.QuarkusTestProfile.TestResourceEntry
  * - an H2 (in memory) database for persistence
  * - RabbitMQ channels for messaging
  *
- * All corresponding Quarkus properties are set by LemlineConfigSourceFactory.
+ * Configuration approach:
+ * - Business config (queue names, enabled flags) uses lemline.* properties
+ *   → LemlineConfigSource transforms these to mp.messaging.* properties
+ * - Test-only infrastructure tweaks use mp.messaging.* directly
+ *   → These bypass LemlineConfigSource intentionally (not production config)
  */
 class RabbitMQProfile : QuarkusTestProfile {
 
@@ -30,19 +34,29 @@ class RabbitMQProfile : QuarkusTestProfile {
      */
     override fun getConfigOverrides(): Map<String, String> {
         return mapOf(
+            // =============================================================
+            // Business configuration (via lemline.* → LemlineConfigSource)
+            // =============================================================
+
             // Database configuration
             DATABASE_TYPE to DatabaseType.H2.configValue,
-            // Messaging configuration
+
+            // Messaging type
             MESSAGING_TYPE to MessagingType.RABBITMQ.configValue,
+
+            // Channel enabled flags
             COMMANDS_CONSUMER_ENABLED to "true",
             COMMANDS_PRODUCER_ENABLED to "true",
             EVENTS_CONSUMER_ENABLED to "true",
             EVENTS_PRODUCER_ENABLED to "true",
 
-            "mp.messaging.incoming.commands-in.queue.name" to "lemline-commands-in",
-            "mp.messaging.outgoing.commands-out.queue.name" to "lemline-commands-out",
-            "mp.messaging.incoming.events-in.queue.name" to "lemline-events-in",
-            "mp.messaging.outgoing.events-out.queue.name" to "lemline-events-out"
+            // Queue names for test isolation (transformed by LemlineConfigSource)
+            // Note: Consumer and producer use different queues for testing
+            // (production would typically use the same queue)
+            "lemline.messaging.rabbitmq.commands.queue" to "lemline-commands-in",
+            "lemline.messaging.rabbitmq.commands.producer.queue-out" to "lemline-commands-out",
+            "lemline.messaging.rabbitmq.events.queue" to "lemline-events-in",
+            "lemline.messaging.rabbitmq.events.producer.queue-out" to "lemline-events-out",
         )
     }
 
