@@ -153,7 +153,7 @@ internal class WorkflowConsumerRabbitMQTest : WorkflowConsumerTest() {
         // No-op - clients are closed in @AfterAll
     }
 
-    override fun sendInstanceMessage(message: String) {
+    override fun sendCommand(message: String) {
         commandsChannel.basicPublish(
             "",
             instanceQueueIn,
@@ -162,9 +162,9 @@ internal class WorkflowConsumerRabbitMQTest : WorkflowConsumerTest() {
         )
     }
 
-    override suspend fun receiveInstanceMessage(timeout: Long, unit: TimeUnit): String? =
+    override suspend fun receiveCommand(timeout: Long, unit: TimeUnit): String? =
         commandsDeliveries.poll(timeout, unit)?.let { String(it.body) }
 
-    override suspend fun receivedEvent(timeout: Long, unit: TimeUnit): String? =
+    override suspend fun receiveEvent(timeout: Long, unit: TimeUnit): String? =
         eventsDeliveries.poll(timeout, unit)?.let { String(it.body) }
 }

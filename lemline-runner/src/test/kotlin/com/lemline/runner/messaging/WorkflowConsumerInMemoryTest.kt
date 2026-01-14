@@ -69,7 +69,7 @@ internal class WorkflowConsumerInMemoryTest : WorkflowConsumerTest() {
      *
      * @param message The message to send
      */
-    override fun sendInstanceMessage(message: String) {
+    override fun sendCommand(message: String) {
         instanceSource.send(message)
     }
 
@@ -80,7 +80,7 @@ internal class WorkflowConsumerInMemoryTest : WorkflowConsumerTest() {
      * @param unit The time unit of the timeout
      * @return The received message, or null if no message was received within the timeout
      */
-    override suspend fun receiveInstanceMessage(timeout: Long, unit: TimeUnit): String? {
+    override suspend fun receiveCommand(timeout: Long, unit: TimeUnit): String? {
         // Wait for the message to be processed
         delay(10)
         // Get the first message from the sink
@@ -94,7 +94,7 @@ internal class WorkflowConsumerInMemoryTest : WorkflowConsumerTest() {
      * @param unit The time unit of the timeout
      * @return The received message, or null if no message was received within the timeout
      */
-    override suspend fun receivedEvent(timeout: Long, unit: TimeUnit): String? {
+    override suspend fun receiveEvent(timeout: Long, unit: TimeUnit): String? {
         // Wait for the message to be processed
         delay(10)
         // Get the first message from the sink

@@ -121,16 +121,16 @@ internal class WorkflowConsumerKafkaTest : WorkflowConsumerTest() {
         // No-op - clients are closed in @AfterAll
     }
 
-    override fun sendInstanceMessage(message: String) {
+    override fun sendCommand(message: String) {
         commandsProducer.send(ProducerRecord(commandsTopicIn, message)).get()
     }
 
-    override suspend fun receiveInstanceMessage(timeout: Long, unit: TimeUnit): String? {
+    override suspend fun receiveCommand(timeout: Long, unit: TimeUnit): String? {
         val records = commandsConsumer.poll(Duration.ofMillis(unit.toMillis(timeout)))
         return records.firstOrNull()?.value()
     }
 
-    override suspend fun receivedEvent(timeout: Long, unit: TimeUnit): String? {
+    override suspend fun receiveEvent(timeout: Long, unit: TimeUnit): String? {
         val records = eventsConsumer.poll(Duration.ofMillis(unit.toMillis(timeout)))
         return records.firstOrNull()?.value()
     }
