@@ -172,11 +172,14 @@ internal abstract class WorkflowConsumerTest {
     protected abstract suspend fun receiveEvent(timeout: Long = 1, unit: TimeUnit = SECONDS): String?
 
     private fun sendMessageFuture(messageJson: String): CompletableFuture<InstanceMessage<*>?> {
+        // Register the future BEFORE sending to avoid race condition where the callback
+        // fires before the future is in the map (can happen with fast brokers like Kafka)
+        val future = processingMessages.computeIfAbsent(messageJson) { CompletableFuture<InstanceMessage<*>?>() }
+
         // Send the message to the input topic
         sendCommand(messageJson)
 
-        // returns the corresponding future
-        return processingMessages.computeIfAbsent(messageJson) { CompletableFuture<InstanceMessage<*>?>() }
+        return future
     }
 
     /**
@@ -206,11 +209,9 @@ internal abstract class WorkflowConsumerTest {
 
         // Then
         // Wait for the message to be processed
-        println("output = ${future.get(1, SECONDS)}")
+        future.get(5, SECONDS)
 
-        receiveCommand().shouldNotBeNull {
-            println("i=$this")
-        }
+        receiveCommand().shouldNotBeNull()
 
         // Verify that no message was sent to the events topic
         receiveEvent() shouldBe null
@@ -271,8 +272,8 @@ internal abstract class WorkflowConsumerTest {
         // When
         val future = sendMessageFuture(commandsMessage.toJsonString())
 
-        // Then
-        future.get(1, SECONDS) shouldBe null
+        // Then - use longer timeout for Kafka which has higher latency
+        future.get(5, SECONDS) shouldBe null
 
         // Check that a message was sent to the events topic
         receiveEvent().shouldNotBeNull {
@@ -314,7 +315,7 @@ internal abstract class WorkflowConsumerTest {
         scheduleWaitCommand shouldNotBe null
         receiveEvent().shouldBe(null)
 
-        sendMessageFuture(scheduleWaitCommand!!.toJsonString()).get(1, SECONDS)
+        sendMessageFuture(scheduleWaitCommand!!.toJsonString()).get(5, SECONDS)
 
         // Check that a message was sent to the events topic
         receiveEvent().shouldNotBeNull {

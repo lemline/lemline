@@ -1,9 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
-package com.lemline.runner.messaging.postgres.config
+package com.lemline.runner.messaging.pgmq.config
 
-import io.smallrye.reactive.messaging.providers.connectors.ExecutionHolder
-import org.eclipse.microprofile.config.Config
 import java.time.Duration
+import org.eclipse.microprofile.config.Config
 
 /**
  * Configuration for the PGMQ SmallRye Reactive Messaging connector.

@@ -1,0 +1,34 @@
+# Lemline Configuration: Kafka + MySQL
+#
+# Start infrastructure:
+#   docker compose --profile kafka-mysql up -d
+#
+# Run Lemline:
+#   LEMLINE_CONFIG=./examples/lemline-kafka-mysql.yaml java -jar lemline-runner.jar listen
+
+lemline:
+  database:
+    type: mysql
+    mysql:
+      host: localhost
+      port: 3306
+      name: lemline
+      username: lemline
+      password: lemline
+
+  messaging:
+    type: kafka
+    kafka:
+      brokers: localhost:9092
+      commands:
+        topic: lemline-commands
+        consumer:
+          concurrency: 4
+          group-id: lemline-commands-group
+          offset-reset: earliest
+      events:
+        topic: lemline-events
+        consumer:
+          concurrency: 2
+          group-id: lemline-events-group
+          offset-reset: earliest

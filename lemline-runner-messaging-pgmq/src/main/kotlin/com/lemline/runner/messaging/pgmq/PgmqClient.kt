@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
-package com.lemline.runner.messaging.postgres
+package com.lemline.runner.messaging.pgmq
 
 import com.lemline.common.logger.logger
-import com.lemline.runner.messaging.postgres.config.PgmqConnectorConfig
+import com.lemline.runner.messaging.pgmq.config.PgmqConnectorConfig
 import io.smallrye.mutiny.Uni
 import io.smallrye.mutiny.coroutines.awaitSuspending
 import io.vertx.mutiny.pgclient.PgBuilder

@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
-package com.lemline.runner.messaging.postgres
+package com.lemline.runner.messaging.pgmq
 
-import kotlinx.serialization.Serializable
 import java.time.Instant
+import kotlinx.serialization.Serializable
 
 /**
  * Represents a message from PGMQ.

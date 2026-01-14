@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-package com.lemline.runner.messaging.postgres.connector
+package com.lemline.runner.messaging.pgmq.connector
 
 import java.time.Instant
 
@@ -34,14 +34,3 @@ data class PgmqOutgoingMetadata(
     /** Custom message ID (optional, will be generated if not provided) */
     val messageId: String? = null,
 )
-
-/**
- * Container class that wraps PgmqIncomingMetadata for use with SmallRye Messaging.
- *
- * Implements Iterable to allow easy integration with Message.of() API.
- */
-class PgmqMetadataContainer(
-    val pgmqMetadata: PgmqIncomingMetadata,
-) : Iterable<Any> {
-    override fun iterator(): Iterator<Any> = listOf(pgmqMetadata).iterator()
-}

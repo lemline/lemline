@@ -7,8 +7,8 @@ import com.lemline.runner.messaging.commands.COMMANDS_IN_CHANNEL
 import com.lemline.runner.messaging.commands.COMMANDS_OUT_CHANNEL
 import com.lemline.runner.messaging.events.EVENTS_IN_CHANNEL
 import com.lemline.runner.messaging.events.EVENTS_OUT_CHANNEL
-import com.lemline.runner.messaging.postgres.PgmqClient
-import com.lemline.runner.messaging.postgres.config.PgmqConnectorConfig
+import com.lemline.runner.messaging.pgmq.PgmqClient
+import com.lemline.runner.messaging.pgmq.config.PgmqConnectorConfig
 import com.lemline.runner.tests.profiles.PgmqProfile
 import io.quarkus.test.junit.QuarkusTest
 import io.quarkus.test.junit.TestProfile

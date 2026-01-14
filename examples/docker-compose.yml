@@ -1,0 +1,169 @@
+# Lemline Docker Compose - Multi-configuration testing
+#
+# This file provides all infrastructure services needed to test Lemline
+# with different messaging and database combinations.
+#
+# Usage with profiles:
+#   docker compose --profile kafka-pg up -d       # Kafka + PostgreSQL
+#   docker compose --profile kafka-mysql up -d    # Kafka + MySQL
+#   docker compose --profile rabbit-pg up -d      # RabbitMQ + PostgreSQL
+#   docker compose --profile rabbit-mysql up -d   # RabbitMQ + MySQL
+#   docker compose --profile pgmq up -d           # PGMQ + PostgreSQL
+#   docker compose --profile all up -d            # All services
+#
+# Then run Lemline with the corresponding config:
+#   LEMLINE_CONFIG=./lemline-kafka-pg.yaml java -jar lemline-runner.jar listen
+
+services:
+  # =============================================================================
+  # PostgreSQL - Used for database and/or PGMQ messaging
+  # =============================================================================
+  postgres:
+    image: postgres:16-alpine
+    container_name: lemline-postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: lemline
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    profiles:
+      - kafka-pg
+      - rabbit-pg
+      - pgmq
+      - all
+
+  # =============================================================================
+  # MySQL - Alternative database
+  # =============================================================================
+  mysql:
+    image: mysql:8.0
+    container_name: lemline-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: lemline
+      MYSQL_USER: lemline
+      MYSQL_PASSWORD: lemline
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    command: --default-authentication-plugin=mysql_native_password
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-proot"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    profiles:
+      - kafka-mysql
+      - rabbit-mysql
+      - all
+
+  # =============================================================================
+  # Kafka + Zookeeper - Messaging broker
+  # =============================================================================
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    container_name: lemline-zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - "2181:2181"
+    volumes:
+      - zookeeper_data:/var/lib/zookeeper/data
+      - zookeeper_log:/var/lib/zookeeper/log
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "2181"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    profiles:
+      - kafka-pg
+      - kafka-mysql
+      - all
+
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: lemline-kafka
+    depends_on:
+      zookeeper:
+        condition: service_healthy
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092,PLAINTEXT_INTERNAL://kafka:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_INTERNAL:PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+    ports:
+      - "9092:9092"
+    volumes:
+      - kafka_data:/var/lib/kafka/data
+    healthcheck:
+      test: ["CMD", "kafka-broker-api-versions", "--bootstrap-server", "localhost:9092"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+    profiles:
+      - kafka-pg
+      - kafka-mysql
+      - all
+
+  # Optional: Kafka UI for debugging
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: lemline-kafka-ui
+    depends_on:
+      kafka:
+        condition: service_healthy
+    environment:
+      KAFKA_CLUSTERS_0_NAME: lemline
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
+    ports:
+      - "8080:8080"
+    profiles:
+      - kafka-pg
+      - kafka-mysql
+      - all
+
+  # =============================================================================
+  # RabbitMQ - Messaging broker
+  # =============================================================================
+  rabbitmq:
+    image: rabbitmq:3.12-management-alpine
+    container_name: lemline-rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    ports:
+      - "5672:5672"   # AMQP
+      - "15672:15672" # Management UI
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "check_running"]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+    profiles:
+      - rabbit-pg
+      - rabbit-mysql
+      - all
+
+volumes:
+  postgres_data:
+  mysql_data:
+  zookeeper_data:
+  zookeeper_log:
+  kafka_data:
+  rabbitmq_data:

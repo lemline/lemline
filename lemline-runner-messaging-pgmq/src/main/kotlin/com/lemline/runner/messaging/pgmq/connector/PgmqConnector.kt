@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: BUSL-1.1
-package com.lemline.runner.messaging.postgres.connector
+package com.lemline.runner.messaging.pgmq.connector
 
 import com.lemline.common.logger.logger
-import com.lemline.runner.messaging.postgres.PgmqClient
-import com.lemline.runner.messaging.postgres.PgmqMessage
-import com.lemline.runner.messaging.postgres.config.PgmqConnectorConfig
+import com.lemline.runner.messaging.pgmq.PgmqClient
+import com.lemline.runner.messaging.pgmq.PgmqMessage
+import com.lemline.runner.messaging.pgmq.config.PgmqConnectorConfig
 import io.quarkus.runtime.ShutdownEvent
 import io.quarkus.runtime.Startup
 import io.smallrye.reactive.messaging.connector.InboundConnector
@@ -15,6 +15,12 @@ import jakarta.annotation.PreDestroy
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.enterprise.event.Observes
 import jakarta.inject.Inject
+import java.util.concurrent.CompletableFuture
+import java.util.concurrent.CompletionStage
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.Flow
+import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -33,12 +39,6 @@ import mutiny.zero.flow.adapters.AdaptersToFlow
 import org.eclipse.microprofile.config.Config
 import org.eclipse.microprofile.reactive.messaging.Message
 import org.eclipse.microprofile.reactive.messaging.spi.Connector
-import java.util.concurrent.CompletableFuture
-import java.util.concurrent.CompletionStage
-import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.Flow
-import java.util.concurrent.atomic.AtomicBoolean
-import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * SmallRye Reactive Messaging connector for PGMQ (PostgreSQL Message Queue).

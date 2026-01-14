@@ -1,20 +1,20 @@
 // SPDX-License-Identifier: BUSL-1.1
-package com.lemline.runner.messaging.postgres
+package com.lemline.runner.messaging.pgmq
 
 import com.lemline.runner.common.test.RequiresDocker
-import com.lemline.runner.messaging.postgres.config.PgmqConnectorConfig
+import com.lemline.runner.messaging.pgmq.config.PgmqConnectorConfig
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.collections.shouldHaveSize
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
 import io.mockk.every
 import io.mockk.mockk
+import java.sql.DriverManager
+import java.util.*
 import kotlinx.coroutines.delay
 import org.eclipse.microprofile.config.Config
 import org.testcontainers.containers.PostgreSQLContainer
 import org.testcontainers.utility.DockerImageName
-import java.sql.DriverManager
-import java.util.Optional
 
 /**
  * Integration tests for PGMQ client using Testcontainers.
@@ -62,21 +62,91 @@ class PgmqIntegrationTest : FunSpec({
 
     fun createConfig(queueName: String): PgmqConnectorConfig {
         val config = mockk<Config>()
-        every { config.getOptionalValue("mp.messaging.incoming.$queueName.host", String::class.java) } returns Optional.of(postgres.host)
-        every { config.getOptionalValue("mp.messaging.incoming.$queueName.port", String::class.java) } returns Optional.of(postgres.getMappedPort(5432).toString())
-        every { config.getOptionalValue("mp.messaging.incoming.$queueName.database", String::class.java) } returns Optional.of(postgres.databaseName)
-        every { config.getOptionalValue("mp.messaging.incoming.$queueName.username", String::class.java) } returns Optional.of(postgres.username)
-        every { config.getOptionalValue("mp.messaging.incoming.$queueName.password", String::class.java) } returns Optional.of(postgres.password)
-        every { config.getOptionalValue("mp.messaging.incoming.$queueName.queue", String::class.java) } returns Optional.of(queueName)
-        every { config.getOptionalValue("mp.messaging.incoming.$queueName.visibility-timeout", String::class.java) } returns Optional.of("30")
-        every { config.getOptionalValue("mp.messaging.incoming.$queueName.poll-interval", String::class.java) } returns Optional.of("100")
-        every { config.getOptionalValue("mp.messaging.incoming.$queueName.batch-size", String::class.java) } returns Optional.of("10")
-        every { config.getOptionalValue("mp.messaging.incoming.$queueName.max-pool-size", String::class.java) } returns Optional.of("5")
-        every { config.getOptionalValue("mp.messaging.incoming.$queueName.auto-create-queue", String::class.java) } returns Optional.of("true")
-        every { config.getOptionalValue("mp.messaging.incoming.$queueName.dead-letter-queue", String::class.java) } returns Optional.of("$queueName-dlq")
-        every { config.getOptionalValue("mp.messaging.incoming.$queueName.max-retries", String::class.java) } returns Optional.of("3")
+        every {
+            config.getOptionalValue(
+                "mp.messaging.incoming.$queueName.host",
+                String::class.java
+            )
+        } returns Optional.of(postgres.host)
+        every {
+            config.getOptionalValue(
+                "mp.messaging.incoming.$queueName.port",
+                String::class.java
+            )
+        } returns Optional.of(postgres.getMappedPort(5432).toString())
+        every {
+            config.getOptionalValue(
+                "mp.messaging.incoming.$queueName.database",
+                String::class.java
+            )
+        } returns Optional.of(postgres.databaseName)
+        every {
+            config.getOptionalValue(
+                "mp.messaging.incoming.$queueName.username",
+                String::class.java
+            )
+        } returns Optional.of(postgres.username)
+        every {
+            config.getOptionalValue(
+                "mp.messaging.incoming.$queueName.password",
+                String::class.java
+            )
+        } returns Optional.of(postgres.password)
+        every {
+            config.getOptionalValue(
+                "mp.messaging.incoming.$queueName.queue",
+                String::class.java
+            )
+        } returns Optional.of(queueName)
+        every {
+            config.getOptionalValue(
+                "mp.messaging.incoming.$queueName.visibility-timeout",
+                String::class.java
+            )
+        } returns Optional.of("30")
+        every {
+            config.getOptionalValue(
+                "mp.messaging.incoming.$queueName.poll-interval",
+                String::class.java
+            )
+        } returns Optional.of("100")
+        every {
+            config.getOptionalValue(
+                "mp.messaging.incoming.$queueName.batch-size",
+                String::class.java
+            )
+        } returns Optional.of("10")
+        every {
+            config.getOptionalValue(
+                "mp.messaging.incoming.$queueName.max-pool-size",
+                String::class.java
+            )
+        } returns Optional.of("5")
+        every {
+            config.getOptionalValue(
+                "mp.messaging.incoming.$queueName.auto-create-queue",
+                String::class.java
+            )
+        } returns Optional.of("true")
+        every {
+            config.getOptionalValue(
+                "mp.messaging.incoming.$queueName.dead-letter-queue",
+                String::class.java
+            )
+        } returns Optional.of("$queueName-dlq")
+        every {
+            config.getOptionalValue(
+                "mp.messaging.incoming.$queueName.max-retries",
+                String::class.java
+            )
+        } returns Optional.of("3")
         // Fallback to outgoing (returns empty)
-        every { config.getOptionalValue(match { it.startsWith("mp.messaging.outgoing.") }, String::class.java) } returns Optional.empty()
+        every {
+            config.getOptionalValue(
+                match { it.startsWith("mp.messaging.outgoing.") },
+                String::class.java
+            )
+        } returns Optional.empty()
 
         return PgmqConnectorConfig(config, queueName)
     }

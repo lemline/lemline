@@ -15,7 +15,6 @@ import java.util.concurrent.TimeUnit
 import kotlin.time.ExperimentalTime
 import kotlinx.serialization.ExperimentalSerializationApi
 import org.apache.kafka.clients.consumer.ConsumerConfig
-import org.apache.kafka.clients.consumer.ConsumerRecords
 import org.apache.kafka.clients.consumer.KafkaConsumer
 import org.apache.kafka.clients.producer.KafkaProducer
 import org.apache.kafka.clients.producer.ProducerConfig
@@ -77,21 +76,29 @@ internal class WorkflowConsumerKafkaTest : WorkflowConsumerTest() {
         commandsProducer = KafkaProducer(producerProps)
         eventsProducer = KafkaProducer(producerProps)
 
-        // Set up Kafka consumer
+        // Set up Kafka consumer with unique group IDs per test run to avoid offset issues
         val baseConsumerProps = mapOf(
             ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG to bootstrapServers,
-            ConsumerConfig.AUTO_OFFSET_RESET_CONFIG to "earliest",
+            ConsumerConfig.AUTO_OFFSET_RESET_CONFIG to "latest",
             ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG to StringDeserializer::class.java.name,
             ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG to StringDeserializer::class.java.name,
             // Disable auto commit and rely on explicit commit
             ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG to "false",
         )
 
-        commandsConsumer = KafkaConsumer(baseConsumerProps + (ConsumerConfig.GROUP_ID_CONFIG to "test-group-commands"))
+        // Use unique group IDs to avoid offset conflicts
+        val uniqueSuffix = System.currentTimeMillis()
+        commandsConsumer =
+            KafkaConsumer(baseConsumerProps + (ConsumerConfig.GROUP_ID_CONFIG to "test-commands-$uniqueSuffix"))
         commandsConsumer.subscribe(listOf(commandsTopicOut))
 
-        eventsConsumer = KafkaConsumer(baseConsumerProps + (ConsumerConfig.GROUP_ID_CONFIG to "test-group-events"))
+        eventsConsumer =
+            KafkaConsumer(baseConsumerProps + (ConsumerConfig.GROUP_ID_CONFIG to "test-events-$uniqueSuffix"))
         eventsConsumer.subscribe(listOf(eventsTopicOut))
+
+        // Initial poll to trigger partition assignment
+        commandsConsumer.poll(Duration.ofMillis(100))
+        eventsConsumer.poll(Duration.ofMillis(100))
     }
 
     @AfterAll
@@ -103,18 +110,17 @@ internal class WorkflowConsumerKafkaTest : WorkflowConsumerTest() {
     }
 
     override fun setupMessaging() {
-        // Flush commands topic by consuming all messages
-        var records: ConsumerRecords<String?, String?>?
-        do {
-            records = commandsConsumer.poll(Duration.ofMillis(100))
-        } while (records.count() > 0)
-        commandsConsumer.commitSync()
+        // Wait and drain again to catch any stragglers
+        Thread.sleep(100)
+        drainMessages(commandsConsumer)
+        drainMessages(eventsConsumer)
+    }
 
-        // Flush events topic by consuming all messages
-        do {
-            records = eventsConsumer.poll(Duration.ofMillis(100))
-        } while (records.count() > 0)
-        eventsConsumer.commitSync()
+    private fun drainMessages(consumer: KafkaConsumer<String, String>) {
+        var records = consumer.poll(Duration.ofMillis(100))
+        while (records.count() > 0) {
+            records = consumer.poll(Duration.ofMillis(100))
+        }
     }
 
     override fun cleanupMessaging() {
@@ -125,13 +131,9 @@ internal class WorkflowConsumerKafkaTest : WorkflowConsumerTest() {
         commandsProducer.send(ProducerRecord(commandsTopicIn, message)).get()
     }
 
-    override suspend fun receiveCommand(timeout: Long, unit: TimeUnit): String? {
-        val records = commandsConsumer.poll(Duration.ofMillis(unit.toMillis(timeout)))
-        return records.firstOrNull()?.value()
-    }
+    override suspend fun receiveCommand(timeout: Long, unit: TimeUnit): String? =
+        commandsConsumer.poll(Duration.ofMillis(unit.toMillis(timeout))).firstOrNull()?.value()
 
-    override suspend fun receiveEvent(timeout: Long, unit: TimeUnit): String? {
-        val records = eventsConsumer.poll(Duration.ofMillis(unit.toMillis(timeout)))
-        return records.firstOrNull()?.value()
-    }
+    override suspend fun receiveEvent(timeout: Long, unit: TimeUnit): String? =
+        eventsConsumer.poll(Duration.ofMillis(unit.toMillis(timeout))).firstOrNull()?.value()
 }

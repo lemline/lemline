@@ -1,0 +1,34 @@
+# Lemline Configuration: Kafka + PostgreSQL
+#
+# Start infrastructure:
+#   docker compose --profile kafka-pg up -d
+#
+# Run Lemline:
+#   LEMLINE_CONFIG=./examples/lemline-kafka-pg.yaml java -jar lemline-runner.jar listen
+
+lemline:
+  database:
+    type: postgresql
+    postgresql:
+      host: localhost
+      port: 5432
+      name: lemline
+      username: postgres
+      password: postgres
+
+  messaging:
+    type: kafka
+    kafka:
+      brokers: localhost:9092
+      commands:
+        topic: lemline-commands
+        consumer:
+          concurrency: 4
+          group-id: lemline-commands-group
+          offset-reset: earliest
+      events:
+        topic: lemline-events
+        consumer:
+          concurrency: 2
+          group-id: lemline-events-group
+          offset-reset: earliest
