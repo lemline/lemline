@@ -36,7 +36,7 @@ data class RetryModel(
     val errorMessage: String?,
 
     /** Stacktrace of the exception that triggered this retry */
-    val errorStackTrace: String,
+    val errorStackTrace: String?,
 
     ) : WithId, WithInstanceMessage, WithOutbox, WithCleanup {
 
@@ -87,7 +87,7 @@ data class RetryModel(
                 else -> error.message
             },
             errorStackTrace = when (error) {
-                is InternalException -> error.error.toJsonPrettyString()
+                is InternalException -> error.error.details
                 else -> error.stackTraceToString()
             },
         )

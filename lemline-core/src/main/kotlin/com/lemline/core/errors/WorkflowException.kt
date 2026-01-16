@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.errors
 
-import com.lemline.common.json.LemlineJson
 import com.lemline.common.values.NodePosition
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -56,8 +55,6 @@ data class InternalException(
             title = title,
             details = details,
         )
-
-        fun toJsonPrettyString(): String = LemlineJson.encodeToPrettyString(this)
 
         companion object Companion {
             private const val URI_BASE = "https://serverlessworkflow.io/spec/1.0.0/errors"
