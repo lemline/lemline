@@ -417,7 +417,7 @@ internal class WorkflowCommandHandler(
      * Sends a workflow event to the database channel for persistence.
      */
     private suspend fun sendToEventChannel(message: InstanceMessage<WorkflowCommand>, event: WorkflowEvent) {
-        logger.debug { "Sending event to database: $event" }
+        logger.debug { "Sending to events channel: $event" }
         eventEmitter.send(
             InstanceMessage(
                 workflowInfo = message.workflowInfo,
