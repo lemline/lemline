@@ -37,6 +37,21 @@ data class EmitConfig(
 )
 
 /**
+ * Configuration for calling a function.
+ *
+ * Contains all data needed to invoke a function defined in use.functions,
+ * from a URL, or from a resource catalog.
+ *
+ * @property functionRef Function reference (URL, name, or catalog:version@name)
+ * @property arguments Resolved arguments from 'with' section
+ */
+@Serializable
+data class CallFunctionConfig(
+    val functionRef: String,
+    val arguments: Map<String, JsonElement> = emptyMap()
+)
+
+/**
  * Configuration for making an HTTP call.
  *
  * Contains all data needed to execute an HTTP request.

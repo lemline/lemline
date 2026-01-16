@@ -4,6 +4,7 @@ package com.lemline.core.activities.mock
 import com.lemline.common.logger.logger
 import com.lemline.core.activities.ActivityExecutor
 import com.lemline.core.states.WorkflowEvent.ActivityStarted
+import com.lemline.core.states.WorkflowEvent.CallFunctionStarted
 import com.lemline.core.states.WorkflowEvent.CallHttpStarted
 import com.lemline.core.states.WorkflowEvent.RunScriptStarted
 import com.lemline.core.states.WorkflowEvent.RunShellStarted
@@ -50,6 +51,7 @@ class MockActivityExecutor(
 
     override suspend fun execute(event: ActivityStarted): JsonElement = when (event) {
         is CallHttpStarted -> executeHttp(event)
+        is CallFunctionStarted -> executeFunction(event)
         is RunScriptStarted -> executeScript(event)
         is RunShellStarted -> executeShell(event)
     }
@@ -69,6 +71,23 @@ class MockActivityExecutor(
         }
 
         return mock.response.body ?: JsonObject(emptyMap())
+    }
+
+    /**
+     * Execute function call using mock configuration.
+     */
+    private fun executeFunction(event: CallFunctionStarted): JsonElement {
+        val config = event.config
+        val mock = mockConfig.findFunctionMock(config.functionRef)
+            ?: throw MockNotFoundException("No function mock found for: ${config.functionRef}")
+
+        logger.debug { "Mock: Function mock matched for ${config.functionRef}" }
+
+        if (mock.response.error != null) {
+            throw MockedActivityException(mock.response.error)
+        }
+
+        return mock.response.output ?: JsonObject(emptyMap())
     }
 
     /**

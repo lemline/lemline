@@ -8,13 +8,16 @@ import com.lemline.core.testcases.impl.WorkflowTestCase
 import com.lemline.core.testcases.impl.WorkflowTestValidators.expectOutput
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.ExperimentalTime
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.contentOrNull
-import kotlinx.serialization.json.intOrNull
-import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
+
+/**
+ * Tests for function call execution using FullOrchestrator.
+ */
+@ExperimentalTime
+class CallFunctionExecutionTest : AbstractWorkflowExecutionTest(CallFunctionTestCases.cases) {
+    override fun createExecutor() = FullOrchestratorTestExecutor()
+}
 
 /**
  * Tests for HTTP call execution using FullOrchestrator.

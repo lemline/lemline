@@ -7,6 +7,7 @@ import com.lemline.common.values.NodePosition
 import com.lemline.common.values.WorkflowId
 import com.lemline.core.errors.InternalException
 import com.lemline.core.json.LemlineJson
+import com.lemline.core.processors.CallFunctionConfig
 import com.lemline.core.processors.CallHttpConfig
 import com.lemline.core.processors.EmitConfig
 import com.lemline.core.processors.ListenConfig
@@ -563,6 +564,31 @@ sealed class WorkflowEvent : WorkflowState() {
         override val nodeStack: NodeStack,
         override val input: JsonElement,
         val config: CallHttpConfig
+    ) : ActivityStarted() {
+
+        @Transient
+        override val nodePosition = nodeStack.currentPosition
+
+        override fun toString() = "${this::class.simpleName}(" +
+            "nodePosition=$nodePosition" +
+            ", config=$config" +
+            ", input=$input" +
+            ", stack=$nodeStack" +
+            ")"
+    }
+
+    /**
+     * Event emitted when a function call task needs to be executed.
+     *
+     * The config contains the function reference and resolved arguments.
+     * The runtime is responsible for fetching and executing the function.
+     */
+    @Serializable
+    @SerialName("callFunctionStarted")
+    data class CallFunctionStarted(
+        override val nodeStack: NodeStack,
+        override val input: JsonElement,
+        val config: CallFunctionConfig
     ) : ActivityStarted() {
 
         @Transient

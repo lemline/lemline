@@ -46,6 +46,8 @@ data class MockConfiguration(
     val listenMocks: List<ListenMockRule> = emptyList(),
     @SerialName("http")
     val httpMocks: List<HttpMockRule> = emptyList(),
+    @SerialName("function")
+    val functionMocks: List<FunctionMockRule> = emptyList(),
     @SerialName("script")
     val scriptMocks: List<ScriptMockRule> = emptyList(),
     @SerialName("shell")
@@ -71,6 +73,13 @@ data class MockConfiguration(
      */
     fun findHttpMock(url: String, method: String): HttpMockRule? =
         httpMocks.firstOrNull { it.matches(url, method) }
+
+    /**
+     * Find function mock matching function reference.
+     * First matching rule wins.
+     */
+    fun findFunctionMock(functionRef: String): FunctionMockRule? =
+        functionMocks.firstOrNull { it.matches(functionRef) }
 
     /**
      * Find script mock matching language.
@@ -250,6 +259,34 @@ data class ShellMockResponse(
     val stdout: String = "",
     val stderr: String = "",
     val exitCode: Int = 0
+)
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Function Mock Rules
+// ─────────────────────────────────────────────────────────────────────────────
+
+@Serializable
+data class FunctionMockRule(
+    val match: FunctionMockMatcher = FunctionMockMatcher(),
+    val response: FunctionMockResponse = FunctionMockResponse()
+) {
+    /**
+     * Check if this rule matches the given function reference.
+     */
+    fun matches(functionRef: String): Boolean {
+        return match.functionRef == null || globMatches(match.functionRef, functionRef)
+    }
+}
+
+@Serializable
+data class FunctionMockMatcher(
+    val functionRef: String? = null
+)
+
+@Serializable
+data class FunctionMockResponse(
+    val output: JsonElement? = null,
+    val error: String? = null
 )
 
 // ─────────────────────────────────────────────────────────────────────────────
