@@ -12,6 +12,7 @@ import io.serverlessworkflow.api.types.CallFunction
 import io.serverlessworkflow.impl.expressions.ExpressionUtils
 import kotlin.time.ExperimentalTime
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 
 /**
@@ -81,16 +82,16 @@ class CallFunctionProcessor(
         // Resolve 'with' arguments (evaluate expressions)
         val arguments = node.task.with?.additionalProperties?.mapValues { (_, value) ->
             evaluateArgument(value, transformedInput, scope)
-        } ?: emptyMap()
+        }
 
         val config = CallFunctionConfig(
             functionRef = functionRef,
-            arguments = arguments
+            input = arguments?.let { JsonObject(it) } ?: transformedInput
         )
 
         return CallFunctionStarted(
             nodeStack = nodeStack,
-            input = transformedInput,
+            rawInput = transformedInput,
             config = config
         )
     }
@@ -109,12 +110,14 @@ class CallFunctionProcessor(
             jsonValue is JsonPrimitive && jsonValue.isString -> {
                 val str = jsonValue.content
                 if (ExpressionUtils.isExpr(str)) {
+                    // Use force=true since we've already verified it's an expression and trimmed it
                     val trimmed = ExpressionUtils.trimExpr(str)
-                    eval(data, JsonPrimitive(trimmed), scope, false)
+                    eval(data, JsonPrimitive(trimmed), scope, true)
                 } else {
                     jsonValue
                 }
             }
+
             else -> jsonValue
         }
     }

@@ -3,11 +3,14 @@ package com.lemline.core.activities.mock
 
 import com.lemline.common.logger.logger
 import com.lemline.core.activities.ActivityExecutor
+import com.lemline.core.cloudevents.CloudEventFactory
 import com.lemline.core.states.WorkflowEvent.ActivityStarted
-import com.lemline.core.states.WorkflowEvent.CallFunctionStarted
 import com.lemline.core.states.WorkflowEvent.CallHttpStarted
+import com.lemline.core.states.WorkflowEvent.EmitStarted
 import com.lemline.core.states.WorkflowEvent.RunScriptStarted
 import com.lemline.core.states.WorkflowEvent.RunShellStarted
+import io.cloudevents.CloudEvent
+import kotlin.time.ExperimentalTime
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -17,6 +20,10 @@ import kotlinx.serialization.json.JsonPrimitive
  *
  * Use this executor for testing workflows without performing real I/O operations
  * (HTTP calls, script execution, shell commands).
+ *
+ * Note: Function calls (CallFunctionStarted) are NOT activities - they are handled
+ * directly by the orchestrator as suspensions. Use [MockFunctionResolver] to provide
+ * mock function definitions for testing.
  *
  * ## Usage in Tests
  *
@@ -29,8 +36,9 @@ import kotlinx.serialization.json.JsonPrimitive
  *         )
  *     )
  * ))
+ * val functionResolver = MockFunctionResolver(mockConfig)
  *
- * FullOrchestrator.start(workflow, activityExecutor = mockExecutor)
+ * FullOrchestrator.start(workflow, activityExecutor = mockExecutor, functionResolver = functionResolver)
  * ```
  *
  * ## File-Based Configuration
@@ -42,18 +50,23 @@ import kotlinx.serialization.json.JsonPrimitive
  * ## Thread Safety
  *
  * MockActivityExecutor is thread-safe. Mock configuration is immutable after construction.
+ *
+ * @param mockConfig The mock configuration defining responses for activities
+ * @param emitCloudEvent Optional callback invoked when a CloudEvent is emitted. Used for testing emit behavior.
  */
+@ExperimentalTime
 class MockActivityExecutor(
-    val mockConfig: MockConfiguration
+    val mockConfig: MockConfiguration,
+    private val emitCloudEvent: (suspend (CloudEvent) -> Unit)? = null,
 ) : ActivityExecutor {
 
     private val logger = logger()
 
     override suspend fun execute(event: ActivityStarted): JsonElement = when (event) {
         is CallHttpStarted -> executeHttp(event)
-        is CallFunctionStarted -> executeFunction(event)
         is RunScriptStarted -> executeScript(event)
         is RunShellStarted -> executeShell(event)
+        is EmitStarted -> executeEmit(event)
     }
 
     /**
@@ -71,23 +84,6 @@ class MockActivityExecutor(
         }
 
         return mock.response.body ?: JsonObject(emptyMap())
-    }
-
-    /**
-     * Execute function call using mock configuration.
-     */
-    private fun executeFunction(event: CallFunctionStarted): JsonElement {
-        val config = event.config
-        val mock = mockConfig.findFunctionMock(config.functionRef)
-            ?: throw MockNotFoundException("No function mock found for: ${config.functionRef}")
-
-        logger.debug { "Mock: Function mock matched for ${config.functionRef}" }
-
-        if (mock.response.error != null) {
-            throw MockedActivityException(mock.response.error)
-        }
-
-        return mock.response.output ?: JsonObject(emptyMap())
     }
 
     /**
@@ -124,29 +120,59 @@ class MockActivityExecutor(
         return JsonPrimitive(mock.response.stdout)
     }
 
+    /**
+     * Execute emit using mock configuration.
+     *
+     * Builds and emits the CloudEvent via the callback if provided.
+     * Mock configuration can override output or simulate errors.
+     */
+    private suspend fun executeEmit(event: EmitStarted): JsonElement {
+        val config = event.config
+        val mock = mockConfig.findEmitMock(config.type, config.source)
+
+        // Check for mock error first
+        if (mock?.response?.error != null) {
+            throw MockedActivityException(mock.response.error)
+        }
+
+        // Build and emit the CloudEvent
+        val cloudEvent = CloudEventFactory.build(config)
+        logger.debug { "Mock: Emitting CloudEvent type=${config.type} source=${config.source}" }
+        emitCloudEvent?.invoke(cloudEvent)
+
+        // Return mock output if provided, otherwise pass through input
+        return mock?.response?.output ?: event.input
+    }
+
     companion object {
         /**
          * Create a MockActivityExecutor from a mock configuration file path.
          */
-        fun fromFile(path: String): MockActivityExecutor {
+        fun fromFile(
+            path: String,
+            emitCloudEvent: (suspend (CloudEvent) -> Unit)? = null
+        ): MockActivityExecutor {
             val config = MockConfigurationParser.fromFile(path)
-            return MockActivityExecutor(config)
+            return MockActivityExecutor(config, emitCloudEvent)
         }
 
         /**
          * Create a MockActivityExecutor from YAML content.
          */
-        fun fromYaml(content: String): MockActivityExecutor {
+        fun fromYaml(
+            content: String,
+            emitCloudEvent: (suspend (CloudEvent) -> Unit)? = null
+        ): MockActivityExecutor {
             val config = MockConfigurationParser.fromYaml(content)
-            return MockActivityExecutor(config)
+            return MockActivityExecutor(config, emitCloudEvent)
         }
 
         /**
          * Create a MockActivityExecutor with empty configuration.
-         * All activity calls will throw MockNotFoundException.
+         * All activity calls will throw MockNotFoundException (except emit which passes through).
          */
-        fun empty(): MockActivityExecutor {
-            return MockActivityExecutor(MockConfiguration.empty())
+        fun empty(emitCloudEvent: (suspend (CloudEvent) -> Unit)? = null): MockActivityExecutor {
+            return MockActivityExecutor(MockConfiguration.empty(), emitCloudEvent)
         }
     }
 }

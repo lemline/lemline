@@ -6,7 +6,6 @@ import com.lemline.common.values.WorkflowId
 import com.lemline.common.values.WorkflowInfo
 import com.lemline.core.errors.InternalException
 import com.lemline.core.lifecycleevents.LifecycleEventHook
-import com.lemline.core.nodes.ForeachTask
 import com.lemline.core.nodes.Node
 import com.lemline.core.orchestrator.StepByStepOrchestrator.completeTask
 import com.lemline.core.orchestrator.StepByStepOrchestrator.processInternalWorkflowException
@@ -20,7 +19,7 @@ import com.lemline.core.states.TryState
 import com.lemline.core.states.WorkflowCommand
 import com.lemline.core.states.WorkflowEvent
 import com.lemline.core.states.WorkflowEvent.ActivityStarted
-import com.lemline.core.states.WorkflowEvent.EmitStarted
+import com.lemline.core.states.WorkflowEvent.CallFunctionStarted
 import com.lemline.core.states.WorkflowEvent.ForEachCompleted
 import com.lemline.core.states.WorkflowEvent.ForkBranchFailed
 import com.lemline.core.states.WorkflowEvent.ForkStarted
@@ -136,7 +135,7 @@ object StepByStepOrchestrator {
      *
      * This handles workflow-level events and task scheduling. Task completion/failure
      * events are emitted closer to where they occur:
-     * - `task.completed` in [completeTask] for async completions, [emitTaskExitEvents] for sync
+     * - `task.completed` in [completeTask] for async completions
      * - `task.faulted` in [tryCatch] when errors are caught
      * - `task.retried` in [processInternalWorkflowException] when retry is scheduled
      *
@@ -212,12 +211,12 @@ object StepByStepOrchestrator {
             }
 
             is ActivityStarted -> event
-            is EmitStarted -> event
             is WaitStarted -> event
             is ListenStarted -> event
             is ForEachCompleted -> event
             is TaskRetryScheduled -> event
             is RunWorkflowStarted -> event
+            is CallFunctionStarted -> event
             is ForkStarted -> event
             is Outcome -> event
         }

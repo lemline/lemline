@@ -4,11 +4,11 @@ package com.lemline.core.testcases.impl
 import com.lemline.common.values.WorkflowId
 import com.lemline.core.activities.mock.MockActivityExecutor
 import com.lemline.core.activities.mock.MockConfiguration
+import com.lemline.core.activities.mock.MockFunctionResolver
 import com.lemline.core.cloudevents.InMemoryCloudEventHook
 import com.lemline.core.lifecycleevents.LifecycleEventHook
 import com.lemline.core.orchestrator.FullOrchestrator
 import com.lemline.core.orchestrator.StepByStepOrchestrator
-import com.lemline.core.testcases.impl.WorkflowTestExecutor
 import com.lemline.core.workflows.WorkflowCache
 import io.cloudevents.CloudEvent
 import io.serverlessworkflow.api.types.Workflow
@@ -60,22 +60,29 @@ class FullOrchestratorTestExecutor : WorkflowTestExecutor {
                 startedAt = Clock.System.now()
             )
 
-            // Use MockActivityExecutor with the provided configuration
-            val activityExecutor = MockActivityExecutor(mockConfig)
-
             // Create CloudEventHook and pre-populate with test events
             val cloudEventHook = InMemoryCloudEventHook()
             cloudEvents.forEach { event ->
                 cloudEventHook.emit(event)
             }
 
+            val lifecycleHook = LifecycleEventHook.Companion.NOOP
+
+            // Create FunctionResolver with mock configuration (for remote functions)
+            val functionResolver = MockFunctionResolver(mockConfig)
+
+            // MockActivityExecutor handles HTTP, Script, Shell, Emit
+            // Functions are handled directly by FullOrchestrator via functionResolver
+            val activityExecutor = MockActivityExecutor(mockConfig = mockConfig)
+
             val event = FullOrchestrator.resume(
                 workflow = workflow,
                 command = startState,
                 serde = true, // For testing, we want to ensure serialization works
                 activityExecutor = activityExecutor,
+                functionResolver = functionResolver,
                 cloudEventHook = cloudEventHook,
-                lifecycleHook = LifecycleEventHook.Companion.NOOP
+                lifecycleHook = lifecycleHook
             )
 
             WorkflowTestResult.Success(event.value())

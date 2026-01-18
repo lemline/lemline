@@ -6,7 +6,7 @@ package com.lemline.core.states
 import com.lemline.common.values.NodePosition
 import com.lemline.common.values.WorkflowId
 import com.lemline.core.errors.InternalException
-import com.lemline.core.json.LemlineJson
+import com.lemline.common.json.LemlineJson
 import com.lemline.core.processors.CallFunctionConfig
 import com.lemline.core.processors.CallHttpConfig
 import com.lemline.core.processors.EmitConfig
@@ -528,9 +528,9 @@ sealed class WorkflowEvent : WorkflowState() {
     @SerialName("emitStarted")
     data class EmitStarted(
         override val nodeStack: NodeStack,
-        val input: JsonElement,   // Pass-through: output = input for emit task
+        override val input: JsonElement,   // Pass-through: output = input for emit task
         val config: EmitConfig
-    ) : Suspension() {
+    ) : ActivityStarted() {
 
         @Transient
         override val nodePosition = nodeStack.currentPosition // Emit position
@@ -580,24 +580,43 @@ sealed class WorkflowEvent : WorkflowState() {
     /**
      * Event emitted when a function call task needs to be executed.
      *
-     * The config contains the function reference and resolved arguments.
-     * The runtime is responsible for fetching and executing the function.
+     * Functions are executed as synthetic workflows through the orchestrator,
+     * similar to RunWorkflow. The config contains the function reference and
+     * resolved arguments.
+     *
+     * Unlike activities (which perform external I/O), function calls are
+     * handled inline by the orchestrator by:
+     * 1. Resolving the function definition (local or remote)
+     * 2. Building a synthetic workflow wrapping the function's task
+     * 3. Executing via recursive orchestration
+     *
+     * @see RunWorkflowStarted for similar pattern
      */
     @Serializable
     @SerialName("callFunctionStarted")
     data class CallFunctionStarted(
         override val nodeStack: NodeStack,
-        override val input: JsonElement,
+        val rawInput: JsonElement,
         val config: CallFunctionConfig
-    ) : ActivityStarted() {
+    ) : Suspension() {
 
         @Transient
         override val nodePosition = nodeStack.currentPosition
 
+        fun resumeAsCompleted(rawOutput: JsonElement) = WorkflowCommand.ResumeWithCompletedTask(
+            nodeStack = nodeStack,
+            rawOutput = rawOutput,
+        )
+
+        fun resumeAsFailed(error: InternalException.Error) = WorkflowCommand.ResumeWithFailedTask(
+            nodeStack = nodeStack,
+            error = error,
+        )
+
         override fun toString() = "${this::class.simpleName}(" +
             "nodePosition=$nodePosition" +
             ", config=$config" +
-            ", input=$input" +
+            ", rawInput=$rawInput" +
             ", stack=$nodeStack" +
             ")"
     }

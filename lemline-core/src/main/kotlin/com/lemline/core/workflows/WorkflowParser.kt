@@ -20,6 +20,7 @@ import io.serverlessworkflow.api.types.DoTask
 import io.serverlessworkflow.api.types.ForTask
 import io.serverlessworkflow.api.types.ForkTask
 import io.serverlessworkflow.api.types.ListenTask
+import io.serverlessworkflow.api.types.Task
 import io.serverlessworkflow.api.types.TaskBase
 import io.serverlessworkflow.api.types.TaskItem
 import io.serverlessworkflow.api.types.TryTask
@@ -363,3 +364,21 @@ private fun parseCallAsyncAPIChildren(node: Node<*>): List<Node<*>>? {
 val Node<CallAsyncAPI>.foreachBlock: Node<DoTask>?
     @Suppress("UNCHECKED_CAST")
     get() = children?.firstOrNull() as? Node<DoTask>
+
+// ============================================================
+// Workflow Extensions
+// ============================================================
+
+/**
+ * Extracts use.functions from a workflow as a typed map.
+ *
+ * Returns the named function definitions from the workflow's `use.functions` section,
+ * converted to TaskBase, or null if no functions are defined.
+ *
+ * The SDK may store function definitions as:
+ * - [Task] union types (need to call `.get()` to unwrap)
+ * - Direct [TaskBase] subtypes (DoTask, SetTask, CallTask, etc.)
+ *
+ * @throws IllegalArgumentException if a function definition cannot be converted to TaskBase
+ */
+val Workflow.useFunctions: Map<String, Task>? get() = use?.functions?.additionalProperties

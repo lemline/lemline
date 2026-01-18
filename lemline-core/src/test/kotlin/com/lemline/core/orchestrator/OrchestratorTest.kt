@@ -8,6 +8,7 @@ import com.lemline.core.activities.mock.HttpMockResponse
 import com.lemline.core.activities.mock.HttpMockRule
 import com.lemline.core.activities.mock.MockActivityExecutor
 import com.lemline.core.activities.mock.MockConfiguration
+import com.lemline.core.activities.mock.MockFunctionResolver
 import com.lemline.core.activities.mock.ShellMockMatcher
 import com.lemline.core.activities.mock.ShellMockResponse
 import com.lemline.core.activities.mock.ShellMockRule
@@ -77,10 +78,13 @@ class OrchestratorTest : FunSpec() {
         namespace: String = "default",
         name: String = "test",
         version: String = "0.1.0",
-        activityExecutor: ActivityExecutor = MockActivityExecutor.empty(),
+        activityExecutor: ActivityExecutor? = null,
         cloudEventHook: CloudEventHook = InMemoryCloudEventHook(),
     ): JsonElement {
         val workflow = getWorkflowToTest(yaml, namespace, name, version)
+
+        // Create executor with emit wired to the cloudEventHook
+        val executor = activityExecutor ?: MockActivityExecutor.empty { cloudEventHook.emit(it) }
 
         val startState = StepByStepOrchestrator.initCmd(
             workflowId = WorkflowId.random(),
@@ -93,7 +97,8 @@ class OrchestratorTest : FunSpec() {
             workflow = workflow,
             command = startState,
             serde = true,
-            activityExecutor = activityExecutor,
+            activityExecutor = executor,
+            functionResolver = MockFunctionResolver(),
             cloudEventHook = cloudEventHook,
             lifecycleHook = LifecycleEventHook.NOOP,
         )

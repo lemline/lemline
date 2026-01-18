@@ -43,12 +43,12 @@ data class EmitConfig(
  * from a URL, or from a resource catalog.
  *
  * @property functionRef Function reference (URL, name, or catalog:version@name)
- * @property arguments Resolved arguments from 'with' section
+ * @property input Resolved arguments from 'with' section
  */
 @Serializable
 data class CallFunctionConfig(
     val functionRef: String,
-    val arguments: Map<String, JsonElement> = emptyMap()
+    val input: JsonElement
 )
 
 /**

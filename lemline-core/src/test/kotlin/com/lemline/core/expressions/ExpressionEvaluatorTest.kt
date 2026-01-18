@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.expressions
 
-import com.lemline.core.json.toJsonElement
+import com.lemline.common.json.toJsonElement
 import kotlin.test.assertEquals
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive

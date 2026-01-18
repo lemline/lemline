@@ -129,12 +129,27 @@ object WorkflowCache {
 
     /**
      * Caches a workflow along with its parsed node tree and listen tasks.
+     * This is the internal implementation used by parse*AndPut methods.
      */
     private fun cacheWorkflow(workflow: Workflow) {
         workflowCache[workflow.info] = workflow
         val (_, nodesMap) = WorkflowParser.parse(workflow)
         nodesMapCache[workflow.info] = nodesMap
         listenTasksCache[workflow.info] = extractListenTasks(workflow.info, nodesMap)
+    }
+
+    /**
+     * Caches a programmatically-built workflow.
+     *
+     * Use this method when you have a Workflow object built in code
+     * (e.g., synthetic workflows for function execution) rather than
+     * parsed from YAML/JSON.
+     *
+     * @param workflow The workflow to cache
+     */
+    @JvmStatic
+    fun putWorkflow(workflow: Workflow) {
+        cacheWorkflow(workflow)
     }
 
     /**

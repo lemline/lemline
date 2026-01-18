@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.activities.mock
 
+import io.serverlessworkflow.api.types.Task
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
@@ -51,7 +52,19 @@ data class MockConfiguration(
     @SerialName("script")
     val scriptMocks: List<ScriptMockRule> = emptyList(),
     @SerialName("shell")
-    val shellMocks: List<ShellMockRule> = emptyList()
+    val shellMocks: List<ShellMockRule> = emptyList(),
+    /**
+     * Function definitions for remote functions (URL/catalog).
+     *
+     * Map of function reference to its Task definition.
+     * Used by MockFunctionResolver to provide definitions for execution.
+     *
+     * Unlike [functionMocks] which return a canned output, these definitions
+     * are actually executed as mini-workflows.
+     */
+    @SerialName("functionDefinitions")
+    @kotlinx.serialization.Transient
+    val functionDefinitions: Map<String, Task> = emptyMap()
 ) {
     /**
      * Find emit mock matching type and source.
@@ -80,6 +93,13 @@ data class MockConfiguration(
      */
     fun findFunctionMock(functionRef: String): FunctionMockRule? =
         functionMocks.firstOrNull { it.matches(functionRef) }
+
+    /**
+     * Get function definition for a remote function reference.
+     * Returns the Task to execute, or null if not defined.
+     */
+    fun getFunctionDefinition(functionRef: String): Task? =
+        functionDefinitions[functionRef]
 
     /**
      * Find script mock matching language.
