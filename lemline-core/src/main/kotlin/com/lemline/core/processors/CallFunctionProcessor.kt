@@ -1,25 +1,48 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.processors
 
-import com.lemline.common.json.LemlineJson
+import com.lemline.common.json.LemlineJson.toJsonElement
+import com.lemline.common.values.NodePosition
+import com.lemline.common.values.Token
 import com.lemline.core.nodes.Node
 import com.lemline.core.processors.scope.Scope
-import com.lemline.core.states.CallState
-import com.lemline.core.states.NodeStack
-import com.lemline.core.states.WorkflowEvent
-import com.lemline.core.states.WorkflowEvent.CallFunctionStarted
+import com.lemline.core.states.CallFunctionState
 import io.serverlessworkflow.api.types.CallFunction
-import io.serverlessworkflow.impl.expressions.ExpressionUtils
+import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
 
 /**
- * Node processor for CallFunction (function call task) - pure functional model.
+ * Node processor for CallFunction (function call task) - control-flow model.
  *
  * CallFunction enables workflows to invoke named functions defined in use.functions,
- * from URLs, or from resource catalogs.
+ * from URLs, or from resource catalogs. Unlike activities (HTTP, Script), function
+ * calls are control-flow tasks that navigate into the function's node tree.
+ *
+ * ## Execution Model
+ *
+ * Function execution follows the normal step-by-step message flow:
+ * 1. Enter CallFunction node
+ * 2. Navigate to function's do block (position: `{callFuncPos}/_fn/do`)
+ * 3. DoProcessor navigates through function tasks
+ * 4. Execute function tasks step-by-step (normal message flow)
+ * 5. When function completes, return to CallFunction
+ * 6. CallFunction returns to its parent with function output
+ *
+ * ## Position Scheme
+ *
+ * Function nodes use composite positions:
+ * - `/do/0/myCall` - CallFunction node
+ * - `/do/0/myCall/_fn/do` - Function's do block
+ * - `/do/0/myCall/_fn/do/0/step1` - First task in function
+ *
+ * For recursive calls, positions nest:
+ * - `/do/0/fact/_fn/do/1/recurse/_fn/do/0/base`
+ *
+ * ## Context Sharing
+ *
+ * Functions share context with the calling workflow because they execute
+ * in the same NodeStack with the same RootState.
  *
  * ## Example Workflow
  *
@@ -27,98 +50,117 @@ import kotlinx.serialization.json.JsonPrimitive
  * use:
  *   functions:
  *     validateAddress:
- *       call: expression
- *       with:
- *         code: |
- *           function validateAddress(street, city, zipCode) {
- *             return { valid: true };
- *           }
+ *       do:
+ *         - check:
+ *             set:
+ *               valid: true
  * do:
- *   - checkAddress:
+ *   - validate:
  *       call: validateAddress
  *       with:
  *         street: "${ .customer.address.street }"
- *         city: "${ .customer.address.city }"
- *         zipCode: "${ .customer.address.zip }"
  * ```
- *
- * ## Function Sources
- *
- * - **URL**: `call: https://example.com/function.yaml` - External function definition
- * - **Named**: `call: validateAddress` - Function defined in workflow's use.functions
- * - **Catalog**: `call: logMessage:1.0@globalUtils` - Function from imported catalog
  *
  * @property node Immutable CallFunction definition
  */
 @ExperimentalTime
 class CallFunctionProcessor(
     node: Node<CallFunction>,
-) : NodeProcessor<CallFunction, CallState>(node) {
+) : NodeProcessor<CallFunction, CallFunctionState>(node) {
 
-    override val isAsync = true
+    override val isAsync = false  // Control-flow, not async
 
-    override fun stateWhenEnteringFromParent(transformedInput: JsonElement, scope: Scope) = CallState()
+    override fun stateWhenEnteringFromParent(transformedInput: JsonElement, scope: Scope) = CallFunctionState(
+        startedAt = Clock.System.now(),
+        entered = false
+    )
+
+    override fun stateWhenReEnteringFromChild(
+        state: CallFunctionState,
+        output: JsonElement,
+        scope: Scope,
+        nodeName: String?
+    ): CallFunctionState = state.copy(entered = true)
 
     /**
-     * Build the function call configuration.
+     * Navigate to the function's do block or return to parent.
      *
-     * Extracts the function reference and resolves all arguments from the 'with' section,
-     * evaluating any expressions against the current scope.
+     * - First entry (entered=false): Navigate to function's do block (/_fn/do)
+     * - After function completes (entered=true): Return to parent
      *
-     * @param nodeStack The stack of nodes currently being processed
-     * @param transformedInput Transformed input from parent
-     * @param scope Expression evaluation scope
-     * @return CallFunctionStarted event with the resolved configuration
+     * Note: We navigate to the function's do block (/_fn/do), not the root (/_fn).
+     * This is analogous to how workflows start at `/do` instead of `/`.
+     * The function's DoProcessor handles navigation through function tasks.
      */
-    override fun startedEvent(
-        nodeStack: NodeStack,
-        transformedInput: JsonElement,
+    override fun getNextNode(
+        state: CallFunctionState,
+        dataset: JsonElement,
         scope: Scope,
-    ): WorkflowEvent {
-        logger.debug { "Building function call config for task: ${node.name}" }
+    ): NavigationInfo {
+        return when (state.entered) {
+            false -> {
+                // Navigate into the function
+                // Create a stub node with the function's do block position
+                // The actual node will be resolved by workflow.getNode()
+                val fnPos = node.position.addToken(Token.FUN)
+                val functionDoPosition = fnPos.addToken(Token.DO)
 
-        val functionRef = node.task.call
+                // Evaluate the `with` arguments to pass to the function
+                // If with is specified, evaluate it as the function input
+                // Otherwise, pass the current dataset (transformed input) as function input
+                val functionInput = evaluateWithArgs(dataset, scope)
 
-        // Resolve 'with' arguments (evaluate expressions)
-        val arguments = node.task.with?.additionalProperties?.mapValues { (_, value) ->
-            evaluateArgument(value, transformedInput, scope)
+                NavigationInfo(
+                    nextNode = createStubNode(functionDoPosition),
+                    nextDirective = null,
+                    nextInput = functionInput
+                )
+            }
+
+            true -> {
+                // Function completed, return to parent
+                NavigationInfo(
+                    nextNode = node.parent,
+                    nextDirective = getFlowDirective()
+                )
+            }
         }
-
-        val config = CallFunctionConfig(
-            functionRef = functionRef,
-            input = arguments?.let { JsonObject(it) } ?: transformedInput
-        )
-
-        return CallFunctionStarted(
-            nodeStack = nodeStack,
-            rawInput = transformedInput,
-            config = config
-        )
     }
 
     /**
-     * Evaluates an argument value, resolving expressions if present.
+     * Evaluates the `with` arguments to produce the function input.
      *
-     * @param value The argument value (may be a runtime expression)
-     * @param data The current data context
-     * @param scope Expression evaluation scope
-     * @return The resolved JsonElement value
+     * The `with` block in a CallFunction contains key-value pairs that can be
+     * either static values or expressions. These are evaluated and passed to
+     * the function as its input.
+     *
+     * @param dataset The current dataset (transformed input)
+     * @param scope The current execution scope
+     * @return The evaluated input for the function
      */
-    private fun evaluateArgument(value: Any?, data: JsonElement, scope: Scope): JsonElement {
-        val jsonValue = with(LemlineJson) { value.toJsonElement() }
-        return when {
-            jsonValue is JsonPrimitive && jsonValue.isString -> {
-                val str = jsonValue.content
-                if (ExpressionUtils.isExpr(str)) {
-                    // Use force=true since we've already verified it's an expression and trimmed it
-                    val trimmed = ExpressionUtils.trimExpr(str)
-                    eval(data, JsonPrimitive(trimmed), scope, true)
-                } else {
-                    jsonValue
-                }
-            }
+    private fun evaluateWithArgs(dataset: JsonElement, scope: Scope): JsonElement {
+        val withArgs = node.task.`with` ?: return dataset
 
-            else -> jsonValue
-        }
+        // Convert the with arguments to JsonElement and evaluate any expressions
+        val withJson = withArgs.additionalProperties.toJsonElement()
+        return eval(dataset, withJson, scope, false)
+    }
+
+    /**
+     * Creates a stub node with the given position.
+     *
+     * This stub is used to generate a TaskScheduled event with the correct position.
+     * The actual node (with correct task, parent chain, etc.) will be resolved
+     * when the orchestrator calls workflow.getNode(position).
+     */
+    private fun createStubNode(position: NodePosition): Node<*> {
+        // Create a minimal node - only position matters for TaskScheduled
+        // The task type doesn't matter as it won't be used
+        return Node(
+            position = position,
+            task = node.task,  // Reuse CallFunction task as placeholder
+            name = "_fn",
+            parent = node
+        )
     }
 }

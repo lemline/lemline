@@ -19,7 +19,6 @@ import com.lemline.core.states.TryState
 import com.lemline.core.states.WorkflowCommand
 import com.lemline.core.states.WorkflowEvent
 import com.lemline.core.states.WorkflowEvent.ActivityStarted
-import com.lemline.core.states.WorkflowEvent.CallFunctionStarted
 import com.lemline.core.states.WorkflowEvent.ForEachCompleted
 import com.lemline.core.states.WorkflowEvent.ForkBranchFailed
 import com.lemline.core.states.WorkflowEvent.ForkStarted
@@ -35,6 +34,7 @@ import com.lemline.core.tasks.toJava
 import com.lemline.core.tasks.toKotlin
 import com.lemline.core.workflows.getNode
 import io.serverlessworkflow.api.types.FlowDirective
+import io.serverlessworkflow.api.types.Task
 import io.serverlessworkflow.api.types.ForkTask
 import io.serverlessworkflow.api.types.TryTask
 import io.serverlessworkflow.api.types.Workflow
@@ -89,14 +89,16 @@ object StepByStepOrchestrator {
      * @param command The command to execute
      * @param workflowInfo The workflow identity (namespace, name, version)
      * @param lifecycleHook Optional hook for lifecycle event callbacks (default: no-op)
+     * @param functionResolver Resolver for remote function references (URLs, catalogs)
      */
     suspend fun runByTask(
         workflow: Workflow,
         command: WorkflowCommand,
         workflowInfo: WorkflowInfo,
         lifecycleHook: LifecycleEventHook,
+        functionResolver: suspend (String) -> Task? = { null },
     ): WorkflowEvent {
-        val node = workflow.getNode(command.nodePosition)
+        val node = workflow.getNode(command.nodePosition, functionResolver)
 
         val event = when (command) {
             is WorkflowCommand.ResumeFromTask -> resumeFromTask(
@@ -195,19 +197,21 @@ object StepByStepOrchestrator {
      * @param command The command to execute
      * @param workflowInfo The workflow identity (namespace, name, version)
      * @param lifecycleHook Optional hook for lifecycle event callbacks (default: no-op)
+     * @param functionResolver Resolver for remote function references (URLs, catalogs)
      */
     suspend fun runByActivity(
         workflow: Workflow,
         command: WorkflowCommand,
         workflowInfo: WorkflowInfo,
         lifecycleHook: LifecycleEventHook,
+        functionResolver: suspend (String) -> Task? = { null },
     ): WorkflowEvent {
 
-        return when (val event = runByTask(workflow, command, workflowInfo, lifecycleHook)) {
-            is TaskScheduled -> if (workflow.getNode(event.nodePosition).isActivity()) {
+        return when (val event = runByTask(workflow, command, workflowInfo, lifecycleHook, functionResolver)) {
+            is TaskScheduled -> if (workflow.getNode(event.nodePosition, functionResolver).isActivity()) {
                 event
             } else {
-                runByActivity(workflow, event.resume(), workflowInfo, lifecycleHook)
+                runByActivity(workflow, event.resume(), workflowInfo, lifecycleHook, functionResolver)
             }
 
             is ActivityStarted -> event
@@ -216,7 +220,6 @@ object StepByStepOrchestrator {
             is ForEachCompleted -> event
             is TaskRetryScheduled -> event
             is RunWorkflowStarted -> event
-            is CallFunctionStarted -> event
             is ForkStarted -> event
             is Outcome -> event
         }

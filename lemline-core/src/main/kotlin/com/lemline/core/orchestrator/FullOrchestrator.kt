@@ -8,11 +8,8 @@ import com.lemline.common.values.info
 import com.lemline.core.activities.ActivityExecutor
 import com.lemline.core.cloudevents.CloudEventHook
 import com.lemline.core.errors.InternalException
-import com.lemline.core.functions.FunctionResolutionException
 import com.lemline.core.functions.FunctionResolver
-import com.lemline.core.functions.FunctionWorkflowBuilder
 import com.lemline.core.lifecycleevents.LifecycleEventHook
-import com.lemline.core.workflows.useFunctions
 import com.lemline.core.nodes.Node
 import com.lemline.core.orchestrator.full.CollectResult
 import com.lemline.core.orchestrator.full.ForkBranchExecutor
@@ -62,7 +59,15 @@ object FullOrchestrator {
         lifecycleHook: LifecycleEventHook,
     ): JsonElement {
         val cmd = StepByStepOrchestrator.initCmd(workflowId, workflowInput, hasWaitingParent, startedAt)
-        return resume(workflow, cmd, serde, activityExecutor, functionResolver, cloudEventHook, lifecycleHook).value()
+        return resume(
+            workflow = workflow,
+            command = cmd,
+            serde = serde,
+            activityExecutor = activityExecutor,
+            functionResolver = functionResolver,
+            cloudEventHook = cloudEventHook,
+            lifecycleHook = lifecycleHook
+        ).value()
     }
 
     suspend fun resume(
@@ -75,10 +80,25 @@ object FullOrchestrator {
         lifecycleHook: LifecycleEventHook,
     ): WorkflowEvent.Outcome {
         val serdeCommand = validateSerde(command, serde)
-        val event = StepByStepOrchestrator.runByTask(workflow, serdeCommand, workflow.info, lifecycleHook)
+        // Convert FunctionResolver to lambda for StepByStepOrchestrator
+        val event = StepByStepOrchestrator.runByTask(
+            workflow = workflow,
+            command = serdeCommand,
+            workflowInfo = workflow.info,
+            lifecycleHook = lifecycleHook,
+            functionResolver = functionResolver::resolve
+        )
         val serdeEvent = validateSerde(event, serde)
 
-        return handleEvent(serdeEvent, workflow, serde, activityExecutor, functionResolver, cloudEventHook, lifecycleHook)
+        return handleEvent(
+            serdeEvent,
+            workflow,
+            serde,
+            activityExecutor,
+            functionResolver,
+            cloudEventHook,
+            lifecycleHook
+        )
     }
 
     private fun validateSerde(command: WorkflowCommand, serde: Boolean): WorkflowCommand {
@@ -130,24 +150,53 @@ object FullOrchestrator {
         )
 
         is WorkflowEvent.RunWorkflowStarted -> resumeWith(
-            workflow, handleRunWorkflowStarted(event, serde, activityExecutor, functionResolver, cloudEventHook, lifecycleHook),
-            serde, activityExecutor, functionResolver, cloudEventHook, lifecycleHook
+            workflow,
+            handleRunWorkflowStarted(event, serde, activityExecutor, functionResolver, cloudEventHook, lifecycleHook),
+            serde,
+            activityExecutor,
+            functionResolver,
+            cloudEventHook,
+            lifecycleHook
         )
 
-        is WorkflowEvent.CallFunctionStarted -> resumeWith(
-            workflow, handleCallFunctionStarted(workflow, event, serde, activityExecutor, functionResolver, cloudEventHook, lifecycleHook),
-            serde, activityExecutor, functionResolver, cloudEventHook, lifecycleHook
-        )
+        // CallFunctionStarted is no longer emitted - CallFunction is now a control-flow task
+        // that navigates to function nodes step-by-step through normal message flow
 
         is WorkflowEvent.ForkStarted -> resumeWith(
-            workflow, handleForkStarted(workflow, event, serde, activityExecutor, functionResolver, cloudEventHook, lifecycleHook),
-            serde, activityExecutor, functionResolver, cloudEventHook, lifecycleHook
+            workflow,
+            handleForkStarted(
+                workflow,
+                event,
+                serde,
+                activityExecutor,
+                functionResolver,
+                cloudEventHook,
+                lifecycleHook
+            ),
+            serde,
+            activityExecutor,
+            functionResolver,
+            cloudEventHook,
+            lifecycleHook
         )
 
         is WorkflowEvent.ListenStarted -> try {
             resumeWith(
-                workflow, handleListenStarted(workflow, event, serde, activityExecutor, functionResolver, cloudEventHook, lifecycleHook),
-                serde, activityExecutor, functionResolver, cloudEventHook, lifecycleHook
+                workflow,
+                handleListenStarted(
+                    workflow,
+                    event,
+                    serde,
+                    activityExecutor,
+                    functionResolver,
+                    cloudEventHook,
+                    lifecycleHook
+                ),
+                serde,
+                activityExecutor,
+                functionResolver,
+                cloudEventHook,
+                lifecycleHook
             )
         } catch (e: EarlyCompletionException) {
             e.event
@@ -164,7 +213,8 @@ object FullOrchestrator {
         functionResolver: FunctionResolver,
         cloudEventHook: CloudEventHook,
         lifecycleHook: LifecycleEventHook,
-    ): WorkflowEvent.Outcome = resume(workflow, command, serde, activityExecutor, functionResolver, cloudEventHook, lifecycleHook)
+    ): WorkflowEvent.Outcome =
+        resume(workflow, command, serde, activityExecutor, functionResolver, cloudEventHook, lifecycleHook)
 
     private suspend fun handleActivityStarted(
         event: WorkflowEvent.ActivityStarted,
@@ -263,7 +313,15 @@ object FullOrchestrator {
                     workflowInput = event.config.input,
                     hasWaitingParent = true
                 )
-                val result = resume(childWorkflow, initCmd, serde, activityExecutor, functionResolver, cloudEventHook, lifecycleHook)
+                val result = resume(
+                    childWorkflow,
+                    initCmd,
+                    serde,
+                    activityExecutor,
+                    functionResolver,
+                    cloudEventHook,
+                    lifecycleHook
+                )
                 logger.debug { "Child workflow completed" }
                 when (result) {
                     is WorkflowEvent.WorkflowCompleted -> event.resumeAsCompleted(result.output)
@@ -278,7 +336,15 @@ object FullOrchestrator {
                         workflowInput = event.config.input,
                         hasWaitingParent = false
                     )
-                    resume(childWorkflow, initCmd, serde, activityExecutor, functionResolver, cloudEventHook, lifecycleHook)
+                    resume(
+                        childWorkflow,
+                        initCmd,
+                        serde,
+                        activityExecutor,
+                        functionResolver,
+                        cloudEventHook,
+                        lifecycleHook
+                    )
                     logger.debug { "Child workflow completed" }
                 }
                 event.resumeAsync()
@@ -286,76 +352,8 @@ object FullOrchestrator {
         }
     }
 
-    /**
-     * Handles CallFunctionStarted by building a synthetic workflow and executing it.
-     *
-     * Functions are treated as mini-workflows: the function's task is wrapped in a
-     * synthetic workflow and executed via recursive orchestration. This ensures
-     * consistent behavior for all task types (http, script, shell, nested functions).
-     */
-    private suspend fun handleCallFunctionStarted(
-        workflow: Workflow,
-        event: WorkflowEvent.CallFunctionStarted,
-        serde: Boolean,
-        activityExecutor: ActivityExecutor,
-        functionResolver: FunctionResolver,
-        cloudEventHook: CloudEventHook,
-        lifecycleHook: LifecycleEventHook,
-    ): WorkflowCommand {
-        val functionRef = event.config.functionRef
-        logger.debug { "Executing function: $functionRef" }
-
-        // Resolve the function task
-        val task = if (isRemoteFunctionRef(functionRef)) {
-            logger.debug { "Resolving remote function: $functionRef" }
-            functionResolver.resolve(functionRef)
-        } else {
-            logger.debug { "Looking up named function: $functionRef" }
-            workflow.useFunctions?.get(functionRef)
-                ?: throw FunctionResolutionException(
-                    "Named function '$functionRef' not found in workflow's use.functions"
-                )
-        }
-
-        // Build synthetic workflow (scoped by parent workflow for named functions)
-        // Pass parent's useFunctions to enable nested function calls
-        val syntheticWorkflow = FunctionWorkflowBuilder.build(
-            task = task,
-            functionRef = functionRef,
-            parentWorkflowInfo = workflow.info,
-            parentUseFunctions = workflow.useFunctions
-        )
-
-        // Execute via recursive orchestration
-        val initCmd = StepByStepOrchestrator.initCmd(
-            workflowInput = event.config.input,
-            hasWaitingParent = true
-        )
-
-        logger.debug { "Executing synthetic workflow for function: $functionRef" }
-        val result = resume(syntheticWorkflow, initCmd, serde, activityExecutor, functionResolver, cloudEventHook, lifecycleHook)
-
-        return when (result) {
-            is WorkflowEvent.WorkflowCompleted -> {
-                logger.debug { "Function completed: $functionRef" }
-                event.resumeAsCompleted(result.output)
-            }
-            is WorkflowEvent.WorkflowFailed -> {
-                logger.error { "Function failed: $functionRef - ${result.error}" }
-                event.resumeAsFailed(result.error)
-            }
-            else -> throw IllegalStateException("Function returned unexpected outcome: $result")
-        }
-    }
-
-    /**
-     * Checks if a function reference is remote (URL or catalog).
-     */
-    private fun isRemoteFunctionRef(functionRef: String): Boolean {
-        return functionRef.startsWith("http://") ||
-            functionRef.startsWith("https://") ||
-            (functionRef.contains("@") && functionRef.contains(":"))
-    }
+    // handleCallFunctionStarted removed - CallFunction is now a control-flow task
+    // that navigates to function nodes step-by-step through normal message flow
 
     @Suppress("UNCHECKED_CAST")
     private suspend fun handleForkStarted(

@@ -46,10 +46,14 @@ import kotlinx.serialization.json.buildJsonObject
  * - Shell command execution
  * - CloudEvent emission (via provided emitter)
  *
+ * Note: Function calls (CallFunctionStarted) are NOT activities - they are handled
+ * directly by the WorkflowCommandHandler as suspensions. Functions are executed
+ * as synthetic workflows.
+ *
  * @param emitCloudEvent Optional callback to emit CloudEvents. If not provided, emit is a no-op.
  */
 class DefaultActivityExecutor(
-    private val emitCloudEvent: (suspend (CloudEvent) -> Unit)? = null
+    private val emitCloudEvent: (suspend (CloudEvent) -> Unit)? = null,
 ) : ActivityExecutor {
 
     private val logger = logger()

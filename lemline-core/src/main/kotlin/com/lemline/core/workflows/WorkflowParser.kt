@@ -145,11 +145,13 @@ private fun TaskItem.toTask(): TaskBase = when (val task = task.get()) {
 
 /**
  * RootTask has a single DoTask child containing the workflow's do block.
- * No accessor needed - navigation starts at NodePosition.doRoot.
+ *
+ * For workflow roots at `/`, the child is at `/do`.
+ * For function roots at `/_fn`, the child is at `/_fn/do`.
  */
 private fun parseRootChildren(task: RootTask, parent: Node<*>): List<Node<*>> = listOf(
     Node(
-        position = NodePosition.root.addToken(DO),
+        position = parent.position.addToken(DO),
         task = DoTask(task.`do`),
         name = "$DO",
         parent = parent,

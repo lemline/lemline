@@ -18,7 +18,6 @@ data class TaskState(
 ) : NodeState()
 
 // Type aliases for semantic clarity - each represents a specific task type
-typealias CallState = TaskState
 typealias RunState = TaskState
 typealias RaiseState = TaskState
 typealias WaitState = TaskState
@@ -27,3 +26,23 @@ typealias ForkState = TaskState
 typealias SwitchState = TaskState
 typealias EmitState = TaskState
 typealias ListenState = TaskState
+typealias CallState = TaskState
+
+/**
+ * State for CallFunction task (function call).
+ *
+ * CallFunction is a control-flow task that navigates into a function's node tree.
+ * The `entered` flag tracks whether we've descended into the function body.
+ *
+ * State transitions:
+ * 1. Enter: entered = false (haven't navigated to function yet)
+ * 2. getNextNode(): returns function's do block (first entry)
+ * 3. Re-enter from child: entered = true (function completed)
+ * 4. getNextNode(): returns node.parent (exit to caller)
+ */
+@Serializable
+data class CallFunctionState(
+    override val startedAt: Instant = Clock.System.now(),
+    /** Whether we've entered the function body */
+    val entered: Boolean = false,
+) : NodeState()

@@ -6,6 +6,7 @@ import com.lemline.core.activities.mock.MockActivityExecutor
 import com.lemline.core.activities.mock.MockConfiguration
 import com.lemline.core.activities.mock.MockFunctionResolver
 import com.lemline.core.cloudevents.InMemoryCloudEventHook
+import com.lemline.core.errors.InternalException
 import com.lemline.core.lifecycleevents.LifecycleEventHook
 import com.lemline.core.orchestrator.FullOrchestrator
 import com.lemline.core.orchestrator.StepByStepOrchestrator
@@ -54,7 +55,7 @@ class FullOrchestratorTestExecutor : WorkflowTestExecutor {
             val workflow = createWorkflow(yaml, namespace, name, version, validateDefinition)
 
             val startState = StepByStepOrchestrator.initCmd(
-                workflowId = WorkflowId.Companion.random(),
+                workflowId = WorkflowId.random(),
                 workflowInput = input,
                 hasWaitingParent = false,
                 startedAt = Clock.System.now()
@@ -66,7 +67,7 @@ class FullOrchestratorTestExecutor : WorkflowTestExecutor {
                 cloudEventHook.emit(event)
             }
 
-            val lifecycleHook = LifecycleEventHook.Companion.NOOP
+            val lifecycleHook = LifecycleEventHook.NOOP
 
             // Create FunctionResolver with mock configuration (for remote functions)
             val functionResolver = MockFunctionResolver(mockConfig)
@@ -87,8 +88,20 @@ class FullOrchestratorTestExecutor : WorkflowTestExecutor {
 
             WorkflowTestResult.Success(event.value())
         } catch (e: Exception) {
+            val errorDetails = buildString {
+                append(e::class.simpleName)
+                e.message?.let { append(": $it") }
+                // For InternalException, show the error details
+                if (e is InternalException) append("\n  Error: ${e.error}")
+                // Include cause chain for debugging
+                var cause = e.cause
+                while (cause != null) {
+                    append("\n  Caused by: ${cause::class.simpleName}: ${cause.message}")
+                    cause = if (cause.cause != cause) cause.cause else null
+                }
+            }
             WorkflowTestResult.Failure(
-                error = e.message ?: e::class.simpleName ?: "Unknown error",
+                error = errorDetails,
                 exception = e
             )
         }

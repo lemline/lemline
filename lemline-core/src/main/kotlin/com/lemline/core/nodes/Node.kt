@@ -61,13 +61,13 @@ data class Node<T : TaskBase>(val position: NodePosition, val task: T, val name:
         is RaiseTask,
         is SetTask,
         is SwitchTask,
+        is CallFunction,  // CallFunction is a control-flow task (navigates to function nodes)
             -> false
 
         is CallAsyncAPI,
         is CallGRPC,
         is CallHTTP,
         is CallOpenAPI,
-        is CallFunction,
         is EmitTask,
         is ListenTask,
         is RunTask,

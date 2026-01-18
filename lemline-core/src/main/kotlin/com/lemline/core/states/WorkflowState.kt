@@ -7,7 +7,6 @@ import com.lemline.common.values.NodePosition
 import com.lemline.common.values.WorkflowId
 import com.lemline.core.errors.InternalException
 import com.lemline.common.json.LemlineJson
-import com.lemline.core.processors.CallFunctionConfig
 import com.lemline.core.processors.CallHttpConfig
 import com.lemline.core.processors.EmitConfig
 import com.lemline.core.processors.ListenConfig
@@ -577,49 +576,8 @@ sealed class WorkflowEvent : WorkflowState() {
             ")"
     }
 
-    /**
-     * Event emitted when a function call task needs to be executed.
-     *
-     * Functions are executed as synthetic workflows through the orchestrator,
-     * similar to RunWorkflow. The config contains the function reference and
-     * resolved arguments.
-     *
-     * Unlike activities (which perform external I/O), function calls are
-     * handled inline by the orchestrator by:
-     * 1. Resolving the function definition (local or remote)
-     * 2. Building a synthetic workflow wrapping the function's task
-     * 3. Executing via recursive orchestration
-     *
-     * @see RunWorkflowStarted for similar pattern
-     */
-    @Serializable
-    @SerialName("callFunctionStarted")
-    data class CallFunctionStarted(
-        override val nodeStack: NodeStack,
-        val rawInput: JsonElement,
-        val config: CallFunctionConfig
-    ) : Suspension() {
-
-        @Transient
-        override val nodePosition = nodeStack.currentPosition
-
-        fun resumeAsCompleted(rawOutput: JsonElement) = WorkflowCommand.ResumeWithCompletedTask(
-            nodeStack = nodeStack,
-            rawOutput = rawOutput,
-        )
-
-        fun resumeAsFailed(error: InternalException.Error) = WorkflowCommand.ResumeWithFailedTask(
-            nodeStack = nodeStack,
-            error = error,
-        )
-
-        override fun toString() = "${this::class.simpleName}(" +
-            "nodePosition=$nodePosition" +
-            ", config=$config" +
-            ", rawInput=$rawInput" +
-            ", stack=$nodeStack" +
-            ")"
-    }
+    // CallFunctionStarted removed - CallFunction is now a control-flow task
+    // that navigates to function nodes step-by-step through normal message flow
 
     /**
      * Event emitted when a script task needs to be executed.

@@ -21,9 +21,9 @@ import kotlinx.serialization.json.JsonPrimitive
  * Use this executor for testing workflows without performing real I/O operations
  * (HTTP calls, script execution, shell commands).
  *
- * Note: Function calls (CallFunctionStarted) are NOT activities - they are handled
- * directly by the orchestrator as suspensions. Use [MockFunctionResolver] to provide
- * mock function definitions for testing.
+ * Note: Function calls are NOT activities - they are control-flow tasks that
+ * navigate to function nodes step-by-step through normal message flow.
+ * Use [MockFunctionResolver] to provide mock function definitions for testing.
  *
  * ## Usage in Tests
  *
