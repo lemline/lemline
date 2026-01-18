@@ -282,6 +282,76 @@ object CallFunctionTestCases {
         ),
 
         WorkflowTestCase(
+            name = "function can calculate factorial recursively",
+            yaml = $$"""
+                use:
+                  functions:
+                    factorial:
+                      do:
+                        - decide:
+                            switch:
+                              - base:
+                                  when: ${ .n <= 1 }
+                                  then: returnResult
+                              - default:
+                                  then: recurse
+                        - returnResult:
+                            set:
+                              result: ${ .acc }
+                            then: end
+                        - recurse:
+                            call: factorial
+                            with:
+                              n: ${ .n - 1 }
+                              acc: ${ .n * .acc }
+                do:
+                  - calculate:
+                      call: factorial
+                      with:
+                        n: 5
+                        acc: 1
+            """.trimIndent(),
+            tags = setOf("function", "execution", "recursion"),
+            validate = expectOutput(
+                buildJsonObject {
+                    put("result", 120)
+                }
+            )
+        ),
+
+        WorkflowTestCase(
+            name = "function should share context",
+            yaml = $$"""
+                use:
+                  functions:
+                    setAndCheck:
+                      do:
+                        - setContext:
+                            set:
+                              marker: true
+                            export:
+                              as: '${ {level: (($context.level // 0) + 1)} }'
+                        - checkLevel:
+                            set:
+                              reportedLevel: ${ $context.level }
+                do:
+                  - outerSet:
+                      set:
+                        start: true
+                      export:
+                        as: '${ {level: 100} }'
+                  - callFunction:
+                      call: setAndCheck
+            """.trimIndent(),
+            tags = setOf("function", "execution", "context", "isolation"),
+            validate = expectOutput(
+                buildJsonObject {
+                    put("reportedLevel", 101)
+                }
+            )
+        ),
+
+        WorkflowTestCase(
             name = "multiple functions can be defined and called independently",
             yaml = $$"""
                 use:
