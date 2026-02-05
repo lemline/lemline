@@ -96,7 +96,7 @@ object StepByStepOrchestrator {
         command: WorkflowCommand,
         workflowInfo: WorkflowInfo,
         lifecycleHook: LifecycleEventHook,
-        functionResolver: suspend (String) -> Task? = { null },
+        functionResolver: suspend (String) -> Task = { error("Function resolver not configured") },
     ): WorkflowEvent {
         val node = workflow.getNode(command.nodePosition, functionResolver)
 
@@ -204,7 +204,7 @@ object StepByStepOrchestrator {
         command: WorkflowCommand,
         workflowInfo: WorkflowInfo,
         lifecycleHook: LifecycleEventHook,
-        functionResolver: suspend (String) -> Task? = { null },
+        functionResolver: suspend (String) -> Task = { error("Function resolver not configured") },
     ): WorkflowEvent {
 
         return when (val event = runByTask(workflow, command, workflowInfo, lifecycleHook, functionResolver)) {

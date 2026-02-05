@@ -44,7 +44,7 @@ class FunctionResolverTest : FunSpec({
         }
 
         test("throws for unknown catalog") {
-            val resolver = FunctionResolver(catalogUrls = mapOf("known" to "https://example.com"))
+            val resolver = FunctionResolver()
 
             val exception = shouldThrow<FunctionResolutionException> {
                 runBlocking { resolver.resolve("log:1.0.0@unknown") }
@@ -100,17 +100,12 @@ class FunctionResolverTest : FunSpec({
                 "https://raw.githubusercontent.com/serverlessworkflow/catalog/main/functions"
         }
 
-        test("uses custom catalog URLs") {
-            val customCatalogs = mapOf(
-                "myorg" to "https://functions.myorg.com/catalog"
-            )
-            val resolver = FunctionResolver(catalogUrls = customCatalogs)
+        test("resolves catalog URL format correctly") {
+            val resolver = FunctionResolver()
 
-            // Should throw for unknown catalog (global not in custom map)
-            val exception = shouldThrow<FunctionResolutionException> {
-                runBlocking { resolver.resolve("log:1.0.0@global") }
-            }
-            exception.message shouldContain "Unknown catalog"
+            // Verify the URL format for global catalog
+            val url = resolver.resolveCatalogUrl("log:1.0.0@global")
+            url shouldBe "https://raw.githubusercontent.com/serverlessworkflow/catalog/main/functions/log/1.0.0/function.yaml"
         }
     }
 

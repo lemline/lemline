@@ -3,6 +3,7 @@
 
 package com.lemline.runner.testcases.pgmq
 
+import com.lemline.core.testcases.CallFunctionTestCases
 import com.lemline.core.testcases.CallHttpTestCases
 import com.lemline.core.testcases.DoTaskTestCases
 import com.lemline.core.testcases.ExportContextTestCases
@@ -30,6 +31,11 @@ import kotlinx.serialization.ExperimentalSerializationApi
  * These tests verify that workflows execute correctly when messages flow through
  * a real PostgreSQL-based PGMQ queue with loopback configuration (same queue for in/out channels).
  */
+
+@RequiresDocker
+@QuarkusTest
+@TestProfile(PgmqTestCaseProfile::class)
+internal class PgmqCallFunctionExecutionTest : BrokerWorkflowTest(CallFunctionTestCases.cases)
 
 @RequiresDocker
 @QuarkusTest

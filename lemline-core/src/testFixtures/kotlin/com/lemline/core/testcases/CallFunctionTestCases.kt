@@ -2,11 +2,13 @@
 package com.lemline.core.testcases
 
 import com.lemline.core.activities.mock.MockConfiguration
+import com.lemline.core.testcases.impl.TestMocks
 import com.lemline.core.testcases.impl.WorkflowTestCase
 import com.lemline.core.testcases.impl.WorkflowTestValidators.expectOutput
 import io.serverlessworkflow.api.types.SetTask
 import io.serverlessworkflow.api.types.SetTaskConfiguration
 import io.serverlessworkflow.api.types.Task
+import java.net.URI
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
@@ -715,6 +717,238 @@ object CallFunctionTestCases {
                 buildJsonObject {
                     put("caughtNested", true)
                     put("source", "outer-try-catch")
+                }
+            )
+        ),
+
+        // ─────────────────────────────────────────────────────────────────────
+        // Fork Inside Function Tests
+        // ─────────────────────────────────────────────────────────────────────
+
+        WorkflowTestCase(
+            name = "function containing fork executes all branches",
+            yaml = $$"""
+                use:
+                  functions:
+                    parallelProcess:
+                      fork:
+                        branches:
+                          - branch1:
+                              set:
+                                b1: "branch1-result"
+                          - branch2:
+                              set:
+                                b2: "branch2-result"
+                do:
+                  - callParallel:
+                      call: parallelProcess
+                      output:
+                        as: '${ {results: [.[0].b1, .[1].b2]} }'
+            """.trimIndent(),
+            tags = setOf("function", "execution", "fork"),
+            validate = expectOutput(
+                buildJsonObject {
+                    put("results", kotlinx.serialization.json.buildJsonArray {
+                        add(kotlinx.serialization.json.JsonPrimitive("branch1-result"))
+                        add(kotlinx.serialization.json.JsonPrimitive("branch2-result"))
+                    })
+                }
+            )
+        ),
+
+        WorkflowTestCase(
+            name = "function containing fork with compete mode returns first result",
+            yaml = """
+                use:
+                  functions:
+                    raceProcess:
+                      fork:
+                        compete: true
+                        branches:
+                          - fast:
+                              set:
+                                winner: "fast-branch"
+                          - slow:
+                              do:
+                                - waiting:
+                                    wait:
+                                      seconds: 1
+                                - result:
+                                    set:
+                                      winner: "slow-branch"
+                do:
+                  - callRace:
+                      call: raceProcess
+            """.trimIndent(),
+            tags = setOf("function", "execution", "fork", "compete"),
+            validate = expectOutput(
+                buildJsonObject {
+                    put("winner", "fast-branch")
+                }
+            )
+        ),
+
+        // ─────────────────────────────────────────────────────────────────────
+        // ForEach Inside Function Tests
+        // ─────────────────────────────────────────────────────────────────────
+
+        WorkflowTestCase(
+            name = "function containing for loop iterates over items",
+            yaml = $$"""
+                use:
+                  functions:
+                    sumArray:
+                      do:
+                        - init:
+                            set:
+                              total: 0
+                              numbers: ${ .numbers }
+                        - loop:
+                            for:
+                              in: ${ .numbers }
+                            do:
+                              - add:
+                                  set:
+                                    total: ${ .total + $item }
+                            output:
+                              as: ${ . }
+                do:
+                  - calculate:
+                      call: sumArray
+                      with:
+                        numbers: ${ [1, 2, 3, 4, 5] }
+            """.trimIndent(),
+            tags = setOf("function", "execution", "for"),
+            validate = expectOutput(
+                buildJsonObject {
+                    put("total", 15)
+                }
+            )
+        ),
+
+        WorkflowTestCase(
+            name = "function containing for loop can transform items",
+            yaml = $$"""
+                use:
+                  functions:
+                    doubleAll:
+                      do:
+                        - init:
+                            set:
+                              results: []
+                              values: ${ .values }
+                        - loop:
+                            for:
+                              in: ${ .values }
+                            do:
+                              - transform:
+                                  set:
+                                    results: '${ .results + [$item * 2] }'
+                            output:
+                              as: ${ . }
+                do:
+                  - process:
+                      call: doubleAll
+                      with:
+                        values: ${ [10, 20, 30] }
+            """.trimIndent(),
+            tags = setOf("function", "execution", "for"),
+            validate = expectOutput(
+                buildJsonObject {
+                    put("results", kotlinx.serialization.json.buildJsonArray {
+                        add(kotlinx.serialization.json.JsonPrimitive(20))
+                        add(kotlinx.serialization.json.JsonPrimitive(40))
+                        add(kotlinx.serialization.json.JsonPrimitive(60))
+                    })
+                }
+            )
+        ),
+
+        // ─────────────────────────────────────────────────────────────────────
+        // Listen Inside Function Tests
+        // ─────────────────────────────────────────────────────────────────────
+
+        WorkflowTestCase(
+            name = "function containing listen waits for event",
+            yaml = $$"""
+                use:
+                  functions:
+                    waitForSignal:
+                      do:
+                        - waitForEvent:
+                            listen:
+                              to:
+                                one:
+                                  with:
+                                    type: signal.received
+                        - transform:
+                            set:
+                              signalReceived: true
+                              data: ${ .[0] }
+                do:
+                  - callWait:
+                      call: waitForSignal
+            """.trimIndent(),
+            tags = setOf("function", "execution", "listen"),
+            cloudEvents = listOf(
+                TestMocks.buildCloudEvent(
+                    type = "signal.received",
+                    data = buildJsonObject { put("message", "hello") },
+                    source = URI.create("https://test.example.com")
+                )
+            ),
+            validate = expectOutput(
+                buildJsonObject {
+                    put("signalReceived", true)
+                    put("data", buildJsonObject { put("message", "hello") })
+                }
+            )
+        ),
+
+        WorkflowTestCase(
+            name = "function containing listen with foreach processes events",
+            yaml = $$"""
+                use:
+                  functions:
+                    collectEvents:
+                      do:
+                        - collectTask:
+                            listen:
+                              to:
+                                any:
+                                  - with:
+                                      type: item.created
+                                until: . | length >= 2
+                            foreach:
+                              do:
+                                - process:
+                                    set:
+                                      processed: '${ {id: .id, name: .name} }'
+                do:
+                  - collect:
+                      call: collectEvents
+            """.trimIndent(),
+            tags = setOf("function", "execution", "listen", "foreach"),
+            cloudEvents = listOf(
+                TestMocks.buildCloudEvent(
+                    type = "item.created",
+                    data = buildJsonObject { put("id", 1); put("name", "item1") },
+                    source = URI.create("https://test.example.com")
+                ),
+                TestMocks.buildCloudEvent(
+                    type = "item.created",
+                    data = buildJsonObject { put("id", 2); put("name", "item2") },
+                    source = URI.create("https://test.example.com")
+                )
+            ),
+            validate = expectOutput(
+                kotlinx.serialization.json.buildJsonArray {
+                    add(buildJsonObject {
+                        put("processed", buildJsonObject { put("id", 1); put("name", "item1") })
+                    })
+                    add(buildJsonObject {
+                        put("processed", buildJsonObject { put("id", 2); put("name", "item2") })
+                    })
                 }
             )
         )

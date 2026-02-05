@@ -425,7 +425,7 @@ object TestMocks {
     /**
      * Helper to build a CloudEvent from type and JSON data.
      */
-    private fun buildCloudEvent(type: String, data: JsonElement): CloudEvent {
+    fun buildCloudEvent(type: String, data: JsonElement): CloudEvent {
         return CloudEventBuilder.v1()
             .withId(UUID.randomUUID().toString())
             .withSource(URI.create("https://test.example.com"))

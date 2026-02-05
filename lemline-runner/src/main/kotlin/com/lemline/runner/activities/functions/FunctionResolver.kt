@@ -5,6 +5,7 @@ import com.lemline.common.json.LemlineJson
 import com.lemline.common.logger.logger
 import com.lemline.core.functions.FunctionResolutionException
 import com.lemline.core.functions.FunctionResolver as CoreFunctionResolver
+import com.lemline.runner.common.activities.TestModeConfiguration
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.engine.cio.*
@@ -14,6 +15,7 @@ import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.serverlessworkflow.api.types.Task
 import jakarta.enterprise.context.ApplicationScoped
+import jakarta.inject.Inject
 import java.util.concurrent.ConcurrentHashMap
 
 /**
@@ -25,6 +27,12 @@ import java.util.concurrent.ConcurrentHashMap
  *
  * Named functions (from workflow's `use.functions`) are resolved directly by the caller
  * since they're a simple map lookup.
+ *
+ * ## Test Mode Support
+ *
+ * In test mode (when [TestModeConfiguration.mockConfiguration] is set), function definitions
+ * are first looked up from [MockConfiguration.functionDefinitions] before falling back to
+ * HTTP fetching. This allows tests to mock remote function definitions.
  *
  * ## Caching
  *
@@ -42,10 +50,13 @@ import java.util.concurrent.ConcurrentHashMap
  * - `global` → `https://raw.githubusercontent.com/serverlessworkflow/catalog/main/functions`
  */
 @ApplicationScoped
-class FunctionResolver(
+class FunctionResolver : CoreFunctionResolver {
+
+    @Inject
+    var testModeConfiguration: TestModeConfiguration = TestModeConfiguration()
+
     /** Map of catalog names to their base URLs */
     private val catalogUrls: Map<String, String> = defaultCatalogUrls
-) : CoreFunctionResolver {
 
     private val logger = logger()
 
@@ -64,12 +75,22 @@ class FunctionResolver(
     /**
      * Resolves a remote function reference to its Task definition.
      *
+     * In test mode, first checks [MockConfiguration.functionDefinitions] for a mock definition.
+     *
      * @param functionRef The function reference (URL or catalog ref)
      * @return The resolved [Task] definition
      * @throws FunctionResolutionException if the function cannot be resolved
      */
     override suspend fun resolve(functionRef: String): Task {
         logger.debug { "Resolving function reference: $functionRef" }
+
+        // In test mode, check mock configuration first
+        testModeConfiguration.mockConfiguration?.let { mockConfig ->
+            mockConfig.getFunctionDefinition(functionRef)?.let {
+                logger.debug { "Using mock function definition for: $functionRef" }
+                return it
+            }
+        }
 
         return when {
             // Direct URL
@@ -161,7 +182,7 @@ class FunctionResolver(
      * @param catalogRef The catalog reference
      * @return The resolved URL
      */
-    private fun resolveCatalogUrl(catalogRef: String): String {
+    internal fun resolveCatalogUrl(catalogRef: String): String {
         val match = CATALOG_PATTERN.matchEntire(catalogRef)
             ?: throw FunctionResolutionException(
                 "Invalid catalog reference format: $catalogRef. Expected: name:version@catalog"

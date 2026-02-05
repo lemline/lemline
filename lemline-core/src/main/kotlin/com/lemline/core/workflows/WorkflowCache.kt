@@ -67,7 +67,13 @@ data class CachedListenTask(
     /** Until condition for ANY + until accumulation mode (null for ONE, ANY without until, ALL) */
     val until: CachedUntilCondition? = null,
     /** Whether this listen task has foreach enabled for sequential event processing */
-    val hasForeach: Boolean = false
+    val hasForeach: Boolean = false,
+    /**
+     * True if this listen task is from a function definition.
+     * Function listen tasks require suffix matching since the actual listener position
+     * includes the call site (e.g., `/do/0/callWait/_fn/do/0/waitForEvent`).
+     */
+    val isFromFunction: Boolean = false
 ) {
     /**
      * Returns the termination filter if this is an ANY + until(event) task.
@@ -140,7 +146,7 @@ object WorkflowCache {
         workflowCache[workflow.info] = workflow
         val (_, nodesMap) = WorkflowParser.parse(workflow)
         nodesMapCache[workflow.info] = nodesMap
-        listenTasksCache[workflow.info] = extractListenTasks(workflow.info, nodesMap)
+        listenTasksCache[workflow.info] = extractListenTasks(workflow.info, nodesMap, workflow)
     }
 
     /**
@@ -267,62 +273,104 @@ object WorkflowCache {
         listenTasksCache[workflowInfo] ?: emptyList()
 
     /**
-     * Extracts listen tasks from a workflow's nodes map.
+     * Extracts listen tasks from a workflow's nodes map and its function definitions.
      * Called once when workflow is cached.
      */
     private fun extractListenTasks(
         workflowInfo: WorkflowInfo,
-        nodesMap: Map<NodePosition, Node<*>>
+        nodesMap: Map<NodePosition, Node<*>>,
+        workflow: Workflow
     ): List<CachedListenTask> {
         val listenTasks = mutableListOf<CachedListenTask>()
 
+        // Extract from main workflow tree
         for ((position, node) in nodesMap) {
-            val listenTask = node.task as? ListenTask ?: continue
-            val listenTo = listenTask.listen?.to?.get() ?: continue
+            extractListenTaskFromNode(workflowInfo, position, node, isFromFunction = false)
+                ?.let { listenTasks.add(it) }
+        }
 
-            val (strategy, sdkFilters, until) = when (listenTo) {
-                is OneEventConsumptionStrategy -> Triple(
-                    ListenStrategy.ONE,
-                    listOfNotNull(listenTo.one),
-                    null
-                )
-
-                is AnyEventConsumptionStrategy -> Triple(
-                    ListenStrategy.ANY,
-                    listenTo.any ?: emptyList(),
-                    parseUntilCondition(listenTo.until)
-                )
-
-                is AllEventConsumptionStrategy -> Triple(
-                    ListenStrategy.ALL,
-                    listenTo.all ?: emptyList(),
-                    null
-                )
-
-                else -> continue
-            }
-
-            // Allow empty filters for ANY strategy (any: [] means "match any event")
-            // For ONE and ALL strategies, filters are required
-            if (sdkFilters.isNotEmpty() || strategy == ListenStrategy.ANY) {
-                val readAs = listenTask.listen?.read
-                    ?: ListenTaskConfiguration.ListenAndReadAs.DATA
-
-                listenTasks.add(
-                    CachedListenTask(
-                        workflowInfo = workflowInfo,
-                        nodePosition = position,
-                        filters = sdkFilters.map { convertFilter(it) },
-                        strategy = strategy,
-                        readAs = readAs,
-                        until = until,
-                        hasForeach = listenTask.foreach != null
-                    )
-                )
-            }
+        // Extract from functions in use.functions
+        workflow.useFunctions?.forEach { (_, functionTask) ->
+            extractListenTasksFromFunction(workflowInfo, functionTask)
+                .forEach { listenTasks.add(it) }
         }
 
         return listenTasks
+    }
+
+    /**
+     * Extracts a CachedListenTask from a node if it's a listen task.
+     */
+    private fun extractListenTaskFromNode(
+        workflowInfo: WorkflowInfo,
+        position: NodePosition,
+        node: Node<*>,
+        isFromFunction: Boolean
+    ): CachedListenTask? {
+        val listenTask = node.task as? ListenTask ?: return null
+        val listenTo = listenTask.listen?.to?.get() ?: return null
+
+        val (strategy, sdkFilters, until) = when (listenTo) {
+            is OneEventConsumptionStrategy -> Triple(
+                ListenStrategy.ONE,
+                listOfNotNull(listenTo.one),
+                null
+            )
+
+            is AnyEventConsumptionStrategy -> Triple(
+                ListenStrategy.ANY,
+                listenTo.any ?: emptyList(),
+                parseUntilCondition(listenTo.until)
+            )
+
+            is AllEventConsumptionStrategy -> Triple(
+                ListenStrategy.ALL,
+                listenTo.all ?: emptyList(),
+                null
+            )
+
+            else -> return null
+        }
+
+        // Allow empty filters for ANY strategy (any: [] means "match any event")
+        // For ONE and ALL strategies, filters are required
+        if (sdkFilters.isEmpty() && strategy != ListenStrategy.ANY) {
+            return null
+        }
+
+        val readAs = listenTask.listen?.read
+            ?: ListenTaskConfiguration.ListenAndReadAs.DATA
+
+        return CachedListenTask(
+            workflowInfo = workflowInfo,
+            nodePosition = position,
+            filters = sdkFilters.map { convertFilter(it) },
+            strategy = strategy,
+            readAs = readAs,
+            until = until,
+            hasForeach = listenTask.foreach != null,
+            isFromFunction = isFromFunction
+        )
+    }
+
+    /**
+     * Extracts listen tasks from a function's task tree.
+     * Uses FunctionCache to build the function's node tree and then extracts any listen tasks.
+     */
+    private fun extractListenTasksFromFunction(
+        workflowInfo: WorkflowInfo,
+        functionTask: Task
+    ): List<CachedListenTask> {
+        // Build function nodes map using FunctionCache
+        val functionNodesMap = FunctionCache.getOrBuild(
+            task = functionTask,
+            functionRef = "inline",  // ref doesn't matter for extraction
+            parentWorkflowInfo = workflowInfo
+        )
+
+        return functionNodesMap.mapNotNull { (position, node) ->
+            extractListenTaskFromNode(workflowInfo, position, node, isFromFunction = true)
+        }
     }
 
     /**

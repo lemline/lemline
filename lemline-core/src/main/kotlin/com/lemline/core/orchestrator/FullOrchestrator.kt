@@ -259,7 +259,7 @@ object FullOrchestrator {
         logger.debug { "Listening for CloudEvents: strategy=${listenStarted.config.strategy} filters=${listenStarted.config.filters} until=${listenStarted.config.until}" }
 
         @Suppress("UNCHECKED_CAST")
-        val listenNode = workflow.getNode(listenStarted.nodePosition) as Node<ListenTask>
+        val listenNode = workflow.getNode(listenStarted.nodePosition, functionResolver::resolve) as Node<ListenTask>
 
         val foreachProcessor = listenNode.foreachBlock?.let { foreachBlock ->
             ListenEventCollector.createForeachProcessor(foreachBlock.position, foreachBlock.task) { cmd ->
@@ -365,7 +365,7 @@ object FullOrchestrator {
         cloudEventHook: CloudEventHook,
         lifecycleHook: LifecycleEventHook,
     ): WorkflowCommand {
-        val forkNode = workflow.getNode(event.nodePosition) as Node<ForkTask>
+        val forkNode = workflow.getNode(event.nodePosition, functionResolver::resolve) as Node<ForkTask>
         val branches = forkNode.branches.ifEmpty {
             throw IllegalStateException("Fork node in ${forkNode.position} has no branches")
         }

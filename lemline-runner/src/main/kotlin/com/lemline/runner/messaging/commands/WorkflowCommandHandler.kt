@@ -278,22 +278,13 @@ internal class WorkflowCommandHandler(
         // Execute using StepByStepOrchestrator
         logger.debug { "resumeFromTask state=$workflowState" }
 
-        // Create resolver lambda for remote functions (URLs, catalogs)
-        val resolverLambda: suspend (String) -> Task? = { ref ->
-            try {
-                functionResolver.resolve(ref)
-            } catch (_: Exception) {
-                null
-            }
-        }
-
         val event = when (config.orchestrator().mode()) {
             LemlineConfiguration.OrchestratorMode.ALL -> StepByStepOrchestrator.runByTask(
                 workflow,
                 workflowState,
                 workflowInfo,
                 lifecycleHook,
-                resolverLambda,
+                functionResolver::resolve,
             )
 
             LemlineConfiguration.OrchestratorMode.ACTION -> StepByStepOrchestrator.runByActivity(
@@ -301,7 +292,7 @@ internal class WorkflowCommandHandler(
                 workflowState,
                 workflowInfo,
                 lifecycleHook,
-                resolverLambda,
+                functionResolver::resolve,
             )
         }
 
@@ -321,7 +312,7 @@ internal class WorkflowCommandHandler(
         return when (event) {
             is WorkflowEvent.TaskScheduled -> {
                 // Activity scheduled
-                logger.debug { "Activity scheduled node=${event.nodePosition} - ${workflow.getNode(event.nodePosition).task::class.simpleName}(input=${event.rawInput})" }
+                logger.debug { "Activity scheduled node=${event.nodePosition} - ${workflow.getNode(event.nodePosition, functionResolver::resolve).task::class.simpleName}(input=${event.rawInput})" }
                 event.resume()
             }
 
