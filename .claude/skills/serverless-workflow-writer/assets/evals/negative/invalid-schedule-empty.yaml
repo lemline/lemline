@@ -1,0 +1,11 @@
+document:
+  dsl: "1.0.0"
+  namespace: test
+  name: invalid-schedule-empty
+  version: "1.0.0"
+schedule: {}
+do:
+  - noop:
+      set:
+        ok: true
+

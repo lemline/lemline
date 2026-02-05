@@ -1,0 +1,67 @@
+document:
+  dsl: "1.0.0"
+  namespace: lending
+  name: nightly-risk-routing
+  version: "1.0.0"
+  title: Nightly Risk Routing
+schedule:
+  cron: "0 2 * * *"
+do:
+  - routeApplications:
+      for:
+        each: application
+        in: .applications
+        at: index
+      do:
+        - chooseRoute:
+            switch:
+              - approveCase:
+                  when: ${ $application.score >= 750 }
+                  then: callApprove
+              - reviewCase:
+                  when: ${ $application.score >= 600 and $application.score < 750 }
+                  then: callReview
+              - default:
+                  then: callReject
+        - callApprove:
+            call: http
+            with:
+              method: post
+              endpoint:
+                uri: https://risk.example.com/approve
+              body:
+                applicationId: ${ $application.id }
+                score: ${ $application.score }
+            then: finalizeRoute
+        - callReview:
+            call: http
+            with:
+              method: post
+              endpoint:
+                uri: https://risk.example.com/review
+              body:
+                applicationId: ${ $application.id }
+                score: ${ $application.score }
+            then: finalizeRoute
+        - callReject:
+            call: http
+            with:
+              method: post
+              endpoint:
+                uri: https://risk.example.com/reject
+              body:
+                applicationId: ${ $application.id }
+                score: ${ $application.score }
+            then: finalizeRoute
+        - finalizeRoute:
+            set:
+              routed: true
+  - emitBatchSummary:
+      emit:
+        event:
+          with:
+            source: https://workflows.example.com/lending
+            type: com.example.lending.batch.completed.v1
+            data:
+              count: ${ (.applications | length) }
+

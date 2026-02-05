@@ -1,0 +1,14 @@
+document:
+  dsl: "1.0.0"
+  namespace: test
+  name: invalid-until-with-one
+  version: "1.0.0"
+do:
+  - waitEvent:
+      listen:
+        to:
+          one:
+            with:
+              type: com.example.event.v1
+          until: ${ true }
+

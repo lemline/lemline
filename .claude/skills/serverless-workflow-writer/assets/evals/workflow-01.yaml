@@ -1,0 +1,87 @@
+document:
+  dsl: "1.0.0"
+  namespace: commerce
+  name: order-confirmation
+  version: "1.0.0"
+  title: Order Confirmation
+use:
+  retries:
+    transientHttp:
+      limit:
+        attempt:
+          count: 4
+      backoff:
+        exponential: {}
+      jitter:
+        from:
+          seconds: 1
+        to:
+          seconds: 3
+  timeouts:
+    externalCall:
+      after:
+        seconds: 20
+timeout:
+  after:
+    minutes: 3
+do:
+  - reserveInventory:
+      try:
+        - reserve:
+            call: http
+            timeout: externalCall
+            with:
+              method: post
+              endpoint:
+                uri: https://inventory.example.com/reservations
+              body:
+                orderId: ${ .order.id }
+                items: ${ .order.items }
+      catch:
+        errors:
+          with:
+            type: https://serverlessworkflow.io/spec/1.0.0/errors/communication
+            status: 503
+        retry: transientHttp
+        do:
+          - failReservation:
+              raise:
+                error:
+                  type: https://serverlessworkflow.io/spec/1.0.0/errors/runtime
+                  status: 500
+                  title: Inventory reservation failed
+  - chargePayment:
+      try:
+        - charge:
+            call: http
+            timeout: externalCall
+            with:
+              method: post
+              endpoint:
+                uri: https://payments.example.com/charges
+              body:
+                orderId: ${ .order.id }
+                amount: ${ .order.totalAmount }
+      catch:
+        errors:
+          with:
+            type: https://serverlessworkflow.io/spec/1.0.0/errors/communication
+            status: 503
+        retry: transientHttp
+        do:
+          - failPayment:
+              raise:
+                error:
+                  type: https://serverlessworkflow.io/spec/1.0.0/errors/runtime
+                  status: 500
+                  title: Payment failed after retries
+  - emitConfirmed:
+      emit:
+        event:
+          with:
+            source: https://workflows.example.com/orders
+            type: com.example.order.confirmed.v1
+            data:
+              orderId: ${ .order.id }
+              totalAmount: ${ .order.totalAmount }
+

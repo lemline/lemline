@@ -1,0 +1,12 @@
+document:
+  dsl: "1.0.0"
+  namespace: test
+  name: invalid-run-workflow-missing-namespace
+  version: "1.0.0"
+do:
+  - runSubflow:
+      run:
+        workflow:
+          name: child
+          version: "1.0.0"
+

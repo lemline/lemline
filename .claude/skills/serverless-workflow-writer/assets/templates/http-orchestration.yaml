@@ -1,0 +1,52 @@
+document:
+  dsl: "1.0.0"
+  namespace: sample
+  name: http-orchestration
+  version: "1.0.0"
+  title: HTTP Orchestration Template
+do:
+  - normalizeInput:
+      set:
+        customerId: ${ .customerId }
+  - fetchCustomer:
+      call: http
+      with:
+        method: get
+        endpoint:
+          uri: https://api.example.com/customers/{customerId}
+        output: content
+  - routeCustomer:
+      switch:
+        - highValue:
+            when: .lifetimeValue >= 10000
+            then: processHighValue
+        - regular:
+            when: .lifetimeValue >= 0
+            then: processRegular
+        - default:
+            then: rejectCustomerData
+  - processHighValue:
+      call: http
+      with:
+        method: post
+        endpoint:
+          uri: https://api.example.com/customers/high-value
+        body:
+          customer: ${ . }
+      then: end
+  - processRegular:
+      call: http
+      with:
+        method: post
+        endpoint:
+          uri: https://api.example.com/customers/regular
+        body:
+          customer: ${ . }
+      then: end
+  - rejectCustomerData:
+      raise:
+        error:
+          type: https://serverlessworkflow.io/spec/1.0.0/errors/validation
+          status: 400
+          title: Invalid customer data
+
