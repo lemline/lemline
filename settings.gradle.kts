@@ -19,6 +19,11 @@ plugins {
 // Include subprojects in the build.
 include(":lemline-common")
 include(":lemline-core")
+include(":lemline-ai-workflow-common")
+include(":lemline-ai-workflow-core")
+include(":lemline-ai-workflow-llm-langchain4j")
+include(":lemline-ai-workflow-store-inmemory")
+include(":lemline-ai-workflow-store-postgres")
 include(":lemline-runner-common")
 include(":lemline-runner-waits")
 include(":lemline-runner-retries")
