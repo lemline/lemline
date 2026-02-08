@@ -2,7 +2,7 @@
 package com.lemline.core.expressions
 
 import com.lemline.common.json.LemlineJson
-import com.lemline.core.json.toJsonElement
+import com.lemline.common.json.toJsonElement
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive

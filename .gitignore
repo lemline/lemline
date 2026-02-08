@@ -59,3 +59,10 @@ webHelpDOCS2-all/
 
 ### Qarkus ###
 .quarkus/
+
+### Oh-my-openclaude ###
+.omc
+
+### BMad ###
+_bmad/
+_bmad-output/

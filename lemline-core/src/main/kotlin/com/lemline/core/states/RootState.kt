@@ -8,6 +8,7 @@ import com.lemline.common.values.WorkflowId
 import com.lemline.core.expressions.scopes.RuntimeDescriptor
 import com.lemline.core.expressions.scopes.WorkflowDescriptor
 import com.lemline.core.processors.scope.Scope
+import com.lemline.core.processors.scope.merge
 import io.serverlessworkflow.impl.expressions.DateTimeDescriptor
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
@@ -50,13 +51,16 @@ data class RootState(
     }
 
     /**
-     * Creates a new RootState with updated context, copying all transient fields.
+     * Creates a new RootState with merged context, copying all transient fields.
      *
-     * @param newContext The new context to use
-     * @return A new RootState with the updated context
+     * The new context is merged with the existing context, where new values
+     * override existing ones for the same keys.
+     *
+     * @param newContext The context to merge with the existing context
+     * @return A new RootState with the merged context
      */
     fun withContext(newContext: Scope): RootState {
-        val state = copy(context = newContext)
+        val state = copy(context = context.merge(newContext))
         // copy also transient fields
         if (this::secrets.isInitialized) state.secrets = this.secrets
 

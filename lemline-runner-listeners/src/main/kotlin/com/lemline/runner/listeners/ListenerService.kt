@@ -68,8 +68,15 @@ class ListenerService {
         listener.filtersCount = config.filters.size
 
         // Lookup hasForeach and until configuration from cached workflow definition
+        // For function listen tasks, use suffix matching since the cached position (/_fn/do/0/task)
+        // differs from the runtime position (/do/0/call/_fn/do/0/task)
         val listenTask = WorkflowCache.getListenTasks(instanceMessage.workflowInfo).find {
-            it.nodePosition == listenStarted.nodePosition
+            if (it.isFromFunction) {
+                // Suffix match: /do/0/call/_fn/do/0/task ends with /_fn/do/0/task
+                listenStarted.nodePosition.toString().endsWith(it.nodePosition.toString())
+            } else {
+                it.nodePosition == listenStarted.nodePosition
+            }
         }
         listener.hasForeach = listenTask?.hasForeach ?: false
 

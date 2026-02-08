@@ -203,9 +203,13 @@ internal class WorkflowEventHandler(
                 ),
                 conn
             )
-            if (rowsInserted == 0) {
-                logger.warn { "Failure model $failureId already exists (idempotent insert), skipping" }
-                return@withTransaction
+            when (rowsInserted == 0) {
+                true -> {
+                    logger.info { "Failure $failureId already exists (idempotent insert), skipping" }
+                    return@withTransaction
+                }
+
+                false -> logger.warn { "Failure $failureId at position ${instance.workflowState.nodePosition}: ${instance.workflowState.error}" }
             }
             // If this workflow has a parent, resume it with the child exception
             if (instance.hasWaitingParent) {

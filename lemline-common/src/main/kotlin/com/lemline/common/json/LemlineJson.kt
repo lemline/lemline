@@ -162,3 +162,8 @@ object LemlineJson {
         else -> JsonPrimitive(element.toString())
     }
 }
+
+/**
+ * Extension function to parse a JSON string into a JsonElement.
+ */
+fun String.toJsonElement(): JsonElement = LemlineJson.json.parseToJsonElement(this)

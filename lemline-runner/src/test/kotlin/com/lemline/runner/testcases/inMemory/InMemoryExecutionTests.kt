@@ -3,6 +3,7 @@
 
 package com.lemline.runner.testcases.inMemory
 
+import com.lemline.core.testcases.CallFunctionTestCases
 import com.lemline.core.testcases.CallHttpTestCases
 import com.lemline.core.testcases.DoTaskTestCases
 import com.lemline.core.testcases.ExportContextTestCases
@@ -32,56 +33,60 @@ import kotlinx.serialization.ExperimentalSerializationApi
 
 @QuarkusTest
 @TestProfile(InMemoryProfile::class)
-internal class CallHttpExecutionTest : InMemoryWorkflowTest(CallHttpTestCases.cases)
+internal class InMemoryCallFunctionExecutionTest : InMemoryWorkflowTest(CallFunctionTestCases.cases)
 
 @QuarkusTest
 @TestProfile(InMemoryProfile::class)
-internal class DoExecutionTest : InMemoryWorkflowTest(DoTaskTestCases.cases)
+internal class InMemoryCallHttpExecutionTest : InMemoryWorkflowTest(CallHttpTestCases.cases)
 
 @QuarkusTest
 @TestProfile(InMemoryProfile::class)
-internal class ExportContextExecutionTest : InMemoryWorkflowTest(ExportContextTestCases.cases)
+internal class InMemoryDoExecutionTest : InMemoryWorkflowTest(DoTaskTestCases.cases)
 
 @QuarkusTest
 @TestProfile(InMemoryProfile::class)
-internal class ForExecutionTest : InMemoryWorkflowTest(ForTaskTestCases.cases)
+internal class InMemoryExportContextExecutionTest : InMemoryWorkflowTest(ExportContextTestCases.cases)
 
 @QuarkusTest
 @TestProfile(InMemoryProfile::class)
-internal class ForkExecutionTest : InMemoryWorkflowTest(ForkTaskTestCases.cases)
+internal class InMemoryForExecutionTest : InMemoryWorkflowTest(ForTaskTestCases.cases)
 
 @QuarkusTest
 @TestProfile(InMemoryProfile::class)
-internal class IfExecutionTest : InMemoryWorkflowTest(IfConditionTestCases.cases)
+internal class InMemoryForkExecutionTest : InMemoryWorkflowTest(ForkTaskTestCases.cases)
 
 @QuarkusTest
 @TestProfile(InMemoryProfile::class)
-internal class RunScriptExecutionTest : InMemoryWorkflowTest(RunScriptTestCases.cases)
+internal class InMemoryIfExecutionTest : InMemoryWorkflowTest(IfConditionTestCases.cases)
 
 @QuarkusTest
 @TestProfile(InMemoryProfile::class)
-internal class RunShellExecutionTest : InMemoryWorkflowTest(RunShellTestCases.cases)
+internal class InMemoryRunScriptExecutionTest : InMemoryWorkflowTest(RunScriptTestCases.cases)
 
 @QuarkusTest
 @TestProfile(InMemoryProfile::class)
-internal class RunWorkflowExecutionTest : InMemoryWorkflowTest(RunWorkflowTestCases.cases)
+internal class InMemoryRunShellExecutionTest : InMemoryWorkflowTest(RunShellTestCases.cases)
 
 @QuarkusTest
 @TestProfile(InMemoryProfile::class)
-internal class SetExecutionTest : InMemoryWorkflowTest(SetTaskTestCases.cases)
+internal class InMemoryRunWorkflowExecutionTest : InMemoryWorkflowTest(RunWorkflowTestCases.cases)
 
 @QuarkusTest
 @TestProfile(InMemoryProfile::class)
-internal class SwitchExecutionTest : InMemoryWorkflowTest(SwitchTaskTestCases.cases)
+internal class InMemorySetExecutionTest : InMemoryWorkflowTest(SetTaskTestCases.cases)
 
 @QuarkusTest
 @TestProfile(InMemoryProfile::class)
-internal class TryExecutionTest : InMemoryWorkflowTest(TryTaskTestCases.cases)
+internal class InMemorySwitchExecutionTest : InMemoryWorkflowTest(SwitchTaskTestCases.cases)
 
 @QuarkusTest
 @TestProfile(InMemoryProfile::class)
-internal class WaitExecutionTest : InMemoryWorkflowTest(WaitTestCases.cases)
+internal class InMemoryTryExecutionTest : InMemoryWorkflowTest(TryTaskTestCases.cases)
 
 @QuarkusTest
 @TestProfile(InMemoryProfile::class)
-internal class ListenExecutionTest : InMemoryWorkflowTest(ListenTestCases.cases)
+internal class InMemoryWaitExecutionTest : InMemoryWorkflowTest(WaitTestCases.cases)
+
+@QuarkusTest
+@TestProfile(InMemoryProfile::class)
+internal class InMemoryListenExecutionTest : InMemoryWorkflowTest(ListenTestCases.cases)

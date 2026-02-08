@@ -191,6 +191,7 @@ class ListenerEventServiceTest {
         }
         every { cachedListenTask.readAs } returns ListenAndReadAs.DATA
         every { cachedListenTask.hasForeach } returns false
+        every { cachedListenTask.isFromFunction } returns false
 
         return MatchingListenTask(
             listenTask = cachedListenTask,
@@ -211,6 +212,7 @@ class ListenerEventServiceTest {
         every { cachedListenTask.nodePosition } returns NodePosition("/do/0/listenTask")
         every { cachedListenTask.readAs } returns ListenAndReadAs.DATA
         every { cachedListenTask.hasForeach } returns false
+        every { cachedListenTask.isFromFunction } returns false
 
         return MatchingListenTaskUntilEvent(listenTask = cachedListenTask)
     }

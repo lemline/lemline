@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.activities.mock
 
+import io.serverlessworkflow.api.types.Task
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
@@ -46,10 +47,24 @@ data class MockConfiguration(
     val listenMocks: List<ListenMockRule> = emptyList(),
     @SerialName("http")
     val httpMocks: List<HttpMockRule> = emptyList(),
+    @SerialName("function")
+    val functionMocks: List<FunctionMockRule> = emptyList(),
     @SerialName("script")
     val scriptMocks: List<ScriptMockRule> = emptyList(),
     @SerialName("shell")
-    val shellMocks: List<ShellMockRule> = emptyList()
+    val shellMocks: List<ShellMockRule> = emptyList(),
+    /**
+     * Function definitions for remote functions (URL/catalog).
+     *
+     * Map of function reference to its Task definition.
+     * Used by MockFunctionResolver to provide definitions for execution.
+     *
+     * Unlike [functionMocks] which return a canned output, these definitions
+     * are actually executed as mini-workflows.
+     */
+    @SerialName("functionDefinitions")
+    @kotlinx.serialization.Transient
+    val functionDefinitions: Map<String, Task> = emptyMap()
 ) {
     /**
      * Find emit mock matching type and source.
@@ -71,6 +86,20 @@ data class MockConfiguration(
      */
     fun findHttpMock(url: String, method: String): HttpMockRule? =
         httpMocks.firstOrNull { it.matches(url, method) }
+
+    /**
+     * Find function mock matching function reference.
+     * First matching rule wins.
+     */
+    fun findFunctionMock(functionRef: String): FunctionMockRule? =
+        functionMocks.firstOrNull { it.matches(functionRef) }
+
+    /**
+     * Get function definition for a remote function reference.
+     * Returns the Task to execute, or null if not defined.
+     */
+    fun getFunctionDefinition(functionRef: String): Task? =
+        functionDefinitions[functionRef]
 
     /**
      * Find script mock matching language.
@@ -250,6 +279,34 @@ data class ShellMockResponse(
     val stdout: String = "",
     val stderr: String = "",
     val exitCode: Int = 0
+)
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Function Mock Rules
+// ─────────────────────────────────────────────────────────────────────────────
+
+@Serializable
+data class FunctionMockRule(
+    val match: FunctionMockMatcher = FunctionMockMatcher(),
+    val response: FunctionMockResponse = FunctionMockResponse()
+) {
+    /**
+     * Check if this rule matches the given function reference.
+     */
+    fun matches(functionRef: String): Boolean {
+        return match.functionRef == null || globMatches(match.functionRef, functionRef)
+    }
+}
+
+@Serializable
+data class FunctionMockMatcher(
+    val functionRef: String? = null
+)
+
+@Serializable
+data class FunctionMockResponse(
+    val output: JsonElement? = null,
+    val error: String? = null
 )
 
 // ─────────────────────────────────────────────────────────────────────────────

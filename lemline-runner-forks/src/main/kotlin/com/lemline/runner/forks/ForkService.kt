@@ -4,6 +4,7 @@ package com.lemline.runner.forks
 import com.lemline.common.json.LemlineJson
 import com.lemline.common.logger.logger
 import com.lemline.common.values.IDV7
+import com.lemline.core.functions.FunctionResolver
 import com.lemline.core.nodes.Node
 import com.lemline.core.states.NodeStack
 import com.lemline.core.states.WorkflowCommand
@@ -45,6 +46,9 @@ class ForkService {
     @Inject
     lateinit var databaseConfig: DatabaseConfig
 
+    @Inject
+    lateinit var functionResolver: FunctionResolver
+
     private val logger = logger()
 
     /**
@@ -65,7 +69,7 @@ class ForkService {
         val workflow = workflowInfo.getWorkflow() ?: error("Workflow definition not found: $workflowInfo")
 
         @Suppress("UNCHECKED_CAST")
-        val forkNode = workflow.getNode(forkStarted.nodePosition) as Node<ForkTask>
+        val forkNode = workflow.getNode(forkStarted.nodePosition, functionResolver::resolve) as Node<ForkTask>
         val isCompete = forkNode.task.fork.isCompete
         val branches = forkNode.branches
 

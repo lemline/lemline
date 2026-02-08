@@ -28,8 +28,9 @@ class KafkaTestResource : QuarkusTestResourceLifecycleManager {
         // This prevents UNKNOWN_TOPIC_OR_PARTITION errors during startup
         createTopics(servers)
 
-        // Return only the bootstrap servers configuration
-        val properties = mapOf("kafka.bootstrap.servers" to servers)
+        // Return the bootstrap servers configuration using lemline.* property
+        // LemlineConfigSource transforms lemline.messaging.kafka.brokers to kafka.bootstrap.servers
+        val properties = mapOf("lemline.messaging.kafka.brokers" to servers)
 
         // Set as system properties so that [LemlineConfigSource] can see them.
         properties.forEach { (k, v) -> System.setProperty(k, v) }
@@ -60,7 +61,7 @@ class KafkaTestResource : QuarkusTestResourceLifecycleManager {
 
     override fun stop() {
         // Clear system properties to prevent conflicts with other test profiles
-        System.clearProperty("kafka.bootstrap.servers")
+        System.clearProperty("lemline.messaging.kafka.brokers")
 
         if (::kafka.isInitialized) {
             kafka.stop()

@@ -4,6 +4,7 @@ package com.lemline.core.orchestrator.full
 import com.lemline.common.values.info
 import com.lemline.core.activities.ActivityExecutor
 import com.lemline.core.cloudevents.CloudEventHook
+import com.lemline.core.functions.FunctionResolver
 import com.lemline.core.lifecycleevents.LifecycleEventHook
 import com.lemline.core.nodes.Node
 import com.lemline.core.states.NodeStack
@@ -36,9 +37,10 @@ internal object ForkBranchExecutor {
         rawInput: JsonElement,
         serde: Boolean,
         activityExecutor: ActivityExecutor,
+        functionResolver: FunctionResolver,
         cloudEventHook: CloudEventHook,
         lifecycleHook: LifecycleEventHook,
-        resumeFn: suspend (Workflow, WorkflowCommand, Boolean, ActivityExecutor, CloudEventHook, LifecycleEventHook) -> WorkflowEvent.Outcome
+        resumeFn: suspend (Workflow, WorkflowCommand, Boolean, ActivityExecutor, FunctionResolver, CloudEventHook, LifecycleEventHook) -> WorkflowEvent.Outcome
     ): JsonElement {
         return branches.mapAwaitFirstFailSlow { branchNode ->
             lifecycleHook.onTaskCreated(
@@ -59,6 +61,7 @@ internal object ForkBranchExecutor {
                 ),
                 serde,
                 activityExecutor,
+                functionResolver,
                 cloudEventHook,
                 lifecycleHook,
             ).value()
@@ -78,9 +81,10 @@ internal object ForkBranchExecutor {
         rawInput: JsonElement,
         serde: Boolean,
         activityExecutor: ActivityExecutor,
+        functionResolver: FunctionResolver,
         cloudEventHook: CloudEventHook,
         lifecycleHook: LifecycleEventHook,
-        resumeFn: suspend (Workflow, WorkflowCommand, Boolean, ActivityExecutor, CloudEventHook, LifecycleEventHook) -> WorkflowEvent.Outcome
+        resumeFn: suspend (Workflow, WorkflowCommand, Boolean, ActivityExecutor, FunctionResolver, CloudEventHook, LifecycleEventHook) -> WorkflowEvent.Outcome
     ): JsonArray {
         return JsonArray(
             branches.mapAwaitAllFailFast { branchNode ->
@@ -102,6 +106,7 @@ internal object ForkBranchExecutor {
                     ),
                     serde,
                     activityExecutor,
+                    functionResolver,
                     cloudEventHook,
                     lifecycleHook,
                 ).value()

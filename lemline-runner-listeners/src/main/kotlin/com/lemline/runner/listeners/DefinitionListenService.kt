@@ -52,7 +52,8 @@ data class MatchingListenTask(
             ListenerStrategy.ANY_UNTIL_EXPR,
             ListenerStrategy.ANY_UNTIL_EVENT -> null        // NULL for accumulation
         },
-        listenerStrategy = listenerStrategy
+        listenerStrategy = listenerStrategy,
+        isFromFunction = listenTask.isFromFunction
     )
 }
 
@@ -76,7 +77,8 @@ data class MatchingListenTaskUntilEvent(
         workflowInfo = workflowInfo,
         position = nodePosition,
         correlationValuesJson = null,
-        listenerStrategy = ListenerStrategy.ANY_UNTIL_EVENT
+        listenerStrategy = ListenerStrategy.ANY_UNTIL_EVENT,
+        isFromFunction = listenTask.isFromFunction
     )
 }
 

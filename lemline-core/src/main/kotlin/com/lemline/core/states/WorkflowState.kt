@@ -6,7 +6,7 @@ package com.lemline.core.states
 import com.lemline.common.values.NodePosition
 import com.lemline.common.values.WorkflowId
 import com.lemline.core.errors.InternalException
-import com.lemline.core.json.LemlineJson
+import com.lemline.common.json.LemlineJson
 import com.lemline.core.processors.CallHttpConfig
 import com.lemline.core.processors.EmitConfig
 import com.lemline.core.processors.ListenConfig
@@ -527,9 +527,9 @@ sealed class WorkflowEvent : WorkflowState() {
     @SerialName("emitStarted")
     data class EmitStarted(
         override val nodeStack: NodeStack,
-        val input: JsonElement,   // Pass-through: output = input for emit task
+        override val input: JsonElement,   // Pass-through: output = input for emit task
         val config: EmitConfig
-    ) : Suspension() {
+    ) : ActivityStarted() {
 
         @Transient
         override val nodePosition = nodeStack.currentPosition // Emit position
@@ -575,6 +575,9 @@ sealed class WorkflowEvent : WorkflowState() {
             ", stack=$nodeStack" +
             ")"
     }
+
+    // CallFunctionStarted removed - CallFunction is now a control-flow task
+    // that navigates to function nodes step-by-step through normal message flow
 
     /**
      * Event emitted when a script task needs to be executed.

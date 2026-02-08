@@ -255,11 +255,12 @@ abstract class NodeProcessor<T : TaskBase, S : NodeState>(
         lifecycleHook: LifecycleEventHook,
     ): WorkflowEvent {
         // Pure navigation - determine where to go next
-        val (nextNode, nextDirective) = @Suppress("UNCHECKED_CAST") getNextNode(
+        val navigationInfo = @Suppress("UNCHECKED_CAST") getNextNode(
             nodeStack.currentState as S,
             transformedInput,
             scope
         )
+        val (nextNode, nextDirective, nextInput) = navigationInfo
 
         // check if we should return to parent
         @Suppress("UNCHECKED_CAST")
@@ -275,9 +276,11 @@ abstract class NodeProcessor<T : TaskBase, S : NodeState>(
             )
 
             // control flows that are not completed (do, for, ...), going to a child
+            // Use nextInput if provided (e.g., from CallFunction's with arguments),
+            // otherwise default to transformedInput
             false -> continueToChild(
                 childNode = nextNode,
-                childRawInput = transformedInput,
+                childRawInput = nextInput ?: transformedInput,
                 nodeStack = nodeStack
             )
         }
@@ -668,8 +671,11 @@ abstract class NodeProcessor<T : TaskBase, S : NodeState>(
  * Components:
  * - A `Node<*>?`: The next node to navigate to, null indicates navigation ends
  * - A `FlowDirective?`: Directives influencing the parent execution flow (if any)
+ * - A `JsonElement?`: Optional input for the next node (overrides default transformedInput)
+ *   Used by CallFunction to pass evaluated `with` arguments to the function.
  */
 data class NavigationInfo(
     val nextNode: Node<*>?,
-    val nextDirective: FlowDirective?
+    val nextDirective: FlowDirective?,
+    val nextInput: JsonElement? = null
 )

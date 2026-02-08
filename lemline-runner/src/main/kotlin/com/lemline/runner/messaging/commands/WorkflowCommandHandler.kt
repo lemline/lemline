@@ -3,6 +3,7 @@ package com.lemline.runner.messaging.commands
 
 import com.lemline.common.logger.logger
 import com.lemline.common.values.IDV7
+import com.lemline.common.values.info
 import com.lemline.core.activities.ActivityExecutor
 import com.lemline.core.cloudevents.CloudEventFactory
 import com.lemline.core.errors.InternalException
@@ -12,6 +13,7 @@ import com.lemline.core.states.WorkflowCommand
 import com.lemline.core.states.WorkflowEvent
 import com.lemline.core.workflows.WorkflowCache
 import com.lemline.core.workflows.getNode
+import com.lemline.core.workflows.useFunctions
 import com.lemline.runner.common.messaging.InstanceMessage
 import com.lemline.runner.config.LemlineConfiguration
 import com.lemline.runner.definitions.DefinitionRepository
@@ -22,16 +24,19 @@ import com.lemline.runner.failures.FailureReasons.SERIALIZATION_FAILURE
 import com.lemline.runner.failures.FailureReasons.getFailureReason
 import com.lemline.runner.failures.FailureRepository
 import com.lemline.runner.messaging.CompensationException
+import com.lemline.runner.activities.functions.FunctionResolver
 import com.lemline.runner.messaging.MessageHandler
 import com.lemline.runner.messaging.cloudevents.CloudEventsEmitter
 import com.lemline.runner.messaging.events.WorkflowEventEmitter
 import com.lemline.runner.messaging.toLogString
+import io.serverlessworkflow.api.types.Task
 import io.serverlessworkflow.api.types.Workflow
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.enterprise.inject.Instance
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.json.JsonElement
 import org.eclipse.microprofile.reactive.messaging.Message
 import org.jetbrains.annotations.TestOnly
 
@@ -54,6 +59,7 @@ internal class WorkflowCommandHandler(
     override val metrics: WorkflowCommandSubscriberMetrics,
     private val config: LemlineConfiguration,
     private val activityExecutor: ActivityExecutor,
+    private val functionResolver: FunctionResolver,
     private val lifecycleHook: LifecycleEventHook,
     private val cloudEventsEmitter: Instance<CloudEventsEmitter>,
 ) : MessageHandler<InstanceMessage<WorkflowCommand>> {
@@ -271,12 +277,14 @@ internal class WorkflowCommandHandler(
     private suspend fun InstanceMessage<WorkflowCommand>.executeStep(workflow: Workflow): InstanceMessage<WorkflowCommand>? {
         // Execute using StepByStepOrchestrator
         logger.debug { "resumeFromTask state=$workflowState" }
+
         val event = when (config.orchestrator().mode()) {
             LemlineConfiguration.OrchestratorMode.ALL -> StepByStepOrchestrator.runByTask(
                 workflow,
                 workflowState,
                 workflowInfo,
                 lifecycleHook,
+                functionResolver::resolve,
             )
 
             LemlineConfiguration.OrchestratorMode.ACTION -> StepByStepOrchestrator.runByActivity(
@@ -284,6 +292,7 @@ internal class WorkflowCommandHandler(
                 workflowState,
                 workflowInfo,
                 lifecycleHook,
+                functionResolver::resolve,
             )
         }
 
@@ -303,7 +312,7 @@ internal class WorkflowCommandHandler(
         return when (event) {
             is WorkflowEvent.TaskScheduled -> {
                 // Activity scheduled
-                logger.debug { "Activity scheduled node=${event.nodePosition} - ${workflow.getNode(event.nodePosition).task::class.simpleName}(input=${event.rawInput})" }
+                logger.debug { "Activity scheduled node=${event.nodePosition} - ${workflow.getNode(event.nodePosition, functionResolver::resolve).task::class.simpleName}(input=${event.rawInput})" }
                 event.resume()
             }
 
@@ -367,6 +376,9 @@ internal class WorkflowCommandHandler(
                 executeActivity(event)
             }
 
+            // CallFunctionStarted is no longer emitted - CallFunction is now a control-flow task
+            // that navigates to function nodes step-by-step through normal message flow
+
             is WorkflowEvent.WorkflowCompleted -> {
                 // Only persist if parent or scheduled workflow
                 logger.debug { "Workflow completed with output: ${event.output}" }
@@ -417,7 +429,7 @@ internal class WorkflowCommandHandler(
      * Sends a workflow event to the database channel for persistence.
      */
     private suspend fun sendToEventChannel(message: InstanceMessage<WorkflowCommand>, event: WorkflowEvent) {
-        logger.debug { "Sending event to database: $event" }
+        logger.debug { "Sending to events channel: $event" }
         eventEmitter.send(
             InstanceMessage(
                 workflowInfo = message.workflowInfo,
@@ -443,6 +455,9 @@ internal class WorkflowCommandHandler(
             event.resumeFailed(InternalException.Error.from(e, event.nodePosition))
         }
     }
+
+    // executeFunction and executeSyntheticWorkflow removed - CallFunction is now a control-flow task
+    // that navigates to function nodes step-by-step through normal message flow
 
     /**
      * Emits a CloudEvent based on EmitStarted event configuration.

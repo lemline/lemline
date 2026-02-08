@@ -4,11 +4,12 @@ package com.lemline.core.testcases.impl
 import com.lemline.common.values.WorkflowId
 import com.lemline.core.activities.mock.MockActivityExecutor
 import com.lemline.core.activities.mock.MockConfiguration
+import com.lemline.core.activities.mock.MockFunctionResolver
 import com.lemline.core.cloudevents.InMemoryCloudEventHook
+import com.lemline.core.errors.InternalException
 import com.lemline.core.lifecycleevents.LifecycleEventHook
 import com.lemline.core.orchestrator.FullOrchestrator
 import com.lemline.core.orchestrator.StepByStepOrchestrator
-import com.lemline.core.testcases.impl.WorkflowTestExecutor
 import com.lemline.core.workflows.WorkflowCache
 import io.cloudevents.CloudEvent
 import io.serverlessworkflow.api.types.Workflow
@@ -54,14 +55,11 @@ class FullOrchestratorTestExecutor : WorkflowTestExecutor {
             val workflow = createWorkflow(yaml, namespace, name, version, validateDefinition)
 
             val startState = StepByStepOrchestrator.initCmd(
-                workflowId = WorkflowId.Companion.random(),
+                workflowId = WorkflowId.random(),
                 workflowInput = input,
                 hasWaitingParent = false,
                 startedAt = Clock.System.now()
             )
-
-            // Use MockActivityExecutor with the provided configuration
-            val activityExecutor = MockActivityExecutor(mockConfig)
 
             // Create CloudEventHook and pre-populate with test events
             val cloudEventHook = InMemoryCloudEventHook()
@@ -69,19 +67,41 @@ class FullOrchestratorTestExecutor : WorkflowTestExecutor {
                 cloudEventHook.emit(event)
             }
 
+            val lifecycleHook = LifecycleEventHook.NOOP
+
+            // Create FunctionResolver with mock configuration (for remote functions)
+            val functionResolver = MockFunctionResolver(mockConfig)
+
+            // MockActivityExecutor handles HTTP, Script, Shell, Emit
+            // Functions are handled directly by FullOrchestrator via functionResolver
+            val activityExecutor = MockActivityExecutor(mockConfig = mockConfig)
+
             val event = FullOrchestrator.resume(
                 workflow = workflow,
                 command = startState,
                 serde = true, // For testing, we want to ensure serialization works
                 activityExecutor = activityExecutor,
+                functionResolver = functionResolver,
                 cloudEventHook = cloudEventHook,
-                lifecycleHook = LifecycleEventHook.Companion.NOOP
+                lifecycleHook = lifecycleHook
             )
 
             WorkflowTestResult.Success(event.value())
         } catch (e: Exception) {
+            val errorDetails = buildString {
+                append(e::class.simpleName)
+                e.message?.let { append(": $it") }
+                // For InternalException, show the error details
+                if (e is InternalException) append("\n  Error: ${e.error}")
+                // Include cause chain for debugging
+                var cause = e.cause
+                while (cause != null) {
+                    append("\n  Caused by: ${cause::class.simpleName}: ${cause.message}")
+                    cause = if (cause.cause != cause) cause.cause else null
+                }
+            }
             WorkflowTestResult.Failure(
-                error = e.message ?: e::class.simpleName ?: "Unknown error",
+                error = errorDetails,
                 exception = e
             )
         }

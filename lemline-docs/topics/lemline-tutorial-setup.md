@@ -4,7 +4,8 @@ title: Setting Up A Local Environment
 
 # Setting Up A Local Environment
 
-This tutorial walks you through setting up Lemline for local development. By the end, you'll have a fully working environment ready to run workflows.
+This tutorial walks you through setting up Lemline for local development. By the end, you'll have a fully working
+environment ready to run workflows.
 
 ## Prerequisites
 
@@ -14,7 +15,10 @@ This tutorial walks you through setting up Lemline for local development. By the
 
 ## 1. Start the Infrastructure
 
-This tutorial uses **PostgreSQL** with **PGMQ** (PostgreSQL Message Queue) for local development. PGMQ runs in SQL-only mode, requiring no extensions—just a standard PostgreSQL instance handles both data persistence and message brokering. You can substitute with other supported databases (MySQL) or message brokers (Kafka, RabbitMQ) that mirror your production infrastructure. See [Configure Message Brokers](lemline-howto-brokers.md) for alternatives.
+This tutorial uses **PostgreSQL** with **PGMQ** (PostgreSQL Message Queue) for local development.
+PGMQ runs in SQL-only mode, requiring no extensions—just a standard PostgreSQL instance handles both data persistence
+and message brokering. You can substitute with other supported databases (MySQL) or message brokers (Kafka, RabbitMQ)
+that mirror your production infrastructure. See [Configure Message Brokers](lemline-howto-brokers.md) for alternatives.
 
 Create a project directory and add a `docker-compose.yaml` file:
 
@@ -27,14 +31,14 @@ Create `docker-compose.yaml` with PostgreSQL:
 
 ```yaml
 services:
-  postgres:
-    image: postgres:16
-    environment:
-      POSTGRES_DB: lemline
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-    ports:
-      - "5432:5432"
+    postgres:
+        image: postgres:16
+        environment:
+            POSTGRES_DB: lemline
+            POSTGRES_USER: postgres
+            POSTGRES_PASSWORD: postgres
+        ports:
+            - "5432:5432"
 ```
 
 Start the service:
@@ -53,25 +57,25 @@ You should see the `postgres` container running.
 
 ## 2. Create the Configuration File
 
-Create a `.lemline.yaml` configuration file in your project directory:
+Create a `lemline.yaml` configuration file in your project directory:
 
 ```yaml
 lemline:
-  database:
-    postgresql:
-      host: localhost
-      port: 5432
-      database: lemline
-      username: postgres
-      password: postgres
+    database:
+        postgresql:
+            host: localhost
+            port: 5432
+            database: lemline
+            username: postgres
+            password: postgres
 
-  messaging:
-    pgmq:
-      host: localhost
-      port: 5432
-      database: lemline
-      username: postgres
-      password: postgres
+    messaging:
+        pgmq:
+            host: localhost
+            port: 5432
+            database: lemline
+            username: postgres
+            password: postgres
 ```
 
 ## 3. Download Lemline
@@ -97,7 +101,7 @@ bin/lemline --version
 curl -L https://github.com/lemline/lemline/releases/download/v%version%/lemline-v%version%-linux-x86_64.tar.gz | tar -xz
 
 # Verify the installation
-bin/lemline --version
+bin/lemline --version 
 ```
 
 </tab>
@@ -126,7 +130,6 @@ curl -L https://github.com/lemline/lemline/releases/download/v%version%/lemline-
 java -jar lemline.jar --version
 ```
 
-
 </tab>
 </tabs>
 
@@ -140,38 +143,41 @@ Lemline requires database tables for workflow state persistence. Run the migrati
 <tab id="macos-migrate" title="macOS (ARM64)" group-key="macos">
 
 ```bash
-bin/lemline migrate
+bin/lemline migrate --config=lemline.yaml
 ```
 
 </tab>
 <tab id="linux-migrate" title="Linux (x86_64)" group-key="linux">
 
 ```bash
-bin/lemline migrate
+bin/lemline migrate --config=lemline.yaml
 ```
 
 </tab>
 <tab id="windows-migrate" title="Windows (x86_64)" group-key="windows">
 
 ```powershell
-bin\lemline.exe migrate
+bin\lemline.exe migrate --config=lemline.yaml
 ```
 
 </tab>
 <tab id="java-migrate" title="Java (Any OS)" group-key="java">
 
 ```bash
-java -jar lemline.jar migrate
+java -jar lemline.jar migrate --config=lemline.yaml
 ```
 
 </tab>
 </tabs>
 
-You should see output indicating successful migration. This creates the necessary tables for workflow definitions, instances, retries, waits, and other operational data—as well as the PGMQ schema and functions for message brokering. The actual message queue tables are created automatically when Lemline first starts.
+You should see output indicating successful migration. This creates the necessary tables for workflow definitions,
+instances, retries, waits, and other operational data—as well as the PGMQ schema and functions for message brokering.
+The actual message queue tables are created automatically when Lemline first starts.
 
 ## Your Environment is Ready!
 
 You now have:
+
 - PostgreSQL database for workflow state persistence
 - PGMQ message broker for workflow execution (built into PostgreSQL)
 - Lemline binary configured and ready to run workflows

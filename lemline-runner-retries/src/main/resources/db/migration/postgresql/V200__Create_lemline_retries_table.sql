@@ -11,7 +11,7 @@ CREATE TABLE IF NOT EXISTS lemline_retries
     error_reason            VARCHAR(255)   NOT NULL,
     error_class             TEXT           NOT NULL,
     error_message           TEXT,
-    error_stacktrace        TEXT           NOT NULL,
+    error_stacktrace        TEXT,
     outbox_scheduled_for    TIMESTAMPTZ(6) NOT NULL,
     outbox_delayed_until    TIMESTAMPTZ(6) NOT NULL,
     outbox_attempt_count    INTEGER        NOT NULL DEFAULT 0,

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.listeners.outbox
 
+import com.lemline.core.functions.FunctionResolver
 import com.lemline.core.nodes.ForeachTask
 import com.lemline.core.nodes.Node
 import com.lemline.core.states.ForeachState
@@ -61,6 +62,9 @@ class ListenerForeachOutbox : AbstractOutbox<ListenerEventModel>() {
 
     @Inject
     private lateinit var listenerRepository: ListenerRepository
+
+    @Inject
+    private lateinit var functionResolver: FunctionResolver
 
     @Inject
     override lateinit var commandEmitter: CommandEmitter
@@ -139,7 +143,7 @@ class ListenerForeachOutbox : AbstractOutbox<ListenerEventModel>() {
         ) ?: error("Workflow ${listener.workflowInfo} not found in cache")
 
         @Suppress("UNCHECKED_CAST")
-        val listenNode = workflow.getNode(listenStarted.nodePosition) as Node<ListenTask>
+        val listenNode = workflow.getNode(listenStarted.nodePosition, functionResolver::resolve) as Node<ListenTask>
         val foreachNode = listenNode.foreachBlock
             ?: error("Listen task at ${listenStarted.nodePosition} has no foreach block")
         val foreachTask = foreachNode.task as ForeachTask

@@ -24,15 +24,29 @@ data class ListenerQueryKey(
     /** Filter index for ALL strategy - indicates which filter matched (null for ONE/ANY) */
     val filterIndex: Int? = null,
     /** Strategy for filtering listeners (null to match any strategy) */
-    val listenerStrategy: ListenerStrategy? = null
+    val listenerStrategy: ListenerStrategy? = null,
+    /**
+     * True if this key is for a listen task from a function definition.
+     * Function listen tasks use suffix matching on position (e.g., LIKE '%/_fn/do/0/waitForEvent').
+     */
+    val isFromFunction: Boolean = false
 ) {
     /**
      * Builds SQL WHERE condition for this key.
+     * For function listen tasks, uses LIKE with suffix matching.
      */
     fun toSqlCondition(tableAlias: String = ""): String {
         val prefix = if (tableAlias.isNotEmpty()) "$tableAlias." else ""
+
+        // For function listen tasks, use suffix matching (position ends with the function path)
+        val positionCondition = if (isFromFunction) {
+            "$prefix${WORKFLOW_POSITION_COLUMN} LIKE ?"
+        } else {
+            "$prefix${WORKFLOW_POSITION_COLUMN} = ?"
+        }
+
         val baseCondition =
-            "$prefix$WORKFLOW_NAMESPACE_COLUMN = ? AND $prefix$WORKFLOW_NAME_COLUMN = ? AND $prefix$WORKFLOW_VERSION_COLUMN = ? AND $prefix${WORKFLOW_POSITION_COLUMN} = ?"
+            "$prefix$WORKFLOW_NAMESPACE_COLUMN = ? AND $prefix$WORKFLOW_NAME_COLUMN = ? AND $prefix$WORKFLOW_VERSION_COLUMN = ? AND $positionCondition"
 
         val correlationCondition = if (correlationValuesJson != null) {
             " AND ($prefix$CORRELATION_VALUES_COLUMN IS NULL OR $prefix$CORRELATION_VALUES_COLUMN = ?)"
@@ -47,13 +61,20 @@ data class ListenerQueryKey(
 
     /**
      * Binds this key's parameters to a PreparedStatement starting at the given index.
+     * For function listen tasks, binds position as a LIKE pattern with wildcard prefix.
      */
     fun bindParameters(stmt: PreparedStatement, startIndex: Int): Int {
         var idx = startIndex
         stmt.setString(idx++, workflowInfo.namespace.toString())
         stmt.setString(idx++, workflowInfo.name.toString())
         stmt.setString(idx++, workflowInfo.version.toString())
-        stmt.setString(idx++, position.toString())
+        // For function listen tasks, use LIKE pattern: %/_fn/do/0/waitForEvent
+        val positionValue = if (isFromFunction) {
+            "%" + position.toString()
+        } else {
+            position.toString()
+        }
+        stmt.setString(idx++, positionValue)
         if (correlationValuesJson != null) stmt.setString(idx++, correlationValuesJson)
         if (listenerStrategy != null) stmt.setString(idx++, listenerStrategy.name)
 

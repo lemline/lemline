@@ -4,6 +4,9 @@ package com.lemline.core.testcases.impl
 import com.lemline.core.activities.mock.EmitMockMatcher
 import com.lemline.core.activities.mock.EmitMockResponse
 import com.lemline.core.activities.mock.EmitMockRule
+import com.lemline.core.activities.mock.FunctionMockMatcher
+import com.lemline.core.activities.mock.FunctionMockResponse
+import com.lemline.core.activities.mock.FunctionMockRule
 import com.lemline.core.activities.mock.HttpMockMatcher
 import com.lemline.core.activities.mock.HttpMockResponse
 import com.lemline.core.activities.mock.HttpMockRule
@@ -224,6 +227,57 @@ object TestMocks {
     )
 
     // ─────────────────────────────────────────────────────────────────────────
+    // Function Mocks - Custom function calls
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /** Mock response for validateAddress function */
+    internal val validateAddressResponse = buildJsonObject {
+        put("valid", true)
+        put("normalized", buildJsonObject {
+            put("street", "123 Main St")
+            put("city", "Springfield")
+            put("zipCode", "12345")
+        })
+    }
+
+    /** Mock response for calculateTotal function */
+    internal val calculateTotalResponse = buildJsonObject {
+        put("subtotal", 100.00)
+        put("tax", 8.50)
+        put("total", 108.50)
+    }
+
+    /** Mock response for log function (from catalog) */
+    internal val logFunctionResponse = buildJsonObject {
+        put("logged", true)
+        put("message", "Hello, world!")
+    }
+
+    /** Function mock rules */
+    val functionMocks = listOf(
+        // validateAddress function
+        FunctionMockRule(
+            match = FunctionMockMatcher(functionRef = "validateAddress"),
+            response = FunctionMockResponse(output = validateAddressResponse)
+        ),
+        // calculateTotal function
+        FunctionMockRule(
+            match = FunctionMockMatcher(functionRef = "calculateTotal"),
+            response = FunctionMockResponse(output = calculateTotalResponse)
+        ),
+        // Log function from catalog URL
+        FunctionMockRule(
+            match = FunctionMockMatcher(functionRef = "*serverlessworkflow/catalog*log*"),
+            response = FunctionMockResponse(output = logFunctionResponse)
+        ),
+        // Catch-all for any function
+        FunctionMockRule(
+            match = FunctionMockMatcher(functionRef = "*"),
+            response = FunctionMockResponse(output = buildJsonObject { put("result", "mocked") })
+        )
+    )
+
+    // ─────────────────────────────────────────────────────────────────────────
     // Emit Mocks
     // ─────────────────────────────────────────────────────────────────────────
 
@@ -361,6 +415,9 @@ object TestMocks {
     /** Full mock configuration for shell tests */
     val shellConfig = MockConfiguration(shellMocks = shellMocks)
 
+    /** Full mock configuration for function tests */
+    val functionConfig = MockConfiguration(functionMocks = functionMocks)
+
     // ─────────────────────────────────────────────────────────────────────────
     // CloudEvent Builders - For listen task tests
     // ─────────────────────────────────────────────────────────────────────────
@@ -368,7 +425,7 @@ object TestMocks {
     /**
      * Helper to build a CloudEvent from type and JSON data.
      */
-    private fun buildCloudEvent(type: String, data: JsonElement): CloudEvent {
+    fun buildCloudEvent(type: String, data: JsonElement): CloudEvent {
         return CloudEventBuilder.v1()
             .withId(UUID.randomUUID().toString())
             .withSource(URI.create("https://test.example.com"))
