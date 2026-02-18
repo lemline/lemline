@@ -457,6 +457,8 @@ See ADR-0003 section "Adding a New Messaging Technology" for detailed steps:
 5. Create test profile and test resources
 
 ## Active Technologies
+- Kotlin 2.2.10 / Java 17 + Picocli (CLI framework), Quarkus 3.x, Jackson YAML (003-cli-config-create)
+- N/A (generates files to local filesystem) (003-cli-config-create)
 
 - Kotlin 2.2.10, Java 17 + Quarkus, SmallRye Reactive Messaging, CloudEvents SDK (io.cloudevents) (002-lifecycle-events)
 - N/A (fire-and-forget to messaging channel, no database persistence) (002-lifecycle-events)
