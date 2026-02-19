@@ -30,6 +30,7 @@ import com.lemline.core.tasks.FlowDirectiveEnum
 import com.lemline.core.tasks.FlowDirectiveGoto
 import io.serverlessworkflow.api.types.ListenTaskConfiguration.ListenAndReadAs
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 import kotlinx.serialization.json.JsonPrimitive
@@ -97,6 +98,17 @@ class WorkflowStateProtobufMapperTest {
             val decoded = WorkflowStateProtobufMapper.fromProto(encoded)
             assertEquals(state, decoded)
         }
+    }
+
+    @Test
+    fun `should encode started event configs as structured protobuf fields`() {
+        assertTrue(WorkflowStateProtobufMapper.toEventProto(eventWaitStarted()).waitStarted.hasConfig())
+        assertTrue(WorkflowStateProtobufMapper.toEventProto(eventRunWorkflowStarted()).runWorkflowStarted.hasConfig())
+        assertTrue(WorkflowStateProtobufMapper.toEventProto(eventListenStarted()).listenStarted.hasConfig())
+        assertTrue(WorkflowStateProtobufMapper.toEventProto(eventEmitStarted()).emitStarted.hasConfig())
+        assertTrue(WorkflowStateProtobufMapper.toEventProto(eventCallHttpStarted()).callHttpStarted.hasConfig())
+        assertTrue(WorkflowStateProtobufMapper.toEventProto(eventRunScriptStarted()).runScriptStarted.hasConfig())
+        assertTrue(WorkflowStateProtobufMapper.toEventProto(eventRunShellStarted()).runShellStarted.hasConfig())
     }
 
     private fun commandResumeFromTask(): WorkflowCommand.ResumeFromTask =

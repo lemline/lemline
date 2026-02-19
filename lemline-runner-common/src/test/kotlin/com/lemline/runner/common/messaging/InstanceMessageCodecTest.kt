@@ -9,6 +9,7 @@ import com.lemline.common.values.WorkflowInfo
 import com.lemline.common.values.WorkflowName
 import com.lemline.common.values.WorkflowNamespace
 import com.lemline.common.values.WorkflowVersion
+import com.lemline.core.processors.RunWorkflowConfig
 import com.lemline.core.processors.WaitConfig
 import com.lemline.core.states.NodeStack
 import com.lemline.core.states.RootState
@@ -19,6 +20,7 @@ import com.lemline.core.states.WorkflowEvent
 import com.lemline.messages.internal.v1.InternalMessageEnvelope
 import java.util.Base64
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
@@ -86,6 +88,17 @@ class InstanceMessageCodecTest {
         assertEquals(state, decoded)
     }
 
+    @Test
+    fun `db protojson should expose structured run workflow config keys`() {
+        val json = InstanceMessageCodec.workflowStateToDbJson(runWorkflowEventMessage().workflowState)
+
+        assertTrue(json.contains("\"runWorkflowStarted\""))
+        assertTrue(json.contains("\"config\":{\"namespace\":\"child-ns\""))
+        assertTrue(json.contains("\"name\":\"child-workflow\""))
+        assertTrue(json.contains("\"version\":\"2.1.0\""))
+        assertFalse(json.contains("configJson"))
+    }
+
     private fun commandMessage(): InstanceMessage<WorkflowCommand> =
         InstanceMessage(
             workflowInfo = workflowInfo,
@@ -102,6 +115,22 @@ class InstanceMessageCodecTest {
                 nodeStack = nodeStack(),
                 rawOutput = JsonPrimitive("wait"),
                 config = WaitConfig(waitUntil = now)
+            )
+        )
+
+    private fun runWorkflowEventMessage(): InstanceMessage<WorkflowEvent> =
+        InstanceMessage(
+            workflowInfo = workflowInfo,
+            workflowState = WorkflowEvent.RunWorkflowStarted(
+                nodeStack = nodeStack(),
+                rawInput = JsonPrimitive("child-input"),
+                config = RunWorkflowConfig(
+                    namespace = WorkflowNamespace("child-ns"),
+                    name = WorkflowName("child-workflow"),
+                    version = WorkflowVersion("2.1.0"),
+                    input = JsonPrimitive("payload"),
+                    sync = true
+                )
             )
         )
 
