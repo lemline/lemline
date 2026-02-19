@@ -2,7 +2,9 @@
 package com.lemline.runner.messaging.commands
 
 import com.lemline.runner.common.messaging.InstanceMessage
+import com.lemline.runner.common.messaging.InstanceMessageCodec
 import com.lemline.runner.random.random
+import com.lemline.core.states.WorkflowState
 import kotlin.time.ExperimentalTime
 import org.junit.jupiter.api.Assertions
 import org.junit.jupiter.api.Test
@@ -11,15 +13,12 @@ import org.junit.jupiter.api.Test
 internal class InstanceMessageTest {
 
     @Test
-    fun `serialized keys maintain their values for messages backward compatibility`() {
-        // Given
+    fun `serialized payload should use protobuf transport encoding`() {
         val instanceMessage = InstanceMessage.random()
-
-        // Serialize and deserialize to verify backward compatibility
         val encoded = instanceMessage.toJsonString()
-        val decoded = InstanceMessage.fromJsonString<com.lemline.core.states.WorkflowCommand>(encoded)
 
-        // Verify the essential fields match
+        Assertions.assertFalse(encoded.trim().startsWith("{"), "Transport payload should not be raw JSON")
+        val decoded = InstanceMessageCodec.fromTransportPayloadAs<WorkflowState>(encoded)
         Assertions.assertEquals(instanceMessage, decoded)
     }
 
@@ -29,8 +28,8 @@ internal class InstanceMessageTest {
         val original = InstanceMessage.random()
 
         // When
-        val serialized = original.toJsonString()
-        val deserialized = InstanceMessage.fromJsonString<com.lemline.core.states.WorkflowCommand>(serialized)
+        val serialized = InstanceMessageCodec.toTransportPayload(original)
+        val deserialized = InstanceMessageCodec.fromTransportPayloadAs<WorkflowState>(serialized)
 
         // When
         Assertions.assertEquals(original, deserialized)

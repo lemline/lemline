@@ -23,6 +23,8 @@ testcontainers = "1.21.3"
 spotless = "7.0.3"
 cloudevents = "4.0.1"
 smallryeReactiveMessagingApi = "4.31.0"
+protobuf = "4.30.2"
+protobufPlugin = "0.9.4"
 
 [libraries]
 spotlessPlugin = { module = "com.diffplug.spotless:spotless-plugin-gradle", version.ref = "spotless" }
@@ -45,6 +47,8 @@ testcontainers-bom = { module = "org.testcontainers:testcontainers-bom", version
 cloudevents-core = { module = "io.cloudevents:cloudevents-core", version.ref = "cloudevents" }
 cloudevents-json-jackson = { module = "io.cloudevents:cloudevents-json-jackson", version.ref = "cloudevents" }
 smallrye-reactive-messaging-api = { module = "io.smallrye.reactive:smallrye-reactive-messaging-api", version.ref = "smallryeReactiveMessagingApi" }
+protobuf-java = { module = "com.google.protobuf:protobuf-java", version.ref = "protobuf" }
+protobuf-java-util = { module = "com.google.protobuf:protobuf-java-util", version.ref = "protobuf" }
 
 # Libraries bundled together for easier import
 [bundles]
@@ -53,3 +57,4 @@ kotlinxEcosystem = ["kotlinxDatetime", "kotlinxSerializationJson", "kotlinxCorou
 [plugins]
 kotlinPluginSerialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
 quarkus = { id = "io.quarkus", version.ref = "quarkus" }
+protobuf = { id = "com.google.protobuf", version.ref = "protobufPlugin" }

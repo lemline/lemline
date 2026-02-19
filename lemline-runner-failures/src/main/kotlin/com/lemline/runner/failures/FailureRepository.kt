@@ -19,6 +19,7 @@ import com.lemline.runner.common.repositories.ops.WORKFLOW_VERSION_COLUMN
 import com.lemline.runner.common.repositories.ops.getInstanceMessage
 import com.lemline.runner.common.repositories.ops.idColumn
 import com.lemline.runner.common.repositories.with.WithIdRepository
+import com.lemline.runner.common.messaging.InstanceMessageCodec
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
 import java.sql.Connection
@@ -77,7 +78,12 @@ class FailureRepository : CrudRepository<FailureModel>(),
                 stmt.setString(idx, entity.instanceMessage?.workflowState?.nodePosition?.toString())
             }
             column(WORKFLOW_STATE_COLUMN) { stmt, entity, idx ->
-                stmt.setString(idx, entity.instanceMessage?.workflowState?.toJsonString())
+                stmt.setString(
+                    idx,
+                    entity.instanceMessage?.workflowState?.let { state ->
+                        InstanceMessageCodec.workflowStateToDbJson(state)
+                    }
+                )
             }
 
             // Failure-specific columns

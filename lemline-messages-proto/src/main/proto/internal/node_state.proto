@@ -1,0 +1,79 @@
+syntax = "proto3";
+
+package lemline.internal.v1;
+
+import "google/protobuf/timestamp.proto";
+import "internal/common.proto";
+
+option java_multiple_files = true;
+option java_package = "com.lemline.messages.internal.v1";
+
+message NodeStackMessage {
+  repeated StackFrameMessage frames = 1;
+}
+
+message StackFrameMessage {
+  string position = 1;
+  NodeStateMessage state = 2;
+  int32 counter = 3;
+}
+
+message NodeStateMessage {
+  oneof state {
+    RootStateMessage root = 1;
+    DoStateMessage do_state = 2;
+    ForStateMessage for_state = 3;
+    ForeachStateMessage foreach_state = 4;
+    TaskStateMessage task_state = 5;
+    CallFunctionStateMessage call_function_state = 6;
+    TryStateMessage try_state = 7;
+  }
+}
+
+message RootStateMessage {
+  google.protobuf.Timestamp started_at = 1;
+  string workflow_id = 2;
+  string workflow_input_json = 3;
+  string context_json = 4;
+  bool has_waiting_parent = 5;
+}
+
+message DoStateMessage {
+  google.protobuf.Timestamp started_at = 1;
+  int32 index = 2;
+}
+
+message ForStateMessage {
+  google.protobuf.Timestamp started_at = 1;
+  string collection_json = 2;
+  int32 index = 3;
+  string for_each = 4;
+  string for_at = 5;
+}
+
+message ForeachStateMessage {
+  google.protobuf.Timestamp started_at = 1;
+  string item_json = 2;
+  int32 index = 3;
+  string item_var = 4;
+  string index_var = 5;
+}
+
+message TaskStateMessage {
+  google.protobuf.Timestamp started_at = 1;
+}
+
+message CallFunctionStateMessage {
+  google.protobuf.Timestamp started_at = 1;
+  bool entered = 2;
+}
+
+message TryStateMessage {
+  google.protobuf.Timestamp started_at = 1;
+  string transformed_input_json = 2;
+  int32 attempt_index = 3;
+  bool running_catch = 4;
+  InternalErrorMessage last_error = 5;
+  string error_as = 6;
+  bool has_started = 7;
+}
