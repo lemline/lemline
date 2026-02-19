@@ -107,7 +107,7 @@ experience.
 - [x] `PROTO-20` Add payload readability checks for DB storage.
 - [x] `PROTO-21` Add size/latency benchmark JSON vs protobuf transport.
 - [x] `PROTO-21A` Define and validate benchmark target thresholds (payload size reduction and serialization latency budget).
-- [ ] `PROTO-21B` Validate integration tests on PostgreSQL, MySQL, and H2 for persistence paths.
+- [x] `PROTO-21B` Validate integration tests on PostgreSQL, MySQL, and H2 for persistence paths.
 
 ### M5 - Governance
 
