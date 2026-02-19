@@ -1,0 +1,38 @@
+name: Protobuf Checks
+
+on:
+  pull_request:
+    paths:
+      - "lemline-messages-proto/src/main/proto/**"
+      - "buf.yaml"
+      - ".github/workflows/protobuf-checks.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "lemline-messages-proto/src/main/proto/**"
+      - "buf.yaml"
+      - ".github/workflows/protobuf-checks.yml"
+
+jobs:
+  protobuf:
+    name: Lint and Breaking Checks
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Buf
+        uses: bufbuild/buf-action@v1
+        with:
+          setup_only: true
+
+      - name: Buf Lint
+        run: buf lint
+
+      - name: Buf Breaking
+        run: buf breaking --against '.git#branch=main'

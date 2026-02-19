@@ -112,7 +112,7 @@ experience.
 ### M5 - Governance
 
 - [x] `PROTO-22` Define protobuf evolution rules in project docs.
-- [ ] `PROTO-23` Add CI check for protobuf breaking changes (Buf or equivalent).
+- [x] `PROTO-23` Add CI check for protobuf breaking changes (Buf or equivalent).
 - [x] `PROTO-24` Add contribution checklist for schema updates.
 - [x] `PROTO-25` Add CI scan preventing legacy direct Jackson serialization on targeted internal messages.
 
