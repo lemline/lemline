@@ -3,8 +3,6 @@
 
 package com.lemline.runner.common.messaging
 
-import com.google.protobuf.Timestamp
-import com.google.protobuf.util.JsonFormat
 import com.lemline.common.values.WorkflowInfo
 import com.lemline.common.values.WorkflowName
 import com.lemline.common.values.WorkflowNamespace
@@ -17,7 +15,11 @@ import com.lemline.messages.internal.v1.InternalMessageEnvelope
 import com.lemline.messages.internal.v1.MessageMetadata
 import com.lemline.messages.internal.v1.WorkflowInfoMessage
 import com.lemline.messages.internal.v1.WorkflowStatePayload
+import com.squareup.moshi.JsonAdapter
+import com.squareup.moshi.Moshi
+import com.squareup.wire.WireJsonAdapterFactory
 import java.util.Base64
+import java.time.Instant as JavaInstant
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
@@ -30,16 +32,22 @@ object InstanceMessageCodec {
 
     private val base64Encoder = Base64.getEncoder()
     private val base64Decoder = Base64.getDecoder()
-    private val protoJsonPrinter = JsonFormat.printer().omittingInsignificantWhitespace()
-    private val protoJsonParser = JsonFormat.parser().ignoringUnknownFields()
+    private val databaseMoshi: Moshi by lazy {
+        Moshi.Builder()
+            .add(WireJsonAdapterFactory(writeIdentityValues = true))
+            .build()
+    }
+    private val workflowStatePayloadJsonAdapter: JsonAdapter<WorkflowStatePayload> by lazy {
+        databaseMoshi.adapter(WorkflowStatePayload::class.java)
+    }
 
     fun toTransportPayload(message: InstanceMessage<out WorkflowState>): String {
-        val bytes = toEnvelope(message).toByteArray()
+        val bytes = InternalMessageEnvelope.ADAPTER.encode(toEnvelope(message))
         return base64Encoder.encodeToString(bytes)
     }
 
     fun fromTransportPayload(payload: String): InstanceMessage<WorkflowState> {
-        val envelope = InternalMessageEnvelope.parseFrom(base64Decoder.decode(payload))
+        val envelope = InternalMessageEnvelope.ADAPTER.decode(base64Decoder.decode(payload))
         return fromEnvelope(envelope)
     }
 
@@ -53,13 +61,15 @@ object InstanceMessageCodec {
         return message as InstanceMessage<S>
     }
 
-    fun workflowStateToDbJson(state: WorkflowState): String =
-        protoJsonPrinter.print(WorkflowStateProtobufMapper.toProto(state))
+    fun workflowStateToDbJson(state: WorkflowState): String {
+        val proto = WorkflowStateProtobufMapper.toProto(state)
+        return workflowStatePayloadJsonAdapter.toJson(proto)
+    }
 
     fun workflowStateFromDbJson(payload: String): WorkflowState {
-        val builder = WorkflowStatePayload.newBuilder()
-        protoJsonParser.merge(payload, builder)
-        return WorkflowStateProtobufMapper.fromProto(builder.build())
+        val proto = workflowStatePayloadJsonAdapter.fromJson(payload)
+            ?: error("Cannot decode workflow_state JSON payload")
+        return WorkflowStateProtobufMapper.fromProto(proto)
     }
 
     internal fun toEnvelope(
@@ -67,46 +77,40 @@ object InstanceMessageCodec {
         emittedAt: Instant = Clock.System.now()
     ): InternalMessageEnvelope {
         val state = message.workflowState
-        return InternalMessageEnvelope.newBuilder()
-            .setMessageType(
-                when (state) {
-                    is WorkflowCommand -> MESSAGE_TYPE_COMMAND
-                    is WorkflowEvent -> MESSAGE_TYPE_EVENT
-                }
-            )
-            .setSchemaVersion(SCHEMA_VERSION)
-            .setWorkflowInfo(
-                WorkflowInfoMessage.newBuilder()
-                    .setNamespace(message.workflowInfo.namespace.toString())
-                    .setName(message.workflowInfo.name.toString())
-                    .setVersion(message.workflowInfo.version.toString())
-                    .build()
-            )
-            .setMetadata(
-                MessageMetadata.newBuilder()
-                    .setWorkflowId(message.workflowId.toString())
-                    .setNodePosition(message.workflowState.nodePosition.toString())
-                    .setEmittedAt(emittedAt.toProto())
-                    .build()
-            )
-            .apply {
-                when (state) {
-                    is WorkflowCommand -> setCommand(WorkflowStateProtobufMapper.toCommandProto(state))
-                    is WorkflowEvent -> setEvent(WorkflowStateProtobufMapper.toEventProto(state))
-                }
+        return InternalMessageEnvelope(
+            message_type = when (state) {
+                is WorkflowCommand -> MESSAGE_TYPE_COMMAND
+                is WorkflowEvent -> MESSAGE_TYPE_EVENT
+            },
+            schema_version = SCHEMA_VERSION,
+            workflow_info = WorkflowInfoMessage(
+                namespace = message.workflowInfo.namespace.toString(),
+                name = message.workflowInfo.name.toString(),
+                version = message.workflowInfo.version.toString()
+            ),
+            metadata = MessageMetadata(
+                workflow_id = message.workflowId.toString(),
+                node_position = message.workflowState.nodePosition.toString(),
+                emitted_at = emittedAt.toProtoInstant()
+            ),
+            command = when (state) {
+                is WorkflowCommand -> WorkflowStateProtobufMapper.toCommandProto(state)
+                is WorkflowEvent -> null
+            },
+            event = when (state) {
+                is WorkflowCommand -> null
+                is WorkflowEvent -> WorkflowStateProtobufMapper.toEventProto(state)
             }
-            .build()
+        )
     }
 
     internal fun fromEnvelope(envelope: InternalMessageEnvelope): InstanceMessage<WorkflowState> {
-        val state = when (envelope.payloadCase) {
-            InternalMessageEnvelope.PayloadCase.COMMAND -> WorkflowStateProtobufMapper.fromCommandProto(envelope.command)
-            InternalMessageEnvelope.PayloadCase.EVENT -> WorkflowStateProtobufMapper.fromEventProto(envelope.event)
-            InternalMessageEnvelope.PayloadCase.PAYLOAD_NOT_SET -> error("Envelope payload is not set")
-            null -> error("Envelope payload is unknown")
-        }
+        val state = envelope.command?.let { WorkflowStateProtobufMapper.fromCommandProto(it) }
+            ?: envelope.event?.let { WorkflowStateProtobufMapper.fromEventProto(it) }
+            ?: error("Envelope payload is not set")
 
-        val workflowInfo = envelope.workflowInfo.toDomain()
+        val workflowInfo = envelope.workflow_info?.toDomain()
+            ?: error("Envelope workflow_info is not set")
 
         return InstanceMessage(
             workflowInfo = workflowInfo,
@@ -121,9 +125,6 @@ object InstanceMessageCodec {
             version = WorkflowVersion(version),
         )
 
-    private fun Instant.toProto(): Timestamp =
-        Timestamp.newBuilder()
-            .setSeconds(epochSeconds)
-            .setNanos(nanosecondsOfSecond)
-            .build()
+    private fun Instant.toProtoInstant(): JavaInstant =
+        JavaInstant.ofEpochSecond(epochSeconds, nanosecondsOfSecond.toLong())
 }

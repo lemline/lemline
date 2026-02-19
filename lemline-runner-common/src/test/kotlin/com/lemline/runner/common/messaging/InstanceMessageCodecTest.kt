@@ -55,10 +55,10 @@ class InstanceMessageCodecTest {
     @Test
     fun `should expose schema metadata in envelope`() {
         val encoded = InstanceMessageCodec.toTransportPayload(commandMessage())
-        val envelope = InternalMessageEnvelope.parseFrom(Base64.getDecoder().decode(encoded))
+        val envelope = InternalMessageEnvelope.ADAPTER.decode(Base64.getDecoder().decode(encoded))
 
-        assertEquals(1, envelope.schemaVersion)
-        assertEquals("workflow.command", envelope.messageType)
+        assertEquals(1, envelope.schema_version)
+        assertEquals("workflow.command", envelope.message_type)
     }
 
     @Test
@@ -68,6 +68,7 @@ class InstanceMessageCodecTest {
 
         val commandJson = InstanceMessageCodec.workflowStateToDbJson(commandState)
         assertTrue(commandJson.contains("resumeWithCompletedTask"))
+        assertFalse(commandJson.contains("_wirePayloadBase64"))
 
         assertEquals(
             commandState,

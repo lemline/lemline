@@ -1,21 +1,15 @@
 plugins {
+    id("buildsrc.convention.kotlin-jvm")
     `java-library`
-    alias(libs.plugins.protobuf)
-}
-
-java {
-    toolchain {
-        languageVersion.set(JavaLanguageVersion.of(17))
-    }
+    alias(libs.plugins.wire)
 }
 
 dependencies {
-    api(libs.protobuf.java)
-    api(libs.protobuf.java.util)
+    api(libs.wire.runtime)
 }
 
-protobuf {
-    protoc {
-        artifact = "com.google.protobuf:protoc:${libs.versions.protobuf.get()}"
+wire {
+    kotlin {
+        enumMode = "sealed_class"
     }
 }

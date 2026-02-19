@@ -105,13 +105,13 @@ class WorkflowStateProtobufMapperTest {
 
     @Test
     fun `should encode started event configs as structured protobuf fields`() {
-        assertTrue(WorkflowStateProtobufMapper.toEventProto(eventWaitStarted()).waitStarted.hasConfig())
-        assertTrue(WorkflowStateProtobufMapper.toEventProto(eventRunWorkflowStarted()).runWorkflowStarted.hasConfig())
-        assertTrue(WorkflowStateProtobufMapper.toEventProto(eventListenStarted()).listenStarted.hasConfig())
-        assertTrue(WorkflowStateProtobufMapper.toEventProto(eventEmitStarted()).emitStarted.hasConfig())
-        assertTrue(WorkflowStateProtobufMapper.toEventProto(eventCallHttpStarted()).callHttpStarted.hasConfig())
-        assertTrue(WorkflowStateProtobufMapper.toEventProto(eventRunScriptStarted()).runScriptStarted.hasConfig())
-        assertTrue(WorkflowStateProtobufMapper.toEventProto(eventRunShellStarted()).runShellStarted.hasConfig())
+        assertTrue(WorkflowStateProtobufMapper.toEventProto(eventWaitStarted()).wait_started?.config != null)
+        assertTrue(WorkflowStateProtobufMapper.toEventProto(eventRunWorkflowStarted()).run_workflow_started?.config != null)
+        assertTrue(WorkflowStateProtobufMapper.toEventProto(eventListenStarted()).listen_started?.config != null)
+        assertTrue(WorkflowStateProtobufMapper.toEventProto(eventEmitStarted()).emit_started?.config != null)
+        assertTrue(WorkflowStateProtobufMapper.toEventProto(eventCallHttpStarted()).call_http_started?.config != null)
+        assertTrue(WorkflowStateProtobufMapper.toEventProto(eventRunScriptStarted()).run_script_started?.config != null)
+        assertTrue(WorkflowStateProtobufMapper.toEventProto(eventRunShellStarted()).run_shell_started?.config != null)
     }
 
     private fun commandResumeFromTask(): WorkflowCommand.ResumeFromTask =

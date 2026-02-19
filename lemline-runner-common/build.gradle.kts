@@ -12,6 +12,7 @@ dependencies {
     implementation(project(":lemline-common"))
     implementation(project(":lemline-core"))
     implementation(project(":lemline-messages-proto"))
+    implementation(libs.wire.moshi.adapter)
 
     // KotlinX ecosystem
     implementation(libs.bundles.kotlinxEcosystem)
