@@ -10,6 +10,7 @@ import com.lemline.common.values.WorkflowNamespace
 import com.lemline.common.values.WorkflowVersion
 import com.lemline.core.errors.InternalException
 import com.lemline.core.processors.CallHttpConfig
+import com.lemline.core.processors.CorrelationDef
 import com.lemline.core.processors.EmitConfig
 import com.lemline.core.processors.EventFilter
 import com.lemline.core.processors.ListenConfig
@@ -34,6 +35,8 @@ import kotlin.test.assertTrue
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import org.junit.jupiter.api.Test
 
 class WorkflowStateProtobufMapperTest {
@@ -219,10 +222,25 @@ class WorkflowStateProtobufMapperTest {
             rawOutput = JsonPrimitive("listen-output"),
             config = ListenConfig(
                 strategy = ListenStrategy.ANY,
-                filters = listOf(EventFilter(type = "com.acme.event")),
+                filters = listOf(
+                    EventFilter(
+                        type = "com.acme.event",
+                        correlations = mapOf(
+                            "orderId" to CorrelationDef(
+                                from = "\${ .orderId }",
+                                expect = "ORD-54321"
+                            )
+                        )
+                    )
+                ),
                 until = UntilCondition.Expression(". | length > 0"),
                 readAs = ListenAndReadAs.DATA,
-                timeoutAt = now
+                timeoutAt = now,
+                correlationContext = buildJsonObject {
+                    put("input", buildJsonObject {
+                        put("orderId", "ORD-54321")
+                    })
+                }
             )
         )
 

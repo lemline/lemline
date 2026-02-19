@@ -9,6 +9,10 @@ import com.lemline.common.values.WorkflowInfo
 import com.lemline.common.values.WorkflowName
 import com.lemline.common.values.WorkflowNamespace
 import com.lemline.common.values.WorkflowVersion
+import com.lemline.core.processors.CorrelationDef
+import com.lemline.core.processors.EventFilter
+import com.lemline.core.processors.ListenConfig
+import com.lemline.core.processors.ListenStrategy
 import com.lemline.core.processors.RunWorkflowConfig
 import com.lemline.core.processors.WaitConfig
 import com.lemline.core.states.NodeStack
@@ -19,12 +23,15 @@ import com.lemline.core.states.WorkflowCommand
 import com.lemline.core.states.WorkflowEvent
 import com.lemline.messages.internal.v1.InternalMessageEnvelope
 import java.util.Base64
+import io.serverlessworkflow.api.types.ListenTaskConfiguration.ListenAndReadAs
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import org.junit.jupiter.api.Test
 
 class InstanceMessageCodecTest {
@@ -99,6 +106,33 @@ class InstanceMessageCodecTest {
         assertFalse(json.contains("configJson"))
     }
 
+    @Test
+    fun `should preserve listen correlation expect through transport payload`() {
+        val message = listenEventMessage()
+
+        val decoded = InstanceMessageCodec.fromTransportPayloadAs<WorkflowEvent>(
+            InstanceMessageCodec.toTransportPayload(message)
+        )
+
+        val listenState = decoded.workflowState as WorkflowEvent.ListenStarted
+        val correlation = listenState.config.filters.single().correlations?.get("orderId")
+        assertEquals("ORD-54321", correlation?.expect)
+        assertEquals(message, decoded)
+    }
+
+    @Test
+    fun `should preserve listen correlation expect through db protojson`() {
+        val state = listenEventMessage().workflowState
+
+        val decoded = InstanceMessageCodec.workflowStateFromDbJson(
+            InstanceMessageCodec.workflowStateToDbJson(state)
+        ) as WorkflowEvent.ListenStarted
+
+        val correlation = decoded.config.filters.single().correlations?.get("orderId")
+        assertEquals("ORD-54321", correlation?.expect)
+        assertEquals(state, decoded)
+    }
+
     private fun commandMessage(): InstanceMessage<WorkflowCommand> =
         InstanceMessage(
             workflowInfo = workflowInfo,
@@ -130,6 +164,33 @@ class InstanceMessageCodecTest {
                     version = WorkflowVersion("2.1.0"),
                     input = JsonPrimitive("payload"),
                     sync = true
+                )
+            )
+        )
+
+    private fun listenEventMessage(): InstanceMessage<WorkflowEvent> =
+        InstanceMessage(
+            workflowInfo = workflowInfo,
+            workflowState = WorkflowEvent.ListenStarted(
+                nodeStack = nodeStack(),
+                rawOutput = JsonPrimitive("listen"),
+                config = ListenConfig(
+                    strategy = ListenStrategy.ONE,
+                    filters = listOf(
+                        EventFilter(
+                            type = "order.created",
+                            correlations = mapOf(
+                                "orderId" to CorrelationDef(
+                                    from = "\${ .orderId }",
+                                    expect = "ORD-54321"
+                                )
+                            )
+                        )
+                    ),
+                    readAs = ListenAndReadAs.DATA,
+                    correlationContext = buildJsonObject {
+                        put("input", buildJsonObject { put("orderId", "ORD-54321") })
+                    }
                 )
             )
         )

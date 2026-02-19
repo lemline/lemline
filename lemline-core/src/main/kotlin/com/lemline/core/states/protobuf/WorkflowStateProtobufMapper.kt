@@ -264,8 +264,8 @@ object WorkflowStateProtobufMapper {
     private fun WorkflowEvent.WorkflowFailed.toProto(): WorkflowFailedEvent =
         WorkflowFailedEvent.newBuilder()
             .setNodeStack(NodeStackProtobufMapper.toProto(nodeStack))
-            .apply { rawInput?.let { setRawInputJson(it.toJsonString()) } }
-            .apply { rawOutput?.let { setRawOutputJson(it.toJsonString()) } }
+            .apply { this@toProto.rawInput?.let { setRawInputJson(it.toJsonString()) } }
+            .apply { this@toProto.rawOutput?.let { setRawOutputJson(it.toJsonString()) } }
             .apply { this@toProto.flowDirective?.let { setFlowDirective(it.toProto()) } }
             .setError(error.toProto())
             .setFailedAt(failedAt.toProto())
@@ -730,7 +730,7 @@ object WorkflowStateProtobufMapper {
     private fun CorrelationDef.toProto(): CorrelationDefMessage =
         CorrelationDefMessage.newBuilder()
             .setFrom(from)
-            .apply { expect?.let { setExpect(it) } }
+            .apply { this@toProto.expect?.let { setExpect(it) } }
             .build()
 
     private fun CorrelationDefMessage.toDomain(): CorrelationDef =
