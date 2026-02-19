@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package lemline.internal.v1;
 
+import "google/protobuf/struct.proto";
 import "google/protobuf/timestamp.proto";
 import "internal/common.proto";
 import "internal/state/node_stack.proto";
@@ -31,15 +32,15 @@ message WorkflowEventMessage {
 }
 
 message WorkflowCompletedEvent {
-  string output_json = 1;
+  google.protobuf.Value output_json = 1;
   google.protobuf.Timestamp completed_at = 2;
   NodeStackMessage node_stack = 3;
 }
 
 message WorkflowFailedEvent {
   NodeStackMessage node_stack = 1;
-  optional string raw_input_json = 2;
-  optional string raw_output_json = 3;
+  google.protobuf.Value raw_input_json = 2;
+  google.protobuf.Value raw_output_json = 3;
   FlowDirectiveMessage flow_directive = 4;
   InternalErrorMessage error = 5;
   google.protobuf.Timestamp failed_at = 6;
@@ -48,7 +49,7 @@ message WorkflowFailedEvent {
 message ForkBranchCompletedEvent {
   NodeStackMessage node_stack = 1;
   string branch_position = 2;
-  string branch_output_json = 3;
+  google.protobuf.Value branch_output_json = 3;
   google.protobuf.Timestamp completed_at = 4;
 }
 
@@ -61,67 +62,67 @@ message ForkBranchFailedEvent {
 
 message ForEachCompletedEvent {
   NodeStackMessage node_stack = 1;
-  string output_json = 2;
+  google.protobuf.Value output_json = 2;
 }
 
 message TaskScheduledEvent {
   NodeStackMessage node_stack = 1;
   string node_position = 2;
-  string raw_input_json = 3;
+  google.protobuf.Value raw_input_json = 3;
   FlowDirectiveMessage flow_directive = 4;
 }
 
 message WaitStartedEvent {
   NodeStackMessage node_stack = 1;
-  string raw_output_json = 2;
+  google.protobuf.Value raw_output_json = 2;
   WaitConfigMessage config = 3;
 }
 
 message TaskRetryScheduledEvent {
   NodeStackMessage node_stack = 1;
   string node_position = 2;
-  string raw_input_json = 3;
+  google.protobuf.Value raw_input_json = 3;
   FlowDirectiveMessage flow_directive = 4;
   google.protobuf.Timestamp retry_at = 5;
 }
 
 message RunWorkflowStartedEvent {
   NodeStackMessage node_stack = 1;
-  string raw_input_json = 2;
+  google.protobuf.Value raw_input_json = 2;
   RunWorkflowConfigMessage config = 3;
 }
 
 message ForkStartedEvent {
   NodeStackMessage node_stack = 1;
-  string raw_input_json = 2;
+  google.protobuf.Value raw_input_json = 2;
 }
 
 message ListenStartedEvent {
   NodeStackMessage node_stack = 1;
-  string raw_output_json = 2;
+  google.protobuf.Value raw_output_json = 2;
   ListenConfigMessage config = 3;
 }
 
 message EmitStartedEvent {
   NodeStackMessage node_stack = 1;
-  string input_json = 2;
+  google.protobuf.Value input_json = 2;
   EmitConfigMessage config = 3;
 }
 
 message CallHttpStartedEvent {
   NodeStackMessage node_stack = 1;
-  string input_json = 2;
+  google.protobuf.Value input_json = 2;
   CallHttpConfigMessage config = 3;
 }
 
 message RunScriptStartedEvent {
   NodeStackMessage node_stack = 1;
-  string input_json = 2;
+  google.protobuf.Value input_json = 2;
   RunScriptConfigMessage config = 3;
 }
 
 message RunShellStartedEvent {
   NodeStackMessage node_stack = 1;
-  string input_json = 2;
+  google.protobuf.Value input_json = 2;
   RunShellConfigMessage config = 3;
 }

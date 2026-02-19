@@ -4,7 +4,6 @@
 package com.lemline.core.states.protobuf
 
 import com.google.protobuf.Timestamp
-import com.lemline.common.json.LemlineJson
 import com.lemline.common.values.IDV7
 import com.lemline.common.values.NodePosition
 import com.lemline.common.values.WorkflowId
@@ -32,9 +31,7 @@ import com.lemline.messages.internal.v1.TaskStateMessage
 import com.lemline.messages.internal.v1.TryStateMessage
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
-import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
-import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 
 object NodeStackProtobufMapper {
@@ -89,8 +86,8 @@ object NodeStackProtobufMapper {
         RootStateMessage.newBuilder()
             .setStartedAt(startedAt.toProto())
             .setWorkflowId(workflowId.toString())
-            .setWorkflowInputJson(workflowInput.toJsonString())
-            .setContextJson(context.toJsonString())
+            .setWorkflowInputJson(workflowInput.toProtoJsonValue())
+            .setContextJson(context.toProtoJsonStruct())
             .setHasWaitingParent(hasWaitingParent)
             .build()
 
@@ -98,8 +95,14 @@ object NodeStackProtobufMapper {
         RootState(
             startedAt = startedAt.toInstantOrEpoch(hasStartedAt()),
             workflowId = WorkflowId(IDV7.from(workflowId)),
-            workflowInput = workflowInputJson.decodeJsonOrDefault<JsonElement>(buildJsonObject { }),
-            context = contextJson.decodeJsonOrDefault<JsonObject>(buildJsonObject { }),
+            workflowInput = when (hasWorkflowInputJson()) {
+                true -> workflowInputJson.toKotlinJsonElement()
+                false -> buildJsonObject { }
+            },
+            context = when (hasContextJson()) {
+                true -> contextJson.toKotlinJsonObject()
+                false -> buildJsonObject { }
+            },
             hasWaitingParent = hasWaitingParent
         )
 
@@ -118,7 +121,7 @@ object NodeStackProtobufMapper {
     private fun ForState.toProto(): ForStateMessage =
         ForStateMessage.newBuilder()
             .setStartedAt(startedAt.toProto())
-            .setCollectionJson(LemlineJson.encodeToString(collection))
+            .setCollectionJson(collection.toProtoJsonListValue())
             .setIndex(index)
             .setForEach(forEach)
             .setForAt(forAt)
@@ -127,7 +130,10 @@ object NodeStackProtobufMapper {
     private fun ForStateMessage.toDomain(): ForState =
         ForState(
             startedAt = startedAt.toInstantOrEpoch(hasStartedAt()),
-            collection = collectionJson.decodeJsonOrDefault<List<JsonElement>>(emptyList()),
+            collection = when (hasCollectionJson()) {
+                true -> collectionJson.toKotlinJsonElementList()
+                false -> emptyList()
+            },
             index = index,
             forEach = forEach,
             forAt = forAt
@@ -136,7 +142,7 @@ object NodeStackProtobufMapper {
     private fun ForeachState.toProto(): ForeachStateMessage =
         ForeachStateMessage.newBuilder()
             .setStartedAt(startedAt.toProto())
-            .setItemJson(item.toJsonString())
+            .setItemJson(item.toProtoJsonValue())
             .setIndex(index)
             .setItemVar(itemVar)
             .setIndexVar(indexVar)
@@ -145,7 +151,10 @@ object NodeStackProtobufMapper {
     private fun ForeachStateMessage.toDomain(): ForeachState =
         ForeachState(
             startedAt = startedAt.toInstantOrEpoch(hasStartedAt()),
-            item = itemJson.decodeJsonOrDefault<JsonElement>(JsonNull),
+            item = when (hasItemJson()) {
+                true -> itemJson.toKotlinJsonElement()
+                false -> JsonNull
+            },
             index = index,
             itemVar = itemVar,
             indexVar = indexVar
@@ -174,7 +183,7 @@ object NodeStackProtobufMapper {
     private fun TryState.toProto(): TryStateMessage =
         TryStateMessage.newBuilder()
             .setStartedAt(startedAt.toProto())
-            .setTransformedInputJson(transformedInput.toJsonString())
+            .setTransformedInputJson(transformedInput.toProtoJsonValue())
             .setAttemptIndex(attemptIndex)
             .setRunningCatch(runningCatch)
             .apply { this@toProto.lastError?.let { setLastError(it.toProto()) } }
@@ -185,7 +194,10 @@ object NodeStackProtobufMapper {
     private fun TryStateMessage.toDomain(): TryState =
         TryState(
             startedAt = startedAt.toInstantOrEpoch(hasStartedAt()),
-            transformedInput = transformedInputJson.decodeJsonOrDefault<JsonElement>(buildJsonObject { }),
+            transformedInput = when (hasTransformedInputJson()) {
+                true -> transformedInputJson.toKotlinJsonElement()
+                false -> buildJsonObject { }
+            },
             attemptIndex = attemptIndex,
             runningCatch = runningCatch,
             lastError = when (hasLastError()) {
@@ -224,13 +236,5 @@ object NodeStackProtobufMapper {
         when (hasValue) {
             true -> Instant.fromEpochSeconds(seconds, nanos.toLong())
             false -> Instant.fromEpochSeconds(0)
-        }
-
-    private fun JsonElement.toJsonString(): String = LemlineJson.encodeToString(this)
-
-    private inline fun <reified T> String.decodeJsonOrDefault(default: T): T =
-        when (isBlank()) {
-            true -> default
-            false -> LemlineJson.decodeFromString(this)
         }
 }

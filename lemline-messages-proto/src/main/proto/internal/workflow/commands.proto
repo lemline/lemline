@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package lemline.internal.v1;
 
+import "google/protobuf/struct.proto";
 import "internal/common.proto";
 import "internal/state/node_stack.proto";
 
@@ -19,13 +20,13 @@ message WorkflowCommandMessage {
 message ResumeFromTaskCommand {
   NodeStackMessage node_stack = 1;
   string node_position = 2;
-  string raw_input_json = 3;
+  google.protobuf.Value raw_input_json = 3;
   FlowDirectiveMessage flow_directive = 4;
 }
 
 message ResumeWithCompletedTaskCommand {
   NodeStackMessage node_stack = 1;
-  string raw_output_json = 2;
+  google.protobuf.Value raw_output_json = 2;
 }
 
 message ResumeWithFailedTaskCommand {

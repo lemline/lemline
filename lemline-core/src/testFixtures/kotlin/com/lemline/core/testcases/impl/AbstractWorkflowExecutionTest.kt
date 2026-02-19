@@ -2,7 +2,12 @@
 package com.lemline.core.testcases.impl
 
 import io.kotest.core.spec.style.FunSpec
+import java.math.BigDecimal
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.booleanOrNull
 
 /**
  * Abstract base class for workflow execution tests.
@@ -117,7 +122,7 @@ object WorkflowTestValidators {
     fun expectOutput(expected: JsonElement): (WorkflowTestResult) -> String? = { result ->
         when (result) {
             is WorkflowTestResult.Success -> {
-                if (result.output != expected) {
+                if (!jsonSemanticallyEquals(result.output, expected)) {
                     "Output mismatch:\n  Expected: $expected\n  Actual:   ${result.output}"
                 } else null
             }
@@ -142,4 +147,45 @@ object WorkflowTestValidators {
             is WorkflowTestResult.Failure -> "Expected success but got failure: ${result.error}"
         }
     }
+
+    private fun jsonSemanticallyEquals(actual: JsonElement, expected: JsonElement): Boolean = when {
+        actual is JsonObject && expected is JsonObject -> {
+            actual.keys == expected.keys &&
+                actual.all { (key, value) -> jsonSemanticallyEquals(value, expected.getValue(key)) }
+        }
+
+        actual is JsonArray && expected is JsonArray -> {
+            actual.size == expected.size &&
+                actual.indices.all { index -> jsonSemanticallyEquals(actual[index], expected[index]) }
+        }
+
+        actual is JsonPrimitive && expected is JsonPrimitive -> {
+            jsonPrimitivesSemanticallyEqual(actual, expected)
+        }
+
+        else -> actual == expected
+    }
+
+    private fun jsonPrimitivesSemanticallyEqual(actual: JsonPrimitive, expected: JsonPrimitive): Boolean {
+        if (actual.isString || expected.isString) {
+            return actual.isString && expected.isString && actual.content == expected.content
+        }
+
+        val actualBoolean = actual.booleanOrNull
+        val expectedBoolean = expected.booleanOrNull
+        if (actualBoolean != null || expectedBoolean != null) {
+            return actualBoolean != null && expectedBoolean != null && actualBoolean == expectedBoolean
+        }
+
+        val actualNumber = actual.toBigDecimalOrNull()
+        val expectedNumber = expected.toBigDecimalOrNull()
+        if (actualNumber != null || expectedNumber != null) {
+            return actualNumber != null && expectedNumber != null && actualNumber.compareTo(expectedNumber) == 0
+        }
+
+        return actual.content == expected.content
+    }
+
+    private fun JsonPrimitive.toBigDecimalOrNull(): BigDecimal? =
+        runCatching { BigDecimal(content) }.getOrNull()
 }

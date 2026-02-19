@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package lemline.internal.v1;
 
+import "google/protobuf/struct.proto";
 import "google/protobuf/timestamp.proto";
 import "internal/common.proto";
 
@@ -23,8 +24,8 @@ message NodeStateMessage {
 message RootStateMessage {
   google.protobuf.Timestamp started_at = 1;
   string workflow_id = 2;
-  string workflow_input_json = 3;
-  string context_json = 4;
+  google.protobuf.Value workflow_input_json = 3;
+  google.protobuf.Struct context_json = 4;
   bool has_waiting_parent = 5;
 }
 
@@ -35,7 +36,7 @@ message DoStateMessage {
 
 message ForStateMessage {
   google.protobuf.Timestamp started_at = 1;
-  string collection_json = 2;
+  google.protobuf.ListValue collection_json = 2;
   int32 index = 3;
   string for_each = 4;
   string for_at = 5;
@@ -43,7 +44,7 @@ message ForStateMessage {
 
 message ForeachStateMessage {
   google.protobuf.Timestamp started_at = 1;
-  string item_json = 2;
+  google.protobuf.Value item_json = 2;
   int32 index = 3;
   string item_var = 4;
   string index_var = 5;
@@ -60,7 +61,7 @@ message CallFunctionStateMessage {
 
 message TryStateMessage {
   google.protobuf.Timestamp started_at = 1;
-  string transformed_input_json = 2;
+  google.protobuf.Value transformed_input_json = 2;
   int32 attempt_index = 3;
   bool running_catch = 4;
   InternalErrorMessage last_error = 5;

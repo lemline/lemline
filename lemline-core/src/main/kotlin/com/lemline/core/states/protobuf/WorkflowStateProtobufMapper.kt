@@ -4,7 +4,6 @@
 package com.lemline.core.states.protobuf
 
 import com.google.protobuf.Timestamp
-import com.lemline.common.json.LemlineJson
 import com.lemline.common.values.NodePosition
 import com.lemline.common.values.WorkflowName
 import com.lemline.common.values.WorkflowNamespace
@@ -77,7 +76,6 @@ import io.serverlessworkflow.api.types.ListenTaskConfiguration.ListenAndReadAs
 import io.serverlessworkflow.api.types.RunTaskConfiguration.ProcessReturnType
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
-import kotlinx.serialization.json.JsonElement
 
 object WorkflowStateProtobufMapper {
 
@@ -208,7 +206,7 @@ object WorkflowStateProtobufMapper {
         ResumeFromTaskCommand.newBuilder()
             .setNodeStack(NodeStackProtobufMapper.toProto(nodeStack))
             .setNodePosition(nodePosition.toString())
-            .setRawInputJson(rawInput.toJsonString())
+            .setRawInputJson(rawInput.toProtoJsonValue())
             .apply { this@toProto.flowDirective?.let { setFlowDirective(it.toProto()) } }
             .build()
 
@@ -216,7 +214,7 @@ object WorkflowStateProtobufMapper {
         WorkflowCommand.ResumeFromTask(
             nodeStack = NodeStackProtobufMapper.fromProto(nodeStack),
             nodePosition = NodePosition(nodePosition),
-            rawInput = rawInputJson.decodeJson(),
+            rawInput = rawInputJson.toKotlinJsonElement(),
             flowDirective = when (hasFlowDirective()) {
                 true -> flowDirective.toDomain()
                 false -> null
@@ -226,13 +224,13 @@ object WorkflowStateProtobufMapper {
     private fun WorkflowCommand.ResumeWithCompletedTask.toProto(): ResumeWithCompletedTaskCommand =
         ResumeWithCompletedTaskCommand.newBuilder()
             .setNodeStack(NodeStackProtobufMapper.toProto(nodeStack))
-            .setRawOutputJson(rawOutput.toJsonString())
+            .setRawOutputJson(rawOutput.toProtoJsonValue())
             .build()
 
     private fun ResumeWithCompletedTaskCommand.toDomain(): WorkflowCommand.ResumeWithCompletedTask =
         WorkflowCommand.ResumeWithCompletedTask(
             nodeStack = NodeStackProtobufMapper.fromProto(nodeStack),
-            rawOutput = rawOutputJson.decodeJson()
+            rawOutput = rawOutputJson.toKotlinJsonElement()
         )
 
     private fun WorkflowCommand.ResumeWithFailedTask.toProto(): ResumeWithFailedTaskCommand =
@@ -249,14 +247,14 @@ object WorkflowStateProtobufMapper {
 
     private fun WorkflowEvent.WorkflowCompleted.toProto(): WorkflowCompletedEvent =
         WorkflowCompletedEvent.newBuilder()
-            .setOutputJson(output.toJsonString())
+            .setOutputJson(output.toProtoJsonValue())
             .setCompletedAt(completedAt.toProto())
             .setNodeStack(NodeStackProtobufMapper.toProto(nodeStack))
             .build()
 
     private fun WorkflowCompletedEvent.toDomain(): WorkflowEvent.WorkflowCompleted =
         WorkflowEvent.WorkflowCompleted(
-            output = outputJson.decodeJson(),
+            output = outputJson.toKotlinJsonElement(),
             completedAt = completedAt.toInstant(),
             nodeStack = NodeStackProtobufMapper.fromProto(nodeStack),
         )
@@ -264,8 +262,8 @@ object WorkflowStateProtobufMapper {
     private fun WorkflowEvent.WorkflowFailed.toProto(): WorkflowFailedEvent =
         WorkflowFailedEvent.newBuilder()
             .setNodeStack(NodeStackProtobufMapper.toProto(nodeStack))
-            .apply { this@toProto.rawInput?.let { setRawInputJson(it.toJsonString()) } }
-            .apply { this@toProto.rawOutput?.let { setRawOutputJson(it.toJsonString()) } }
+            .apply { this@toProto.rawInput?.let { setRawInputJson(it.toProtoJsonValue()) } }
+            .apply { this@toProto.rawOutput?.let { setRawOutputJson(it.toProtoJsonValue()) } }
             .apply { this@toProto.flowDirective?.let { setFlowDirective(it.toProto()) } }
             .setError(error.toProto())
             .setFailedAt(failedAt.toProto())
@@ -275,11 +273,11 @@ object WorkflowStateProtobufMapper {
         WorkflowEvent.WorkflowFailed(
             nodeStack = NodeStackProtobufMapper.fromProto(nodeStack),
             rawInput = when (hasRawInputJson()) {
-                true -> rawInputJson.decodeJson()
+                true -> rawInputJson.toKotlinJsonElement()
                 false -> null
             },
             rawOutput = when (hasRawOutputJson()) {
-                true -> rawOutputJson.decodeJson()
+                true -> rawOutputJson.toKotlinJsonElement()
                 false -> null
             },
             flowDirective = when (hasFlowDirective()) {
@@ -294,7 +292,7 @@ object WorkflowStateProtobufMapper {
         ForkBranchCompletedEvent.newBuilder()
             .setNodeStack(NodeStackProtobufMapper.toProto(nodeStack))
             .setBranchPosition(branchPosition.toString())
-            .setBranchOutputJson(branchOutput.toJsonString())
+            .setBranchOutputJson(branchOutput.toProtoJsonValue())
             .setCompletedAt(completedAt.toProto())
             .build()
 
@@ -302,7 +300,7 @@ object WorkflowStateProtobufMapper {
         WorkflowEvent.ForkBranchCompleted(
             nodeStack = NodeStackProtobufMapper.fromProto(nodeStack),
             branchPosition = NodePosition(branchPosition),
-            branchOutput = branchOutputJson.decodeJson(),
+            branchOutput = branchOutputJson.toKotlinJsonElement(),
             completedAt = completedAt.toInstant(),
         )
 
@@ -325,20 +323,20 @@ object WorkflowStateProtobufMapper {
     private fun WorkflowEvent.ForEachCompleted.toProto(): ForEachCompletedEvent =
         ForEachCompletedEvent.newBuilder()
             .setNodeStack(NodeStackProtobufMapper.toProto(nodeStack))
-            .setOutputJson(output.toJsonString())
+            .setOutputJson(output.toProtoJsonValue())
             .build()
 
     private fun ForEachCompletedEvent.toDomain(): WorkflowEvent.ForEachCompleted =
         WorkflowEvent.ForEachCompleted(
             nodeStack = NodeStackProtobufMapper.fromProto(nodeStack),
-            output = outputJson.decodeJson(),
+            output = outputJson.toKotlinJsonElement(),
         )
 
     private fun WorkflowEvent.TaskScheduled.toProto(): TaskScheduledEvent =
         TaskScheduledEvent.newBuilder()
             .setNodeStack(NodeStackProtobufMapper.toProto(nodeStack))
             .setNodePosition(nodePosition.toString())
-            .setRawInputJson(rawInput.toJsonString())
+            .setRawInputJson(rawInput.toProtoJsonValue())
             .apply { this@toProto.flowDirective?.let { setFlowDirective(it.toProto()) } }
             .build()
 
@@ -346,7 +344,7 @@ object WorkflowStateProtobufMapper {
         WorkflowEvent.TaskScheduled(
             nodeStack = NodeStackProtobufMapper.fromProto(nodeStack),
             nodePosition = NodePosition(nodePosition),
-            rawInput = rawInputJson.decodeJson(),
+            rawInput = rawInputJson.toKotlinJsonElement(),
             flowDirective = when (hasFlowDirective()) {
                 true -> flowDirective.toDomain()
                 false -> null
@@ -356,14 +354,14 @@ object WorkflowStateProtobufMapper {
     private fun WorkflowEvent.WaitStarted.toProto(): WaitStartedEvent =
         WaitStartedEvent.newBuilder()
             .setNodeStack(NodeStackProtobufMapper.toProto(nodeStack))
-            .setRawOutputJson(rawOutput.toJsonString())
+            .setRawOutputJson(rawOutput.toProtoJsonValue())
             .setConfig(config.toProto())
             .build()
 
     private fun WaitStartedEvent.toDomain(): WorkflowEvent.WaitStarted =
         WorkflowEvent.WaitStarted(
             nodeStack = NodeStackProtobufMapper.fromProto(nodeStack),
-            rawOutput = rawOutputJson.decodeJson(),
+            rawOutput = rawOutputJson.toKotlinJsonElement(),
             config = config.toDomain(),
         )
 
@@ -371,7 +369,7 @@ object WorkflowStateProtobufMapper {
         TaskRetryScheduledEvent.newBuilder()
             .setNodeStack(NodeStackProtobufMapper.toProto(nodeStack))
             .setNodePosition(nodePosition.toString())
-            .setRawInputJson(rawInput.toJsonString())
+            .setRawInputJson(rawInput.toProtoJsonValue())
             .apply { this@toProto.flowDirective?.let { setFlowDirective(it.toProto()) } }
             .setRetryAt(retryAt.toProto())
             .build()
@@ -380,7 +378,7 @@ object WorkflowStateProtobufMapper {
         WorkflowEvent.TaskRetryScheduled(
             nodeStack = NodeStackProtobufMapper.fromProto(nodeStack),
             nodePosition = NodePosition(nodePosition),
-            rawInput = rawInputJson.decodeJson(),
+            rawInput = rawInputJson.toKotlinJsonElement(),
             flowDirective = when (hasFlowDirective()) {
                 true -> flowDirective.toDomain()
                 false -> null
@@ -391,96 +389,96 @@ object WorkflowStateProtobufMapper {
     private fun WorkflowEvent.RunWorkflowStarted.toProto(): RunWorkflowStartedEvent =
         RunWorkflowStartedEvent.newBuilder()
             .setNodeStack(NodeStackProtobufMapper.toProto(nodeStack))
-            .setRawInputJson(rawInput.toJsonString())
+            .setRawInputJson(rawInput.toProtoJsonValue())
             .setConfig(config.toProto())
             .build()
 
     private fun RunWorkflowStartedEvent.toDomain(): WorkflowEvent.RunWorkflowStarted =
         WorkflowEvent.RunWorkflowStarted(
             nodeStack = NodeStackProtobufMapper.fromProto(nodeStack),
-            rawInput = rawInputJson.decodeJson(),
+            rawInput = rawInputJson.toKotlinJsonElement(),
             config = config.toDomain()
         )
 
     private fun WorkflowEvent.ForkStarted.toProto(): ForkStartedEvent =
         ForkStartedEvent.newBuilder()
             .setNodeStack(NodeStackProtobufMapper.toProto(nodeStack))
-            .setRawInputJson(rawInput.toJsonString())
+            .setRawInputJson(rawInput.toProtoJsonValue())
             .build()
 
     private fun ForkStartedEvent.toDomain(): WorkflowEvent.ForkStarted =
         WorkflowEvent.ForkStarted(
             nodeStack = NodeStackProtobufMapper.fromProto(nodeStack),
-            rawInput = rawInputJson.decodeJson(),
+            rawInput = rawInputJson.toKotlinJsonElement(),
         )
 
     private fun WorkflowEvent.ListenStarted.toProto(): ListenStartedEvent =
         ListenStartedEvent.newBuilder()
             .setNodeStack(NodeStackProtobufMapper.toProto(nodeStack))
-            .setRawOutputJson(rawOutput.toJsonString())
+            .setRawOutputJson(rawOutput.toProtoJsonValue())
             .setConfig(config.toProto())
             .build()
 
     private fun ListenStartedEvent.toDomain(): WorkflowEvent.ListenStarted =
         WorkflowEvent.ListenStarted(
             nodeStack = NodeStackProtobufMapper.fromProto(nodeStack),
-            rawOutput = rawOutputJson.decodeJson(),
+            rawOutput = rawOutputJson.toKotlinJsonElement(),
             config = config.toDomain()
         )
 
     private fun WorkflowEvent.EmitStarted.toProto(): EmitStartedEvent =
         EmitStartedEvent.newBuilder()
             .setNodeStack(NodeStackProtobufMapper.toProto(nodeStack))
-            .setInputJson(input.toJsonString())
+            .setInputJson(input.toProtoJsonValue())
             .setConfig(config.toProto())
             .build()
 
     private fun EmitStartedEvent.toDomain(): WorkflowEvent.EmitStarted =
         WorkflowEvent.EmitStarted(
             nodeStack = NodeStackProtobufMapper.fromProto(nodeStack),
-            input = inputJson.decodeJson(),
+            input = inputJson.toKotlinJsonElement(),
             config = config.toDomain()
         )
 
     private fun WorkflowEvent.CallHttpStarted.toProto(): CallHttpStartedEvent =
         CallHttpStartedEvent.newBuilder()
             .setNodeStack(NodeStackProtobufMapper.toProto(nodeStack))
-            .setInputJson(input.toJsonString())
+            .setInputJson(input.toProtoJsonValue())
             .setConfig(config.toProto())
             .build()
 
     private fun CallHttpStartedEvent.toDomain(): WorkflowEvent.CallHttpStarted =
         WorkflowEvent.CallHttpStarted(
             nodeStack = NodeStackProtobufMapper.fromProto(nodeStack),
-            input = inputJson.decodeJson(),
+            input = inputJson.toKotlinJsonElement(),
             config = config.toDomain()
         )
 
     private fun WorkflowEvent.RunScriptStarted.toProto(): RunScriptStartedEvent =
         RunScriptStartedEvent.newBuilder()
             .setNodeStack(NodeStackProtobufMapper.toProto(nodeStack))
-            .setInputJson(input.toJsonString())
+            .setInputJson(input.toProtoJsonValue())
             .setConfig(config.toProto())
             .build()
 
     private fun RunScriptStartedEvent.toDomain(): WorkflowEvent.RunScriptStarted =
         WorkflowEvent.RunScriptStarted(
             nodeStack = NodeStackProtobufMapper.fromProto(nodeStack),
-            input = inputJson.decodeJson(),
+            input = inputJson.toKotlinJsonElement(),
             config = config.toDomain()
         )
 
     private fun WorkflowEvent.RunShellStarted.toProto(): RunShellStartedEvent =
         RunShellStartedEvent.newBuilder()
             .setNodeStack(NodeStackProtobufMapper.toProto(nodeStack))
-            .setInputJson(input.toJsonString())
+            .setInputJson(input.toProtoJsonValue())
             .setConfig(config.toProto())
             .build()
 
     private fun RunShellStartedEvent.toDomain(): WorkflowEvent.RunShellStarted =
         WorkflowEvent.RunShellStarted(
             nodeStack = NodeStackProtobufMapper.fromProto(nodeStack),
-            input = inputJson.decodeJson(),
+            input = inputJson.toKotlinJsonElement(),
             config = config.toDomain()
         )
 
@@ -499,7 +497,7 @@ object WorkflowStateProtobufMapper {
             .setNamespace(namespace.toString())
             .setName(name.toString())
             .setVersion(version.toString())
-            .setInputJson(input.toJsonString())
+            .setInputJson(input.toProtoJsonValue())
             .setSync(sync)
             .build()
 
@@ -508,7 +506,7 @@ object WorkflowStateProtobufMapper {
             namespace = WorkflowNamespace(namespace),
             name = WorkflowName(name),
             version = WorkflowVersion(version),
-            input = inputJson.decodeJson(),
+            input = inputJson.toKotlinJsonElement(),
             sync = sync,
         )
 
@@ -519,7 +517,7 @@ object WorkflowStateProtobufMapper {
             .apply { this@toProto.until?.let { setUntil(it.toProto()) } }
             .setReadAs(readAs.toProto())
             .apply { this@toProto.timeoutAt?.let { setTimeoutAt(it.toProto()) } }
-            .apply { this@toProto.correlationContext?.let { setCorrelationContextJson(it.toJsonString()) } }
+            .apply { this@toProto.correlationContext?.let { setCorrelationContextJson(it.toProtoJsonValue()) } }
             .build()
 
     private fun ListenConfigMessage.toDomain(): ListenConfig =
@@ -536,7 +534,7 @@ object WorkflowStateProtobufMapper {
                 false -> null
             },
             correlationContext = when (hasCorrelationContextJson()) {
-                true -> correlationContextJson.decodeJson()
+                true -> correlationContextJson.toKotlinJsonElement()
                 false -> null
             },
         )
@@ -550,7 +548,7 @@ object WorkflowStateProtobufMapper {
             .apply { this@toProto.subject?.let { setSubject(it) } }
             .apply { this@toProto.dataschema?.let { setDataschema(it) } }
             .apply { this@toProto.datacontenttype?.let { setDatacontenttype(it) } }
-            .apply { this@toProto.data?.let { setDataJson(it.toJsonString()) } }
+            .apply { this@toProto.data?.let { setDataJson(it.toProtoJsonValue()) } }
             .apply { this@toProto.extensions?.let { setExtensions(it.toProtoStringMap()) } }
             .build()
 
@@ -576,7 +574,7 @@ object WorkflowStateProtobufMapper {
                 false -> null
             },
             data = when (hasDataJson()) {
-                true -> dataJson.decodeJson()
+                true -> dataJson.toKotlinJsonElement()
                 false -> null
             },
             extensions = when (hasExtensions()) {
@@ -591,7 +589,7 @@ object WorkflowStateProtobufMapper {
             .setUrl(url)
             .putAllHeaders(headers)
             .putAllQuery(query)
-            .apply { this@toProto.body?.let { setBodyJson(it.toJsonString()) } }
+            .apply { this@toProto.body?.let { setBodyJson(it.toProtoJsonValue()) } }
             .setOutput(output.toProto())
             .setRedirect(redirect)
             .apply { this@toProto.authentication?.let { setAuthentication(it.toProto()) } }
@@ -604,7 +602,7 @@ object WorkflowStateProtobufMapper {
             headers = headersMap.toMap(),
             query = queryMap.toMap(),
             body = when (hasBodyJson()) {
-                true -> bodyJson.decodeJson()
+                true -> bodyJson.toKotlinJsonElement()
                 false -> null
             },
             output = output.toDomain(),
@@ -893,10 +891,4 @@ object WorkflowStateProtobufMapper {
             .build()
 
     private fun Timestamp.toInstant(): Instant = Instant.fromEpochSeconds(seconds, nanos.toLong())
-
-    private fun JsonElement.toJsonString(): String = LemlineJson.encodeToString(this)
-
-    private inline fun <reified T> T.toJsonString(): String = LemlineJson.encodeToString(this)
-
-    private inline fun <reified T> String.decodeJson(): T = LemlineJson.decodeFromString(this)
 }

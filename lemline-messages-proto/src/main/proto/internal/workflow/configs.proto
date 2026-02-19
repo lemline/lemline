@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package lemline.internal.v1;
 
+import "google/protobuf/struct.proto";
 import "google/protobuf/timestamp.proto";
 
 option java_multiple_files = true;
@@ -15,7 +16,7 @@ message RunWorkflowConfigMessage {
   string namespace = 1;
   string name = 2;
   string version = 3;
-  string input_json = 4;
+  google.protobuf.Value input_json = 4;
   bool sync = 5;
 }
 
@@ -67,7 +68,7 @@ message ListenConfigMessage {
   UntilConditionMessage until = 3;
   ListenReadAsMessage read_as = 4;
   google.protobuf.Timestamp timeout_at = 5;
-  optional string correlation_context_json = 6;
+  google.protobuf.Value correlation_context_json = 6;
 }
 
 message StringMapMessage {
@@ -82,7 +83,7 @@ message EmitConfigMessage {
   optional string subject = 5;
   optional string dataschema = 6;
   optional string datacontenttype = 7;
-  optional string data_json = 8;
+  google.protobuf.Value data_json = 8;
   StringMapMessage extensions = 9;
 }
 
@@ -129,7 +130,7 @@ message CallHttpConfigMessage {
   string url = 2;
   map<string, string> headers = 3;
   map<string, string> query = 4;
-  optional string body_json = 5;
+  google.protobuf.Value body_json = 5;
   HttpOutputMessage output = 6;
   bool redirect = 7;
   HttpAuthenticationMessage authentication = 8;
