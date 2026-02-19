@@ -56,6 +56,61 @@ class InternalMessageSerializationGuardTest {
         )
     }
 
+    @Test
+    fun `internal protobuf schema should not define legacy config_json fields`() {
+        val repoRoot = findRepoRoot()
+        val protoRoot = repoRoot.resolve("lemline-messages-proto/src/main/proto/internal")
+        val violations = mutableListOf<String>()
+        val forbidden = Regex("""\bconfig_json\b""")
+
+        Files.walk(protoRoot).use { paths ->
+            paths.filter { Files.isRegularFile(it) && it.fileName.toString().endsWith(".proto") }
+                .forEach { file ->
+                    file.readText()
+                        .lineSequence()
+                        .forEachIndexed { index, line ->
+                            if (forbidden.containsMatchIn(line)) {
+                                violations += "${file.relativeTo(repoRoot)}:${index + 1}: $line"
+                            }
+                        }
+                }
+        }
+
+        assertTrue(
+            violations.isEmpty(),
+            "Legacy protobuf config_json fields found:\n${violations.joinToString("\n")}"
+        )
+    }
+
+    @Test
+    fun `core protobuf mappers should not use legacy configJson accessors`() {
+        val repoRoot = findRepoRoot()
+        val mapperRoot = repoRoot.resolve("lemline-core/src/main/kotlin/com/lemline/core/states/protobuf")
+        val violations = mutableListOf<String>()
+        val forbidden = listOf(
+            Regex("""\bsetConfigJson\s*\("""),
+            Regex("""\bconfigJson\b""")
+        )
+
+        Files.walk(mapperRoot).use { paths ->
+            paths.filter { Files.isRegularFile(it) && it.fileName.toString().endsWith(".kt") }
+                .forEach { file ->
+                    file.readText()
+                        .lineSequence()
+                        .forEachIndexed { index, line ->
+                            if (forbidden.any { it.containsMatchIn(line) }) {
+                                violations += "${file.relativeTo(repoRoot)}:${index + 1}: $line"
+                            }
+                        }
+                }
+        }
+
+        assertTrue(
+            violations.isEmpty(),
+            "Legacy configJson protobuf mapper usage found:\n${violations.joinToString("\n")}"
+        )
+    }
+
     private fun findRepoRoot(): Path {
         var current = Path.of(System.getProperty("user.dir")).toAbsolutePath()
         while (true) {
