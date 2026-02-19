@@ -1,0 +1,34 @@
+syntax = "proto3";
+
+package lemline.internal.v1;
+
+import "internal/common.proto";
+import "internal/state/node_stack.proto";
+
+option java_multiple_files = true;
+option java_package = "com.lemline.messages.internal.v1";
+
+message WorkflowCommandMessage {
+  oneof command {
+    ResumeFromTaskCommand resume_from_task = 1;
+    ResumeWithCompletedTaskCommand resume_with_completed_task = 2;
+    ResumeWithFailedTaskCommand resume_with_failed_task = 3;
+  }
+}
+
+message ResumeFromTaskCommand {
+  NodeStackMessage node_stack = 1;
+  string node_position = 2;
+  string raw_input_json = 3;
+  FlowDirectiveMessage flow_directive = 4;
+}
+
+message ResumeWithCompletedTaskCommand {
+  NodeStackMessage node_stack = 1;
+  string raw_output_json = 2;
+}
+
+message ResumeWithFailedTaskCommand {
+  NodeStackMessage node_stack = 1;
+  InternalErrorMessage error = 2;
+}

@@ -1,0 +1,127 @@
+syntax = "proto3";
+
+package lemline.internal.v1;
+
+import "google/protobuf/timestamp.proto";
+import "internal/common.proto";
+import "internal/state/node_stack.proto";
+import "internal/workflow/configs.proto";
+
+option java_multiple_files = true;
+option java_package = "com.lemline.messages.internal.v1";
+
+message WorkflowEventMessage {
+  oneof event {
+    WorkflowCompletedEvent workflow_completed = 1;
+    WorkflowFailedEvent workflow_failed = 2;
+    ForkBranchCompletedEvent fork_branch_completed = 3;
+    ForkBranchFailedEvent fork_branch_failed = 4;
+    ForEachCompletedEvent for_each_completed = 5;
+    TaskScheduledEvent task_scheduled = 6;
+    WaitStartedEvent wait_started = 7;
+    TaskRetryScheduledEvent task_retry_scheduled = 8;
+    RunWorkflowStartedEvent run_workflow_started = 9;
+    ForkStartedEvent fork_started = 10;
+    ListenStartedEvent listen_started = 11;
+    EmitStartedEvent emit_started = 12;
+    CallHttpStartedEvent call_http_started = 13;
+    RunScriptStartedEvent run_script_started = 14;
+    RunShellStartedEvent run_shell_started = 15;
+  }
+}
+
+message WorkflowCompletedEvent {
+  string output_json = 1;
+  google.protobuf.Timestamp completed_at = 2;
+  NodeStackMessage node_stack = 3;
+}
+
+message WorkflowFailedEvent {
+  NodeStackMessage node_stack = 1;
+  optional string raw_input_json = 2;
+  optional string raw_output_json = 3;
+  FlowDirectiveMessage flow_directive = 4;
+  InternalErrorMessage error = 5;
+  google.protobuf.Timestamp failed_at = 6;
+}
+
+message ForkBranchCompletedEvent {
+  NodeStackMessage node_stack = 1;
+  string branch_position = 2;
+  string branch_output_json = 3;
+  google.protobuf.Timestamp completed_at = 4;
+}
+
+message ForkBranchFailedEvent {
+  NodeStackMessage node_stack = 1;
+  string branch_position = 2;
+  InternalErrorMessage error = 3;
+  google.protobuf.Timestamp failed_at = 4;
+}
+
+message ForEachCompletedEvent {
+  NodeStackMessage node_stack = 1;
+  string output_json = 2;
+}
+
+message TaskScheduledEvent {
+  NodeStackMessage node_stack = 1;
+  string node_position = 2;
+  string raw_input_json = 3;
+  FlowDirectiveMessage flow_directive = 4;
+}
+
+message WaitStartedEvent {
+  NodeStackMessage node_stack = 1;
+  string raw_output_json = 2;
+  WaitConfigMessage config = 3;
+}
+
+message TaskRetryScheduledEvent {
+  NodeStackMessage node_stack = 1;
+  string node_position = 2;
+  string raw_input_json = 3;
+  FlowDirectiveMessage flow_directive = 4;
+  google.protobuf.Timestamp retry_at = 5;
+}
+
+message RunWorkflowStartedEvent {
+  NodeStackMessage node_stack = 1;
+  string raw_input_json = 2;
+  RunWorkflowConfigMessage config = 3;
+}
+
+message ForkStartedEvent {
+  NodeStackMessage node_stack = 1;
+  string raw_input_json = 2;
+}
+
+message ListenStartedEvent {
+  NodeStackMessage node_stack = 1;
+  string raw_output_json = 2;
+  ListenConfigMessage config = 3;
+}
+
+message EmitStartedEvent {
+  NodeStackMessage node_stack = 1;
+  string input_json = 2;
+  EmitConfigMessage config = 3;
+}
+
+message CallHttpStartedEvent {
+  NodeStackMessage node_stack = 1;
+  string input_json = 2;
+  CallHttpConfigMessage config = 3;
+}
+
+message RunScriptStartedEvent {
+  NodeStackMessage node_stack = 1;
+  string input_json = 2;
+  RunScriptConfigMessage config = 3;
+}
+
+message RunShellStartedEvent {
+  NodeStackMessage node_stack = 1;
+  string input_json = 2;
+  RunShellConfigMessage config = 3;
+}

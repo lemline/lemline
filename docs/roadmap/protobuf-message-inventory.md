@@ -72,5 +72,9 @@
 ## Protobuf Contracts Introduced
 
 - `/Users/gilles/dev/lemline/lemline/lemline-messages-proto/src/main/proto/internal/common.proto`
-- `/Users/gilles/dev/lemline/lemline/lemline-messages-proto/src/main/proto/internal/node_state.proto`
-- `/Users/gilles/dev/lemline/lemline/lemline-messages-proto/src/main/proto/internal/workflow_messages.proto`
+- `/Users/gilles/dev/lemline/lemline/lemline-messages-proto/src/main/proto/internal/state/node_state.proto`
+- `/Users/gilles/dev/lemline/lemline/lemline-messages-proto/src/main/proto/internal/state/node_stack.proto`
+- `/Users/gilles/dev/lemline/lemline/lemline-messages-proto/src/main/proto/internal/workflow/configs.proto`
+- `/Users/gilles/dev/lemline/lemline/lemline-messages-proto/src/main/proto/internal/workflow/commands.proto`
+- `/Users/gilles/dev/lemline/lemline/lemline-messages-proto/src/main/proto/internal/workflow/events.proto`
+- `/Users/gilles/dev/lemline/lemline/lemline-messages-proto/src/main/proto/internal/workflow/envelope.proto`

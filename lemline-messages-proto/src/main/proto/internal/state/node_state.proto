@@ -8,16 +8,6 @@ import "internal/common.proto";
 option java_multiple_files = true;
 option java_package = "com.lemline.messages.internal.v1";
 
-message NodeStackMessage {
-  repeated StackFrameMessage frames = 1;
-}
-
-message StackFrameMessage {
-  string position = 1;
-  NodeStateMessage state = 2;
-  int32 counter = 3;
-}
-
 message NodeStateMessage {
   oneof state {
     RootStateMessage root = 1;

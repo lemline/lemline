@@ -1,0 +1,153 @@
+syntax = "proto3";
+
+package lemline.internal.v1;
+
+import "google/protobuf/timestamp.proto";
+
+option java_multiple_files = true;
+option java_package = "com.lemline.messages.internal.v1";
+
+message WaitConfigMessage {
+  google.protobuf.Timestamp wait_until = 1;
+}
+
+message RunWorkflowConfigMessage {
+  string namespace = 1;
+  string name = 2;
+  string version = 3;
+  string input_json = 4;
+  bool sync = 5;
+}
+
+enum ListenStrategyMessage {
+  LISTEN_STRATEGY_MESSAGE_UNSPECIFIED = 0;
+  LISTEN_STRATEGY_MESSAGE_ONE = 1;
+  LISTEN_STRATEGY_MESSAGE_ANY = 2;
+  LISTEN_STRATEGY_MESSAGE_ALL = 3;
+}
+
+enum ListenReadAsMessage {
+  LISTEN_READ_AS_MESSAGE_UNSPECIFIED = 0;
+  LISTEN_READ_AS_MESSAGE_DATA = 1;
+  LISTEN_READ_AS_MESSAGE_ENVELOPE = 2;
+  LISTEN_READ_AS_MESSAGE_RAW = 3;
+}
+
+message CorrelationDefMessage {
+  string from = 1;
+  optional string expect = 2;
+}
+
+message CorrelationMapMessage {
+  map<string, CorrelationDefMessage> values = 1;
+}
+
+message EventFilterMessage {
+  optional string type = 1;
+  optional string source = 2;
+  optional string subject = 3;
+  optional string id = 4;
+  optional string datacontenttype = 5;
+  optional string dataschema = 6;
+  optional string time = 7;
+  optional string data_filter = 8;
+  CorrelationMapMessage correlations = 9;
+}
+
+message UntilConditionMessage {
+  oneof value {
+    string expression = 1;
+    EventFilterMessage event_filter = 2;
+  }
+}
+
+message ListenConfigMessage {
+  ListenStrategyMessage strategy = 1;
+  repeated EventFilterMessage filters = 2;
+  UntilConditionMessage until = 3;
+  ListenReadAsMessage read_as = 4;
+  google.protobuf.Timestamp timeout_at = 5;
+  optional string correlation_context_json = 6;
+}
+
+message StringMapMessage {
+  map<string, string> values = 1;
+}
+
+message EmitConfigMessage {
+  string id = 1;
+  string source = 2;
+  string type = 3;
+  optional string time = 4;
+  optional string subject = 5;
+  optional string dataschema = 6;
+  optional string datacontenttype = 7;
+  optional string data_json = 8;
+  StringMapMessage extensions = 9;
+}
+
+message BasicAuthMessage {
+  string username = 1;
+  string password = 2;
+}
+
+message BearerAuthMessage {
+  string token = 1;
+}
+
+message OAuth2AuthMessage {
+  string token = 1;
+  string token_type = 2;
+}
+
+message HttpAuthenticationMessage {
+  oneof value {
+    BasicAuthMessage basic = 1;
+    BearerAuthMessage bearer = 2;
+    OAuth2AuthMessage oauth2 = 3;
+  }
+}
+
+enum HttpOutputMessage {
+  HTTP_OUTPUT_MESSAGE_UNSPECIFIED = 0;
+  HTTP_OUTPUT_MESSAGE_RAW = 1;
+  HTTP_OUTPUT_MESSAGE_CONTENT = 2;
+  HTTP_OUTPUT_MESSAGE_RESPONSE = 3;
+}
+
+enum ProcessReturnTypeMessage {
+  PROCESS_RETURN_TYPE_MESSAGE_UNSPECIFIED = 0;
+  PROCESS_RETURN_TYPE_MESSAGE_NONE = 1;
+  PROCESS_RETURN_TYPE_MESSAGE_STDOUT = 2;
+  PROCESS_RETURN_TYPE_MESSAGE_STDERR = 3;
+  PROCESS_RETURN_TYPE_MESSAGE_CODE = 4;
+  PROCESS_RETURN_TYPE_MESSAGE_ALL = 5;
+}
+
+message CallHttpConfigMessage {
+  string method = 1;
+  string url = 2;
+  map<string, string> headers = 3;
+  map<string, string> query = 4;
+  optional string body_json = 5;
+  HttpOutputMessage output = 6;
+  bool redirect = 7;
+  HttpAuthenticationMessage authentication = 8;
+}
+
+message RunScriptConfigMessage {
+  string language = 1;
+  string code = 2;
+  StringMapMessage arguments = 3;
+  StringMapMessage environment = 4;
+  bool await = 5;
+  ProcessReturnTypeMessage return_type = 6;
+}
+
+message RunShellConfigMessage {
+  string command = 1;
+  StringMapMessage arguments = 2;
+  StringMapMessage environment = 3;
+  bool await = 4;
+  ProcessReturnTypeMessage return_type = 5;
+}

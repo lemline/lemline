@@ -8,6 +8,7 @@ lint:
     - STANDARD
   except:
     - PACKAGE_DIRECTORY_MATCH
+    - PACKAGE_SAME_DIRECTORY
 
 breaking:
   use:

@@ -1,0 +1,35 @@
+syntax = "proto3";
+
+package lemline.internal.v1;
+
+import "google/protobuf/timestamp.proto";
+import "internal/common.proto";
+import "internal/workflow/commands.proto";
+import "internal/workflow/events.proto";
+
+option java_multiple_files = true;
+option java_package = "com.lemline.messages.internal.v1";
+
+message MessageMetadata {
+  string workflow_id = 1;
+  string node_position = 2;
+  google.protobuf.Timestamp emitted_at = 3;
+}
+
+message InternalMessageEnvelope {
+  string message_type = 1;
+  int32 schema_version = 2;
+  WorkflowInfoMessage workflow_info = 3;
+  MessageMetadata metadata = 4;
+  oneof payload {
+    WorkflowCommandMessage command = 10;
+    WorkflowEventMessage event = 11;
+  }
+}
+
+message WorkflowStatePayload {
+  oneof state {
+    WorkflowCommandMessage command = 1;
+    WorkflowEventMessage event = 2;
+  }
+}
