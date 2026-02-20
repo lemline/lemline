@@ -22,7 +22,7 @@ data class WorkflowDependency(
     val namespace: String = "test",
     val name: String,
     val version: String = "0.1.0"
-)
+) 
 
 /**
  * Represents a single workflow test case that can be executed
@@ -54,9 +54,7 @@ data class WorkflowTestCase(
     val timeout: Duration = 5.seconds,
     val validateDefinition: Boolean = true,
     val skip: Boolean = false
-) {
-    companion object
-}
+)
 
 /**
  * Result of executing a workflow test case.

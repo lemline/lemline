@@ -6,7 +6,7 @@ package com.lemline.runner.failures
 import com.lemline.common.random.random
 import com.lemline.common.values.IDV7
 import com.lemline.common.values.WorkflowInfo
-import com.lemline.core.random.random
+import com.lemline.core.random.*
 import com.lemline.core.states.WorkflowEvent
 import com.lemline.runner.common.config.DatabaseConfig
 import com.lemline.runner.common.messaging.InstanceMessage
@@ -58,8 +58,8 @@ abstract class FailureRepositoryTestBase {
         val model = FailureModel.from(
             id = IDV7.random(),
             instance = InstanceMessage(
-                workflowInfo = WorkflowInfo.random(),
-                workflowState = WorkflowEvent.WorkflowFailed.random(),
+                workflowInfo = randomWorkflowInfo(),
+                workflowState = randomWorkflowFailedEvent(),
             ),
             exception = ex,
         )
@@ -94,12 +94,12 @@ abstract class FailureRepositoryTestBase {
     @Test
     fun `should find failures by workflow id`() = runTest {
         val instance1 = InstanceMessage(
-            workflowInfo = WorkflowInfo.random(),
-            workflowState = WorkflowEvent.WorkflowFailed.random(),
+            workflowInfo = randomWorkflowInfo(),
+            workflowState = randomWorkflowFailedEvent(),
         )
         val instance2 = InstanceMessage(
-            workflowInfo = WorkflowInfo.random(),
-            workflowState = WorkflowEvent.WorkflowFailed.random(),
+            workflowInfo = randomWorkflowInfo(),
+            workflowState = randomWorkflowFailedEvent(),
         )
 
         val f1 = FailureModel.from(IDV7.random(), instance1, RuntimeException("e1")).copy(payload = "m1")
@@ -118,8 +118,8 @@ abstract class FailureRepositoryTestBase {
     @Test
     fun `count and deleteAll should work`() = runTest {
         val instance = InstanceMessage(
-            workflowInfo = WorkflowInfo.random(),
-            workflowState = WorkflowEvent.WorkflowFailed.random(),
+            workflowInfo = randomWorkflowInfo(),
+            workflowState = randomWorkflowFailedEvent(),
         )
         val failures = List(3) { idx ->
             FailureModel.from(IDV7.random(), instance, RuntimeException("err-$idx")).copy(payload = "m$idx")
@@ -137,8 +137,8 @@ abstract class FailureRepositoryTestBase {
         val failure = FailureModel.from(
             IDV7.random(),
             InstanceMessage(
-                workflowInfo = WorkflowInfo.random(),
-                workflowState = WorkflowEvent.WorkflowFailed.random(),
+                workflowInfo = randomWorkflowInfo(),
+                workflowState = randomWorkflowFailedEvent(),
             ),
             RuntimeException("boom")
         )
@@ -155,8 +155,8 @@ abstract class FailureRepositoryTestBase {
         val failure = FailureModel.from(
             IDV7.random(),
             InstanceMessage(
-                workflowInfo = WorkflowInfo.random(),
-                workflowState = WorkflowEvent.WorkflowFailed.random(),
+                workflowInfo = randomWorkflowInfo(),
+                workflowState = randomWorkflowFailedEvent(),
             ),
             RuntimeException("boom")
         )

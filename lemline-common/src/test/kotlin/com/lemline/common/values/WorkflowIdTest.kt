@@ -1,14 +1,13 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.common.values
 
-import com.lemline.common.json.LemlineJson
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
 class WorkflowIdTest {
 
     @Test
-    fun `WorkflowName toString`() {
+    fun `WorkflowId toString`() {
         val id1 = IDV7.random()
         val id2 = IDV7.random()
         val w1 = WorkflowId(id1)
@@ -25,17 +24,10 @@ class WorkflowIdTest {
     }
 
     @Test
-    fun `WorkflowName JSON roundtrip with LemlineJson`() {
+    fun `WorkflowId wraps and exposes underlying IDV7`() {
         val workflowId = WorkflowId.random()
-
-        val serialized: String = LemlineJson.encodeToString(workflowId)
-
-        // Encoded as JSON strings
-        assertEquals("\"$workflowId\"", serialized)
-
-        // Decoding
-        val decoded = LemlineJson.decodeFromString<WorkflowId>(serialized)
-
-        assertEquals(workflowId, decoded)
+        val rebuilt = WorkflowId(workflowId.value)
+        assertEquals(workflowId, rebuilt)
+        assertEquals(workflowId.toString(), rebuilt.toString())
     }
 }

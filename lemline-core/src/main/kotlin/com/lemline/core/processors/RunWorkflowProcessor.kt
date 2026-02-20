@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: BUSL-1.1
 @file:OptIn(ExperimentalTime::class)
-
 package com.lemline.core.processors
-
 import com.lemline.common.values.WorkflowName
 import com.lemline.common.values.WorkflowNamespace
 import com.lemline.common.values.WorkflowVersion
@@ -14,9 +12,7 @@ import com.lemline.core.states.WorkflowEvent
 import com.lemline.core.states.WorkflowEvent.RunWorkflowStarted
 import io.serverlessworkflow.api.types.RunTask
 import kotlin.time.ExperimentalTime
-import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
-
 /**
  * Node processor for RunTask with Workflow configuration - pure functional model.
  *
@@ -59,11 +55,8 @@ import kotlinx.serialization.json.JsonElement
 class RunWorkflowProcessor(
     node: Node<RunTask>,
 ) : NodeProcessor<RunTask, RunState>(node) {
-
     override val isAsync = true
-
     override fun stateWhenEnteringFromParent(transformedInput: JsonElement, scope: Scope) = RunState()
-
     /**
      * Prepares and handles the event for starting a sub-workflow.
      *
@@ -83,21 +76,16 @@ class RunWorkflowProcessor(
         scope: Scope,
     ): WorkflowEvent {
         logger.debug { "Preparing sub-workflow: ${node.name}" }
-
         // Extract workflow configuration
         val runWorkflow = node.task.run.runWorkflow
         val workflowConfig = runWorkflow.workflow
-
         // Extract namespace, name, and version
         val subWorkflowNamespace = WorkflowNamespace(workflowConfig.namespace)
         val subWorkflowName = WorkflowName(workflowConfig.name)
         val subWorkflowVersion = WorkflowVersion(workflowConfig.version)
-
         // Determine the input for the sub-workflow by evaluating the 'input' expression if it exists
         val childWorkflowInput = runWorkflowInput(transformedInput, workflowConfig.input, scope)
-
         val awaitCompletion = runWorkflow.isAwait
-
         val childWorkflowConfig = RunWorkflowConfig(
             namespace = subWorkflowNamespace,
             name = subWorkflowName,
@@ -105,7 +93,6 @@ class RunWorkflowProcessor(
             input = childWorkflowInput,
             sync = awaitCompletion
         )
-
         // returns RunWorkflowStarted event for an asynchronous execution
         return RunWorkflowStarted(
             nodeStack = nodeStack,
@@ -114,7 +101,6 @@ class RunWorkflowProcessor(
         )
     }
 }
-
 /**
  * Configuration details required to initiate a child workflow.
  *
@@ -127,7 +113,6 @@ class RunWorkflowProcessor(
  * @property input The input provided to the child workflow.
  * @property sync Indicates whether the parent workflow should wait for the child workflow to complete.
  */
-@Serializable
 data class RunWorkflowConfig(
     val namespace: WorkflowNamespace,
     val name: WorkflowName,

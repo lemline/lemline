@@ -15,7 +15,8 @@ import java.time.Instant
 import java.time.LocalDateTime
 import java.time.ZoneOffset
 import java.util.concurrent.ConcurrentHashMap
-import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 
 /**
  * PGMQ (PostgreSQL Message Queue) client.
@@ -467,16 +468,13 @@ class PgmqClient(
         val dlq = config.deadLetterQueue ?: return
 
         // Create a DLQ message with error info
-        val dlqMessage = Json.encodeToString(
-            DlqMessage.serializer(),
-            DlqMessage(
-                originalMessageId = msgId,
-                originalQueue = config.queue,
-                payload = message,
-                error = error,
-                timestamp = Instant.now().toString()
-            )
-        )
+        val dlqMessage = buildJsonObject {
+            put("originalMessageId", msgId)
+            put("originalQueue", config.queue)
+            put("payload", message)
+            put("error", error)
+            put("timestamp", Instant.now().toString())
+        }.toString()
 
         // Send to DLQ and delete from original queue
         pool.preparedQuery(SEND_MESSAGE)

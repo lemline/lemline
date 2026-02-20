@@ -93,7 +93,7 @@ internal class InMemoryWorkflowTestExecutor : AbstractWorkflowTestExecutor() {
         commandsOut.clear()
         eventsOut.clear()
         lifecycleEventsOut.clear()
-        commandsIn.send(message.toJsonString())
+        commandsIn.send(message.toTransportPayload())
     }
 
     override suspend fun sendCloudEventPayload(payload: String) {

@@ -4,6 +4,9 @@
 package com.lemline.core.random
 
 import com.lemline.common.random.random
+import com.lemline.common.random.randomWorkflowName
+import com.lemline.common.random.randomWorkflowNamespace
+import com.lemline.common.random.randomWorkflowVersion
 import com.lemline.common.values.NodePosition
 import com.lemline.common.values.WorkflowId
 import com.lemline.common.values.WorkflowInfo
@@ -81,10 +84,10 @@ fun JsonElement.Companion.nullableRandom(): JsonElement {
 
 fun NodePosition.Companion.random() = NodePosition("/${String.random()}/${String.random()}/${String.random()}")
 
-fun WorkflowInfo.Companion.random() = WorkflowInfo(
-    namespace = WorkflowNamespace.random(),
-    name = WorkflowName.random(),
-    version = WorkflowVersion.random(),
+fun randomWorkflowInfo() = WorkflowInfo(
+    namespace = randomWorkflowNamespace(),
+    name = randomWorkflowName(),
+    version = randomWorkflowVersion(),
 )
 
 fun randomNodeState() = when (Random.nextInt(12)) {
@@ -167,9 +170,9 @@ fun randomFlowDirective(): FlowDirective = when (Random.nextInt(4)) {
 }
 
 fun randomRunWorkflowConfig() = RunWorkflowConfig(
-    namespace = WorkflowNamespace.random(),
-    name = WorkflowName.random(),
-    version = WorkflowVersion.random(),
+    namespace = randomWorkflowNamespace(),
+    name = randomWorkflowName(),
+    version = randomWorkflowVersion(),
     input = JsonElement.random(),
     sync = Random.nextBoolean()
 )

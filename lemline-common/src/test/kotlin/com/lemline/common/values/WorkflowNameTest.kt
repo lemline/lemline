@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.common.values
 
-import com.lemline.common.json.LemlineJson
 import com.lemline.common.random.random
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -24,18 +23,9 @@ class WorkflowNameTest {
     }
 
     @Test
-    fun `WorkflowName JSON roundtrip with LemlineJson`() {
+    fun `WorkflowName supports arbitrary string values`() {
         val str = String.random()
         val name = WorkflowName(str)
-
-        val nameJson = LemlineJson.encodeToString(name)
-
-        // Encoded as JSON strings
-        assertEquals("\"$str\"", nameJson)
-
-        // Decoding
-        val decodedName = LemlineJson.decodeFromString<WorkflowName>(nameJson)
-
-        assertEquals(name, decodedName)
+        assertEquals(str, name.toString())
     }
 }

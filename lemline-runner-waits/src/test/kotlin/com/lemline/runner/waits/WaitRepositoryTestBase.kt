@@ -5,7 +5,7 @@ package com.lemline.runner.waits
 
 import com.lemline.common.values.IDV7
 import com.lemline.common.values.WorkflowInfo
-import com.lemline.core.random.random
+import com.lemline.core.random.*
 import com.lemline.core.states.WorkflowEvent
 import com.lemline.runner.common.config.DatabaseConfig
 import com.lemline.runner.common.messaging.InstanceMessage
@@ -91,8 +91,8 @@ abstract class WaitRepositoryTestBase {
             WaitModel(
                 id = IDV7.random(),
                 instanceMessage = InstanceMessage(
-                    workflowInfo = WorkflowInfo.random(),
-                    workflowState = WorkflowEvent.WaitStarted.random(),
+                    workflowInfo = randomWorkflowInfo(),
+                    workflowState = randomWaitStartedEvent(),
                 ),
                 outboxScheduledFor = Clock.System.now(),
             )

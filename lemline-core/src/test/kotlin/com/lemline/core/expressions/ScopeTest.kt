@@ -4,7 +4,6 @@ package com.lemline.core.expressions
 import com.lemline.common.json.LemlineJson
 import com.lemline.common.values.WorkflowId
 import com.lemline.core.expressions.scopes.RuntimeDescriptor
-import com.lemline.core.expressions.scopes.TaskDescriptor
 import com.lemline.core.expressions.scopes.WorkflowDescriptor
 import com.lemline.core.loadWorkflowFromYaml
 import com.lemline.core.set
@@ -23,21 +22,11 @@ class ScopeTest :
         val workflowPath = "/examples/do-single.yaml"
         val workflow = loadWorkflowFromYaml(workflowPath)
         val testInput: JsonElement = JsonObject(mapOf("test" to JsonPrimitive("value")))
-        val testOutput: JsonElement = JsonObject(mapOf("result" to JsonPrimitive(true)))
-        val testDefinition = JsonObject(mapOf("type" to JsonPrimitive("set")))
         val testStartedAt = DateTimeDescriptor.from(Instant.now())
         val testWorkflowDescriptor = WorkflowDescriptor(
             id = WorkflowId.random().toString(),
             //definition = LemlineJson.encodeToElement(workflow),
             input = testInput,
-            startedAt = LemlineJson.encodeToElement(testStartedAt),
-        )
-        val testTaskDescriptor = TaskDescriptor(
-            name = "Test Task",
-            reference = "/do/0/testTask",
-            definition = testDefinition,
-            input = testInput,
-            output = testOutput,
             startedAt = LemlineJson.encodeToElement(testStartedAt),
         )
         LemlineJson.jsonObject.set("custom", "data")
@@ -67,14 +56,6 @@ class ScopeTest :
             val deserializedDescriptor = LemlineJson.decodeFromString<WorkflowDescriptor>(jsonString)
 
             deserializedDescriptor shouldBe testWorkflowDescriptor
-        }
-
-        "should serialize and deserialize TaskDescriptor" {
-
-            val jsonString = LemlineJson.encodeToString(testTaskDescriptor)
-            val deserializedDescriptor = LemlineJson.decodeFromString<TaskDescriptor>(jsonString)
-
-            deserializedDescriptor shouldBe testTaskDescriptor
         }
 
     })

@@ -42,7 +42,7 @@ abstract class ForkBranchRepositoryTestBase {
     }
 
     private fun getOrCreateFork(): ForkModel {
-        return sharedFork ?: ForkModel.random().also {
+        return sharedFork ?: randomForkModel().also {
             sharedFork = it
             runBlocking { getForkRepository().insert(it) }
         }
@@ -50,7 +50,7 @@ abstract class ForkBranchRepositoryTestBase {
 
     private fun createEntity(): ForkBranchModel {
         val fork = getOrCreateFork()
-        return ForkBranchModel.random(fork.id)
+        return randomForkBranchModel(fork.id)
     }
 
     private fun modifyEntity(entity: ForkBranchModel): ForkBranchModel {
@@ -73,7 +73,7 @@ abstract class ForkBranchRepositoryTestBase {
 
     @Test
     fun `findByForkId should return empty list when fork has no branches`() = runTest {
-        val fork = ForkModel.random()
+        val fork = randomForkModel()
         getForkRepository().insert(fork)
 
         val branches = getBranchRepository().findByForkId(fork.id)
@@ -83,13 +83,13 @@ abstract class ForkBranchRepositoryTestBase {
 
     @Test
     fun `findByForkId should return all branches for a fork`() = runTest {
-        val fork = ForkModel.random()
+        val fork = randomForkModel()
         getForkRepository().insert(fork)
 
         val branches = listOf(
-            ForkBranchModel.random(fork.id).copy(branchPosition = "branch-a"),
-            ForkBranchModel.random(fork.id).copy(branchPosition = "branch-b"),
-            ForkBranchModel.random(fork.id).copy(branchPosition = "branch-c")
+            randomForkBranchModel(fork.id).copy(branchPosition = "branch-a"),
+            randomForkBranchModel(fork.id).copy(branchPosition = "branch-b"),
+            randomForkBranchModel(fork.id).copy(branchPosition = "branch-c")
         )
         getBranchRepository().insert(branches)
 
@@ -101,13 +101,13 @@ abstract class ForkBranchRepositoryTestBase {
 
     @Test
     fun `findByForkId should return branches ordered by name`() = runTest {
-        val fork = ForkModel.random()
+        val fork = randomForkModel()
         getForkRepository().insert(fork)
 
         val branches = listOf(
-            ForkBranchModel.random(fork.id).copy(branchPosition = "zebra"),
-            ForkBranchModel.random(fork.id).copy(branchPosition = "alpha"),
-            ForkBranchModel.random(fork.id).copy(branchPosition = "beta")
+            randomForkBranchModel(fork.id).copy(branchPosition = "zebra"),
+            randomForkBranchModel(fork.id).copy(branchPosition = "alpha"),
+            randomForkBranchModel(fork.id).copy(branchPosition = "beta")
         )
         getBranchRepository().insert(branches)
 
@@ -118,16 +118,16 @@ abstract class ForkBranchRepositoryTestBase {
 
     @Test
     fun `findByForkId should only return branches for specified fork`() = runTest {
-        val fork1 = ForkModel.random()
-        val fork2 = ForkModel.random()
+        val fork1 = randomForkModel()
+        val fork2 = randomForkModel()
         getForkRepository().insert(listOf(fork1, fork2))
 
         val branches1 = listOf(
-            ForkBranchModel.random(fork1.id).copy(branchPosition = "fork1-branch1"),
-            ForkBranchModel.random(fork1.id).copy(branchPosition = "fork1-branch2")
+            randomForkBranchModel(fork1.id).copy(branchPosition = "fork1-branch1"),
+            randomForkBranchModel(fork1.id).copy(branchPosition = "fork1-branch2")
         )
         val branches2 = listOf(
-            ForkBranchModel.random(fork2.id).copy(branchPosition = "fork2-branch1")
+            randomForkBranchModel(fork2.id).copy(branchPosition = "fork2-branch1")
         )
         getBranchRepository().insert(branches1 + branches2)
 
@@ -148,13 +148,13 @@ abstract class ForkBranchRepositoryTestBase {
 
     @Test
     fun `deleteByForkId should delete all branches for a fork`() = runTest {
-        val fork = ForkModel.random()
+        val fork = randomForkModel()
         getForkRepository().insert(fork)
 
         val branches = listOf(
-            ForkBranchModel.random(fork.id).copy(branchPosition = "branch-1"),
-            ForkBranchModel.random(fork.id).copy(branchPosition = "branch-2"),
-            ForkBranchModel.random(fork.id).copy(branchPosition = "branch-3")
+            randomForkBranchModel(fork.id).copy(branchPosition = "branch-1"),
+            randomForkBranchModel(fork.id).copy(branchPosition = "branch-2"),
+            randomForkBranchModel(fork.id).copy(branchPosition = "branch-3")
         )
         getBranchRepository().insert(branches)
 
@@ -168,15 +168,15 @@ abstract class ForkBranchRepositoryTestBase {
 
     @Test
     fun `deleteByForkId should not affect branches of other forks`() = runTest {
-        val fork1 = ForkModel.random()
-        val fork2 = ForkModel.random()
+        val fork1 = randomForkModel()
+        val fork2 = randomForkModel()
         getForkRepository().insert(listOf(fork1, fork2))
 
         val branches1 = listOf(
-            ForkBranchModel.random(fork1.id).copy(branchPosition = "fork1-branch")
+            randomForkBranchModel(fork1.id).copy(branchPosition = "fork1-branch")
         )
         val branches2 = listOf(
-            ForkBranchModel.random(fork2.id).copy(branchPosition = "fork2-branch")
+            randomForkBranchModel(fork2.id).copy(branchPosition = "fork2-branch")
         )
         getBranchRepository().insert(branches1 + branches2)
 
@@ -189,10 +189,10 @@ abstract class ForkBranchRepositoryTestBase {
 
     @Test
     fun `should update branch output and completion timestamp`() = runTest {
-        val fork = ForkModel.random()
+        val fork = randomForkModel()
         getForkRepository().insert(fork)
 
-        val branch = ForkBranchModel.random(fork.id).copy(
+        val branch = randomForkBranchModel(fork.id).copy(
             branchPosition = "test-branch",
             branchOutput = null,
             completedAt = null
@@ -215,10 +215,10 @@ abstract class ForkBranchRepositoryTestBase {
 
     @Test
     fun `should update branch with error information`() = runTest {
-        val fork = ForkModel.random()
+        val fork = randomForkModel()
         getForkRepository().insert(fork)
 
-        val branch = ForkBranchModel.random(fork.id).copy(
+        val branch = randomForkBranchModel(fork.id).copy(
             branchPosition = "failing-branch",
             branchOutput = null,
             completedAt = null,

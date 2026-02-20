@@ -81,7 +81,7 @@ internal class WorkflowEventHandler(
      * If deserialization fails, it stores the failure and throws to NACK the message.
      */
     override suspend fun Message<String>.deserialize(): InstanceMessage<WorkflowEvent> = try {
-        InstanceMessage.fromJsonString(payload)
+        InstanceMessage.fromTransportPayload(payload)
     } catch (e: Exception) {
         logger.warn { "Failed to deserialize message ${toLogString()} $payload: ${e.message}" }
         throw CompensationException(DESERIALIZATION_FAILURE) {

@@ -5,6 +5,9 @@ package com.lemline.runner.random
 
 import com.lemline.common.random.nullableRandom
 import com.lemline.common.random.random
+import com.lemline.common.random.randomWorkflowName
+import com.lemline.common.random.randomWorkflowNamespace
+import com.lemline.common.random.randomWorkflowVersion
 import com.lemline.common.values.IDV7
 import com.lemline.common.values.NodePosition
 import com.lemline.common.values.WorkflowId
@@ -13,7 +16,7 @@ import com.lemline.common.values.WorkflowName
 import com.lemline.common.values.WorkflowNamespace
 import com.lemline.common.values.WorkflowVersion
 import com.lemline.core.errors.InternalException
-import com.lemline.core.random.random
+import com.lemline.core.random.*
 import com.lemline.core.random.randomForkStartedEvent
 import com.lemline.core.random.randomListenStartedEvent
 import com.lemline.core.random.randomRunWorkflowConfig
@@ -55,10 +58,10 @@ private fun NodeStack.Companion.random(): NodeStack = NodeStack.fromFrames(
     )
 )
 
-fun WorkflowInfo.Companion.random() = WorkflowInfo(
-    namespace = WorkflowNamespace.random(),
-    name = WorkflowName.random(),
-    version = WorkflowVersion.random()
+fun randomWorkflowInfo() = WorkflowInfo(
+    namespace = randomWorkflowNamespace(),
+    name = randomWorkflowName(),
+    version = randomWorkflowVersion()
 )
 
 fun randomWorkflowCommand() = when (Random.nextBoolean()) {
@@ -116,7 +119,7 @@ fun randomWaitStartedEvent() = WorkflowEvent.WaitStarted(
 fun randomWorkflowState(): WorkflowState = randomWorkflowCommand()
 
 fun InstanceMessage.Companion.random() = InstanceMessage(
-    workflowInfo = WorkflowInfo.random(),
+    workflowInfo = randomWorkflowInfo(),
     workflowState = randomWorkflowState(),
 )
 
@@ -129,7 +132,7 @@ fun FailureModel.Companion.random() = FailureModel(
     id = IDV7.random(),
     instanceMessage = when (Random.nextBoolean()) {
         true -> InstanceMessage(
-            workflowInfo = WorkflowInfo.random(),
+            workflowInfo = randomWorkflowInfo(),
             workflowState = randomWorkflowFailedEvent(),
         )
 
@@ -152,7 +155,7 @@ fun WithOutbox.randomize(nullableDelayed: Boolean = false) = apply {
 fun ParentModel.Companion.random() = ParentModel(
     id = IDV7.random(),
     instanceMessage = InstanceMessage(
-        workflowInfo = WorkflowInfo.random(),
+        workflowInfo = randomWorkflowInfo(),
         workflowState = randomRunWorkflowStartedEvent(),
     ),
     childId = WorkflowId.random()
@@ -161,7 +164,7 @@ fun ParentModel.Companion.random() = ParentModel(
 fun ScheduleModel.Companion.random() = ScheduleModel(
     id = IDV7.random(),
     instanceMessage = InstanceMessage(
-        workflowInfo = WorkflowInfo.random(),
+        workflowInfo = randomWorkflowInfo(),
         workflowState = randomResumeFromTaskCommand(),
     ),
     outboxScheduledFor = Instant.nullableRandom(),
@@ -174,7 +177,7 @@ fun ScheduleModel.Companion.random() = ScheduleModel(
 fun RetryModel.Companion.random() = RetryModel(
     id = IDV7.random(),
     instanceMessage = InstanceMessage(
-        workflowInfo = WorkflowInfo.random(),
+        workflowInfo = randomWorkflowInfo(),
         workflowState = randomTaskRetryScheduledEvent(),
     ),
     outboxScheduledFor = Instant.random(),
@@ -192,7 +195,7 @@ fun RetryModel.Companion.random() = RetryModel(
 fun WaitModel.Companion.random() = WaitModel(
     id = IDV7.random(),
     instanceMessage = InstanceMessage(
-        workflowInfo = WorkflowInfo.random(),
+        workflowInfo = randomWorkflowInfo(),
         workflowState = randomWaitStartedEvent(),
     ),
     outboxScheduledFor = Instant.random(),
@@ -203,9 +206,9 @@ fun WaitModel.Companion.random() = WaitModel(
     it.outboxErrorMessage = String.nullableRandom()
 }
 
-fun ForkModel.Companion.random() = ForkModel(
+fun randomForkModel() = ForkModel(
     instanceMessage = InstanceMessage(
-        workflowInfo = WorkflowInfo.random(),
+        workflowInfo = randomWorkflowInfo(),
         workflowState = randomForkStartedEvent(),
     ),
     compete = Random.nextBoolean(),
@@ -213,12 +216,12 @@ fun ForkModel.Companion.random() = ForkModel(
     position = NodePosition.random().toString()
 )
 
-fun ForkBranchModel.Companion.random(forkId: IDV7 = IDV7.random()) = ForkBranchModel(
+fun randomForkBranchModel(forkId: IDV7 = IDV7.random()) = ForkBranchModel(
     forkId = forkId,
     branchPosition = String.random()
 )
 
-fun ListenerEventModel.Companion.random(
+fun randomListenerEventModel(
     listenerId: IDV7 = IDV7.random(),
     filterIndex: Int = Random.nextInt(0, 10)
 ) = ListenerEventModel(
@@ -230,7 +233,7 @@ fun ListenerEventModel.Companion.random(
 )
 
 fun ListenerModel.Companion.random(): ListenerModel {
-    val workflowInfo = WorkflowInfo.random()
+    val workflowInfo = randomWorkflowInfo()
     val listenStarted = randomListenStartedEvent()
     val config = listenStarted.config
 

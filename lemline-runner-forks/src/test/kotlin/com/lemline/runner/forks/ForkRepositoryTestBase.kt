@@ -53,7 +53,7 @@ abstract class ForkRepositoryTestBase {
     private val testWorkflowId = WorkflowId.random()
     private var testForkId: IDV7? = null
 
-    private fun createEntity() = ForkModel.random()
+    private fun createEntity() = randomForkModel()
     private fun modifyEntity(entity: ForkModel) =
         entity.copy().apply { completedAt = Instant.fromEpochMilliseconds(System.currentTimeMillis()) }
 

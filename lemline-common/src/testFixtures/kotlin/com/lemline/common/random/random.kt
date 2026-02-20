@@ -65,19 +65,19 @@ fun Int.Companion.nullableRandom() = when (Random.nextBoolean()) {
  * Generates a random WorkflowNamespace.
  * @return A WorkflowNamespace with a random string value
  */
-fun WorkflowNamespace.Companion.random() = WorkflowNamespace(String.random())
+fun randomWorkflowNamespace() = WorkflowNamespace(String.random())
 
 /**
  * Generates a random WorkflowName.
  * @return A WorkflowName with a random string value
  */
-fun WorkflowName.Companion.random() = WorkflowName(String.random())
+fun randomWorkflowName() = WorkflowName(String.random())
 
 /**
  * Generates a random WorkflowVersion.
  * @return A WorkflowVersion with a random string value
  */
-fun WorkflowVersion.Companion.random() = WorkflowVersion(String.random())
+fun randomWorkflowVersion() = WorkflowVersion(String.random())
 
 /**
  * Generates a random nullable IDV7.

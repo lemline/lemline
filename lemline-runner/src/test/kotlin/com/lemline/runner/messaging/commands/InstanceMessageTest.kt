@@ -15,7 +15,7 @@ internal class InstanceMessageTest {
     @Test
     fun `serialized payload should use protobuf transport encoding`() {
         val instanceMessage = InstanceMessage.random()
-        val encoded = instanceMessage.toJsonString()
+        val encoded = instanceMessage.toTransportPayload()
 
         Assertions.assertFalse(encoded.trim().startsWith("{"), "Transport payload should not be raw JSON")
         val decoded = InstanceMessageCodec.fromTransportPayloadAs<WorkflowState>(encoded)
@@ -23,7 +23,7 @@ internal class InstanceMessageTest {
     }
 
     @Test
-    fun `should be JSON serializable and deserializable`() {
+    fun `should roundtrip through transport codec`() {
         // Given
         val original = InstanceMessage.random()
 

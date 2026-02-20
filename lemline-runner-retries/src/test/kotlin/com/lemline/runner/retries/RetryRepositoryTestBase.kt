@@ -5,7 +5,7 @@ package com.lemline.runner.retries
 
 import com.lemline.common.values.IDV7
 import com.lemline.common.values.WorkflowInfo
-import com.lemline.core.random.random
+import com.lemline.core.random.*
 import com.lemline.core.states.WorkflowEvent
 import com.lemline.runner.common.config.DatabaseConfig
 import com.lemline.runner.common.messaging.InstanceMessage
@@ -79,8 +79,8 @@ abstract class RetryRepositoryTestBase {
             RetryModel(
                 id = IDV7.random(),
                 instanceMessage = InstanceMessage(
-                    workflowInfo = WorkflowInfo.random(),
-                    workflowState = WorkflowEvent.TaskRetryScheduled.random(),
+                    workflowInfo = randomWorkflowInfo(),
+                    workflowState = randomTaskRetryScheduledEvent(),
                 ),
                 outboxScheduledFor = Clock.System.now(),
                 errorReason = "test-error-reason",

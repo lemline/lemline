@@ -25,7 +25,7 @@ internal interface MessageHandler<T> {
     suspend fun handle(current: T): T?
 
     /**
-     * Serializes the message to a JSON string payload.
+     * Serializes the message to a transport payload string.
      * Can throw CompensationException for corruption/serialization errors.
      */
     suspend fun serialize(current: T, next: T): String

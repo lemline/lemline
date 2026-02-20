@@ -69,6 +69,4 @@ data class ForkModel(
 
     /** Timestamp after which this entity can be deleted, set when the fork completes or fails */
     override var cleanupAfter: Instant? = null
-
-    companion object
 }

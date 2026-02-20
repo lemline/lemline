@@ -113,7 +113,7 @@ internal class WorkflowCommandHandler(
     // ========================================
 
     /**
-     * Serializes the InstanceMessage to a JSON string.
+     * Serializes the InstanceMessage to a transport payload.
      * Can throw CompensationException for serialization errors (corrupted state).
      */
     override suspend fun serialize(
@@ -121,7 +121,7 @@ internal class WorkflowCommandHandler(
         next: InstanceMessage<WorkflowCommand>
     ): String {
         return try {
-            next.toJsonString()
+            next.toTransportPayload()
         } catch (e: Exception) {
             logger.error(e) { "Failed to serialize message: $next" }
 

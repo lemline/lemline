@@ -1,13 +1,9 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.errors
-
 import com.lemline.common.values.NodePosition
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-
-
 sealed class WorkflowException : RuntimeException()
-
 /**
  * Internal Exception thrown during the execution of a workflow.
  *
@@ -20,7 +16,6 @@ sealed class WorkflowException : RuntimeException()
 data class InternalException(
     val error: Error
 ) : WorkflowException() {
-
     /**
      * Represents an error that occurs during the execution of a workflow.
      *
@@ -55,10 +50,8 @@ data class InternalException(
             title = title,
             details = details,
         )
-
         companion object Companion {
             private const val URI_BASE = "https://serverlessworkflow.io/spec/1.0.0/errors"
-
             fun from(e: Exception, position: NodePosition) = when (e) {
                 is InternalException -> e.error
                 else -> Error(

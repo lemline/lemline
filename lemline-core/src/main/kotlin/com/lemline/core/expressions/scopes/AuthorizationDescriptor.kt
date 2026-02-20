@@ -1,8 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.expressions.scopes
-
-import kotlinx.serialization.Serializable
-
 /**
  * Data class representing an authorization descriptor.
  *
@@ -11,5 +8,4 @@ import kotlinx.serialization.Serializable
  *
  * @see <a href="https://github.com/serverlessworkflow/specification/blob/main/dsl.md#authorization-descriptor">Authorization Descriptor</a>
  */
-@Serializable
 data class AuthorizationDescriptor(val scheme: String, val parameter: String)

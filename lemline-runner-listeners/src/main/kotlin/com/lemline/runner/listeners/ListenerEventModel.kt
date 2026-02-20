@@ -69,7 +69,4 @@ data class ListenerEventModel(
     override var outboxCompletedAt: Instant? = null,
     override var outboxFailedAt: Instant? = null,
     override var cleanupAfter: Instant? = null,
-) : WithOutbox, WithCleanup {
-
-    companion object
-}
+) : WithOutbox, WithCleanup

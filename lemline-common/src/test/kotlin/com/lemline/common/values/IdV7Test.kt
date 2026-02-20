@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.common.values
 
-import com.lemline.common.json.LemlineJson
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotEquals
@@ -34,17 +33,10 @@ class IdV7Test {
     }
 
     @Test
-    fun `test JSON roundtrip with LemlineJson`() {
+    fun `test byte roundtrip`() {
         val idstr = "019923d5-0d46-78ed-a2b5-8f54704b4a1e"
         val id = IDV7.from(idstr)
-
-        val serialized: String = LemlineJson.encodeToString(id)
-
-        // Encoded as JSON strings
-        assertEquals("\"$idstr\"", serialized)
-
-        // Decoding
-        val decoded = LemlineJson.decodeFromString<IDV7>(serialized)
+        val decoded = IDV7.from(id.toBytes())
 
         assertEquals(id, decoded)
     }
