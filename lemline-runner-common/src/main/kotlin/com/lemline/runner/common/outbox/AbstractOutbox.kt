@@ -19,7 +19,6 @@ import kotlin.time.ExperimentalTime
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
-import kotlinx.serialization.ExperimentalSerializationApi
 import org.jetbrains.annotations.VisibleForTesting
 
 /**
@@ -42,7 +41,6 @@ import org.jetbrains.annotations.VisibleForTesting
  * @param T Type of the message entity (must implement WithOutbox interface)
  */
 @ExperimentalTime
-@ExperimentalSerializationApi
 abstract class AbstractOutbox<T : WithOutbox> : AbstractScheduledTask() {
 
     protected abstract val outboxRepository: WithOutboxRepository<T>

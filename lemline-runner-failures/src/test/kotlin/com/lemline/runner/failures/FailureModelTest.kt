@@ -5,10 +5,8 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.time.ExperimentalTime
-import kotlinx.serialization.ExperimentalSerializationApi
 
 @ExperimentalTime
-@ExperimentalSerializationApi
 class FailureModelTest {
 
     @Test

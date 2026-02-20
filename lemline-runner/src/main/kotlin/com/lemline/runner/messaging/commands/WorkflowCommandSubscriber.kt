@@ -9,7 +9,6 @@ import com.lemline.runner.messaging.MessageSubscriber
 import io.quarkus.runtime.Startup
 import jakarta.enterprise.context.ApplicationScoped
 import kotlin.time.ExperimentalTime
-import kotlinx.serialization.ExperimentalSerializationApi
 import org.eclipse.microprofile.config.inject.ConfigProperty
 import org.eclipse.microprofile.reactive.messaging.Channel
 import org.eclipse.microprofile.reactive.messaging.Message
@@ -18,7 +17,6 @@ import org.reactivestreams.Publisher
 internal const val COMMANDS_IN_CHANNEL = "commands-in"
 
 @ExperimentalTime
-@ExperimentalSerializationApi
 @Startup
 @ApplicationScoped
 internal class WorkflowCommandSubscriber(

@@ -10,7 +10,6 @@ import com.lemline.runner.common.models.WithId
 import com.lemline.runner.common.models.WithInstanceMessage
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
-import kotlinx.serialization.ExperimentalSerializationApi
 
 /**
  * Database model for fork metadata.
@@ -20,7 +19,6 @@ import kotlinx.serialization.ExperimentalSerializationApi
  * for better concurrency and observability.
  */
 @ExperimentalTime
-@ExperimentalSerializationApi
 data class ForkModel(
     /** Parent workflow state when the fork started */
     override val instanceMessage: InstanceMessage<WorkflowEvent.ForkStarted>,

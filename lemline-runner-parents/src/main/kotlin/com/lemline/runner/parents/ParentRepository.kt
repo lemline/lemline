@@ -28,7 +28,6 @@ import java.sql.Connection
 import java.sql.ResultSet
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
-import kotlinx.serialization.ExperimentalSerializationApi
 
 const val PARENT_TABLE = "lemline_parents"
 
@@ -41,7 +40,6 @@ const val PARENT_TABLE = "lemline_parents"
  */
 @ApplicationScoped
 @ExperimentalTime
-@ExperimentalSerializationApi
 class ParentRepository : CrudRepository<ParentModel>(),
     WithIdRepository<ParentModel>,
     WithInstanceRepository<ParentModel>,

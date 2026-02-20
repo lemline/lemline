@@ -11,7 +11,6 @@ import java.util.concurrent.TimeUnit
 import kotlin.time.ExperimentalTime
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
-import kotlinx.serialization.ExperimentalSerializationApi
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 
@@ -28,7 +27,6 @@ import org.junit.jupiter.api.Test
  * @param modifyEntity Function to modify an entity for update tests
  */
 @ExperimentalTime
-@ExperimentalSerializationApi
 abstract class CrudRepositoryTest<T : Any>(
     crudRepository: () -> WithCrudRepository<T>,
     private val createEntity: () -> T,

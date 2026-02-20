@@ -13,13 +13,11 @@ import io.mockk.coVerify
 import io.mockk.mockk
 import kotlin.time.ExperimentalTime
 import kotlinx.coroutines.test.runTest
-import kotlinx.serialization.ExperimentalSerializationApi
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 
 @ExperimentalTime
-@ExperimentalSerializationApi
 class DefinitionServiceTest {
 
     private lateinit var service: DefinitionService

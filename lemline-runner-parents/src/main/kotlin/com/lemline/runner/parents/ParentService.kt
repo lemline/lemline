@@ -16,7 +16,6 @@ import jakarta.inject.Inject
 import java.sql.Connection
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
-import kotlinx.serialization.ExperimentalSerializationApi
 
 /**
  * Service for handling parent-child workflow relationships.
@@ -26,7 +25,6 @@ import kotlinx.serialization.ExperimentalSerializationApi
  * - Resuming parent workflows when children complete or fail
  */
 @ExperimentalTime
-@ExperimentalSerializationApi
 @ApplicationScoped
 class ParentService {
 

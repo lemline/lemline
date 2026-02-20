@@ -6,7 +6,6 @@ import com.lemline.core.testcases.impl.WorkflowTestExecutor
 import com.lemline.runner.testcases.bases.AbstractWorkflowTest
 import jakarta.inject.Inject
 import kotlin.time.ExperimentalTime
-import kotlinx.serialization.ExperimentalSerializationApi
 
 /**
  * Abstract base class for in-memory workflow execution tests.
@@ -26,7 +25,6 @@ import kotlinx.serialization.ExperimentalSerializationApi
  * @param excludeTags Tags to exclude from execution (e.g., "external", "slow")
  */
 @ExperimentalTime
-@ExperimentalSerializationApi
 internal abstract class InMemoryWorkflowTest(
     testCases: List<WorkflowTestCase>,
     excludeTags: Set<String> = emptySet()

@@ -15,7 +15,6 @@ import io.quarkus.test.junit.TestProfile
 import java.util.concurrent.TimeUnit
 import kotlin.time.ExperimentalTime
 import kotlinx.coroutines.runBlocking
-import kotlinx.serialization.ExperimentalSerializationApi
 import org.eclipse.microprofile.config.ConfigProvider
 import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.BeforeAll
@@ -30,7 +29,6 @@ import org.junit.jupiter.api.TestInstance
 @Tag("integration")
 @RequiresDocker
 @ExperimentalTime
-@ExperimentalSerializationApi
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 internal class WorkflowConsumerPgmqTest : WorkflowConsumerTest() {
 

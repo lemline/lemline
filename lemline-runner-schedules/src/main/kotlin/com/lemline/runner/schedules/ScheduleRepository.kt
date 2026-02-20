@@ -32,7 +32,6 @@ import java.sql.Connection
 import java.sql.ResultSet
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
-import kotlinx.serialization.ExperimentalSerializationApi
 
 const val SCHEDULE_TABLE = "lemline_schedules"
 
@@ -44,7 +43,6 @@ const val SCHEDULE_TABLE = "lemline_schedules"
  */
 @ApplicationScoped
 @ExperimentalTime
-@ExperimentalSerializationApi
 class ScheduleRepository : CrudRepository<ScheduleModel>(),
     WithIdRepository<ScheduleModel>,
     WithOutboxRepository<ScheduleModel>,

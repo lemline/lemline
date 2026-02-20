@@ -27,7 +27,6 @@ import java.util.concurrent.TimeoutException
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.ExperimentalTime
 import kotlinx.coroutines.delay
-import kotlinx.serialization.ExperimentalSerializationApi
 
 private const val LIFECYCLEEVENTS_OUT_CHANNEL = "lifecycleevents-out"
 private const val LIFECYCLEEVENTS_IN_CHANNEL = "lifecycleevents-in"
@@ -45,7 +44,6 @@ private const val LIFECYCLEEVENTS_IN_CHANNEL = "lifecycleevents-in"
  */
 @Singleton
 @ExperimentalTime
-@ExperimentalSerializationApi
 internal class InMemoryWorkflowTestExecutor : AbstractWorkflowTestExecutor() {
 
     private val logger = logger()

@@ -29,7 +29,6 @@ import java.sql.Connection
 import java.sql.ResultSet
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
-import kotlinx.serialization.ExperimentalSerializationApi
 
 const val RETRY_TABLE = "lemline_retries"
 
@@ -41,7 +40,6 @@ const val RETRY_TABLE = "lemline_retries"
  */
 @ApplicationScoped
 @ExperimentalTime
-@ExperimentalSerializationApi
 class RetryRepository : CrudRepository<RetryModel>(),
     WithIdRepository<RetryModel>,
     WithOutboxRepository<RetryModel>,

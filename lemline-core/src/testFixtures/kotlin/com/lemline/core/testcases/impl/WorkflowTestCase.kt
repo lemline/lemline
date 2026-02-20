@@ -22,7 +22,7 @@ data class WorkflowDependency(
     val namespace: String = "test",
     val name: String,
     val version: String = "0.1.0"
-) 
+)
 
 /**
  * Represents a single workflow test case that can be executed

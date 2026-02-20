@@ -9,7 +9,6 @@ import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
 import kotlin.time.ExperimentalTime
 import kotlinx.coroutines.test.runTest
-import kotlinx.serialization.ExperimentalSerializationApi
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 
@@ -26,7 +25,6 @@ import org.junit.jupiter.api.Test
  * @param getWorkflowId Function to extract the workflow ID from an entity
  */
 @ExperimentalTime
-@ExperimentalSerializationApi
 abstract class InstanceRepositoryTest<T : WithInstanceMessage>(
     instanceRepository: () -> WithInstanceRepository<T>,
     crudRepository: () -> WithCrudRepository<T>,

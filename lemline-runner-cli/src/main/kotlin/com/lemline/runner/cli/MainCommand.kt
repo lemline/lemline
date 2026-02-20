@@ -10,7 +10,6 @@ import io.quarkus.arc.Unremovable
 import io.quarkus.picocli.runtime.annotations.TopCommand
 import jakarta.enterprise.context.Dependent
 import kotlin.time.ExperimentalTime
-import kotlinx.serialization.ExperimentalSerializationApi
 import picocli.CommandLine.Command
 import picocli.CommandLine.Mixin
 
@@ -20,7 +19,6 @@ import picocli.CommandLine.Mixin
  * It doesn't implement QuarkusApplication - it's purely for command parsing.
  */
 @ExperimentalTime
-@ExperimentalSerializationApi
 @TopCommand
 @Command(
     name = "lemline",

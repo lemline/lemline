@@ -5,7 +5,6 @@ import com.lemline.runner.common.models.WithCleanup
 import java.sql.Connection
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
-import kotlinx.serialization.ExperimentalSerializationApi
 
 /**
  * Interface for repositories that support cleanup operations.
@@ -14,7 +13,6 @@ import kotlinx.serialization.ExperimentalSerializationApi
  * Note: This interface is meant to be implemented by classes that extend Repository,
  * which provides delete implementation.
  */
-@ExperimentalSerializationApi
 @ExperimentalTime
 interface WithCleanerRepository<T : WithCleanup> {
     /**

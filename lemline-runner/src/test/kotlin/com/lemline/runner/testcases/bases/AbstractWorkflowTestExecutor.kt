@@ -27,7 +27,6 @@ import java.util.concurrent.TimeoutException
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.ExperimentalTime
 import kotlinx.coroutines.delay
-import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.JsonElement
 
 /**
@@ -49,7 +48,6 @@ import kotlinx.serialization.json.JsonElement
  * actually flow through the messaging infrastructure.
  */
 @ExperimentalTime
-@ExperimentalSerializationApi
 internal abstract class AbstractWorkflowTestExecutor : WorkflowTestExecutor {
 
     private val logger = logger()

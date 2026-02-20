@@ -11,7 +11,6 @@ import io.cloudevents.CloudEvent
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
 import kotlin.time.ExperimentalTime
-import kotlinx.serialization.ExperimentalSerializationApi
 import org.eclipse.microprofile.reactive.messaging.Message
 
 /**
@@ -25,7 +24,6 @@ import org.eclipse.microprofile.reactive.messaging.Message
  * evaluating until conditions) is in [ListenerEventService].
  */
 @ExperimentalTime
-@ExperimentalSerializationApi
 @ApplicationScoped
 internal class CloudEventHandler(
     override val metrics: CloudEventSubscriberMetrics,

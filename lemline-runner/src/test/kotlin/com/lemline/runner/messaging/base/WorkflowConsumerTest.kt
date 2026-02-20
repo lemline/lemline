@@ -26,7 +26,6 @@ import java.util.concurrent.TimeUnit
 import java.util.concurrent.TimeUnit.SECONDS
 import kotlin.time.ExperimentalTime
 import kotlinx.coroutines.test.runTest
-import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.JsonPrimitive
 import org.eclipse.microprofile.reactive.messaging.Message
 import org.junit.jupiter.api.AfterEach
@@ -52,7 +51,6 @@ import org.junit.jupiter.api.Test
  * - Handling workflows that complete without further output.
  */
 @ExperimentalTime
-@ExperimentalSerializationApi
 internal abstract class WorkflowConsumerTest {
     @Inject
     lateinit var definitionRepository: DefinitionRepository

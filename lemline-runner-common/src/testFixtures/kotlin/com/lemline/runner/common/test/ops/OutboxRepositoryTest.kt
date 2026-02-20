@@ -20,7 +20,6 @@ import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
-import kotlinx.serialization.ExperimentalSerializationApi
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 
@@ -38,7 +37,6 @@ import org.junit.jupiter.api.Test
  * @param databaseConfig Provider for database configuration (for transaction support)
  */
 @ExperimentalTime
-@ExperimentalSerializationApi
 abstract class OutboxRepositoryTest<T : WithOutbox>(
     outboxRepository: () -> WithOutboxRepository<T>,
     crudRepository: () -> WithCrudRepository<T>,

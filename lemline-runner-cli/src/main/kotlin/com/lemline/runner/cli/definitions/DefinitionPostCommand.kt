@@ -10,7 +10,6 @@ import jakarta.inject.Inject
 import java.io.File
 import kotlin.time.ExperimentalTime
 import kotlinx.coroutines.runBlocking
-import kotlinx.serialization.ExperimentalSerializationApi
 import picocli.CommandLine
 import picocli.CommandLine.Command
 import picocli.CommandLine.Mixin
@@ -22,7 +21,6 @@ import picocli.CommandLine.Option
     name = "post",
     description = ["Create or update workflows from definition files."],
 )
-@ExperimentalSerializationApi
 class DefinitionPostCommand : Runnable {
 
     @Mixin

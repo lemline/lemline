@@ -4,7 +4,6 @@ package com.lemline.runner.common.repositories.with
 import com.lemline.runner.common.models.WithOutbox
 import java.sql.Connection
 import kotlin.time.ExperimentalTime
-import kotlinx.serialization.ExperimentalSerializationApi
 
 /**
  * Interface for repositories that support outbox operations.
@@ -13,7 +12,6 @@ import kotlinx.serialization.ExperimentalSerializationApi
  * Note: This interface is meant to be implemented by classes that extend Repository,
  * which provides withTransaction and update implementations.
  */
-@ExperimentalSerializationApi
 @ExperimentalTime
 interface WithOutboxRepository<T : WithOutbox> {
     /**

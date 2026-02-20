@@ -16,7 +16,6 @@ import jakarta.inject.Inject
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.ExperimentalTime
-import kotlinx.serialization.ExperimentalSerializationApi
 
 /**
  * Processes listener timeouts by emitting failure commands for listeners that have exceeded
@@ -34,7 +33,6 @@ import kotlinx.serialization.ExperimentalSerializationApi
 @Startup
 @ApplicationScoped
 @ExperimentalTime
-@ExperimentalSerializationApi
 class ListenerScheduledTimeout : AbstractScheduledTask() {
 
     override val jobName = "Listener scheduled timeout"

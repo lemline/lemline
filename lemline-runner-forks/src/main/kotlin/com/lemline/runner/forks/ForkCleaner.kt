@@ -10,7 +10,6 @@ import io.quarkus.runtime.Startup
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
 import kotlin.time.ExperimentalTime
-import kotlinx.serialization.ExperimentalSerializationApi
 
 /**
  * ForkCleaner specializes AbstractCleaner to clean up old fork waiting records.
@@ -22,7 +21,6 @@ import kotlinx.serialization.ExperimentalSerializationApi
 @Startup
 @ApplicationScoped
 @ExperimentalTime
-@ExperimentalSerializationApi
 class ForkCleaner : AbstractCleaner<ForkModel>() {
 
     @Inject

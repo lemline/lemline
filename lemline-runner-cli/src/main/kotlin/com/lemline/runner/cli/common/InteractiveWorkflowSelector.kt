@@ -10,10 +10,8 @@ import io.quarkus.arc.Unremovable
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
 import kotlin.time.ExperimentalTime
-import kotlinx.serialization.ExperimentalSerializationApi
 
 @ExperimentalTime
-@ExperimentalSerializationApi
 @ApplicationScoped
 @Unremovable
 class InteractiveWorkflowSelector @Inject constructor(

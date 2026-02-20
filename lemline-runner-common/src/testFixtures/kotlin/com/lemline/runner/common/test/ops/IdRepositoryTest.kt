@@ -10,7 +10,6 @@ import io.kotest.matchers.shouldNotBe
 import java.sql.Connection
 import kotlin.time.ExperimentalTime
 import kotlinx.coroutines.test.runTest
-import kotlinx.serialization.ExperimentalSerializationApi
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 
@@ -18,7 +17,6 @@ import org.junit.jupiter.api.Test
  * Interface for ID-based repository operations used in testing.
  */
 @ExperimentalTime
-@ExperimentalSerializationApi
 interface IdRepositoryOps<T : WithId> {
     suspend fun findById(id: IDV7, connection: Connection? = null): T?
     suspend fun deleteById(id: IDV7, connection: Connection? = null): Int
@@ -36,7 +34,6 @@ interface IdRepositoryOps<T : WithId> {
  * @param createEntity Factory function to create random test entities
  */
 @ExperimentalTime
-@ExperimentalSerializationApi
 abstract class IdRepositoryTest<T : WithId>(
     idRepository: () -> WithIdRepository<T>,
     crudRepository: () -> WithCrudRepository<T>,

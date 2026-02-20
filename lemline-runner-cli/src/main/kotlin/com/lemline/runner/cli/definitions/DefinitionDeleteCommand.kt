@@ -10,7 +10,6 @@ import com.lemline.runner.cli.exceptions.CliException
 import com.lemline.runner.definitions.DefinitionModel
 import com.lemline.runner.definitions.DefinitionService
 import kotlin.time.ExperimentalTime
-import kotlinx.serialization.ExperimentalSerializationApi
 import io.quarkus.arc.Unremovable
 import jakarta.inject.Inject
 import kotlinx.coroutines.runBlocking
@@ -22,7 +21,6 @@ import picocli.CommandLine.Parameters
 
 @Unremovable
 @ExperimentalTime
-@ExperimentalSerializationApi
 @Command(
     name = "delete",
     description = [

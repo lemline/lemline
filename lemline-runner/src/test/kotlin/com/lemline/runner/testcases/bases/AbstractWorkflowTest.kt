@@ -6,12 +6,10 @@ import com.lemline.core.testcases.impl.WorkflowTestExecutor
 import com.lemline.runner.testcases.PlatformUtils
 import kotlin.time.ExperimentalTime
 import kotlinx.coroutines.runBlocking
-import kotlinx.serialization.ExperimentalSerializationApi
 import org.junit.jupiter.api.DynamicTest
 import org.junit.jupiter.api.TestFactory
 
 @ExperimentalTime
-@ExperimentalSerializationApi
 internal abstract class AbstractWorkflowTest(
     private val testCases: List<WorkflowTestCase>,
     private val excludeTags: Set<String> = emptySet()

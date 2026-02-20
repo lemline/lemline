@@ -10,9 +10,7 @@ import com.lemline.runner.common.models.WithInstanceMessage
 import com.lemline.runner.common.models.WithOutbox
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
-import kotlinx.serialization.ExperimentalSerializationApi
 
-@ExperimentalSerializationApi
 @ExperimentalTime
 data class WaitModel(
     /** Unique identifier for this wait operation - must be derived from position + step for idempotency */

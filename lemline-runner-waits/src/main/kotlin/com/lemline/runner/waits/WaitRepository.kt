@@ -29,7 +29,6 @@ import java.sql.Connection
 import java.sql.ResultSet
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
-import kotlinx.serialization.ExperimentalSerializationApi
 
 const val WAIT_TABLE = "lemline_waits"
 
@@ -40,7 +39,6 @@ const val WAIT_TABLE = "lemline_waits"
  * @see WaitModel for the message model
  */
 @ApplicationScoped
-@ExperimentalSerializationApi
 @ExperimentalTime
 class WaitRepository : CrudRepository<WaitModel>(),
     WithIdRepository<WaitModel>,

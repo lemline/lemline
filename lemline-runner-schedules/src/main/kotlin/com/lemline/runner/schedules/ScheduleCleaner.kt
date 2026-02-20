@@ -10,7 +10,6 @@ import io.quarkus.runtime.Startup
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
 import kotlin.time.ExperimentalTime
-import kotlinx.serialization.ExperimentalSerializationApi
 
 /**
  * Cleaner for schedule entities.
@@ -19,7 +18,6 @@ import kotlinx.serialization.ExperimentalSerializationApi
 @Startup
 @ApplicationScoped
 @ExperimentalTime
-@ExperimentalSerializationApi
 class ScheduleCleaner : AbstractCleaner<ScheduleModel>() {
 
     @Inject

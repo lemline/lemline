@@ -28,10 +28,8 @@ import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 import kotlin.time.toJavaInstant
 import kotlin.time.toKotlinInstant
-import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.JsonElement
 
-@ExperimentalSerializationApi
 @ExperimentalTime
 data class ScheduleModel(
     /** Unique identifier for this scheduled workflow execution */

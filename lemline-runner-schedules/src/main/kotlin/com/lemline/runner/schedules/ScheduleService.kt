@@ -7,7 +7,6 @@ import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
 import java.sql.Connection
 import kotlin.time.ExperimentalTime
-import kotlinx.serialization.ExperimentalSerializationApi
 
 /**
  * Service for handling schedule-related workflow operations.
@@ -16,7 +15,6 @@ import kotlinx.serialization.ExperimentalSerializationApi
  * - Scheduling next workflow run after completion (for workflows with schedule.after)
  */
 @ExperimentalTime
-@ExperimentalSerializationApi
 @ApplicationScoped
 class ScheduleService {
 

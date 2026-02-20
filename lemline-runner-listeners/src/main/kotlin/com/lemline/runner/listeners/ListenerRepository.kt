@@ -49,7 +49,6 @@ import java.sql.Types
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 import kotlin.time.toJavaInstant
-import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonArray
 
@@ -69,7 +68,6 @@ const val LISTENER_TABLE = "lemline_listeners"
  * @see ListenerModel for the entity model
  */
 @ApplicationScoped
-@ExperimentalSerializationApi
 @ExperimentalTime
 class ListenerRepository : CrudRepository<ListenerModel>(),
     WithIdRepository<ListenerModel>,

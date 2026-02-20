@@ -35,7 +35,6 @@ import jakarta.enterprise.context.ApplicationScoped
 import jakarta.enterprise.inject.Instance
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
-import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.JsonElement
 import org.eclipse.microprofile.reactive.messaging.Message
 import org.jetbrains.annotations.TestOnly
@@ -49,7 +48,6 @@ import org.jetbrains.annotations.TestOnly
  * - Sends event to database channel for persistence (WaitStarted, RetryScheduled, etc.)
  */
 @ExperimentalTime
-@ExperimentalSerializationApi
 @ApplicationScoped
 internal class WorkflowCommandHandler(
     private val commandEmitter: WorkflowCommandEmitter,

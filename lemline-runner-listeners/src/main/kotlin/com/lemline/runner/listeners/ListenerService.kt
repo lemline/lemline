@@ -16,7 +16,6 @@ import io.serverlessworkflow.impl.expressions.ExpressionUtils
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
 import kotlin.time.ExperimentalTime
-import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -33,7 +32,6 @@ import kotlinx.serialization.json.put
  * For CloudEvent processing and event completion, see [ListenerEventService].
  */
 @ExperimentalTime
-@ExperimentalSerializationApi
 @ApplicationScoped
 class ListenerService {
 

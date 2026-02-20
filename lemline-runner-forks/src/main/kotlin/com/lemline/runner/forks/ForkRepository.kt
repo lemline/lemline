@@ -29,7 +29,6 @@ import java.sql.Timestamp
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 import kotlin.time.toJavaInstant
-import kotlinx.serialization.ExperimentalSerializationApi
 
 const val FORK_TABLE = "lemline_forks"
 
@@ -41,7 +40,6 @@ const val FORK_TABLE = "lemline_forks"
  * @see ForkBranchRepository for branch operations
  */
 @ExperimentalTime
-@ExperimentalSerializationApi
 @ApplicationScoped
 class ForkRepository : CrudRepository<ForkModel>(),
     WithIdRepository<ForkModel>,

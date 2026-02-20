@@ -12,11 +12,9 @@ import kotlin.test.assertFails
 import kotlin.test.assertNotNull
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
-import kotlinx.serialization.ExperimentalSerializationApi
 import org.junit.jupiter.api.Test
 
 @ExperimentalTime
-@ExperimentalSerializationApi
 class ScheduleModelTest {
 
     private fun createModel(

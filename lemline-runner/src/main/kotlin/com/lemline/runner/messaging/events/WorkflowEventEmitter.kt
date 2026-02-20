@@ -9,13 +9,11 @@ import io.quarkus.runtime.Startup
 import io.smallrye.reactive.messaging.MutinyEmitter
 import jakarta.enterprise.context.ApplicationScoped
 import kotlin.time.ExperimentalTime
-import kotlinx.serialization.ExperimentalSerializationApi
 import org.eclipse.microprofile.config.inject.ConfigProperty
 import org.eclipse.microprofile.reactive.messaging.Channel
 
 internal const val EVENTS_OUT_CHANNEL = "events-out"
 
-@ExperimentalSerializationApi
 @ExperimentalTime
 @Startup
 @ApplicationScoped

@@ -30,7 +30,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
-import kotlinx.serialization.ExperimentalSerializationApi
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 
@@ -65,7 +64,6 @@ infix fun Instant.shouldBeAfter(date: Instant) = (this > date) shouldBe true
  * @param createTestModel Factory function to create test entities
  */
 @ExperimentalTime
-@ExperimentalSerializationApi
 abstract class OutboxProcessorTest<T>(
     outboxRepository: () -> WithOutboxRepository<T>,
     crudRepository: () -> WithCrudRepository<T>,

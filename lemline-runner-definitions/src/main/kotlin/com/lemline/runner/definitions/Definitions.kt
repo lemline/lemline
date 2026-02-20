@@ -10,10 +10,8 @@ import io.serverlessworkflow.api.types.Workflow
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
 import kotlin.time.ExperimentalTime
-import kotlinx.serialization.ExperimentalSerializationApi
 
 @ExperimentalTime
-@ExperimentalSerializationApi
 @ApplicationScoped
 class Definitions {
 

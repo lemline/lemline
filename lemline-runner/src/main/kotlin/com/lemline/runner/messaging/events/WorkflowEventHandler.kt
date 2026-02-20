@@ -24,7 +24,6 @@ import com.lemline.runner.schedules.ScheduleService
 import com.lemline.runner.waits.WaitService
 import jakarta.enterprise.context.ApplicationScoped
 import kotlin.time.ExperimentalTime
-import kotlinx.serialization.ExperimentalSerializationApi
 import org.eclipse.microprofile.reactive.messaging.Message
 import org.jetbrains.annotations.TestOnly
 
@@ -46,7 +45,6 @@ import org.jetbrains.annotations.TestOnly
  */
 @ExperimentalTime
 @ApplicationScoped
-@ExperimentalSerializationApi
 internal class WorkflowEventHandler(
     private val definitions: Definitions,
     private val failureRepository: FailureRepository,

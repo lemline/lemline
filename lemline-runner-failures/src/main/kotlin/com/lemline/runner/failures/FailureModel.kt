@@ -7,9 +7,7 @@ import com.lemline.runner.common.messaging.InstanceMessage
 import com.lemline.runner.common.models.WithId
 import com.lemline.runner.failures.FailureReasons.getFailureReason
 import kotlin.time.ExperimentalTime
-import kotlinx.serialization.ExperimentalSerializationApi
 
-@ExperimentalSerializationApi
 @ExperimentalTime
 data class FailureModel(
     /** Unique identifier for this failure record */
