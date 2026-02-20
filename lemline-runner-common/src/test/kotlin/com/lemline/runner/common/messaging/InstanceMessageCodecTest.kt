@@ -56,7 +56,7 @@ class InstanceMessageCodecTest {
         val envelope = InstanceMessageProto.ADAPTER.decode(Base64.getDecoder().decode(encoded))
 
         assertEquals(1, envelope.schema_version)
-        assertTrue(envelope.state?.command != null)
+        assertTrue(envelope.workflow_state?.command != null)
     }
 
     @Test
