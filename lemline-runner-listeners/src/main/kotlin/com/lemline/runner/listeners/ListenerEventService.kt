@@ -12,8 +12,6 @@ import com.lemline.runner.common.messaging.InstanceMessage
 import io.cloudevents.CloudEvent
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
-import kotlin.time.ExperimentalTime
-import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
@@ -27,8 +25,6 @@ import kotlinx.serialization.json.booleanOrNull
  * - ONE/ANY (without until): Complete on first event
  * - Accumulating (ALL or ANY+until): Accumulate events until condition is met
  */
-@ExperimentalTime
-@ExperimentalSerializationApi
 @ApplicationScoped
 class ListenerEventService {
 

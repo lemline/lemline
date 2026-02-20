@@ -2,7 +2,6 @@
 package com.lemline.core.lifecycleevents
 
 import io.cloudevents.CloudEvent
-import kotlin.time.ExperimentalTime
 
 /**
  * Interface for emitting workflow lifecycle CloudEvents.
@@ -16,7 +15,6 @@ import kotlin.time.ExperimentalTime
  *
  * @see CloudEventLifecycleHook for building CloudEvents from workflow state
  */
-@ExperimentalTime
 interface LifecycleEventEmitter {
     /**
      * Emits a lifecycle CloudEvent.

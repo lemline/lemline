@@ -15,9 +15,7 @@ import io.smallrye.reactive.messaging.memory.InMemorySource
 import jakarta.enterprise.inject.Any
 import jakarta.inject.Inject
 import java.util.concurrent.TimeUnit
-import kotlin.time.ExperimentalTime
 import kotlinx.coroutines.delay
-import kotlinx.serialization.ExperimentalSerializationApi
 import org.junit.jupiter.api.Tag
 
 /**
@@ -26,8 +24,6 @@ import org.junit.jupiter.api.Tag
 @QuarkusTest
 @TestProfile(InMemoryProfile::class)
 @Tag("integration")
-@ExperimentalTime
-@ExperimentalSerializationApi
 internal class WorkflowConsumerInMemoryTest : WorkflowConsumerTest() {
 
     @Inject

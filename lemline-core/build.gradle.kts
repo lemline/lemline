@@ -33,6 +33,7 @@ tasks.test {
 
 dependencies {
     implementation(project(":lemline-common"))
+    implementation(project(":lemline-messages-proto"))
 
     // Add kotlinx-coroutines-slf4j for MDC context support in coroutines
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-slf4j:1.7.3")

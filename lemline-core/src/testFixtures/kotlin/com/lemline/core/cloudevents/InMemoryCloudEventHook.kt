@@ -3,14 +3,12 @@ package com.lemline.core.cloudevents
 
 import com.lemline.common.logger.logger
 import io.cloudevents.CloudEvent
-import kotlin.time.ExperimentalTime
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
-@ExperimentalTime
 class InMemoryCloudEventHook : CloudEventHook {
 
     private val logger = logger()

@@ -15,17 +15,13 @@ import com.lemline.runner.starters.Starter
 import io.quarkus.arc.Unremovable
 import jakarta.inject.Inject
 import java.time.ZoneId
-import kotlin.time.ExperimentalTime
 import kotlinx.coroutines.runBlocking
-import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.JsonElement
 import picocli.CommandLine.Command
 import picocli.CommandLine.Mixin
 import picocli.CommandLine.Option
 import picocli.CommandLine.Parameters
 
-@ExperimentalTime
-@ExperimentalSerializationApi
 @Unremovable
 @Command(
     name = "start",

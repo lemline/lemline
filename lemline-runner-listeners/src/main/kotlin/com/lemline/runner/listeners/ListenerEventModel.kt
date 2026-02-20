@@ -4,9 +4,7 @@ package com.lemline.runner.listeners
 import com.lemline.common.values.IDV7
 import com.lemline.runner.common.models.WithCleanup
 import com.lemline.runner.common.models.WithOutbox
-import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
-import kotlinx.serialization.ExperimentalSerializationApi
 
 /**
  * Model representing a CloudEvent stored for a listener.
@@ -49,8 +47,6 @@ import kotlinx.serialization.ExperimentalSerializationApi
  *
  * @see ListenerModel for the parent listener
  */
-@ExperimentalSerializationApi
-@ExperimentalTime
 data class ListenerEventModel(
     val listenerId: IDV7,
     val eventId: String,
@@ -69,7 +65,4 @@ data class ListenerEventModel(
     override var outboxCompletedAt: Instant? = null,
     override var outboxFailedAt: Instant? = null,
     override var cleanupAfter: Instant? = null,
-) : WithOutbox, WithCleanup {
-
-    companion object
-}
+) : WithOutbox, WithCleanup

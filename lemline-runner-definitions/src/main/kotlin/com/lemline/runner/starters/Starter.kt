@@ -1,6 +1,4 @@
 // SPDX-License-Identifier: BUSL-1.1
-@file:OptIn(ExperimentalSerializationApi::class, ExperimentalTime::class)
-
 package com.lemline.runner.starters
 
 import com.lemline.common.values.WorkflowId
@@ -19,8 +17,6 @@ import com.lemline.runner.schedules.ScheduleModel
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
 import java.time.ZoneId
-import kotlin.time.ExperimentalTime
-import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.JsonElement
 
 @ApplicationScoped

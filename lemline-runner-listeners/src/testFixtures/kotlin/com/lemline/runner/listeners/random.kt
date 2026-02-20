@@ -1,21 +1,16 @@
 // SPDX-License-Identifier: BUSL-1.1
-@file:OptIn(ExperimentalTime::class, ExperimentalSerializationApi::class)
-
 package com.lemline.runner.listeners
 
 import com.lemline.common.random.nullableRandom
 import com.lemline.common.random.random
 import com.lemline.common.values.IDV7
-import com.lemline.common.values.WorkflowInfo
-import com.lemline.core.random.random
-import com.lemline.core.states.WorkflowEvent
+import com.lemline.core.random.randomListenStartedEvent
+import com.lemline.core.random.randomWorkflowInfo
 import com.lemline.runner.common.messaging.InstanceMessage
 import kotlin.random.Random
-import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
-import kotlinx.serialization.ExperimentalSerializationApi
 
-fun ListenerEventModel.Companion.random(
+fun randomListenerEventModel(
     listenerId: IDV7 = IDV7.random(),
     filterIndex: Int = Random.nextInt(0, 10)
 ) = ListenerEventModel(
@@ -27,8 +22,8 @@ fun ListenerEventModel.Companion.random(
 )
 
 fun ListenerModel.Companion.random(): ListenerModel {
-    val workflowInfo = WorkflowInfo.random()
-    val listenStarted = WorkflowEvent.ListenStarted.random()
+    val workflowInfo = randomWorkflowInfo()
+    val listenStarted = randomListenStartedEvent()
     val config = listenStarted.config
 
     return ListenerModel(

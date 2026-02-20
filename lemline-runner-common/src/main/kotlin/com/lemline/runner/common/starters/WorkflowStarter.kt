@@ -9,8 +9,6 @@ import com.lemline.core.lifecycleevents.LifecycleEventHook
 import com.lemline.core.states.WorkflowCommand
 import com.lemline.runner.common.messaging.InstanceMessage
 import java.time.ZoneId
-import kotlin.time.ExperimentalTime
-import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.JsonElement
 
 /**
@@ -26,8 +24,6 @@ import kotlinx.serialization.json.JsonElement
  * @property onWorkflowCreated Lambda to trigger the workflow.created lifecycle event.
  *           Caller should invoke this after successfully sending the message.
  */
-@ExperimentalTime
-@ExperimentalSerializationApi
 data class PreparedWorkflow<S>(
     val instanceMessage: InstanceMessage<WorkflowCommand.ResumeFromTask>?,
     val scheduleModel: S?,
@@ -42,8 +38,6 @@ data class PreparedWorkflow<S>(
  * - Validating input against workflow schema
  * - Creating instance messages and schedule models
  */
-@ExperimentalTime
-@ExperimentalSerializationApi
 interface WorkflowStarter<S> {
     /**
      * Prepares a workflow for execution.

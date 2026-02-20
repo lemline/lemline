@@ -4,12 +4,9 @@ package com.lemline.core.processors
 import io.serverlessworkflow.api.types.HTTPArguments.HTTPOutput
 import io.serverlessworkflow.api.types.ListenTaskConfiguration.ListenAndReadAs
 import io.serverlessworkflow.api.types.RunTaskConfiguration.ProcessReturnType
-import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 import kotlinx.serialization.Contextual
 import kotlinx.serialization.KSerializer
-import kotlinx.serialization.SerialName
-import kotlinx.serialization.Serializable
 import kotlinx.serialization.descriptors.PrimitiveKind
 import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
 import kotlinx.serialization.descriptors.SerialDescriptor
@@ -23,7 +20,6 @@ import kotlinx.serialization.json.JsonElement
  * Contains all data needed to build a CloudEvent using the CloudEvents SDK.
  * The ActivityExecutor uses this config to construct and publish the event.
  */
-@Serializable
 data class EmitConfig(
     val id: String,
     val source: String,
@@ -42,7 +38,6 @@ data class EmitConfig(
  * Contains all data needed to execute an HTTP request.
  * Authentication is resolved at config-building time.
  */
-@Serializable
 data class CallHttpConfig(
     val method: String,
     val url: String,
@@ -58,15 +53,9 @@ data class CallHttpConfig(
  * Resolved authentication data for HTTP calls.
  * Authentication policies are resolved when building the config.
  */
-@Serializable
 sealed class HttpAuthentication {
-    @Serializable
     data class Basic(val username: String, val password: String) : HttpAuthentication()
-
-    @Serializable
     data class Bearer(val token: String) : HttpAuthentication()
-
-    @Serializable
     data class OAuth2(
         val token: String,
         val tokenType: String = "Bearer"
@@ -78,7 +67,6 @@ sealed class HttpAuthentication {
  *
  * Contains all data needed to execute a script in a supported language.
  */
-@Serializable
 data class RunScriptConfig(
     val language: String,
     val code: String,
@@ -93,7 +81,6 @@ data class RunScriptConfig(
  *
  * Contains all data needed to execute a shell command.
  */
-@Serializable
 data class RunShellConfig(
     val command: String,
     val arguments: Map<String, String>? = null,
@@ -101,26 +88,20 @@ data class RunShellConfig(
     val await: Boolean = true,
     val returnType: ProcessReturnType = ProcessReturnType.STDOUT
 )
-
 // ========================================
 // Listen Task Configuration
 // ========================================
-
 /**
  * Strategy for consuming events in a listen task.
  */
-@Serializable
 enum class ListenStrategy {
     /** Wait for a single event matching the filter */
-    @SerialName("one")
     ONE,
 
     /** Wait for first event matching any filter, or accumulate with until */
-    @SerialName("any")
     ANY,
 
     /** Wait for one event per filter */
-    @SerialName("all")
     ALL
 }
 
@@ -148,7 +129,6 @@ internal object ListenAndReadAsSerializer : KSerializer<ListenAndReadAs> {
  * @property expect Optional expected value expression evaluated against workflow context.
  *                  If absent, first event sets the baseline (Mode 2).
  */
-@Serializable
 data class CorrelationDef(
     val from: String,
     val expect: String? = null
@@ -167,7 +147,6 @@ data class CorrelationDef(
  * @property dataFilter JQ expression evaluated against event.data
  * @property correlations Map of correlation definitions by key name
  */
-@Serializable
 data class EventFilter(
     val type: String? = null,
     val source: String? = null,
@@ -185,16 +164,11 @@ data class EventFilter(
  * Can be either an expression evaluated against accumulated events,
  * or an event filter that terminates when matched.
  */
-@Serializable
 sealed class UntilCondition {
     /** Expression evaluated against accumulated events array (e.g., ". | any(.temp > 38)") */
-    @Serializable
-    @SerialName("expression")
     data class Expression(val expression: String) : UntilCondition()
 
     /** Event filter - stop when this event arrives */
-    @Serializable
-    @SerialName("event")
     data class Event(val filter: EventFilter) : UntilCondition()
 }
 
@@ -212,13 +186,10 @@ sealed class UntilCondition {
  * @property correlationContext Workflow context data for evaluating correlate.expect expressions.
  *                              Only values needed for correlation are included.
  */
-@OptIn(ExperimentalTime::class)
-@Serializable
 data class ListenConfig(
     val strategy: ListenStrategy,
     val filters: List<EventFilter>,
     val until: UntilCondition? = null,
-    @Serializable(with = ListenAndReadAsSerializer::class)
     val readAs: ListenAndReadAs = ListenAndReadAs.DATA,
     @Contextual val timeoutAt: Instant? = null,
     val correlationContext: JsonElement? = null

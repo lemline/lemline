@@ -1,20 +1,18 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.states
 
-import com.lemline.common.json.LemlineJson
 import com.lemline.common.values.NodePosition
 import com.lemline.common.values.Token
 import com.lemline.common.values.WorkflowId
 import com.lemline.core.random.random
+import com.lemline.core.states.protobuf.NodeStackProtobufMapper
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 import kotlin.time.Clock
-import kotlin.time.ExperimentalTime
 import kotlinx.serialization.json.JsonPrimitive
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 
-@ExperimentalTime
 class NodeStackTest {
 
     @Test
@@ -27,11 +25,13 @@ class NodeStackTest {
 
         val stack = NodeStack(
             listOf(
-                StackFrame(root, RootState(
-                    startedAt = Clock.System.now(),
-                    workflowId = WorkflowId.random(),
-                    workflowInput = JsonPrimitive("test")
-                )),
+                StackFrame(
+                    root, RootState(
+                        startedAt = Clock.System.now(),
+                        workflowId = WorkflowId.random(),
+                        workflowInput = JsonPrimitive("test")
+                    )
+                ),
                 StackFrame(doPos, DoState(startedAt = Clock.System.now(), index = 0)),
                 StackFrame(taskPos, DoState(startedAt = Clock.System.now(), index = 0)),
                 StackFrame(nestedPos, TaskState(startedAt = Clock.System.now()))
@@ -39,8 +39,7 @@ class NodeStackTest {
         )
 
         // When
-        val serialized = LemlineJson.encodeToString(stack)
-        val deserialized = LemlineJson.decodeFromString<NodeStack>(serialized)
+        val deserialized = roundTrip(stack)
 
         // Then
         assertEquals(stack, deserialized)
@@ -57,11 +56,13 @@ class NodeStackTest {
 
         val stack = NodeStack(
             listOf(
-                StackFrame(root, RootState(
-                    startedAt = Clock.System.now(),
-                    workflowId = WorkflowId.random(),
-                    workflowInput = JsonPrimitive("test")
-                )),
+                StackFrame(
+                    root, RootState(
+                        startedAt = Clock.System.now(),
+                        workflowId = WorkflowId.random(),
+                        workflowInput = JsonPrimitive("test")
+                    )
+                ),
                 StackFrame(doPos, DoState(startedAt = Clock.System.now(), index = 0)),
                 StackFrame(taskPos, DoState(startedAt = Clock.System.now(), index = 0)),
                 StackFrame(nestedPos, TaskState(startedAt = Clock.System.now()))
@@ -69,13 +70,13 @@ class NodeStackTest {
         )
 
         // When
-        val serialized = LemlineJson.encodeToString(stack)
+        val compactPositions = compactPositions(stack)
 
         // Then - should contain relative segments, not full paths
-        assertTrue(serialized.contains("\"do\""), "Should contain segment 'do'")
-        assertTrue(serialized.contains("\"0/myTask\""), "Should contain segment '0/myTask'")
-        assertTrue(!serialized.contains("\"/do\""), "Should not contain full path '/do'")
-        assertTrue(!serialized.contains("\"/do/0/myTask\""), "Should not contain full path")
+        assertTrue(compactPositions.contains("do"), "Should contain segment 'do'")
+        assertTrue(compactPositions.contains("0/myTask"), "Should contain segment '0/myTask'")
+        assertTrue(!compactPositions.contains("/do"), "Should not contain full path '/do'")
+        assertTrue(!compactPositions.contains("/do/0/myTask"), "Should not contain full path")
     }
 
     @Test
@@ -83,11 +84,13 @@ class NodeStackTest {
         // Given - a deep stack with RFC 6901 compliant positions
         var position = NodePosition.root
         val frames = mutableListOf<StackFrame>(
-            StackFrame(position, RootState(
-                startedAt = Clock.System.now(),
-                workflowId = WorkflowId.random(),
-                workflowInput = JsonPrimitive("test")
-            ))
+            StackFrame(
+                position, RootState(
+                    startedAt = Clock.System.now(),
+                    workflowId = WorkflowId.random(),
+                    workflowInput = JsonPrimitive("test")
+                )
+            )
         )
 
         repeat(5) { i ->
@@ -98,8 +101,7 @@ class NodeStackTest {
         val stack = NodeStack(frames)
 
         // When
-        val serialized = LemlineJson.encodeToString(stack)
-        val deserialized = LemlineJson.decodeFromString<NodeStack>(serialized)
+        val deserialized = roundTrip(stack)
 
         // Then
         assertEquals(stack, deserialized)
@@ -113,8 +115,7 @@ class NodeStackTest {
             val stack = NodeStack.random()
 
             // When
-            val serialized = LemlineJson.encodeToString(stack)
-            val deserialized = LemlineJson.decodeFromString<NodeStack>(serialized)
+            val deserialized = roundTrip(stack)
 
             // Then
             assertEquals(stack, deserialized)
@@ -126,17 +127,18 @@ class NodeStackTest {
         // Given - only root
         val stack = NodeStack(
             listOf(
-                StackFrame(NodePosition.root, RootState(
-                    startedAt = Clock.System.now(),
-                    workflowId = WorkflowId.random(),
-                    workflowInput = JsonPrimitive("test")
-                ))
+                StackFrame(
+                    NodePosition.root, RootState(
+                        startedAt = Clock.System.now(),
+                        workflowId = WorkflowId.random(),
+                        workflowInput = JsonPrimitive("test")
+                    )
+                )
             )
         )
 
         // When
-        val serialized = LemlineJson.encodeToString(stack)
-        val deserialized = LemlineJson.decodeFromString<NodeStack>(serialized)
+        val deserialized = roundTrip(stack)
 
         // Then
         assertEquals(stack, deserialized)
@@ -155,27 +157,30 @@ class NodeStackTest {
 
         val stack = NodeStack(
             listOf(
-                StackFrame(root, RootState(
-                    startedAt = Clock.System.now(),
-                    workflowId = WorkflowId.random(),
-                    workflowInput = JsonPrimitive("test")
-                )),
+                StackFrame(
+                    root, RootState(
+                        startedAt = Clock.System.now(),
+                        workflowId = WorkflowId.random(),
+                        workflowInput = JsonPrimitive("test")
+                    )
+                ),
                 StackFrame(doPos, DoState(startedAt = Clock.System.now(), index = 0)),
-                StackFrame(tryTaskPos, TryState(
-                    startedAt = Clock.System.now(),
-                    transformedInput = JsonPrimitive("input"),
-                    attemptIndex = 0,
-                    runningCatch = true,
-                    lastError = null,
-                    errorAs = "error"
-                )),
+                StackFrame(
+                    tryTaskPos, TryState(
+                        startedAt = Clock.System.now(),
+                        transformedInput = JsonPrimitive("input"),
+                        attemptIndex = 0,
+                        runningCatch = true,
+                        lastError = null,
+                        errorAs = "error"
+                    )
+                ),
                 StackFrame(recoveryPos, TaskState(startedAt = Clock.System.now()))
             )
         )
 
         // When
-        val serialized = LemlineJson.encodeToString(stack)
-        val deserialized = LemlineJson.decodeFromString<NodeStack>(serialized)
+        val deserialized = roundTrip(stack)
 
         // Then - the catch/do path should be preserved correctly
         assertEquals(stack, deserialized)
@@ -199,19 +204,20 @@ class NodeStackTest {
 
             val stack = NodeStack(
                 listOf(
-                    StackFrame(root, RootState(
-                        startedAt = Clock.System.now(),
-                        workflowId = WorkflowId.random(),
-                        workflowInput = JsonPrimitive("test")
-                    )),
+                    StackFrame(
+                        root, RootState(
+                            startedAt = Clock.System.now(),
+                            workflowId = WorkflowId.random(),
+                            workflowInput = JsonPrimitive("test")
+                        )
+                    ),
                     StackFrame(doPos, DoState(startedAt = Clock.System.now(), index = 0)),
                     StackFrame(taskPos, TaskState(startedAt = Clock.System.now()))
                 )
             )
 
             // When
-            val serialized = LemlineJson.encodeToString(stack)
-            val deserialized = LemlineJson.decodeFromString<NodeStack>(serialized)
+            val deserialized = roundTrip(stack)
 
             // Then
             assertEquals(stack, deserialized)
@@ -227,22 +233,24 @@ class NodeStackTest {
 
             val stack = NodeStack(
                 listOf(
-                    StackFrame(root, RootState(
-                        startedAt = Clock.System.now(),
-                        workflowId = WorkflowId.random(),
-                        workflowInput = JsonPrimitive("test")
-                    )),
+                    StackFrame(
+                        root, RootState(
+                            startedAt = Clock.System.now(),
+                            workflowId = WorkflowId.random(),
+                            workflowInput = JsonPrimitive("test")
+                        )
+                    ),
                     StackFrame(doPos, DoState(startedAt = Clock.System.now(), index = 0)),
                     StackFrame(taskPos, TaskState(startedAt = Clock.System.now()))
                 )
             )
 
             // When
-            val serialized = LemlineJson.encodeToString(stack)
+            val compactPositions = compactPositions(stack)
 
             // Then - should contain relative segments "do" and "0/taskA"
-            assertTrue(serialized.contains("\"do\""), "Should contain segment 'do'")
-            assertTrue(serialized.contains("\"0/taskA\""), "Should contain segment '0/taskA'")
+            assertTrue(compactPositions.contains("do"), "Should contain segment 'do'")
+            assertTrue(compactPositions.contains("0/taskA"), "Should contain segment '0/taskA'")
         }
 
         @Test
@@ -257,28 +265,31 @@ class NodeStackTest {
 
             val stack = NodeStack(
                 listOf(
-                    StackFrame(root, RootState(
-                        startedAt = Clock.System.now(),
-                        workflowId = WorkflowId.random(),
-                        workflowInput = JsonPrimitive("test")
-                    )),
+                    StackFrame(
+                        root, RootState(
+                            startedAt = Clock.System.now(),
+                            workflowId = WorkflowId.random(),
+                            workflowInput = JsonPrimitive("test")
+                        )
+                    ),
                     StackFrame(doPos, DoState(startedAt = Clock.System.now(), index = 0)),
-                    StackFrame(outerPos, TryState(
-                        startedAt = Clock.System.now(),
-                        transformedInput = JsonPrimitive("input"),
-                        attemptIndex = 0,
-                        runningCatch = false,
-                        lastError = null,
-                        errorAs = "error"
-                    )),
+                    StackFrame(
+                        outerPos, TryState(
+                            startedAt = Clock.System.now(),
+                            transformedInput = JsonPrimitive("input"),
+                            attemptIndex = 0,
+                            runningCatch = false,
+                            lastError = null,
+                            errorAs = "error"
+                        )
+                    ),
                     StackFrame(tryDoPos, DoState(startedAt = Clock.System.now(), index = 1)),
                     StackFrame(innerPos, TaskState(startedAt = Clock.System.now()))
                 )
             )
 
             // When
-            val serialized = LemlineJson.encodeToString(stack)
-            val deserialized = LemlineJson.decodeFromString<NodeStack>(serialized)
+            val deserialized = roundTrip(stack)
 
             // Then
             assertEquals(stack, deserialized)
@@ -297,11 +308,13 @@ class NodeStackTest {
 
             val stack = NodeStack(
                 listOf(
-                    StackFrame(root, RootState(
-                        startedAt = Clock.System.now(),
-                        workflowId = WorkflowId.random(),
-                        workflowInput = JsonPrimitive("test")
-                    )),
+                    StackFrame(
+                        root, RootState(
+                            startedAt = Clock.System.now(),
+                            workflowId = WorkflowId.random(),
+                            workflowInput = JsonPrimitive("test")
+                        )
+                    ),
                     StackFrame(doPos, DoState(startedAt = Clock.System.now(), index = 0)),
                     StackFrame(forkTaskPos, ForkState(startedAt = Clock.System.now())),
                     StackFrame(branchPos, TaskState(startedAt = Clock.System.now()))
@@ -309,8 +322,7 @@ class NodeStackTest {
             )
 
             // When
-            val serialized = LemlineJson.encodeToString(stack)
-            val deserialized = LemlineJson.decodeFromString<NodeStack>(serialized)
+            val deserialized = roundTrip(stack)
 
             // Then
             assertEquals(stack, deserialized)
@@ -326,19 +338,20 @@ class NodeStackTest {
 
             val stack = NodeStack(
                 listOf(
-                    StackFrame(root, RootState(
-                        startedAt = Clock.System.now(),
-                        workflowId = WorkflowId.random(),
-                        workflowInput = JsonPrimitive("test")
-                    )),
+                    StackFrame(
+                        root, RootState(
+                            startedAt = Clock.System.now(),
+                            workflowId = WorkflowId.random(),
+                            workflowInput = JsonPrimitive("test")
+                        )
+                    ),
                     StackFrame(doPos, DoState(startedAt = Clock.System.now(), index = 2)),
                     StackFrame(taskPos, TaskState(startedAt = Clock.System.now()))
                 )
             )
 
             // When
-            val serialized = LemlineJson.encodeToString(stack)
-            val deserialized = LemlineJson.decodeFromString<NodeStack>(serialized)
+            val deserialized = roundTrip(stack)
 
             // Then
             assertEquals(stack, deserialized)
@@ -357,27 +370,30 @@ class NodeStackTest {
 
             val stack = NodeStack(
                 listOf(
-                    StackFrame(root, RootState(
-                        startedAt = Clock.System.now(),
-                        workflowId = WorkflowId.random(),
-                        workflowInput = JsonPrimitive("test")
-                    )),
+                    StackFrame(
+                        root, RootState(
+                            startedAt = Clock.System.now(),
+                            workflowId = WorkflowId.random(),
+                            workflowInput = JsonPrimitive("test")
+                        )
+                    ),
                     StackFrame(doPos, DoState(startedAt = Clock.System.now(), index = 0)),
-                    StackFrame(forTaskPos, ForState(
-                        startedAt = Clock.System.now(),
-                        collection = listOf(JsonPrimitive(1), JsonPrimitive(2)),
-                        index = 0,
-                        forEach = "item",
-                        forAt = "index"
-                    )),
+                    StackFrame(
+                        forTaskPos, ForState(
+                            startedAt = Clock.System.now(),
+                            collection = listOf(JsonPrimitive(1), JsonPrimitive(2)),
+                            index = 0,
+                            forEach = "item",
+                            forAt = "index"
+                        )
+                    ),
                     StackFrame(forDoPos, DoState(startedAt = Clock.System.now(), index = 0)),
                     StackFrame(itemPos, TaskState(startedAt = Clock.System.now()))
                 )
             )
 
             // When
-            val serialized = LemlineJson.encodeToString(stack)
-            val deserialized = LemlineJson.decodeFromString<NodeStack>(serialized)
+            val deserialized = roundTrip(stack)
 
             // Then
             assertEquals(stack, deserialized)
@@ -393,24 +409,25 @@ class NodeStackTest {
 
             val stack = NodeStack(
                 listOf(
-                    StackFrame(root, RootState(
-                        startedAt = Clock.System.now(),
-                        workflowId = WorkflowId.random(),
-                        workflowInput = JsonPrimitive("test")
-                    )),
+                    StackFrame(
+                        root, RootState(
+                            startedAt = Clock.System.now(),
+                            workflowId = WorkflowId.random(),
+                            workflowInput = JsonPrimitive("test")
+                        )
+                    ),
                     StackFrame(doPos, DoState(startedAt = Clock.System.now(), index = 0)),
                     StackFrame(taskPos, TaskState(startedAt = Clock.System.now()))
                 )
             )
 
             // When
-            val serialized = LemlineJson.encodeToString(stack)
+            val compactPositions = compactPositions(stack)
 
             // Then - verify correct structure
-            // The serialized JSON should have: [{"":...}, {"do":...}, {"0/taskA":...}]
             assertTrue(
-                serialized.contains("\"0/taskA\"") || serialized.contains("\"0\\/taskA\""),
-                "Should contain index and task name as relative suffix. Got: $serialized"
+                compactPositions.contains("0/taskA"),
+                "Should contain index and task name as relative suffix. Got: $compactPositions"
             )
         }
 
@@ -427,11 +444,13 @@ class NodeStackTest {
 
             val stack = NodeStack(
                 listOf(
-                    StackFrame(root, RootState(
-                        startedAt = Clock.System.now(),
-                        workflowId = WorkflowId.random(),
-                        workflowInput = JsonPrimitive("test")
-                    )),
+                    StackFrame(
+                        root, RootState(
+                            startedAt = Clock.System.now(),
+                            workflowId = WorkflowId.random(),
+                            workflowInput = JsonPrimitive("test")
+                        )
+                    ),
                     StackFrame(doPos, DoState(startedAt = Clock.System.now(), index = 0)),
                     StackFrame(outerPos, DoState(startedAt = Clock.System.now(), index = 0)),
                     StackFrame(middlePos, DoState(startedAt = Clock.System.now(), index = 1)),
@@ -440,12 +459,17 @@ class NodeStackTest {
             )
 
             // When
-            val serialized = LemlineJson.encodeToString(stack)
-            val deserialized = LemlineJson.decodeFromString<NodeStack>(serialized)
+            val deserialized = roundTrip(stack)
 
             // Then
             assertEquals(stack, deserialized)
             assertEquals("/do/0/outer/do/1/middle/do/2/inner", deserialized.currentPosition.toString())
         }
     }
+
+    private fun roundTrip(stack: NodeStack): NodeStack =
+        NodeStackProtobufMapper.fromProto(NodeStackProtobufMapper.toProto(stack))
+
+    private fun compactPositions(stack: NodeStack): List<String> =
+        NodeStackProtobufMapper.toProto(stack).frames.map { it.position }
 }

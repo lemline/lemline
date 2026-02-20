@@ -5,10 +5,7 @@ import com.lemline.core.testcases.impl.WorkflowTestCase
 import com.lemline.runner.tests.profiles.InMemoryProfile
 import io.quarkus.test.junit.QuarkusTest
 import io.quarkus.test.junit.TestProfile
-import kotlin.time.ExperimentalTime
-import kotlinx.serialization.ExperimentalSerializationApi
 
-@OptIn(ExperimentalTime::class, ExperimentalSerializationApi::class)
 @QuarkusTest
 @TestProfile(InMemoryProfile::class)
 internal class DebugListenTest : InMemoryWorkflowTest(emptyList<WorkflowTestCase>())

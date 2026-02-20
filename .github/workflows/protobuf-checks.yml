@@ -1,0 +1,54 @@
+name: Protobuf Checks
+
+on:
+  pull_request:
+    paths:
+      - "lemline-messages-proto/src/main/proto/**"
+      - "lemline-messages-proto/buf.yaml"
+      - ".github/workflows/protobuf-checks.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "lemline-messages-proto/src/main/proto/**"
+      - "lemline-messages-proto/buf.yaml"
+      - ".github/workflows/protobuf-checks.yml"
+
+jobs:
+  protobuf:
+    name: Lint and Breaking Checks
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Buf
+        uses: bufbuild/buf-action@v1
+        with:
+          setup_only: true
+
+      - name: Buf Lint
+        working-directory: lemline-messages-proto
+        run: buf lint
+
+      - name: Check Breaking Baseline
+        id: baseline
+        run: |
+          if git ls-tree -r --name-only main | grep -q '^lemline-messages-proto/src/main/proto/.*\.proto$'; then
+            echo "has_baseline=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_baseline=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Buf Breaking
+        if: steps.baseline.outputs.has_baseline == 'true'
+        working-directory: lemline-messages-proto
+        run: buf breaking --against '.git#branch=main,subdir=lemline-messages-proto'
+
+      - name: Buf Breaking (Skipped)
+        if: steps.baseline.outputs.has_baseline != 'true'
+        run: echo "No protobuf baseline found on main; skipping buf breaking."

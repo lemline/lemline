@@ -1,18 +1,13 @@
 // SPDX-License-Identifier: BUSL-1.1
-@file:OptIn(ExperimentalTime::class)
-
 package com.lemline.core.states
 
 import kotlin.time.Clock
-import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
-import kotlinx.serialization.Serializable
 
 /**
  * Default task state implementation for simple tasks that don't require additional state tracking.
  * Used by: Call, Run, Raise, Wait, Set, Fork, and Switch tasks.
  */
-@Serializable
 data class TaskState(
     override val startedAt: Instant = Clock.System.now(),
 ) : NodeState()
@@ -40,7 +35,6 @@ typealias CallState = TaskState
  * 3. Re-enter from child: entered = true (function completed)
  * 4. getNextNode(): returns node.parent (exit to caller)
  */
-@Serializable
 data class CallFunctionState(
     override val startedAt: Instant = Clock.System.now(),
     /** Whether we've entered the function body */

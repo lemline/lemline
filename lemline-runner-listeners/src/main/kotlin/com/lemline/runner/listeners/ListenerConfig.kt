@@ -2,7 +2,6 @@
 package com.lemline.runner.listeners
 
 import com.lemline.runner.common.config.OutboxAndCleanupConfig
-import kotlin.time.ExperimentalTime
 
 /**
  * Configuration interface for the listeners feature module.
@@ -13,5 +12,4 @@ import kotlin.time.ExperimentalTime
  * - Outbox processing parameters (batch size, intervals, retry settings)
  * - Cleanup parameters (retention period, batch size)
  */
-@ExperimentalTime
 interface ListenerConfig : OutboxAndCleanupConfig

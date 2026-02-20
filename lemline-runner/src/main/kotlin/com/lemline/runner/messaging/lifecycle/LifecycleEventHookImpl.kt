@@ -10,7 +10,6 @@ import com.lemline.core.lifecycleevents.LifecycleEventHook
 import com.lemline.core.states.NodeStack
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.enterprise.inject.Instance
-import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 import kotlinx.serialization.json.JsonElement
 
@@ -23,7 +22,6 @@ import kotlinx.serialization.json.JsonElement
  * @see CloudEventLifecycleHook for the actual implementation
  * @see LifecycleEventEmitter for the emission interface
  */
-@ExperimentalTime
 @ApplicationScoped
 class LifecycleEventHookImpl(
     emitterInstance: Instance<LifecycleEventEmitter>,

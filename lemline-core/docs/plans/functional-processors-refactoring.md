@@ -88,7 +88,6 @@ Extract stateless helper methods from `NodeProcessor` base class:
 
 ```kotlin
 // New file: NodeProcessorOps.kt
-@ExperimentalTime
 object NodeProcessorOps {
     private val logger = logger()
 
@@ -116,7 +115,13 @@ object NodeProcessorOps {
     fun getFlowDirective(node: Node<*>): FlowDirective?
 
     // Error handling
-    fun raiseError(node: Node<*>, type: WorkflowErrorType, title: String?, details: String? = null, status: Int? = null): Nothing
+    fun raiseError(
+        node: Node<*>,
+        type: WorkflowErrorType,
+        title: String?,
+        details: String? = null,
+        status: Int? = null
+    ): Nothing
 
     // RunWorkflow input transformation
     fun runWorkflowInput(node: Node<*>, data: JsonElement, subFlowInput: SubflowInput?, scope: Scope): JsonElement
@@ -154,7 +159,6 @@ object NodeProcessors {
 
 ```kotlin
 // New structure for NodeProcessor.kt
-@ExperimentalTime
 interface NodeProcessor<T : TaskBase, S : NodeState> {
 
     // Required: Create initial state when entering node
@@ -167,7 +171,8 @@ interface NodeProcessor<T : TaskBase, S : NodeState> {
     fun getNextNode(node: Node<T>, state: S, dataset: JsonElement, scope: Scope): NavigationInfo
 
     // Optional: Execute node action (default: pass through input)
-    suspend fun execute(node: Node<T>, transformedInput: JsonElement, scope: Scope, state: S): JsonElement = transformedInput
+    suspend fun execute(node: Node<T>, transformedInput: JsonElement, scope: Scope, state: S): JsonElement =
+        transformedInput
 
     // Async behavior
     val isAsync: Boolean get() = false
@@ -256,12 +261,16 @@ class SetProcessor(node: Node<SetTask>) : NodeProcessor<SetTask, SetState>(node)
 }
 
 // After
-@ExperimentalTime
 object SetProcessor : NodeProcessor<SetTask, SetState> {
 
     override fun stateEnterFromParent(node: Node<SetTask>, transformedInput: JsonElement, scope: Scope) = SetState()
 
-    override suspend fun execute(node: Node<SetTask>, transformedInput: JsonElement, scope: Scope, state: SetState): JsonElement {
+    override suspend fun execute(
+        node: Node<SetTask>,
+        transformedInput: JsonElement,
+        scope: Scope,
+        state: SetState
+    ): JsonElement {
         val setConfig = node.task.set ?: throw NoSuchElementException("SetTask has no set")
         return NodeProcessorOps.eval(node, transformedInput, LemlineJson.encodeToElement(setConfig), scope)
     }
@@ -302,11 +311,11 @@ Return interface type, dispatch to objects:
 ```kotlin
 @Suppress("UNCHECKED_CAST")
 fun <T : TaskBase> getProcessor(node: Node<T>): NodeProcessor<T, *> = when (node.task) {
-    is DoTask -> DoProcessor
-    is ForTask -> ForProcessor
-    is SetTask -> SetProcessor
-    // ...
-} as NodeProcessor<T, *>
+        is DoTask -> DoProcessor
+        is ForTask -> ForProcessor
+        is SetTask -> SetProcessor
+        // ...
+    } as NodeProcessor<T, *>
 ```
 
 ### 4.2 Update `StepByStepOrchestrator`
@@ -379,7 +388,7 @@ processors/
 ### 5.3 Documentation updates
 
 - Update `core-processors.md` with new patterns
-- Update `CLAUDE.md` if needed
+- Update `AGENTS.md` if needed
 
 ---
 
@@ -395,24 +404,24 @@ After each phase:
 
 ## Risks and Mitigations
 
-| Risk | Mitigation |
-|------|------------|
-| Type safety with generics | Use `@Suppress("UNCHECKED_CAST")` at boundaries (same as current) |
-| Breaking orchestrator calls | Update call sites in same commit as processor changes |
-| Missing edge cases in TryProcessor | Extra test coverage for retry/catch scenarios |
-| Performance regression | Unlikely - objects are more efficient than class instances |
+| Risk                               | Mitigation                                                        |
+|------------------------------------|-------------------------------------------------------------------|
+| Type safety with generics          | Use `@Suppress("UNCHECKED_CAST")` at boundaries (same as current) |
+| Breaking orchestrator calls        | Update call sites in same commit as processor changes             |
+| Missing edge cases in TryProcessor | Extra test coverage for retry/catch scenarios                     |
+| Performance regression             | Unlikely - objects are more efficient than class instances        |
 
 ---
 
 ## Estimated Scope
 
-| Phase | Files Changed | New Files | Complexity |
-|-------|--------------|-----------|------------|
-| Phase 1 | 1-2 | 1 (NodeProcessorOps.kt) | Low |
-| Phase 2 | 1 | 0 | Medium |
-| Phase 3 | 15 | 0 | Medium (repetitive) |
-| Phase 4 | 3-4 | 0 | Medium |
-| Phase 5 | 2-3 | 1 (NavigationInfo.kt) | Low |
+| Phase   | Files Changed | New Files               | Complexity          |
+|---------|---------------|-------------------------|---------------------|
+| Phase 1 | 1-2           | 1 (NodeProcessorOps.kt) | Low                 |
+| Phase 2 | 1             | 0                       | Medium              |
+| Phase 3 | 15            | 0                       | Medium (repetitive) |
+| Phase 4 | 3-4           | 0                       | Medium              |
+| Phase 5 | 2-3           | 1 (NavigationInfo.kt)   | Low                 |
 
 **Total:** ~25 files touched, 2 new files
 

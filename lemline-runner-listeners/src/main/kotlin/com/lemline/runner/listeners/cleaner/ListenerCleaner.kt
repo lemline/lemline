@@ -11,8 +11,6 @@ import com.lemline.runner.listeners.ListenerRepository
 import io.quarkus.runtime.Startup
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
-import kotlin.time.ExperimentalTime
-import kotlinx.serialization.ExperimentalSerializationApi
 
 /**
  * Cleans up old completed and failed listener records.
@@ -27,8 +25,6 @@ import kotlinx.serialization.ExperimentalSerializationApi
  */
 @Startup
 @ApplicationScoped
-@ExperimentalTime
-@ExperimentalSerializationApi
 internal class ListenerCleaner : AbstractCleaner<ListenerModel>() {
 
     @Inject

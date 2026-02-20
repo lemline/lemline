@@ -1,0 +1,34 @@
+syntax = "proto3";
+
+package lemline.internal.v1;
+
+option java_multiple_files = true;
+option java_package = "com.lemline.messages.internal.v1";
+
+message WorkflowInfoProto {
+    string namespace = 1;
+    string name = 2;
+    string version = 3;
+}
+
+message InternalErrorProto {
+    string type = 1;
+    int32 status = 2;
+    string position = 3;
+    optional string title = 4;
+    optional string details = 5;
+}
+
+enum FlowDirectiveEnumProto {
+    FLOW_DIRECTIVE_ENUM_PROTO_UNSPECIFIED = 0;
+    FLOW_DIRECTIVE_ENUM_PROTO_CONTINUE = 1;
+    FLOW_DIRECTIVE_ENUM_PROTO_EXIT = 2;
+    FLOW_DIRECTIVE_ENUM_PROTO_END = 3;
+}
+
+message FlowDirectiveProto {
+    oneof value {
+        FlowDirectiveEnumProto directive = 1;
+        string goto_target = 2;
+    }
+}

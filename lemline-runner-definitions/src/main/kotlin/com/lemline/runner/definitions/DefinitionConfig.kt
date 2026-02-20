@@ -2,7 +2,6 @@
 package com.lemline.runner.definitions
 
 import kotlin.time.Duration
-import kotlin.time.ExperimentalTime
 
 /**
  * Configuration interface for the definitions feature module.
@@ -12,7 +11,6 @@ import kotlin.time.ExperimentalTime
  * - Whether the definition cache sync is enabled
  * - Sync interval for loading definitions from database to cache
  */
-@ExperimentalTime
 interface DefinitionConfig {
     /**
      * Whether the definition cache sync is enabled.

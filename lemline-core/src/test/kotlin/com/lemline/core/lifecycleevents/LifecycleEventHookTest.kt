@@ -20,7 +20,6 @@ import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.shouldBe
 import java.util.concurrent.CopyOnWriteArrayList
 import kotlin.time.Clock
-import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.buildJsonObject
@@ -32,7 +31,6 @@ import kotlinx.serialization.json.buildJsonObject
  * during workflow execution. The tests use a capturing hook implementation
  * to verify event emission without requiring actual CloudEvent infrastructure.
  */
-@ExperimentalTime
 class LifecycleEventHookTest : FunSpec() {
 
     /**

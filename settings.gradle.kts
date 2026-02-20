@@ -18,6 +18,7 @@ plugins {
 
 // Include subprojects in the build.
 include(":lemline-common")
+include(":lemline-messages-proto")
 include(":lemline-core")
 include(":lemline-runner-common")
 include(":lemline-runner-waits")

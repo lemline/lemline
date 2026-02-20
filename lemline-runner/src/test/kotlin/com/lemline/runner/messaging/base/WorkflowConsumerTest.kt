@@ -24,9 +24,7 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ExecutionException
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.TimeUnit.SECONDS
-import kotlin.time.ExperimentalTime
 import kotlinx.coroutines.test.runTest
-import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.JsonPrimitive
 import org.eclipse.microprofile.reactive.messaging.Message
 import org.junit.jupiter.api.AfterEach
@@ -51,8 +49,6 @@ import org.junit.jupiter.api.Test
  * - Storing commandss requiring a wait state.
  * - Handling workflows that complete without further output.
  */
-@ExperimentalTime
-@ExperimentalSerializationApi
 internal abstract class WorkflowConsumerTest {
     @Inject
     lateinit var definitionRepository: DefinitionRepository
@@ -205,7 +201,7 @@ internal abstract class WorkflowConsumerTest {
         )
 
         // When
-        val future = sendMessageFuture(commandsMessage.toJsonString())
+        val future = sendMessageFuture(commandsMessage.toTransportPayload())
 
         // Then
         // Wait for the message to be processed
@@ -218,7 +214,7 @@ internal abstract class WorkflowConsumerTest {
     }
 
     /**
-     * **Scenario: **Tests how the consumer handles a fundamentally invalid message (e.g., non-JSON string).
+     * **Scenario: **Tests how the consumer handles a fundamentally invalid transport payload.
      *
      * **Given: **
      * - Defines an invalid message string.
@@ -233,7 +229,7 @@ internal abstract class WorkflowConsumerTest {
     @Test
     fun `invalid message should be handled without sending to events topic`() = runTest {
         // Given
-        val invalidMessage = "invalid json message"
+        val invalidMessage = "invalid transport payload"
 
         // When
         val future = sendMessageFuture(invalidMessage)
@@ -270,14 +266,14 @@ internal abstract class WorkflowConsumerTest {
         )
 
         // When
-        val future = sendMessageFuture(commandsMessage.toJsonString())
+        val future = sendMessageFuture(commandsMessage.toTransportPayload())
 
         // Then - use longer timeout for Kafka which has higher latency
         future.get(5, SECONDS) shouldBe null
 
         // Check that a message was sent to the events topic
         receiveEvent().shouldNotBeNull {
-            val commands = InstanceMessage.fromJsonString<WorkflowEvent>(this)
+            val commands = InstanceMessage.fromTransportPayload<WorkflowEvent>(this)
             commands.workflowState.nodePosition.toString() shouldBe "/do/3/retryCase/try"
             val retryingState = commands.workflowState as WorkflowEvent.TaskRetryScheduled
             retryingState.retryAt shouldNotBe null
@@ -309,17 +305,17 @@ internal abstract class WorkflowConsumerTest {
         )
 
         // When
-        val scheduleWaitCommand = sendMessageFuture(commandsMessage.toJsonString()).get(5, SECONDS)
+        val scheduleWaitCommand = sendMessageFuture(commandsMessage.toTransportPayload()).get(5, SECONDS)
 
         // Then
         scheduleWaitCommand shouldNotBe null
         receiveEvent().shouldBe(null)
 
-        sendMessageFuture(scheduleWaitCommand!!.toJsonString()).get(5, SECONDS)
+        sendMessageFuture(scheduleWaitCommand!!.toTransportPayload()).get(5, SECONDS)
 
         // Check that a message was sent to the events topic
         receiveEvent().shouldNotBeNull {
-            val commands = InstanceMessage.fromJsonString<WorkflowEvent>(this)
+            val commands = InstanceMessage.fromTransportPayload<WorkflowEvent>(this)
             commands.workflowState.nodePosition.toString() shouldBe "/do/2/waitCase"
             val waitState = commands.workflowState as WorkflowEvent.WaitStarted
             waitState.config.waitUntil shouldNotBe null
@@ -349,7 +345,7 @@ internal abstract class WorkflowConsumerTest {
         )
 
         // When
-        val future = sendMessageFuture(commandsMessage.toJsonString())
+        val future = sendMessageFuture(commandsMessage.toTransportPayload())
 
         // Then
         future.get(5, SECONDS) shouldBe null

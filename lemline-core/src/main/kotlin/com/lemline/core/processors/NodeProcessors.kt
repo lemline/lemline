@@ -22,7 +22,6 @@ import io.serverlessworkflow.api.types.SwitchTask
 import io.serverlessworkflow.api.types.TaskBase
 import io.serverlessworkflow.api.types.TryTask
 import io.serverlessworkflow.api.types.WaitTask
-import kotlin.time.ExperimentalTime
 
 /**
  * Factory for creating NodeProcessor instances based on task type.
@@ -30,7 +29,6 @@ import kotlin.time.ExperimentalTime
  * This centralizes the mapping between task types and their corresponding processors,
  * keeping the Node class focused on representing the workflow tree structure.
  */
-@ExperimentalTime
 object NodeProcessors {
 
     /**

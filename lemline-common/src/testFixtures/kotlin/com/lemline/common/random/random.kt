@@ -1,5 +1,4 @@
 // SPDX-License-Identifier: BUSL-1.1
-@file:OptIn(ExperimentalTime::class)
 @file:Suppress("unused")
 
 package com.lemline.common.random
@@ -11,7 +10,6 @@ import com.lemline.common.values.WorkflowVersion
 import kotlin.random.Random
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.days
-import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 
 /**
@@ -65,19 +63,19 @@ fun Int.Companion.nullableRandom() = when (Random.nextBoolean()) {
  * Generates a random WorkflowNamespace.
  * @return A WorkflowNamespace with a random string value
  */
-fun WorkflowNamespace.Companion.random() = WorkflowNamespace(String.random())
+fun randomWorkflowNamespace() = WorkflowNamespace(String.random())
 
 /**
  * Generates a random WorkflowName.
  * @return A WorkflowName with a random string value
  */
-fun WorkflowName.Companion.random() = WorkflowName(String.random())
+fun randomWorkflowName() = WorkflowName(String.random())
 
 /**
  * Generates a random WorkflowVersion.
  * @return A WorkflowVersion with a random string value
  */
-fun WorkflowVersion.Companion.random() = WorkflowVersion(String.random())
+fun randomWorkflowVersion() = WorkflowVersion(String.random())
 
 /**
  * Generates a random nullable IDV7.

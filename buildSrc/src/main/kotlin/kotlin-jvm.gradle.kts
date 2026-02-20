@@ -3,6 +3,7 @@
 package buildsrc.convention
 
 import org.gradle.api.tasks.testing.logging.TestLogEvent
+import org.jetbrains.kotlin.gradle.tasks.KotlinJvmCompile
 
 plugins {
     id("com.diffplug.spotless")
@@ -31,6 +32,12 @@ java {
 
 kotlin {
     jvmToolchain(17)
+}
+
+tasks.withType<KotlinJvmCompile>().configureEach {
+    compilerOptions {
+        optIn.add("kotlin.time.ExperimentalTime")
+    }
 }
 
 tasks.withType<Test>().configureEach {

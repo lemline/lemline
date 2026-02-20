@@ -69,6 +69,6 @@ object MockConfigurationParser {
      */
     fun fromJson(content: String): MockConfiguration {
         if (content.isBlank()) return MockConfiguration.empty()
-        return json.decodeFromString(MockConfiguration.serializer(), content)
+        return json.decodeFromString(content)
     }
 }

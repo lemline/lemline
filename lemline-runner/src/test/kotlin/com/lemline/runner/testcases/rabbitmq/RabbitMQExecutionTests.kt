@@ -1,5 +1,4 @@
 // SPDX-License-Identifier: BUSL-1.1
-@file:OptIn(ExperimentalTime::class, ExperimentalSerializationApi::class)
 
 package com.lemline.runner.testcases.rabbitmq
 
@@ -21,8 +20,6 @@ import com.lemline.runner.common.test.RequiresDocker
 import com.lemline.runner.testcases.bases.BrokerWorkflowTest
 import io.quarkus.test.junit.QuarkusTest
 import io.quarkus.test.junit.TestProfile
-import kotlin.time.ExperimentalTime
-import kotlinx.serialization.ExperimentalSerializationApi
 
 /**
  * End-to-end workflow execution tests using RabbitMQ messaging infrastructure.

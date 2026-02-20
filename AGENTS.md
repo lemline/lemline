@@ -1,269 +1,189 @@
-<!-- Generated: 2026-02-18 | Updated: 2026-02-18 -->
+<!-- Updated: 2026-02-20 -->
 
 # AGENTS.md
 
-Guidelines for AI coding agents working in the Lemline repository.
-
-**Generated:** 2026-02-18
-**Branch:** main
-
-## Overview
-
-Lemline: Event-driven workflow orchestration runtime implementing Serverless Workflow DSL v1.0.  
-Kotlin 2.2.10 + Java 17 + Quarkus 3.x. Stateless workers, dual-channel messaging, outbox pattern.
-
-## Structure
-
-```
-lemline/
-├── lemline-common/          # Shared utilities (IDV7, JSON, logging)
-├── lemline-core/            # DSL parsing, execution engine, processors
-├── lemline-runner/          # Quarkus runtime, messaging, CLI
-├── lemline-runner-cli/      # Picocli CLI commands
-├── lemline-runner-common/   # Shared infrastructure (outbox, cleaner, repos)
-├── lemline-runner-*/        # Feature modules (waits, retries, parents, forks, schedules, listeners, definitions, failures)
-├── lemline-docs/            # Writerside documentation
-├── docs/adr/                # Architecture Decision Records
-├── buildSrc/                # Convention plugins
-└── examples/                # Docker compose and config examples for dev
-```
-
-## Where to Look
-
-| Task                   | Location                                                | Notes                                            |
-|------------------------|---------------------------------------------------------|--------------------------------------------------|
-| Add workflow task type | `lemline-core/src/.../processors/`                      | Create processor + state, use core-dev skill     |
-| Add runner feature     | Create `lemline-runner-{feature}/`                      | Follow outbox pattern, use runner-dev skill      |
-| Modify messaging       | `lemline-runner/src/.../messaging/`                     | commands/ for execution, events/ for persistence |
-| Add CLI command        | `lemline-runner-cli/src/.../cli/`                       | Picocli commands                                 |
-| Database schema        | `lemline-runner-*/src/main/resources/db/migration/`     | Flyway, all 3 DBs                                |
-| Configuration          | `lemline-runner/src/.../config/LemlineConfiguration.kt` | Quarkus config                                   |
-| Shared infrastructure  | `lemline-runner-common/src/main/kotlin/`                | Outbox, cleaner, repos                           |
-
-## Commands
-
-```bash
-# Build
-./gradlew build                           # Full build
-./gradlew :lemline-core:build             # Single module
-
-# Test
-./gradlew test                            # All tests
-./gradlew :lemline-runner:test            # Single module
-./gradlew test --tests "*RepositoryTest"  # Pattern match
-
-# Format
-./gradlew spotlessCheck                   # Check
-./gradlew spotlessApply                   # Fix
-
-# Dev mode
-./gradlew :lemline-runner:quarkusDev      # Hot reload
-```
-
-## Code Style
-
-### Formatting
-
-- 4 spaces indent (2 for JSON/YAML)
-- 120 char line length
-- LF line endings, UTF-8
-- `// SPDX-License-Identifier: BUSL-1.1` header required
-
-### Naming
-
-| Element   | Convention      | Example         |
-|-----------|-----------------|-----------------|
-| Classes   | PascalCase      | `NodeProcessor` |
-| Functions | camelCase       | `findById`      |
-| Constants | SCREAMING_SNAKE | `MAX_RETRIES`   |
-
-### Async
-
-```kotlin
-// CORRECT: suspend functions with coroutines
-suspend fun findByUUID(uuid: IDV7): Model?
-
-// WRONG: Mutiny Uni
-fun findByUUID(uuid: IDV7): Uni<Model?>
-```
-
-### IDs
-
-All entities use `IDV7` (UUID v7) - time-sortable, globally unique.
-
-## Anti-Patterns (This Project)
-
-### NEVER
-
-- **Mutiny (Uni/Multi)** - Use Kotlin coroutines with `suspend` functions
-- **Hibernate ORM/Panache** - Use native SQL with repositories
-- **Type suppression** - No `as any`, `@ts-ignore`, empty catch blocks
-- **Database-specific SQL** without variants for PostgreSQL, MySQL, H2
-- **Skip migrations** - All schema changes via Flyway
-
-### SQL Warning
-
-```kotlin
-// WRONG: NULL comparison always fails
-WHERE col = NULL
-
-// CORRECT: Use null-safe equals
-    WHERE col IS NOT DISTINCT FROM $1--PostgreSQL
-WHERE col <= > $1--MySQL
-```
-
-### TODO Items Found
-
-- `scope.kt`: "Current implementation does not follow spec"
-- `HttpCall.kt`: "authorization_code grant is not yet supported"
-- `InstanceStartCommand.kt`: "This should ideally be transactional"
-
-## Complexity Hotspots
-
-| File                      | Lines | Issue                                           |
-|---------------------------|-------|-------------------------------------------------|
-| `FullOrchestrator.kt`     | 1024  | Deep nesting, long methods for event collection |
-| `NodeProcessor.kt`        | 680   | Complex expression evaluation                   |
-| `HttpCall.kt`             | 640   | OAuth2 state machine, incomplete grant types    |
-| `WorkflowState.kt`        | 629   | Sealed class hierarchy needs architectural docs |
-| `LemlineConfiguration.kt` | 536   | Extensive config mapping                        |
-
-## Module Patterns
-
-### Feature Modules (lemline-runner-*)
-
-Each follows consistent outbox pattern:
-
-- `*Service.kt` - Business logic
-- `*Model.kt` - Entity with `WithOutbox` interface
-- `*Repository.kt` - SQL operations with `FOR UPDATE SKIP LOCKED`
-- `*Outbox.kt` - Extends `AbstractOutbox<T>`
-- `*Cleaner.kt` - Extends `AbstractCleaner<T>`
-
-### Deviations
-
-- `lemline-runner-definitions` - Pure CRUD, no outbox (definitions are static)
-- `lemline-runner-failures` - Dead letter storage, no outbox (failures are terminal)
-- `lemline-runner-listeners` - Multiple specialized outboxes
-
-## Testing
-
-### lemline-core
-
-Kotest + coroutines test:
-
-```kotlin
-@Test
-fun testWorkflow() = runTest {
-        val processor = getWorkflowProcessor(yaml, input)
-        processor.run()
-        assertEquals(expected, processor.output)
-    }
-```
-
-### lemline-runner
-
-Kotest + `@QuarkusTest` + Testcontainers:
-
-```kotlin
-@QuarkusTest
-@TestProfile(PostgresProfile::class)
-class RepositoryTest : FunSpec({
-    test("should find entity") {
-        val result = repository.findById(id)
-        assertNotNull(result)
-    }
-})
-```
-
-**Test all 3 databases** when touching persistence layer.
-
-### Test Output Handling (AI Agents)
-
-**Always capture test output to files** - never rely on `grep | tail` pipelines that may miss important information.
-
-```bash
-# CORRECT: Capture full output, then analyze
-./gradlew :lemline-runner-listeners:test --tests "*ListenerRepository*" 2>&1 | tee /tmp/lemline-listeners-repo.log
-
-# Then iterate on analysis without rerunning:
-grep -E "FAILED|ERROR" /tmp/lemline-listeners-repo.log
-grep -i "exception" /tmp/lemline-listeners-repo.log | head -30
-tail -100 /tmp/lemline-listeners-repo.log
-
-# WRONG: Direct pipeline that may lose context
-./gradlew :module:test 2>&1 | grep -E "PASSED|FAILED" | tail -5
-```
-
-**File naming convention**: `/tmp/lemline-<module-short>-<test-pattern>.log`
-
-- `/tmp/lemline-core-dataflow.log`
-- `/tmp/lemline-runner-outbox.log`
-- `/tmp/lemline-listeners-repo.log`
-
-**Cleaning**: Manual.
-
-**Why this matters**:
-
-- Test runs are expensive (Gradle startup, compilation, Testcontainers)
-- `tee` gives real-time output AND persistent file
-- Reanalyze without rerunning when grep pattern was too narrow
-
-## Key Files
-
-### Core Execution
-
-- `lemline-core/src/.../orchestrator/StepByStepOrchestrator.kt` - Step execution
-- `lemline-core/src/.../orchestrator/FullOrchestrator.kt` - Full execution (tests)
-- `lemline-core/src/.../processors/NodeProcessor.kt` - Processor interface
-
-### Runner Infrastructure
-
-- `lemline-runner/src/.../messaging/commands/WorkflowCommandHandler.kt` - Command handling
-- `lemline-runner/src/.../messaging/events/WorkflowEventHandler.kt` - Event routing
-- `lemline-runner-common/src/.../outbox/AbstractOutbox.kt` - Outbox base class
-
-### Entry Points
-
-- `lemline-runner/src/.../LemlineApplication.kt` - CLI bootstrap (pre-Quarkus)
-- `lemline-runner-cli/src/.../MainCommand.kt` - Picocli top command
-
-## Skills (Use These)
-
-For detailed development guidance, invoke skills:
-
-| Skill        | When to Use                                                              |
-|--------------|--------------------------------------------------------------------------|
-| `core-dev`   | Working on lemline-core (processors, orchestrators, states, expressions) |
-| `runner-dev` | Working on lemline-runner-* (messaging, outbox, repositories, CLI)       |
-
-Skills provide file references, code patterns, and critical rules.
-
-## Architecture Notes
-
-### Dual-Channel Design
-
-- **Commands channel** (`commands-in/out`): High-throughput, stateless execution
-- **Events channel** (`events-out`): Durable operations requiring DB (waits, retries, parents)
-
-### State Compression
-
-Entire workflow state serialized into `InstanceMessage` - enables stateless workers.
-
-### Exception-Driven Control
-
-- Normal step: Returns `NextStepInfo`
-- Wait needed: Throws `WaitStartedException`
-- Retry needed: Throws `TaskRetriedException`
-- Child workflow: Throws `RunWorkflowStartedException`
-
-### Structural Deviations (Non-Standard)
-
-- No root `build.gradle.kts` - all via buildSrc convention plugins
-- Extremely granular feature modules (9 tiny outbox modules)
-- Separated CLI module from main runner
-- Dual "common" modules (`lemline-common` + `lemline-runner-common`)
+Single source of truth for AI coding agents in the Lemline repository.
 
 ## Language
 
-Always use English in code, comments, and documentation.
+Use English in code, comments, docs, commit messages, and PR text.
+
+## Project Snapshot
+
+Lemline is an event-driven workflow orchestration runtime implementing Serverless Workflow DSL v1.0.
+
+- Stack: Kotlin 2.2.10, Java 17, Quarkus 3.x
+- Runtime model: stateless workers, workflow state carried in messages
+- Persistence model: outbox pattern for durable operations
+- Messaging model: dual-channel (`commands-*` and `events-*`)
+
+## Documentation Map
+
+Use these docs as primary context before broad refactors:
+
+- System architecture: [`docs/orchestrator-architecture.md`](docs/orchestrator-architecture.md), [`docs/runner-architecture.md`](docs/runner-architecture.md)
+- Messaging architecture ADR: [`docs/adr/0003-messaging-architecture.md`](docs/adr/0003-messaging-architecture.md)
+- Workflow execution model ADR: [`docs/adr/0002-workflow-execution-model.md`](docs/adr/0002-workflow-execution-model.md)
+- Database strategy ADR: [`docs/adr/0004-database-storage-strategy.md`](docs/adr/0004-database-storage-strategy.md)
+- Error handling ADR: [`docs/adr/0005-error-handling-approach.md`](docs/adr/0005-error-handling-approach.md)
+- Config strategy ADR: [`docs/adr/0007-config-strategy.md`](docs/adr/0007-config-strategy.md)
+- Protobuf messaging rules: [`docs/protobuf-messaging.md`](docs/protobuf-messaging.md)
+- Logging strategy: [`docs/logging-strategy.md`](docs/logging-strategy.md)
+- CLI strategy: [`docs/cli-strategy.md`](docs/cli-strategy.md)
+- Listen behavior reference: [`docs/listen-task.md`](docs/listen-task.md)
+- ADR index: [`docs/adr/README.md`](docs/adr/README.md)
+
+## Repository Layout
+
+```text
+lemline/
+├── lemline-common/          # Shared utilities (IDV7, JSON, logging)
+├── lemline-core/            # DSL parsing, processors, orchestrators, workflow state
+├── lemline-runner/          # Runtime bootstrap, messaging handlers/subscribers
+├── lemline-runner-cli/      # CLI commands (Picocli)
+├── lemline-runner-common/   # Shared infra (outbox, cleaners, repositories, codecs)
+├── lemline-runner-*/        # Feature modules (waits, retries, parents, forks, etc.)
+├── lemline-messages-proto/  # Internal protobuf schemas + generated types
+├── docs/adr/                # Architecture decisions
+└── examples/                # Local dev examples
+```
+
+## Core Architecture Rules
+
+### Dual-channel processing
+
+1. Commands channel (`commands-in/out`) is for high-throughput stateless execution.
+2. Events channel (`events-out`) is for durable workflows operations needing DB guarantees.
+
+### Exception-driven orchestration
+
+Control flow in orchestration relies on specific exceptions:
+
+- `WaitStartedException`
+- `TaskRetriedException`
+- `RunWorkflowStartedException`
+
+Do not replace this pattern casually; it is part of runtime semantics.
+
+### Stateless workflow state
+
+`InstanceMessage` carries serialized workflow state so any worker can continue execution.
+
+## Non-negotiable Engineering Rules
+
+1. Use Kotlin coroutines (`suspend`) for async flows.
+2. Do not introduce Mutiny (`Uni`, `Multi`) in application/repository code.
+3. Do not use Hibernate ORM/Panache; use repositories with native SQL.
+4. All persistence schema changes must be Flyway migrations.
+5. Persistence changes must consider PostgreSQL, MySQL, and H2.
+6. Use `IDV7` for entity IDs.
+7. Keep domain models decoupled from transport types (protobuf classes).
+
+## Protobuf Messaging Rules
+
+Internal schemas are under `lemline-messages-proto/src/main/proto/internal/`.
+
+1. Protobuf is the canonical internal messaging contract.
+2. Transport uses protobuf binary; DB payloads use ProtoJSON.
+3. Never reuse field numbers.
+4. If removing a field, reserve both its number and name.
+5. Enums must include `*_UNSPECIFIED = 0`.
+6. Enum value names must satisfy Buf enum-prefix conventions.
+7. Use `optional` for presence-sensitive scalar fields.
+8. Keep mapping exhaustive in `*ProtobufMapper` classes.
+
+See `docs/protobuf-messaging.md` for full policy/checklist.
+
+## Module Patterns
+
+Most `lemline-runner-*` feature modules follow an outbox pattern:
+
+- `*Service.kt`: business logic
+- `*Model.kt`: persistence model
+- `*Repository.kt`: SQL operations (often with `FOR UPDATE SKIP LOCKED`)
+- `*Outbox.kt`: outbox processor
+- `*Cleaner.kt`: retention cleanup
+
+Known deviations:
+
+- `lemline-runner-definitions`: CRUD-centric, no outbox relay
+- `lemline-runner-failures`: terminal storage, no outbox relay
+- `lemline-runner-listeners`: multiple specialized outboxes
+
+## High-Value File Locations
+
+- Orchestration entry points:
+  - `lemline-core/src/main/kotlin/com/lemline/core/orchestrator/StepByStepOrchestrator.kt`
+  - `lemline-core/src/main/kotlin/com/lemline/core/orchestrator/FullOrchestrator.kt`
+- Processor contract:
+  - `lemline-core/src/main/kotlin/com/lemline/core/processors/NodeProcessor.kt`
+- Runner command/event handling:
+  - `lemline-runner/src/main/kotlin/com/lemline/runner/messaging/commands/WorkflowCommandHandler.kt`
+  - `lemline-runner/src/main/kotlin/com/lemline/runner/messaging/events/WorkflowEventHandler.kt`
+- Common outbox base:
+  - `lemline-runner-common/src/main/kotlin/com/lemline/runner/common/outbox/AbstractOutbox.kt`
+
+## Build and Test Commands
+
+```bash
+# Build
+./gradlew build
+./gradlew :lemline-core:build
+
+# Test
+./gradlew test
+./gradlew :lemline-runner:test
+./gradlew test --tests "*RepositoryTest"
+
+# Format
+./gradlew spotlessCheck
+./gradlew spotlessApply
+
+# Dev
+./gradlew :lemline-runner:quarkusDev
+```
+
+## Test Execution Policy for Agents
+
+Always capture full test logs to file.
+
+```bash
+./gradlew :lemline-runner-listeners:test --tests "*ListenerRepository*" 2>&1 | tee /tmp/lemline-listeners-repo.log
+```
+
+Then inspect that file (`grep`, `tail`) instead of rerunning immediately.
+
+Suggested naming:
+
+- `/tmp/lemline-<module>-<topic>.log`
+
+When changing repositories or SQL, run coverage against PostgreSQL, MySQL, and H2.
+
+## SQL and Data Notes
+
+Use null-safe equality per database:
+
+```sql
+-- PostgreSQL
+col IS NOT DISTINCT FROM $1
+
+-- MySQL
+col <=> ?
+```
+
+## Practical Change Checklist
+
+Before opening/updating a PR:
+
+1. Update code + tests together (especially mapper and serialization paths).
+2. Run the smallest relevant test slice, then broader suite as needed.
+3. If `.proto` changed, run `buf lint` in `lemline-messages-proto/`.
+4. Verify no accidental API/schema breakage.
+5. Keep commits focused and messages explicit.
+
+## Structural Peculiarities
+
+1. No root `build.gradle.kts`; build is driven via convention plugins in `buildSrc`.
+2. Very granular runner feature modules.
+3. CLI is separated in `lemline-runner-cli`.
+4. Two common modules exist: `lemline-common` and `lemline-runner-common`.

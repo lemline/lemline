@@ -1,12 +1,9 @@
 // SPDX-License-Identifier: BUSL-1.1
-@file:OptIn(ExperimentalTime::class)
-
 package com.lemline.core.states
 
 import com.lemline.common.values.NodePosition
 import com.lemline.common.values.WorkflowId
 import com.lemline.core.errors.InternalException
-import com.lemline.common.json.LemlineJson
 import com.lemline.core.processors.CallHttpConfig
 import com.lemline.core.processors.EmitConfig
 import com.lemline.core.processors.ListenConfig
@@ -16,12 +13,7 @@ import com.lemline.core.processors.RunWorkflowConfig
 import com.lemline.core.processors.WaitConfig
 import com.lemline.core.tasks.FlowDirective
 import kotlin.time.Clock
-import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
-import kotlinx.serialization.Contextual
-import kotlinx.serialization.SerialName
-import kotlinx.serialization.Serializable
-import kotlinx.serialization.Transient
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
@@ -34,16 +26,10 @@ import kotlinx.serialization.json.JsonObject
  * boundaries (activities, delays, sub-workflows) to allow the runner to persist
  * state and resume execution in different workers.
  */
-@Serializable
 sealed class WorkflowState {
     abstract val nodeStack: NodeStack
     abstract val nodePosition: NodePosition
 
-    open fun toJsonString(): String = LemlineJson.encodeToString(this)
-
-    companion object {
-        fun fromJsonString(jsonString: String): WorkflowState = LemlineJson.decodeFromString(jsonString)
-    }
 
     val workflowId: WorkflowId get() = nodeStack.rootState.workflowId
 
@@ -52,20 +38,18 @@ sealed class WorkflowState {
     val isNew: Boolean get() = nodeStack[nodePosition] == null
 }
 
-@Serializable
 sealed class WorkflowCommand : WorkflowState() {
 
     /**
      * Command to resume workflow execution from a specific task (possibly not yet in nodeStack).
      */
-    @Serializable
-    @SerialName("resumeFromTask")
     data class ResumeFromTask(
         override val nodeStack: NodeStack,
         override val nodePosition: NodePosition,
         val rawInput: JsonElement,
         val flowDirective: FlowDirective? = null
     ) : WorkflowCommand() {
+
         override fun toString() = "${this::class.simpleName}(" +
             "nodePosition=$nodePosition" +
             ", rawInput=$rawInput" +
@@ -82,14 +66,11 @@ sealed class WorkflowCommand : WorkflowState() {
     /**
      * Command to resume execution with a task completed asynchronously.
      */
-    @Serializable
-    @SerialName("resumeWithCompletedTask")
     data class ResumeWithCompletedTask(
         override val nodeStack: NodeStack,
         val rawOutput: JsonElement,
     ) : WorkflowCommand() {
 
-        @Transient
         override val nodePosition = nodeStack.currentPosition
 
         override fun toString() = "${this::class.simpleName}(" +
@@ -102,14 +83,11 @@ sealed class WorkflowCommand : WorkflowState() {
     /**
      * Command to resume execution with a task failed asynchronously.
      */
-    @Serializable
-    @SerialName("resumeWithFailedTask")
     data class ResumeWithFailedTask(
         override val nodeStack: NodeStack,
         val error: InternalException.Error,
     ) : WorkflowCommand() {
 
-        @Transient
         override val nodePosition = nodeStack.currentPosition
 
         override fun toString() = "${this::class.simpleName}(" +
@@ -120,7 +98,6 @@ sealed class WorkflowCommand : WorkflowState() {
     }
 }
 
-@Serializable
 sealed class WorkflowEvent : WorkflowState() {
 
 
@@ -148,15 +125,12 @@ sealed class WorkflowEvent : WorkflowState() {
     /**
      * Event emitted when a workflow completes.
      */
-    @Serializable
-    @SerialName("workflowCompleted")
     data class WorkflowCompleted(
         val output: JsonElement,
         val completedAt: Instant,
         override val nodeStack: NodeStack,
     ) : Outcome() {
 
-        @Transient
         override val nodePosition = NodePosition.root
 
         override fun toString() = "${this::class.simpleName}(" +
@@ -170,8 +144,6 @@ sealed class WorkflowEvent : WorkflowState() {
      * If rawInput is not null, this error comes from the [com.lemline.core.orchestrator.StepByStepOrchestrator.resumeFromTask] method
      * If rawOutput is not null, this error comes from the [com.lemline.core.orchestrator.StepByStepOrchestrator.resumeFromCompletedTask] method
      */
-    @Serializable
-    @SerialName("workflowFailed")
     data class WorkflowFailed(
         override val nodeStack: NodeStack,
         val rawInput: JsonElement?,
@@ -181,7 +153,6 @@ sealed class WorkflowEvent : WorkflowState() {
         val failedAt: Instant,
     ) : Outcome() {
 
-        @Transient
         override val nodePosition = nodeStack.currentPosition
 
         val exception: Exception get() = InternalException(error)
@@ -216,8 +187,6 @@ sealed class WorkflowEvent : WorkflowState() {
     /**
      * Event emitted when a fork branch execution completes.
      */
-    @Serializable
-    @SerialName("forkBranchCompleted")
     data class ForkBranchCompleted(
         override val nodeStack: NodeStack,
         val branchPosition: NodePosition,
@@ -225,7 +194,6 @@ sealed class WorkflowEvent : WorkflowState() {
         val completedAt: Instant,
     ) : Outcome() {
 
-        @Transient
         override val nodePosition = nodeStack.currentPosition // Fork position
 
         override fun toString() = "${this::class.simpleName}(" +
@@ -239,17 +207,15 @@ sealed class WorkflowEvent : WorkflowState() {
     /**
      * Event emitted when a fork branch execution fails.
      */
-    @Serializable
-    @SerialName("forkBranchFailed")
     data class ForkBranchFailed(
         override val nodeStack: NodeStack,
         val branchPosition: NodePosition,
         val error: InternalException.Error,
         val failedAt: Instant
     ) : Outcome() {
+
         val exception: InternalException by lazy { InternalException(error) }
 
-        @Transient
         override val nodePosition = nodeStack.currentPosition // Fork position
 
         override fun toString() = "${this::class.simpleName}(" +
@@ -298,8 +264,6 @@ sealed class WorkflowEvent : WorkflowState() {
     /**
      * Event emitted when the next task (possibly not yet in nodeStack) is scheduled.
      */
-    @Serializable
-    @SerialName("taskScheduled")
     data class TaskScheduled(
         override val nodeStack: NodeStack,
         override val nodePosition: NodePosition,
@@ -325,15 +289,12 @@ sealed class WorkflowEvent : WorkflowState() {
     /**
      * Event emitted when a wait task is scheduled.
      */
-    @Serializable
-    @SerialName("waitStarted")
     data class WaitStarted(
         override val nodeStack: NodeStack,
         val rawOutput: JsonElement,
-        @Contextual val config: WaitConfig
+        val config: WaitConfig
     ) : Suspension() {
 
-        @Transient
         override val nodePosition = nodeStack.currentPosition // Wait position
 
         override fun toString() = "${this::class.simpleName}(" +
@@ -352,8 +313,6 @@ sealed class WorkflowEvent : WorkflowState() {
     /**
      * Event emitted when the retry of a task (possibly not yet in nodeStack) is scheduled.
      */
-    @Serializable
-    @SerialName("taskRetryScheduled")
     data class TaskRetryScheduled(
         override val nodeStack: NodeStack,
         override val nodePosition: NodePosition,
@@ -382,15 +341,12 @@ sealed class WorkflowEvent : WorkflowState() {
     /**
      * Event emitted when a child workflow is scheduled.
      */
-    @Serializable
-    @SerialName("runWorkflowStarted")
     data class RunWorkflowStarted(
         override val nodeStack: NodeStack,
         val rawInput: JsonElement,
         val config: RunWorkflowConfig,
     ) : Suspension() {
 
-        @Transient
         override val nodePosition = nodeStack.currentPosition // RunWorkflow position
 
         override fun toString() = "${this::class.simpleName}(" +
@@ -420,14 +376,11 @@ sealed class WorkflowEvent : WorkflowState() {
      * Event emitted when a fork is started.
      * (each branch is processed separately)
      */
-    @Serializable
-    @SerialName("forkStarted")
     data class ForkStarted(
         override val nodeStack: NodeStack,
         val rawInput: JsonElement,
     ) : Suspension() {
 
-        @Transient
         override val nodePosition = nodeStack.currentPosition // Fork position
 
         override fun toString() = "${this::class.simpleName}(" +
@@ -455,15 +408,12 @@ sealed class WorkflowEvent : WorkflowState() {
      * - Strategy ALL: One event per filter has been received
      * - Timeout: If timeoutAt is set and exceeded
      */
-    @Serializable
-    @SerialName("listenStarted")
     data class ListenStarted(
         override val nodeStack: NodeStack,
         val rawOutput: JsonElement,
         val config: ListenConfig
     ) : Suspension() {
 
-        @Transient
         override val nodePosition = nodeStack.currentPosition // Listen position
 
         override fun toString() = "${this::class.simpleName}(" +
@@ -498,8 +448,6 @@ sealed class WorkflowEvent : WorkflowState() {
      *
      * @see ListenStarted for the initial listen task event
      */
-    @Serializable
-    @SerialName("forEachCompleted")
     data class ForEachCompleted(
         override val nodeStack: NodeStack,
         val output: JsonElement,
@@ -523,15 +471,12 @@ sealed class WorkflowEvent : WorkflowState() {
      *
      * The workflow continues immediately after publishing (fire-and-forget).
      */
-    @Serializable
-    @SerialName("emitStarted")
     data class EmitStarted(
         override val nodeStack: NodeStack,
         override val input: JsonElement,   // Pass-through: output = input for emit task
         val config: EmitConfig
     ) : ActivityStarted() {
 
-        @Transient
         override val nodePosition = nodeStack.currentPosition // Emit position
 
         override fun toString() = "${this::class.simpleName}(" +
@@ -557,15 +502,12 @@ sealed class WorkflowEvent : WorkflowState() {
      * The config contains all data needed to make the HTTP request,
      * including resolved authentication.
      */
-    @Serializable
-    @SerialName("callHttpStarted")
     data class CallHttpStarted(
         override val nodeStack: NodeStack,
         override val input: JsonElement,
         val config: CallHttpConfig
     ) : ActivityStarted() {
 
-        @Transient
         override val nodePosition = nodeStack.currentPosition
 
         override fun toString() = "${this::class.simpleName}(" +
@@ -585,15 +527,12 @@ sealed class WorkflowEvent : WorkflowState() {
      * The config contains all data needed to run the script,
      * including resolved code, arguments, and environment.
      */
-    @Serializable
-    @SerialName("runScriptStarted")
     data class RunScriptStarted(
         override val nodeStack: NodeStack,
         override val input: JsonElement,
         val config: RunScriptConfig
     ) : ActivityStarted() {
 
-        @Transient
         override val nodePosition = nodeStack.currentPosition
 
         override fun toString() = "${this::class.simpleName}(" +
@@ -610,15 +549,12 @@ sealed class WorkflowEvent : WorkflowState() {
      * The config contains all data needed to run the shell command,
      * including resolved command, arguments, and environment.
      */
-    @Serializable
-    @SerialName("runShellStarted")
     data class RunShellStarted(
         override val nodeStack: NodeStack,
         override val input: JsonElement,
         val config: RunShellConfig
     ) : ActivityStarted() {
 
-        @Transient
         override val nodePosition = nodeStack.currentPosition
 
         override fun toString() = "${this::class.simpleName}(" +

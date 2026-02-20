@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.common.models
 
-import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 
 /**
@@ -14,7 +13,6 @@ import kotlin.time.Instant
  * - [WithOutbox.outboxCompletedAt] which tracks outbox processing completion
  * - [WithCleanup.cleanupAfter] which tracks when cleanup should happen
  */
-@ExperimentalTime
 interface WithCompletedAt {
 
     /**

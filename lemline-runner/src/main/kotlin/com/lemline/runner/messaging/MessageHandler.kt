@@ -14,10 +14,8 @@ import com.lemline.runner.healthcheck.FatalAckLiveness.livenessDownOnFailure
 import com.lemline.runner.healthcheck.RetryReadiness.readinessDownDuringRetries
 import io.quarkus.smallrye.reactivemessaging.ackSuspending
 import io.quarkus.smallrye.reactivemessaging.nackSuspending
-import kotlin.time.ExperimentalTime
 import org.eclipse.microprofile.reactive.messaging.Message
 
-@ExperimentalTime
 internal interface MessageHandler<T> {
 
     suspend fun Message<String>.deserialize(): T
@@ -25,7 +23,7 @@ internal interface MessageHandler<T> {
     suspend fun handle(current: T): T?
 
     /**
-     * Serializes the message to a JSON string payload.
+     * Serializes the message to a transport payload string.
      * Can throw CompensationException for corruption/serialization errors.
      */
     suspend fun serialize(current: T, next: T): String

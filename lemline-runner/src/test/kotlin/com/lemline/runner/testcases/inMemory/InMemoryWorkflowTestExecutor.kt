@@ -25,9 +25,7 @@ import jakarta.inject.Inject
 import jakarta.inject.Singleton
 import java.util.concurrent.TimeoutException
 import kotlin.time.Duration.Companion.seconds
-import kotlin.time.ExperimentalTime
 import kotlinx.coroutines.delay
-import kotlinx.serialization.ExperimentalSerializationApi
 
 private const val LIFECYCLEEVENTS_OUT_CHANNEL = "lifecycleevents-out"
 private const val LIFECYCLEEVENTS_IN_CHANNEL = "lifecycleevents-in"
@@ -44,8 +42,6 @@ private const val LIFECYCLEEVENTS_IN_CHANNEL = "lifecycleevents-in"
  * to the in-memory channel, verifying that events flow through the messaging infrastructure.
  */
 @Singleton
-@ExperimentalTime
-@ExperimentalSerializationApi
 internal class InMemoryWorkflowTestExecutor : AbstractWorkflowTestExecutor() {
 
     private val logger = logger()
@@ -93,7 +89,7 @@ internal class InMemoryWorkflowTestExecutor : AbstractWorkflowTestExecutor() {
         commandsOut.clear()
         eventsOut.clear()
         lifecycleEventsOut.clear()
-        commandsIn.send(message.toJsonString())
+        commandsIn.send(message.toTransportPayload())
     }
 
     override suspend fun sendCloudEventPayload(payload: String) {

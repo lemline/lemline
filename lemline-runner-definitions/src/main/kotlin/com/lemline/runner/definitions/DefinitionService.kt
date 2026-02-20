@@ -11,8 +11,6 @@ import com.lemline.runner.listeners.DefinitionListenService
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
 import java.sql.Connection
-import kotlin.time.ExperimentalTime
-import kotlinx.serialization.ExperimentalSerializationApi
 
 /**
  * Service for managing workflow definitions and their associated listen tasks.
@@ -40,8 +38,6 @@ import kotlinx.serialization.ExperimentalSerializationApi
  * listen definitions are kept in sync. Do not use [DefinitionRepository]
  * directly for insert/update/delete operations.
  */
-@ExperimentalTime
-@ExperimentalSerializationApi
 @ApplicationScoped
 class DefinitionService {
 

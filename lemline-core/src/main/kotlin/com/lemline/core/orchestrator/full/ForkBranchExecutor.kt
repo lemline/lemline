@@ -14,14 +14,12 @@ import com.lemline.core.utils.mapAwaitAllFailFast
 import com.lemline.core.utils.mapAwaitFirstFailSlow
 import io.serverlessworkflow.api.types.Workflow
 import kotlin.time.Clock
-import kotlin.time.ExperimentalTime
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 
 /**
  * Executes fork branches in compete or cooperative mode.
  */
-@ExperimentalTime
 internal object ForkBranchExecutor {
 
     /**

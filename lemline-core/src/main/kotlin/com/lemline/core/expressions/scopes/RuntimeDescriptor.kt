@@ -1,12 +1,10 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.expressions.scopes
-
 import com.fasterxml.jackson.databind.JsonNode
 import com.lemline.core.expressions.scopes.RuntimeDescriptor.metadata
 import com.lemline.core.expressions.scopes.RuntimeDescriptor.name
 import com.lemline.core.expressions.scopes.RuntimeDescriptor.version
 import kotlinx.serialization.Serializable
-
 /**
  * Data class representing a runtime descriptor.
  *

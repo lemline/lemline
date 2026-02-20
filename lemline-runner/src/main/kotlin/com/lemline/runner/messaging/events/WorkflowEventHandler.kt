@@ -23,8 +23,6 @@ import com.lemline.runner.retries.RetryService
 import com.lemline.runner.schedules.ScheduleService
 import com.lemline.runner.waits.WaitService
 import jakarta.enterprise.context.ApplicationScoped
-import kotlin.time.ExperimentalTime
-import kotlinx.serialization.ExperimentalSerializationApi
 import org.eclipse.microprofile.reactive.messaging.Message
 import org.jetbrains.annotations.TestOnly
 
@@ -44,9 +42,7 @@ import org.jetbrains.annotations.TestOnly
  * - ListenStarted → ListenerService
  * - ListenForEachCompleted → ListenerEventService
  */
-@ExperimentalTime
 @ApplicationScoped
-@ExperimentalSerializationApi
 internal class WorkflowEventHandler(
     private val definitions: Definitions,
     private val failureRepository: FailureRepository,
@@ -81,7 +77,7 @@ internal class WorkflowEventHandler(
      * If deserialization fails, it stores the failure and throws to NACK the message.
      */
     override suspend fun Message<String>.deserialize(): InstanceMessage<WorkflowEvent> = try {
-        InstanceMessage.fromJsonString(payload)
+        InstanceMessage.fromTransportPayload(payload)
     } catch (e: Exception) {
         logger.warn { "Failed to deserialize message ${toLogString()} $payload: ${e.message}" }
         throw CompensationException(DESERIALIZATION_FAILURE) {

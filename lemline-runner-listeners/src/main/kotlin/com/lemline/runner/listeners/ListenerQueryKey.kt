@@ -9,14 +9,11 @@ import com.lemline.runner.common.repositories.ops.WORKFLOW_POSITION_COLUMN
 import com.lemline.runner.common.repositories.ops.WORKFLOW_VERSION_COLUMN
 import com.lemline.runner.listeners.ListenerRepository.Companion.CORRELATION_VALUES_COLUMN
 import java.sql.PreparedStatement
-import kotlin.time.ExperimentalTime
-import kotlinx.serialization.ExperimentalSerializationApi
 
 /**
  * Key for batch querying listeners by workflow identity, correlation, and strategy.
  * Optionally includes filterIndex for ALL strategy event insertion.
  */
-@OptIn(ExperimentalTime::class, ExperimentalSerializationApi::class)
 data class ListenerQueryKey(
     val workflowInfo: WorkflowInfo,
     val position: NodePosition,

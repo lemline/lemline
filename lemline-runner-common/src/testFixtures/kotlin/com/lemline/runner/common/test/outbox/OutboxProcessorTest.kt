@@ -24,18 +24,14 @@ import kotlin.time.Clock
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
-import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
-import kotlinx.serialization.ExperimentalSerializationApi
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 
-
-@ExperimentalTime
 infix fun Instant.shouldBeAfter(date: Instant) = (this > date) shouldBe true
 
 /**
@@ -64,8 +60,6 @@ infix fun Instant.shouldBeAfter(date: Instant) = (this > date) shouldBe true
  * @param modelClass KClass reference for MockK
  * @param createTestModel Factory function to create test entities
  */
-@ExperimentalTime
-@ExperimentalSerializationApi
 abstract class OutboxProcessorTest<T>(
     outboxRepository: () -> WithOutboxRepository<T>,
     crudRepository: () -> WithCrudRepository<T>,

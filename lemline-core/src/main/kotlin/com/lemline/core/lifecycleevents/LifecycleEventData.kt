@@ -2,7 +2,6 @@
 package com.lemline.core.lifecycleevents
 
 import com.lemline.common.values.WorkflowInfo
-import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -17,7 +16,6 @@ import kotlinx.serialization.json.JsonElement
  *
  * @see LifecycleEventHook for event emission hook points
  */
-@ExperimentalTime
 @Serializable
 sealed class LifecycleEventData {
 

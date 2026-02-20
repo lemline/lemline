@@ -1,10 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.expressions.scopes
-
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
-
 /**
  * Data class representing a workflow descriptor.
  *

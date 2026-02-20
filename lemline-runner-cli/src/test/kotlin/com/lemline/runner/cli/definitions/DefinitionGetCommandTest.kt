@@ -21,16 +21,12 @@ import io.mockk.verify
 import io.serverlessworkflow.api.types.Workflow
 import java.io.ByteArrayOutputStream
 import java.io.PrintStream
-import kotlin.time.ExperimentalTime
-import kotlinx.serialization.ExperimentalSerializationApi
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import picocli.CommandLine
 
-@ExperimentalTime
-@ExperimentalSerializationApi
 class DefinitionGetCommandTest {
 
     private lateinit var command: DefinitionGetCommand

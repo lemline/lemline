@@ -1,12 +1,10 @@
 // SPDX-License-Identifier: BUSL-1.1
-@file:OptIn(ExperimentalTime::class, ExperimentalSerializationApi::class)
 
 package com.lemline.runner.waits
 
 import com.lemline.common.values.IDV7
-import com.lemline.common.values.WorkflowInfo
-import com.lemline.core.random.random
-import com.lemline.core.states.WorkflowEvent
+import com.lemline.core.random.randomWaitStartedEvent
+import com.lemline.core.random.randomWorkflowInfo
 import com.lemline.runner.common.config.DatabaseConfig
 import com.lemline.runner.common.messaging.InstanceMessage
 import com.lemline.runner.common.test.ops.CleanerRepositoryTest
@@ -17,8 +15,6 @@ import com.lemline.runner.common.test.outbox.OutboxProcessorTest
 import kotlin.random.Random
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.days
-import kotlin.time.ExperimentalTime
-import kotlinx.serialization.ExperimentalSerializationApi
 import org.junit.jupiter.api.Nested
 
 /**
@@ -91,8 +87,8 @@ abstract class WaitRepositoryTestBase {
             WaitModel(
                 id = IDV7.random(),
                 instanceMessage = InstanceMessage(
-                    workflowInfo = WorkflowInfo.random(),
-                    workflowState = WorkflowEvent.WaitStarted.random(),
+                    workflowInfo = randomWorkflowInfo(),
+                    workflowState = randomWaitStartedEvent(),
                 ),
                 outboxScheduledFor = Clock.System.now(),
             )

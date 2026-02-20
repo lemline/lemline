@@ -8,7 +8,6 @@ import com.lemline.runner.common.activities.TestModeConfiguration
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.enterprise.inject.Produces
 import jakarta.inject.Inject
-import kotlin.time.ExperimentalTime
 import kotlinx.serialization.json.JsonElement
 
 @ApplicationScoped
@@ -17,11 +16,9 @@ class ActivityExecutorProducer {
     @Inject
     lateinit var testModeConfiguration: TestModeConfiguration
 
-    @ExperimentalTime
     private val runnerActivityExecutor by lazy { RunnerActivityExecutor() }
 
     @Produces
-    @ExperimentalTime
     @ApplicationScoped
     fun produce(): ActivityExecutor = object : ActivityExecutor {
         override suspend fun execute(event: ActivityStarted): JsonElement {

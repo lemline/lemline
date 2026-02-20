@@ -1,6 +1,4 @@
 // SPDX-License-Identifier: BUSL-1.1
-@file:OptIn(ExperimentalTime::class, ExperimentalSerializationApi::class)
-
 package com.lemline.runner.schedules
 
 import com.lemline.runner.common.config.DatabaseConfig
@@ -12,8 +10,6 @@ import com.lemline.runner.common.test.ops.OutboxRepositoryTest
 import kotlin.random.Random
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.days
-import kotlin.time.ExperimentalTime
-import kotlinx.serialization.ExperimentalSerializationApi
 import org.junit.jupiter.api.Nested
 
 abstract class ScheduleRepositoryTestBase {

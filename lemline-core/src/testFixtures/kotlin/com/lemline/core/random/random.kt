@@ -1,15 +1,13 @@
 // SPDX-License-Identifier: BUSL-1.1
-@file:OptIn(ExperimentalTime::class)
-
 package com.lemline.core.random
 
 import com.lemline.common.random.random
+import com.lemline.common.random.randomWorkflowName
+import com.lemline.common.random.randomWorkflowNamespace
+import com.lemline.common.random.randomWorkflowVersion
 import com.lemline.common.values.NodePosition
 import com.lemline.common.values.WorkflowId
 import com.lemline.common.values.WorkflowInfo
-import com.lemline.common.values.WorkflowName
-import com.lemline.common.values.WorkflowNamespace
-import com.lemline.common.values.WorkflowVersion
 import com.lemline.core.errors.InternalException
 import com.lemline.core.processors.CorrelationDef
 import com.lemline.core.processors.EventFilter
@@ -20,18 +18,11 @@ import com.lemline.core.processors.UntilCondition
 import com.lemline.core.processors.WaitConfig
 import com.lemline.core.states.DoState
 import com.lemline.core.states.ForState
-import com.lemline.core.states.ForkState
 import com.lemline.core.states.NodeStack
-import com.lemline.core.states.NodeState
-import com.lemline.core.states.RaiseState
 import com.lemline.core.states.RootState
-import com.lemline.core.states.RunState
-import com.lemline.core.states.SetState
 import com.lemline.core.states.StackFrame
-import com.lemline.core.states.SwitchState
 import com.lemline.core.states.TaskState
 import com.lemline.core.states.TryState
-import com.lemline.core.states.WaitState
 import com.lemline.core.states.WorkflowCommand
 import com.lemline.core.states.WorkflowEvent
 import com.lemline.core.states.WorkflowState
@@ -42,7 +33,6 @@ import io.serverlessworkflow.api.types.ListenTaskConfiguration.ListenAndReadAs
 import kotlin.random.Random
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.milliseconds
-import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
@@ -81,37 +71,37 @@ fun JsonElement.Companion.nullableRandom(): JsonElement {
 
 fun NodePosition.Companion.random() = NodePosition("/${String.random()}/${String.random()}/${String.random()}")
 
-fun WorkflowInfo.Companion.random() = WorkflowInfo(
-    namespace = WorkflowNamespace.random(),
-    name = WorkflowName.random(),
-    version = WorkflowVersion.random(),
+fun randomWorkflowInfo() = WorkflowInfo(
+    namespace = randomWorkflowNamespace(),
+    name = randomWorkflowName(),
+    version = randomWorkflowVersion(),
 )
 
-fun NodeState.Companion.random() = when (Random.nextInt(12)) {
-    0 -> TaskState.random()
-    1 -> DoState.random()
-    2 -> ForkState.random()
-    3 -> ForState.random()
-    4 -> RaiseState.random()
-    5 -> RootState.random()
-    6 -> RunState.random()
-    7 -> SetState.random()
-    8 -> SwitchState.random()
-    9 -> TryState.random()
-    10 -> WaitState.random()
-    else -> RootState.random()
+fun randomNodeState() = when (Random.nextInt(12)) {
+    0 -> randomTaskState()
+    1 -> randomDoState()
+    2 -> randomTaskState()
+    3 -> randomForState()
+    4 -> randomTaskState()
+    5 -> randomRootState()
+    6 -> randomTaskState()
+    7 -> randomTaskState()
+    8 -> randomTaskState()
+    9 -> randomTryState()
+    10 -> randomTaskState()
+    else -> randomRootState()
 }
 
-fun TaskState.Companion.random() = TaskState(
+fun randomTaskState() = TaskState(
     startedAt = Instant.random(),
 )
 
-fun DoState.Companion.random() = DoState(
+fun randomDoState() = DoState(
     startedAt = Instant.random(),
     index = Random.nextInt(),
 )
 
-fun ForState.Companion.random() = ForState(
+fun randomForState() = ForState(
     startedAt = Instant.random(),
     collection = listOf(JsonElement.random()),
     index = Random.nextInt(),
@@ -119,7 +109,7 @@ fun ForState.Companion.random() = ForState(
     forAt = String.random()
 )
 
-fun RootState.Companion.random() = RootState(
+fun randomRootState() = RootState(
     startedAt = Instant.random(),
     workflowId = WorkflowId.random(),
     workflowInput = JsonElement.random(),
@@ -131,7 +121,7 @@ fun RootState.Companion.random() = RootState(
     hasWaitingParent = Random.nextBoolean()
 )
 
-fun TryState.Companion.random() = TryState(
+fun randomTryState() = TryState(
     startedAt = Instant.random(),
     transformedInput = JsonElement.random(),
     attemptIndex = Random.nextInt(0, 10),
@@ -166,49 +156,49 @@ fun randomFlowDirective(): FlowDirective = when (Random.nextInt(4)) {
     else -> FlowDirectiveGoto(String.random())
 }
 
-fun RunWorkflowConfig.Companion.random() = RunWorkflowConfig(
-    namespace = WorkflowNamespace.random(),
-    name = WorkflowName.random(),
-    version = WorkflowVersion.random(),
+fun randomRunWorkflowConfig() = RunWorkflowConfig(
+    namespace = randomWorkflowNamespace(),
+    name = randomWorkflowName(),
+    version = randomWorkflowVersion(),
     input = JsonElement.random(),
     sync = Random.nextBoolean()
 )
 
-fun WorkflowState.Companion.random(): WorkflowState = when (Random.nextBoolean()) {
-    true -> WorkflowEvent.random()
-    false -> WorkflowCommand.random()
+fun randomWorkflowState(): WorkflowState = when (Random.nextBoolean()) {
+    true -> randomWorkflowEvent()
+    false -> randomWorkflowCommand()
 }
 
-fun WorkflowCommand.Companion.random(): WorkflowCommand {
+fun randomWorkflowCommand(): WorkflowCommand {
     return when (Random.nextInt(2)) {
-        0 -> WorkflowCommand.ResumeFromTask.random()
-        else -> WorkflowCommand.ResumeWithCompletedTask.random()
+        0 -> randomResumeFromTaskCommand()
+        else -> randomResumeWithCompletedTaskCommand()
     }
 }
 
-fun WorkflowCommand.ResumeFromTask.Companion.random() = WorkflowCommand.ResumeFromTask(
+fun randomResumeFromTaskCommand() = WorkflowCommand.ResumeFromTask(
     nodeStack = NodeStack.random(),
     nodePosition = NodePosition.random(),
     rawInput = JsonElement.random(),
     flowDirective = randomFlowDirective(),
 )
 
-fun WorkflowCommand.ResumeWithCompletedTask.Companion.random() = WorkflowCommand.ResumeWithCompletedTask(
+fun randomResumeWithCompletedTaskCommand() = WorkflowCommand.ResumeWithCompletedTask(
     nodeStack = NodeStack.random(),
     rawOutput = JsonElement.random(),
 )
 
-fun WorkflowEvent.Companion.random(): WorkflowEvent {
+fun randomWorkflowEvent(): WorkflowEvent {
     return when (Random.nextInt(9)) {
-        0 -> WorkflowEvent.WorkflowCompleted.random()
-        1 -> WorkflowEvent.WorkflowFailed.random()
-        2 -> WorkflowEvent.TaskScheduled.random()
-        3 -> WorkflowEvent.WaitStarted.random()
-        4 -> WorkflowEvent.TaskRetryScheduled.random()
-        5 -> WorkflowEvent.RunWorkflowStarted.random()
-        6 -> WorkflowEvent.ForkStarted.random()
-        7 -> WorkflowEvent.ForkBranchCompleted.random()
-        else -> WorkflowEvent.ListenStarted.random()
+        0 -> randomWorkflowCompletedEvent()
+        1 -> randomWorkflowFailedEvent()
+        2 -> randomTaskScheduledEvent()
+        3 -> randomWaitStartedEvent()
+        4 -> randomTaskRetryScheduledEvent()
+        5 -> randomRunWorkflowStartedEvent()
+        6 -> randomForkStartedEvent()
+        7 -> randomForkBranchCompletedEvent()
+        else -> randomListenStartedEvent()
     }
 }
 
@@ -220,20 +210,20 @@ fun NodeStack.Companion.random(): NodeStack {
 
     return NodeStack.fromFrames(
         listOf(
-            StackFrame(rootPosition, RootState.random()),
-            StackFrame(childPosition, NodeState.random()),
-            StackFrame(grandchildPosition, NodeState.random())
+            StackFrame(rootPosition, randomRootState()),
+            StackFrame(childPosition, randomNodeState()),
+            StackFrame(grandchildPosition, randomNodeState())
         )
     )
 }
 
-fun WorkflowEvent.WorkflowCompleted.Companion.random() = WorkflowEvent.WorkflowCompleted(
+fun randomWorkflowCompletedEvent() = WorkflowEvent.WorkflowCompleted(
     output = JsonElement.random(),
     completedAt = Clock.System.now(),
     nodeStack = NodeStack.random()
 )
 
-fun WorkflowEvent.WorkflowFailed.Companion.random() = WorkflowEvent.WorkflowFailed(
+fun randomWorkflowFailedEvent() = WorkflowEvent.WorkflowFailed(
     nodeStack = NodeStack.random(),
     rawInput = when (Random.nextBoolean()) {
         true -> JsonElement.random()
@@ -251,7 +241,7 @@ fun WorkflowEvent.WorkflowFailed.Companion.random() = WorkflowEvent.WorkflowFail
     failedAt = Instant.random()
 )
 
-fun WorkflowEvent.TaskScheduled.Companion.random() = WorkflowEvent.TaskScheduled(
+fun randomTaskScheduledEvent() = WorkflowEvent.TaskScheduled(
     nodeStack = NodeStack.random(),
     nodePosition = NodePosition.random(),
     rawInput = JsonElement.random(),
@@ -261,17 +251,17 @@ fun WorkflowEvent.TaskScheduled.Companion.random() = WorkflowEvent.TaskScheduled
     }
 )
 
-fun WaitConfig.Companion.random() = WaitConfig(
+fun randomWaitConfig() = WaitConfig(
     waitUntil = Clock.System.now() + Random.nextLong(100, 10000).milliseconds
 )
 
-fun WorkflowEvent.WaitStarted.Companion.random() = WorkflowEvent.WaitStarted(
+fun randomWaitStartedEvent() = WorkflowEvent.WaitStarted(
     nodeStack = NodeStack.random(),
     rawOutput = JsonElement.random(),
-    config = WaitConfig.random()
+    config = randomWaitConfig()
 )
 
-fun WorkflowEvent.TaskRetryScheduled.Companion.random() = WorkflowEvent.TaskRetryScheduled(
+fun randomTaskRetryScheduledEvent() = WorkflowEvent.TaskRetryScheduled(
     nodeStack = NodeStack.random(),
     nodePosition = NodePosition.random(),
     rawInput = JsonElement.random(),
@@ -282,18 +272,18 @@ fun WorkflowEvent.TaskRetryScheduled.Companion.random() = WorkflowEvent.TaskRetr
     retryAt = Clock.System.now() + Random.nextLong(100, 10000).milliseconds
 )
 
-fun WorkflowEvent.RunWorkflowStarted.Companion.random() = WorkflowEvent.RunWorkflowStarted(
+fun randomRunWorkflowStartedEvent() = WorkflowEvent.RunWorkflowStarted(
     nodeStack = NodeStack.random(),
     rawInput = JsonElement.random(),
-    config = RunWorkflowConfig.random()
+    config = randomRunWorkflowConfig()
 )
 
-fun WorkflowEvent.ForkStarted.Companion.random() = WorkflowEvent.ForkStarted(
+fun randomForkStartedEvent() = WorkflowEvent.ForkStarted(
     nodeStack = NodeStack.random(),
     rawInput = JsonElement.random(),
 )
 
-fun WorkflowEvent.ForkBranchCompleted.Companion.random() =
+fun randomForkBranchCompletedEvent() =
     WorkflowEvent.ForkBranchCompleted(
         nodeStack = NodeStack.random(),
         branchPosition = NodePosition.random(),
@@ -381,7 +371,7 @@ fun randomListenConfig() = ListenConfig(
     }
 )
 
-fun WorkflowEvent.ListenStarted.Companion.random() = WorkflowEvent.ListenStarted(
+fun randomListenStartedEvent() = WorkflowEvent.ListenStarted(
     nodeStack = NodeStack.random(),
     rawOutput = JsonElement.random(),
     config = randomListenConfig()

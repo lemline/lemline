@@ -1,14 +1,6 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.common.values
 
-import kotlinx.serialization.KSerializer
-import kotlinx.serialization.Serializable
-import kotlinx.serialization.descriptors.PrimitiveKind
-import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
-import kotlinx.serialization.descriptors.SerialDescriptor
-import kotlinx.serialization.encoding.Decoder
-import kotlinx.serialization.encoding.Encoder
-
 /**
  * Represents a static position in the workflow definition tree.
  *
@@ -20,7 +12,6 @@ import kotlinx.serialization.encoding.Encoder
  *
  * @property path The path string representing the position in JSON Pointer format.
  */
-@Serializable(with = NodePositionSerializer::class)
 data class NodePosition(private val path: String) {
 
     init {
@@ -114,23 +105,5 @@ data class NodePosition(private val path: String) {
          * Common position: /do
          */
         val doRoot = NodePosition(root.path + Token.DO.token)
-    }
-}
-
-/**
- * Custom kotlinx.serialization serializer for [NodePosition].
- * Serializes to/from the string representation of the JSON Pointer.
- */
-internal object NodePositionSerializer : KSerializer<NodePosition> {
-
-    override val descriptor: SerialDescriptor =
-        PrimitiveSerialDescriptor("NodePosition", PrimitiveKind.STRING)
-
-    override fun serialize(encoder: Encoder, value: NodePosition) {
-        encoder.encodeString(value.toString())
-    }
-
-    override fun deserialize(decoder: Decoder): NodePosition {
-        return NodePosition(decoder.decodeString())
     }
 }

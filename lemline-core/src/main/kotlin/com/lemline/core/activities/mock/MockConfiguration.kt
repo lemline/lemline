@@ -122,7 +122,6 @@ data class MockConfiguration(
         fun empty() = MockConfiguration()
     }
 }
-
 // ─────────────────────────────────────────────────────────────────────────────
 // Emit Mock Rules
 // ─────────────────────────────────────────────────────────────────────────────
@@ -157,7 +156,6 @@ data class EmitMockResponse(
     val output: JsonElement? = null,
     val error: String? = null
 )
-
 // ─────────────────────────────────────────────────────────────────────────────
 // Listen Mock Rules
 // ─────────────────────────────────────────────────────────────────────────────
@@ -186,7 +184,6 @@ data class ListenMockResponse(
     val data: JsonElement? = null,
     val error: String? = null
 )
-
 // ─────────────────────────────────────────────────────────────────────────────
 // HTTP Mock Rules
 // ─────────────────────────────────────────────────────────────────────────────
@@ -223,7 +220,6 @@ data class HttpMockResponse(
     val headers: Map<String, String> = emptyMap(),
     val error: String? = null
 )
-
 // ─────────────────────────────────────────────────────────────────────────────
 // Script Mock Rules
 // ─────────────────────────────────────────────────────────────────────────────
@@ -251,7 +247,6 @@ data class ScriptMockResponse(
     val output: JsonElement? = null,
     val exitCode: Int = 0
 )
-
 // ─────────────────────────────────────────────────────────────────────────────
 // Shell Mock Rules
 // ─────────────────────────────────────────────────────────────────────────────
@@ -280,7 +275,6 @@ data class ShellMockResponse(
     val stderr: String = "",
     val exitCode: Int = 0
 )
-
 // ─────────────────────────────────────────────────────────────────────────────
 // Function Mock Rules
 // ─────────────────────────────────────────────────────────────────────────────
@@ -308,11 +302,9 @@ data class FunctionMockResponse(
     val output: JsonElement? = null,
     val error: String? = null
 )
-
 // ─────────────────────────────────────────────────────────────────────────────
 // Utility Functions
 // ─────────────────────────────────────────────────────────────────────────────
-
 /**
  * Simple glob pattern matching.
  * Supports `*` (matches any characters) and `?` (matches single character).
@@ -324,11 +316,9 @@ internal fun globMatches(pattern: String, input: String): Boolean {
         .replace("?", ".")
     return Regex(regex, RegexOption.IGNORE_CASE).matches(input)
 }
-
 // ─────────────────────────────────────────────────────────────────────────────
 // Exceptions
 // ─────────────────────────────────────────────────────────────────────────────
-
 /**
  * Thrown when no mock rule matches the activity request.
  */

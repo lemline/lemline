@@ -14,7 +14,6 @@ import com.lemline.core.workflows.WorkflowCache
 import io.cloudevents.CloudEvent
 import io.serverlessworkflow.api.types.Workflow
 import kotlin.time.Clock
-import kotlin.time.ExperimentalTime
 import kotlinx.serialization.json.JsonElement
 
 /**
@@ -35,7 +34,6 @@ import kotlinx.serialization.json.JsonElement
  */
 class FullOrchestratorTestExecutor : WorkflowTestExecutor {
 
-    @ExperimentalTime
     override suspend fun execute(
         yaml: String,
         input: JsonElement,

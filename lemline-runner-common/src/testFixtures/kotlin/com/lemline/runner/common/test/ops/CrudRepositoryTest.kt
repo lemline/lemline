@@ -8,10 +8,8 @@ import io.kotest.matchers.shouldBe
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
-import kotlin.time.ExperimentalTime
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
-import kotlinx.serialization.ExperimentalSerializationApi
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 
@@ -27,8 +25,6 @@ import org.junit.jupiter.api.Test
  * @param createEntity Factory function to create random test entities
  * @param modifyEntity Function to modify an entity for update tests
  */
-@ExperimentalTime
-@ExperimentalSerializationApi
 abstract class CrudRepositoryTest<T : Any>(
     crudRepository: () -> WithCrudRepository<T>,
     private val createEntity: () -> T,

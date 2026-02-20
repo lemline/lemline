@@ -20,9 +20,7 @@ import io.smallrye.reactive.messaging.MutinyEmitter
 import jakarta.enterprise.inject.Instance
 import jakarta.inject.Inject
 import jakarta.inject.Singleton
-import kotlin.time.ExperimentalTime
 import kotlinx.coroutines.delay
-import kotlinx.serialization.ExperimentalSerializationApi
 import org.eclipse.microprofile.reactive.messaging.Channel
 import org.eclipse.microprofile.reactive.messaging.Message
 
@@ -42,8 +40,6 @@ import org.eclipse.microprofile.reactive.messaging.Message
  * to the broker, verifying that events actually flow through the messaging infrastructure.
  */
 @Singleton
-@ExperimentalTime
-@ExperimentalSerializationApi
 internal class BrokerWorkflowTestExecutor : AbstractWorkflowTestExecutor() {
 
     private val logger = logger()

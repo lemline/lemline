@@ -1,6 +1,4 @@
 // SPDX-License-Identifier: BUSL-1.1
-@file:OptIn(ExperimentalTime::class, ExperimentalSerializationApi::class)
-
 package com.lemline.runner.common.repositories.ops
 
 import com.lemline.common.values.IDV7
@@ -17,10 +15,8 @@ import java.sql.Timestamp
 import java.sql.Types
 import java.time.Instant
 import kotlin.time.Clock
-import kotlin.time.ExperimentalTime
 import kotlin.time.toJavaInstant
 import kotlin.time.toKotlinInstant
-import kotlinx.serialization.ExperimentalSerializationApi
 
 const val CREATED_AT_COLUMN = "created_at"
 const val UPDATED_AT_COLUMN = "updated_at"

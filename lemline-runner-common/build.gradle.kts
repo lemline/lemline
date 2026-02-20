@@ -11,6 +11,7 @@ dependencies {
     // Internal modules
     implementation(project(":lemline-common"))
     implementation(project(":lemline-core"))
+    implementation(project(":lemline-messages-proto"))
 
     // KotlinX ecosystem
     implementation(libs.bundles.kotlinxEcosystem)

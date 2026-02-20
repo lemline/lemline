@@ -1,6 +1,4 @@
 // SPDX-License-Identifier: BUSL-1.1
-@file:OptIn(ExperimentalTime::class, ExperimentalSerializationApi::class)
-
 package com.lemline.runner.common.repositories.ops
 
 import com.lemline.common.values.IDV7
@@ -11,8 +9,6 @@ import com.lemline.runner.common.repositories.helpers.IdV7Helper
 import com.lemline.runner.common.repositories.with.WithIdRepository
 import java.sql.Connection
 import java.sql.ResultSet
-import kotlin.time.ExperimentalTime
-import kotlinx.serialization.ExperimentalSerializationApi
 
 const val ID_COLUMN = "id"
 

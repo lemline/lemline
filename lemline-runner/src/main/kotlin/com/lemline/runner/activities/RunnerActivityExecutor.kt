@@ -6,7 +6,6 @@ import com.lemline.core.activities.ActivityExecutor
 import com.lemline.core.states.WorkflowEvent.ActivityStarted
 import com.lemline.runner.messaging.cloudevents.CloudEventsEmitter
 import io.quarkus.arc.Arc
-import kotlin.time.ExperimentalTime
 import kotlinx.serialization.json.JsonElement
 
 /**
@@ -22,7 +21,6 @@ import kotlinx.serialization.json.JsonElement
  * Note: This class is NOT a CDI bean. It's instantiated by [ActivityExecutorProducer]
  * which decides which executor to use based on test mode configuration.
  */
-@ExperimentalTime
 class RunnerActivityExecutor : ActivityExecutor {
 
     private val logger = logger()

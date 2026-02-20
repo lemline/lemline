@@ -54,9 +54,7 @@ data class WorkflowTestCase(
     val timeout: Duration = 5.seconds,
     val validateDefinition: Boolean = true,
     val skip: Boolean = false
-) {
-    companion object
-}
+)
 
 /**
  * Result of executing a workflow test case.

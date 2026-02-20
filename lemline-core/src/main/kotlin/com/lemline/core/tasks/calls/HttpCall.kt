@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.tasks.calls
-
 import com.charleskorn.kaml.Yaml
 import com.charleskorn.kaml.YamlConfiguration
 import com.lemline.common.json.LemlineJson
@@ -53,20 +52,17 @@ import java.util.*
 import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import nl.adaptivity.xmlutil.serialization.XML
-
 // Yaml mapper for kotlin serialization
 private val yaml = Yaml(configuration = YamlConfiguration(strictMode = false))
-
 // XML mapper for kotlin serialization
 private val xml = XML { autoPolymorphic = true }
-
 // HTTP client with CIO engine and JSON serialization
 private val defaultClient by lazy {
     HttpClient(CIO) {
@@ -91,7 +87,6 @@ private val defaultClient by lazy {
         followRedirects = false
     }
 }
-
 /**
  * HttpCall is a utility class for making HTTP requests.
  * It supports GET, POST, PUT, and DELETE methods, with various options
@@ -124,13 +119,11 @@ class HttpCall(
         redirect: Boolean,
         authentication: AuthenticationPolicy?,
     ): JsonElement {
-
         // Create a new client configuration for this specific request with the redirect setting and authentication
         val response: HttpResponse = try {
             client.config {
                 // Only follow redirects if explicitly requested
                 followRedirects = redirect
-
                 // Apply authentication if provided
                 authentication?.let { applyAuthentication(it) }
             }.request(url) {
@@ -148,7 +141,6 @@ class HttpCall(
             // Handle other exceptions (connection errors, etc.)
             raiseError(COMMUNICATION, "HTTP call failed: ${e.message}", e.stackTraceToString(), null)
         }
-
         // Check for HTTP errors based on the redirect parameter
         if (!isAcceptableStatus(response.status, redirect)) {
             val statusCode = response.status.value
@@ -161,17 +153,14 @@ class HttpCall(
             }
             raiseError(COMMUNICATION, message, responseBody, statusCode)
         }
-
         // Return response as requested
         return response.getAs(output)
     }
-
     private suspend fun HttpResponse.getAs(format: HTTPOutput): JsonElement = when (format) {
         HTTPOutput.RAW -> getRawContentAsJsonElement(this)
         HTTPOutput.CONTENT -> getContentAsJsonElement(this)
         HTTPOutput.RESPONSE -> getResponseAsJsonElement(this)
     }
-
     /**
      * Retrieves the HTTP response as a JsonElement, including request details, status code, headers, and content.
      *
@@ -189,13 +178,11 @@ class HttpCall(
         put("headers", response.headers.toMap().toJsonElement())
         put("content", getContentAsJsonElement(response))
     }
-
     /**
      * Retrieves the raw content of the HTTP response as a base64-encoded JsonPrimitive.
      */
     private suspend fun getRawContentAsJsonElement(response: HttpResponse) =
         JsonPrimitive(Base64.getEncoder().encodeToString(response.bodyAsBytes()))
-
     /**
      * Retrieves the content of the HTTP response as a JsonElement based on the content type.
      * It supports JSON, YAML, XML, and plain text formats.
@@ -206,9 +193,7 @@ class HttpCall(
     private suspend fun getContentAsJsonElement(response: HttpResponse): JsonElement {
         val contentType = response.contentType()?.withoutParameters()?.toString()?.lowercase()
             ?: return getRawContentAsJsonElement(response)
-
         val text = response.bodyAsText()
-
         return try {
             when {
                 contentType.contains("json") -> LemlineJson.json.parseToJsonElement(text)
@@ -221,7 +206,6 @@ class HttpCall(
             raiseError(COMMUNICATION, "Failed to parse response content as $contentType: ${e.message}", text, null)
         }
     }
-
     /**
      * Determines if a given HTTP status code is acceptable based on the redirect parameter.
      *
@@ -239,7 +223,6 @@ class HttpCall(
             statusValue in 200..299
         }
     }
-
     /**
      * Applies authentication to the HTTP client configuration based on the authentication configuration.
      */
@@ -252,34 +235,28 @@ class HttpCall(
             is SecretBasedAuthenticationPolicy -> applySecretBasedAuth(auth, fromUse)
             else -> raiseError(RUNTIME, "Unsupported basic authentication type: ${auth::class.simpleName}", null, null)
         }
-
         is BearerAuthenticationPolicy -> when (val auth = authentication.bearer.get()) {
             is BearerAuthenticationProperties -> applyBearerAuth(auth)
             is SecretBasedAuthenticationPolicy -> applySecretBasedAuth(auth, fromUse)
             else -> raiseError(RUNTIME, "Unsupported bearer authentication type: ${auth::class.simpleName}", null, null)
         }
-
         is OAuth2AuthenticationPolicy -> when (val auth = authentication.oauth2.get()) {
             is OAuth2AuthenticationPolicyConfiguration -> applyOauth2Auth(auth)
             is SecretBasedAuthenticationPolicy -> applySecretBasedAuth(auth, fromUse)
             else -> raiseError(RUNTIME, "Unsupported oauth2 authentication type: ${auth::class.simpleName}", null, null)
         }
-
         is DigestAuthenticationPolicy -> when (val auth = authentication.digest.get()) {
             is DigestAuthenticationProperties -> applyDigestAuth(auth)
             is SecretBasedAuthenticationPolicy -> applySecretBasedAuth(auth, fromUse)
             else -> raiseError(RUNTIME, "Unsupported digest authentication type: ${auth::class.simpleName}", null, null)
         }
-
         is OpenIdConnectAuthenticationPolicy -> when (val auth = authentication.oidc.get()) {
             is OAuth2AutenthicationData -> applyOpenIdAuth(auth)
             is SecretBasedAuthenticationPolicy -> applySecretBasedAuth(auth, fromUse)
             else -> raiseError(RUNTIME, "Unsupported openId authentication type: ${auth::class.simpleName}", null, null)
         }
-
         else -> raiseError(RUNTIME, "Unsupported authentication type: ${authentication::class.simpleName}", null, null)
     }
-
     /**
      * Applies secret-based authentication to the HTTP client configuration.
      */
@@ -293,7 +270,6 @@ class HttpCall(
         // Check if the authentication is defined in the workflow's use section
         applyAuthentication(getAuthenticationPolicyByName(name), true)
     }
-
     /**
      * Applies Digest authentication to the HTTP client configuration.
      */
@@ -302,7 +278,6 @@ class HttpCall(
             ?: raiseError(CONFIGURATION, "Username is missing for Digest authentication", null, null)
         val password = digestAuthenticationProperties.password?.let { getSecretByName(it) }
             ?: raiseError(CONFIGURATION, "Password is missing for Digest authentication", null, null)
-
         install(Auth) {
             digest {
                 credentials {
@@ -314,7 +289,6 @@ class HttpCall(
             }
         }
     }
-
     /**
      * Applies Basic authentication to the HTTP client configuration.
      */
@@ -323,7 +297,6 @@ class HttpCall(
             ?: raiseError(CONFIGURATION, "Username is missing for Basic authentication", null, null)
         val password = basicAuthenticationProperties.password?.let { getSecretByName(it) }
             ?: raiseError(CONFIGURATION, "Password is missing for Basic authentication", null, null)
-
         install(Auth) {
             basic {
                 credentials {
@@ -332,14 +305,12 @@ class HttpCall(
             }
         }
     }
-
     /**
      * Applies Bearer authentication to the HTTP client configuration.
      */
     private fun HttpClientConfig<*>.applyBearerAuth(bearerAuthenticationProperties: BearerAuthenticationProperties) {
         val token = bearerAuthenticationProperties.token?.let { getSecretByName(it) }
             ?: raiseError(CONFIGURATION, "Token is missing for Bearer authentication", null, null)
-
         install(Auth) {
             bearer {
                 loadTokens {
@@ -349,7 +320,6 @@ class HttpCall(
             }
         }
     }
-
     /**
      * Applies OAuth2 authentication to the HTTP client configuration.
      */
@@ -358,10 +328,8 @@ class HttpCall(
     ) {
         val authData = oauth2AuthenticationPolicyConfiguration.getoAuth2AutenthicationData()
         val endpoints = oauth2AuthenticationPolicyConfiguration.getoAuth2ConnectAuthenticationProperties().endpoints
-
         applyOauth2Auth(authData, endpoints)
     }
-
     private fun HttpClientConfig<*>.applyOauth2Auth(
         authData: OAuth2AutenthicationData,
         endpoints: OAuth2AuthenticationPropertiesEndpoints,
@@ -389,23 +357,24 @@ class HttpCall(
             }
         }
     }
-
     private fun HttpClientConfig<*>.applyOpenIdAuth(authData: OAuth2AutenthicationData) {
         val endpoints = OAuth2AuthenticationPropertiesEndpoints() // default endpoints
-
         applyOauth2Auth(authData, endpoints)
     }
-
     @Serializable
     data class OAuthTokenResponse(
-        @SerialName("access_token") val accessToken: String,
-        @SerialName("token_type") val tokenType: String,
-        @SerialName("expires_in") val expiresIn: Int,
-        @SerialName("refresh_token") val refreshToken: String? = null,
-        @SerialName("id_token") val idToken: String? = null,
+        @SerialName("access_token")
+        val accessToken: String,
+        @SerialName("token_type")
+        val tokenType: String,
+        @SerialName("expires_in")
+        val expiresIn: Int,
+        @SerialName("refresh_token")
+        val refreshToken: String? = null,
+        @SerialName("id_token")
+        val idToken: String? = null,
         val scope: String? = null,
     )
-
     private suspend fun requestOAuth2Token(
         client: HttpClient,
         authData: OAuth2AutenthicationData,
@@ -414,24 +383,19 @@ class HttpCall(
         val authority = authData.authority?.toUrl(raiseError)
             ?: raiseError(CONFIGURATION, "Authority is missing for OAuth2 authentification", null, null)
         val tokenUrl = URLBuilder(authority).apply { encodedPath += endpoints.token }.buildString()
-
         val params = Parameters.build {
             append("grant_type", authData.grant.value())
-
             val authMethod = authData.client?.authentication ?: CLIENT_SECRET_POST
             val authMethodError by lazy { "is required for ${authMethod.value()} of OAuth2 authentication" }
-
             val clientId = authData.client?.id
                 ?: raiseError(CONFIGURATION, "client.id $authMethodError", null, null)
             val clientSecret = authData.client?.secret?.let { getSecretByName(it) }
-
             when (authMethod) {
                 CLIENT_SECRET_POST -> {
                     clientSecret ?: raiseError(CONFIGURATION, "client.secret $authMethodError", null, null)
                     append("client_id", clientId)
                     append("client_secret", clientSecret)
                 }
-
                 CLIENT_SECRET_BASIC -> {
                     clientSecret ?: raiseError(CONFIGURATION, "client.secret $authMethodError", null, null)
                     headers {
@@ -442,7 +406,6 @@ class HttpCall(
                         )
                     }
                 }
-
                 CLIENT_SECRET_JWT, PRIVATE_KEY_JWT -> {
                     append("client_id", clientId)
                     append("client_assertion_type", "urn:ietf:params:oauth:client-assertion-type:jwt-bearer")
@@ -450,35 +413,28 @@ class HttpCall(
                         ?: raiseError(CONFIGURATION, "client.assertion $authMethodError", null, null)
                     append("client_assertion", jwtAssertion)
                 }
-
                 NONE -> {
                     append("client_id", clientId)
                 }
             }
-
             if (authData.scopes.isNotEmpty()) {
                 append("scope", authData.scopes.joinToString(" "))
             }
-
             if (authData.audiences.isNotEmpty()) {
                 append("audience", authData.audiences.joinToString(" "))
             }
-
             when (val grantType = authData.grant) {
                 AUTHORIZATION_CODE -> {
                     raiseError(RUNTIME, "authorization_code grant is not yet supported", null, null) // TODO
-
 //                    authData.request?.let { req ->
 //                        req.code?.let { append("code", it) }
 //                        req.redirectUri?.let { append("redirect_uri", it) }
 //                        req.codeVerifier?.let { append("code_verifier", it) }
 //                    }
                 }
-
                 CLIENT_CREDENTIALS -> {
                     /* No additional parameters needed */
                 }
-
                 PASSWORD -> {
                     val username = authData.username
                         ?: raiseError(CONFIGURATION, "username is missing for ${grantType.value()} grant", null, null)
@@ -487,7 +443,6 @@ class HttpCall(
                     append("username", username)
                     append("password", password)
                 }
-
                 REFRESH_TOKEN -> {
                     val refreshToken = authData.subject.token?.let { getSecretByName(it) }
                         ?: raiseError(
@@ -498,7 +453,6 @@ class HttpCall(
                         )
                     append("refresh_token", refreshToken)
                 }
-
                 URN_IETF_PARAMS_OAUTH_GRANT_TYPE_TOKEN_EXCHANGE -> {
                     val subjectToken = authData.subject.token?.let { getSecretByName(it) }
                         ?: raiseError(
@@ -519,17 +473,14 @@ class HttpCall(
                     append("requested_token_type", "urn:ietf:params:oauth:token-type:access_token")
                     append("subject_token_type", "urn:ietf:params:oauth:token-type:access_token")
                 }
-
                 else -> raiseError(CONFIGURATION, "Unsupported grant type: $grantType", null, null)
             }
         }
-
         return client.submitForm(
             url = tokenUrl,
             formParameters = params,
         ).body()
     }
-
     /**
      * Cache for OAuth2 tokens to avoid unnecessary requests.
      * The cache uses a combination of authority, client ID, grant type, scopes, audiences, username, and subject token
@@ -537,7 +488,6 @@ class HttpCall(
      */
     private val tokenCache = ConcurrentHashMap<Int, CachedOAuthToken>()
     private val tokenLocks = ConcurrentHashMap<Int, Mutex>()
-
     data class CachedOAuthToken(
         val token: OAuthTokenResponse,
         val expirationTime: Long, // epoch millis
@@ -545,7 +495,6 @@ class HttpCall(
     ) {
         fun isExpired(): Boolean = System.currentTimeMillis() > expirationTime - 30_000 // 30 sec early
     }
-
     /**
      * Requests an OAuth2 token with caching support.
      * If a valid token is already cached, it will be returned instead of making a new request.
@@ -558,21 +507,17 @@ class HttpCall(
     ): OAuthTokenResponse {
         val key = cacheKey(authData)
         val lock = tokenLocks.computeIfAbsent(key) { Mutex() }
-
         return lock.withLock {
             val cached = tokenCache[key]
-
             if (cached != null && !cached.isExpired()) {
                 return@withLock cached.token
             }
-
             // Try refresh
             if (cached?.refreshable == true && cached.token.refreshToken != null) {
                 val refreshData = authData.copyWith(
                     grant = REFRESH_TOKEN,
                     subject = OAuth2TokenDefinition().apply { token = cached.token.refreshToken },
                 )
-
                 try {
                     val refreshed = requestOAuth2Token(client, refreshData, endpoints)
                     tokenCache[key] = CachedOAuthToken(
@@ -591,7 +536,6 @@ class HttpCall(
                     )
                 }
             }
-
             // Full token request
             val newToken = requestOAuth2Token(client, authData, endpoints)
             tokenCache[key] = CachedOAuthToken(
@@ -602,7 +546,6 @@ class HttpCall(
             return@withLock newToken
         }
     }
-
     /**
      * Generates a cache key for the OAuth2 token based on the authentication data.
      * The key is a hash of the authority, client ID, grant type, scopes, audiences, username, and subject token.
@@ -616,13 +559,11 @@ class HttpCall(
         authData.username,
         authData.subject?.token,
     )
-
     private fun OAuth2AutenthicationData.copyWith(
         grant: OAuth2AutenthicationData.OAuth2AutenthicationDataGrant? = this.grant,
         subject: OAuth2TokenDefinition? = this.subject,
     ): OAuth2AutenthicationData {
         val copy = OAuth2AutenthicationData()
-
         copy.authority = this.authority
         copy.grant = grant
         copy.client = this.client
@@ -634,7 +575,6 @@ class HttpCall(
         copy.password = this.password
         copy.subject = subject
         copy.actor = this.actor
-
         return copy
     }
 }

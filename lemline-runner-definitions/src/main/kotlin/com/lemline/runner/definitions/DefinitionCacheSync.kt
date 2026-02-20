@@ -7,7 +7,6 @@ import io.quarkus.runtime.Startup
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
 import kotlin.time.Duration
-import kotlin.time.ExperimentalTime
 
 /**
  * Scheduled process that ensures all workflow definitions from the database are loaded into DefinitionCache.
@@ -29,7 +28,6 @@ import kotlin.time.ExperimentalTime
  */
 @Startup
 @ApplicationScoped
-@ExperimentalTime
 internal class DefinitionCacheSync : AbstractScheduledTask() {
 
     @Inject

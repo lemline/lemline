@@ -1,6 +1,4 @@
 // SPDX-License-Identifier: BUSL-1.1
-@file:OptIn(ExperimentalTime::class)
-
 package com.lemline.runner
 
 import com.lemline.runner.cli.MainCommand
@@ -24,8 +22,6 @@ import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.Paths
 import kotlin.system.exitProcess
-import kotlin.time.ExperimentalTime
-import kotlinx.serialization.ExperimentalSerializationApi
 import org.jboss.logging.Logger
 import org.jboss.logging.Logger.Level
 import picocli.CommandLine
@@ -37,7 +33,6 @@ import picocli.CommandLine.ParseResult
  * This class is responsible for starting the Quarkus application and processing CLI commands.
  */
 @QuarkusMain
-@ExperimentalSerializationApi
 class LemlineApplication : QuarkusApplication {
 
     @Inject
@@ -246,7 +241,6 @@ class LemlineApplication : QuarkusApplication {
     }
 }
 
-@ExperimentalSerializationApi
 private fun checkConfigLocation(filePath: Path, provided: Boolean): Boolean {
     val path = filePath.normalize()
     val fileExists = Files.exists(path)

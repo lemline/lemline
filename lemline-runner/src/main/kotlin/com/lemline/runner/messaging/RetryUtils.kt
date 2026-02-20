@@ -7,7 +7,6 @@ import java.util.concurrent.CompletionException
 import java.util.concurrent.ExecutionException
 import java.util.concurrent.TimeUnit
 import kotlin.random.Random
-import kotlin.time.ExperimentalTime
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withTimeout
@@ -29,7 +28,6 @@ import org.apache.kafka.common.errors.RetriableException
  * @param onFailure Called when all retries are exhausted. Optional.
  * @param block The suspending block of code to execute and retry upon failure.
  */
-@ExperimentalTime
 suspend fun <T> retry(
     logger: Logger,
     label: String,

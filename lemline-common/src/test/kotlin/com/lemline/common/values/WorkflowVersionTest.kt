@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.common.values
 
-import com.lemline.common.json.LemlineJson
 import com.lemline.common.random.random
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -27,19 +26,9 @@ class WorkflowVersionTest {
     }
 
     @Test
-    fun `WorkflowVersion JSON roundtrip with LemlineJson`() {
+    fun `WorkflowVersion supports arbitrary string values`() {
         val str = String.random()
-
         val version = WorkflowVersion(str)
-
-        val versionJson = LemlineJson.encodeToString(version)
-
-        // Encoded as JSON strings
-        assertEquals("\"$str\"", versionJson)
-
-        // Decoding
-        val decodedVersion = LemlineJson.decodeFromString<WorkflowVersion>(versionJson)
-
-        assertEquals(version, decodedVersion)
+        assertEquals(str, version.toString())
     }
 }

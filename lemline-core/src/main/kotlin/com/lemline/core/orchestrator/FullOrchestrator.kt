@@ -18,16 +18,17 @@ import com.lemline.core.states.NodeStack
 import com.lemline.core.states.WorkflowCommand
 import com.lemline.core.states.WorkflowEvent
 import com.lemline.core.states.WorkflowState
+import com.lemline.core.states.protobuf.WorkflowStateProtobufMapper
 import com.lemline.core.workflows.WorkflowCache
 import com.lemline.core.workflows.branches
 import com.lemline.core.workflows.foreachBlock
 import com.lemline.core.workflows.getNode
+import com.lemline.messages.internal.v1.WorkflowStateProto
 import io.serverlessworkflow.api.types.ForkTask
 import io.serverlessworkflow.api.types.ListenTask
 import io.serverlessworkflow.api.types.Workflow
 import kotlin.time.Clock
 import kotlin.time.Duration
-import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.TimeoutCancellationException
@@ -41,7 +42,6 @@ import kotlinx.serialization.json.buildJsonObject
 
 internal class EarlyCompletionException(val event: WorkflowEvent.Outcome) : Exception()
 
-@ExperimentalTime
 object FullOrchestrator {
 
     private val logger = logger()
@@ -103,20 +103,47 @@ object FullOrchestrator {
 
     private fun validateSerde(command: WorkflowCommand, serde: Boolean): WorkflowCommand {
         if (!serde) return command
-        val roundTripped = WorkflowState.fromJsonString(command.toJsonString()) as WorkflowCommand
-        if (command != roundTripped) {
-            throw IllegalStateException("Command mismatch\ncommand     : $command\nserdeCommand: $roundTripped")
+        val commandProto = WorkflowStateProtobufMapper.toProto(command)
+        val roundTripped = roundTripViaProtobuf(command)
+        val roundTrippedProto = WorkflowStateProtobufMapper.toProto(roundTripped)
+        if (commandProto != roundTrippedProto) {
+            throw IllegalStateException(
+                "Command mismatch\n" +
+                    "command     : $command\n" +
+                    "serdeCommand: $roundTripped\n" +
+                    "commandProto     : $commandProto\n" +
+                    "serdeCommandProto: $roundTrippedProto"
+            )
         }
         return roundTripped
     }
 
     private fun validateSerde(event: WorkflowEvent, serde: Boolean): WorkflowEvent {
         if (!serde) return event
-        val roundTripped = WorkflowState.fromJsonString(event.toJsonString()) as WorkflowEvent
-        if (event != roundTripped) {
-            throw IllegalStateException("Event mismatch\nevent     : $event\nserdeEvent: $roundTripped")
+        val eventProto = WorkflowStateProtobufMapper.toProto(event)
+        val roundTripped = roundTripViaProtobuf(event)
+        val roundTrippedProto = WorkflowStateProtobufMapper.toProto(roundTripped)
+        if (eventProto != roundTrippedProto) {
+            throw IllegalStateException(
+                "Event mismatch\n" +
+                    "event     : $event\n" +
+                    "serdeEvent: $roundTripped\n" +
+                    "eventProto     : $eventProto\n" +
+                    "serdeEventProto: $roundTrippedProto"
+            )
         }
         return roundTripped
+    }
+
+    private inline fun <reified S : WorkflowState> roundTripViaProtobuf(state: S): S {
+        val proto = WorkflowStateProtobufMapper.toProto(state)
+        val decoded = WorkflowStateProtobufMapper.fromProto(
+            WorkflowStateProto.ADAPTER.decode(WorkflowStateProto.ADAPTER.encode(proto))
+        )
+        require(decoded is S) {
+            "Protobuf round-trip type mismatch. Expected ${S::class.qualifiedName}, got ${decoded::class.qualifiedName}"
+        }
+        return decoded
     }
 
     private suspend fun handleEvent(

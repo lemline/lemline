@@ -1,44 +1,10 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.errors
 
-import com.lemline.common.json.LemlineJson
 import kotlin.test.assertEquals
 import org.junit.jupiter.api.Test
 
 class WorkflowErrorTypeTest {
-
-    @Test
-    fun `test serialization to JSON`() {
-        // Test all error types
-        WorkflowErrorType.entries.forEach { errorType ->
-            val json = LemlineJson.encodeToString(errorType)
-            assertEquals("\"${errorType.type}\"", json)
-        }
-    }
-
-    @Test
-    fun `test deserialization from JSON`() {
-        // Test all error types
-        WorkflowErrorType.entries.forEach { expectedType ->
-            val json = "\"${expectedType.type}\""
-            val deserializedType = LemlineJson.decodeFromString<WorkflowErrorType>(json)
-            assertEquals(expectedType, deserializedType)
-        }
-    }
-
-    @Test
-    fun `test specific error type serialization`() {
-        val error = WorkflowErrorType.VALIDATION
-        val json = LemlineJson.encodeToString(error)
-        assertEquals("\"validation\"", json)
-    }
-
-    @Test
-    fun `test specific error type deserialization`() {
-        val json = "\"timeout\""
-        val error = LemlineJson.decodeFromString<WorkflowErrorType>(json)
-        assertEquals(WorkflowErrorType.TIMEOUT, error)
-    }
 
     @Test
     fun `verify default status codes`() {
@@ -50,5 +16,17 @@ class WorkflowErrorTypeTest {
         assertEquals(408, WorkflowErrorType.TIMEOUT.defaultStatus)
         assertEquals(500, WorkflowErrorType.COMMUNICATION.defaultStatus)
         assertEquals(500, WorkflowErrorType.RUNTIME.defaultStatus)
+    }
+
+    @Test
+    fun `verify error type slugs`() {
+        assertEquals("configuration", WorkflowErrorType.CONFIGURATION.type)
+        assertEquals("validation", WorkflowErrorType.VALIDATION.type)
+        assertEquals("expression", WorkflowErrorType.EXPRESSION.type)
+        assertEquals("authentication", WorkflowErrorType.AUTHENTICATION.type)
+        assertEquals("authorization", WorkflowErrorType.AUTHORIZATION.type)
+        assertEquals("timeout", WorkflowErrorType.TIMEOUT.type)
+        assertEquals("communication", WorkflowErrorType.COMMUNICATION.type)
+        assertEquals("runtime", WorkflowErrorType.RUNTIME.type)
     }
 }

@@ -9,7 +9,6 @@ import com.lemline.core.processors.scope.Scope
 import com.lemline.core.states.CallFunctionState
 import io.serverlessworkflow.api.types.CallFunction
 import kotlin.time.Clock
-import kotlin.time.ExperimentalTime
 import kotlinx.serialization.json.JsonElement
 
 /**
@@ -63,7 +62,6 @@ import kotlinx.serialization.json.JsonElement
  *
  * @property node Immutable CallFunction definition
  */
-@ExperimentalTime
 class CallFunctionProcessor(
     node: Node<CallFunction>,
 ) : NodeProcessor<CallFunction, CallFunctionState>(node) {

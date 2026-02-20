@@ -16,7 +16,6 @@ import com.lemline.core.states.WorkflowCommand
 import com.lemline.core.states.WorkflowEvent
 import io.cloudevents.CloudEvent
 import io.serverlessworkflow.api.types.ListenTaskConfiguration.ListenAndReadAs
-import kotlin.time.ExperimentalTime
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.channels.ReceiveChannel
 import kotlinx.coroutines.currentCoroutineContext
@@ -27,7 +26,6 @@ import kotlinx.coroutines.flow.produceIn
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 
-@ExperimentalTime
 internal sealed class CollectResult {
     data class Success(val outputs: List<JsonElement>) : CollectResult()
     data class Failure(val nodeStack: NodeStack, val error: InternalException) : CollectResult()
@@ -36,10 +34,8 @@ internal sealed class CollectResult {
 
 internal class ForeachEscapedException(val event: WorkflowEvent.WorkflowCompleted) : Exception()
 
-@ExperimentalTime
 internal typealias ForeachProcessor = suspend (NodeStack, JsonElement, Int) -> Pair<NodeStack, JsonElement>
 
-@ExperimentalTime
 internal object ListenEventCollector {
 
     private val logger = logger()
@@ -70,9 +66,11 @@ internal object ListenEventCollector {
                 ListenStrategy.ONE -> collectFirst(
                     eventFlow, event.config.filters, correlationContext, establishedCorrelations, processEvent
                 )
+
                 ListenStrategy.ANY -> collectAny(
                     eventFlow, event, correlationContext, establishedCorrelations, processEvent
                 )
+
                 ListenStrategy.ALL -> collectAll(
                     eventFlow, event.config.filters, correlationContext, establishedCorrelations, processEvent
                 )
@@ -219,7 +217,8 @@ internal object ListenEventCollector {
                 }
                 if (CloudEventMatcher.matchesFilters(
                         cloudEvent, filters, correlationContext, establishedCorrelations
-                    )) {
+                    )
+                ) {
                     outputs.add(processEvent(cloudEvent, outputs.size))
                     logger.debug { "Accumulated event (count=${outputs.size}): type=${cloudEvent.type}" }
                 }

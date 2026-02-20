@@ -9,12 +9,8 @@ import com.lemline.runner.common.models.WithCleanup
 import com.lemline.runner.common.models.WithCompletedAt
 import com.lemline.runner.common.models.WithId
 import com.lemline.runner.common.models.WithInstanceMessage
-import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
-import kotlinx.serialization.ExperimentalSerializationApi
 
-@ExperimentalSerializationApi
-@ExperimentalTime
 data class ParentModel(
     /** Unique identifier for this parent-child relationship */
     override val id: IDV7 = instanceMessage.workflowState.nodeStack.deriveIdempotentId("-parent"),

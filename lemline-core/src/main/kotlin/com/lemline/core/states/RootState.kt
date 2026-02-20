@@ -1,6 +1,4 @@
 // SPDX-License-Identifier: BUSL-1.1
-@file:OptIn(ExperimentalTime::class)
-
 package com.lemline.core.states
 
 import com.lemline.common.json.LemlineJson
@@ -10,17 +8,13 @@ import com.lemline.core.expressions.scopes.WorkflowDescriptor
 import com.lemline.core.processors.scope.Scope
 import com.lemline.core.processors.scope.merge
 import io.serverlessworkflow.impl.expressions.DateTimeDescriptor
-import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 import kotlin.time.toJavaInstant
-import kotlinx.serialization.Serializable
-import kotlinx.serialization.Transient
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.encodeToJsonElement
 
-@Serializable
 data class RootState(
     override val startedAt: Instant,
     val workflowId: WorkflowId,
@@ -29,7 +23,6 @@ data class RootState(
     val hasWaitingParent: Boolean = false,
 ) : NodeState() {
 
-    @Transient
     lateinit var secrets: Map<String, String>
 
     private val workflowDescriptor

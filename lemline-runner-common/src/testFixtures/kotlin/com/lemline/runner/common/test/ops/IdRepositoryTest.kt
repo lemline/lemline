@@ -1,28 +1,14 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.common.test.ops
 
-import com.lemline.common.values.IDV7
 import com.lemline.runner.common.models.WithId
 import com.lemline.runner.common.repositories.with.WithCrudRepository
 import com.lemline.runner.common.repositories.with.WithIdRepository
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
-import java.sql.Connection
-import kotlin.time.ExperimentalTime
 import kotlinx.coroutines.test.runTest
-import kotlinx.serialization.ExperimentalSerializationApi
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
-
-/**
- * Interface for ID-based repository operations used in testing.
- */
-@ExperimentalTime
-@ExperimentalSerializationApi
-interface IdRepositoryOps<T : WithId> {
-    suspend fun findById(id: IDV7, connection: Connection? = null): T?
-    suspend fun deleteById(id: IDV7, connection: Connection? = null): Int
-}
 
 /**
  * Concrete test class for ID-based repository operations.
@@ -35,8 +21,6 @@ interface IdRepositoryOps<T : WithId> {
  * @param crudRepository Provider for CRUD operations needed for setup
  * @param createEntity Factory function to create random test entities
  */
-@ExperimentalTime
-@ExperimentalSerializationApi
 abstract class IdRepositoryTest<T : WithId>(
     idRepository: () -> WithIdRepository<T>,
     crudRepository: () -> WithCrudRepository<T>,

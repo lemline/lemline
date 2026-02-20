@@ -5,7 +5,6 @@ import com.lemline.common.values.NodePosition
 import com.lemline.common.values.WorkflowInfo
 import com.lemline.core.errors.InternalException
 import com.lemline.core.states.NodeStack
-import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 import kotlinx.serialization.json.JsonElement
 
@@ -28,7 +27,6 @@ import kotlinx.serialization.json.JsonElement
  *
  * @see com.lemline.core.orchestrator.StepByStepOrchestrator for hook call sites
  */
-@ExperimentalTime
 interface LifecycleEventHook {
 
     // ==========================================

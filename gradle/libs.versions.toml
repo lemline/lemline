@@ -23,6 +23,7 @@ testcontainers = "1.21.3"
 spotless = "7.0.3"
 cloudevents = "4.0.1"
 smallryeReactiveMessagingApi = "4.31.0"
+wire = "5.5.0"
 
 [libraries]
 spotlessPlugin = { module = "com.diffplug.spotless:spotless-plugin-gradle", version.ref = "spotless" }
@@ -45,6 +46,8 @@ testcontainers-bom = { module = "org.testcontainers:testcontainers-bom", version
 cloudevents-core = { module = "io.cloudevents:cloudevents-core", version.ref = "cloudevents" }
 cloudevents-json-jackson = { module = "io.cloudevents:cloudevents-json-jackson", version.ref = "cloudevents" }
 smallrye-reactive-messaging-api = { module = "io.smallrye.reactive:smallrye-reactive-messaging-api", version.ref = "smallryeReactiveMessagingApi" }
+wire-runtime = { module = "com.squareup.wire:wire-runtime", version.ref = "wire" }
+wire-moshi-adapter = { module = "com.squareup.wire:wire-moshi-adapter", version.ref = "wire" }
 
 # Libraries bundled together for easier import
 [bundles]
@@ -53,3 +56,4 @@ kotlinxEcosystem = ["kotlinxDatetime", "kotlinxSerializationJson", "kotlinxCorou
 [plugins]
 kotlinPluginSerialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
 quarkus = { id = "io.quarkus", version.ref = "quarkus" }
+wire = { id = "com.squareup.wire", version.ref = "wire" }

@@ -1,25 +1,20 @@
 // SPDX-License-Identifier: BUSL-1.1
-@file:OptIn(ExperimentalTime::class, ExperimentalSerializationApi::class)
-
 package com.lemline.runner.schedules
 
 import com.lemline.common.random.nullableRandom
 import com.lemline.common.random.random
 import com.lemline.common.values.IDV7
-import com.lemline.common.values.WorkflowInfo
-import com.lemline.core.random.random
-import com.lemline.core.states.WorkflowCommand
+import com.lemline.core.random.randomResumeFromTaskCommand
+import com.lemline.core.random.randomWorkflowInfo
 import com.lemline.runner.common.messaging.InstanceMessage
 import com.lemline.runner.common.models.WithOutbox
-import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
-import kotlinx.serialization.ExperimentalSerializationApi
 
 fun ScheduleModel.Companion.random() = ScheduleModel(
     id = IDV7.random(),
     instanceMessage = InstanceMessage(
-        workflowInfo = WorkflowInfo.random(),
-        workflowState = WorkflowCommand.ResumeFromTask.random(),
+        workflowInfo = randomWorkflowInfo(),
+        workflowState = randomResumeFromTaskCommand(),
     ),
     outboxScheduledFor = Instant.nullableRandom(),
     scheduleAfter = String.nullableRandom(),

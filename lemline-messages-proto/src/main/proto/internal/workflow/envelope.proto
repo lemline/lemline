@@ -1,0 +1,23 @@
+syntax = "proto3";
+
+package lemline.internal.v1;
+
+import "internal/common.proto";
+import "internal/workflow/commands.proto";
+import "internal/workflow/events.proto";
+
+option java_multiple_files = true;
+option java_package = "com.lemline.messages.internal.v1";
+
+message InstanceMessageProto {
+    int32 schema_version = 1;
+    WorkflowInfoProto workflow_info = 2;
+    WorkflowStateProto workflow_state = 3;
+}
+
+message WorkflowStateProto {
+    oneof state {
+        WorkflowCommandProto command = 1;
+        WorkflowEventProto event = 2;
+    }
+}

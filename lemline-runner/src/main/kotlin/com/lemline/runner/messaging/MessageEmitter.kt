@@ -1,23 +1,21 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.messaging
 
-import com.lemline.common.json.JsonSerializable
 import com.lemline.common.logger.logger
 import com.lemline.common.values.IDV7
 import com.lemline.common.values.WithOptionalWorkflowInfo
+import com.lemline.runner.common.messaging.TransportSerializable
 import io.smallrye.mutiny.coroutines.awaitSuspending
 import io.smallrye.reactive.messaging.MutinyEmitter
 import jakarta.annotation.PostConstruct
 import jakarta.inject.Inject
-import kotlin.time.ExperimentalTime
 import org.eclipse.microprofile.reactive.messaging.Message
 
 /**
  * Base class for message emitters.
- * Generic type T must be JsonSerializable to support toJsonString() method.
+ * Generic type T must be TransportSerializable to support transport payload encoding.
  */
-@ExperimentalTime
-abstract class MessageEmitter<T : JsonSerializable> {
+abstract class MessageEmitter<T : TransportSerializable> {
 
     protected abstract val emitter: MutinyEmitter<String>
 
@@ -75,7 +73,7 @@ abstract class MessageEmitter<T : JsonSerializable> {
      */
     suspend fun send(msg: T, idempotentKey: IDV7? = null) {
         val payload = metrics.recordSerializationDuration(msg.workflowInfo) {
-            msg.toJsonString()
+            msg.toTransportPayload()
         }
         sendPayload(payload, idempotentKey)
     }

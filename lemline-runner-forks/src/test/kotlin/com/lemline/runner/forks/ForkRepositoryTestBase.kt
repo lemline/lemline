@@ -1,6 +1,4 @@
 // SPDX-License-Identifier: BUSL-1.1
-@file:OptIn(ExperimentalTime::class, ExperimentalSerializationApi::class)
-
 package com.lemline.runner.forks
 
 import com.lemline.common.json.LemlineJson
@@ -27,12 +25,10 @@ import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
 import kotlin.time.Clock
-import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.test.runTest
-import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonPrimitive
 import org.junit.jupiter.api.BeforeEach
@@ -53,7 +49,7 @@ abstract class ForkRepositoryTestBase {
     private val testWorkflowId = WorkflowId.random()
     private var testForkId: IDV7? = null
 
-    private fun createEntity() = ForkModel.random()
+    private fun createEntity() = randomForkModel()
     private fun modifyEntity(entity: ForkModel) =
         entity.copy().apply { completedAt = Instant.fromEpochMilliseconds(System.currentTimeMillis()) }
 

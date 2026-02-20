@@ -53,7 +53,6 @@ import com.lemline.runner.messaging.commands.COMMANDS_OUT_CHANNEL
 import com.lemline.runner.messaging.events.EVENTS_IN_CHANNEL
 import com.lemline.runner.messaging.events.EVENTS_OUT_CHANNEL
 import io.smallrye.config.PropertiesConfigSource
-import kotlinx.serialization.ExperimentalSerializationApi
 
 /**
  * Channel name for lifecycle events output.
@@ -95,7 +94,6 @@ enum class TopicType(
     );
 }
 
-@ExperimentalSerializationApi
 class LemlineConfigSource : PropertiesConfigSource(
     buildProperties(),
     LemlineConfigConstants.CONFIG_SOURCE_NAME,

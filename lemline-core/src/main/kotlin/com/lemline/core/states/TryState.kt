@@ -1,12 +1,9 @@
 // SPDX-License-Identifier: BUSL-1.1
-@file:OptIn(kotlin.time.ExperimentalTime::class)
-
 package com.lemline.core.states
 
 import com.lemline.core.errors.InternalException
 import com.lemline.core.processors.scope.Scope
 import kotlin.time.Instant
-import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.buildJsonObject
@@ -41,7 +38,6 @@ import kotlinx.serialization.json.encodeToJsonElement
  * @property runningCatch Whether currently executing in catch block
  * @property lastError Last caught error object (for context)
  */
-@Serializable
 data class TryState(
     override val startedAt: Instant,
     val transformedInput: JsonElement,

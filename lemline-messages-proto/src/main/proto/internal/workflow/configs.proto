@@ -1,0 +1,154 @@
+syntax = "proto3";
+
+package lemline.internal.v1;
+
+import "google/protobuf/struct.proto";
+import "google/protobuf/timestamp.proto";
+
+option java_multiple_files = true;
+option java_package = "com.lemline.messages.internal.v1";
+
+message WaitConfigProto {
+    google.protobuf.Timestamp wait_until = 1;
+}
+
+message RunWorkflowConfigProto {
+    string namespace = 1;
+    string name = 2;
+    string version = 3;
+    google.protobuf.Value input_json = 4;
+    bool sync = 5;
+}
+
+enum ListenStrategyProto {
+    LISTEN_STRATEGY_PROTO_UNSPECIFIED = 0;
+    LISTEN_STRATEGY_PROTO_ONE = 1;
+    LISTEN_STRATEGY_PROTO_ANY = 2;
+    LISTEN_STRATEGY_PROTO_ALL = 3;
+}
+
+enum ListenReadAsProto {
+    LISTEN_READ_AS_PROTO_UNSPECIFIED = 0;
+    LISTEN_READ_AS_PROTO_DATA = 1;
+    LISTEN_READ_AS_PROTO_ENVELOPE = 2;
+    LISTEN_READ_AS_PROTO_RAW = 3;
+}
+
+message CorrelationDefProto {
+    string from = 1;
+    optional string expect = 2;
+}
+
+message CorrelationMapProto {
+    map<string, CorrelationDefProto> values = 1;
+}
+
+message EventFilterProto {
+    optional string type = 1;
+    optional string source = 2;
+    optional string subject = 3;
+    optional string id = 4;
+    optional string datacontenttype = 5;
+    optional string dataschema = 6;
+    optional string time = 7;
+    optional string data_filter = 8;
+    CorrelationMapProto correlations = 9;
+}
+
+message UntilConditionProto {
+    oneof value {
+        string expression = 1;
+        EventFilterProto event_filter = 2;
+    }
+}
+
+message ListenConfigProto {
+    ListenStrategyProto strategy = 1;
+    repeated EventFilterProto filters = 2;
+    UntilConditionProto until = 3;
+    ListenReadAsProto read_as = 4;
+    google.protobuf.Timestamp timeout_at = 5;
+    google.protobuf.Value correlation_context_json = 6;
+}
+
+message StringMapProto {
+    map<string, string> values = 1;
+}
+
+message EmitConfigProto {
+    string id = 1;
+    string source = 2;
+    string type = 3;
+    optional string time = 4;
+    optional string subject = 5;
+    optional string dataschema = 6;
+    optional string datacontenttype = 7;
+    google.protobuf.Value data_json = 8;
+    StringMapProto extensions = 9;
+}
+
+message BasicAuthProto {
+    string username = 1;
+    string password = 2;
+}
+
+message BearerAuthProto {
+    string token = 1;
+}
+
+message OAuth2AuthProto {
+    string token = 1;
+    string token_type = 2;
+}
+
+message HttpAuthenticationProto {
+    oneof value {
+        BasicAuthProto basic = 1;
+        BearerAuthProto bearer = 2;
+        OAuth2AuthProto oauth2 = 3;
+    }
+}
+
+enum HttpOutputProto {
+    HTTP_OUTPUT_PROTO_UNSPECIFIED = 0;
+    HTTP_OUTPUT_PROTO_RAW = 1;
+    HTTP_OUTPUT_PROTO_CONTENT = 2;
+    HTTP_OUTPUT_PROTO_RESPONSE = 3;
+}
+
+enum ProcessReturnTypeProto {
+    PROCESS_RETURN_TYPE_PROTO_UNSPECIFIED = 0;
+    PROCESS_RETURN_TYPE_PROTO_NONE = 1;
+    PROCESS_RETURN_TYPE_PROTO_STDOUT = 2;
+    PROCESS_RETURN_TYPE_PROTO_STDERR = 3;
+    PROCESS_RETURN_TYPE_PROTO_CODE = 4;
+    PROCESS_RETURN_TYPE_PROTO_ALL = 5;
+}
+
+message CallHttpConfigProto {
+    string method = 1;
+    string url = 2;
+    map<string, string> headers = 3;
+    map<string, string> query = 4;
+    google.protobuf.Value body_json = 5;
+    HttpOutputProto output = 6;
+    bool redirect = 7;
+    HttpAuthenticationProto authentication = 8;
+}
+
+message RunScriptConfigProto {
+    string language = 1;
+    string code = 2;
+    StringMapProto arguments = 3;
+    StringMapProto environment = 4;
+    bool await = 5;
+    ProcessReturnTypeProto return_type = 6;
+}
+
+message RunShellConfigProto {
+    string command = 1;
+    StringMapProto arguments = 2;
+    StringMapProto environment = 3;
+    bool await = 4;
+    ProcessReturnTypeProto return_type = 5;
+}

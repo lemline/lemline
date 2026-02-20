@@ -1,6 +1,4 @@
 // SPDX-License-Identifier: BUSL-1.1
-@file:OptIn(ExperimentalTime::class)
-
 package com.lemline.core.processors
 
 import com.lemline.core.errors.WorkflowErrorType.CONFIGURATION
@@ -22,7 +20,6 @@ import io.serverlessworkflow.api.types.Timeout
 import io.serverlessworkflow.impl.expressions.ExpressionUtils
 import kotlin.time.Clock
 import kotlin.time.Duration
-import kotlin.time.ExperimentalTime
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.buildJsonObject
 

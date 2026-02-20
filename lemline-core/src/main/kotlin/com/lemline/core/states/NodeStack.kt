@@ -1,6 +1,4 @@
 // SPDX-License-Identifier: BUSL-1.1
-@file:OptIn(ExperimentalTime::class)
-
 package com.lemline.core.states
 
 import com.lemline.common.values.IDV7
@@ -8,14 +6,6 @@ import com.lemline.common.values.NodePosition
 import com.lemline.common.values.WorkflowId
 import com.lemline.core.processors.scope.Scope
 import com.lemline.core.processors.scope.merge
-import kotlin.time.ExperimentalTime
-import kotlinx.serialization.ExperimentalSerializationApi
-import kotlinx.serialization.KSerializer
-import kotlinx.serialization.Serializable
-import kotlinx.serialization.builtins.ListSerializer
-import kotlinx.serialization.descriptors.SerialDescriptor
-import kotlinx.serialization.encoding.Decoder
-import kotlinx.serialization.encoding.Encoder
 import kotlinx.serialization.json.buildJsonObject
 import org.jetbrains.annotations.TestOnly
 
@@ -26,7 +16,6 @@ import org.jetbrains.annotations.TestOnly
  * @property state The node's execution state
  * @property counter Increments on re-entry (loops, retries, goto). Used for idempotent ID derivation.
  */
-@Serializable
 data class StackFrame(
     val position: NodePosition,
     val state: NodeState,
@@ -52,7 +41,6 @@ data class StackFrame(
  * - Full paths are reconstructed during deserialization
  * - Example: [("/", R), ("/do", D), ("/do/task", T)] → [("", R), ("do", D), ("task", T)]
  */
-@Serializable(with = NodeStackSerializer::class)
 class NodeStack internal constructor(
     private val frames: List<StackFrame> = emptyList()
 ) : Iterable<StackFrame> by frames {
@@ -148,52 +136,5 @@ class NodeStack internal constructor(
     companion object {
         @TestOnly
         fun fromFrames(frames: List<StackFrame>): NodeStack = NodeStack(frames)
-    }
-}
-
-@Serializable
-private data class CompactFrame(
-    val p: String,
-    val s: NodeState,
-    val i: Int = 0
-)
-
-@OptIn(ExperimentalSerializationApi::class)
-internal object NodeStackSerializer : KSerializer<NodeStack> {
-
-    private val delegateSerializer = ListSerializer(CompactFrame.serializer())
-
-    override val descriptor: SerialDescriptor = delegateSerializer.descriptor
-
-    override fun serialize(encoder: Encoder, value: NodeStack) {
-        var previousPath = ""
-        val compactFrames = value.map { frame ->
-            val currentPath = frame.position.toString()
-            val suffix = if (previousPath.isEmpty() || previousPath == "/") {
-                currentPath.removePrefix("/")
-            } else {
-                currentPath.removePrefix("$previousPath/")
-            }
-            previousPath = currentPath
-            CompactFrame(p = suffix, s = frame.state, i = frame.counter)
-        }
-        delegateSerializer.serialize(encoder, compactFrames)
-    }
-
-    override fun deserialize(decoder: Decoder): NodeStack {
-        val compactFrames = delegateSerializer.deserialize(decoder)
-
-        var currentPosition = NodePosition.root
-        val frames = compactFrames.map { compact ->
-            currentPosition = if (compact.p.isEmpty()) {
-                NodePosition.root
-            } else {
-                val basePath = if (currentPosition.isRoot) "" else currentPosition.toString()
-                NodePosition("$basePath/${compact.p}")
-            }
-            StackFrame(currentPosition, compact.s, compact.i)
-        }
-
-        return NodeStack(frames)
     }
 }

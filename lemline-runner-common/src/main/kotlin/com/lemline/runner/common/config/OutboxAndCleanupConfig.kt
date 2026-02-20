@@ -4,12 +4,10 @@ package com.lemline.runner.common.config
 import kotlin.random.Random
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
-import kotlin.time.ExperimentalTime
 
 /**
  * Combined configuration for a feature's outbox and cleanup.
  */
-@ExperimentalTime
 interface OutboxAndCleanupConfig {
     /**
      * Whether this feature is enabled
@@ -31,7 +29,6 @@ interface OutboxAndCleanupConfig {
  * Configuration interface for outbox processing.
  * Implementations are provided by the main runner module.
  */
-@ExperimentalTime
 interface OutboxConfig {
     /**
      * Processing interval
@@ -74,7 +71,6 @@ interface OutboxConfig {
  * Configuration interface for cleanup operations.
  * Implementations are provided by the main runner module.
  */
-@ExperimentalTime
 interface CleanupConfig {
     /**
      * Cleanup interval

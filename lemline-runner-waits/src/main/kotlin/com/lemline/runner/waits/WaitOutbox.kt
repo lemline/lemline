@@ -12,16 +12,12 @@ import io.quarkus.runtime.Startup
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
 import kotlin.time.Clock
-import kotlin.time.ExperimentalTime
-import kotlinx.serialization.ExperimentalSerializationApi
 
 /**
  * `WaitOutbox` specializes `AbstractOutbox` to implement the outbox pattern for wait tasks in workflows.
  */
 @Startup
 @ApplicationScoped
-@ExperimentalTime
-@ExperimentalSerializationApi
 class WaitOutbox : AbstractOutbox<WaitModel>() {
 
     override val jobName: String get() = "Waits outbox"

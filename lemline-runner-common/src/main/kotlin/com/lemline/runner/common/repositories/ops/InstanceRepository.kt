@@ -1,6 +1,4 @@
 // SPDX-License-Identifier: BUSL-1.1
-@file:OptIn(ExperimentalTime::class, ExperimentalSerializationApi::class)
-
 package com.lemline.runner.common.repositories.ops
 
 import com.lemline.common.values.WorkflowId
@@ -11,14 +9,13 @@ import com.lemline.common.values.WorkflowVersion
 import com.lemline.core.states.WorkflowState
 import com.lemline.runner.common.config.DatabaseConfig
 import com.lemline.runner.common.messaging.InstanceMessage
+import com.lemline.runner.common.messaging.InstanceMessageCodec
 import com.lemline.runner.common.models.WithInstanceMessage
 import com.lemline.runner.common.repositories.helpers.ColumnBindingsBuilder
 import com.lemline.runner.common.repositories.helpers.IdV7Helper
 import com.lemline.runner.common.repositories.with.WithInstanceRepository
 import java.sql.Connection
 import java.sql.ResultSet
-import kotlin.time.ExperimentalTime
-import kotlinx.serialization.ExperimentalSerializationApi
 
 const val WORKFLOW_ID_COLUMN = "workflow_id"
 const val WORKFLOW_NAMESPACE_COLUMN = "workflow_namespace"
@@ -80,7 +77,7 @@ inline fun <reified S : WorkflowState> ResultSet.getInstanceMessage(idHelper: Id
                 name = WorkflowName(getString(WORKFLOW_NAME_COLUMN)),
                 version = WorkflowVersion(getString(WORKFLOW_VERSION_COLUMN)),
             ),
-            workflowState = WorkflowState.fromJsonString(getString(WORKFLOW_STATE_COLUMN)) as S,
+            workflowState = InstanceMessageCodec.workflowStateFromDbJson(getString(WORKFLOW_STATE_COLUMN)) as S,
         )
     }
 
@@ -94,7 +91,7 @@ inline fun <reified S : WorkflowState> ResultSet.getInstanceMessage(idHelper: Id
  * - workflow_name
  * - workflow_version
  * - workflow_position (from workflowState.nodePosition)
- * - workflow_state (JSON serialized)
+ * - workflow_state (serialized workflow state payload)
  *
  * @param idHelper The IDV7 helper for database-agnostic ID handling
  *
@@ -126,6 +123,6 @@ fun <T : WithInstanceMessage> ColumnBindingsBuilder<T>.instanceColumns(idHelper:
         stmt.setString(idx, entity.nodePosition.toString())
     }
     column(WORKFLOW_STATE_COLUMN) { stmt, entity, idx ->
-        stmt.setString(idx, entity.workflowState.toJsonString())
+        stmt.setString(idx, InstanceMessageCodec.workflowStateToDbJson(entity.workflowState))
     }
 }

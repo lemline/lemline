@@ -9,11 +9,7 @@ import com.lemline.runner.definitions.DefinitionService
 import io.quarkus.arc.Unremovable
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
-import kotlin.time.ExperimentalTime
-import kotlinx.serialization.ExperimentalSerializationApi
 
-@ExperimentalTime
-@ExperimentalSerializationApi
 @ApplicationScoped
 @Unremovable
 class InteractiveWorkflowSelector @Inject constructor(
@@ -32,8 +28,10 @@ class InteractiveWorkflowSelector @Inject constructor(
         val workflows = when {
             workflowNamespace != null && filterName != null ->
                 definitionService.listByName(workflowNamespace, filterName)
+
             workflowNamespace != null ->
                 definitionService.listAllInNamespace(workflowNamespace)
+
             else ->
                 definitionService.listAll()
         }
@@ -101,7 +99,13 @@ class InteractiveWorkflowSelector @Inject constructor(
 
         output.appendLine() // Blank line before header
         output.appendLine("$paddedNumHeader  $paddedNamespaceHeader  $paddedNameHeader  $versionHeader")
-        output.appendLine("${"-".repeat(numWidth)}  ${"-".repeat(maxNamespaceWidth)}  ${"-".repeat(maxNameWidth)}  ${"-".repeat(versionHeader.length)}")
+        output.appendLine(
+            "${"-".repeat(numWidth)}  ${"-".repeat(maxNamespaceWidth)}  ${"-".repeat(maxNameWidth)}  ${
+                "-".repeat(
+                    versionHeader.length
+                )
+            }"
+        )
 
         var itemIndex = 0 // Use index from selectionList to get correct number
         groupedData.forEach { (_, versionsList) ->
@@ -111,8 +115,12 @@ class InteractiveWorkflowSelector @Inject constructor(
                 val numberPart = currentNumber.toString().padStart(numWidth)
                 itemIndex++
 
-                val namespacePart = if (index == 0) workflow.namespace.toString().padEnd(maxNamespaceWidth) else " ".repeat(maxNamespaceWidth)
-                val namePart = if (index == 0) workflow.name.toString().padEnd(maxNameWidth) else " ".repeat(maxNameWidth)
+                val namespacePart =
+                    if (index == 0) workflow.namespace.toString().padEnd(maxNamespaceWidth) else " ".repeat(
+                        maxNamespaceWidth
+                    )
+                val namePart =
+                    if (index == 0) workflow.name.toString().padEnd(maxNameWidth) else " ".repeat(maxNameWidth)
                 val prefix = when {
                     versionsList.size == 1 -> ""
                     index == versionsList.size - 1 -> "└─"

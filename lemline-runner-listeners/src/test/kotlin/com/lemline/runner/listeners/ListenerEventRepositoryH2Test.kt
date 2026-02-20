@@ -1,13 +1,9 @@
 // SPDX-License-Identifier: BUSL-1.1
-@file:OptIn(ExperimentalTime::class, ExperimentalSerializationApi::class)
-
 package com.lemline.runner.listeners
 
 import com.lemline.runner.common.config.DatabaseConfig
 import com.lemline.runner.common.test.H2TestDatabaseConfig
 import com.lemline.runner.definitions.DefinitionRepository
-import kotlin.time.ExperimentalTime
-import kotlinx.serialization.ExperimentalSerializationApi
 import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.DisplayName

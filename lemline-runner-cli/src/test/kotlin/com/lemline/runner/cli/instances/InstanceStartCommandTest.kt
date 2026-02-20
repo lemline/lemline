@@ -29,8 +29,6 @@ import io.mockk.slot
 import io.mockk.spyk
 import java.io.ByteArrayOutputStream
 import java.io.PrintStream
-import kotlin.time.ExperimentalTime
-import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.addJsonObject
@@ -42,8 +40,6 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import picocli.CommandLine
 
-@ExperimentalTime
-@ExperimentalSerializationApi
 class InstanceStartCommandTest {
 
     private lateinit var command: InstanceStartCommand

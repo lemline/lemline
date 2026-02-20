@@ -10,8 +10,6 @@ import io.mockk.every
 import io.mockk.mockk
 import java.io.ByteArrayOutputStream
 import java.io.PrintStream
-import kotlin.time.ExperimentalTime
-import kotlinx.serialization.ExperimentalSerializationApi
 import org.eclipse.microprofile.config.Config
 import org.eclipse.microprofile.config.ConfigValue
 import org.junit.jupiter.api.AfterEach
@@ -23,8 +21,6 @@ import picocli.CommandLine
  * Unit tests for ConfigCommand.
  * Uses manual dependency injection with mocks instead of @QuarkusTest.
  */
-@ExperimentalSerializationApi
-@ExperimentalTime
 class ConfigCommandTest {
 
     private lateinit var command: ConfigShowCommand

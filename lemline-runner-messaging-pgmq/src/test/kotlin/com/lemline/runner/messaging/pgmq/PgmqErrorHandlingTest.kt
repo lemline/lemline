@@ -9,6 +9,8 @@ import io.mockk.every
 import io.mockk.mockk
 import java.time.Instant
 import java.util.*
+import kotlinx.serialization.decodeFromString
+import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import org.eclipse.microprofile.config.Config
 
@@ -112,7 +114,7 @@ class PgmqErrorHandlingTest : FunSpec({
                 timestamp = "2024-01-15T10:30:00Z"
             )
 
-            val json = Json.encodeToString(DlqMessage.serializer(), dlqMessage)
+            val json = Json.encodeToString(dlqMessage)
 
             json shouldContain "123"
             json shouldContain "test-queue"
@@ -124,7 +126,7 @@ class PgmqErrorHandlingTest : FunSpec({
             val json =
                 """{"originalMessageId":456,"originalQueue":"q1","payload":"test","error":"err","timestamp":"2024-01-01T00:00:00Z"}"""
 
-            val dlqMessage = Json.decodeFromString(DlqMessage.serializer(), json)
+            val dlqMessage = Json.decodeFromString<DlqMessage>(json)
 
             dlqMessage.originalMessageId shouldBe 456L
             dlqMessage.originalQueue shouldBe "q1"
@@ -143,8 +145,8 @@ here""",
                 timestamp = "2024-01-01T00:00:00Z"
             )
 
-            val json = Json.encodeToString(DlqMessage.serializer(), dlqMessage)
-            val decoded = Json.decodeFromString(DlqMessage.serializer(), json)
+            val json = Json.encodeToString(dlqMessage)
+            val decoded = Json.decodeFromString<DlqMessage>(json)
 
             decoded.error shouldBe dlqMessage.error
         }
@@ -159,8 +161,8 @@ here""",
                 timestamp = "2024-01-01T00:00:00Z"
             )
 
-            val json = Json.encodeToString(DlqMessage.serializer(), dlqMessage)
-            val decoded = Json.decodeFromString(DlqMessage.serializer(), json)
+            val json = Json.encodeToString(dlqMessage)
+            val decoded = Json.decodeFromString<DlqMessage>(json)
 
             decoded.payload shouldBe nestedPayload
         }

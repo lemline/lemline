@@ -9,8 +9,6 @@ import com.lemline.runner.common.repositories.with.WithCrudRepository
 import io.quarkus.runtime.Startup
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
-import kotlin.time.ExperimentalTime
-import kotlinx.serialization.ExperimentalSerializationApi
 
 /**
  * ParentCleaner specializes AbstractCleaner to clean up old parent waiting records.
@@ -21,8 +19,6 @@ import kotlinx.serialization.ExperimentalSerializationApi
  */
 @Startup
 @ApplicationScoped
-@ExperimentalTime
-@ExperimentalSerializationApi
 class ParentCleaner : AbstractCleaner<ParentModel>() {
 
     @Inject

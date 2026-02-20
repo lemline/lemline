@@ -1,10 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.expressions.scopes
-
-import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
-
 /**
  * Data class representing a task descriptor.
  *
@@ -17,7 +14,6 @@ import kotlinx.serialization.json.JsonObject
  *
  * @see <a href="https://github.com/serverlessworkflow/specification/blob/main/dsl.md#task-descriptor">Task Descriptor</a>
  */
-@Serializable
 data class TaskDescriptor(
     val name: String,
     val reference: String,
