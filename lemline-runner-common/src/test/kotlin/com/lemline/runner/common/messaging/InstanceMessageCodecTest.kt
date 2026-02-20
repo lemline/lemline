@@ -88,7 +88,7 @@ class InstanceMessageCodecTest {
 
     @Test
     fun `should reject non protobuf db payload`() {
-        val legacyJson = commandMessage().workflowState.toJsonString()
+        val legacyJson = """{"state":"legacy-json"}"""
 
         assertFailsWith<IllegalArgumentException> {
             InstanceMessageCodec.workflowStateFromDbJson(legacyJson)

@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.states
 
-import com.lemline.common.json.LemlineJson
 import com.lemline.common.values.NodePosition
 import com.lemline.common.values.Token
 import com.lemline.common.values.WorkflowId
 import com.lemline.core.random.random
+import com.lemline.core.states.protobuf.NodeStackProtobufMapper
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 import kotlin.time.Clock
@@ -39,8 +39,7 @@ class NodeStackTest {
         )
 
         // When
-        val serialized = LemlineJson.encodeToString(stack)
-        val deserialized = LemlineJson.decodeFromString<NodeStack>(serialized)
+        val deserialized = roundTrip(stack)
 
         // Then
         assertEquals(stack, deserialized)
@@ -69,13 +68,13 @@ class NodeStackTest {
         )
 
         // When
-        val serialized = LemlineJson.encodeToString(stack)
+        val compactPositions = compactPositions(stack)
 
         // Then - should contain relative segments, not full paths
-        assertTrue(serialized.contains("\"do\""), "Should contain segment 'do'")
-        assertTrue(serialized.contains("\"0/myTask\""), "Should contain segment '0/myTask'")
-        assertTrue(!serialized.contains("\"/do\""), "Should not contain full path '/do'")
-        assertTrue(!serialized.contains("\"/do/0/myTask\""), "Should not contain full path")
+        assertTrue(compactPositions.contains("do"), "Should contain segment 'do'")
+        assertTrue(compactPositions.contains("0/myTask"), "Should contain segment '0/myTask'")
+        assertTrue(!compactPositions.contains("/do"), "Should not contain full path '/do'")
+        assertTrue(!compactPositions.contains("/do/0/myTask"), "Should not contain full path")
     }
 
     @Test
@@ -98,8 +97,7 @@ class NodeStackTest {
         val stack = NodeStack(frames)
 
         // When
-        val serialized = LemlineJson.encodeToString(stack)
-        val deserialized = LemlineJson.decodeFromString<NodeStack>(serialized)
+        val deserialized = roundTrip(stack)
 
         // Then
         assertEquals(stack, deserialized)
@@ -113,8 +111,7 @@ class NodeStackTest {
             val stack = NodeStack.random()
 
             // When
-            val serialized = LemlineJson.encodeToString(stack)
-            val deserialized = LemlineJson.decodeFromString<NodeStack>(serialized)
+            val deserialized = roundTrip(stack)
 
             // Then
             assertEquals(stack, deserialized)
@@ -135,8 +132,7 @@ class NodeStackTest {
         )
 
         // When
-        val serialized = LemlineJson.encodeToString(stack)
-        val deserialized = LemlineJson.decodeFromString<NodeStack>(serialized)
+        val deserialized = roundTrip(stack)
 
         // Then
         assertEquals(stack, deserialized)
@@ -174,8 +170,7 @@ class NodeStackTest {
         )
 
         // When
-        val serialized = LemlineJson.encodeToString(stack)
-        val deserialized = LemlineJson.decodeFromString<NodeStack>(serialized)
+        val deserialized = roundTrip(stack)
 
         // Then - the catch/do path should be preserved correctly
         assertEquals(stack, deserialized)
@@ -210,8 +205,7 @@ class NodeStackTest {
             )
 
             // When
-            val serialized = LemlineJson.encodeToString(stack)
-            val deserialized = LemlineJson.decodeFromString<NodeStack>(serialized)
+            val deserialized = roundTrip(stack)
 
             // Then
             assertEquals(stack, deserialized)
@@ -238,11 +232,11 @@ class NodeStackTest {
             )
 
             // When
-            val serialized = LemlineJson.encodeToString(stack)
+            val compactPositions = compactPositions(stack)
 
             // Then - should contain relative segments "do" and "0/taskA"
-            assertTrue(serialized.contains("\"do\""), "Should contain segment 'do'")
-            assertTrue(serialized.contains("\"0/taskA\""), "Should contain segment '0/taskA'")
+            assertTrue(compactPositions.contains("do"), "Should contain segment 'do'")
+            assertTrue(compactPositions.contains("0/taskA"), "Should contain segment '0/taskA'")
         }
 
         @Test
@@ -277,8 +271,7 @@ class NodeStackTest {
             )
 
             // When
-            val serialized = LemlineJson.encodeToString(stack)
-            val deserialized = LemlineJson.decodeFromString<NodeStack>(serialized)
+            val deserialized = roundTrip(stack)
 
             // Then
             assertEquals(stack, deserialized)
@@ -309,8 +302,7 @@ class NodeStackTest {
             )
 
             // When
-            val serialized = LemlineJson.encodeToString(stack)
-            val deserialized = LemlineJson.decodeFromString<NodeStack>(serialized)
+            val deserialized = roundTrip(stack)
 
             // Then
             assertEquals(stack, deserialized)
@@ -337,8 +329,7 @@ class NodeStackTest {
             )
 
             // When
-            val serialized = LemlineJson.encodeToString(stack)
-            val deserialized = LemlineJson.decodeFromString<NodeStack>(serialized)
+            val deserialized = roundTrip(stack)
 
             // Then
             assertEquals(stack, deserialized)
@@ -376,8 +367,7 @@ class NodeStackTest {
             )
 
             // When
-            val serialized = LemlineJson.encodeToString(stack)
-            val deserialized = LemlineJson.decodeFromString<NodeStack>(serialized)
+            val deserialized = roundTrip(stack)
 
             // Then
             assertEquals(stack, deserialized)
@@ -404,13 +394,12 @@ class NodeStackTest {
             )
 
             // When
-            val serialized = LemlineJson.encodeToString(stack)
+            val compactPositions = compactPositions(stack)
 
             // Then - verify correct structure
-            // The serialized JSON should have: [{"":...}, {"do":...}, {"0/taskA":...}]
             assertTrue(
-                serialized.contains("\"0/taskA\"") || serialized.contains("\"0\\/taskA\""),
-                "Should contain index and task name as relative suffix. Got: $serialized"
+                compactPositions.contains("0/taskA"),
+                "Should contain index and task name as relative suffix. Got: $compactPositions"
             )
         }
 
@@ -440,12 +429,17 @@ class NodeStackTest {
             )
 
             // When
-            val serialized = LemlineJson.encodeToString(stack)
-            val deserialized = LemlineJson.decodeFromString<NodeStack>(serialized)
+            val deserialized = roundTrip(stack)
 
             // Then
             assertEquals(stack, deserialized)
             assertEquals("/do/0/outer/do/1/middle/do/2/inner", deserialized.currentPosition.toString())
         }
     }
+
+    private fun roundTrip(stack: NodeStack): NodeStack =
+        NodeStackProtobufMapper.fromProto(NodeStackProtobufMapper.toProto(stack))
+
+    private fun compactPositions(stack: NodeStack): List<String> =
+        NodeStackProtobufMapper.toProto(stack).frames.map { it.position }
 }

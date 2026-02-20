@@ -5,13 +5,11 @@ import com.lemline.core.processors.scope.Scope
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
-import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 
-@Serializable
 @ExperimentalTime
 data class ForeachState(
     override val startedAt: Instant = Clock.System.now(),

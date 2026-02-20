@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.nodes
 
-import com.lemline.common.json.LemlineJson
 import com.lemline.common.values.NodePosition
 import com.lemline.common.values.NodePosition.Companion.root
 import com.lemline.common.values.Token
@@ -139,27 +138,19 @@ class NodePositionTest {
     @Nested
     inner class Serialization {
         @Test
-        fun `serialize and deserialize random`() {
+        fun `string round-trip random`() {
             val original = NodePosition.random()
-            val json = LemlineJson.encodeToString(original)
-
-            println(json)
-            val decoded = LemlineJson.decodeFromString<NodePosition>(json)
+            val decoded = NodePosition(original.toString())
             assertEquals(original, decoded)
         }
 
         @Test
-        fun `serialize and deserialize root`() {
+        fun `string round-trip root`() {
             val root = root
-            val json = LemlineJson.encodeToString(root)
-            // Empty pointer serializes to empty JSON string
-            assertEquals("\"/\"", json)
-
-            val decoded = LemlineJson.decodeFromString<NodePosition>(json)
+            val decoded = NodePosition(root.toString())
             assertEquals(root, decoded)
             assertEquals("/", decoded.toString())
         }
-
 
     }
 }
