@@ -2,6 +2,7 @@
 package com.lemline.runner
 
 import com.lemline.runner.cli.MainCommand
+import com.lemline.runner.cli.config.ConfigCreateCommand
 import com.lemline.runner.cli.config.ConfigPathHolder
 import com.lemline.runner.cli.instances.InstanceStartCommand
 import com.lemline.runner.cli.listen.ListenCommand
@@ -85,7 +86,10 @@ class LemlineApplication : QuarkusApplication {
                 // Set the config path
                 setConfigPath(parseResults)
 
-                if (ConfigPathHolder.configPath == null && !helpOrVersion) {
+                // config create doesn't need an existing config file
+                val isConfigCreate = parseResults.command<ConfigCreateCommand>() != null
+
+                if (ConfigPathHolder.configPath == null && !helpOrVersion && !isConfigCreate) {
                     System.err.println("No valid configuration file found. Please provide one, using one of the following methods:")
                     System.err.println("1. Pass the path to the file as a command-line argument (e.g., --config=<path>).")
                     System.err.println("2. Set the LEMLINE_CONFIG environment variable to the file's path.")
@@ -107,6 +111,7 @@ class LemlineApplication : QuarkusApplication {
                         disableMetricsEndpoint()
                         disableMessaging()
                         disableScheduled()
+                        if (isConfigCreate) disableDatabase()
                     } else {
                         listen.port?.let { setMetricsEndpointPort(it) }
                         enableMessaging()

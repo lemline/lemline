@@ -282,7 +282,7 @@ This project is licensed under the [Business Source License 1.1](LICENSE.md).
 ### Others
 
 - [x] Namespace
-- [ ] Catalog
+- [x] Catalog
 - [ ] Extensions
 
 ## 📬 Contact

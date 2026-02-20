@@ -23,7 +23,7 @@ import picocli.CommandLine
  */
 class ConfigCommandTest {
 
-    private lateinit var command: ConfigCommand
+    private lateinit var command: ConfigShowCommand
     private lateinit var mockedConfig: Config
     private lateinit var cmd: CommandLine
     private lateinit var outStream: ByteArrayOutputStream
@@ -57,7 +57,7 @@ class ConfigCommandTest {
         }
 
         // Create command and inject mocks
-        command = ConfigCommand().apply {
+        command = ConfigShowCommand().apply {
             this.mixin = GlobalMixin()
             this.lemlineConfig = mockedConfig
         }
