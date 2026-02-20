@@ -12,7 +12,7 @@ option java_package = "com.lemline.messages.internal.v1";
 message InstanceMessageProto {
     int32 schema_version = 1;
     WorkflowInfoProto workflow_info = 2;
-    WorkflowStateProto state = 3;
+    WorkflowStateProto workflow_state = 3;
 }
 
 message WorkflowStateProto {

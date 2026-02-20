@@ -142,7 +142,7 @@ object WorkflowStateProtobufMapper {
     private fun WorkflowCommand.ResumeFromTask.toProto() = ResumeFromTaskProto(
         node_stack = NodeStackProtobufMapper.toProto(nodeStack),
         node_position = nodePosition.toString(),
-        raw_input_json = rawInput.toProtoJsonValue(),
+        input_json = rawInput.toProtoJsonValue(),
         flow_directive = flowDirective?.toProto()
     )
 
@@ -150,19 +150,19 @@ object WorkflowStateProtobufMapper {
         nodeStack = node_stack?.let(NodeStackProtobufMapper::fromProto)
             ?: error("ResumeFromTaskCommand.node_stack is required"),
         nodePosition = NodePosition(node_position),
-        rawInput = raw_input_json.toKotlinJsonElement(),
+        rawInput = input_json.toKotlinJsonElement(),
         flowDirective = flow_directive?.toDomain()
     )
 
     private fun WorkflowCommand.ResumeWithCompletedTask.toProto() = ResumeWithCompletedTaskProto(
         node_stack = NodeStackProtobufMapper.toProto(nodeStack),
-        raw_output_json = rawOutput.toProtoJsonValue()
+        output_json = rawOutput.toProtoJsonValue()
     )
 
     private fun ResumeWithCompletedTaskProto.toDomain() = WorkflowCommand.ResumeWithCompletedTask(
         nodeStack = node_stack?.let(NodeStackProtobufMapper::fromProto)
             ?: error("ResumeWithCompletedTaskCommand.node_stack is required"),
-        rawOutput = raw_output_json.toKotlinJsonElement()
+        rawOutput = output_json.toKotlinJsonElement()
     )
 
     private fun WorkflowCommand.ResumeWithFailedTask.toProto() = ResumeWithFailedTaskProto(

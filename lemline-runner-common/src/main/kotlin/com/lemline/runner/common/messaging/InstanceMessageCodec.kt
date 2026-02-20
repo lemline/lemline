@@ -63,20 +63,20 @@ object InstanceMessageCodec {
                 name = message.workflowInfo.name.toString(),
                 version = message.workflowInfo.version.toString()
             ),
-            state = WorkflowStateProtobufMapper.toProto(workflowState)
+            workflow_state = WorkflowStateProtobufMapper.toProto(workflowState)
         )
     }
 
     internal fun fromEnvelope(envelope: InstanceMessageProto): InstanceMessage<WorkflowState> {
-        val state = envelope.state?.let { WorkflowStateProtobufMapper.fromProto(it) }
-            ?: error("Envelope state is not set")
+        val workflowState = envelope.workflow_state?.let { WorkflowStateProtobufMapper.fromProto(it) }
+            ?: error("Envelope workflow_state is not set")
 
         val workflowInfo = envelope.workflow_info?.toDomain()
             ?: error("Envelope workflow_info is not set")
 
         return InstanceMessage(
             workflowInfo = workflowInfo,
-            workflowState = state,
+            workflowState = workflowState,
         )
     }
 
