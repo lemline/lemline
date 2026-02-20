@@ -1,8 +1,10 @@
+<!-- Generated: 2026-02-18 | Updated: 2026-02-18 -->
+
 # AGENTS.md
 
 Guidelines for AI coding agents working in the Lemline repository.
 
-**Generated:** 2026-01-02  
+**Generated:** 2026-02-18
 **Branch:** main
 
 ## Overview

@@ -1,3 +1,6 @@
+<!-- Parent: ../AGENTS.md -->
+<!-- Generated: 2026-02-18 -->
+
 # lemline-runner
 
 Quarkus runtime with dual-channel messaging, CLI, and configuration.

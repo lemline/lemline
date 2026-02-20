@@ -1,3 +1,6 @@
+<!-- Parent: ../AGENTS.md -->
+<!-- Generated: 2026-02-18 -->
+
 # lemline-core
 
 Stateless workflow execution engine implementing Serverless Workflow DSL v1.0.
