@@ -26,50 +26,50 @@ import com.lemline.core.states.WorkflowState
 import com.lemline.core.tasks.FlowDirective
 import com.lemline.core.tasks.FlowDirectiveEnum
 import com.lemline.core.tasks.FlowDirectiveGoto
-import com.lemline.messages.internal.v1.BasicAuthMessage
-import com.lemline.messages.internal.v1.BearerAuthMessage
-import com.lemline.messages.internal.v1.CallHttpConfigMessage
-import com.lemline.messages.internal.v1.CallHttpStartedEvent
-import com.lemline.messages.internal.v1.CorrelationDefMessage
-import com.lemline.messages.internal.v1.CorrelationMapMessage
-import com.lemline.messages.internal.v1.EmitConfigMessage
-import com.lemline.messages.internal.v1.EmitStartedEvent
-import com.lemline.messages.internal.v1.EventFilterMessage
-import com.lemline.messages.internal.v1.FlowDirectiveEnumMessage
-import com.lemline.messages.internal.v1.FlowDirectiveMessage
-import com.lemline.messages.internal.v1.ForEachCompletedEvent
-import com.lemline.messages.internal.v1.ForkBranchCompletedEvent
-import com.lemline.messages.internal.v1.ForkBranchFailedEvent
-import com.lemline.messages.internal.v1.ForkStartedEvent
-import com.lemline.messages.internal.v1.HttpAuthenticationMessage
-import com.lemline.messages.internal.v1.HttpOutputMessage
-import com.lemline.messages.internal.v1.InternalErrorMessage
-import com.lemline.messages.internal.v1.ListenConfigMessage
-import com.lemline.messages.internal.v1.ListenReadAsMessage
-import com.lemline.messages.internal.v1.ListenStartedEvent
-import com.lemline.messages.internal.v1.ListenStrategyMessage
-import com.lemline.messages.internal.v1.OAuth2AuthMessage
-import com.lemline.messages.internal.v1.ProcessReturnTypeMessage
-import com.lemline.messages.internal.v1.ResumeFromTaskCommand
-import com.lemline.messages.internal.v1.ResumeWithCompletedTaskCommand
-import com.lemline.messages.internal.v1.ResumeWithFailedTaskCommand
-import com.lemline.messages.internal.v1.RunScriptConfigMessage
-import com.lemline.messages.internal.v1.RunScriptStartedEvent
-import com.lemline.messages.internal.v1.RunShellConfigMessage
-import com.lemline.messages.internal.v1.RunShellStartedEvent
-import com.lemline.messages.internal.v1.RunWorkflowConfigMessage
-import com.lemline.messages.internal.v1.RunWorkflowStartedEvent
-import com.lemline.messages.internal.v1.StringMapMessage
-import com.lemline.messages.internal.v1.TaskRetryScheduledEvent
-import com.lemline.messages.internal.v1.TaskScheduledEvent
-import com.lemline.messages.internal.v1.UntilConditionMessage
-import com.lemline.messages.internal.v1.WaitConfigMessage
-import com.lemline.messages.internal.v1.WaitStartedEvent
-import com.lemline.messages.internal.v1.WorkflowCommandMessage
-import com.lemline.messages.internal.v1.WorkflowCompletedEvent
-import com.lemline.messages.internal.v1.WorkflowEventMessage
-import com.lemline.messages.internal.v1.WorkflowFailedEvent
-import com.lemline.messages.internal.v1.WorkflowStatePayload
+import com.lemline.messages.internal.v1.BasicAuthProto
+import com.lemline.messages.internal.v1.BearerAuthProto
+import com.lemline.messages.internal.v1.CallHttpConfigProto
+import com.lemline.messages.internal.v1.CallHttpStartedProto
+import com.lemline.messages.internal.v1.CorrelationDefProto
+import com.lemline.messages.internal.v1.CorrelationMapProto
+import com.lemline.messages.internal.v1.EmitConfigProto
+import com.lemline.messages.internal.v1.EmitStartedProto
+import com.lemline.messages.internal.v1.EventFilterProto
+import com.lemline.messages.internal.v1.FlowDirectiveEnumProto
+import com.lemline.messages.internal.v1.FlowDirectiveProto
+import com.lemline.messages.internal.v1.ForEachCompletedProto
+import com.lemline.messages.internal.v1.ForkBranchCompletedProto
+import com.lemline.messages.internal.v1.ForkBranchFailedProto
+import com.lemline.messages.internal.v1.ForkStartedProto
+import com.lemline.messages.internal.v1.HttpAuthenticationProto
+import com.lemline.messages.internal.v1.HttpOutputProto
+import com.lemline.messages.internal.v1.InternalErrorProto
+import com.lemline.messages.internal.v1.ListenConfigProto
+import com.lemline.messages.internal.v1.ListenReadAsProto
+import com.lemline.messages.internal.v1.ListenStartedProto
+import com.lemline.messages.internal.v1.ListenStrategyProto
+import com.lemline.messages.internal.v1.OAuth2AuthProto
+import com.lemline.messages.internal.v1.ProcessReturnTypeProto
+import com.lemline.messages.internal.v1.ResumeFromTaskProto
+import com.lemline.messages.internal.v1.ResumeWithCompletedTaskProto
+import com.lemline.messages.internal.v1.ResumeWithFailedTaskProto
+import com.lemline.messages.internal.v1.RunScriptConfigProto
+import com.lemline.messages.internal.v1.RunScriptStartedProto
+import com.lemline.messages.internal.v1.RunShellConfigProto
+import com.lemline.messages.internal.v1.RunShellStartedProto
+import com.lemline.messages.internal.v1.RunWorkflowConfigProto
+import com.lemline.messages.internal.v1.RunWorkflowStartedProto
+import com.lemline.messages.internal.v1.StringMapProto
+import com.lemline.messages.internal.v1.TaskRetryScheduledProto
+import com.lemline.messages.internal.v1.TaskScheduledProto
+import com.lemline.messages.internal.v1.UntilConditionProto
+import com.lemline.messages.internal.v1.WaitConfigProto
+import com.lemline.messages.internal.v1.WaitStartedProto
+import com.lemline.messages.internal.v1.WorkflowCommandProto
+import com.lemline.messages.internal.v1.WorkflowCompletedProto
+import com.lemline.messages.internal.v1.WorkflowEventProto
+import com.lemline.messages.internal.v1.WorkflowFailedProto
+import com.lemline.messages.internal.v1.WorkflowStateProto
 import io.serverlessworkflow.api.types.HTTPArguments.HTTPOutput
 import io.serverlessworkflow.api.types.ListenTaskConfiguration.ListenAndReadAs
 import io.serverlessworkflow.api.types.RunTaskConfiguration.ProcessReturnType
@@ -79,56 +79,51 @@ import kotlin.time.Instant
 
 object WorkflowStateProtobufMapper {
 
-    fun toProto(state: WorkflowState): WorkflowStatePayload =
+    fun toProto(state: WorkflowState): WorkflowStateProto =
         when (state) {
-            is WorkflowCommand -> WorkflowStatePayload(command = toCommandProto(state))
-            is WorkflowEvent -> WorkflowStatePayload(event = toEventProto(state))
+            is WorkflowCommand -> WorkflowStateProto(command = toCommandProto(state))
+            is WorkflowEvent -> WorkflowStateProto(event = toEventProto(state))
         }
 
-    fun fromProto(state: WorkflowStatePayload): WorkflowState {
+    fun fromProto(state: WorkflowStateProto): WorkflowState {
         state.command?.let { return fromCommandProto(it) }
         state.event?.let { return fromEventProto(it) }
         error("WorkflowStatePayload has no state set")
     }
 
-    fun toCommandProto(command: WorkflowCommand): WorkflowCommandMessage =
+    fun toCommandProto(command: WorkflowCommand): WorkflowCommandProto =
         when (command) {
-            is WorkflowCommand.ResumeFromTask -> WorkflowCommandMessage(resume_from_task = command.toProto())
-            is WorkflowCommand.ResumeWithCompletedTask -> WorkflowCommandMessage(
-                resume_with_completed_task = command.toProto()
-            )
-
-            is WorkflowCommand.ResumeWithFailedTask -> WorkflowCommandMessage(
-                resume_with_failed_task = command.toProto()
-            )
+            is WorkflowCommand.ResumeFromTask -> WorkflowCommandProto(resume_from_task = command.toProto())
+            is WorkflowCommand.ResumeWithCompletedTask -> WorkflowCommandProto(resume_with_completed_task = command.toProto())
+            is WorkflowCommand.ResumeWithFailedTask -> WorkflowCommandProto(resume_with_failed_task = command.toProto())
         }
 
-    fun fromCommandProto(command: WorkflowCommandMessage): WorkflowCommand {
+    fun fromCommandProto(command: WorkflowCommandProto): WorkflowCommand {
         command.resume_from_task?.let { return it.toDomain() }
         command.resume_with_completed_task?.let { return it.toDomain() }
         command.resume_with_failed_task?.let { return it.toDomain() }
         error("WorkflowCommandMessage has no command set")
     }
 
-    fun toEventProto(event: WorkflowEvent): WorkflowEventMessage = when (event) {
-        is WorkflowEvent.WorkflowCompleted -> WorkflowEventMessage(workflow_completed = event.toProto())
-        is WorkflowEvent.WorkflowFailed -> WorkflowEventMessage(workflow_failed = event.toProto())
-        is WorkflowEvent.ForkBranchCompleted -> WorkflowEventMessage(fork_branch_completed = event.toProto())
-        is WorkflowEvent.ForkBranchFailed -> WorkflowEventMessage(fork_branch_failed = event.toProto())
-        is WorkflowEvent.ForEachCompleted -> WorkflowEventMessage(for_each_completed = event.toProto())
-        is WorkflowEvent.TaskScheduled -> WorkflowEventMessage(task_scheduled = event.toProto())
-        is WorkflowEvent.WaitStarted -> WorkflowEventMessage(wait_started = event.toProto())
-        is WorkflowEvent.TaskRetryScheduled -> WorkflowEventMessage(task_retry_scheduled = event.toProto())
-        is WorkflowEvent.RunWorkflowStarted -> WorkflowEventMessage(run_workflow_started = event.toProto())
-        is WorkflowEvent.ForkStarted -> WorkflowEventMessage(fork_started = event.toProto())
-        is WorkflowEvent.ListenStarted -> WorkflowEventMessage(listen_started = event.toProto())
-        is WorkflowEvent.EmitStarted -> WorkflowEventMessage(emit_started = event.toProto())
-        is WorkflowEvent.CallHttpStarted -> WorkflowEventMessage(call_http_started = event.toProto())
-        is WorkflowEvent.RunScriptStarted -> WorkflowEventMessage(run_script_started = event.toProto())
-        is WorkflowEvent.RunShellStarted -> WorkflowEventMessage(run_shell_started = event.toProto())
+    fun toEventProto(event: WorkflowEvent): WorkflowEventProto = when (event) {
+        is WorkflowEvent.WorkflowCompleted -> WorkflowEventProto(workflow_completed = event.toProto())
+        is WorkflowEvent.WorkflowFailed -> WorkflowEventProto(workflow_failed = event.toProto())
+        is WorkflowEvent.ForkBranchCompleted -> WorkflowEventProto(fork_branch_completed = event.toProto())
+        is WorkflowEvent.ForkBranchFailed -> WorkflowEventProto(fork_branch_failed = event.toProto())
+        is WorkflowEvent.ForEachCompleted -> WorkflowEventProto(for_each_completed = event.toProto())
+        is WorkflowEvent.TaskScheduled -> WorkflowEventProto(task_scheduled = event.toProto())
+        is WorkflowEvent.WaitStarted -> WorkflowEventProto(wait_started = event.toProto())
+        is WorkflowEvent.TaskRetryScheduled -> WorkflowEventProto(task_retry_scheduled = event.toProto())
+        is WorkflowEvent.RunWorkflowStarted -> WorkflowEventProto(run_workflow_started = event.toProto())
+        is WorkflowEvent.ForkStarted -> WorkflowEventProto(fork_started = event.toProto())
+        is WorkflowEvent.ListenStarted -> WorkflowEventProto(listen_started = event.toProto())
+        is WorkflowEvent.EmitStarted -> WorkflowEventProto(emit_started = event.toProto())
+        is WorkflowEvent.CallHttpStarted -> WorkflowEventProto(call_http_started = event.toProto())
+        is WorkflowEvent.RunScriptStarted -> WorkflowEventProto(run_script_started = event.toProto())
+        is WorkflowEvent.RunShellStarted -> WorkflowEventProto(run_shell_started = event.toProto())
     }
 
-    fun fromEventProto(event: WorkflowEventMessage): WorkflowEvent {
+    fun fromEventProto(event: WorkflowEventProto): WorkflowEvent {
         event.workflow_completed?.let { return it.toDomain() }
         event.workflow_failed?.let { return it.toDomain() }
         event.fork_branch_completed?.let { return it.toDomain() }
@@ -147,15 +142,15 @@ object WorkflowStateProtobufMapper {
         error("WorkflowEventMessage has no event set")
     }
 
-    private fun WorkflowCommand.ResumeFromTask.toProto(): ResumeFromTaskCommand =
-        ResumeFromTaskCommand(
+    private fun WorkflowCommand.ResumeFromTask.toProto(): ResumeFromTaskProto =
+        ResumeFromTaskProto(
             node_stack = NodeStackProtobufMapper.toProto(nodeStack),
             node_position = nodePosition.toString(),
             raw_input_json = rawInput.toProtoJsonValue(),
             flow_directive = flowDirective?.toProto()
         )
 
-    private fun ResumeFromTaskCommand.toDomain(): WorkflowCommand.ResumeFromTask =
+    private fun ResumeFromTaskProto.toDomain(): WorkflowCommand.ResumeFromTask =
         WorkflowCommand.ResumeFromTask(
             nodeStack = node_stack?.let(NodeStackProtobufMapper::fromProto)
                 ?: error("ResumeFromTaskCommand.node_stack is required"),
@@ -164,40 +159,40 @@ object WorkflowStateProtobufMapper {
             flowDirective = flow_directive?.toDomain()
         )
 
-    private fun WorkflowCommand.ResumeWithCompletedTask.toProto(): ResumeWithCompletedTaskCommand =
-        ResumeWithCompletedTaskCommand(
+    private fun WorkflowCommand.ResumeWithCompletedTask.toProto(): ResumeWithCompletedTaskProto =
+        ResumeWithCompletedTaskProto(
             node_stack = NodeStackProtobufMapper.toProto(nodeStack),
             raw_output_json = rawOutput.toProtoJsonValue()
         )
 
-    private fun ResumeWithCompletedTaskCommand.toDomain(): WorkflowCommand.ResumeWithCompletedTask =
+    private fun ResumeWithCompletedTaskProto.toDomain(): WorkflowCommand.ResumeWithCompletedTask =
         WorkflowCommand.ResumeWithCompletedTask(
             nodeStack = node_stack?.let(NodeStackProtobufMapper::fromProto)
                 ?: error("ResumeWithCompletedTaskCommand.node_stack is required"),
             rawOutput = raw_output_json.toKotlinJsonElement()
         )
 
-    private fun WorkflowCommand.ResumeWithFailedTask.toProto(): ResumeWithFailedTaskCommand =
-        ResumeWithFailedTaskCommand(
+    private fun WorkflowCommand.ResumeWithFailedTask.toProto(): ResumeWithFailedTaskProto =
+        ResumeWithFailedTaskProto(
             node_stack = NodeStackProtobufMapper.toProto(nodeStack),
             error = error.toProto()
         )
 
-    private fun ResumeWithFailedTaskCommand.toDomain(): WorkflowCommand.ResumeWithFailedTask =
+    private fun ResumeWithFailedTaskProto.toDomain(): WorkflowCommand.ResumeWithFailedTask =
         WorkflowCommand.ResumeWithFailedTask(
             nodeStack = node_stack?.let(NodeStackProtobufMapper::fromProto)
                 ?: error("ResumeWithFailedTaskCommand.node_stack is required"),
             error = error?.toDomain() ?: error("ResumeWithFailedTaskCommand.error is required")
         )
 
-    private fun WorkflowEvent.WorkflowCompleted.toProto(): WorkflowCompletedEvent =
-        WorkflowCompletedEvent(
+    private fun WorkflowEvent.WorkflowCompleted.toProto(): WorkflowCompletedProto =
+        WorkflowCompletedProto(
             output_json = output.toProtoJsonValue(),
             completed_at = completedAt.toProtoInstant(),
             node_stack = NodeStackProtobufMapper.toProto(nodeStack)
         )
 
-    private fun WorkflowCompletedEvent.toDomain(): WorkflowEvent.WorkflowCompleted =
+    private fun WorkflowCompletedProto.toDomain(): WorkflowEvent.WorkflowCompleted =
         WorkflowEvent.WorkflowCompleted(
             output = output_json.toKotlinJsonElement(),
             completedAt = completed_at.toKotlinInstantOrEpoch(),
@@ -205,36 +200,36 @@ object WorkflowStateProtobufMapper {
                 ?: error("WorkflowCompletedEvent.node_stack is required"),
         )
 
-    private fun WorkflowEvent.WorkflowFailed.toProto(): WorkflowFailedEvent =
-        WorkflowFailedEvent(
+    private fun WorkflowEvent.WorkflowFailed.toProto(): WorkflowFailedProto =
+        WorkflowFailedProto(
             node_stack = NodeStackProtobufMapper.toProto(nodeStack),
-            raw_input_json = rawInput?.toProtoJsonValue(),
-            raw_output_json = rawOutput?.toProtoJsonValue(),
+            input_json = rawInput?.toProtoJsonValue(),
+            output_json = rawOutput?.toProtoJsonValue(),
             flow_directive = flowDirective?.toProto(),
             error = error.toProto(),
             failed_at = failedAt.toProtoInstant()
         )
 
-    private fun WorkflowFailedEvent.toDomain(): WorkflowEvent.WorkflowFailed =
+    private fun WorkflowFailedProto.toDomain(): WorkflowEvent.WorkflowFailed =
         WorkflowEvent.WorkflowFailed(
             nodeStack = node_stack?.let(NodeStackProtobufMapper::fromProto)
                 ?: error("WorkflowFailedEvent.node_stack is required"),
-            rawInput = raw_input_json?.toKotlinJsonElement(),
-            rawOutput = raw_output_json?.toKotlinJsonElement(),
+            rawInput = input_json?.toKotlinJsonElement(),
+            rawOutput = output_json?.toKotlinJsonElement(),
             flowDirective = flow_directive?.toDomain(),
             error = error?.toDomain() ?: error("WorkflowFailedEvent.error is required"),
             failedAt = failed_at.toKotlinInstantOrEpoch(),
         )
 
-    private fun WorkflowEvent.ForkBranchCompleted.toProto(): ForkBranchCompletedEvent =
-        ForkBranchCompletedEvent(
+    private fun WorkflowEvent.ForkBranchCompleted.toProto(): ForkBranchCompletedProto =
+        ForkBranchCompletedProto(
             node_stack = NodeStackProtobufMapper.toProto(nodeStack),
             branch_position = branchPosition.toString(),
             branch_output_json = branchOutput.toProtoJsonValue(),
             completed_at = completedAt.toProtoInstant()
         )
 
-    private fun ForkBranchCompletedEvent.toDomain(): WorkflowEvent.ForkBranchCompleted =
+    private fun ForkBranchCompletedProto.toDomain(): WorkflowEvent.ForkBranchCompleted =
         WorkflowEvent.ForkBranchCompleted(
             nodeStack = node_stack?.let(NodeStackProtobufMapper::fromProto)
                 ?: error("ForkBranchCompletedEvent.node_stack is required"),
@@ -243,15 +238,15 @@ object WorkflowStateProtobufMapper {
             completedAt = completed_at.toKotlinInstantOrEpoch(),
         )
 
-    private fun WorkflowEvent.ForkBranchFailed.toProto(): ForkBranchFailedEvent =
-        ForkBranchFailedEvent(
+    private fun WorkflowEvent.ForkBranchFailed.toProto(): ForkBranchFailedProto =
+        ForkBranchFailedProto(
             node_stack = NodeStackProtobufMapper.toProto(nodeStack),
             branch_position = branchPosition.toString(),
             error = error.toProto(),
             failed_at = failedAt.toProtoInstant()
         )
 
-    private fun ForkBranchFailedEvent.toDomain(): WorkflowEvent.ForkBranchFailed =
+    private fun ForkBranchFailedProto.toDomain(): WorkflowEvent.ForkBranchFailed =
         WorkflowEvent.ForkBranchFailed(
             nodeStack = node_stack?.let(NodeStackProtobufMapper::fromProto)
                 ?: error("ForkBranchFailedEvent.node_stack is required"),
@@ -260,121 +255,121 @@ object WorkflowStateProtobufMapper {
             failedAt = failed_at.toKotlinInstantOrEpoch(),
         )
 
-    private fun WorkflowEvent.ForEachCompleted.toProto(): ForEachCompletedEvent =
-        ForEachCompletedEvent(
+    private fun WorkflowEvent.ForEachCompleted.toProto(): ForEachCompletedProto =
+        ForEachCompletedProto(
             node_stack = NodeStackProtobufMapper.toProto(nodeStack),
             output_json = output.toProtoJsonValue()
         )
 
-    private fun ForEachCompletedEvent.toDomain(): WorkflowEvent.ForEachCompleted =
+    private fun ForEachCompletedProto.toDomain(): WorkflowEvent.ForEachCompleted =
         WorkflowEvent.ForEachCompleted(
             nodeStack = node_stack?.let(NodeStackProtobufMapper::fromProto)
                 ?: error("ForEachCompletedEvent.node_stack is required"),
             output = output_json.toKotlinJsonElement(),
         )
 
-    private fun WorkflowEvent.TaskScheduled.toProto(): TaskScheduledEvent =
-        TaskScheduledEvent(
+    private fun WorkflowEvent.TaskScheduled.toProto(): TaskScheduledProto =
+        TaskScheduledProto(
             node_stack = NodeStackProtobufMapper.toProto(nodeStack),
             node_position = nodePosition.toString(),
-            raw_input_json = rawInput.toProtoJsonValue(),
+            input_json = rawInput.toProtoJsonValue(),
             flow_directive = flowDirective?.toProto()
         )
 
-    private fun TaskScheduledEvent.toDomain(): WorkflowEvent.TaskScheduled =
+    private fun TaskScheduledProto.toDomain(): WorkflowEvent.TaskScheduled =
         WorkflowEvent.TaskScheduled(
             nodeStack = node_stack?.let(NodeStackProtobufMapper::fromProto)
                 ?: error("TaskScheduledEvent.node_stack is required"),
             nodePosition = NodePosition(node_position),
-            rawInput = raw_input_json.toKotlinJsonElement(),
+            rawInput = input_json.toKotlinJsonElement(),
             flowDirective = flow_directive?.toDomain(),
         )
 
-    private fun WorkflowEvent.WaitStarted.toProto(): WaitStartedEvent =
-        WaitStartedEvent(
+    private fun WorkflowEvent.WaitStarted.toProto(): WaitStartedProto =
+        WaitStartedProto(
             node_stack = NodeStackProtobufMapper.toProto(nodeStack),
-            raw_output_json = rawOutput.toProtoJsonValue(),
+            output_json = rawOutput.toProtoJsonValue(),
             config = config.toProto()
         )
 
-    private fun WaitStartedEvent.toDomain(): WorkflowEvent.WaitStarted =
+    private fun WaitStartedProto.toDomain(): WorkflowEvent.WaitStarted =
         WorkflowEvent.WaitStarted(
             nodeStack = node_stack?.let(NodeStackProtobufMapper::fromProto)
                 ?: error("WaitStartedEvent.node_stack is required"),
-            rawOutput = raw_output_json.toKotlinJsonElement(),
+            rawOutput = output_json.toKotlinJsonElement(),
             config = config?.toDomain() ?: error("WaitStartedEvent.config is required"),
         )
 
-    private fun WorkflowEvent.TaskRetryScheduled.toProto(): TaskRetryScheduledEvent =
-        TaskRetryScheduledEvent(
+    private fun WorkflowEvent.TaskRetryScheduled.toProto(): TaskRetryScheduledProto =
+        TaskRetryScheduledProto(
             node_stack = NodeStackProtobufMapper.toProto(nodeStack),
             node_position = nodePosition.toString(),
-            raw_input_json = rawInput.toProtoJsonValue(),
+            input_json = rawInput.toProtoJsonValue(),
             flow_directive = flowDirective?.toProto(),
             retry_at = retryAt.toProtoInstant()
         )
 
-    private fun TaskRetryScheduledEvent.toDomain(): WorkflowEvent.TaskRetryScheduled =
+    private fun TaskRetryScheduledProto.toDomain(): WorkflowEvent.TaskRetryScheduled =
         WorkflowEvent.TaskRetryScheduled(
             nodeStack = node_stack?.let(NodeStackProtobufMapper::fromProto)
                 ?: error("TaskRetryScheduledEvent.node_stack is required"),
             nodePosition = NodePosition(node_position),
-            rawInput = raw_input_json.toKotlinJsonElement(),
+            rawInput = input_json.toKotlinJsonElement(),
             flowDirective = flow_directive?.toDomain(),
             retryAt = retry_at.toKotlinInstantOrEpoch()
         )
 
-    private fun WorkflowEvent.RunWorkflowStarted.toProto(): RunWorkflowStartedEvent =
-        RunWorkflowStartedEvent(
+    private fun WorkflowEvent.RunWorkflowStarted.toProto(): RunWorkflowStartedProto =
+        RunWorkflowStartedProto(
             node_stack = NodeStackProtobufMapper.toProto(nodeStack),
-            raw_input_json = rawInput.toProtoJsonValue(),
+            input_json = rawInput.toProtoJsonValue(),
             config = config.toProto()
         )
 
-    private fun RunWorkflowStartedEvent.toDomain(): WorkflowEvent.RunWorkflowStarted =
+    private fun RunWorkflowStartedProto.toDomain(): WorkflowEvent.RunWorkflowStarted =
         WorkflowEvent.RunWorkflowStarted(
             nodeStack = node_stack?.let(NodeStackProtobufMapper::fromProto)
                 ?: error("RunWorkflowStartedEvent.node_stack is required"),
-            rawInput = raw_input_json.toKotlinJsonElement(),
+            rawInput = input_json.toKotlinJsonElement(),
             config = config?.toDomain() ?: error("RunWorkflowStartedEvent.config is required")
         )
 
-    private fun WorkflowEvent.ForkStarted.toProto(): ForkStartedEvent =
-        ForkStartedEvent(
+    private fun WorkflowEvent.ForkStarted.toProto(): ForkStartedProto =
+        ForkStartedProto(
             node_stack = NodeStackProtobufMapper.toProto(nodeStack),
-            raw_input_json = rawInput.toProtoJsonValue()
+            input_json = rawInput.toProtoJsonValue()
         )
 
-    private fun ForkStartedEvent.toDomain(): WorkflowEvent.ForkStarted =
+    private fun ForkStartedProto.toDomain(): WorkflowEvent.ForkStarted =
         WorkflowEvent.ForkStarted(
             nodeStack = node_stack?.let(NodeStackProtobufMapper::fromProto)
                 ?: error("ForkStartedEvent.node_stack is required"),
-            rawInput = raw_input_json.toKotlinJsonElement(),
+            rawInput = input_json.toKotlinJsonElement(),
         )
 
-    private fun WorkflowEvent.ListenStarted.toProto(): ListenStartedEvent =
-        ListenStartedEvent(
+    private fun WorkflowEvent.ListenStarted.toProto(): ListenStartedProto =
+        ListenStartedProto(
             node_stack = NodeStackProtobufMapper.toProto(nodeStack),
-            raw_output_json = rawOutput.toProtoJsonValue(),
+            output_json = rawOutput.toProtoJsonValue(),
             config = config.toProto()
         )
 
-    private fun ListenStartedEvent.toDomain(): WorkflowEvent.ListenStarted =
+    private fun ListenStartedProto.toDomain(): WorkflowEvent.ListenStarted =
         WorkflowEvent.ListenStarted(
             nodeStack = node_stack?.let(NodeStackProtobufMapper::fromProto)
                 ?: error("ListenStartedEvent.node_stack is required"),
-            rawOutput = raw_output_json.toKotlinJsonElement(),
+            rawOutput = output_json.toKotlinJsonElement(),
             config = config?.toDomain() ?: error("ListenStartedEvent.config is required")
         )
 
-    private fun WorkflowEvent.EmitStarted.toProto(): EmitStartedEvent =
-        EmitStartedEvent(
+    private fun WorkflowEvent.EmitStarted.toProto(): EmitStartedProto =
+        EmitStartedProto(
             node_stack = NodeStackProtobufMapper.toProto(nodeStack),
             input_json = input.toProtoJsonValue(),
             config = config.toProto()
         )
 
-    private fun EmitStartedEvent.toDomain(): WorkflowEvent.EmitStarted =
+    private fun EmitStartedProto.toDomain(): WorkflowEvent.EmitStarted =
         WorkflowEvent.EmitStarted(
             nodeStack = node_stack?.let(NodeStackProtobufMapper::fromProto)
                 ?: error("EmitStartedEvent.node_stack is required"),
@@ -382,14 +377,14 @@ object WorkflowStateProtobufMapper {
             config = config?.toDomain() ?: error("EmitStartedEvent.config is required")
         )
 
-    private fun WorkflowEvent.CallHttpStarted.toProto(): CallHttpStartedEvent =
-        CallHttpStartedEvent(
+    private fun WorkflowEvent.CallHttpStarted.toProto(): CallHttpStartedProto =
+        CallHttpStartedProto(
             node_stack = NodeStackProtobufMapper.toProto(nodeStack),
             input_json = input.toProtoJsonValue(),
             config = config.toProto()
         )
 
-    private fun CallHttpStartedEvent.toDomain(): WorkflowEvent.CallHttpStarted =
+    private fun CallHttpStartedProto.toDomain(): WorkflowEvent.CallHttpStarted =
         WorkflowEvent.CallHttpStarted(
             nodeStack = node_stack?.let(NodeStackProtobufMapper::fromProto)
                 ?: error("CallHttpStartedEvent.node_stack is required"),
@@ -397,14 +392,14 @@ object WorkflowStateProtobufMapper {
             config = config?.toDomain() ?: error("CallHttpStartedEvent.config is required")
         )
 
-    private fun WorkflowEvent.RunScriptStarted.toProto(): RunScriptStartedEvent =
-        RunScriptStartedEvent(
+    private fun WorkflowEvent.RunScriptStarted.toProto(): RunScriptStartedProto =
+        RunScriptStartedProto(
             node_stack = NodeStackProtobufMapper.toProto(nodeStack),
             input_json = input.toProtoJsonValue(),
             config = config.toProto()
         )
 
-    private fun RunScriptStartedEvent.toDomain(): WorkflowEvent.RunScriptStarted =
+    private fun RunScriptStartedProto.toDomain(): WorkflowEvent.RunScriptStarted =
         WorkflowEvent.RunScriptStarted(
             nodeStack = node_stack?.let(NodeStackProtobufMapper::fromProto)
                 ?: error("RunScriptStartedEvent.node_stack is required"),
@@ -412,14 +407,14 @@ object WorkflowStateProtobufMapper {
             config = config?.toDomain() ?: error("RunScriptStartedEvent.config is required")
         )
 
-    private fun WorkflowEvent.RunShellStarted.toProto(): RunShellStartedEvent =
-        RunShellStartedEvent(
+    private fun WorkflowEvent.RunShellStarted.toProto(): RunShellStartedProto =
+        RunShellStartedProto(
             node_stack = NodeStackProtobufMapper.toProto(nodeStack),
             input_json = input.toProtoJsonValue(),
             config = config.toProto()
         )
 
-    private fun RunShellStartedEvent.toDomain(): WorkflowEvent.RunShellStarted =
+    private fun RunShellStartedProto.toDomain(): WorkflowEvent.RunShellStarted =
         WorkflowEvent.RunShellStarted(
             nodeStack = node_stack?.let(NodeStackProtobufMapper::fromProto)
                 ?: error("RunShellStartedEvent.node_stack is required"),
@@ -427,16 +422,16 @@ object WorkflowStateProtobufMapper {
             config = config?.toDomain() ?: error("RunShellStartedEvent.config is required")
         )
 
-    private fun WaitConfig.toProto(): WaitConfigMessage =
-        WaitConfigMessage(wait_until = waitUntil.toProtoInstant())
+    private fun WaitConfig.toProto(): WaitConfigProto =
+        WaitConfigProto(wait_until = waitUntil.toProtoInstant())
 
-    private fun WaitConfigMessage.toDomain(): WaitConfig {
+    private fun WaitConfigProto.toDomain(): WaitConfig {
         val waitUntil = wait_until ?: error("WaitConfigMessage.wait_until must be set")
         return WaitConfig(waitUntil = waitUntil.toKotlinInstant())
     }
 
-    private fun RunWorkflowConfig.toProto(): RunWorkflowConfigMessage =
-        RunWorkflowConfigMessage(
+    private fun RunWorkflowConfig.toProto(): RunWorkflowConfigProto =
+        RunWorkflowConfigProto(
             namespace = namespace.toString(),
             name = name.toString(),
             version = version.toString(),
@@ -444,7 +439,7 @@ object WorkflowStateProtobufMapper {
             sync = sync
         )
 
-    private fun RunWorkflowConfigMessage.toDomain(): RunWorkflowConfig =
+    private fun RunWorkflowConfigProto.toDomain(): RunWorkflowConfig =
         RunWorkflowConfig(
             namespace = WorkflowNamespace(namespace),
             name = WorkflowName(name),
@@ -453,8 +448,8 @@ object WorkflowStateProtobufMapper {
             sync = sync,
         )
 
-    private fun ListenConfig.toProto(): ListenConfigMessage =
-        ListenConfigMessage(
+    private fun ListenConfig.toProto(): ListenConfigProto =
+        ListenConfigProto(
             strategy = strategy.toProto(),
             filters = filters.map { it.toProto() },
             until = until?.toProto(),
@@ -463,7 +458,7 @@ object WorkflowStateProtobufMapper {
             correlation_context_json = correlationContext?.toProtoJsonValue()
         )
 
-    private fun ListenConfigMessage.toDomain(): ListenConfig =
+    private fun ListenConfigProto.toDomain(): ListenConfig =
         ListenConfig(
             strategy = strategy.toDomain(),
             filters = filters.map { it.toDomain() },
@@ -473,8 +468,8 @@ object WorkflowStateProtobufMapper {
             correlationContext = correlation_context_json?.toKotlinJsonElement(),
         )
 
-    private fun EmitConfig.toProto(): EmitConfigMessage =
-        EmitConfigMessage(
+    private fun EmitConfig.toProto(): EmitConfigProto =
+        EmitConfigProto(
             id = id,
             source = source,
             type = type,
@@ -486,7 +481,7 @@ object WorkflowStateProtobufMapper {
             extensions = extensions?.toProtoStringMap()
         )
 
-    private fun EmitConfigMessage.toDomain(): EmitConfig =
+    private fun EmitConfigProto.toDomain(): EmitConfig =
         EmitConfig(
             id = id,
             source = source,
@@ -499,8 +494,8 @@ object WorkflowStateProtobufMapper {
             extensions = extensions?.toDomainStringMap(),
         )
 
-    private fun CallHttpConfig.toProto(): CallHttpConfigMessage =
-        CallHttpConfigMessage(
+    private fun CallHttpConfig.toProto(): CallHttpConfigProto =
+        CallHttpConfigProto(
             method = method,
             url = url,
             headers = headers,
@@ -511,7 +506,7 @@ object WorkflowStateProtobufMapper {
             authentication = authentication?.toProto()
         )
 
-    private fun CallHttpConfigMessage.toDomain(): CallHttpConfig =
+    private fun CallHttpConfigProto.toDomain(): CallHttpConfig =
         CallHttpConfig(
             method = method,
             url = url,
@@ -523,8 +518,8 @@ object WorkflowStateProtobufMapper {
             authentication = authentication?.toDomain(),
         )
 
-    private fun RunScriptConfig.toProto(): RunScriptConfigMessage =
-        RunScriptConfigMessage(
+    private fun RunScriptConfig.toProto(): RunScriptConfigProto =
+        RunScriptConfigProto(
             language = language,
             code = code,
             arguments = arguments?.toProtoStringMap(),
@@ -533,7 +528,7 @@ object WorkflowStateProtobufMapper {
             return_type = returnType.toProto()
         )
 
-    private fun RunScriptConfigMessage.toDomain(): RunScriptConfig =
+    private fun RunScriptConfigProto.toDomain(): RunScriptConfig =
         RunScriptConfig(
             language = language,
             code = code,
@@ -543,8 +538,8 @@ object WorkflowStateProtobufMapper {
             returnType = return_type.toDomain(),
         )
 
-    private fun RunShellConfig.toProto(): RunShellConfigMessage =
-        RunShellConfigMessage(
+    private fun RunShellConfig.toProto(): RunShellConfigProto =
+        RunShellConfigProto(
             command = command,
             arguments = arguments?.toProtoStringMap(),
             environment = environment?.toProtoStringMap(),
@@ -552,7 +547,7 @@ object WorkflowStateProtobufMapper {
             return_type = returnType.toProto()
         )
 
-    private fun RunShellConfigMessage.toDomain(): RunShellConfig =
+    private fun RunShellConfigProto.toDomain(): RunShellConfig =
         RunShellConfig(
             command = command,
             arguments = arguments?.toDomainStringMap(),
@@ -561,36 +556,36 @@ object WorkflowStateProtobufMapper {
             returnType = return_type.toDomain(),
         )
 
-    private fun ListenStrategy.toProto(): ListenStrategyMessage = when (this) {
-        ListenStrategy.ONE -> ListenStrategyMessage.LISTEN_STRATEGY_MESSAGE_ONE
-        ListenStrategy.ANY -> ListenStrategyMessage.LISTEN_STRATEGY_MESSAGE_ANY
-        ListenStrategy.ALL -> ListenStrategyMessage.LISTEN_STRATEGY_MESSAGE_ALL
+    private fun ListenStrategy.toProto(): ListenStrategyProto = when (this) {
+        ListenStrategy.ONE -> ListenStrategyProto.LISTEN_STRATEGY_MESSAGE_ONE
+        ListenStrategy.ANY -> ListenStrategyProto.LISTEN_STRATEGY_MESSAGE_ANY
+        ListenStrategy.ALL -> ListenStrategyProto.LISTEN_STRATEGY_MESSAGE_ALL
     }
 
-    private fun ListenStrategyMessage.toDomain(): ListenStrategy = when (this) {
-        ListenStrategyMessage.LISTEN_STRATEGY_MESSAGE_ONE -> ListenStrategy.ONE
-        ListenStrategyMessage.LISTEN_STRATEGY_MESSAGE_ANY -> ListenStrategy.ANY
-        ListenStrategyMessage.LISTEN_STRATEGY_MESSAGE_ALL -> ListenStrategy.ALL
-        ListenStrategyMessage.LISTEN_STRATEGY_MESSAGE_UNSPECIFIED -> error("Listen strategy unspecified")
-        is ListenStrategyMessage.Unrecognized -> error("Listen strategy unrecognized")
+    private fun ListenStrategyProto.toDomain(): ListenStrategy = when (this) {
+        ListenStrategyProto.LISTEN_STRATEGY_MESSAGE_ONE -> ListenStrategy.ONE
+        ListenStrategyProto.LISTEN_STRATEGY_MESSAGE_ANY -> ListenStrategy.ANY
+        ListenStrategyProto.LISTEN_STRATEGY_MESSAGE_ALL -> ListenStrategy.ALL
+        ListenStrategyProto.LISTEN_STRATEGY_MESSAGE_UNSPECIFIED -> error("Listen strategy unspecified")
+        is ListenStrategyProto.Unrecognized -> error("Listen strategy unrecognized")
     }
 
-    private fun ListenAndReadAs.toProto(): ListenReadAsMessage = when (this) {
-        ListenAndReadAs.DATA -> ListenReadAsMessage.LISTEN_READ_AS_MESSAGE_DATA
-        ListenAndReadAs.ENVELOPE -> ListenReadAsMessage.LISTEN_READ_AS_MESSAGE_ENVELOPE
-        ListenAndReadAs.RAW -> ListenReadAsMessage.LISTEN_READ_AS_MESSAGE_RAW
+    private fun ListenAndReadAs.toProto(): ListenReadAsProto = when (this) {
+        ListenAndReadAs.DATA -> ListenReadAsProto.LISTEN_READ_AS_MESSAGE_DATA
+        ListenAndReadAs.ENVELOPE -> ListenReadAsProto.LISTEN_READ_AS_MESSAGE_ENVELOPE
+        ListenAndReadAs.RAW -> ListenReadAsProto.LISTEN_READ_AS_MESSAGE_RAW
     }
 
-    private fun ListenReadAsMessage.toDomain(): ListenAndReadAs = when (this) {
-        ListenReadAsMessage.LISTEN_READ_AS_MESSAGE_DATA -> ListenAndReadAs.DATA
-        ListenReadAsMessage.LISTEN_READ_AS_MESSAGE_ENVELOPE -> ListenAndReadAs.ENVELOPE
-        ListenReadAsMessage.LISTEN_READ_AS_MESSAGE_RAW -> ListenAndReadAs.RAW
-        ListenReadAsMessage.LISTEN_READ_AS_MESSAGE_UNSPECIFIED -> error("Listen readAs unspecified")
-        is ListenReadAsMessage.Unrecognized -> error("Listen readAs unrecognized")
+    private fun ListenReadAsProto.toDomain(): ListenAndReadAs = when (this) {
+        ListenReadAsProto.LISTEN_READ_AS_MESSAGE_DATA -> ListenAndReadAs.DATA
+        ListenReadAsProto.LISTEN_READ_AS_MESSAGE_ENVELOPE -> ListenAndReadAs.ENVELOPE
+        ListenReadAsProto.LISTEN_READ_AS_MESSAGE_RAW -> ListenAndReadAs.RAW
+        ListenReadAsProto.LISTEN_READ_AS_MESSAGE_UNSPECIFIED -> error("Listen readAs unspecified")
+        is ListenReadAsProto.Unrecognized -> error("Listen readAs unrecognized")
     }
 
-    private fun EventFilter.toProto(): EventFilterMessage =
-        EventFilterMessage(
+    private fun EventFilter.toProto(): EventFilterProto =
+        EventFilterProto(
             type = type,
             source = source,
             subject = subject,
@@ -602,7 +597,7 @@ object WorkflowStateProtobufMapper {
             correlations = correlations?.toProto(),
         )
 
-    private fun EventFilterMessage.toDomain(): EventFilter =
+    private fun EventFilterProto.toDomain(): EventFilter =
         EventFilter(
             type = type,
             source = source,
@@ -615,54 +610,54 @@ object WorkflowStateProtobufMapper {
             correlations = correlations?.toDomain(),
         )
 
-    private fun Map<String, CorrelationDef>.toProto(): CorrelationMapMessage =
-        CorrelationMapMessage(
+    private fun Map<String, CorrelationDef>.toProto(): CorrelationMapProto =
+        CorrelationMapProto(
             values = mapValues { (_, value) -> value.toProto() }
         )
 
-    private fun CorrelationMapMessage.toDomain(): Map<String, CorrelationDef> =
+    private fun CorrelationMapProto.toDomain(): Map<String, CorrelationDef> =
         values.mapValues { (_, value) -> value.toDomain() }
 
-    private fun CorrelationDef.toProto(): CorrelationDefMessage =
-        CorrelationDefMessage(
+    private fun CorrelationDef.toProto(): CorrelationDefProto =
+        CorrelationDefProto(
             from = from,
             expect_ = expect
         )
 
-    private fun CorrelationDefMessage.toDomain(): CorrelationDef =
+    private fun CorrelationDefProto.toDomain(): CorrelationDef =
         CorrelationDef(
             from = from,
             expect = expect_,
         )
 
-    private fun UntilCondition.toProto(): UntilConditionMessage =
+    private fun UntilCondition.toProto(): UntilConditionProto =
         when (this) {
-            is UntilCondition.Expression -> UntilConditionMessage(expression = expression)
-            is UntilCondition.Event -> UntilConditionMessage(event_filter = filter.toProto())
+            is UntilCondition.Expression -> UntilConditionProto(expression = expression)
+            is UntilCondition.Event -> UntilConditionProto(event_filter = filter.toProto())
         }
 
-    private fun UntilConditionMessage.toDomain(): UntilCondition {
+    private fun UntilConditionProto.toDomain(): UntilCondition {
         expression?.let { return UntilCondition.Expression(it) }
         event_filter?.let { return UntilCondition.Event(it.toDomain()) }
         error("Until condition not set")
     }
 
-    private fun HttpAuthentication.toProto(): HttpAuthenticationMessage =
+    private fun HttpAuthentication.toProto(): HttpAuthenticationProto =
         when (this) {
-            is HttpAuthentication.Basic -> HttpAuthenticationMessage(
-                basic = BasicAuthMessage(username = username, password = password)
+            is HttpAuthentication.Basic -> HttpAuthenticationProto(
+                basic = BasicAuthProto(username = username, password = password)
             )
 
-            is HttpAuthentication.Bearer -> HttpAuthenticationMessage(
-                bearer = BearerAuthMessage(token = token)
+            is HttpAuthentication.Bearer -> HttpAuthenticationProto(
+                bearer = BearerAuthProto(token = token)
             )
 
-            is HttpAuthentication.OAuth2 -> HttpAuthenticationMessage(
-                oauth2 = OAuth2AuthMessage(token = token, token_type = tokenType)
+            is HttpAuthentication.OAuth2 -> HttpAuthenticationProto(
+                oauth2 = OAuth2AuthProto(token = token, token_type = tokenType)
             )
         }
 
-    private fun HttpAuthenticationMessage.toDomain(): HttpAuthentication {
+    private fun HttpAuthenticationProto.toDomain(): HttpAuthentication {
         basic?.let {
             return HttpAuthentication.Basic(
                 username = it.username,
@@ -683,71 +678,71 @@ object WorkflowStateProtobufMapper {
         error("HTTP authentication not set")
     }
 
-    private fun HTTPOutput.toProto(): HttpOutputMessage = when (this) {
-        HTTPOutput.RAW -> HttpOutputMessage.HTTP_OUTPUT_MESSAGE_RAW
-        HTTPOutput.CONTENT -> HttpOutputMessage.HTTP_OUTPUT_MESSAGE_CONTENT
-        HTTPOutput.RESPONSE -> HttpOutputMessage.HTTP_OUTPUT_MESSAGE_RESPONSE
+    private fun HTTPOutput.toProto(): HttpOutputProto = when (this) {
+        HTTPOutput.RAW -> HttpOutputProto.HTTP_OUTPUT_MESSAGE_RAW
+        HTTPOutput.CONTENT -> HttpOutputProto.HTTP_OUTPUT_MESSAGE_CONTENT
+        HTTPOutput.RESPONSE -> HttpOutputProto.HTTP_OUTPUT_MESSAGE_RESPONSE
     }
 
-    private fun HttpOutputMessage.toDomain(): HTTPOutput = when (this) {
-        HttpOutputMessage.HTTP_OUTPUT_MESSAGE_RAW -> HTTPOutput.RAW
-        HttpOutputMessage.HTTP_OUTPUT_MESSAGE_CONTENT -> HTTPOutput.CONTENT
-        HttpOutputMessage.HTTP_OUTPUT_MESSAGE_RESPONSE -> HTTPOutput.RESPONSE
-        HttpOutputMessage.HTTP_OUTPUT_MESSAGE_UNSPECIFIED -> error("HTTP output unspecified")
-        is HttpOutputMessage.Unrecognized -> error("HTTP output unrecognized")
+    private fun HttpOutputProto.toDomain(): HTTPOutput = when (this) {
+        HttpOutputProto.HTTP_OUTPUT_MESSAGE_RAW -> HTTPOutput.RAW
+        HttpOutputProto.HTTP_OUTPUT_MESSAGE_CONTENT -> HTTPOutput.CONTENT
+        HttpOutputProto.HTTP_OUTPUT_MESSAGE_RESPONSE -> HTTPOutput.RESPONSE
+        HttpOutputProto.HTTP_OUTPUT_MESSAGE_UNSPECIFIED -> error("HTTP output unspecified")
+        is HttpOutputProto.Unrecognized -> error("HTTP output unrecognized")
     }
 
-    private fun ProcessReturnType.toProto(): ProcessReturnTypeMessage = when (this) {
-        ProcessReturnType.NONE -> ProcessReturnTypeMessage.PROCESS_RETURN_TYPE_MESSAGE_NONE
-        ProcessReturnType.STDOUT -> ProcessReturnTypeMessage.PROCESS_RETURN_TYPE_MESSAGE_STDOUT
-        ProcessReturnType.STDERR -> ProcessReturnTypeMessage.PROCESS_RETURN_TYPE_MESSAGE_STDERR
-        ProcessReturnType.CODE -> ProcessReturnTypeMessage.PROCESS_RETURN_TYPE_MESSAGE_CODE
-        ProcessReturnType.ALL -> ProcessReturnTypeMessage.PROCESS_RETURN_TYPE_MESSAGE_ALL
+    private fun ProcessReturnType.toProto(): ProcessReturnTypeProto = when (this) {
+        ProcessReturnType.NONE -> ProcessReturnTypeProto.PROCESS_RETURN_TYPE_MESSAGE_NONE
+        ProcessReturnType.STDOUT -> ProcessReturnTypeProto.PROCESS_RETURN_TYPE_MESSAGE_STDOUT
+        ProcessReturnType.STDERR -> ProcessReturnTypeProto.PROCESS_RETURN_TYPE_MESSAGE_STDERR
+        ProcessReturnType.CODE -> ProcessReturnTypeProto.PROCESS_RETURN_TYPE_MESSAGE_CODE
+        ProcessReturnType.ALL -> ProcessReturnTypeProto.PROCESS_RETURN_TYPE_MESSAGE_ALL
     }
 
-    private fun ProcessReturnTypeMessage.toDomain(): ProcessReturnType = when (this) {
-        ProcessReturnTypeMessage.PROCESS_RETURN_TYPE_MESSAGE_NONE -> ProcessReturnType.NONE
-        ProcessReturnTypeMessage.PROCESS_RETURN_TYPE_MESSAGE_STDOUT -> ProcessReturnType.STDOUT
-        ProcessReturnTypeMessage.PROCESS_RETURN_TYPE_MESSAGE_STDERR -> ProcessReturnType.STDERR
-        ProcessReturnTypeMessage.PROCESS_RETURN_TYPE_MESSAGE_CODE -> ProcessReturnType.CODE
-        ProcessReturnTypeMessage.PROCESS_RETURN_TYPE_MESSAGE_ALL -> ProcessReturnType.ALL
-        ProcessReturnTypeMessage.PROCESS_RETURN_TYPE_MESSAGE_UNSPECIFIED -> error("Process return type unspecified")
-        is ProcessReturnTypeMessage.Unrecognized -> error("Process return type unrecognized")
+    private fun ProcessReturnTypeProto.toDomain(): ProcessReturnType = when (this) {
+        ProcessReturnTypeProto.PROCESS_RETURN_TYPE_MESSAGE_NONE -> ProcessReturnType.NONE
+        ProcessReturnTypeProto.PROCESS_RETURN_TYPE_MESSAGE_STDOUT -> ProcessReturnType.STDOUT
+        ProcessReturnTypeProto.PROCESS_RETURN_TYPE_MESSAGE_STDERR -> ProcessReturnType.STDERR
+        ProcessReturnTypeProto.PROCESS_RETURN_TYPE_MESSAGE_CODE -> ProcessReturnType.CODE
+        ProcessReturnTypeProto.PROCESS_RETURN_TYPE_MESSAGE_ALL -> ProcessReturnType.ALL
+        ProcessReturnTypeProto.PROCESS_RETURN_TYPE_MESSAGE_UNSPECIFIED -> error("Process return type unspecified")
+        is ProcessReturnTypeProto.Unrecognized -> error("Process return type unrecognized")
     }
 
-    private fun Map<String, String>.toProtoStringMap(): StringMapMessage =
-        StringMapMessage(values = this)
+    private fun Map<String, String>.toProtoStringMap(): StringMapProto =
+        StringMapProto(values = this)
 
-    private fun StringMapMessage.toDomainStringMap(): Map<String, String> = values.toMap()
+    private fun StringMapProto.toDomainStringMap(): Map<String, String> = values.toMap()
 
-    private fun FlowDirective.toProto(): FlowDirectiveMessage =
+    private fun FlowDirective.toProto(): FlowDirectiveProto =
         when (this) {
-            is FlowDirectiveEnum.Continue -> FlowDirectiveMessage(
-                directive = FlowDirectiveEnumMessage.FLOW_DIRECTIVE_ENUM_MESSAGE_CONTINUE
+            is FlowDirectiveEnum.Continue -> FlowDirectiveProto(
+                directive = FlowDirectiveEnumProto.FLOW_DIRECTIVE_ENUM_MESSAGE_CONTINUE
             )
 
-            is FlowDirectiveEnum.Exit -> FlowDirectiveMessage(
-                directive = FlowDirectiveEnumMessage.FLOW_DIRECTIVE_ENUM_MESSAGE_EXIT
+            is FlowDirectiveEnum.Exit -> FlowDirectiveProto(
+                directive = FlowDirectiveEnumProto.FLOW_DIRECTIVE_ENUM_MESSAGE_EXIT
             )
 
-            is FlowDirectiveEnum.End -> FlowDirectiveMessage(
-                directive = FlowDirectiveEnumMessage.FLOW_DIRECTIVE_ENUM_MESSAGE_END
+            is FlowDirectiveEnum.End -> FlowDirectiveProto(
+                directive = FlowDirectiveEnumProto.FLOW_DIRECTIVE_ENUM_MESSAGE_END
             )
 
-            is FlowDirectiveGoto -> FlowDirectiveMessage(goto_target = target)
+            is FlowDirectiveGoto -> FlowDirectiveProto(goto_target = target)
         }
 
-    private fun FlowDirectiveMessage.toDomain(): FlowDirective {
+    private fun FlowDirectiveProto.toDomain(): FlowDirective {
         directive?.let {
             return when (it) {
-                FlowDirectiveEnumMessage.FLOW_DIRECTIVE_ENUM_MESSAGE_CONTINUE -> FlowDirectiveEnum.Continue
-                FlowDirectiveEnumMessage.FLOW_DIRECTIVE_ENUM_MESSAGE_EXIT -> FlowDirectiveEnum.Exit
-                FlowDirectiveEnumMessage.FLOW_DIRECTIVE_ENUM_MESSAGE_END -> FlowDirectiveEnum.End
-                FlowDirectiveEnumMessage.FLOW_DIRECTIVE_ENUM_MESSAGE_UNSPECIFIED -> error(
+                FlowDirectiveEnumProto.FLOW_DIRECTIVE_ENUM_MESSAGE_CONTINUE -> FlowDirectiveEnum.Continue
+                FlowDirectiveEnumProto.FLOW_DIRECTIVE_ENUM_MESSAGE_EXIT -> FlowDirectiveEnum.Exit
+                FlowDirectiveEnumProto.FLOW_DIRECTIVE_ENUM_MESSAGE_END -> FlowDirectiveEnum.End
+                FlowDirectiveEnumProto.FLOW_DIRECTIVE_ENUM_MESSAGE_UNSPECIFIED -> error(
                     "Flow directive enum unspecified"
                 )
 
-                is FlowDirectiveEnumMessage.Unrecognized -> error("Unknown flow directive enum")
+                is FlowDirectiveEnumProto.Unrecognized -> error("Unknown flow directive enum")
             }
         }
 
@@ -755,8 +750,8 @@ object WorkflowStateProtobufMapper {
         error("Flow directive not set")
     }
 
-    private fun InternalException.Error.toProto(): InternalErrorMessage =
-        InternalErrorMessage(
+    private fun InternalException.Error.toProto(): InternalErrorProto =
+        InternalErrorProto(
             type = type,
             status = status,
             position = position,
@@ -764,7 +759,7 @@ object WorkflowStateProtobufMapper {
             details = details
         )
 
-    private fun InternalErrorMessage.toDomain(): InternalException.Error =
+    private fun InternalErrorProto.toDomain(): InternalException.Error =
         InternalException.Error(
             type = type,
             status = status,

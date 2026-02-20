@@ -9,27 +9,27 @@ import "internal/state/node_stack.proto";
 option java_multiple_files = true;
 option java_package = "com.lemline.messages.internal.v1";
 
-message WorkflowCommandMessage {
-  oneof command {
-    ResumeFromTaskCommand resume_from_task = 1;
-    ResumeWithCompletedTaskCommand resume_with_completed_task = 2;
-    ResumeWithFailedTaskCommand resume_with_failed_task = 3;
-  }
+message WorkflowCommandProto {
+    oneof command {
+        ResumeFromTaskProto resume_from_task = 1;
+        ResumeWithCompletedTaskProto resume_with_completed_task = 2;
+        ResumeWithFailedTaskProto resume_with_failed_task = 3;
+    }
 }
 
-message ResumeFromTaskCommand {
-  NodeStackMessage node_stack = 1;
-  string node_position = 2;
-  google.protobuf.Value raw_input_json = 3;
-  FlowDirectiveMessage flow_directive = 4;
+message ResumeFromTaskProto {
+    NodeStackProto node_stack = 1;
+    string node_position = 2;
+    google.protobuf.Value raw_input_json = 3;
+    FlowDirectiveProto flow_directive = 4;
 }
 
-message ResumeWithCompletedTaskCommand {
-  NodeStackMessage node_stack = 1;
-  google.protobuf.Value raw_output_json = 2;
+message ResumeWithCompletedTaskProto {
+    NodeStackProto node_stack = 1;
+    google.protobuf.Value raw_output_json = 2;
 }
 
-message ResumeWithFailedTaskCommand {
-  NodeStackMessage node_stack = 1;
-  InternalErrorMessage error = 2;
+message ResumeWithFailedTaskProto {
+    NodeStackProto node_stack = 1;
+    InternalErrorProto error = 2;
 }

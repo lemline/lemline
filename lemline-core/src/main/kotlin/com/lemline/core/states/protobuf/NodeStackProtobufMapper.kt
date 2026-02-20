@@ -17,17 +17,17 @@ import com.lemline.core.states.RootState
 import com.lemline.core.states.StackFrame
 import com.lemline.core.states.TaskState
 import com.lemline.core.states.TryState
-import com.lemline.messages.internal.v1.CallFunctionStateMessage
-import com.lemline.messages.internal.v1.DoStateMessage
-import com.lemline.messages.internal.v1.ForStateMessage
-import com.lemline.messages.internal.v1.ForeachStateMessage
-import com.lemline.messages.internal.v1.InternalErrorMessage
-import com.lemline.messages.internal.v1.NodeStackMessage
-import com.lemline.messages.internal.v1.NodeStateMessage
-import com.lemline.messages.internal.v1.RootStateMessage
-import com.lemline.messages.internal.v1.StackFrameMessage
-import com.lemline.messages.internal.v1.TaskStateMessage
-import com.lemline.messages.internal.v1.TryStateMessage
+import com.lemline.messages.internal.v1.CallFunctionStateProto
+import com.lemline.messages.internal.v1.DoStateProto
+import com.lemline.messages.internal.v1.ForStateProto
+import com.lemline.messages.internal.v1.ForeachStateProto
+import com.lemline.messages.internal.v1.InternalErrorProto
+import com.lemline.messages.internal.v1.NodeStackProto
+import com.lemline.messages.internal.v1.NodeStateProto
+import com.lemline.messages.internal.v1.RootStateProto
+import com.lemline.messages.internal.v1.StackFrameProto
+import com.lemline.messages.internal.v1.TaskStateProto
+import com.lemline.messages.internal.v1.TryStateProto
 import java.time.Instant as JavaInstant
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
@@ -36,41 +36,41 @@ import kotlinx.serialization.json.buildJsonObject
 
 object NodeStackProtobufMapper {
 
-    fun toProto(nodeStack: NodeStack): NodeStackMessage =
-        NodeStackMessage(
+    fun toProto(nodeStack: NodeStack): NodeStackProto =
+        NodeStackProto(
             frames = nodeStack.map { frame -> frame.toProto() }
         )
 
-    fun fromProto(nodeStack: NodeStackMessage): NodeStack =
+    fun fromProto(nodeStack: NodeStackProto): NodeStack =
         NodeStack(
             nodeStack.frames.map { frame -> frame.toDomain() }
         )
 
-    private fun StackFrame.toProto(): StackFrameMessage =
-        StackFrameMessage(
+    private fun StackFrame.toProto(): StackFrameProto =
+        StackFrameProto(
             position = position.toString(),
             state = state.toProto(),
             counter = counter
         )
 
-    private fun StackFrameMessage.toDomain(): StackFrame =
+    private fun StackFrameProto.toDomain(): StackFrame =
         StackFrame(
             position = NodePosition(position),
             state = state?.toDomain() ?: error("StackFrameMessage.state is required"),
             counter = counter
         )
 
-    private fun NodeState.toProto(): NodeStateMessage = when (this) {
-        is RootState -> NodeStateMessage(root = toProto())
-        is DoState -> NodeStateMessage(do_state = toProto())
-        is ForState -> NodeStateMessage(for_state = toProto())
-        is ForeachState -> NodeStateMessage(foreach_state = toProto())
-        is CallFunctionState -> NodeStateMessage(call_function_state = toProto())
-        is TryState -> NodeStateMessage(try_state = toProto())
-        is TaskState -> NodeStateMessage(task_state = toProto())
+    private fun NodeState.toProto(): NodeStateProto = when (this) {
+        is RootState -> NodeStateProto(root = toProto())
+        is DoState -> NodeStateProto(do_state = toProto())
+        is ForState -> NodeStateProto(for_state = toProto())
+        is ForeachState -> NodeStateProto(foreach_state = toProto())
+        is CallFunctionState -> NodeStateProto(call_function_state = toProto())
+        is TryState -> NodeStateProto(try_state = toProto())
+        is TaskState -> NodeStateProto(task_state = toProto())
     }
 
-    private fun NodeStateMessage.toDomain(): NodeState {
+    private fun NodeStateProto.toDomain(): NodeState {
         root?.let { return it.toDomain() }
         do_state?.let { return it.toDomain() }
         for_state?.let { return it.toDomain() }
@@ -81,8 +81,8 @@ object NodeStackProtobufMapper {
         error("NodeStateMessage has no state set")
     }
 
-    private fun RootState.toProto(): RootStateMessage =
-        RootStateMessage(
+    private fun RootState.toProto(): RootStateProto =
+        RootStateProto(
             started_at = startedAt.toProtoInstant(),
             workflow_id = workflowId.toString(),
             workflow_input_json = workflowInput.toProtoJsonValue(),
@@ -90,7 +90,7 @@ object NodeStackProtobufMapper {
             has_waiting_parent = hasWaitingParent
         )
 
-    private fun RootStateMessage.toDomain(): RootState =
+    private fun RootStateProto.toDomain(): RootState =
         RootState(
             startedAt = started_at.toKotlinInstantOrEpoch(),
             workflowId = WorkflowId(IDV7.from(workflow_id)),
@@ -99,20 +99,20 @@ object NodeStackProtobufMapper {
             hasWaitingParent = has_waiting_parent
         )
 
-    private fun DoState.toProto(): DoStateMessage =
-        DoStateMessage(
+    private fun DoState.toProto(): DoStateProto =
+        DoStateProto(
             started_at = startedAt.toProtoInstant(),
             index = index
         )
 
-    private fun DoStateMessage.toDomain(): DoState =
+    private fun DoStateProto.toDomain(): DoState =
         DoState(
             startedAt = started_at.toKotlinInstantOrEpoch(),
             index = index
         )
 
-    private fun ForState.toProto(): ForStateMessage =
-        ForStateMessage(
+    private fun ForState.toProto(): ForStateProto =
+        ForStateProto(
             started_at = startedAt.toProtoInstant(),
             collection_json = collection.toProtoJsonListValue(),
             index = index,
@@ -120,7 +120,7 @@ object NodeStackProtobufMapper {
             for_at = forAt
         )
 
-    private fun ForStateMessage.toDomain(): ForState =
+    private fun ForStateProto.toDomain(): ForState =
         ForState(
             startedAt = started_at.toKotlinInstantOrEpoch(),
             collection = collection_json?.toKotlinJsonElementList() ?: emptyList(),
@@ -129,8 +129,8 @@ object NodeStackProtobufMapper {
             forAt = for_at
         )
 
-    private fun ForeachState.toProto(): ForeachStateMessage =
-        ForeachStateMessage(
+    private fun ForeachState.toProto(): ForeachStateProto =
+        ForeachStateProto(
             started_at = startedAt.toProtoInstant(),
             item_json = item.toProtoJsonValue(),
             index = index,
@@ -138,7 +138,7 @@ object NodeStackProtobufMapper {
             index_var = indexVar
         )
 
-    private fun ForeachStateMessage.toDomain(): ForeachState =
+    private fun ForeachStateProto.toDomain(): ForeachState =
         ForeachState(
             startedAt = started_at.toKotlinInstantOrEpoch(),
             item = item_json?.toKotlinJsonElement() ?: JsonNull,
@@ -147,26 +147,26 @@ object NodeStackProtobufMapper {
             indexVar = index_var
         )
 
-    private fun TaskState.toProto(): TaskStateMessage =
-        TaskStateMessage(started_at = startedAt.toProtoInstant())
+    private fun TaskState.toProto(): TaskStateProto =
+        TaskStateProto(started_at = startedAt.toProtoInstant())
 
-    private fun TaskStateMessage.toDomain(): TaskState =
+    private fun TaskStateProto.toDomain(): TaskState =
         TaskState(startedAt = started_at.toKotlinInstantOrEpoch())
 
-    private fun CallFunctionState.toProto(): CallFunctionStateMessage =
-        CallFunctionStateMessage(
+    private fun CallFunctionState.toProto(): CallFunctionStateProto =
+        CallFunctionStateProto(
             started_at = startedAt.toProtoInstant(),
             entered = entered
         )
 
-    private fun CallFunctionStateMessage.toDomain(): CallFunctionState =
+    private fun CallFunctionStateProto.toDomain(): CallFunctionState =
         CallFunctionState(
             startedAt = started_at.toKotlinInstantOrEpoch(),
             entered = entered
         )
 
-    private fun TryState.toProto(): TryStateMessage =
-        TryStateMessage(
+    private fun TryState.toProto(): TryStateProto =
+        TryStateProto(
             started_at = startedAt.toProtoInstant(),
             transformed_input_json = transformedInput.toProtoJsonValue(),
             attempt_index = attemptIndex,
@@ -176,7 +176,7 @@ object NodeStackProtobufMapper {
             has_started = hasStarted
         )
 
-    private fun TryStateMessage.toDomain(): TryState =
+    private fun TryStateProto.toDomain(): TryState =
         TryState(
             startedAt = started_at.toKotlinInstantOrEpoch(),
             transformedInput = transformed_input_json?.toKotlinJsonElement() ?: buildJsonObject { },
@@ -187,8 +187,8 @@ object NodeStackProtobufMapper {
             hasStarted = has_started
         )
 
-    private fun InternalException.Error.toProto(): InternalErrorMessage =
-        InternalErrorMessage(
+    private fun InternalException.Error.toProto(): InternalErrorProto =
+        InternalErrorProto(
             type = type,
             status = status,
             position = position,
@@ -196,7 +196,7 @@ object NodeStackProtobufMapper {
             details = details
         )
 
-    private fun InternalErrorMessage.toDomain(): InternalException.Error =
+    private fun InternalErrorProto.toDomain(): InternalException.Error =
         InternalException.Error(
             type = type,
             status = status,

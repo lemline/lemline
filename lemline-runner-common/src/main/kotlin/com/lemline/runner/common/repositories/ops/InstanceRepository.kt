@@ -95,7 +95,7 @@ inline fun <reified S : WorkflowState> ResultSet.getInstanceMessage(idHelper: Id
  * - workflow_name
  * - workflow_version
  * - workflow_position (from workflowState.nodePosition)
- * - workflow_state (JSON serialized workflow state)
+ * - workflow_state (serialized workflow state payload)
  *
  * @param idHelper The IDV7 helper for database-agnostic ID handling
  *
