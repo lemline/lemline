@@ -36,22 +36,50 @@ import kotlinx.serialization.json.buildJsonObject
 
 object NodeStackProtobufMapper {
 
-    fun toProto(nodeStack: NodeStack) = NodeStackProto(
-        frames = nodeStack.map { frame -> frame.toProto() }
-    )
+    fun toProto(nodeStack: NodeStack): NodeStackProto {
+        var previousPath = ""
+        val frames = nodeStack.map { frame ->
+            val currentPath = frame.position.toString()
+            val relativePosition = if (previousPath.isEmpty() || previousPath == "/") {
+                currentPath.removePrefix("/")
+            } else {
+                currentPath.removePrefix("$previousPath/")
+            }
+            previousPath = currentPath
+            frame.toProto(relativePosition)
+        }
+        return NodeStackProto(frames = frames)
+    }
 
-    fun fromProto(nodeStack: NodeStackProto) = NodeStack(
-        nodeStack.frames.map { frame -> frame.toDomain() }
-    )
+    fun fromProto(nodeStack: NodeStackProto): NodeStack {
+        var currentPosition = NodePosition.root
+        val frames = nodeStack.frames.map { frame ->
+            currentPosition = frame.toNodePosition(currentPosition)
+            frame.toDomain(currentPosition)
+        }
+        return NodeStack(frames)
+    }
 
-    private fun StackFrame.toProto() = StackFrameProto(
-        position = position.toString(),
+    private fun StackFrame.toProto(relativePosition: String) = StackFrameProto(
+        position = relativePosition,
         state = state.toProto(),
         counter = counter
     )
 
-    private fun StackFrameProto.toDomain() = StackFrame(
-        position = NodePosition(position),
+    private fun StackFrameProto.toNodePosition(previousPosition: NodePosition): NodePosition =
+        when {
+            position.isEmpty() -> NodePosition.root
+            else -> {
+                require(!position.startsWith("/")) {
+                    "Expected compact relative frame position but got absolute path: '$position'"
+                }
+                val basePath = if (previousPosition.isRoot) "" else previousPosition.toString()
+                NodePosition("$basePath/$position")
+            }
+        }
+
+    private fun StackFrameProto.toDomain(position: NodePosition) = StackFrame(
+        position = position,
         state = state?.toDomain() ?: error("StackFrameMessage.state is required"),
         counter = counter
     )
@@ -187,9 +215,8 @@ object NodeStackProtobufMapper {
 
     private fun Instant.toProtoInstant() = JavaInstant.ofEpochSecond(epochSeconds, nanosecondsOfSecond.toLong())
 
-    private fun JavaInstant?.toKotlinInstantOrEpoch(): Instant =
-        when (this) {
-            null -> Instant.fromEpochSeconds(0)
-            else -> Instant.fromEpochSeconds(epochSecond, nano.toLong())
-        }
+    private fun JavaInstant?.toKotlinInstantOrEpoch(): Instant = when (this) {
+        null -> Instant.fromEpochSeconds(0)
+        else -> Instant.fromEpochSeconds(epochSecond, nano.toLong())
+    }
 }

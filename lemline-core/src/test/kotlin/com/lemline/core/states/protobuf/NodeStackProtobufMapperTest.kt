@@ -37,6 +37,42 @@ class NodeStackProtobufMapperTest {
     }
 
     @Test
+    fun `should encode compact relative frame positions`() {
+        val stack = NodeStack(
+            listOf(
+                StackFrame(
+                    position = NodePosition.root,
+                    state = RootState(
+                        startedAt = Instant.fromEpochSeconds(1735732800),
+                        workflowId = WorkflowId.random(),
+                        workflowInput = JsonPrimitive("input")
+                    ),
+                    counter = 0
+                ),
+                StackFrame(
+                    position = NodePosition("/do"),
+                    state = DoState(startedAt = Instant.fromEpochSeconds(1735732801), index = 0),
+                    counter = 0
+                ),
+                StackFrame(
+                    position = NodePosition("/do/0/task"),
+                    state = TaskState(startedAt = Instant.fromEpochSeconds(1735732802)),
+                    counter = 0
+                ),
+                StackFrame(
+                    position = NodePosition("/do/0/task/do/0/nested"),
+                    state = TaskState(startedAt = Instant.fromEpochSeconds(1735732803)),
+                    counter = 0
+                )
+            )
+        )
+
+        val proto = NodeStackProtobufMapper.toProto(stack)
+
+        assertEquals(listOf("", "do", "0/task", "do/0/nested"), proto.frames.map { it.position })
+    }
+
+    @Test
     fun `should round-trip all node state variants`() {
         val sampleStates = listOf<NodeState>(
             RootState(
