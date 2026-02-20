@@ -505,30 +505,30 @@ object WorkflowStateProtobufMapper {
     )
 
     private fun ListenStrategy.toProto(): ListenStrategyProto = when (this) {
-        ListenStrategy.ONE -> ListenStrategyProto.LISTEN_STRATEGY_ONE
-        ListenStrategy.ANY -> ListenStrategyProto.LISTEN_STRATEGY_ANY
-        ListenStrategy.ALL -> ListenStrategyProto.LISTEN_STRATEGY_ALL
+        ListenStrategy.ONE -> ListenStrategyProto.LISTEN_STRATEGY_PROTO_ONE
+        ListenStrategy.ANY -> ListenStrategyProto.LISTEN_STRATEGY_PROTO_ANY
+        ListenStrategy.ALL -> ListenStrategyProto.LISTEN_STRATEGY_PROTO_ALL
     }
 
     private fun ListenStrategyProto.toDomain(): ListenStrategy = when (this) {
-        ListenStrategyProto.LISTEN_STRATEGY_ONE -> ListenStrategy.ONE
-        ListenStrategyProto.LISTEN_STRATEGY_ANY -> ListenStrategy.ANY
-        ListenStrategyProto.LISTEN_STRATEGY_ALL -> ListenStrategy.ALL
-        ListenStrategyProto.LISTEN_STRATEGY_UNSPECIFIED -> error("Listen strategy unspecified")
+        ListenStrategyProto.LISTEN_STRATEGY_PROTO_ONE -> ListenStrategy.ONE
+        ListenStrategyProto.LISTEN_STRATEGY_PROTO_ANY -> ListenStrategy.ANY
+        ListenStrategyProto.LISTEN_STRATEGY_PROTO_ALL -> ListenStrategy.ALL
+        ListenStrategyProto.LISTEN_STRATEGY_PROTO_UNSPECIFIED -> error("Listen strategy unspecified")
         is ListenStrategyProto.Unrecognized -> error("Listen strategy unrecognized")
     }
 
     private fun ListenAndReadAs.toProto(): ListenReadAsProto = when (this) {
-        ListenAndReadAs.DATA -> ListenReadAsProto.LISTEN_READ_AS_DATA
-        ListenAndReadAs.ENVELOPE -> ListenReadAsProto.LISTEN_READ_AS_ENVELOPE
-        ListenAndReadAs.RAW -> ListenReadAsProto.LISTEN_READ_AS_RAW
+        ListenAndReadAs.DATA -> ListenReadAsProto.LISTEN_READ_AS_PROTO_DATA
+        ListenAndReadAs.ENVELOPE -> ListenReadAsProto.LISTEN_READ_AS_PROTO_ENVELOPE
+        ListenAndReadAs.RAW -> ListenReadAsProto.LISTEN_READ_AS_PROTO_RAW
     }
 
     private fun ListenReadAsProto.toDomain(): ListenAndReadAs = when (this) {
-        ListenReadAsProto.LISTEN_READ_AS_DATA -> ListenAndReadAs.DATA
-        ListenReadAsProto.LISTEN_READ_AS_ENVELOPE -> ListenAndReadAs.ENVELOPE
-        ListenReadAsProto.LISTEN_READ_AS_RAW -> ListenAndReadAs.RAW
-        ListenReadAsProto.LISTEN_READ_AS_UNSPECIFIED -> error("Listen readAs unspecified")
+        ListenReadAsProto.LISTEN_READ_AS_PROTO_DATA -> ListenAndReadAs.DATA
+        ListenReadAsProto.LISTEN_READ_AS_PROTO_ENVELOPE -> ListenAndReadAs.ENVELOPE
+        ListenReadAsProto.LISTEN_READ_AS_PROTO_RAW -> ListenAndReadAs.RAW
+        ListenReadAsProto.LISTEN_READ_AS_PROTO_UNSPECIFIED -> error("Listen readAs unspecified")
         is ListenReadAsProto.Unrecognized -> error("Listen readAs unrecognized")
     }
 
@@ -622,34 +622,34 @@ object WorkflowStateProtobufMapper {
     }
 
     private fun HTTPOutput.toProto(): HttpOutputProto = when (this) {
-        HTTPOutput.RAW -> HttpOutputProto.HTTP_OUTPUT_RAW
-        HTTPOutput.CONTENT -> HttpOutputProto.HTTP_OUTPUT_CONTENT
-        HTTPOutput.RESPONSE -> HttpOutputProto.HTTP_OUTPUT_RESPONSE
+        HTTPOutput.RAW -> HttpOutputProto.HTTP_OUTPUT_PROTO_RAW
+        HTTPOutput.CONTENT -> HttpOutputProto.HTTP_OUTPUT_PROTO_CONTENT
+        HTTPOutput.RESPONSE -> HttpOutputProto.HTTP_OUTPUT_PROTO_RESPONSE
     }
 
     private fun HttpOutputProto.toDomain(): HTTPOutput = when (this) {
-        HttpOutputProto.HTTP_OUTPUT_RAW -> HTTPOutput.RAW
-        HttpOutputProto.HTTP_OUTPUT_CONTENT -> HTTPOutput.CONTENT
-        HttpOutputProto.HTTP_OUTPUT_RESPONSE -> HTTPOutput.RESPONSE
-        HttpOutputProto.HTTP_OUTPUT_UNSPECIFIED -> error("HTTP output unspecified")
+        HttpOutputProto.HTTP_OUTPUT_PROTO_RAW -> HTTPOutput.RAW
+        HttpOutputProto.HTTP_OUTPUT_PROTO_CONTENT -> HTTPOutput.CONTENT
+        HttpOutputProto.HTTP_OUTPUT_PROTO_RESPONSE -> HTTPOutput.RESPONSE
+        HttpOutputProto.HTTP_OUTPUT_PROTO_UNSPECIFIED -> error("HTTP output unspecified")
         is HttpOutputProto.Unrecognized -> error("HTTP output unrecognized")
     }
 
     private fun ProcessReturnType.toProto(): ProcessReturnTypeProto = when (this) {
-        ProcessReturnType.NONE -> ProcessReturnTypeProto.PROCESS_RETURN_TYPE_NONE
-        ProcessReturnType.STDOUT -> ProcessReturnTypeProto.PROCESS_RETURN_TYPE_STDOUT
-        ProcessReturnType.STDERR -> ProcessReturnTypeProto.PROCESS_RETURN_TYPE_STDERR
-        ProcessReturnType.CODE -> ProcessReturnTypeProto.PROCESS_RETURN_TYPE_CODE
-        ProcessReturnType.ALL -> ProcessReturnTypeProto.PROCESS_RETURN_TYPE_ALL
+        ProcessReturnType.NONE -> ProcessReturnTypeProto.PROCESS_RETURN_TYPE_PROTO_NONE
+        ProcessReturnType.STDOUT -> ProcessReturnTypeProto.PROCESS_RETURN_TYPE_PROTO_STDOUT
+        ProcessReturnType.STDERR -> ProcessReturnTypeProto.PROCESS_RETURN_TYPE_PROTO_STDERR
+        ProcessReturnType.CODE -> ProcessReturnTypeProto.PROCESS_RETURN_TYPE_PROTO_CODE
+        ProcessReturnType.ALL -> ProcessReturnTypeProto.PROCESS_RETURN_TYPE_PROTO_ALL
     }
 
     private fun ProcessReturnTypeProto.toDomain(): ProcessReturnType = when (this) {
-        ProcessReturnTypeProto.PROCESS_RETURN_TYPE_NONE -> ProcessReturnType.NONE
-        ProcessReturnTypeProto.PROCESS_RETURN_TYPE_STDOUT -> ProcessReturnType.STDOUT
-        ProcessReturnTypeProto.PROCESS_RETURN_TYPE_STDERR -> ProcessReturnType.STDERR
-        ProcessReturnTypeProto.PROCESS_RETURN_TYPE_CODE -> ProcessReturnType.CODE
-        ProcessReturnTypeProto.PROCESS_RETURN_TYPE_ALL -> ProcessReturnType.ALL
-        ProcessReturnTypeProto.PROCESS_RETURN_TYPE_UNSPECIFIED -> error("Process return type unspecified")
+        ProcessReturnTypeProto.PROCESS_RETURN_TYPE_PROTO_NONE -> ProcessReturnType.NONE
+        ProcessReturnTypeProto.PROCESS_RETURN_TYPE_PROTO_STDOUT -> ProcessReturnType.STDOUT
+        ProcessReturnTypeProto.PROCESS_RETURN_TYPE_PROTO_STDERR -> ProcessReturnType.STDERR
+        ProcessReturnTypeProto.PROCESS_RETURN_TYPE_PROTO_CODE -> ProcessReturnType.CODE
+        ProcessReturnTypeProto.PROCESS_RETURN_TYPE_PROTO_ALL -> ProcessReturnType.ALL
+        ProcessReturnTypeProto.PROCESS_RETURN_TYPE_PROTO_UNSPECIFIED -> error("Process return type unspecified")
         is ProcessReturnTypeProto.Unrecognized -> error("Process return type unrecognized")
     }
 
@@ -661,15 +661,15 @@ object WorkflowStateProtobufMapper {
     private fun FlowDirective.toProto(): FlowDirectiveProto =
         when (this) {
             is FlowDirectiveEnum.Continue -> FlowDirectiveProto(
-                directive = FlowDirectiveEnumProto.FLOW_DIRECTIVE_ENUM_CONTINUE
+                directive = FlowDirectiveEnumProto.FLOW_DIRECTIVE_ENUM_PROTO_CONTINUE
             )
 
             is FlowDirectiveEnum.Exit -> FlowDirectiveProto(
-                directive = FlowDirectiveEnumProto.FLOW_DIRECTIVE_ENUM_EXIT
+                directive = FlowDirectiveEnumProto.FLOW_DIRECTIVE_ENUM_PROTO_EXIT
             )
 
             is FlowDirectiveEnum.End -> FlowDirectiveProto(
-                directive = FlowDirectiveEnumProto.FLOW_DIRECTIVE_ENUM_END
+                directive = FlowDirectiveEnumProto.FLOW_DIRECTIVE_ENUM_PROTO_END
             )
 
             is FlowDirectiveGoto -> FlowDirectiveProto(goto_target = target)
@@ -678,10 +678,10 @@ object WorkflowStateProtobufMapper {
     private fun FlowDirectiveProto.toDomain(): FlowDirective {
         directive?.let {
             return when (it) {
-                FlowDirectiveEnumProto.FLOW_DIRECTIVE_ENUM_CONTINUE -> FlowDirectiveEnum.Continue
-                FlowDirectiveEnumProto.FLOW_DIRECTIVE_ENUM_EXIT -> FlowDirectiveEnum.Exit
-                FlowDirectiveEnumProto.FLOW_DIRECTIVE_ENUM_END -> FlowDirectiveEnum.End
-                FlowDirectiveEnumProto.FLOW_DIRECTIVE_ENUM_UNSPECIFIED -> error(
+                FlowDirectiveEnumProto.FLOW_DIRECTIVE_ENUM_PROTO_CONTINUE -> FlowDirectiveEnum.Continue
+                FlowDirectiveEnumProto.FLOW_DIRECTIVE_ENUM_PROTO_EXIT -> FlowDirectiveEnum.Exit
+                FlowDirectiveEnumProto.FLOW_DIRECTIVE_ENUM_PROTO_END -> FlowDirectiveEnum.End
+                FlowDirectiveEnumProto.FLOW_DIRECTIVE_ENUM_PROTO_UNSPECIFIED -> error(
                     "Flow directive enum unspecified"
                 )
 
