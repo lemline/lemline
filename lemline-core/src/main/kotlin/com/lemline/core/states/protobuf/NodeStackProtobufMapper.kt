@@ -36,29 +36,25 @@ import kotlinx.serialization.json.buildJsonObject
 
 object NodeStackProtobufMapper {
 
-    fun toProto(nodeStack: NodeStack): NodeStackProto =
-        NodeStackProto(
-            frames = nodeStack.map { frame -> frame.toProto() }
-        )
+    fun toProto(nodeStack: NodeStack) = NodeStackProto(
+        frames = nodeStack.map { frame -> frame.toProto() }
+    )
 
-    fun fromProto(nodeStack: NodeStackProto): NodeStack =
-        NodeStack(
-            nodeStack.frames.map { frame -> frame.toDomain() }
-        )
+    fun fromProto(nodeStack: NodeStackProto) = NodeStack(
+        nodeStack.frames.map { frame -> frame.toDomain() }
+    )
 
-    private fun StackFrame.toProto(): StackFrameProto =
-        StackFrameProto(
-            position = position.toString(),
-            state = state.toProto(),
-            counter = counter
-        )
+    private fun StackFrame.toProto() = StackFrameProto(
+        position = position.toString(),
+        state = state.toProto(),
+        counter = counter
+    )
 
-    private fun StackFrameProto.toDomain(): StackFrame =
-        StackFrame(
-            position = NodePosition(position),
-            state = state?.toDomain() ?: error("StackFrameMessage.state is required"),
-            counter = counter
-        )
+    private fun StackFrameProto.toDomain() = StackFrame(
+        position = NodePosition(position),
+        state = state?.toDomain() ?: error("StackFrameMessage.state is required"),
+        counter = counter
+    )
 
     private fun NodeState.toProto(): NodeStateProto = when (this) {
         is RootState -> NodeStateProto(root = toProto())
@@ -81,132 +77,115 @@ object NodeStackProtobufMapper {
         error("NodeStateMessage has no state set")
     }
 
-    private fun RootState.toProto(): RootStateProto =
-        RootStateProto(
-            started_at = startedAt.toProtoInstant(),
-            workflow_id = workflowId.toString(),
-            workflow_input_json = workflowInput.toProtoJsonValue(),
-            context_json = context.toProtoJsonStruct(),
-            has_waiting_parent = hasWaitingParent
-        )
+    private fun RootState.toProto() = RootStateProto(
+        started_at = startedAt.toProtoInstant(),
+        workflow_id = workflowId.toString(),
+        workflow_input_json = workflowInput.toProtoJsonValue(),
+        context_json = context.toProtoJsonStruct(),
+        has_waiting_parent = hasWaitingParent
+    )
 
-    private fun RootStateProto.toDomain(): RootState =
-        RootState(
-            startedAt = started_at.toKotlinInstantOrEpoch(),
-            workflowId = WorkflowId(IDV7.from(workflow_id)),
-            workflowInput = workflow_input_json?.toKotlinJsonElement() ?: buildJsonObject { },
-            context = context_json?.toKotlinJsonObject() ?: buildJsonObject { },
-            hasWaitingParent = has_waiting_parent
-        )
+    private fun RootStateProto.toDomain() = RootState(
+        startedAt = started_at.toKotlinInstantOrEpoch(),
+        workflowId = WorkflowId(IDV7.from(workflow_id)),
+        workflowInput = workflow_input_json?.toKotlinJsonElement() ?: buildJsonObject { },
+        context = context_json?.toKotlinJsonObject() ?: buildJsonObject { },
+        hasWaitingParent = has_waiting_parent
+    )
 
-    private fun DoState.toProto(): DoStateProto =
-        DoStateProto(
-            started_at = startedAt.toProtoInstant(),
-            index = index
-        )
+    private fun DoState.toProto() = DoStateProto(
+        started_at = startedAt.toProtoInstant(),
+        index = index
+    )
 
-    private fun DoStateProto.toDomain(): DoState =
-        DoState(
-            startedAt = started_at.toKotlinInstantOrEpoch(),
-            index = index
-        )
+    private fun DoStateProto.toDomain() = DoState(
+        startedAt = started_at.toKotlinInstantOrEpoch(),
+        index = index
+    )
 
-    private fun ForState.toProto(): ForStateProto =
-        ForStateProto(
-            started_at = startedAt.toProtoInstant(),
-            collection_json = collection.toProtoJsonListValue(),
-            index = index,
-            for_each = forEach,
-            for_at = forAt
-        )
+    private fun ForState.toProto() = ForStateProto(
+        started_at = startedAt.toProtoInstant(),
+        collection_json = collection.toProtoJsonListValue(),
+        index = index,
+        for_each = forEach,
+        for_at = forAt
+    )
 
-    private fun ForStateProto.toDomain(): ForState =
-        ForState(
-            startedAt = started_at.toKotlinInstantOrEpoch(),
-            collection = collection_json?.toKotlinJsonElementList() ?: emptyList(),
-            index = index,
-            forEach = for_each,
-            forAt = for_at
-        )
+    private fun ForStateProto.toDomain() = ForState(
+        startedAt = started_at.toKotlinInstantOrEpoch(),
+        collection = collection_json?.toKotlinJsonElementList() ?: emptyList(),
+        index = index,
+        forEach = for_each,
+        forAt = for_at
+    )
 
-    private fun ForeachState.toProto(): ForeachStateProto =
-        ForeachStateProto(
-            started_at = startedAt.toProtoInstant(),
-            item_json = item.toProtoJsonValue(),
-            index = index,
-            item_var = itemVar,
-            index_var = indexVar
-        )
+    private fun ForeachState.toProto() = ForeachStateProto(
+        started_at = startedAt.toProtoInstant(),
+        item_json = item.toProtoJsonValue(),
+        index = index,
+        item_var = itemVar,
+        index_var = indexVar
+    )
 
-    private fun ForeachStateProto.toDomain(): ForeachState =
-        ForeachState(
-            startedAt = started_at.toKotlinInstantOrEpoch(),
-            item = item_json?.toKotlinJsonElement() ?: JsonNull,
-            index = index,
-            itemVar = item_var,
-            indexVar = index_var
-        )
+    private fun ForeachStateProto.toDomain() = ForeachState(
+        startedAt = started_at.toKotlinInstantOrEpoch(),
+        item = item_json?.toKotlinJsonElement() ?: JsonNull,
+        index = index,
+        itemVar = item_var,
+        indexVar = index_var
+    )
 
-    private fun TaskState.toProto(): TaskStateProto =
-        TaskStateProto(started_at = startedAt.toProtoInstant())
+    private fun TaskState.toProto() = TaskStateProto(started_at = startedAt.toProtoInstant())
 
-    private fun TaskStateProto.toDomain(): TaskState =
-        TaskState(startedAt = started_at.toKotlinInstantOrEpoch())
+    private fun TaskStateProto.toDomain() = TaskState(startedAt = started_at.toKotlinInstantOrEpoch())
 
-    private fun CallFunctionState.toProto(): CallFunctionStateProto =
-        CallFunctionStateProto(
-            started_at = startedAt.toProtoInstant(),
-            entered = entered
-        )
+    private fun CallFunctionState.toProto() = CallFunctionStateProto(
+        started_at = startedAt.toProtoInstant(),
+        entered = entered
+    )
 
-    private fun CallFunctionStateProto.toDomain(): CallFunctionState =
-        CallFunctionState(
-            startedAt = started_at.toKotlinInstantOrEpoch(),
-            entered = entered
-        )
+    private fun CallFunctionStateProto.toDomain() = CallFunctionState(
+        startedAt = started_at.toKotlinInstantOrEpoch(),
+        entered = entered
+    )
 
-    private fun TryState.toProto(): TryStateProto =
-        TryStateProto(
-            started_at = startedAt.toProtoInstant(),
-            transformed_input_json = transformedInput.toProtoJsonValue(),
-            attempt_index = attemptIndex,
-            running_catch = runningCatch,
-            last_error = lastError?.toProto(),
-            error_as = errorAs,
-            has_started = hasStarted
-        )
+    private fun TryState.toProto() = TryStateProto(
+        started_at = startedAt.toProtoInstant(),
+        transformed_input_json = transformedInput.toProtoJsonValue(),
+        attempt_index = attemptIndex,
+        running_catch = runningCatch,
+        last_error = lastError?.toProto(),
+        error_as = errorAs,
+        has_started = hasStarted
+    )
 
-    private fun TryStateProto.toDomain(): TryState =
-        TryState(
-            startedAt = started_at.toKotlinInstantOrEpoch(),
-            transformedInput = transformed_input_json?.toKotlinJsonElement() ?: buildJsonObject { },
-            attemptIndex = attempt_index,
-            runningCatch = running_catch,
-            lastError = last_error?.toDomain(),
-            errorAs = error_as,
-            hasStarted = has_started
-        )
+    private fun TryStateProto.toDomain() = TryState(
+        startedAt = started_at.toKotlinInstantOrEpoch(),
+        transformedInput = transformed_input_json?.toKotlinJsonElement() ?: buildJsonObject { },
+        attemptIndex = attempt_index,
+        runningCatch = running_catch,
+        lastError = last_error?.toDomain(),
+        errorAs = error_as,
+        hasStarted = has_started
+    )
 
-    private fun InternalException.Error.toProto(): InternalErrorProto =
-        InternalErrorProto(
-            type = type,
-            status = status,
-            position = position,
-            title = title,
-            details = details
-        )
+    private fun InternalException.Error.toProto() = InternalErrorProto(
+        type = type,
+        status = status,
+        position = position,
+        title = title,
+        details = details
+    )
 
-    private fun InternalErrorProto.toDomain(): InternalException.Error =
-        InternalException.Error(
-            type = type,
-            status = status,
-            position = position,
-            title = title,
-            details = details
-        )
+    private fun InternalErrorProto.toDomain() = InternalException.Error(
+        type = type,
+        status = status,
+        position = position,
+        title = title,
+        details = details
+    )
 
-    private fun Instant.toProtoInstant(): JavaInstant =
-        JavaInstant.ofEpochSecond(epochSeconds, nanosecondsOfSecond.toLong())
+    private fun Instant.toProtoInstant() = JavaInstant.ofEpochSecond(epochSeconds, nanosecondsOfSecond.toLong())
 
     private fun JavaInstant?.toKotlinInstantOrEpoch(): Instant =
         when (this) {
