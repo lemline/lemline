@@ -7,47 +7,28 @@ import com.lemline.common.values.WorkflowInfo
 import com.lemline.common.values.WorkflowName
 import com.lemline.common.values.WorkflowNamespace
 import com.lemline.common.values.WorkflowVersion
-import com.lemline.core.states.WorkflowCommand
-import com.lemline.core.states.WorkflowEvent
 import com.lemline.core.states.WorkflowState
 import com.lemline.core.states.protobuf.WorkflowStateProtobufMapper
-import com.lemline.messages.internal.v1.InternalMessageEnvelope
-import com.lemline.messages.internal.v1.MessageMetadata
-import com.lemline.messages.internal.v1.WorkflowInfoMessage
-import com.lemline.messages.internal.v1.WorkflowStatePayload
-import com.squareup.moshi.JsonAdapter
-import com.squareup.moshi.Moshi
-import com.squareup.wire.WireJsonAdapterFactory
-import java.util.Base64
-import java.time.Instant as JavaInstant
-import kotlin.time.Clock
+import com.lemline.messages.internal.v1.InstanceMessageProto
+import com.lemline.messages.internal.v1.WorkflowInfoProto
+import com.lemline.messages.internal.v1.WorkflowStateProto
+import java.util.*
 import kotlin.time.ExperimentalTime
-import kotlin.time.Instant
 
-@ExperimentalTime
 object InstanceMessageCodec {
     private const val SCHEMA_VERSION = 1
-    private const val MESSAGE_TYPE_COMMAND = "workflow.command"
-    private const val MESSAGE_TYPE_EVENT = "workflow.event"
+    private const val DB_PROTOBUF_BASE64_PREFIX = "pb64:"
 
     private val base64Encoder = Base64.getEncoder()
     private val base64Decoder = Base64.getDecoder()
-    private val databaseMoshi: Moshi by lazy {
-        Moshi.Builder()
-            .add(WireJsonAdapterFactory(writeIdentityValues = true))
-            .build()
-    }
-    private val workflowStatePayloadJsonAdapter: JsonAdapter<WorkflowStatePayload> by lazy {
-        databaseMoshi.adapter(WorkflowStatePayload::class.java)
-    }
 
     fun toTransportPayload(message: InstanceMessage<out WorkflowState>): String {
-        val bytes = InternalMessageEnvelope.ADAPTER.encode(toEnvelope(message))
+        val bytes = InstanceMessageProto.ADAPTER.encode(toEnvelope(message))
         return base64Encoder.encodeToString(bytes)
     }
 
     fun fromTransportPayload(payload: String): InstanceMessage<WorkflowState> {
-        val envelope = InternalMessageEnvelope.ADAPTER.decode(base64Decoder.decode(payload))
+        val envelope = InstanceMessageProto.ADAPTER.decode(base64Decoder.decode(payload))
         return fromEnvelope(envelope)
     }
 
@@ -63,51 +44,35 @@ object InstanceMessageCodec {
 
     fun workflowStateToDbJson(state: WorkflowState): String {
         val proto = WorkflowStateProtobufMapper.toProto(state)
-        return workflowStatePayloadJsonAdapter.toJson(proto)
+        val payload = base64Encoder.encodeToString(WorkflowStateProto.ADAPTER.encode(proto))
+        return DB_PROTOBUF_BASE64_PREFIX + payload
     }
 
     fun workflowStateFromDbJson(payload: String): WorkflowState {
-        val proto = workflowStatePayloadJsonAdapter.fromJson(payload)
-            ?: error("Cannot decode workflow_state JSON payload")
+        require(payload.startsWith(DB_PROTOBUF_BASE64_PREFIX)) {
+            "Invalid workflow_state format. Expected '$DB_PROTOBUF_BASE64_PREFIX' prefix"
+        }
+        val base64Payload = payload.removePrefix(DB_PROTOBUF_BASE64_PREFIX)
+        val proto = WorkflowStateProto.ADAPTER.decode(base64Decoder.decode(base64Payload))
         return WorkflowStateProtobufMapper.fromProto(proto)
     }
 
-    internal fun toEnvelope(
-        message: InstanceMessage<out WorkflowState>,
-        emittedAt: Instant = Clock.System.now()
-    ): InternalMessageEnvelope {
-        val state = message.workflowState
-        return InternalMessageEnvelope(
-            message_type = when (state) {
-                is WorkflowCommand -> MESSAGE_TYPE_COMMAND
-                is WorkflowEvent -> MESSAGE_TYPE_EVENT
-            },
+    internal fun toEnvelope(message: InstanceMessage<out WorkflowState>): InstanceMessageProto {
+        val workflowState = message.workflowState
+        return InstanceMessageProto(
             schema_version = SCHEMA_VERSION,
-            workflow_info = WorkflowInfoMessage(
+            workflow_info = WorkflowInfoProto(
                 namespace = message.workflowInfo.namespace.toString(),
                 name = message.workflowInfo.name.toString(),
                 version = message.workflowInfo.version.toString()
             ),
-            metadata = MessageMetadata(
-                workflow_id = message.workflowId.toString(),
-                node_position = message.workflowState.nodePosition.toString(),
-                emitted_at = emittedAt.toProtoInstant()
-            ),
-            command = when (state) {
-                is WorkflowCommand -> WorkflowStateProtobufMapper.toCommandProto(state)
-                is WorkflowEvent -> null
-            },
-            event = when (state) {
-                is WorkflowCommand -> null
-                is WorkflowEvent -> WorkflowStateProtobufMapper.toEventProto(state)
-            }
+            state = WorkflowStateProtobufMapper.toProto(workflowState)
         )
     }
 
-    internal fun fromEnvelope(envelope: InternalMessageEnvelope): InstanceMessage<WorkflowState> {
-        val state = envelope.command?.let { WorkflowStateProtobufMapper.fromCommandProto(it) }
-            ?: envelope.event?.let { WorkflowStateProtobufMapper.fromEventProto(it) }
-            ?: error("Envelope payload is not set")
+    internal fun fromEnvelope(envelope: InstanceMessageProto): InstanceMessage<WorkflowState> {
+        val state = envelope.state?.let { WorkflowStateProtobufMapper.fromProto(it) }
+            ?: error("Envelope state is not set")
 
         val workflowInfo = envelope.workflow_info?.toDomain()
             ?: error("Envelope workflow_info is not set")
@@ -118,13 +83,10 @@ object InstanceMessageCodec {
         )
     }
 
-    private fun WorkflowInfoMessage.toDomain(): WorkflowInfo =
+    private fun WorkflowInfoProto.toDomain(): WorkflowInfo =
         WorkflowInfo(
             namespace = WorkflowNamespace(namespace),
             name = WorkflowName(name),
             version = WorkflowVersion(version),
         )
-
-    private fun Instant.toProtoInstant(): JavaInstant =
-        JavaInstant.ofEpochSecond(epochSeconds, nanosecondsOfSecond.toLong())
 }

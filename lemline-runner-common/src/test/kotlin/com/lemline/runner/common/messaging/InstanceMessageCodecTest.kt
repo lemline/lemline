@@ -21,10 +21,11 @@ import com.lemline.core.states.StackFrame
 import com.lemline.core.states.TaskState
 import com.lemline.core.states.WorkflowCommand
 import com.lemline.core.states.WorkflowEvent
-import com.lemline.messages.internal.v1.InternalMessageEnvelope
-import java.util.Base64
+import com.lemline.messages.internal.v1.InstanceMessageProto
 import io.serverlessworkflow.api.types.ListenTaskConfiguration.ListenAndReadAs
+import java.util.*
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 import kotlin.time.ExperimentalTime
@@ -55,25 +56,25 @@ class InstanceMessageCodecTest {
     @Test
     fun `should expose schema metadata in envelope`() {
         val encoded = InstanceMessageCodec.toTransportPayload(commandMessage())
-        val envelope = InternalMessageEnvelope.ADAPTER.decode(Base64.getDecoder().decode(encoded))
+        val envelope = InstanceMessageProto.ADAPTER.decode(Base64.getDecoder().decode(encoded))
 
         assertEquals(1, envelope.schema_version)
-        assertEquals("workflow.command", envelope.message_type)
+        assertTrue(envelope.state?.command != null)
     }
 
     @Test
-    fun `should round-trip workflow state through protojson for database`() {
+    fun `should round-trip workflow state through protobuf db payload`() {
         val commandState = commandMessage().workflowState
         val eventState = eventMessage().workflowState
 
-        val commandJson = InstanceMessageCodec.workflowStateToDbJson(commandState)
-        assertTrue(commandJson.contains("resumeWithCompletedTask"))
-        assertFalse(commandJson.contains("_wirePayloadBase64"))
+        val commandPayload = InstanceMessageCodec.workflowStateToDbJson(commandState)
+        assertTrue(commandPayload.startsWith("pb64:"))
+        assertFalse(commandPayload.contains("resumeWithCompletedTask"))
 
         assertEquals(
             commandState,
             InstanceMessageCodec.workflowStateFromDbJson(
-                commandJson
+                commandPayload
             )
         )
 
@@ -86,25 +87,25 @@ class InstanceMessageCodecTest {
     }
 
     @Test
-    fun `should ignore unknown fields in protojson database payload`() {
-        val state = commandMessage().workflowState
-        val json = InstanceMessageCodec.workflowStateToDbJson(state)
-        val payloadWithUnknown = json.replaceFirst("{", """{"futureField":"ignored",""")
+    fun `should reject non protobuf db payload`() {
+        val legacyJson = commandMessage().workflowState.toJsonString()
 
-        val decoded = InstanceMessageCodec.workflowStateFromDbJson(payloadWithUnknown)
-
-        assertEquals(state, decoded)
+        assertFailsWith<IllegalArgumentException> {
+            InstanceMessageCodec.workflowStateFromDbJson(legacyJson)
+        }
     }
 
     @Test
-    fun `db protojson should expose structured run workflow config keys`() {
-        val json = InstanceMessageCodec.workflowStateToDbJson(runWorkflowEventMessage().workflowState)
+    fun `db protobuf payload should preserve run workflow config`() {
+        val payload = InstanceMessageCodec.workflowStateToDbJson(runWorkflowEventMessage().workflowState)
 
-        assertTrue(json.contains("\"runWorkflowStarted\""))
-        assertTrue(json.contains("\"config\":{\"namespace\":\"child-ns\""))
-        assertTrue(json.contains("\"name\":\"child-workflow\""))
-        assertTrue(json.contains("\"version\":\"2.1.0\""))
-        assertFalse(json.contains("configJson"))
+        assertTrue(payload.startsWith("pb64:"))
+        assertFalse(payload.contains("child-workflow"))
+
+        val decoded = InstanceMessageCodec.workflowStateFromDbJson(payload) as WorkflowEvent.RunWorkflowStarted
+        assertEquals("child-ns", decoded.config.namespace.toString())
+        assertEquals("child-workflow", decoded.config.name.toString())
+        assertEquals("2.1.0", decoded.config.version.toString())
     }
 
     @Test
@@ -122,7 +123,7 @@ class InstanceMessageCodecTest {
     }
 
     @Test
-    fun `should preserve listen correlation expect through db protojson`() {
+    fun `should preserve listen correlation expect through db payload`() {
         val state = listenEventMessage().workflowState
 
         val decoded = InstanceMessageCodec.workflowStateFromDbJson(
