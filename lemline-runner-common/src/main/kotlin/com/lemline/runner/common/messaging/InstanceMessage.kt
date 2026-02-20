@@ -1,12 +1,11 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.common.messaging
+
 import com.lemline.common.values.WithDefiniteWorkflowInfo
 import com.lemline.common.values.WorkflowInfo
 import com.lemline.core.states.WorkflowState
-import kotlin.time.ExperimentalTime
 import org.eclipse.microprofile.reactive.messaging.Message
 
-@ExperimentalTime
 data class InstanceMessage<S : WorkflowState>(
     /**
      * Description of the workflow instance

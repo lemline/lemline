@@ -11,7 +11,6 @@ import io.quarkus.runtime.Startup
 import io.smallrye.mutiny.coroutines.awaitSuspending
 import io.smallrye.reactive.messaging.MutinyEmitter
 import jakarta.enterprise.context.ApplicationScoped
-import kotlin.time.ExperimentalTime
 import org.eclipse.microprofile.reactive.messaging.Channel
 import org.eclipse.microprofile.reactive.messaging.Message
 
@@ -28,7 +27,6 @@ import org.eclipse.microprofile.reactive.messaging.Message
  *
  * Only instantiated when `lemline.lifecycle-events-producer-enabled=true`.
  */
-@ExperimentalTime
 @Startup
 @ApplicationScoped
 class LifecycleEventEmitterImpl : LifecycleEventEmitter {

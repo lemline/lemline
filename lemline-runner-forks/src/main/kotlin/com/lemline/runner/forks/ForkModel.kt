@@ -8,7 +8,6 @@ import com.lemline.runner.common.models.WithCleanup
 import com.lemline.runner.common.models.WithCompletedAt
 import com.lemline.runner.common.models.WithId
 import com.lemline.runner.common.models.WithInstanceMessage
-import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 
 /**
@@ -18,7 +17,6 @@ import kotlin.time.Instant
  * Uses multiple-rows approach (one metadata row + one row per branch)
  * for better concurrency and observability.
  */
-@ExperimentalTime
 data class ForkModel(
     /** Parent workflow state when the fork started */
     override val instanceMessage: InstanceMessage<WorkflowEvent.ForkStarted>,

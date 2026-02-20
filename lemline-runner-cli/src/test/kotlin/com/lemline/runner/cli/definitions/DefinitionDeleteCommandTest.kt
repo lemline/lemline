@@ -16,14 +16,12 @@ import io.mockk.coVerify
 import io.mockk.mockk
 import java.io.ByteArrayOutputStream
 import java.io.PrintStream
-import kotlin.time.ExperimentalTime
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import picocli.CommandLine
 
-@ExperimentalTime
 class DefinitionDeleteCommandTest {
 
     private lateinit var command: DefinitionDeleteCommand

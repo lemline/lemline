@@ -4,14 +4,12 @@ package com.lemline.runner.forks
 import com.lemline.common.values.IDV7
 import com.lemline.runner.common.models.WithCompletedAt
 import com.lemline.runner.common.models.WithId
-import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 
 /**
  * Database model for individual fork branch execution.
  * One row per branch, tracks branch state and output.
  */
-@ExperimentalTime
 data class ForkBranchModel(
     /** Reference to parent fork by ID */
     val forkId: IDV7,

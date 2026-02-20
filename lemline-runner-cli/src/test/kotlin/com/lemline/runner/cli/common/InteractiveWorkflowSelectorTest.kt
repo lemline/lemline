@@ -15,14 +15,12 @@ import io.mockk.coVerify
 import io.mockk.mockk
 import java.io.ByteArrayOutputStream
 import java.io.PrintStream
-import kotlin.time.ExperimentalTime
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 
-@ExperimentalTime
 class InteractiveWorkflowSelectorTest {
 
     private lateinit var selector: InteractiveWorkflowSelector

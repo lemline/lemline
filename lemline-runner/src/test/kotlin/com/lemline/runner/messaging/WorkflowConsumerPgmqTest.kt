@@ -13,7 +13,6 @@ import com.lemline.runner.tests.profiles.PgmqProfile
 import io.quarkus.test.junit.QuarkusTest
 import io.quarkus.test.junit.TestProfile
 import java.util.concurrent.TimeUnit
-import kotlin.time.ExperimentalTime
 import kotlinx.coroutines.runBlocking
 import org.eclipse.microprofile.config.ConfigProvider
 import org.junit.jupiter.api.AfterAll
@@ -28,7 +27,6 @@ import org.junit.jupiter.api.TestInstance
 @TestProfile(PgmqProfile::class)
 @Tag("integration")
 @RequiresDocker
-@ExperimentalTime
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 internal class WorkflowConsumerPgmqTest : WorkflowConsumerTest() {
 

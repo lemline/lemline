@@ -8,13 +8,11 @@ import com.lemline.runner.messaging.MessageEmitter
 import io.quarkus.runtime.Startup
 import io.smallrye.reactive.messaging.MutinyEmitter
 import jakarta.enterprise.context.ApplicationScoped
-import kotlin.time.ExperimentalTime
 import org.eclipse.microprofile.config.inject.ConfigProperty
 import org.eclipse.microprofile.reactive.messaging.Channel
 
 internal const val EVENTS_OUT_CHANNEL = "events-out"
 
-@ExperimentalTime
 @Startup
 @ApplicationScoped
 internal class WorkflowEventEmitter(

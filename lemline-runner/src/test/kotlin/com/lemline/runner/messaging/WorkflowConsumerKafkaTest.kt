@@ -12,7 +12,6 @@ import io.quarkus.test.junit.QuarkusTest
 import io.quarkus.test.junit.TestProfile
 import java.time.Duration
 import java.util.concurrent.TimeUnit
-import kotlin.time.ExperimentalTime
 import org.apache.kafka.clients.consumer.ConsumerConfig
 import org.apache.kafka.clients.consumer.KafkaConsumer
 import org.apache.kafka.clients.producer.KafkaProducer
@@ -33,7 +32,6 @@ import org.junit.jupiter.api.TestInstance
 @TestProfile(KafkaProfile::class)
 @Tag("integration")
 @RequiresDocker
-@ExperimentalTime
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 internal class WorkflowConsumerKafkaTest : WorkflowConsumerTest() {
 

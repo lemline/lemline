@@ -3,18 +3,15 @@ package com.lemline.runner.schedules
 
 import com.lemline.common.values.IDV7
 import com.lemline.common.values.WorkflowId
-import com.lemline.common.values.WorkflowInfo
-import com.lemline.core.random.*
-import com.lemline.core.states.WorkflowCommand
+import com.lemline.core.random.randomResumeFromTaskCommand
+import com.lemline.core.random.randomWorkflowInfo
 import com.lemline.runner.common.messaging.InstanceMessage
 import kotlin.test.assertEquals
 import kotlin.test.assertFails
 import kotlin.test.assertNotNull
-import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 import org.junit.jupiter.api.Test
 
-@ExperimentalTime
 class ScheduleModelTest {
 
     private fun createModel(

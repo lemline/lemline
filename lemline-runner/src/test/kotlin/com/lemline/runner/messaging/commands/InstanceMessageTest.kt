@@ -1,15 +1,13 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.messaging.commands
 
+import com.lemline.core.states.WorkflowState
 import com.lemline.runner.common.messaging.InstanceMessage
 import com.lemline.runner.common.messaging.InstanceMessageCodec
 import com.lemline.runner.random.random
-import com.lemline.core.states.WorkflowState
-import kotlin.time.ExperimentalTime
 import org.junit.jupiter.api.Assertions
 import org.junit.jupiter.api.Test
 
-@ExperimentalTime
 internal class InstanceMessageTest {
 
     @Test

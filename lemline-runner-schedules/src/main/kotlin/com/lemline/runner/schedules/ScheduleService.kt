@@ -6,7 +6,6 @@ import com.lemline.common.values.WorkflowId
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
 import java.sql.Connection
-import kotlin.time.ExperimentalTime
 
 /**
  * Service for handling schedule-related workflow operations.
@@ -14,7 +13,6 @@ import kotlin.time.ExperimentalTime
  * Provides business logic for:
  * - Scheduling next workflow run after completion (for workflows with schedule.after)
  */
-@ExperimentalTime
 @ApplicationScoped
 class ScheduleService {
 

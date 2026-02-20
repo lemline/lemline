@@ -24,13 +24,11 @@ import io.serverlessworkflow.api.types.Schedule
 import java.time.ZoneId
 import kotlin.time.Clock
 import kotlin.time.Duration
-import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 import kotlin.time.toJavaInstant
 import kotlin.time.toKotlinInstant
 import kotlinx.serialization.json.JsonElement
 
-@ExperimentalTime
 data class ScheduleModel(
     /** Unique identifier for this scheduled workflow execution */
     override val id: IDV7,
@@ -167,7 +165,6 @@ data class ScheduleModel(
     }
 }
 
-@ExperimentalTime
 internal fun Cron.getNextCronExecutionInstant(now: Instant, zoneId: ZoneId?): Instant? = ExecutionTime.forCron(this)
     .nextExecution(now.toJavaInstant().atZone(zoneId ?: ZoneId.of("UTC")))
     .map { it.toInstant().toKotlinInstant() }

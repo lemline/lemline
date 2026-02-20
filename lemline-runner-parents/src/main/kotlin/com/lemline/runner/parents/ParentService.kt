@@ -15,7 +15,6 @@ import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
 import java.sql.Connection
 import kotlin.time.Clock
-import kotlin.time.ExperimentalTime
 
 /**
  * Service for handling parent-child workflow relationships.
@@ -24,7 +23,6 @@ import kotlin.time.ExperimentalTime
  * - Starting child workflows (creating parent record, preparing child, emitting child message)
  * - Resuming parent workflows when children complete or fail
  */
-@ExperimentalTime
 @ApplicationScoped
 class ParentService {
 

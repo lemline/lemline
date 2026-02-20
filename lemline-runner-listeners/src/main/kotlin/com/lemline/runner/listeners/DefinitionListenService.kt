@@ -15,7 +15,6 @@ import io.cloudevents.CloudEvent
 import io.serverlessworkflow.api.types.ListenTaskConfiguration
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
-import kotlin.time.ExperimentalTime
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 
@@ -23,7 +22,6 @@ import kotlinx.serialization.json.JsonElement
  * Represents a workflow definition that may listen to an event.
  * This is the result of matching an event against workflow definitions (no database query).
  */
-@ExperimentalTime
 data class MatchingListenTask(
     val listenTask: CachedListenTask,
     /** Correlation values extracted from the event using 'correlate.from' expressions */
@@ -59,7 +57,6 @@ data class MatchingListenTask(
  * Represents a workflow definition whose termination filter matches an event.
  * Used for ANY + until(event) strategy where a specific event type triggers completion.
  */
-@ExperimentalTime
 data class MatchingListenTaskUntilEvent(
     val listenTask: CachedListenTask
 ) {
@@ -97,7 +94,6 @@ data class MatchingListenTaskUntilEvent(
  * @see WorkflowCache for workflow definition caching
  * @see ListenerRepository for active listener storage
  */
-@ExperimentalTime
 @ApplicationScoped
 class DefinitionListenService {
 

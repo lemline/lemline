@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
-@file:OptIn(ExperimentalTime::class)
-
 package com.lemline.runner.testcases.pgmq
 
+import com.lemline.runner.common.config.MessagingType
 import com.lemline.runner.config.CLOUDEVENTS_CONSUMER_ENABLED
 import com.lemline.runner.config.CLOUDEVENTS_PRODUCER_ENABLED
 import com.lemline.runner.config.COMMANDS_CONSUMER_ENABLED
@@ -10,12 +9,10 @@ import com.lemline.runner.config.COMMANDS_PRODUCER_ENABLED
 import com.lemline.runner.config.EVENTS_CONSUMER_ENABLED
 import com.lemline.runner.config.EVENTS_PRODUCER_ENABLED
 import com.lemline.runner.config.LIFECYCLE_EVENTS_PRODUCER_ENABLED
-import com.lemline.runner.common.config.MessagingType
 import com.lemline.runner.config.MESSAGING_TYPE
 import com.lemline.runner.config.ORCHESTRATOR_MODE
 import com.lemline.runner.tests.resources.PgmqTestResource
 import io.quarkus.test.junit.QuarkusTestProfile
-import kotlin.time.ExperimentalTime
 
 /**
  * Test profile for PGMQ messaging with loopback configuration.

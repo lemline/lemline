@@ -1,6 +1,4 @@
 // SPDX-License-Identifier: BUSL-1.1
-@file:OptIn(ExperimentalTime::class)
-
 package com.lemline.runner.common.messaging
 
 import com.lemline.common.values.WorkflowInfo
@@ -13,7 +11,6 @@ import com.lemline.messages.internal.v1.InstanceMessageProto
 import com.lemline.messages.internal.v1.WorkflowInfoProto
 import com.lemline.messages.internal.v1.WorkflowStateProto
 import java.util.*
-import kotlin.time.ExperimentalTime
 
 object InstanceMessageCodec {
     private const val SCHEMA_VERSION = 1

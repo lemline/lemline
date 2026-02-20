@@ -23,7 +23,6 @@ import com.lemline.runner.retries.RetryService
 import com.lemline.runner.schedules.ScheduleService
 import com.lemline.runner.waits.WaitService
 import jakarta.enterprise.context.ApplicationScoped
-import kotlin.time.ExperimentalTime
 import org.eclipse.microprofile.reactive.messaging.Message
 import org.jetbrains.annotations.TestOnly
 
@@ -43,7 +42,6 @@ import org.jetbrains.annotations.TestOnly
  * - ListenStarted → ListenerService
  * - ListenForEachCompleted → ListenerEventService
  */
-@ExperimentalTime
 @ApplicationScoped
 internal class WorkflowEventHandler(
     private val definitions: Definitions,

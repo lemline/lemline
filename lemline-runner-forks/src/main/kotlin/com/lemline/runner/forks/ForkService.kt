@@ -19,7 +19,6 @@ import io.serverlessworkflow.api.types.ForkTask
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
 import kotlin.time.Clock
-import kotlin.time.ExperimentalTime
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 
@@ -31,7 +30,6 @@ import kotlinx.serialization.json.JsonElement
  * - Handling branch completion (assembling output, resuming parent)
  * - Handling branch failure (applying compete/cooperative error semantics)
  */
-@ExperimentalTime
 @ApplicationScoped
 class ForkService {
 

@@ -1,5 +1,4 @@
 // SPDX-License-Identifier: BUSL-1.1
-@file:OptIn(ExperimentalTime::class, ExperimentalSerializationApi::class)
 
 package com.lemline.runner.testcases.inMemory
 
@@ -21,8 +20,6 @@ import com.lemline.core.testcases.WaitTestCases
 import com.lemline.runner.tests.profiles.InMemoryProfile
 import io.quarkus.test.junit.QuarkusTest
 import io.quarkus.test.junit.TestProfile
-import kotlin.time.ExperimentalTime
-import kotlinx.serialization.ExperimentalSerializationApi
 
 /**
  * In-memory workflow execution tests using runner messaging infrastructure.

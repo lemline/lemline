@@ -15,7 +15,6 @@ import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.TimeoutException
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
-import kotlin.time.ExperimentalTime
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.json.Json
@@ -28,10 +27,9 @@ import org.eclipse.microprofile.reactive.messaging.Incoming
  * mechanisms to capture, query, and wait for specific events based on workflows and event types.
  * It is primarily intended for use in test environments to verify lifecycle-related behavior.
  *
- * Annotated with `@ExperimentalTime`, `@Startup`, and `@ApplicationScoped` to enable proper initialization
+ * Annotated with `@Startup`, and `@ApplicationScoped` to enable proper initialization
  * and scope handling.
  */
-@ExperimentalTime
 @Startup
 @ApplicationScoped
 class TestLifecycleEventListener {

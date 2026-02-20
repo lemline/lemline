@@ -22,7 +22,6 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Clock
-import kotlin.time.ExperimentalTime
 import kotlinx.coroutines.delay
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -68,10 +67,8 @@ import kotlinx.serialization.json.put
  * }
  * ```
  */
-@ExperimentalTime
 class OrchestratorTest : FunSpec() {
 
-    @OptIn(ExperimentalTime::class)
     internal suspend fun executeWorkflow(
         yaml: String,
         input: JsonElement = buildJsonObject { },

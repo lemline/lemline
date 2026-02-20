@@ -14,10 +14,8 @@ import com.lemline.runner.healthcheck.FatalAckLiveness.livenessDownOnFailure
 import com.lemline.runner.healthcheck.RetryReadiness.readinessDownDuringRetries
 import io.quarkus.smallrye.reactivemessaging.ackSuspending
 import io.quarkus.smallrye.reactivemessaging.nackSuspending
-import kotlin.time.ExperimentalTime
 import org.eclipse.microprofile.reactive.messaging.Message
 
-@ExperimentalTime
 internal interface MessageHandler<T> {
 
     suspend fun Message<String>.deserialize(): T

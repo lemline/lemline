@@ -27,7 +27,6 @@ import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
 import java.sql.Connection
 import java.sql.ResultSet
-import kotlin.time.ExperimentalTime
 
 const val LISTENER_EVENTS_TABLE = "lemline_listener_events"
 
@@ -54,7 +53,6 @@ const val LISTENER_EVENTS_TABLE = "lemline_listener_events"
  * @see ListenerEventModel for the entity model
  */
 @ApplicationScoped
-@ExperimentalTime
 class ListenerEventRepository : CrudRepository<ListenerEventModel>(),
     WithOutboxRepository<ListenerEventModel> {
 

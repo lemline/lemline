@@ -1,6 +1,4 @@
 // SPDX-License-Identifier: BUSL-1.1
-@file:OptIn(ExperimentalTime::class, ExperimentalSerializationApi::class)
-
 package com.lemline.runner.common.repositories.ops
 
 import com.lemline.runner.common.config.DatabaseConfig
@@ -11,10 +9,8 @@ import java.sql.Connection
 import java.sql.ResultSet
 import java.sql.Timestamp
 import java.sql.Types
-import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 import kotlin.time.toJavaInstant
-import kotlinx.serialization.ExperimentalSerializationApi
 
 const val CLEANUP_AFTER_COLUMN = "cleanup_after"
 

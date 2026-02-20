@@ -2,7 +2,6 @@
 package com.lemline.core.processors.scope
 
 import com.lemline.core.nodes.Node
-import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
@@ -29,7 +28,6 @@ internal fun Scope.merge(other: Scope?): Scope =
 /**
  * Creates a new Scope with the given task information.
  */
-@ExperimentalTime
 fun Scope.withTask(
     node: Node<*>,
     startedAt: Instant,

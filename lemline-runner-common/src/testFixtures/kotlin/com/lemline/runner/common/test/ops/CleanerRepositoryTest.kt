@@ -17,7 +17,6 @@ import kotlin.time.Clock
 import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.seconds
-import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
@@ -37,7 +36,6 @@ import org.junit.jupiter.api.Test
  * @param getEntityKey Function to extract unique key from entity for comparison
  * @param databaseConfig Provider for database configuration (for transaction support)
  */
-@ExperimentalTime
 abstract class CleanerRepositoryTest<T : WithCleanup>(
     cleanerRepository: () -> WithCleanerRepository<T>,
     crudRepository: () -> WithCrudRepository<T>,

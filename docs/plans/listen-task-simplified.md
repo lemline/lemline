@@ -2,7 +2,8 @@
 
 ## Overview
 
-This plan simplifies the listen task implementation by using a **uniform event-based model** where all CloudEvents are stored in `listener_events`, with `foreach_completed_at` as the universal "event processed" flag.
+This plan simplifies the listen task implementation by using a **uniform event-based model** where all CloudEvents are
+stored in `listener_events`, with `foreach_completed_at` as the universal "event processed" flag.
 
 ## Design Principles
 
@@ -71,21 +72,22 @@ This plan simplifies the listen task implementation by using a **uniform event-b
 ### lemline_listeners (simplified)
 
 ```sql
-CREATE TABLE lemline_listeners (
+CREATE TABLE lemline_listeners
+(
     -- Identity
     id                      UUID PRIMARY KEY,
     workflow_namespace      VARCHAR(255) NOT NULL,
     workflow_name           VARCHAR(255) NOT NULL,
     workflow_version        VARCHAR(255) NOT NULL,
-    workflow_id             UUID NOT NULL,
-    workflow_position       TEXT NOT NULL,
-    instance_message        TEXT NOT NULL,
+    workflow_id             UUID         NOT NULL,
+    workflow_position       TEXT         NOT NULL,
+    instance_message        TEXT         NOT NULL,
 
     -- Listen configuration
-    strategy                VARCHAR(20) NOT NULL,  -- ONE, ANY, ANY_UNTIL_EXPR, ANY_UNTIL_EVENT, ALL
+    strategy                VARCHAR(20)  NOT NULL, -- ONE, ANY, ANY_UNTIL_EXPR, ANY_UNTIL_EVENT, ALL
     filters_count           INT,                   -- for ALL: required distinct filter matches
     until_expression        TEXT,                  -- for ANY_UNTIL_EXPR: jq expression
-    has_foreach             BOOLEAN NOT NULL DEFAULT FALSE,
+    has_foreach             BOOLEAN      NOT NULL DEFAULT FALSE,
     correlation_values      TEXT,                  -- JSON for correlation matching
     timeout_at              TIMESTAMP,
 
@@ -93,9 +95,9 @@ CREATE TABLE lemline_listeners (
     ready_at                TIMESTAMP,             -- set when completion criteria met
 
     -- Standard outbox fields (for completion processing)
-    outbox_scheduled_for    TIMESTAMP NOT NULL,
+    outbox_scheduled_for    TIMESTAMP    NOT NULL,
     outbox_delayed_until    TIMESTAMP,             -- NULL = waiting, NOT NULL = ready for outbox
-    outbox_attempt_count    INT NOT NULL DEFAULT 0,
+    outbox_attempt_count    INT          NOT NULL DEFAULT 0,
     outbox_error_class      VARCHAR(255),
     outbox_error_message    TEXT,
     outbox_error_stacktrace TEXT,
@@ -106,51 +108,49 @@ CREATE TABLE lemline_listeners (
     cleanup_after           TIMESTAMP,
 
     -- Timestamps
-    created_at              TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at              TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+    created_at              TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at              TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Index for finding pending listeners by query key
 CREATE INDEX idx_listeners_pending ON lemline_listeners
-    (workflow_namespace, workflow_name, workflow_version, workflow_position)
-    WHERE outbox_completed_at IS NULL;
+    (workflow_namespace, workflow_name, workflow_version, workflow_position) WHERE outbox_completed_at IS NULL;
 
 -- Index for completion outbox
-CREATE INDEX idx_listeners_ready ON lemline_listeners (ready_at)
-    WHERE ready_at IS NOT NULL AND outbox_completed_at IS NULL;
+CREATE INDEX idx_listeners_ready ON lemline_listeners (ready_at) WHERE ready_at IS NOT NULL AND outbox_completed_at IS NULL;
 
 -- Index for cleanup
-CREATE INDEX idx_listeners_cleanup ON lemline_listeners (cleanup_after)
-    WHERE cleanup_after IS NOT NULL;
+CREATE INDEX idx_listeners_cleanup ON lemline_listeners (cleanup_after) WHERE cleanup_after IS NOT NULL;
 ```
 
 ### lemline_listener_events (following standard outbox pattern)
 
 ```sql
-CREATE TABLE lemline_listener_events (
+CREATE TABLE lemline_listener_events
+(
     -- Identity
     id                      UUID PRIMARY KEY,
-    listener_id             UUID NOT NULL REFERENCES lemline_listeners(id) ON DELETE CASCADE,
+    listener_id             UUID      NOT NULL REFERENCES lemline_listeners (id) ON DELETE CASCADE,
 
     -- Event data
-    filter_index            INT,                   -- which filter matched (for ALL strategy)
-    event                   TEXT NOT NULL,         -- the CloudEvent data (JSON)
+    filter_index            INT,                -- which filter matched (for ALL strategy)
+    event                   TEXT      NOT NULL, -- the CloudEvent data (JSON)
 
     -- Sequence for FIFO ordering (per listener)
-    sequence                BIGINT NOT NULL,       -- 1, 2, 3... per listener
+    sequence                BIGINT    NOT NULL, -- 1, 2, 3... per listener
 
     -- Foreach output (captured after foreach.do completes)
-    foreach_output          TEXT,                  -- output from foreach.do iteration
+    foreach_output          TEXT,               -- output from foreach.do iteration
 
     -- Standard outbox fields (for foreach processing via AbstractOutbox)
-    outbox_scheduled_for    TIMESTAMP NOT NULL,    -- when this event was inserted
-    outbox_delayed_until    TIMESTAMP,             -- NULL = waiting for FIFO turn, NOT NULL = ready
-    outbox_attempt_count    INT NOT NULL DEFAULT 0,
+    outbox_scheduled_for    TIMESTAMP NOT NULL, -- when this event was inserted
+    outbox_delayed_until    TIMESTAMP,          -- NULL = waiting for FIFO turn, NOT NULL = ready
+    outbox_attempt_count    INT       NOT NULL DEFAULT 0,
     outbox_error_class      VARCHAR(255),
     outbox_error_message    TEXT,
     outbox_error_stacktrace TEXT,
-    outbox_completed_at     TIMESTAMP,             -- foreach.do completed successfully
-    outbox_failed_at        TIMESTAMP,             -- foreach.do failed after max retries
+    outbox_completed_at     TIMESTAMP,          -- foreach.do completed successfully
+    outbox_failed_at        TIMESTAMP,          -- foreach.do failed after max retries
 
     -- Cleanup
     cleanup_after           TIMESTAMP,
@@ -165,13 +165,11 @@ CREATE TABLE lemline_listener_events (
 -- Index for foreach outbox processing (FIFO ordering)
 -- Find events ready for processing: delayed_until <= NOW, not completed/failed
 CREATE INDEX idx_listener_events_outbox ON lemline_listener_events
-    (listener_id, outbox_delayed_until, sequence)
-    WHERE outbox_completed_at IS NULL AND outbox_failed_at IS NULL;
+    (listener_id, outbox_delayed_until, sequence) WHERE outbox_completed_at IS NULL AND outbox_failed_at IS NULL;
 
 -- Index for counting in-flight events (FIFO check)
 CREATE INDEX idx_listener_events_processing ON lemline_listener_events
-    (listener_id, outbox_delayed_until)
-    WHERE outbox_completed_at IS NULL
+    (listener_id, outbox_delayed_until) WHERE outbox_completed_at IS NULL
       AND outbox_failed_at IS NULL
       AND outbox_delayed_until IS NOT NULL;
 
@@ -182,11 +180,11 @@ CREATE INDEX idx_listener_events_listener ON lemline_listener_events (listener_i
 CREATE INDEX idx_listener_events_filter ON lemline_listener_events (listener_id, filter_index);
 
 -- Index for cleanup
-CREATE INDEX idx_listener_events_cleanup ON lemline_listener_events (cleanup_after)
-    WHERE cleanup_after IS NOT NULL;
+CREATE INDEX idx_listener_events_cleanup ON lemline_listener_events (cleanup_after) WHERE cleanup_after IS NOT NULL;
 ```
 
 **State tracking via outbox columns:**
+
 - **Waiting for FIFO turn**: `outbox_delayed_until IS NULL` (waiting for previous events to complete)
 - **Ready for processing**: `outbox_delayed_until IS NOT NULL AND <= NOW()` (can be claimed)
 - **Processing**: Claimed via `FOR UPDATE SKIP LOCKED` (in-flight)
@@ -195,6 +193,7 @@ CREATE INDEX idx_listener_events_cleanup ON lemline_listener_events (cleanup_aft
 - **Skipped**: `outbox_completed_at = created_at` (no foreach, completed immediately)
 
 **FIFO enforcement**:
+
 - First event for a listener gets `outbox_delayed_until = NOW()` (immediately ready)
 - Subsequent events get `outbox_delayed_until = NULL` (waiting)
 - When an event completes, the next event's `outbox_delayed_until` is set to `NOW()`
@@ -357,8 +356,6 @@ const val LISTENER_EVENT_TABLE = "lemline_listener_events"
  * @see ListenerEventModel for the event model
  */
 @ApplicationScoped
-@ExperimentalSerializationApi
-@ExperimentalTime
 internal class ListenerEventRepository : CrudRepository<ListenerEventModel>(),
     WithIdRepository<ListenerEventModel>,
     WithOutboxRepository<ListenerEventModel>,
@@ -382,7 +379,11 @@ internal class ListenerEventRepository : CrudRepository<ListenerEventModel>(),
         idOps.deleteById(id, connection)
 
     // Delegate WithOutboxRepository methods (FIFO-aware override)
-    override suspend fun findEntitiesToProcess(maxAttempts: Int, limit: Int, connection: Connection?): List<ListenerEventModel> =
+    override suspend fun findEntitiesToProcess(
+        maxAttempts: Int,
+        limit: Int,
+        connection: Connection?
+    ): List<ListenerEventModel> =
         findEntitiesToProcessFifo(maxAttempts, limit, connection)
 
     // Delegate WithCleanerRepository methods
@@ -668,8 +669,6 @@ const val LISTENER_TABLE = "lemline_listeners"
  * @see ListenerModel for the listener model
  */
 @ApplicationScoped
-@ExperimentalSerializationApi
-@ExperimentalTime
 internal class ListenerRepository : CrudRepository<ListenerModel>(),
     WithIdRepository<ListenerModel>,
     WithOutboxRepository<ListenerModel>,
@@ -944,8 +943,6 @@ internal class ListenerRepository : CrudRepository<ListenerModel>(),
 ```kotlin
 @Startup
 @ApplicationScoped
-@ExperimentalTime
-@ExperimentalSerializationApi
 internal class ListenerForeachOutbox : AbstractOutbox<ListenerEventModel>() {
 
     @Inject
@@ -1009,6 +1006,7 @@ internal class ListenerForeachOutbox : AbstractOutbox<ListenerEventModel>() {
 ```
 
 **Key points:**
+
 - Extends `AbstractOutbox<ListenerEventModel>` - inherits retry logic, error tracking, cleanup
 - `outboxRepository.findEntitiesToProcess()` enforces FIFO via `outbox_delayed_until`
 - Event's `outbox_completed_at` is set by `WorkflowEventHandler.handleListenForEachCompleted`
@@ -1044,8 +1042,6 @@ Next poll claims seq=2:
 ```kotlin
 @Startup
 @ApplicationScoped
-@ExperimentalTime
-@ExperimentalSerializationApi
 internal class ListenerCompletionOutbox : AbstractOutbox<ListenerModel>() {
 
     @Inject
@@ -1154,8 +1150,6 @@ private suspend fun handleListenForEachCompleted(
 ```kotlin
 @Startup
 @ApplicationScoped
-@ExperimentalTime
-@ExperimentalSerializationApi
 internal class ListenerCleaner : AbstractCleaner<ListenerModel>() {
 
     @Inject
@@ -1180,7 +1174,9 @@ internal class ListenerCleaner : AbstractCleaner<ListenerModel>() {
 
 ### Correlation (`correlate` property)
 
-Correlation allows listeners to filter events based on values extracted from the event data. The current implementation uses **Mode 2: First-sets-baseline** where the first matching event sets the correlation values, and subsequent events must match.
+Correlation allows listeners to filter events based on values extracted from the event data. The current implementation
+uses **Mode 2: First-sets-baseline** where the first matching event sets the correlation values, and subsequent events
+must match.
 
 **How it works:**
 
@@ -1196,13 +1192,14 @@ Correlation allows listeners to filter events based on values extracted from the
                from: .orderId
    ```
 
-2. **Event matching**: `DefinitionListenService.extractCorrelationValues()` evaluates `correlate.from` expressions against event data
+2. **Event matching**: `DefinitionListenService.extractCorrelationValues()` evaluates `correlate.from` expressions
+   against event data
 
 3. **Query key**: `ListenerQueryKey` includes `correlationValuesJson` for database matching
 
 4. **Database matching**: SQL uses `(correlation_values IS NULL OR correlation_values = ?)`:
-   - If listener's `correlation_values` is NULL: Match any event (first event sets baseline)
-   - If listener's `correlation_values` is set: Match only events with same correlation values
+    - If listener's `correlation_values` is NULL: Match any event (first event sets baseline)
+    - If listener's `correlation_values` is set: Match only events with same correlation values
 
 **Data flow:**
 
@@ -1288,29 +1285,36 @@ data class ListenerQueryKey(
 }
 ```
 
-**Note**: The `whereClause` used in batch INSERT queries (e.g., `batchInsertForOneAny`, `batchInsertForAccumulating`) is built from `ListenerQueryKey.buildWhereClause(keys, "l")`, which automatically includes correlation matching when `correlationValuesJson` is present.
+**Note**: The `whereClause` used in batch INSERT queries (e.g., `batchInsertForOneAny`, `batchInsertForAccumulating`) is
+built from `ListenerQueryKey.buildWhereClause(keys, "l")`, which automatically includes correlation matching when
+`correlationValuesJson` is present.
 
 **Batch INSERT with correlation** (used in `batchInsertForOneAny` and `batchInsertForAccumulating`):
 
 ```sql
 INSERT INTO lemline_listener_events (...)
-SELECT ...
-FROM lemline_listeners l
+SELECT...
+    FROM lemline_listeners l
 WHERE l.outbox_completed_at IS NULL
-  AND l.strategy IN ('ONE', 'ANY')
+  AND l.strategy IN ('ONE'
+    , 'ANY')
   AND NOT EXISTS (SELECT 1 FROM lemline_listener_events e WHERE e.listener_id = l.id)
-  -- Correlation: match if listener has no baseline OR event matches baseline
-  AND (l.correlation_values IS NULL OR l.correlation_values = ?)
-  AND (workflow_namespace = ? AND workflow_name = ? ...)
+-- Correlation: match if listener has no baseline OR event matches baseline
+  AND (l.correlation_values IS NULL
+   OR l.correlation_values = ?)
+  AND (workflow_namespace = ?
+  AND workflow_name = ?...)
 ```
 
 **Setting correlation baseline** (when listener is created):
 
 The `correlation_values` column is set when the listener is created (in `WorkflowEventHandler.handleListenStarted()`):
+
 - If workflow provides correlation context: Set `correlation_values` to those values
 - If no correlation context: Set `correlation_values = NULL` (first event sets baseline)
 
-**Note**: The current implementation uses simple JSON string comparison for correlation matching. This requires correlation values to be serialized with sorted keys for consistent comparison.
+**Note**: The current implementation uses simple JSON string comparison for correlation matching. This requires
+correlation values to be serialized with sorted keys for consistent comparison.
 
 ---
 
@@ -1318,9 +1322,11 @@ The `correlation_values` column is set when the listener is created (in `Workflo
 
 Events accumulate until a JQ expression evaluates to `true` against the collected array.
 
-**Key insight**: The until expression must be evaluated **after each event is processed** (not just once when checking completion). This ensures we stop accumulating as soon as the condition is met.
+**Key insight**: The until expression must be evaluated **after each event is processed** (not just once when checking
+completion). This ensures we stop accumulating as soon as the condition is met.
 
 **When to evaluate:**
+
 1. After event INSERT (if no foreach)
 2. After foreach.do completes (if has foreach)
 
@@ -1346,7 +1352,8 @@ Event arrives → INSERT into listener_events
 
 **Point 1: After event INSERT (no foreach)**
 
-In `CloudEventHandler`, after batch INSERT for accumulating strategies, evaluate until expressions for listeners WITHOUT foreach:
+In `CloudEventHandler`, after batch INSERT for accumulating strategies, evaluate until expressions for listeners WITHOUT
+foreach:
 
 ```kotlin
 /**
@@ -1743,6 +1750,7 @@ The batch INSERT logic remains unchanged - wildcards are just listeners without 
 ### Timeout Handling
 
 Keep `ListenerTimeoutOutbox` unchanged - it handles timeout independently by:
+
 1. Finding listeners where `timeout_at < NOW()`
 2. Marking them as failed (not ready)
 3. Emitting a timeout error to the workflow
@@ -1755,24 +1763,24 @@ Keep `ListenerTimeoutOutbox` unchanged - it handles timeout independently by:
 ### Phase 1: Database Migration
 
 1. Update `V8__Create_lemline_listeners_tables.sql` with simplified schema:
-   - Add `ready_at` column to `lemline_listeners`
-   - Remove `foreach_current_index`, `listener_completed` (replaced by event status)
-   - Add `sequence`, `foreach_status`, `foreach_claimed_at` to `lemline_listener_events`
-   - Update indexes for ADR-0013 pattern
+    - Add `ready_at` column to `lemline_listeners`
+    - Remove `foreach_current_index`, `listener_completed` (replaced by event status)
+    - Add `sequence`, `foreach_status`, `foreach_claimed_at` to `lemline_listener_events`
+    - Update indexes for ADR-0013 pattern
 2. Test migrations on PostgreSQL, MySQL, H2
 
 ### Phase 2: Repository Changes
 
 1. Simplify `ListenerRepository`:
-   - Remove: `markReadyForCompletion*`, `markTerminated*`, `markAllCompleted*`, etc.
-   - Add: `batchMarkReady()`, `findReadyWithOutput()`
-   - Keep: `findByWorkflowIdAndPosition()`, `findByIds()`
+    - Remove: `markReadyForCompletion*`, `markTerminated*`, `markAllCompleted*`, etc.
+    - Add: `batchMarkReady()`, `findReadyWithOutput()`
+    - Keep: `findByWorkflowIdAndPosition()`, `findByIds()`
 
 2. Simplify `ListenerEventRepository`:
-   - Remove: `bulkInsertEventsForKeys`, `setForeachScheduled*`, `triggerFirstEvent*`, etc.
-   - Add: `batchInsertForOneAny()`, `batchInsertForAccumulating()`
-   - Add: `claimNextForForeach()`, `markForeachCompleted()` (ADR-0013 pattern)
-   - Add: `releaseStaleClaimsForForeach()`, `getNextSequence()`
+    - Remove: `bulkInsertEventsForKeys`, `setForeachScheduled*`, `triggerFirstEvent*`, etc.
+    - Add: `batchInsertForOneAny()`, `batchInsertForAccumulating()`
+    - Add: `claimNextForForeach()`, `markForeachCompleted()` (ADR-0013 pattern)
+    - Add: `releaseStaleClaimsForForeach()`, `getNextSequence()`
 
 ### Phase 3: Outbox Changes
 
@@ -1784,12 +1792,12 @@ Keep `ListenerTimeoutOutbox` unchanged - it handles timeout independently by:
 ### Phase 4: Handler Changes
 
 1. Simplify `CloudEventHandler`:
-   - Remove strategy-specific code paths
-   - Use two batch INSERT methods
+    - Remove strategy-specific code paths
+    - Use two batch INSERT methods
 
 2. Simplify `WorkflowEventHandler.handleListenForEachCompleted`:
-   - Remove strategy branching
-   - Just mark event complete and clear processing flag
+    - Remove strategy branching
+    - Just mark event complete and clear processing flag
 
 ### Phase 5: Testing
 
@@ -1801,46 +1809,48 @@ Keep `ListenerTimeoutOutbox` unchanged - it handles timeout independently by:
 
 ## Summary
 
-| Aspect                    | Before                              | After                                    |
-|---------------------------|-------------------------------------|------------------------------------------|
-| Code paths                | 4 in CloudEventHandler              | 2 batch INSERT methods                   |
-| State tracking            | Multiple flags                      | Standard outbox columns                  |
-| Repository methods        | 25+                                 | ~10 focused methods                      |
-| Completion logic          | Scattered across handlers           | Centralized in ListenerCompletionOutbox  |
-| Flow                      | Hard to trace                       | Linear: INSERT → foreach → complete      |
-| Sequential foreach        | Custom `foreach_processing` flag    | FIFO via `outbox_delayed_until`          |
-| Retry/error handling      | Custom implementation               | Inherited from AbstractOutbox            |
+| Aspect               | Before                           | After                                   |
+|----------------------|----------------------------------|-----------------------------------------|
+| Code paths           | 4 in CloudEventHandler           | 2 batch INSERT methods                  |
+| State tracking       | Multiple flags                   | Standard outbox columns                 |
+| Repository methods   | 25+                              | ~10 focused methods                     |
+| Completion logic     | Scattered across handlers        | Centralized in ListenerCompletionOutbox |
+| Flow                 | Hard to trace                    | Linear: INSERT → foreach → complete     |
+| Sequential foreach   | Custom `foreach_processing` flag | FIFO via `outbox_delayed_until`         |
+| Retry/error handling | Custom implementation            | Inherited from AbstractOutbox           |
 
 ## Standard Outbox Pattern Compliance
 
 Both `lemline_listeners` and `lemline_listener_events` follow the standard outbox pattern:
 
-| Outbox Column             | Purpose                                                       |
-|---------------------------|---------------------------------------------------------------|
-| `outbox_scheduled_for`    | When the event was scheduled (observability)                  |
-| `outbox_delayed_until`    | When to process (NULL = waiting, NOT NULL = ready)            |
-| `outbox_attempt_count`    | Retry counter for exponential backoff                         |
-| `outbox_error_*`          | Error tracking (class, message, stacktrace)                   |
-| `outbox_completed_at`     | When processing completed successfully                        |
-| `outbox_failed_at`        | When processing permanently failed                            |
-| `cleanup_after`           | When to delete the row                                        |
+| Outbox Column          | Purpose                                            |
+|------------------------|----------------------------------------------------|
+| `outbox_scheduled_for` | When the event was scheduled (observability)       |
+| `outbox_delayed_until` | When to process (NULL = waiting, NOT NULL = ready) |
+| `outbox_attempt_count` | Retry counter for exponential backoff              |
+| `outbox_error_*`       | Error tracking (class, message, stacktrace)        |
+| `outbox_completed_at`  | When processing completed successfully             |
+| `outbox_failed_at`     | When processing permanently failed                 |
+| `cleanup_after`        | When to delete the row                             |
 
 ## FIFO Enforcement (listener_events)
 
 Sequential foreach processing is enforced via `outbox_delayed_until`:
 
-| State                     | outbox_delayed_until | outbox_completed_at |
-|---------------------------|----------------------|---------------------|
-| Waiting for FIFO turn     | NULL                 | NULL                |
-| Ready for processing      | NOT NULL, <= NOW()   | NULL                |
-| Processing (claimed)      | NOT NULL, <= NOW()   | NULL (in-flight)    |
-| Completed                 | (any)                | NOT NULL            |
-| Failed                    | (any)                | NULL, failed_at SET |
+| State                 | outbox_delayed_until | outbox_completed_at |
+|-----------------------|----------------------|---------------------|
+| Waiting for FIFO turn | NULL                 | NULL                |
+| Ready for processing  | NOT NULL, <= NOW()   | NULL                |
+| Processing (claimed)  | NOT NULL, <= NOW()   | NULL (in-flight)    |
+| Completed             | (any)                | NOT NULL            |
+| Failed                | (any)                | NULL, failed_at SET |
 
 **FIFO flow:**
+
 1. First event inserted with `outbox_delayed_until = NOW()` (immediately ready)
 2. Subsequent events inserted with `outbox_delayed_until = NULL` (waiting)
 3. When event completes, `triggerNextEvent()` sets next event's `delayed_until = NOW()`
 4. Standard outbox polling picks up the next ready event
 
-The key simplification: **all events go through `listener_events`**, and standard outbox columns provide state tracking, retry logic, and cleanup - all inherited from `AbstractOutbox`.
+The key simplification: **all events go through `listener_events`**, and standard outbox columns provide state tracking,
+retry logic, and cleanup - all inherited from `AbstractOutbox`.

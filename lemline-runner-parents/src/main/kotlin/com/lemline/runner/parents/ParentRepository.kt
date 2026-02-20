@@ -26,7 +26,6 @@ import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
 import java.sql.Connection
 import java.sql.ResultSet
-import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 
 const val PARENT_TABLE = "lemline_parents"
@@ -39,7 +38,6 @@ const val PARENT_TABLE = "lemline_parents"
  * @see ParentModel for the state model
  */
 @ApplicationScoped
-@ExperimentalTime
 class ParentRepository : CrudRepository<ParentModel>(),
     WithIdRepository<ParentModel>,
     WithInstanceRepository<ParentModel>,

@@ -6,9 +6,7 @@ import com.lemline.core.states.WorkflowState
 import com.lemline.runner.common.messaging.InstanceMessage
 import com.lemline.runner.common.models.WithId
 import com.lemline.runner.failures.FailureReasons.getFailureReason
-import kotlin.time.ExperimentalTime
 
-@ExperimentalTime
 data class FailureModel(
     /** Unique identifier for this failure record */
     override val id: IDV7,

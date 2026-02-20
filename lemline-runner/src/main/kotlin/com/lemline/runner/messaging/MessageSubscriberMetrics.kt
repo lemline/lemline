@@ -9,7 +9,6 @@ import io.micrometer.core.instrument.Counter
 import io.micrometer.core.instrument.Gauge
 import io.micrometer.core.instrument.MeterRegistry
 import java.util.concurrent.atomic.AtomicInteger
-import kotlin.time.ExperimentalTime
 import kotlin.time.TimeSource.Monotonic.markNow
 import kotlin.time.toJavaDuration
 
@@ -18,7 +17,6 @@ import kotlin.time.toJavaDuration
  * Uses Micrometer for metrics collection and reporting.
  */
 @Suppress("PropertyName")
-@ExperimentalTime
 abstract class MessageSubscriberMetrics(val registry: MeterRegistry) {
 
     // Metric Names

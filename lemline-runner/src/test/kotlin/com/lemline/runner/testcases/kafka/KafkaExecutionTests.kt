@@ -1,6 +1,4 @@
 // SPDX-License-Identifier: BUSL-1.1
-@file:OptIn(ExperimentalSerializationApi::class, ExperimentalTime::class)
-
 package com.lemline.runner.testcases.kafka
 
 import com.lemline.core.testcases.CallFunctionTestCases
@@ -22,8 +20,6 @@ import com.lemline.runner.common.test.RequiresDocker
 import com.lemline.runner.testcases.bases.BrokerWorkflowTest
 import io.quarkus.test.junit.QuarkusTest
 import io.quarkus.test.junit.TestProfile
-import kotlin.time.ExperimentalTime
-import kotlinx.serialization.ExperimentalSerializationApi
 
 /**
  * End-to-end workflow execution tests using Kafka messaging infrastructure.

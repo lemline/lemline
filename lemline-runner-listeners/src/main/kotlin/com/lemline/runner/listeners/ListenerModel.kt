@@ -10,7 +10,6 @@ import com.lemline.runner.common.models.WithId
 import com.lemline.runner.common.models.WithInstanceMessage
 import com.lemline.runner.common.models.WithOutbox
 import io.serverlessworkflow.api.types.ListenTaskConfiguration.ListenAndReadAs
-import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 
 /**
@@ -53,7 +52,6 @@ import kotlin.time.Instant
  * @see WorkflowEvent.ListenStarted for the triggering event
  * @see ListenerEventModel for accumulated events
  */
-@ExperimentalTime
 data class ListenerModel(
     override var instanceMessage: InstanceMessage<WorkflowEvent.ListenStarted>,
     override val id: IDV7 = instanceMessage.workflowState.nodeStack.listenerId(),

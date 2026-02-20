@@ -9,9 +9,7 @@ import com.lemline.core.workflows.WorkflowCache
 import io.serverlessworkflow.api.types.Workflow
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
-import kotlin.time.ExperimentalTime
 
-@ExperimentalTime
 @ApplicationScoped
 class Definitions {
 

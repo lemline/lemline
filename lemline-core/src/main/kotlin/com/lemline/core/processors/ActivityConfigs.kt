@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.processors
+
 import io.serverlessworkflow.api.types.HTTPArguments.HTTPOutput
 import io.serverlessworkflow.api.types.ListenTaskConfiguration.ListenAndReadAs
 import io.serverlessworkflow.api.types.RunTaskConfiguration.ProcessReturnType
-import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 import kotlinx.serialization.Contextual
 import kotlinx.serialization.KSerializer
@@ -13,6 +13,7 @@ import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 import kotlinx.serialization.json.JsonElement
+
 /**
  * Configuration for emitting a CloudEvent.
  *
@@ -30,6 +31,7 @@ data class EmitConfig(
     val data: JsonElement? = null,
     val extensions: Map<String, String>? = null
 )
+
 /**
  * Configuration for making an HTTP call.
  *
@@ -46,6 +48,7 @@ data class CallHttpConfig(
     val redirect: Boolean = true,
     val authentication: HttpAuthentication? = null
 )
+
 /**
  * Resolved authentication data for HTTP calls.
  * Authentication policies are resolved when building the config.
@@ -58,6 +61,7 @@ sealed class HttpAuthentication {
         val tokenType: String = "Bearer"
     ) : HttpAuthentication()
 }
+
 /**
  * Configuration for running a script.
  *
@@ -71,6 +75,7 @@ data class RunScriptConfig(
     val await: Boolean = true,
     val returnType: ProcessReturnType = ProcessReturnType.STDOUT
 )
+
 /**
  * Configuration for running a shell command.
  *
@@ -92,11 +97,14 @@ data class RunShellConfig(
 enum class ListenStrategy {
     /** Wait for a single event matching the filter */
     ONE,
+
     /** Wait for first event matching any filter, or accumulate with until */
     ANY,
+
     /** Wait for one event per filter */
     ALL
 }
+
 /**
  * Custom serializer for [ListenAndReadAs] Java enum.
  * Serializes to/from the string value ("data", "envelope", "raw").
@@ -104,13 +112,16 @@ enum class ListenStrategy {
 internal object ListenAndReadAsSerializer : KSerializer<ListenAndReadAs> {
     override val descriptor: SerialDescriptor =
         PrimitiveSerialDescriptor("ListenAndReadAs", PrimitiveKind.STRING)
+
     override fun serialize(encoder: Encoder, value: ListenAndReadAs) {
         encoder.encodeString(value.value())
     }
+
     override fun deserialize(decoder: Decoder): ListenAndReadAs {
         return ListenAndReadAs.fromValue(decoder.decodeString())
     }
 }
+
 /**
  * Correlation definition for linking events to workflow instances.
  *
@@ -122,6 +133,7 @@ data class CorrelationDef(
     val from: String,
     val expect: String? = null
 )
+
 /**
  * Event filter for matching CloudEvents.
  *
@@ -146,6 +158,7 @@ data class EventFilter(
     val dataFilter: String? = null,
     val correlations: Map<String, CorrelationDef>? = null
 )
+
 /**
  * Until condition for accumulation mode.
  * Can be either an expression evaluated against accumulated events,
@@ -154,9 +167,11 @@ data class EventFilter(
 sealed class UntilCondition {
     /** Expression evaluated against accumulated events array (e.g., ". | any(.temp > 38)") */
     data class Expression(val expression: String) : UntilCondition()
+
     /** Event filter - stop when this event arrives */
     data class Event(val filter: EventFilter) : UntilCondition()
 }
+
 /**
  * Configuration for listening to CloudEvents.
  *
@@ -171,7 +186,6 @@ sealed class UntilCondition {
  * @property correlationContext Workflow context data for evaluating correlate.expect expressions.
  *                              Only values needed for correlation are included.
  */
-@OptIn(ExperimentalTime::class)
 data class ListenConfig(
     val strategy: ListenStrategy,
     val filters: List<EventFilter>,

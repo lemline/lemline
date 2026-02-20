@@ -3,13 +3,11 @@ package com.lemline.runner.common.messaging
 
 import com.lemline.common.values.IDV7
 import com.lemline.core.states.WorkflowCommand
-import kotlin.time.ExperimentalTime
 
 /**
  * Interface for emitting workflow commands to the command channel.
  * Implementations are provided by the main runner module.
  */
-@ExperimentalTime
 interface CommandEmitter {
     /**
      * Sends an instance message to the command channel.

@@ -3,12 +3,10 @@ package com.lemline.core.testcases
 
 import com.lemline.core.testcases.impl.AbstractWorkflowExecutionTest
 import com.lemline.core.testcases.impl.FullOrchestratorTestExecutor
-import kotlin.time.ExperimentalTime
 
 /**
  * Tests for function call execution using FullOrchestrator.
  */
-@ExperimentalTime
 class CallFunctionExecutionTest : AbstractWorkflowExecutionTest(CallFunctionTestCases.cases) {
     override fun createExecutor() = FullOrchestratorTestExecutor()
 }
@@ -16,7 +14,6 @@ class CallFunctionExecutionTest : AbstractWorkflowExecutionTest(CallFunctionTest
 /**
  * Tests for HTTP call execution using FullOrchestrator.
  */
-@ExperimentalTime
 class CallHttpExecutionTest : AbstractWorkflowExecutionTest(CallHttpTestCases.cases) {
     override fun createExecutor() = FullOrchestratorTestExecutor()
 }
@@ -24,7 +21,6 @@ class CallHttpExecutionTest : AbstractWorkflowExecutionTest(CallHttpTestCases.ca
 /**
  * Tests for DoTask execution using FullOrchestrator.
  */
-@ExperimentalTime
 class DoTaskExecutionTest : AbstractWorkflowExecutionTest(DoTaskTestCases.cases) {
     override fun createExecutor() = FullOrchestratorTestExecutor()
 }
@@ -32,7 +28,6 @@ class DoTaskExecutionTest : AbstractWorkflowExecutionTest(DoTaskTestCases.cases)
 /**
  * Tests for export.as directive using FullOrchestrator.
  */
-@ExperimentalTime
 class ExportContextExecutionTest : AbstractWorkflowExecutionTest(ExportContextTestCases.cases) {
     override fun createExecutor() = FullOrchestratorTestExecutor()
 }
@@ -40,7 +35,6 @@ class ExportContextExecutionTest : AbstractWorkflowExecutionTest(ExportContextTe
 /**
  * Tests for ForTask execution using FullOrchestrator.
  */
-@ExperimentalTime
 class ForTaskExecutionTest : AbstractWorkflowExecutionTest(ForTaskTestCases.cases) {
     override fun createExecutor() = FullOrchestratorTestExecutor()
 }
@@ -48,7 +42,6 @@ class ForTaskExecutionTest : AbstractWorkflowExecutionTest(ForTaskTestCases.case
 /**
  * Tests for ForkTask execution using FullOrchestrator.
  */
-@ExperimentalTime
 class ForkTaskExecutionTest : AbstractWorkflowExecutionTest(ForkTaskTestCases.cases) {
     override fun createExecutor() = FullOrchestratorTestExecutor()
 }
@@ -56,7 +49,6 @@ class ForkTaskExecutionTest : AbstractWorkflowExecutionTest(ForkTaskTestCases.ca
 /**
  * Tests for if condition execution using FullOrchestrator.
  */
-@ExperimentalTime
 class IfConditionExecutionTest : AbstractWorkflowExecutionTest(IfConditionTestCases.cases) {
     override fun createExecutor() = FullOrchestratorTestExecutor()
 }
@@ -64,7 +56,6 @@ class IfConditionExecutionTest : AbstractWorkflowExecutionTest(IfConditionTestCa
 /**
  * Tests for Listen task execution using FullOrchestrator.
  */
-@ExperimentalTime
 class ListenExecutionTest : AbstractWorkflowExecutionTest(ListenTestCases.cases) {
     override fun createExecutor() = FullOrchestratorTestExecutor()
 }
@@ -72,7 +63,6 @@ class ListenExecutionTest : AbstractWorkflowExecutionTest(ListenTestCases.cases)
 /**
  * Tests for Script execution using FullOrchestrator.
  */
-@ExperimentalTime
 class RunScriptExecutionTest : AbstractWorkflowExecutionTest(RunScriptTestCases.cases) {
     override fun createExecutor() = FullOrchestratorTestExecutor()
 }
@@ -80,7 +70,6 @@ class RunScriptExecutionTest : AbstractWorkflowExecutionTest(RunScriptTestCases.
 /**
  * Tests for Shell execution using FullOrchestrator.
  */
-@ExperimentalTime
 class RunShellExecutionTest : AbstractWorkflowExecutionTest(RunShellTestCases.cases) {
     override fun createExecutor() = FullOrchestratorTestExecutor()
 }
@@ -88,7 +77,6 @@ class RunShellExecutionTest : AbstractWorkflowExecutionTest(RunShellTestCases.ca
 /**
  * Tests for RunWorkflow (sub-workflow) execution using FullOrchestrator.
  */
-@ExperimentalTime
 class RunWorkflowExecutionTest : AbstractWorkflowExecutionTest(RunWorkflowTestCases.cases) {
     override fun createExecutor() = FullOrchestratorTestExecutor()
 }
@@ -96,7 +84,6 @@ class RunWorkflowExecutionTest : AbstractWorkflowExecutionTest(RunWorkflowTestCa
 /**
  * Tests for SetTask execution using FullOrchestrator.
  */
-@ExperimentalTime
 class SetTaskExecutionTest : AbstractWorkflowExecutionTest(SetTaskTestCases.cases) {
     override fun createExecutor() = FullOrchestratorTestExecutor()
 }
@@ -104,7 +91,6 @@ class SetTaskExecutionTest : AbstractWorkflowExecutionTest(SetTaskTestCases.case
 /**
  * Tests for SwitchTask execution using FullOrchestrator.
  */
-@ExperimentalTime
 class SwitchTaskExecutionTest : AbstractWorkflowExecutionTest(SwitchTaskTestCases.cases) {
     override fun createExecutor() = FullOrchestratorTestExecutor()
 }
@@ -112,7 +98,6 @@ class SwitchTaskExecutionTest : AbstractWorkflowExecutionTest(SwitchTaskTestCase
 /**
  * Tests for TryTask execution using FullOrchestrator.
  */
-@ExperimentalTime
 class TryTaskExecutionTest : AbstractWorkflowExecutionTest(TryTaskTestCases.cases) {
     override fun createExecutor() = FullOrchestratorTestExecutor()
 }
@@ -120,7 +105,6 @@ class TryTaskExecutionTest : AbstractWorkflowExecutionTest(TryTaskTestCases.case
 /**
  * Tests for Wait task execution using FullOrchestrator.
  */
-@ExperimentalTime
 class WaitExecutionTest : AbstractWorkflowExecutionTest(WaitTestCases.cases) {
     override fun createExecutor() = FullOrchestratorTestExecutor()
 }

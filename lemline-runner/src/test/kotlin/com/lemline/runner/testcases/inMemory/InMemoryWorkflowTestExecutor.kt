@@ -25,7 +25,6 @@ import jakarta.inject.Inject
 import jakarta.inject.Singleton
 import java.util.concurrent.TimeoutException
 import kotlin.time.Duration.Companion.seconds
-import kotlin.time.ExperimentalTime
 import kotlinx.coroutines.delay
 
 private const val LIFECYCLEEVENTS_OUT_CHANNEL = "lifecycleevents-out"
@@ -43,7 +42,6 @@ private const val LIFECYCLEEVENTS_IN_CHANNEL = "lifecycleevents-in"
  * to the in-memory channel, verifying that events flow through the messaging infrastructure.
  */
 @Singleton
-@ExperimentalTime
 internal class InMemoryWorkflowTestExecutor : AbstractWorkflowTestExecutor() {
 
     private val logger = logger()

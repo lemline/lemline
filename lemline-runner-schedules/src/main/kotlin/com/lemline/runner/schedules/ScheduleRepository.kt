@@ -30,7 +30,6 @@ import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
 import java.sql.Connection
 import java.sql.ResultSet
-import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 
 const val SCHEDULE_TABLE = "lemline_schedules"
@@ -42,7 +41,6 @@ const val SCHEDULE_TABLE = "lemline_schedules"
  * @see ScheduleModel for the message model
  */
 @ApplicationScoped
-@ExperimentalTime
 class ScheduleRepository : CrudRepository<ScheduleModel>(),
     WithIdRepository<ScheduleModel>,
     WithOutboxRepository<ScheduleModel>,

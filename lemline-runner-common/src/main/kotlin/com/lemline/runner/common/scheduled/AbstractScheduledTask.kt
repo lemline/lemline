@@ -12,7 +12,6 @@ import java.util.concurrent.ScheduledExecutorService
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.time.Duration
-import kotlin.time.ExperimentalTime
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -60,7 +59,6 @@ import org.eclipse.microprofile.config.inject.ConfigProperty
  * @see com.lemline.runner.common.cleaner.AbstractCleaner for cleanup-specific scheduling
  * @see com.lemline.runner.common.outbox.AbstractOutbox for outbox processing with cleanup
  */
-@ExperimentalTime
 abstract class AbstractScheduledTask {
     protected val logger by lazy { logger() }
 

@@ -11,7 +11,6 @@ import com.lemline.runner.common.repositories.with.WithOutboxRepository
 import io.quarkus.runtime.Startup
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
-import kotlin.time.ExperimentalTime
 
 /**
  * `ScheduleOutbox` specializes `AbstractOutbox` to implement the outbox pattern for scheduled workflow executions.
@@ -25,7 +24,6 @@ import kotlin.time.ExperimentalTime
  */
 @Startup
 @ApplicationScoped
-@ExperimentalTime
 class ScheduleOutbox : AbstractOutbox<ScheduleModel>() {
 
     override val jobName: String get() = "Schedules outbox"

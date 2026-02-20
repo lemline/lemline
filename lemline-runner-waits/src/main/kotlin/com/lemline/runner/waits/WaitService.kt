@@ -6,7 +6,6 @@ import com.lemline.core.states.WorkflowEvent
 import com.lemline.runner.common.messaging.InstanceMessage
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
-import kotlin.time.ExperimentalTime
 
 /**
  * Service for handling wait-related workflow events.
@@ -14,7 +13,6 @@ import kotlin.time.ExperimentalTime
  * Provides business logic for starting waits by persisting wait state to the database.
  * The wait outbox processor will later resume the workflow when the wait period ends.
  */
-@ExperimentalTime
 @ApplicationScoped
 class WaitService {
 

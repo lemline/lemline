@@ -3,7 +3,6 @@ package com.lemline.runner.common.repositories.with
 
 import com.lemline.runner.common.models.WithCleanup
 import java.sql.Connection
-import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 
 /**
@@ -13,7 +12,6 @@ import kotlin.time.Instant
  * Note: This interface is meant to be implemented by classes that extend Repository,
  * which provides delete implementation.
  */
-@ExperimentalTime
 interface WithCleanerRepository<T : WithCleanup> {
     /**
      * Find entities ready for cleanup (cleanup_after < cutoffDate).

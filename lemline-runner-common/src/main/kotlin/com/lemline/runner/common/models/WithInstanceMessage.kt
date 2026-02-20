@@ -3,9 +3,7 @@ package com.lemline.runner.common.models
 
 import com.lemline.core.states.WorkflowState
 import com.lemline.runner.common.messaging.InstanceMessage
-import kotlin.time.ExperimentalTime
 
-@ExperimentalTime
 interface WithInstanceMessage {
     /** The current execution state of the workflow instance, null if not available */
     val instanceMessage: InstanceMessage<out WorkflowState>

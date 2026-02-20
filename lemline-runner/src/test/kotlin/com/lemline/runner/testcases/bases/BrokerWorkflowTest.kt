@@ -4,7 +4,6 @@ package com.lemline.runner.testcases.bases
 import com.lemline.core.testcases.impl.WorkflowTestCase
 import com.lemline.core.testcases.impl.WorkflowTestExecutor
 import jakarta.inject.Inject
-import kotlin.time.ExperimentalTime
 
 /**
  * Abstract base class for broker-based workflow execution tests.
@@ -23,7 +22,6 @@ import kotlin.time.ExperimentalTime
  * @param testCases The list of test cases to execute
  * @param excludeTags Tags to exclude from execution (e.g., "external", "slow")
  */
-@ExperimentalTime
 internal abstract class BrokerWorkflowTest(
     testCases: List<WorkflowTestCase>,
     excludeTags: Set<String> = emptySet()

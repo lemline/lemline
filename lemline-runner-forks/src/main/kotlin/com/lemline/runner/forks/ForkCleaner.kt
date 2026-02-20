@@ -9,7 +9,6 @@ import com.lemline.runner.common.repositories.with.WithCrudRepository
 import io.quarkus.runtime.Startup
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
-import kotlin.time.ExperimentalTime
 
 /**
  * ForkCleaner specializes AbstractCleaner to clean up old fork waiting records.
@@ -20,7 +19,6 @@ import kotlin.time.ExperimentalTime
  */
 @Startup
 @ApplicationScoped
-@ExperimentalTime
 class ForkCleaner : AbstractCleaner<ForkModel>() {
 
     @Inject

@@ -9,7 +9,6 @@ import com.lemline.runner.common.repositories.with.WithCrudRepository
 import io.quarkus.runtime.Startup
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
-import kotlin.time.ExperimentalTime
 
 /**
  * Cleaner for retry entities.
@@ -17,7 +16,6 @@ import kotlin.time.ExperimentalTime
  */
 @Startup
 @ApplicationScoped
-@ExperimentalTime
 class RetryCleaner : AbstractCleaner<RetryModel>() {
 
     @Inject

@@ -3,12 +3,10 @@ package com.lemline.runner.cli.definitions
 
 import com.lemline.runner.cli.GlobalMixin
 import io.quarkus.arc.Unremovable
-import kotlin.time.ExperimentalTime
 import picocli.CommandLine.Command
 import picocli.CommandLine.Mixin
 
 @Unremovable
-@ExperimentalTime
 @Command(
     name = "definition",
     description = ["Manage workflow definitions"],

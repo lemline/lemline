@@ -8,10 +8,8 @@ import com.lemline.runner.common.models.WithCleanup
 import com.lemline.runner.common.models.WithId
 import com.lemline.runner.common.models.WithInstanceMessage
 import com.lemline.runner.common.models.WithOutbox
-import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 
-@ExperimentalTime
 data class WaitModel(
     /** Unique identifier for this wait operation - must be derived from position + step for idempotency */
     override val id: IDV7 = instanceMessage.workflowState.nodeStack.deriveIdempotentId("-wait"),

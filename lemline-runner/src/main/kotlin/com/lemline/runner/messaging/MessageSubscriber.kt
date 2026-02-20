@@ -6,7 +6,6 @@ import io.quarkus.runtime.ShutdownEvent
 import jakarta.annotation.PostConstruct
 import jakarta.enterprise.event.Observes
 import java.util.concurrent.atomic.AtomicBoolean
-import kotlin.time.ExperimentalTime
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -44,7 +43,6 @@ import org.reactivestreams.Subscription
  * @param T The message type that the handler processes
  */
 @Suppress("ReactiveStreamsSubscriberImplementation")
-@ExperimentalTime
 internal abstract class MessageSubscriber<T> : Subscriber<Message<String>> {
 
     abstract val maxConcurrency: Long

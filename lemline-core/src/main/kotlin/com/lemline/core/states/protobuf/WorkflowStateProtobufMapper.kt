@@ -1,6 +1,4 @@
 // SPDX-License-Identifier: BUSL-1.1
-@file:OptIn(ExperimentalTime::class)
-
 package com.lemline.core.states.protobuf
 
 import com.lemline.common.values.NodePosition
@@ -74,7 +72,6 @@ import io.serverlessworkflow.api.types.HTTPArguments.HTTPOutput
 import io.serverlessworkflow.api.types.ListenTaskConfiguration.ListenAndReadAs
 import io.serverlessworkflow.api.types.RunTaskConfiguration.ProcessReturnType
 import java.time.Instant as JavaInstant
-import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 
 object WorkflowStateProtobufMapper {

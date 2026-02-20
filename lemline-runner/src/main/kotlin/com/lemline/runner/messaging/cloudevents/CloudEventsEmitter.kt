@@ -11,7 +11,6 @@ import io.smallrye.mutiny.coroutines.awaitSuspending
 import io.smallrye.reactive.messaging.MutinyEmitter
 import jakarta.annotation.PostConstruct
 import jakarta.enterprise.context.ApplicationScoped
-import kotlin.time.ExperimentalTime
 import org.eclipse.microprofile.config.inject.ConfigProperty
 import org.eclipse.microprofile.reactive.messaging.Channel
 import org.eclipse.microprofile.reactive.messaging.Message
@@ -28,7 +27,6 @@ internal const val CLOUDEVENTS_OUT_CHANNEL = "cloudevents-out"
  * This emitter is fire-and-forget - it does not wait for acknowledgment
  * and does not persist events to the database.
  */
-@ExperimentalTime
 @Startup
 @ApplicationScoped
 internal class CloudEventsEmitter(

@@ -9,7 +9,6 @@ import com.lemline.runner.common.repositories.with.WithCrudRepository
 import com.lemline.runner.common.scheduled.AbstractScheduledTask
 import kotlin.time.Clock
 import kotlin.time.Duration
-import kotlin.time.ExperimentalTime
 
 /**
  * AbstractCleaner provides base functionality for scheduled cleanup operations.
@@ -30,7 +29,6 @@ import kotlin.time.ExperimentalTime
  * @param T The type of entity to clean up (must implement WithCleanup)
  * @see AbstractScheduledTask for the scheduling infrastructure
  */
-@ExperimentalTime
 abstract class AbstractCleaner<T : WithCleanup> : AbstractScheduledTask() {
 
     protected abstract val cleanerConfig: CleanupConfig

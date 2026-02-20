@@ -534,8 +534,6 @@ When current foreach.do completes, the handler checks for queued events and trig
  */
 @Startup
 @ApplicationScoped
-@ExperimentalTime
-@ExperimentalSerializationApi
 internal class ListenerEventOutbox : AbstractOutbox<ListenerEventModel>() {
 
     @Inject

@@ -5,13 +5,11 @@ import com.lemline.runner.messaging.MessageSubscriberMetrics
 import io.micrometer.core.instrument.MeterRegistry
 import jakarta.inject.Inject
 import jakarta.inject.Singleton
-import kotlin.time.ExperimentalTime
 
 /**
  * Provides micrometer metrics for monitoring CloudEvent message processing.
  */
 @Singleton
-@ExperimentalTime
 internal class CloudEventSubscriberMetrics @Inject constructor(
     registry: MeterRegistry
 ) : MessageSubscriberMetrics(registry) {

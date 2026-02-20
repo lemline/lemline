@@ -10,7 +10,6 @@ import com.lemline.core.states.WorkflowEvent.EmitStarted
 import com.lemline.core.states.WorkflowEvent.RunScriptStarted
 import com.lemline.core.states.WorkflowEvent.RunShellStarted
 import io.cloudevents.CloudEvent
-import kotlin.time.ExperimentalTime
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -54,7 +53,6 @@ import kotlinx.serialization.json.JsonPrimitive
  * @param mockConfig The mock configuration defining responses for activities
  * @param emitCloudEvent Optional callback invoked when a CloudEvent is emitted. Used for testing emit behavior.
  */
-@ExperimentalTime
 class MockActivityExecutor(
     val mockConfig: MockConfiguration,
     private val emitCloudEvent: (suspend (CloudEvent) -> Unit)? = null,

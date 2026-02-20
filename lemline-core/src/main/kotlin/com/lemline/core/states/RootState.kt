@@ -1,6 +1,4 @@
 // SPDX-License-Identifier: BUSL-1.1
-@file:OptIn(ExperimentalTime::class)
-
 package com.lemline.core.states
 
 import com.lemline.common.json.LemlineJson
@@ -10,7 +8,6 @@ import com.lemline.core.expressions.scopes.WorkflowDescriptor
 import com.lemline.core.processors.scope.Scope
 import com.lemline.core.processors.scope.merge
 import io.serverlessworkflow.impl.expressions.DateTimeDescriptor
-import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 import kotlin.time.toJavaInstant
 import kotlinx.serialization.json.Json

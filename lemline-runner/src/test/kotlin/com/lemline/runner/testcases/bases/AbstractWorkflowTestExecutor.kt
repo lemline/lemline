@@ -25,7 +25,6 @@ import io.cloudevents.CloudEvent
 import io.cloudevents.jackson.JsonFormat
 import java.util.concurrent.TimeoutException
 import kotlin.time.Duration.Companion.seconds
-import kotlin.time.ExperimentalTime
 import kotlinx.coroutines.delay
 import kotlinx.serialization.json.JsonElement
 
@@ -47,7 +46,6 @@ import kotlinx.serialization.json.JsonElement
  * [TestLifecycleEventListener] which subscribes to the broker, ensuring that events
  * actually flow through the messaging infrastructure.
  */
-@ExperimentalTime
 internal abstract class AbstractWorkflowTestExecutor : WorkflowTestExecutor {
 
     private val logger = logger()

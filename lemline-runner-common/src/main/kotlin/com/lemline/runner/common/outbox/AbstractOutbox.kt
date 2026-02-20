@@ -4,18 +4,17 @@ package com.lemline.runner.common.outbox
 import com.lemline.common.logger.withSuspendLoggingContext
 import com.lemline.runner.common.config.DatabaseConfig
 import com.lemline.runner.common.config.OutboxConfig
-import java.sql.Connection
 import com.lemline.runner.common.messaging.CommandEmitter
 import com.lemline.runner.common.models.WithInstanceMessage
 import com.lemline.runner.common.models.WithOutbox
 import com.lemline.runner.common.repositories.with.WithCrudRepository
 import com.lemline.runner.common.repositories.with.WithOutboxRepository
 import com.lemline.runner.common.scheduled.AbstractScheduledTask
+import java.sql.Connection
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.time.Clock
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
-import kotlin.time.ExperimentalTime
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
@@ -40,7 +39,6 @@ import org.jetbrains.annotations.VisibleForTesting
  *
  * @param T Type of the message entity (must implement WithOutbox interface)
  */
-@ExperimentalTime
 abstract class AbstractOutbox<T : WithOutbox> : AbstractScheduledTask() {
 
     protected abstract val outboxRepository: WithOutboxRepository<T>

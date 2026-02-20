@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: BUSL-1.1
-@file:OptIn(ExperimentalTime::class)
 package com.lemline.core.processors
+
 import com.lemline.core.nodes.Node
 import com.lemline.core.processors.scope.Scope
 import com.lemline.core.states.NodeStack
@@ -11,10 +11,10 @@ import com.lemline.core.utils.toDuration
 import io.serverlessworkflow.api.types.WaitTask
 import kotlin.time.Clock
 import kotlin.time.Duration
-import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 import kotlinx.serialization.Contextual
 import kotlinx.serialization.json.JsonElement
+
 /**
  * Node processor for WaitTask - pure functional model.
  *
@@ -47,6 +47,7 @@ class WaitProcessor(
 ) : NodeProcessor<WaitTask, WaitState>(node) {
     override val isAsync = true
     override fun stateWhenEnteringFromParent(transformedInput: JsonElement, scope: Scope) = WaitState()
+
     /**
      * Handles the "started" event for a workflow by creating a `WaitStarted` event with
      * the appropriate wait configuration.
@@ -68,6 +69,7 @@ class WaitProcessor(
             config = config,
         )
     }
+
     /**
      * Get the delay duration for this wait task.
      *
@@ -88,6 +90,7 @@ class WaitProcessor(
         }
     }
 }
+
 data class WaitConfig(
     @Contextual val waitUntil: Instant
 )

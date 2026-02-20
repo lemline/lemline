@@ -5,6 +5,7 @@ import com.lemline.common.values.IDV7
 import com.lemline.common.values.WorkflowId
 import com.lemline.core.states.WorkflowEvent
 import com.lemline.runner.common.config.DatabaseConfig
+import com.lemline.runner.common.messaging.InstanceMessageCodec
 import com.lemline.runner.common.repositories.helpers.ColumnBindings
 import com.lemline.runner.common.repositories.helpers.ColumnBindingsBuilder
 import com.lemline.runner.common.repositories.ops.CrudRepository
@@ -19,12 +20,10 @@ import com.lemline.runner.common.repositories.ops.WORKFLOW_VERSION_COLUMN
 import com.lemline.runner.common.repositories.ops.getInstanceMessage
 import com.lemline.runner.common.repositories.ops.idColumn
 import com.lemline.runner.common.repositories.with.WithIdRepository
-import com.lemline.runner.common.messaging.InstanceMessageCodec
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
 import java.sql.Connection
 import java.sql.ResultSet
-import kotlin.time.ExperimentalTime
 
 const val FAILURE_TABLE = "lemline_failures"
 
@@ -35,7 +34,6 @@ const val FAILURE_TABLE = "lemline_failures"
  * @see FailureModel for the entity model
  */
 @ApplicationScoped
-@ExperimentalTime
 class FailureRepository : CrudRepository<FailureModel>(),
     WithIdRepository<FailureModel> {
 

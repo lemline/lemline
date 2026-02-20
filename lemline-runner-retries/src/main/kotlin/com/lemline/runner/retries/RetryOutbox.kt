@@ -12,14 +12,12 @@ import io.quarkus.runtime.Startup
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
 import kotlin.time.Clock
-import kotlin.time.ExperimentalTime
 
 /**
  * `RetryOutbox` specializes `AbstractOutbox` to implement the outbox pattern for retrying failed operations.
  */
 @Startup
 @ApplicationScoped
-@ExperimentalTime
 class RetryOutbox : AbstractOutbox<RetryModel>() {
 
     override val jobName: String get() = "Retries outbox"

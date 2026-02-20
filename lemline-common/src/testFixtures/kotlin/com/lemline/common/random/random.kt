@@ -1,5 +1,4 @@
 // SPDX-License-Identifier: BUSL-1.1
-@file:OptIn(ExperimentalTime::class)
 @file:Suppress("unused")
 
 package com.lemline.common.random
@@ -11,7 +10,6 @@ import com.lemline.common.values.WorkflowVersion
 import kotlin.random.Random
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.days
-import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 
 /**

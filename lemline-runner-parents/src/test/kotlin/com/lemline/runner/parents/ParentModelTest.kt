@@ -4,9 +4,7 @@ package com.lemline.runner.parents
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
-import kotlin.time.ExperimentalTime
 
-@ExperimentalTime
 class ParentModelTest {
 
     @Test

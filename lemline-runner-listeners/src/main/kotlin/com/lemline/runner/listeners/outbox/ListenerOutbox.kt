@@ -20,7 +20,6 @@ import jakarta.inject.Inject
 import java.sql.Connection
 import kotlin.time.Clock
 import kotlin.time.Duration
-import kotlin.time.ExperimentalTime
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 
@@ -64,7 +63,6 @@ import kotlinx.serialization.json.JsonArray
  */
 @Startup
 @ApplicationScoped
-@ExperimentalTime
 class ListenerOutbox : AbstractOutbox<ListenerModel>() {
 
     override val jobName = "Listeners outbox"

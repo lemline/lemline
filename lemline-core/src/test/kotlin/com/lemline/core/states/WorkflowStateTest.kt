@@ -7,10 +7,8 @@ import com.lemline.core.random.randomWorkflowState
 import com.lemline.core.states.protobuf.WorkflowStateProtobufMapper
 import com.lemline.messages.internal.v1.WorkflowStateProto
 import kotlin.test.assertEquals
-import kotlin.time.ExperimentalTime
 import org.junit.jupiter.api.Test
 
-@ExperimentalTime
 class WorkflowStateTest {
 
     // ========================================

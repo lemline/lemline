@@ -3,7 +3,6 @@ package com.lemline.runner.messaging.commands
 
 import com.lemline.common.logger.logger
 import com.lemline.common.values.IDV7
-import com.lemline.common.values.info
 import com.lemline.core.activities.ActivityExecutor
 import com.lemline.core.cloudevents.CloudEventFactory
 import com.lemline.core.errors.InternalException
@@ -13,7 +12,7 @@ import com.lemline.core.states.WorkflowCommand
 import com.lemline.core.states.WorkflowEvent
 import com.lemline.core.workflows.WorkflowCache
 import com.lemline.core.workflows.getNode
-import com.lemline.core.workflows.useFunctions
+import com.lemline.runner.activities.functions.FunctionResolver
 import com.lemline.runner.common.messaging.InstanceMessage
 import com.lemline.runner.config.LemlineConfiguration
 import com.lemline.runner.definitions.DefinitionRepository
@@ -24,18 +23,14 @@ import com.lemline.runner.failures.FailureReasons.SERIALIZATION_FAILURE
 import com.lemline.runner.failures.FailureReasons.getFailureReason
 import com.lemline.runner.failures.FailureRepository
 import com.lemline.runner.messaging.CompensationException
-import com.lemline.runner.activities.functions.FunctionResolver
 import com.lemline.runner.messaging.MessageHandler
 import com.lemline.runner.messaging.cloudevents.CloudEventsEmitter
 import com.lemline.runner.messaging.events.WorkflowEventEmitter
 import com.lemline.runner.messaging.toLogString
-import io.serverlessworkflow.api.types.Task
 import io.serverlessworkflow.api.types.Workflow
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.enterprise.inject.Instance
 import kotlin.time.Clock
-import kotlin.time.ExperimentalTime
-import kotlinx.serialization.json.JsonElement
 import org.eclipse.microprofile.reactive.messaging.Message
 import org.jetbrains.annotations.TestOnly
 
@@ -47,7 +42,6 @@ import org.jetbrains.annotations.TestOnly
  * - Emits next command for continued execution (TaskScheduled)
  * - Sends event to database channel for persistence (WaitStarted, RetryScheduled, etc.)
  */
-@ExperimentalTime
 @ApplicationScoped
 internal class WorkflowCommandHandler(
     private val commandEmitter: WorkflowCommandEmitter,
@@ -310,7 +304,14 @@ internal class WorkflowCommandHandler(
         return when (event) {
             is WorkflowEvent.TaskScheduled -> {
                 // Activity scheduled
-                logger.debug { "Activity scheduled node=${event.nodePosition} - ${workflow.getNode(event.nodePosition, functionResolver::resolve).task::class.simpleName}(input=${event.rawInput})" }
+                logger.debug {
+                    "Activity scheduled node=${event.nodePosition} - ${
+                        workflow.getNode(
+                            event.nodePosition,
+                            functionResolver::resolve
+                        ).task::class.simpleName
+                    }(input=${event.rawInput})"
+                }
                 event.resume()
             }
 

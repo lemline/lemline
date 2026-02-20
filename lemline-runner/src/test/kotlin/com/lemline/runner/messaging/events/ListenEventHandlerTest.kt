@@ -22,14 +22,12 @@ import com.lemline.runner.common.messaging.InstanceMessage
 import com.lemline.runner.listeners.ListenerRepository
 import com.lemline.runner.tests.profiles.InMemoryProfile
 import io.kotest.matchers.shouldBe
-import io.kotest.matchers.shouldNotBe
 import io.quarkus.test.junit.QuarkusTest
 import io.quarkus.test.junit.TestProfile
 import io.serverlessworkflow.api.types.ListenTaskConfiguration.ListenAndReadAs
 import jakarta.inject.Inject
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.minutes
-import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonNull
@@ -46,7 +44,6 @@ import org.junit.jupiter.api.TestInstance
 @QuarkusTest
 @TestProfile(InMemoryProfile::class)
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-@ExperimentalTime
 internal class ListenEventHandlerTest {
 
     @Inject
@@ -163,7 +160,7 @@ internal class ListenEventHandlerTest {
     private fun createListenStartedInstance(
         strategy: ListenStrategy,
         filters: List<EventFilter>,
-        timeoutAt: kotlin.time.Instant? = null,
+        timeoutAt: Instant? = null,
         readAs: ListenAndReadAs = ListenAndReadAs.DATA,
         nodePosition: NodePosition = testNodePosition
     ): InstanceMessage<WorkflowEvent.ListenStarted> {

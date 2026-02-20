@@ -11,11 +11,9 @@ import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldStartWith
-import kotlin.time.ExperimentalTime
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 
-@OptIn(ExperimentalTime::class)
 class JsonPointerValidationTest : FunSpec({
 
     val objectMapper = ObjectMapper()

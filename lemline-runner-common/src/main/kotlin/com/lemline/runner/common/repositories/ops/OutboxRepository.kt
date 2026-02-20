@@ -1,6 +1,4 @@
 // SPDX-License-Identifier: BUSL-1.1
-@file:OptIn(ExperimentalTime::class, ExperimentalSerializationApi::class)
-
 package com.lemline.runner.common.repositories.ops
 
 import com.lemline.runner.common.config.DatabaseConfig
@@ -12,9 +10,7 @@ import java.sql.ResultSet
 import java.sql.Timestamp
 import java.sql.Types
 import kotlin.time.Clock
-import kotlin.time.ExperimentalTime
 import kotlin.time.toJavaInstant
-import kotlinx.serialization.ExperimentalSerializationApi
 
 const val OUTBOX_COMPLETED_AT_COLUMN = "outbox_completed_at"
 const val OUTBOX_SCHEDULED_FOR_COLUMN = "outbox_scheduled_for"

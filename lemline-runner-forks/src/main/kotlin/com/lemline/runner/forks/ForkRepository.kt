@@ -26,7 +26,6 @@ import jakarta.inject.Inject
 import java.sql.Connection
 import java.sql.ResultSet
 import java.sql.Timestamp
-import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 import kotlin.time.toJavaInstant
 
@@ -39,7 +38,6 @@ const val FORK_TABLE = "lemline_forks"
  * @see ForkModel for the entity model
  * @see ForkBranchRepository for branch operations
  */
-@ExperimentalTime
 @ApplicationScoped
 class ForkRepository : CrudRepository<ForkModel>(),
     WithIdRepository<ForkModel>,

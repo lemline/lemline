@@ -22,7 +22,6 @@ import io.serverlessworkflow.api.types.Workflow
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.PrintStream
-import kotlin.time.ExperimentalTime
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Nested
@@ -30,7 +29,6 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import picocli.CommandLine
 
-@ExperimentalTime
 class DefinitionPostCommandTest {
 
     private lateinit var command: DefinitionPostCommand

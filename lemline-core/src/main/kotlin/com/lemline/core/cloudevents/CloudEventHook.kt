@@ -2,7 +2,6 @@
 package com.lemline.core.cloudevents
 
 import io.cloudevents.CloudEvent
-import kotlin.time.ExperimentalTime
 import kotlinx.coroutines.flow.Flow
 
 /**
@@ -16,7 +15,6 @@ import kotlinx.coroutines.flow.Flow
  * The hook is a pure transport layer - filtering and strategy handling
  * is done by the orchestrator based on [com.lemline.core.processors.ListenConfig].
  */
-@ExperimentalTime
 interface CloudEventHook {
 
     /**

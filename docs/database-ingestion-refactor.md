@@ -44,7 +44,6 @@ File: lemline-runner/src/main/kotlin/com/lemline/runner/messaging/database/Datab
 package com.lemline.runner.messaging.events
 
 import com.lemline.runner.messaging.commands.InstanceMessage
-import kotlin.time.ExperimentalTime
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -56,8 +55,6 @@ import kotlinx.serialization.Serializable
 * This sealed class represents all types of messages that require database operations,
 * keeping the workflow channel non-blocking even when the database is unavailable.
   */
-  @ExperimentalTime
-  @ExperimentalSerializationApi
   @Serializable
   sealed class DatabaseMessage {
 

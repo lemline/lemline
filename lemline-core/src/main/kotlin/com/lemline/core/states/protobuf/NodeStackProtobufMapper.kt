@@ -1,6 +1,4 @@
 // SPDX-License-Identifier: BUSL-1.1
-@file:OptIn(ExperimentalTime::class)
-
 package com.lemline.core.states.protobuf
 
 import com.lemline.common.values.IDV7
@@ -29,7 +27,6 @@ import com.lemline.messages.internal.v1.StackFrameProto
 import com.lemline.messages.internal.v1.TaskStateProto
 import com.lemline.messages.internal.v1.TryStateProto
 import java.time.Instant as JavaInstant
-import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.buildJsonObject
@@ -85,7 +82,7 @@ object NodeStackProtobufMapper {
     )
 
     private fun NodeState.toProto(): NodeStateProto = when (this) {
-        is RootState -> NodeStateProto(root = toProto())
+        is RootState -> NodeStateProto(root_state = toProto())
         is DoState -> NodeStateProto(do_state = toProto())
         is ForState -> NodeStateProto(for_state = toProto())
         is ForeachState -> NodeStateProto(foreach_state = toProto())
@@ -95,7 +92,7 @@ object NodeStackProtobufMapper {
     }
 
     private fun NodeStateProto.toDomain(): NodeState {
-        root?.let { return it.toDomain() }
+        root_state?.let { return it.toDomain() }
         do_state?.let { return it.toDomain() }
         for_state?.let { return it.toDomain() }
         foreach_state?.let { return it.toDomain() }

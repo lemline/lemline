@@ -10,10 +10,8 @@ import com.lemline.runner.common.models.WithCleanup
 import com.lemline.runner.common.models.WithId
 import com.lemline.runner.common.models.WithInstanceMessage
 import com.lemline.runner.common.models.WithOutbox
-import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 
-@ExperimentalTime
 data class RetryModel(
     /** Unique identifier for this retry attempt */
     override val id: IDV7,

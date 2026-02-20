@@ -27,7 +27,6 @@ import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
 import java.sql.Connection
 import java.sql.ResultSet
-import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 
 const val RETRY_TABLE = "lemline_retries"
@@ -39,7 +38,6 @@ const val RETRY_TABLE = "lemline_retries"
  * @see RetryModel for the message model
  */
 @ApplicationScoped
-@ExperimentalTime
 class RetryRepository : CrudRepository<RetryModel>(),
     WithIdRepository<RetryModel>,
     WithOutboxRepository<RetryModel>,

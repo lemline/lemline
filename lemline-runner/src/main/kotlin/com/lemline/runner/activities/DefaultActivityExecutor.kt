@@ -1,6 +1,4 @@
 // SPDX-License-Identifier: BUSL-1.1
-@file:OptIn(ExperimentalTime::class)
-
 package com.lemline.runner.activities
 
 import com.lemline.common.json.LemlineJson
@@ -32,7 +30,6 @@ import io.ktor.serialization.kotlinx.json.*
 import io.serverlessworkflow.api.types.HTTPArguments.HTTPOutput
 import java.io.File
 import java.util.*
-import kotlin.time.ExperimentalTime
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject

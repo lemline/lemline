@@ -10,7 +10,6 @@ import com.lemline.runner.messaging.MessageHandler
 import io.cloudevents.CloudEvent
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
-import kotlin.time.ExperimentalTime
 import org.eclipse.microprofile.reactive.messaging.Message
 
 /**
@@ -23,7 +22,6 @@ import org.eclipse.microprofile.reactive.messaging.Message
  * All business logic for CloudEvent processing (matching, inserting events,
  * evaluating until conditions) is in [ListenerEventService].
  */
-@ExperimentalTime
 @ApplicationScoped
 internal class CloudEventHandler(
     override val metrics: CloudEventSubscriberMetrics,

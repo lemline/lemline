@@ -9,14 +9,12 @@ import io.smallrye.mutiny.coroutines.awaitSuspending
 import io.smallrye.reactive.messaging.MutinyEmitter
 import jakarta.annotation.PostConstruct
 import jakarta.inject.Inject
-import kotlin.time.ExperimentalTime
 import org.eclipse.microprofile.reactive.messaging.Message
 
 /**
  * Base class for message emitters.
  * Generic type T must be TransportSerializable to support transport payload encoding.
  */
-@ExperimentalTime
 abstract class MessageEmitter<T : TransportSerializable> {
 
     protected abstract val emitter: MutinyEmitter<String>

@@ -11,7 +11,6 @@ import io.cloudevents.core.builder.CloudEventBuilder
 import java.net.URI
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
-import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 import kotlin.time.toJavaInstant
 import kotlinx.serialization.json.Json
@@ -33,7 +32,6 @@ import kotlinx.serialization.json.JsonElement
  *
  * @param emitter The emitter for CloudEvents
  */
-@ExperimentalTime
 class CloudEventLifecycleHook(
     private val emitter: LifecycleEventEmitter,
 ) : LifecycleEventHook {

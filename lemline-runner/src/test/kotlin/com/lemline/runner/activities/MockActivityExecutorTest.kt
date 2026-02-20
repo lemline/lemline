@@ -1,6 +1,4 @@
 // SPDX-License-Identifier: BUSL-1.1
-@file:OptIn(kotlin.time.ExperimentalTime::class)
-
 package com.lemline.runner.activities
 
 import com.lemline.core.activities.mock.HttpMockMatcher

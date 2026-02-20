@@ -7,7 +7,6 @@ import com.lemline.runner.messaging.MessageSubscriber
 import io.cloudevents.CloudEvent
 import io.quarkus.runtime.Startup
 import jakarta.enterprise.context.ApplicationScoped
-import kotlin.time.ExperimentalTime
 import org.eclipse.microprofile.config.inject.ConfigProperty
 import org.eclipse.microprofile.reactive.messaging.Channel
 import org.eclipse.microprofile.reactive.messaging.Message
@@ -27,7 +26,6 @@ internal const val CLOUDEVENTS_IN_CHANNEL = "cloudevents-in"
  * This class is a thin wrapper that provides configuration to [MessageSubscriber].
  * All subscription lifecycle, backpressure, and graceful shutdown logic is inherited.
  */
-@ExperimentalTime
 @Startup
 @ApplicationScoped
 internal class CloudEventSubscriber(

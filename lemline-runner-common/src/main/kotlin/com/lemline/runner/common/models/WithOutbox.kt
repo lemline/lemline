@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.common.models
 
-import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 
 /**
@@ -23,7 +22,6 @@ import kotlin.time.Instant
  * @see com.lemline.runner.common.outbox.AbstractOutbox for the processing logic
  * @see WithCleanup for cleanup tracking
  */
-@ExperimentalTime
 interface WithOutbox {
 
     /**

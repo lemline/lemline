@@ -28,7 +28,6 @@ import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
 import java.sql.Connection
 import kotlin.time.Duration
-import kotlin.time.ExperimentalTime
 
 /**
  * ListenerForeachOutbox is a specialized implementation of AbstractOutbox for handling "foreach" processing pattern.
@@ -47,7 +46,6 @@ import kotlin.time.ExperimentalTime
  */
 @Startup
 @ApplicationScoped
-@ExperimentalTime
 class ListenerForeachOutbox : AbstractOutbox<ListenerEventModel>() {
 
     override val jobName = "Listener foreach outbox"

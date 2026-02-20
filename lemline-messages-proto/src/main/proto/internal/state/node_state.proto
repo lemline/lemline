@@ -11,7 +11,7 @@ option java_package = "com.lemline.messages.internal.v1";
 
 message NodeStateProto {
     oneof state {
-        RootStateProto root = 1;
+        RootStateProto root_state = 1;
         DoStateProto do_state = 2;
         ForStateProto for_state = 3;
         ForeachStateProto foreach_state = 4;

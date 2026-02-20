@@ -24,14 +24,12 @@ import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
-import kotlin.time.ExperimentalTime
 
 /**
  * CDI producer for feature configuration beans and infrastructure interfaces.
  * Converts [LemlineConfiguration] to feature-specific configuration interfaces
  * and provides [CommandEmitter] for use by feature modules.
  */
-@ExperimentalTime
 @ApplicationScoped
 class ConfigProducer {
 

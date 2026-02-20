@@ -9,7 +9,6 @@ import com.lemline.runner.cli.common.InteractiveWorkflowSelector
 import com.lemline.runner.cli.exceptions.CliException
 import com.lemline.runner.definitions.DefinitionModel
 import com.lemline.runner.definitions.DefinitionService
-import kotlin.time.ExperimentalTime
 import io.quarkus.arc.Unremovable
 import jakarta.inject.Inject
 import kotlinx.coroutines.runBlocking
@@ -20,7 +19,6 @@ import picocli.CommandLine.Option
 import picocli.CommandLine.Parameters
 
 @Unremovable
-@ExperimentalTime
 @Command(
     name = "delete",
     description = [
@@ -182,6 +180,7 @@ open class DefinitionDeleteCommand : Runnable {
         when (val result = definitionService.deleteAllInNamespace(workflowNamespace)) {
             is DefinitionService.DeleteResult.Deleted ->
                 println("Successfully deleted ${result.count} workflows." + if (force) " (forced)" else "")
+
             is DefinitionService.DeleteResult.NotFound ->
                 println(result.message)
         }
@@ -204,6 +203,7 @@ open class DefinitionDeleteCommand : Runnable {
                 println("Successfully deleted ${result.details}." + if (force) " (forced)" else "")
                 true
             }
+
             is DefinitionService.DeleteResult.NotFound -> {
                 println(result.message)
                 false
@@ -224,6 +224,7 @@ open class DefinitionDeleteCommand : Runnable {
                 println("Successfully deleted ${result.details}." + if (force) " (forced)" else "")
                 true
             }
+
             is DefinitionService.DeleteResult.NotFound -> {
                 System.err.println("Warning: ${result.message}")
                 false
@@ -261,6 +262,7 @@ open class DefinitionDeleteCommand : Runnable {
                     println("Successfully deleted ${result.count} workflow(s) as requested by '*' selection.")
                     true
                 }
+
                 is DefinitionService.DeleteResult.NotFound -> {
                     println(result.message)
                     false

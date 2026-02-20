@@ -29,7 +29,6 @@ import io.serverlessworkflow.api.types.ListenTask
 import io.serverlessworkflow.api.types.Workflow
 import kotlin.time.Clock
 import kotlin.time.Duration
-import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.TimeoutCancellationException
@@ -43,7 +42,6 @@ import kotlinx.serialization.json.buildJsonObject
 
 internal class EarlyCompletionException(val event: WorkflowEvent.Outcome) : Exception()
 
-@ExperimentalTime
 object FullOrchestrator {
 
     private val logger = logger()

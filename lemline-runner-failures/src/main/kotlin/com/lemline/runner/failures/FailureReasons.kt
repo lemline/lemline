@@ -4,9 +4,7 @@ package com.lemline.runner.failures
 import com.lemline.core.errors.InternalException
 import java.io.IOException
 import java.sql.SQLException
-import kotlin.time.ExperimentalTime
 
-@ExperimentalTime
 object FailureReasons {
     const val OUTBOX_FAILURE = "outbox_failure"
     const val DESERIALIZATION_FAILURE = "deserialization_failure"

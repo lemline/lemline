@@ -22,7 +22,6 @@ import io.serverlessworkflow.api.types.SwitchTask
 import io.serverlessworkflow.api.types.TaskBase
 import io.serverlessworkflow.api.types.TryTask
 import io.serverlessworkflow.api.types.WaitTask
-import kotlin.time.ExperimentalTime
 import kotlinx.serialization.json.JsonObject
 
 /**
@@ -36,7 +35,6 @@ import kotlinx.serialization.json.JsonObject
 data class Node<T : TaskBase>(val position: NodePosition, val task: T, val name: String, val parent: Node<*>? = null) {
     val definition: JsonObject by lazy { LemlineJson.encodeToElement(task) }
 
-    @ExperimentalTime
     val processor by lazy { NodeProcessors.createProcessor(this) }
 
     /**

@@ -6,7 +6,6 @@ import com.lemline.core.states.WorkflowEvent
 import com.lemline.runner.common.messaging.InstanceMessage
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
-import kotlin.time.ExperimentalTime
 
 /**
  * Service for handling retry-related workflow events.
@@ -14,7 +13,6 @@ import kotlin.time.ExperimentalTime
  * Provides business logic for scheduling task retries by persisting retry state to the database.
  * The retry outbox processor will later resume the workflow when the retry is due.
  */
-@ExperimentalTime
 @ApplicationScoped
 class RetryService {
 

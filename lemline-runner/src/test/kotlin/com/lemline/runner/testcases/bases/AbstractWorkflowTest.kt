@@ -4,12 +4,10 @@ package com.lemline.runner.testcases.bases
 import com.lemline.core.testcases.impl.WorkflowTestCase
 import com.lemline.core.testcases.impl.WorkflowTestExecutor
 import com.lemline.runner.testcases.PlatformUtils
-import kotlin.time.ExperimentalTime
 import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.DynamicTest
 import org.junit.jupiter.api.TestFactory
 
-@ExperimentalTime
 internal abstract class AbstractWorkflowTest(
     private val testCases: List<WorkflowTestCase>,
     private val excludeTags: Set<String> = emptySet()
