@@ -388,7 +388,7 @@ processors/
 ### 5.3 Documentation updates
 
 - Update `core-processors.md` with new patterns
-- Update `CLAUDE.md` if needed
+- Update `AGENTS.md` if needed
 
 ---
 
