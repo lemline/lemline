@@ -32,5 +32,6 @@ include(":lemline-runner-definitions")
 include(":lemline-runner-cli")
 include(":lemline-runner-messaging-pgmq")
 include(":lemline-runner")
+include(":lemline-gateway")
 
 rootProject.name = "lemline"

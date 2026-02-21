@@ -21,6 +21,9 @@ An Architectural Decision Record (ADR) is a document that captures an important 
 | [ADR-0009](0009-dynamic-step-index.md) | Dynamic Step Index | Accepted |
 | [ADR-0010](0010-emitting-events.md) | Emitting Events | Accepted |
 | [ADR-0011](0011-listen-correlation-matching.md) | Listen Correlation Matching | Accepted |
+| [ADR-0012](0012-listen-task-cloudevent-processing.md) | Listen Task CloudEvent Processing | Accepted |
+| [ADR-0013](0013-subscriptions.md) | Subscriptions | Accepted |
+| [ADR-0014](0014-grpc-gateway.md) | Public Secured gRPC Gateway for Lemline | Proposed |
 
 ## Creating a New ADR
 

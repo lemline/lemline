@@ -91,6 +91,8 @@ Welcome to the official documentation for Lemline, the modern runtime for Server
 * [Configuration Reference (lemline.yaml)](lemline-ref-config.md)
 * [Environment Variables](lemline-ref-env-vars.md)
 * [Metrics and Requirements](lemline-ref-metrics.md)
+* [gRPC Gateway Reference](lemline-ref-gateway.md)
+* [Lifecycle Analytics Reference](lemline-ref-analytics.md)
 
 ### 🖥️ CLI Reference
 

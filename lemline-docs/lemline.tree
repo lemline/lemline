@@ -83,6 +83,8 @@
                 <toc-element topic="lemline-ref-config.md"/>
                 <toc-element topic="lemline-ref-env-vars.md"/>
                 <toc-element topic="lemline-ref-metrics.md"/>
+                <toc-element topic="lemline-ref-gateway.md"/>
+                <toc-element topic="lemline-ref-analytics.md"/>
                 <toc-element topic="lemline-ref-implementation.md"/>
             </toc-element>
             <toc-element toc-title="CLI Reference">
