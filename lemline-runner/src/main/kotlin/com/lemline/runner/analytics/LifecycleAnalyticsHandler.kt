@@ -8,13 +8,12 @@ import com.lemline.runner.listeners.CloudEventService
 import com.lemline.runner.messaging.MessageHandler
 import io.cloudevents.CloudEvent
 import jakarta.enterprise.context.ApplicationScoped
-import jakarta.enterprise.inject.Instance
 import org.eclipse.microprofile.reactive.messaging.Message
 
 @ApplicationScoped
 internal class LifecycleAnalyticsHandler(
     override val metrics: LifecycleAnalyticsSubscriberMetrics,
-    private val sinks: Instance<LifecycleAnalyticsSink>,
+    private val lifecycleAnalyticsService: LifecycleAnalyticsService,
 ) : MessageHandler<CloudEvent> {
 
     override val logger: Logger = logger()
@@ -28,20 +27,13 @@ internal class LifecycleAnalyticsHandler(
     }
 
     override suspend fun handle(current: CloudEvent): CloudEvent? {
-        if (sinks.isUnsatisfied) {
-            logger.debug { "No lifecycle analytics sink is available; skipping event id=${current.id}" }
-            return null
-        }
+        when (lifecycleAnalyticsService.ingest(current)) {
+            IngestResult.INSERTED -> logger.debug {
+                "Lifecycle analytics inserted: id=${current.id}, source=${current.source}"
+            }
 
-        for (sink in sinks) {
-            when (sink.ingest(current)) {
-                IngestResult.INSERTED -> logger.debug {
-                    "Lifecycle analytics inserted: id=${current.id}, source=${current.source}"
-                }
-
-                IngestResult.DUPLICATE -> logger.debug {
-                    "Lifecycle analytics duplicate ignored: id=${current.id}, source=${current.source}"
-                }
+            IngestResult.DUPLICATE -> logger.debug {
+                "Lifecycle analytics duplicate ignored: id=${current.id}, source=${current.source}"
             }
         }
 
