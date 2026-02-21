@@ -1,0 +1,37 @@
+// SPDX-License-Identifier: BUSL-1.1
+package com.lemline.runner.config
+
+import com.lemline.common.info
+import com.lemline.common.logger
+import com.lemline.runner.config.LemlineConfigConstants.ANALYTICS_CONSUMER_ENABLED_DEFAULT
+import com.lemline.runner.config.LemlineConfigConstants.ANALYTICS_POSTGRES_MIGRATE_AT_START_DEFAULT
+import io.quarkus.runtime.StartupEvent
+import jakarta.annotation.Priority
+import jakarta.enterprise.context.ApplicationScoped
+import jakarta.enterprise.event.Observes
+import jakarta.inject.Inject
+import org.eclipse.microprofile.config.inject.ConfigProperty
+
+@ApplicationScoped
+internal class AnalyticsMigration(
+    @param:ConfigProperty(name = LIFECYCLE_EVENTS_CONSUMER_ENABLED, defaultValue = ANALYTICS_CONSUMER_ENABLED_DEFAULT)
+    val analyticsEnabled: Boolean,
+    @param:ConfigProperty(
+        name = "quarkus.flyway.analytics.migrate-at-start",
+        defaultValue = ANALYTICS_POSTGRES_MIGRATE_AT_START_DEFAULT
+    )
+    val migrateAtStart: Boolean,
+) {
+    private val logger = logger()
+
+    @Inject
+    lateinit var analyticsManager: AnalyticsManager
+
+    @Suppress("unused")
+    fun onStart(@Observes @Priority(1) event: StartupEvent) {
+        if (!analyticsEnabled || !migrateAtStart) return
+
+        analyticsManager.flyway.migrate()
+        logger.info { "Flyway migrations applied successfully on analytics PostgreSQL database." }
+    }
+}

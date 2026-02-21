@@ -160,3 +160,22 @@ lemline:
     #   # Queue defaults to 'lemline-lifecycle-events' if not specified
     #   # rabbitmq:
     #   #   queue: ${LEMLINE_LIFECYCLE_EVENTS_QUEUE:lemline-lifecycle-events}
+
+  # --- Lifecycle Events Analytics Ingestion (Optional) ---
+  # Consumes the same lifecycle events stream and stores CloudEvents in a dedicated
+  # PostgreSQL analytics database.
+  analytics:
+    consumer:
+      enabled: ${LEMLINE_ANALYTICS_CONSUMER_ENABLED:false}
+      concurrency: ${LEMLINE_ANALYTICS_CONSUMER_CONCURRENCY:64}
+    migrate-at-start: ${LEMLINE_ANALYTICS_MIGRATE_AT_START:true}
+    baseline-on-migrate: ${LEMLINE_ANALYTICS_BASELINE_ON_MIGRATE:false}
+
+    postgresql:
+      host: ${LEMLINE_ANALYTICS_PG_HOST:localhost}
+      port: ${LEMLINE_ANALYTICS_PG_PORT:5432}
+      database: ${LEMLINE_ANALYTICS_PG_DATABASE:lemline_analytics}
+      username: ${LEMLINE_ANALYTICS_PG_USERNAME:postgres}
+      password: ${LEMLINE_ANALYTICS_PG_PASSWORD:postgres}
+      schema: ${LEMLINE_ANALYTICS_PG_SCHEMA:public}
+      table: ${LEMLINE_ANALYTICS_PG_TABLE:lemline_lifecycle_events}

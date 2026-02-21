@@ -1,6 +1,13 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.config
 
+import com.lemline.runner.config.LemlineConfigConstants.ANALYTICS_CONSUMER_CONCURRENCY_DEFAULT
+import com.lemline.runner.config.LemlineConfigConstants.ANALYTICS_CONSUMER_ENABLED_DEFAULT
+import com.lemline.runner.config.LemlineConfigConstants.ANALYTICS_POSTGRES_BASELINE_ON_MIGRATE_DEFAULT
+import com.lemline.runner.config.LemlineConfigConstants.ANALYTICS_POSTGRES_DATABASE_DEFAULT
+import com.lemline.runner.config.LemlineConfigConstants.ANALYTICS_POSTGRES_MIGRATE_AT_START_DEFAULT
+import com.lemline.runner.config.LemlineConfigConstants.ANALYTICS_POSTGRES_SCHEMA_DEFAULT
+import com.lemline.runner.config.LemlineConfigConstants.ANALYTICS_POSTGRES_TABLE_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.COMMANDS_TOPIC_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.CONSUMER_CONCURRENCY_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.DB_BASELINE_ON_MIGRATE_DEFAULT
@@ -46,6 +53,8 @@ const val CLOUDEVENTS_CONSUMER_ENABLED = "lemline.messaging.cloudevents.consumer
 const val CLOUDEVENTS_CONSUMER_CONCURRENCY = "lemline.messaging.cloudevents.consumer.concurrency"
 
 const val LIFECYCLE_EVENTS_PRODUCER_ENABLED = "lemline.messaging.lifecycleevents.producer.enabled"
+const val LIFECYCLE_EVENTS_CONSUMER_ENABLED = "lemline.analytics.consumer.enabled"
+const val LIFECYCLE_EVENTS_CONSUMER_CONCURRENCY = "lemline.analytics.consumer.concurrency"
 
 const val DATABASE_ENABLED = "lemline.database.enabled"
 const val SCHEDULED_ENABLED = "lemline.scheduled.enabled"
@@ -82,6 +91,7 @@ const val ORCHESTRATOR_MODE = "lemline.orchestrator.mode"
 interface LemlineConfiguration {
     fun config(): Optional<String>
     fun database(): DatabaseConfig
+    fun analytics(): Optional<AnalyticsConfig>
     fun messaging(): MessagingConfig
     fun scheduled(): ScheduledConfig
     fun orchestrator(): OrchestratorConfig
@@ -129,6 +139,53 @@ interface LemlineConfiguration {
          * Optional MySQL configuration
          */
         fun mysql(): Optional<MySQLConfig>
+    }
+
+    /**
+     * Analytics ingestion configuration.
+     * Controls lifecycle events consumption and analytics PostgreSQL destination.
+     */
+    interface AnalyticsConfig {
+        fun consumer(): AnalyticsConsumerConfig
+
+        @WithDefault(ANALYTICS_POSTGRES_MIGRATE_AT_START_DEFAULT)
+        fun migrateAtStart(): Boolean
+
+        @WithDefault(ANALYTICS_POSTGRES_BASELINE_ON_MIGRATE_DEFAULT)
+        fun baselineOnMigrate(): Boolean
+
+        fun postgresql(): AnalyticsPostgreSQLConfig
+    }
+
+    interface AnalyticsConsumerConfig {
+        @WithDefault(ANALYTICS_CONSUMER_ENABLED_DEFAULT)
+        fun enabled(): Boolean
+
+        @WithDefault(ANALYTICS_CONSUMER_CONCURRENCY_DEFAULT)
+        fun concurrency(): Long
+    }
+
+    interface AnalyticsPostgreSQLConfig {
+        @WithDefault(POSTGRES_HOST_DEFAULT)
+        fun host(): String
+
+        @WithDefault(POSTGRES_PORT_DEFAULT)
+        fun port(): Int
+
+        @WithDefault(ANALYTICS_POSTGRES_DATABASE_DEFAULT)
+        fun database(): String
+
+        @WithDefault(POSTGRES_USERNAME_DEFAULT)
+        fun username(): String
+
+        @WithDefault(POSTGRES_PASSWORD_DEFAULT)
+        fun password(): String
+
+        @WithDefault(ANALYTICS_POSTGRES_SCHEMA_DEFAULT)
+        fun schema(): String
+
+        @WithDefault(ANALYTICS_POSTGRES_TABLE_DEFAULT)
+        fun table(): String
     }
 
     /**

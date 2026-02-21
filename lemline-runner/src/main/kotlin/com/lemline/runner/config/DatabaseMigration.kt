@@ -18,7 +18,7 @@ import org.eclipse.microprofile.config.inject.ConfigProperty
  * Runs at priority 1, after DatabaseStartupValidator (priority 0) has verified connectivity.
  */
 @ApplicationScoped
-class FlywayMigration(
+class DatabaseMigration(
     @param:ConfigProperty(name = "quarkus.profile")
     val profile: String,
 

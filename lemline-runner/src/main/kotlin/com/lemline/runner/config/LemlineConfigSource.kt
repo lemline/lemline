@@ -5,6 +5,9 @@ import com.lemline.common.logger.logger
 import com.lemline.runner.cli.config.ConfigPathHolder
 import com.lemline.runner.common.config.DatabaseType
 import com.lemline.runner.common.config.MessagingType
+import com.lemline.runner.config.LemlineConfigConstants.ANALYTICS_POSTGRES_BASELINE_ON_MIGRATE_DEFAULT
+import com.lemline.runner.config.LemlineConfigConstants.ANALYTICS_POSTGRES_DATABASE_DEFAULT
+import com.lemline.runner.config.LemlineConfigConstants.ANALYTICS_POSTGRES_MIGRATE_AT_START_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.CLOUDEVENTS_TOPIC_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.COMMANDS_TOPIC_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.CONSUMER_CONCURRENCY_DEFAULT
@@ -17,6 +20,7 @@ import com.lemline.runner.config.LemlineConfigConstants.KAFKA_BROKERS_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.KAFKA_CLOUDEVENTS_GROUP_ID_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.KAFKA_CONNECTOR
 import com.lemline.runner.config.LemlineConfigConstants.KAFKA_DATABASE_GROUP_ID_DEFAULT
+import com.lemline.runner.config.LemlineConfigConstants.KAFKA_LIFECYCLE_EVENTS_GROUP_ID_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.KAFKA_OFFSET_RESET_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.KAFKA_STRING_DESERIALIZER
 import com.lemline.runner.config.LemlineConfigConstants.KAFKA_STRING_SERIALIZER
@@ -55,9 +59,9 @@ import com.lemline.runner.messaging.events.EVENTS_OUT_CHANNEL
 import io.smallrye.config.PropertiesConfigSource
 
 /**
- * Channel name for lifecycle events output.
- * Lifecycle events are producer-only (no consumer) for external observability.
+ * Channel names for lifecycle events.
  */
+internal const val LIFECYCLEEVENTS_IN_CHANNEL = "lifecycleevents-in"
 internal const val LIFECYCLEEVENTS_OUT_CHANNEL = "lifecycleevents-out"
 
 enum class TopicType(
@@ -138,6 +142,7 @@ class LemlineConfigSource : PropertiesConfigSource(
             // Generate and merge transformed properties
             val generatedProps = mutableMapOf<String, String>()
             generatedProps.putAll(generateDatabaseProperties(lemlineProps))
+            generatedProps.putAll(generateAnalyticsDatabaseProperties(lemlineProps))
             generatedProps.putAll(generateMessagingProperties(lemlineProps))
             generatedProps.putAll(generateMetricsProperties(lemlineProps))
 
@@ -208,6 +213,37 @@ class LemlineConfigSource : PropertiesConfigSource(
             return generated
         }
 
+        private fun generateAnalyticsDatabaseProperties(props: Map<String, String>): Map<String, String> {
+            if (!props[LIFECYCLE_EVENTS_CONSUMER_ENABLED].toBoolean()) return emptyMap()
+
+            val generated = mutableMapOf<String, String>()
+            val analytics = "lemline.analytics"
+            val analyticsPostgresql = "$analytics.postgresql"
+
+            val host = props["$analyticsPostgresql.host"] ?: POSTGRES_HOST_DEFAULT
+            val port = props["$analyticsPostgresql.port"] ?: POSTGRES_PORT_DEFAULT
+            val database = props["$analyticsPostgresql.database"] ?: ANALYTICS_POSTGRES_DATABASE_DEFAULT
+            val username = props["$analyticsPostgresql.username"] ?: POSTGRES_USERNAME_DEFAULT
+            val password = props["$analyticsPostgresql.password"] ?: POSTGRES_PASSWORD_DEFAULT
+            // Backward-compatible fallback for previous key location under analytics.postgresql.*
+            val migrateAtStart = props["$analytics.migrate-at-start"]
+                ?: props["$analyticsPostgresql.migrate-at-start"]
+                ?: ANALYTICS_POSTGRES_MIGRATE_AT_START_DEFAULT
+            val baselineOnMigrate = props["$analytics.baseline-on-migrate"]
+                ?: props["$analyticsPostgresql.baseline-on-migrate"]
+                ?: ANALYTICS_POSTGRES_BASELINE_ON_MIGRATE_DEFAULT
+
+            generated["quarkus.datasource.analytics.db-kind"] = "postgresql"
+            generated["quarkus.datasource.analytics.username"] = username
+            generated["quarkus.datasource.analytics.password"] = password
+            generated["quarkus.datasource.analytics.jdbc.url"] = "jdbc:postgresql://$host:$port/$database"
+            generated["quarkus.flyway.analytics.migrate-at-start"] = migrateAtStart
+            generated["quarkus.flyway.analytics.baseline-on-migrate"] = baselineOnMigrate
+            generated["quarkus.flyway.analytics.locations"] = "classpath:db/migration/analytics/postgresql"
+
+            return generated
+        }
+
         private fun generateMessagingProperties(props: Map<String, String>): Map<String, String> {
             val generated = mutableMapOf<String, String>()
             val useKafka = props.keys.any { it.startsWith("lemline.messaging.kafka.") }
@@ -239,7 +275,7 @@ class LemlineConfigSource : PropertiesConfigSource(
                 MessagingType.KAFKA -> generated.configureKafka(props)
                 MessagingType.RABBITMQ -> generated.configureRabbit(props)
                 MessagingType.PGMQ -> generated.configurePgmq(props)
-                MessagingType.IN_MEMORY -> generated.configureInMemory()
+                MessagingType.IN_MEMORY -> generated.configureInMemory(props)
             }
 
             return generated
@@ -348,13 +384,30 @@ class LemlineConfigSource : PropertiesConfigSource(
 
         /**
          * Configures the Lifecycle Events Kafka topic.
-         * Producer-only: Emits workflow and task lifecycle events for external observability.
+         * - Producer: Emits workflow and task lifecycle events
+         * - Consumer: Analytics ingestion from the same lifecycle events stream
          */
         private fun MutableMap<String, String>.configureKafkaLifecycleEventsTopic(props: Map<String, String>) {
             val type = "lemline.messaging.kafka.lifecycleevents"
             val topic = props["$type.topic"] ?: LIFECYCLE_EVENTS_TOPIC_DEFAULT
 
-            // Producer configuration for lifecycle events (producer-only, no consumer)
+            if (props[LIFECYCLE_EVENTS_CONSUMER_ENABLED].toBoolean()) {
+                val incoming = "mp.messaging.incoming.$LIFECYCLEEVENTS_IN_CHANNEL"
+                val topicDLQ = "$topic.dlq"
+                set("$incoming.connector", KAFKA_CONNECTOR)
+                set("$incoming.topic", topic)
+                set("$incoming.broadcast", "true")
+                set("$incoming.group.id", KAFKA_LIFECYCLE_EVENTS_GROUP_ID_DEFAULT)
+                set("$incoming.auto.offset.reset", KAFKA_OFFSET_RESET_DEFAULT)
+                set("$incoming.value.deserializer", KAFKA_STRING_DESERIALIZER)
+                set("$incoming.failure-strategy", "dead-letter-queue")
+                set("$incoming.dead-letter-queue.topic", topicDLQ)
+                set(
+                    LIFECYCLE_EVENTS_CONSUMER_CONCURRENCY,
+                    props[LIFECYCLE_EVENTS_CONSUMER_CONCURRENCY] ?: CONSUMER_CONCURRENCY_DEFAULT
+                )
+            }
+
             if (props[LIFECYCLE_EVENTS_PRODUCER_ENABLED].toBoolean()) {
                 val producer = "$type.producer"
                 val outgoing = "mp.messaging.outgoing.$LIFECYCLEEVENTS_OUT_CHANNEL"
@@ -463,13 +516,38 @@ class LemlineConfigSource : PropertiesConfigSource(
 
         /**
          * Configures the Lifecycle Events RabbitMQ queue.
-         * Producer-only: Emits workflow and task lifecycle events for external observability.
+         * - Producer: Emits workflow and task lifecycle events
+         * - Consumer: Analytics ingestion from the same lifecycle events destination
          */
         private fun MutableMap<String, String>.configureRabbitLifecycleEventsQueue(props: Map<String, String>) {
             val type = "lemline.messaging.rabbitmq.lifecycleevents"
             val queue = props["$type.queue"] ?: LIFECYCLE_EVENTS_TOPIC_DEFAULT
 
-            // Producer configuration for lifecycle events (producer-only, no consumer)
+            if (props[LIFECYCLE_EVENTS_CONSUMER_ENABLED].toBoolean()) {
+                val incoming = "mp.messaging.incoming.$LIFECYCLEEVENTS_IN_CHANNEL"
+                val queueDLQ = "$queue.dlq"
+                set("$incoming.connector", RABBITMQ_CONNECTOR)
+                set("$incoming.queue.name", queue)
+                set("$incoming.broadcast", "true")
+                set("$incoming.queue.durable", "true")
+                set("$incoming.auto-ack", "false")
+                set("$incoming.deserializer", RABBITMQ_STRING_SERIALIZER)
+                set("$incoming.failure-strategy", "reject")
+                set("$incoming.auto-bind-dlq", "true")
+                set("$incoming.dlx.declare", "true")
+                set("$incoming.dead-letter-queue-name", queueDLQ)
+                set("$incoming.dead-letter-exchange", "$LIFECYCLEEVENTS_IN_CHANNEL.dlx")
+                set("$incoming.dead-letter-exchange-type", "direct")
+                set("$incoming.dead-letter-routing-key", queueDLQ)
+                props["$type.producer.exchange-name"]?.let { exchange ->
+                    set("$incoming.exchange.name", exchange)
+                }
+                set(
+                    LIFECYCLE_EVENTS_CONSUMER_CONCURRENCY,
+                    props[LIFECYCLE_EVENTS_CONSUMER_CONCURRENCY] ?: CONSUMER_CONCURRENCY_DEFAULT
+                )
+            }
+
             if (props[LIFECYCLE_EVENTS_PRODUCER_ENABLED].toBoolean()) {
                 val producer = "$type.producer"
                 val outgoing = "mp.messaging.outgoing.$LIFECYCLEEVENTS_OUT_CHANNEL"
@@ -616,7 +694,8 @@ class LemlineConfigSource : PropertiesConfigSource(
 
         /**
          * Configures the Lifecycle Events PGMQ queue.
-         * Producer-only: Emits workflow and task lifecycle events for external observability.
+         * - Producer: Emits workflow and task lifecycle events
+         * - Consumer: Analytics ingestion from the same lifecycle events queue
          */
         private fun MutableMap<String, String>.configurePgmqLifecycleEventsQueue(
             props: Map<String, String>,
@@ -629,7 +708,34 @@ class LemlineConfigSource : PropertiesConfigSource(
             val type = "lemline.messaging.pgmq.lifecycleevents"
             val queue = props["$type.queue"] ?: LIFECYCLE_EVENTS_TOPIC_DEFAULT
 
-            // Producer configuration for lifecycle events (producer-only, no consumer)
+            if (props[LIFECYCLE_EVENTS_CONSUMER_ENABLED].toBoolean()) {
+                val consumer = "$type.consumer"
+                val incoming = "mp.messaging.incoming.$LIFECYCLEEVENTS_IN_CHANNEL"
+                val queueDLQ = props["$consumer.queue-dlq"] ?: "$queue.dlq"
+
+                set("$incoming.connector", PGMQ_CONNECTOR)
+                set("$incoming.queue", queue)
+                set("$incoming.broadcast", "true")
+                set("$incoming.host", host)
+                set("$incoming.port", port)
+                set("$incoming.database", database)
+                set("$incoming.username", username)
+                set("$incoming.password", password)
+                set(
+                    "$incoming.visibility-timeout",
+                    props["$consumer.visibility-timeout"] ?: PGMQ_VISIBILITY_TIMEOUT_DEFAULT
+                )
+                set("$incoming.poll-interval", props["$consumer.poll-interval"] ?: PGMQ_POLL_INTERVAL_DEFAULT)
+                set("$incoming.batch-size", props["$consumer.batch-size"] ?: PGMQ_BATCH_SIZE_DEFAULT)
+                set("$incoming.max-retries", props["$consumer.max-retries"] ?: PGMQ_MAX_RETRIES_DEFAULT)
+                set("$incoming.dead-letter-queue", queueDLQ)
+                set("$incoming.auto-create-queue", "false")
+                set(
+                    LIFECYCLE_EVENTS_CONSUMER_CONCURRENCY,
+                    props[LIFECYCLE_EVENTS_CONSUMER_CONCURRENCY] ?: CONSUMER_CONCURRENCY_DEFAULT
+                )
+            }
+
             if (props[LIFECYCLE_EVENTS_PRODUCER_ENABLED].toBoolean()) {
                 val producer = "$type.producer"
                 val outgoing = "mp.messaging.outgoing.$LIFECYCLEEVENTS_OUT_CHANNEL"
@@ -645,7 +751,7 @@ class LemlineConfigSource : PropertiesConfigSource(
             }
         }
 
-        private fun MutableMap<String, String>.configureInMemory() {
+        private fun MutableMap<String, String>.configureInMemory(props: Map<String, String>) {
             set("mp.messaging.incoming.$COMMANDS_IN_CHANNEL.connector", IN_MEMORY_CONNECTOR)
             set("mp.messaging.outgoing.$COMMANDS_OUT_CHANNEL.connector", IN_MEMORY_CONNECTOR)
 
@@ -656,7 +762,12 @@ class LemlineConfigSource : PropertiesConfigSource(
             set("mp.messaging.incoming.$CLOUDEVENTS_IN_CHANNEL.connector", IN_MEMORY_CONNECTOR)
             set("mp.messaging.outgoing.$CLOUDEVENTS_OUT_CHANNEL.connector", IN_MEMORY_CONNECTOR)
 
-            // Lifecycle events channel (producer-only for external observability)
+            // Lifecycle events producer channel is always configured for emission.
+            // Consumer channel is created only when analytics ingestion is enabled.
+            if (props[LIFECYCLE_EVENTS_CONSUMER_ENABLED].toBoolean()) {
+                set("mp.messaging.incoming.$LIFECYCLEEVENTS_IN_CHANNEL.connector", IN_MEMORY_CONNECTOR)
+                set("mp.messaging.incoming.$LIFECYCLEEVENTS_IN_CHANNEL.broadcast", "true")
+            }
             set("mp.messaging.outgoing.$LIFECYCLEEVENTS_OUT_CHANNEL.connector", IN_MEMORY_CONNECTOR)
         }
 
