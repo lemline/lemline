@@ -4,24 +4,26 @@ package com.lemline.runner.gateway.start
 import com.lemline.common.json.LemlineJson
 import com.lemline.common.values.IDV7
 import com.lemline.common.values.WorkflowId
+import com.lemline.common.values.WorkflowInfo
 import com.lemline.common.values.WorkflowName
 import com.lemline.common.values.WorkflowNamespace
 import com.lemline.common.values.WorkflowVersion
 import com.lemline.core.lifecycleevents.LifecycleEventHook
+import com.lemline.gateway.v1.StartWorkflowRequest
+import com.lemline.runner.common.config.DatabaseConfig
 import com.lemline.runner.gateway.auth.GatewayAuthorizer
 import com.lemline.runner.gateway.auth.GatewayPrincipal
 import com.lemline.runner.gateway.errors.GatewayBadRequestException
 import com.lemline.runner.gateway.errors.GatewayConflictException
 import com.lemline.runner.gateway.errors.GatewayNotFoundException
-import com.lemline.gateway.v1.StartWorkflowRequest
-import com.lemline.runner.common.messaging.CommandEmitter
+import com.lemline.runner.gateway.outbox.GatewayCommandOutboxModel
+import com.lemline.runner.gateway.outbox.GatewayCommandOutboxRepository
 import com.lemline.runner.schedules.ScheduleRepository
 import com.lemline.runner.starters.Starter
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
-import java.security.MessageDigest
 import java.time.ZoneId
-import kotlin.text.Charsets.UTF_8
+import kotlin.time.Clock
 import kotlinx.serialization.json.JsonElement
 
 enum class GatewayStartResult {
@@ -31,7 +33,6 @@ enum class GatewayStartResult {
 
 data class WorkflowStartResult(
     val workflowId: WorkflowId,
-    val version: WorkflowVersion,
     val result: GatewayStartResult,
 )
 
@@ -42,122 +43,146 @@ class WorkflowStartService {
     lateinit var starter: Starter
 
     @Inject
-    lateinit var commandEmitter: CommandEmitter
+    lateinit var databaseConfig: DatabaseConfig
 
     @Inject
     lateinit var scheduleRepository: ScheduleRepository
 
     @Inject
-    lateinit var lifecycleHook: LifecycleEventHook
+    lateinit var gatewayOutboxRepository: GatewayCommandOutboxRepository
 
     @Inject
-    lateinit var reservationRepository: GatewayWorkflowReservationRepository
+    lateinit var lifecycleHook: LifecycleEventHook
 
     @Inject
     lateinit var authorizer: GatewayAuthorizer
 
     suspend fun start(request: StartWorkflowRequest, principal: GatewayPrincipal): WorkflowStartResult {
         val workflowId = parseWorkflowId(request.workflowId)
-        val namespace = request.namespace.trim().ifBlank {
-            throw GatewayBadRequestException("Workflow namespace must be provided")
-        }
-        val name = request.name.trim().ifBlank {
-            throw GatewayBadRequestException("Workflow name must be provided")
-        }
-        val version = request.version.trim().ifBlank {
-            throw GatewayBadRequestException("Workflow version must be provided")
-        }
+        val workflowNamespace = parseWorkflowNamespace(request.namespace)
+        val workflowName = parseWorkflowName(request.name)
+        val workflowVersion = parseWorkflowVersion(request.version)
+        val zoneId = parseZoneId(request)
 
         authorizer.requireScope(principal, "lemline.start")
-        authorizer.requireNamespace(principal, namespace)
+        authorizer.requireNamespace(principal, workflowNamespace.toString())
 
-        val workflowNamespace = WorkflowNamespace(namespace)
-        val workflowName = WorkflowName(name)
-        val workflowVersion = WorkflowVersion(version)
-        val normalizedInputJson = normalizeInputJson(request)
-        val workflowInput = parseInputJson(normalizedInputJson)
-        val zoneId = parseZoneId(request)
-        val requestFingerprint = buildRequestFingerprint(
-            workflowNamespace = namespace,
-            workflowName = name,
-            workflowVersion = version,
-            inputJson = normalizedInputJson,
-            zoneId = zoneId.id
+        val workflowInput = parseInputJson(request)
+        val workflowInfo = WorkflowInfo(
+            namespace = workflowNamespace,
+            name = workflowName,
+            version = workflowVersion
         )
 
-        val reserveResult = reservationRepository.reserve(
+        // Prepare workflow (validates definition exists, builds messages)
+        val preparedWorkflow = starter.prepareWorkflow(
             workflowId = workflowId,
-            workflowNamespace = namespace,
-            workflowName = name,
-            workflowVersion = version,
-            inputJson = normalizedInputJson,
-            zoneId = zoneId.id,
-            requestFingerprint = requestFingerprint
-        )
+            workflowNamespace = workflowNamespace,
+            workflowName = workflowName,
+            optionalVersion = workflowVersion,
+            workflowInput = workflowInput,
+            hasWaitingParent = false,
+            zoneId = zoneId
+        ) { message ->
+            if (message.contains("not found", ignoreCase = true)) {
+                throw GatewayNotFoundException(message)
+            }
+            throw GatewayBadRequestException(message)
+        }
 
-        when (reserveResult.type) {
-            ReserveResultType.EXISTING_MISMATCH -> {
-                throw GatewayConflictException(
-                    "Workflow '$workflowId' already exists with a different start request fingerprint"
+        // Atomically insert outbox + schedule in one transaction.
+        // The outbox unique constraint on workflow_id is the idempotency guard for immediate
+        // workflows. For cron-only workflows (instanceMessage is null), the schedule table's
+        // own unique constraint on workflow_id provides deduplication.
+        // Outbox is inserted first: if it's a duplicate, we skip the schedule insert entirely.
+        val result = databaseConfig.withTransaction { conn ->
+            val outboxResult = preparedWorkflow.instanceMessage?.let { msg ->
+                val outboxEntry = GatewayCommandOutboxModel(
+                    id = IDV7.random(),
+                    instanceMessage = msg,
+                    outboxScheduledFor = Clock.System.now(),
+                )
+                insertOrDetectConflict(
+                    inserted = gatewayOutboxRepository.insert(outboxEntry, conn),
+                    workflowId = workflowId,
+                    workflowInfo = workflowInfo,
+                    workflowInput = workflowInput,
+                    loadExisting = { gatewayOutboxRepository.findByWorkflowId(workflowId) },
                 )
             }
 
-            ReserveResultType.EXISTING_SAME -> {
-                return WorkflowStartResult(
-                    workflowId = reserveResult.reservation.workflowId,
-                    version = WorkflowVersion(reserveResult.reservation.workflowVersion),
-                    result = GatewayStartResult.ACCEPTED_EXISTING
+            outboxResult ?: preparedWorkflow.scheduleModel?.let {
+                insertOrDetectConflict(
+                    inserted = scheduleRepository.insert(it, conn),
+                    workflowId = workflowId,
+                    workflowInfo = workflowInfo,
+                    workflowInput = workflowInput,
+                    loadExisting = { scheduleRepository.findByWorkflowId(workflowId) },
+                    extraConflictCheck = { existing -> existing.zone != zoneId },
                 )
             }
+        }
 
-            ReserveResultType.NEW -> {
-                try {
-                    val preparedWorkflow = starter.prepareWorkflow(
-                        workflowId = workflowId,
-                        workflowNamespace = workflowNamespace,
-                        workflowName = workflowName,
-                        optionalVersion = workflowVersion,
-                        workflowInput = workflowInput,
-                        hasWaitingParent = false,
-                        zoneId = zoneId
-                    ) { message ->
-                        if (message.contains("not found", ignoreCase = true)) {
-                            throw GatewayNotFoundException(message)
-                        }
-                        throw GatewayBadRequestException(message)
-                    }
+        return result ?: run {
+            // Fire-and-forget lifecycle hook (outside transaction)
+            preparedWorkflow.onWorkflowCreated(lifecycleHook)
 
-                    preparedWorkflow.scheduleModel?.let { scheduleRepository.insert(it) }
-                    preparedWorkflow.instanceMessage?.let { commandEmitter.send(it) }
-                    preparedWorkflow.onWorkflowCreated(lifecycleHook)
-
-                    val effectiveVersion =
-                        preparedWorkflow.instanceMessage?.workflowInfo?.version
-                            ?: preparedWorkflow.scheduleModel?.workflowVersion
-                            ?: workflowVersion
-
-                    return WorkflowStartResult(
-                        workflowId = workflowId,
-                        version = effectiveVersion,
-                        result = GatewayStartResult.ACCEPTED_NEW
-                    )
-                } catch (t: Throwable) {
-                    runCatching { reservationRepository.deleteByWorkflowId(workflowId) }
-                    throw t
-                }
-            }
+            WorkflowStartResult(
+                workflowId = workflowId,
+                result = GatewayStartResult.ACCEPTED_NEW
+            )
         }
     }
 
-    private fun parseWorkflowId(rawWorkflowId: String): WorkflowId = try {
-        WorkflowId(IDV7.from(rawWorkflowId.trim()))
-    } catch (e: Exception) {
+    /**
+     * If the insert succeeded (row count > 0), returns null (no conflict).
+     * If the insert was a no-op (unique constraint), loads the existing row and compares
+     * workflowInfo + workflowInput. Returns ACCEPTED_EXISTING on match, throws on mismatch.
+     */
+    private suspend fun <T : com.lemline.runner.common.models.WithInstanceMessage> insertOrDetectConflict(
+        inserted: Int,
+        workflowId: WorkflowId,
+        workflowInfo: WorkflowInfo,
+        workflowInput: JsonElement,
+        loadExisting: suspend () -> T?,
+        extraConflictCheck: (T) -> Boolean = { false },
+    ): WorkflowStartResult? {
+        if (inserted > 0) return null
+
+        val existing = loadExisting()
+        if (existing?.workflowInfo != workflowInfo ||
+            existing.workflowState.nodeStack.rootState.workflowInput != workflowInput ||
+            extraConflictCheck(existing)
+        ) {
+            throw GatewayConflictException(
+                "Workflow '$workflowId' already exists with different parameters: $existing"
+            )
+        }
+        return WorkflowStartResult(
+            workflowId = workflowId,
+            result = GatewayStartResult.ACCEPTED_EXISTING
+        )
+    }
+
+    private fun parseWorkflowId(raw: String): WorkflowId = try {
+        WorkflowId(IDV7.from(raw.trim()))
+    } catch (_: Exception) {
         throw GatewayBadRequestException("workflow_id must be a valid UUIDv7 string")
     }
 
+    private fun parseWorkflowNamespace(raw: String): WorkflowNamespace =
+        WorkflowNamespace(
+            raw.trim().ifBlank { throw GatewayBadRequestException("Workflow namespace must be provided") })
+
+    private fun parseWorkflowName(raw: String): WorkflowName =
+        WorkflowName(raw.trim().ifBlank { throw GatewayBadRequestException("Workflow name must be provided") })
+
+    private fun parseWorkflowVersion(raw: String): WorkflowVersion =
+        WorkflowVersion(raw.trim().ifBlank { throw GatewayBadRequestException("Workflow version must be provided") })
+
     private fun parseZoneId(request: StartWorkflowRequest): ZoneId {
         val zoneRaw = if (request.hasZoneId()) request.zoneId.trim() else "UTC"
-        val zone = if (zoneRaw.isBlank()) "UTC" else zoneRaw
+        val zone = zoneRaw.ifBlank { "UTC" }
         return try {
             ZoneId.of(zone)
         } catch (_: Exception) {
@@ -165,37 +190,13 @@ class WorkflowStartService {
         }
     }
 
-    private fun normalizeInputJson(request: StartWorkflowRequest): String {
+    private fun parseInputJson(request: StartWorkflowRequest): JsonElement {
         val rawInput = if (request.hasInputJson()) request.inputJson else "{}"
         return try {
-            LemlineJson.jacksonMapper.readTree(rawInput).toString()
+            LemlineJson.json.parseToJsonElement(rawInput)
         } catch (e: Exception) {
             throw GatewayBadRequestException("Invalid JSON input: ${e.message}")
         }
     }
 
-    private fun parseInputJson(normalizedInput: String): JsonElement = try {
-        LemlineJson.json.parseToJsonElement(normalizedInput)
-    } catch (e: Exception) {
-        throw GatewayBadRequestException("Invalid normalized JSON input: ${e.message}")
-    }
-
-    private fun buildRequestFingerprint(
-        workflowNamespace: String,
-        workflowName: String,
-        workflowVersion: String,
-        inputJson: String,
-        zoneId: String,
-    ): String {
-        val payload = listOf(
-            workflowNamespace,
-            workflowName,
-            workflowVersion,
-            inputJson,
-            zoneId
-        ).joinToString("\n")
-
-        val digest = MessageDigest.getInstance("SHA-256").digest(payload.toByteArray(UTF_8))
-        return digest.joinToString("") { "%02x".format(it) }
-    }
 }
