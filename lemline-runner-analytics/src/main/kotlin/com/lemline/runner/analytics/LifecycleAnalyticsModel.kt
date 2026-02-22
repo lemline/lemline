@@ -4,7 +4,7 @@ package com.lemline.runner.analytics
 import java.time.OffsetDateTime
 import java.util.*
 
-internal data class LifecycleAnalyticsModel(
+data class LifecycleAnalyticsModel(
     val eventId: String,
     val source: String,
     val type: String,

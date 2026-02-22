@@ -6,7 +6,7 @@ import com.lemline.common.logger.logger
 import com.lemline.common.values.IDV7
 import com.lemline.runner.listeners.CloudEventService
 import com.lemline.runner.listeners.ListenerEventService
-import com.lemline.runner.messaging.MessageHandler
+import com.lemline.runner.messaging.WithHealthCheckMessageHandler
 import io.cloudevents.CloudEvent
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
@@ -25,7 +25,7 @@ import org.eclipse.microprofile.reactive.messaging.Message
 @ApplicationScoped
 internal class CloudEventHandler(
     override val metrics: CloudEventSubscriberMetrics,
-) : MessageHandler<CloudEvent> {
+) : WithHealthCheckMessageHandler<CloudEvent> {
 
     override val logger: Logger = logger()
 

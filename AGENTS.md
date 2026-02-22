@@ -1,4 +1,4 @@
-<!-- Updated: 2026-02-20 -->
+<!-- Updated: 2026-02-22 -->
 
 # AGENTS.md
 
@@ -39,11 +39,13 @@ Use these docs as primary context before broad refactors:
 lemline/
 ├── lemline-common/          # Shared utilities (IDV7, JSON, logging)
 ├── lemline-core/            # DSL parsing, processors, orchestrators, workflow state
+├── lemline-messages-proto/  # Internal protobuf schemas + generated types
+├── lemline-runner-common/   # Shared infra (outbox, cleaners, repositories, codecs)
+├── lemline-runner-gateway/  # gRPC ingress gateway (start/watch APIs, auth, gateway outbox)
+├── lemline-runner-analytics/ # Lifecycle analytics sink (CloudEvents -> analytics PostgreSQL)
 ├── lemline-runner/          # Runtime bootstrap, messaging handlers/subscribers
 ├── lemline-runner-cli/      # CLI commands (Picocli)
-├── lemline-runner-common/   # Shared infra (outbox, cleaners, repositories, codecs)
-├── lemline-runner-*/        # Feature modules (waits, retries, parents, forks, etc.)
-├── lemline-messages-proto/  # Internal protobuf schemas + generated types
+├── lemline-runner-*/        # Other feature modules (waits, retries, parents, forks, listeners, etc.)
 ├── docs/adr/                # Architecture decisions
 └── examples/                # Local dev examples
 ```
@@ -109,6 +111,8 @@ Known deviations:
 - `lemline-runner-definitions`: CRUD-centric, no outbox relay
 - `lemline-runner-failures`: terminal storage, no outbox relay
 - `lemline-runner-listeners`: multiple specialized outboxes
+- `lemline-runner-gateway`: gRPC/API module with gateway outbox + analytics read-side
+- `lemline-runner-analytics`: sink-only analytics ingestion (no outbox relay)
 
 ## High-Value File Locations
 
@@ -122,6 +126,16 @@ Known deviations:
   - `lemline-runner/src/main/kotlin/com/lemline/runner/messaging/events/WorkflowEventHandler.kt`
 - Common outbox base:
   - `lemline-runner-common/src/main/kotlin/com/lemline/runner/common/outbox/AbstractOutbox.kt`
+- Gateway ingress + streaming:
+  - `lemline-runner-gateway/src/main/kotlin/com/lemline/runner/gateway/grpc/WorkflowGatewayGrpcService.kt`
+  - `lemline-runner-gateway/src/main/kotlin/com/lemline/runner/gateway/start/WorkflowStartService.kt`
+  - `lemline-runner-gateway/src/main/kotlin/com/lemline/runner/gateway/watch/WorkflowWatchService.kt`
+- Analytics ingestion:
+  - `lemline-runner-analytics/src/main/kotlin/com/lemline/runner/analytics/LifecycleAnalyticsSubscriber.kt`
+  - `lemline-runner-analytics/src/main/kotlin/com/lemline/runner/analytics/LifecycleAnalyticsRepository.kt`
+- Protobuf contracts:
+  - `lemline-messages-proto/src/main/proto/internal/workflow/commands.proto`
+  - `lemline-messages-proto/src/main/proto/internal/workflow/events.proto`
 
 ## Build and Test Commands
 
@@ -133,7 +147,12 @@ Known deviations:
 # Test
 ./gradlew test
 ./gradlew :lemline-runner:test
+./gradlew :lemline-runner-gateway:test
+./gradlew :lemline-runner-analytics:test
 ./gradlew test --tests "*RepositoryTest"
+
+# Protobuf
+./gradlew :lemline-messages-proto:build
 
 # Format
 ./gradlew spotlessCheck

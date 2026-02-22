@@ -24,6 +24,13 @@ dependencies {
     // SmallRye Reactive Messaging API (for Message type) - provides extended Message interface
     implementation(libs.smallrye.reactive.messaging.api)
 
+    // Quarkus Reactive Messaging extensions (for ackSuspending/nackSuspending and metadata types)
+    implementation("io.quarkus:quarkus-messaging-kafka")
+    implementation("io.quarkus:quarkus-messaging-rabbitmq")
+
+    // Micrometer (for MessageSubscriberMetrics)
+    implementation("io.quarkus:quarkus-micrometer")
+
     // Serverless Workflow SDK (for InstanceMessage state types)
     implementation(libs.serverlessworkflow.api)
 

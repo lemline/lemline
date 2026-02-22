@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.analytics
 
-import com.lemline.runner.config.LIFECYCLE_EVENTS_CONSUMER_ENABLED
-import com.lemline.runner.config.LemlineConfigConstants.ANALYTICS_POSTGRES_SCHEMA_DEFAULT
-import com.lemline.runner.config.LemlineConfigConstants.ANALYTICS_POSTGRES_TABLE_DEFAULT
+import com.lemline.runner.analytics.config.AnalyticsConfigConstants.ANALYTICS_CONSUMER_ENABLED
+import com.lemline.runner.analytics.config.AnalyticsConfigConstants.ANALYTICS_POSTGRES_SCHEMA_DEFAULT
+import com.lemline.runner.analytics.config.AnalyticsConfigConstants.ANALYTICS_POSTGRES_TABLE_DEFAULT
 import io.agroal.api.AgroalDataSource
 import io.quarkus.agroal.DataSource
 import jakarta.enterprise.context.ApplicationScoped
@@ -16,7 +16,7 @@ import kotlinx.coroutines.withContext
 import org.eclipse.microprofile.config.inject.ConfigProperty
 
 @ApplicationScoped
-internal class LifecycleAnalyticsRepository(
+class LifecycleAnalyticsRepository(
     @ConfigProperty(name = "lemline.analytics.postgresql.schema", defaultValue = ANALYTICS_POSTGRES_SCHEMA_DEFAULT)
     schema: String,
     @ConfigProperty(name = "lemline.analytics.postgresql.table", defaultValue = ANALYTICS_POSTGRES_TABLE_DEFAULT)
@@ -84,7 +84,7 @@ internal class LifecycleAnalyticsRepository(
 
         throw IllegalStateException(
             "Analytics datasource 'analytics' is not available. " +
-                "Enable '$LIFECYCLE_EVENTS_CONSUMER_ENABLED' and configure lemline.analytics.postgresql.*"
+                "Enable '$ANALYTICS_CONSUMER_ENABLED' and configure lemline.analytics.postgresql.*"
         )
     }
 

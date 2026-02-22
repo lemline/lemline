@@ -8,7 +8,7 @@ import jakarta.enterprise.context.ApplicationScoped
 import java.util.*
 
 @ApplicationScoped
-internal class LifecycleAnalyticsService(
+class LifecycleAnalyticsService(
     private val repository: LifecycleAnalyticsRepository,
 ) {
     private val logger = logger()

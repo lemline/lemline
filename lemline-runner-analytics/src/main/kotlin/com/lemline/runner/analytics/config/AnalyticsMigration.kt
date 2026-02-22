@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: BUSL-1.1
-package com.lemline.runner.config
+package com.lemline.runner.analytics.config
 
 import com.lemline.common.info
 import com.lemline.common.logger
-import com.lemline.runner.config.LemlineConfigConstants.ANALYTICS_CONSUMER_ENABLED_DEFAULT
-import com.lemline.runner.config.LemlineConfigConstants.ANALYTICS_POSTGRES_MIGRATE_AT_START_DEFAULT
+import com.lemline.runner.analytics.config.AnalyticsConfigConstants.ANALYTICS_CONSUMER_ENABLED
+import com.lemline.runner.analytics.config.AnalyticsConfigConstants.ANALYTICS_CONSUMER_ENABLED_DEFAULT
+import com.lemline.runner.analytics.config.AnalyticsConfigConstants.ANALYTICS_POSTGRES_MIGRATE_AT_START_DEFAULT
 import io.quarkus.runtime.StartupEvent
 import jakarta.annotation.Priority
 import jakarta.enterprise.context.ApplicationScoped
@@ -14,7 +15,7 @@ import org.eclipse.microprofile.config.inject.ConfigProperty
 
 @ApplicationScoped
 internal class AnalyticsMigration(
-    @param:ConfigProperty(name = LIFECYCLE_EVENTS_CONSUMER_ENABLED, defaultValue = ANALYTICS_CONSUMER_ENABLED_DEFAULT)
+    @param:ConfigProperty(name = ANALYTICS_CONSUMER_ENABLED, defaultValue = ANALYTICS_CONSUMER_ENABLED_DEFAULT)
     val analyticsEnabled: Boolean,
     @param:ConfigProperty(
         name = "quarkus.flyway.analytics.migrate-at-start",

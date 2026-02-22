@@ -4,8 +4,8 @@ package com.lemline.runner.analytics
 import com.lemline.common.logger.Logger
 import com.lemline.common.logger.logger
 import com.lemline.common.values.IDV7
+import com.lemline.runner.common.messaging.MessageHandler
 import com.lemline.runner.listeners.CloudEventService
-import com.lemline.runner.messaging.MessageHandler
 import io.cloudevents.CloudEvent
 import jakarta.enterprise.context.ApplicationScoped
 import org.eclipse.microprofile.reactive.messaging.Message

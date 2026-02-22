@@ -14,7 +14,7 @@ import com.lemline.runner.healthcheck.RetryReadiness.readinessDownDuringRetries
  * Implement this interface alongside [MessageHandler] in lemline-runner
  * handlers to get automatic liveness/readiness integration.
  */
-interface HealthCheckAwareHandler<T> : MessageHandler<T> {
+interface WithHealthCheckMessageHandler<T> : MessageHandler<T> {
     override fun onRetryStarted() {
         readinessDownDuringRetries.set(true)
     }

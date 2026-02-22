@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.messaging.cloudevents
 
+import com.lemline.runner.common.messaging.MessageSubscriber
 import com.lemline.runner.config.CLOUDEVENTS_CONSUMER_CONCURRENCY
 import com.lemline.runner.config.CLOUDEVENTS_CONSUMER_ENABLED
-import com.lemline.runner.messaging.MessageSubscriber
 import io.cloudevents.CloudEvent
 import io.quarkus.runtime.Startup
 import jakarta.enterprise.context.ApplicationScoped
