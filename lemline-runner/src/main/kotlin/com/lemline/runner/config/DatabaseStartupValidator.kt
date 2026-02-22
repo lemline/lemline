@@ -82,10 +82,11 @@ class DatabaseStartupValidator(
             )
         }
     }
-}
 
-/**
- * Exception thrown when database startup validation fails.
- * The message is designed to be user-friendly and actionable.
- */
-class DatabaseStartupException(message: String, cause: Throwable? = null) : RuntimeException(message, cause)
+    /**
+     * Exception thrown when database startup validation fails.
+     * The message is designed to be user-friendly and actionable.
+     */
+    class DatabaseStartupException(message: String, cause: Throwable? = null) : RuntimeException(message, cause)
+
+}

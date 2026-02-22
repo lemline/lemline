@@ -3,6 +3,7 @@ package com.lemline.runner.cli
 
 import com.lemline.runner.cli.config.ConfigCommand
 import com.lemline.runner.cli.definitions.DefinitionCommand
+import com.lemline.runner.cli.gateway.GatewayCommand
 import com.lemline.runner.cli.instances.InstanceCommand
 import com.lemline.runner.cli.listen.ListenCommand
 import com.lemline.runner.cli.migrate.MigrateCommand
@@ -25,6 +26,7 @@ import picocli.CommandLine.Mixin
         InstanceCommand::class,
         ConfigCommand::class,
         ListenCommand::class,
+        GatewayCommand::class,
         MigrateCommand::class
     ]
 )

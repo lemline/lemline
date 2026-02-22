@@ -4,14 +4,19 @@ package com.lemline.runner
 import com.lemline.runner.cli.MainCommand
 import com.lemline.runner.cli.config.ConfigCreateCommand
 import com.lemline.runner.cli.config.ConfigPathHolder
+import com.lemline.runner.cli.gateway.GatewayStartCommand
 import com.lemline.runner.cli.instances.InstanceStartCommand
 import com.lemline.runner.cli.listen.ListenCommand
 import com.lemline.runner.cli.setup
+import com.lemline.runner.config.CLOUDEVENTS_CONSUMER_ENABLED
+import com.lemline.runner.config.CLOUDEVENTS_PRODUCER_ENABLED
 import com.lemline.runner.config.COMMANDS_CONSUMER_ENABLED
 import com.lemline.runner.config.COMMANDS_PRODUCER_ENABLED
 import com.lemline.runner.config.DATABASE_ENABLED
 import com.lemline.runner.config.EVENTS_CONSUMER_ENABLED
 import com.lemline.runner.config.EVENTS_PRODUCER_ENABLED
+import com.lemline.runner.config.LIFECYCLE_EVENTS_CONSUMER_ENABLED
+import com.lemline.runner.config.LIFECYCLE_EVENTS_PRODUCER_ENABLED
 import com.lemline.runner.config.SCHEDULED_ENABLED
 import io.quarkus.picocli.runtime.annotations.TopCommand
 import io.quarkus.runtime.Quarkus
@@ -121,6 +126,15 @@ class LemlineApplication : QuarkusApplication {
                     val start = parseResults.command<InstanceStartCommand>()
                     if (start != null) {
                         System.setProperty(COMMANDS_PRODUCER_ENABLED, "true")
+                    }
+
+                    // the gateway start command, if any
+                    val gatewayStart = parseResults.command<GatewayStartCommand>()
+                    if (gatewayStart != null) {
+                        configureGatewayToggles()
+                        gatewayStart.port?.let {
+                            System.setProperty("lemline.gateway.grpc.port", it.toString())
+                        }
                     }
                 }
             } catch (ex: Exception) {
@@ -253,6 +267,7 @@ private fun checkConfigLocation(filePath: Path, provided: Boolean): Boolean {
     }
     if (fileExists && isRegularFile) {
         ConfigPathHolder.configPath = path
+        System.setProperty("lemline.config.path", path.toAbsolutePath().toString())
         return true
     }
     return false
@@ -290,6 +305,24 @@ private fun disableDatabase() {
 
 private fun disableScheduled() {
     System.setProperty(SCHEDULED_ENABLED, "false")
+}
+
+private fun configureGatewayToggles() {
+    System.setProperty("lemline.gateway.enabled", "true")
+    System.setProperty(DATABASE_ENABLED, "true")
+    System.setProperty(SCHEDULED_ENABLED, "false")
+
+    System.setProperty(COMMANDS_PRODUCER_ENABLED, "true")
+    System.setProperty(COMMANDS_CONSUMER_ENABLED, "false")
+    System.setProperty(EVENTS_PRODUCER_ENABLED, "false")
+    System.setProperty(EVENTS_CONSUMER_ENABLED, "false")
+    System.setProperty(CLOUDEVENTS_PRODUCER_ENABLED, "false")
+    System.setProperty(CLOUDEVENTS_CONSUMER_ENABLED, "false")
+    System.setProperty(LIFECYCLE_EVENTS_PRODUCER_ENABLED, "false")
+    System.setProperty(LIFECYCLE_EVENTS_CONSUMER_ENABLED, "false")
+
+    System.setProperty("quarkus.http.port", "0")
+    System.setProperty("quarkus.http.ssl-port", "0")
 }
 
 private fun setLogLevel(level: Level) = level.name.let {

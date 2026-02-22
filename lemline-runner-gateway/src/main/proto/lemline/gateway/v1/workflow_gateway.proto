@@ -1,0 +1,41 @@
+syntax = "proto3";
+
+package lemline.gateway.v1;
+
+option java_multiple_files = true;
+option java_package = "com.lemline.gateway.v1";
+option java_outer_classname = "WorkflowGatewayProto";
+
+service WorkflowGateway {
+  rpc StartWorkflow(StartWorkflowRequest) returns (StartWorkflowResponse);
+  rpc WatchWorkflow(WatchWorkflowRequest) returns (stream WorkflowAnalyticsEvent);
+}
+
+message StartWorkflowRequest {
+  string workflow_id = 1;
+  string namespace = 2;
+  string name = 3;
+  string version = 4;
+  optional string input_json = 5;
+  optional string zone_id = 6;
+}
+
+message StartWorkflowResponse {
+  enum Result {
+    START_WORKFLOW_RESULT_UNSPECIFIED = 0;
+    START_WORKFLOW_RESULT_ACCEPTED_NEW = 1;
+    START_WORKFLOW_RESULT_ACCEPTED_EXISTING = 2;
+  }
+
+  string workflow_id = 1;
+  Result result = 2;
+}
+
+message WatchWorkflowRequest {
+  string workflow_id = 1;
+}
+
+message WorkflowAnalyticsEvent {
+  int64 cursor = 1;
+  string cloudevent_json = 2;
+}

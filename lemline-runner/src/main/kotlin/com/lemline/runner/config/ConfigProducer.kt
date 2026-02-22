@@ -9,6 +9,7 @@ import com.lemline.runner.common.messaging.CommandEmitter
 import com.lemline.runner.common.messaging.InstanceMessage
 import com.lemline.runner.definitions.DefinitionConfig
 import com.lemline.runner.forks.ForkFeatureConfig
+import com.lemline.runner.gateway.outbox.GatewayOutboxConfig
 import com.lemline.runner.listeners.ListenerConfig
 import com.lemline.runner.messaging.commands.WorkflowCommandEmitter
 import com.lemline.runner.parents.ParentFeatureConfig
@@ -19,6 +20,7 @@ import jakarta.enterprise.context.ApplicationScoped
 import jakarta.enterprise.inject.Produces
 import jakarta.inject.Inject
 import kotlin.jvm.optionals.getOrNull
+import org.eclipse.microprofile.config.inject.ConfigProperty
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.hours
@@ -38,6 +40,10 @@ class ConfigProducer {
 
     @Inject
     internal lateinit var workflowCommandEmitter: WorkflowCommandEmitter
+
+    @Inject
+    @ConfigProperty(name = "lemline.gateway.enabled", defaultValue = "false")
+    lateinit var gatewayEnabled: String
 
     @Produces
     @ApplicationScoped
@@ -101,6 +107,15 @@ class ConfigProducer {
 
     @Produces
     @ApplicationScoped
+    fun gatewayOutboxConfig(): GatewayOutboxConfig = object : GatewayOutboxConfig {
+        private val source = config.outbox().gateway().getOrNull()
+        override val enabled: Boolean get() = gatewayEnabled == "true" && (source?.enabled() ?: true)
+        override val outbox: OutboxConfig get() = source?.outbox()?.toOutboxProcessingConfig() ?: defaultGatewayOutboxConfig()
+        override val cleanup: CleanupConfig get() = source?.cleanup()?.toOutboxCleanupConfig() ?: defaultCleanupConfig()
+    }
+
+    @Produces
+    @ApplicationScoped
     fun definitionConfig(): DefinitionConfig = object : DefinitionConfig {
         override val enabled: Boolean
             get() = config.messaging().cloudevents().getOrNull()?.consumer()?.enabled() ?: false
@@ -124,6 +139,14 @@ class ConfigProducer {
             override val after: Duration get() = this@toOutboxCleanupConfig.after
             override val batchSize: Int get() = this@toOutboxCleanupConfig.batchSize
         }
+
+    private fun defaultGatewayOutboxConfig(): OutboxConfig = object : OutboxConfig {
+        override val every: Duration = 1.seconds
+        override val batchSize: Int = 1000
+        override val initialJitter: Duration = 3.seconds
+        override val retryDelay: Duration = 30.seconds
+        override val maxAttempts: Int = 5
+    }
 
     private fun defaultCleanupConfig(): CleanupConfig = object : CleanupConfig {
         override val every: Duration = 1.hours

@@ -1,10 +1,9 @@
 // SPDX-License-Identifier: BUSL-1.1
-package com.lemline.runner.messaging
+package com.lemline.runner.common.messaging
 
 import com.lemline.common.values.WorkflowInfo
-import com.lemline.runner.failures.FailureReasons.getFailureReason
-import com.lemline.runner.messaging.MessageHandler.Companion.UNKNOWN_NAME
-import com.lemline.runner.messaging.MessageHandler.Companion.UNKNOWN_VERSION
+import com.lemline.runner.common.messaging.MessageHandler.Companion.UNKNOWN_NAME
+import com.lemline.runner.common.messaging.MessageHandler.Companion.UNKNOWN_VERSION
 import io.micrometer.core.instrument.Counter
 import io.micrometer.core.instrument.Gauge
 import io.micrometer.core.instrument.MeterRegistry
@@ -222,6 +221,8 @@ abstract class MessageSubscriberMetrics(val registry: MeterRegistry) {
             timer.record(start.elapsedNow().toJavaDuration())
         }
     }
+
+    protected fun getFailureReason(e: Throwable): String = FailureReasons.getFailureReason(e)
 
     companion object {
         // Tag Keys

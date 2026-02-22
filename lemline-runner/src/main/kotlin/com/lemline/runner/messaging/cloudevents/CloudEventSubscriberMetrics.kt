@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.messaging.cloudevents
 
-import com.lemline.runner.messaging.MessageSubscriberMetrics
+import com.lemline.runner.common.messaging.MessageSubscriberMetrics
 import io.micrometer.core.instrument.MeterRegistry
 import jakarta.inject.Inject
 import jakarta.inject.Singleton

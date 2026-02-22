@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-package com.lemline.runner.messaging
+package com.lemline.runner.common.messaging
 
 import com.lemline.common.logger.logger
 import io.quarkus.runtime.ShutdownEvent
@@ -43,7 +43,7 @@ import org.reactivestreams.Subscription
  * @param T The message type that the handler processes
  */
 @Suppress("ReactiveStreamsSubscriberImplementation")
-internal abstract class MessageSubscriber<T> : Subscriber<Message<String>> {
+abstract class MessageSubscriber<T> : Subscriber<Message<String>> {
 
     abstract val maxConcurrency: Long
     abstract val enabled: Boolean

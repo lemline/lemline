@@ -13,6 +13,7 @@ dependencies {
     implementation(project(":lemline-runner-definitions"))
     implementation(project(":lemline-runner-schedules"))
     implementation(project(":lemline-runner-listeners"))
+    implementation(project(":lemline-runner-gateway"))
 
     // KotlinX ecosystem
     implementation(libs.bundles.kotlinxEcosystem)

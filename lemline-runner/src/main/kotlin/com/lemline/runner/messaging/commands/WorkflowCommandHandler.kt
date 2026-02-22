@@ -13,7 +13,9 @@ import com.lemline.core.states.WorkflowEvent
 import com.lemline.core.workflows.WorkflowCache
 import com.lemline.core.workflows.getNode
 import com.lemline.runner.activities.functions.FunctionResolver
+import com.lemline.runner.common.messaging.CompensationException
 import com.lemline.runner.common.messaging.InstanceMessage
+import com.lemline.runner.common.messaging.toLogString
 import com.lemline.runner.config.LemlineConfiguration
 import com.lemline.runner.definitions.DefinitionRepository
 import com.lemline.runner.failures.FailureModel
@@ -22,11 +24,9 @@ import com.lemline.runner.failures.FailureReasons.DESERIALIZATION_FAILURE
 import com.lemline.runner.failures.FailureReasons.SERIALIZATION_FAILURE
 import com.lemline.runner.failures.FailureReasons.getFailureReason
 import com.lemline.runner.failures.FailureRepository
-import com.lemline.runner.messaging.CompensationException
-import com.lemline.runner.messaging.MessageHandler
+import com.lemline.runner.messaging.WithHealthCheckMessageHandler
 import com.lemline.runner.messaging.cloudevents.CloudEventsEmitter
 import com.lemline.runner.messaging.events.WorkflowEventEmitter
-import com.lemline.runner.messaging.toLogString
 import io.serverlessworkflow.api.types.Workflow
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.enterprise.inject.Instance
@@ -54,7 +54,7 @@ internal class WorkflowCommandHandler(
     private val functionResolver: FunctionResolver,
     private val lifecycleHook: LifecycleEventHook,
     private val cloudEventsEmitter: Instance<CloudEventsEmitter>,
-) : MessageHandler<InstanceMessage<WorkflowCommand>> {
+) : WithHealthCheckMessageHandler<InstanceMessage<WorkflowCommand>> {
     override var logger = logger()
 
     @TestOnly

@@ -29,8 +29,10 @@ include(":lemline-runner-forks")
 include(":lemline-runner-listeners")
 include(":lemline-runner-failures")
 include(":lemline-runner-definitions")
+include(":lemline-runner-gateway")
 include(":lemline-runner-cli")
 include(":lemline-runner-messaging-pgmq")
+include(":lemline-runner-analytics")
 include(":lemline-runner")
 
 rootProject.name = "lemline"

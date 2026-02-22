@@ -15,6 +15,8 @@ object LemlineConfigConstants {
 
     // Consumer concurrency
     const val CONSUMER_CONCURRENCY_DEFAULT = "64"
+    const val ANALYTICS_CONSUMER_ENABLED_DEFAULT = "false"
+    const val ANALYTICS_CONSUMER_CONCURRENCY_DEFAULT = CONSUMER_CONCURRENCY_DEFAULT
 
     // Messaging connectors
     const val IN_MEMORY_CONNECTOR = "smallrye-in-memory"
@@ -33,6 +35,11 @@ object LemlineConfigConstants {
     const val POSTGRES_DATABASE_DEFAULT = "lemline"
     const val POSTGRES_USERNAME_DEFAULT = "postgres"
     const val POSTGRES_PASSWORD_DEFAULT = "postgres"
+    const val ANALYTICS_POSTGRES_DATABASE_DEFAULT = "lemline_analytics"
+    const val ANALYTICS_POSTGRES_SCHEMA_DEFAULT = "public"
+    const val ANALYTICS_POSTGRES_TABLE_DEFAULT = "lemline_lifecycle_events"
+    const val ANALYTICS_POSTGRES_MIGRATE_AT_START_DEFAULT = "true"
+    const val ANALYTICS_POSTGRES_BASELINE_ON_MIGRATE_DEFAULT = "false"
 
     // MySQL
     const val MYSQL_HOST_DEFAULT = "localhost"

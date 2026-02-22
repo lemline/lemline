@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-package com.lemline.runner.messaging
+package com.lemline.runner.common.messaging
 
 import io.smallrye.reactive.messaging.kafka.api.IncomingKafkaRecordMetadata
 import io.smallrye.reactive.messaging.rabbitmq.IncomingRabbitMQMetadata

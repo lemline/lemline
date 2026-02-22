@@ -1,5 +1,4 @@
 // SPDX-License-Identifier: BUSL-1.1
-
 package com.lemline.runner.testcases.inMemory
 
 import com.lemline.core.testcases.CallFunctionTestCases

@@ -6,7 +6,9 @@ import com.lemline.common.values.IDV7
 import com.lemline.core.errors.InternalException
 import com.lemline.core.states.WorkflowEvent
 import com.lemline.runner.common.config.DatabaseConfig
+import com.lemline.runner.common.messaging.CompensationException
 import com.lemline.runner.common.messaging.InstanceMessage
+import com.lemline.runner.common.messaging.toLogString
 import com.lemline.runner.definitions.Definitions
 import com.lemline.runner.failures.FailureModel
 import com.lemline.runner.failures.FailureReasons.DESERIALIZATION_FAILURE
@@ -15,9 +17,7 @@ import com.lemline.runner.failures.FailureRepository
 import com.lemline.runner.forks.ForkService
 import com.lemline.runner.listeners.ListenerEventService
 import com.lemline.runner.listeners.ListenerService
-import com.lemline.runner.messaging.CompensationException
-import com.lemline.runner.messaging.MessageHandler
-import com.lemline.runner.messaging.toLogString
+import com.lemline.runner.messaging.WithHealthCheckMessageHandler
 import com.lemline.runner.parents.ParentService
 import com.lemline.runner.retries.RetryService
 import com.lemline.runner.schedules.ScheduleService
@@ -56,7 +56,7 @@ internal class WorkflowEventHandler(
     private val listenerService: ListenerService,
     private val listenerEventService: ListenerEventService,
     private val scheduleService: ScheduleService,
-) : MessageHandler<InstanceMessage<WorkflowEvent>> {
+) : WithHealthCheckMessageHandler<InstanceMessage<WorkflowEvent>> {
 
     override var logger = logger()
 

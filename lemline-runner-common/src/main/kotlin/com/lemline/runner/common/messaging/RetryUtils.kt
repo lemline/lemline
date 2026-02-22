@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-package com.lemline.runner.messaging
+package com.lemline.runner.common.messaging
 
 import com.lemline.common.logger.Logger
 import java.io.IOException

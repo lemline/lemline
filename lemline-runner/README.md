@@ -171,6 +171,37 @@ lemline:
             queue: ${LEMLINE_RABBITMQ_QUEUE_IN:workflows}
 ```
 
+### Lifecycle Events Analytics Ingestion
+
+Lemline can ingest lifecycle CloudEvents into a dedicated analytics PostgreSQL database by consuming the existing
+`lifecycleevents` broker destination.
+
+Enable it with:
+
+```yaml
+lemline:
+    analytics:
+        consumer:
+            enabled: true
+            concurrency: 64
+        migrate-at-start: true
+        baseline-on-migrate: false
+        postgresql:
+            host: localhost
+            port: 5432
+            database: lemline_analytics
+            username: postgres
+            password: postgres
+            schema: public
+            table: lemline_lifecycle_events
+```
+
+Behavior:
+
+* ACK-after-commit processing.
+* Deduplicated inserts using CloudEvent identity (`source`, `id`).
+* Works with Kafka, RabbitMQ, and PGMQ lifecycleevents bindings.
+
 ### Service Settings
 
 The runner includes configurable service settings for task scheduling and cleanup:

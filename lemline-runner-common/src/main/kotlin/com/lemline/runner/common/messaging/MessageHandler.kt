@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-package com.lemline.runner.messaging
+package com.lemline.runner.common.messaging
 
 import com.lemline.common.logger.Logger
 import com.lemline.common.logger.withSuspendLoggingContext
@@ -9,14 +9,11 @@ import com.lemline.common.values.WorkflowId
 import com.lemline.common.values.WorkflowInfo
 import com.lemline.common.values.WorkflowName
 import com.lemline.common.values.WorkflowVersion
-import com.lemline.runner.common.messaging.InstanceMessage
-import com.lemline.runner.healthcheck.FatalAckLiveness.livenessDownOnFailure
-import com.lemline.runner.healthcheck.RetryReadiness.readinessDownDuringRetries
 import io.quarkus.smallrye.reactivemessaging.ackSuspending
 import io.quarkus.smallrye.reactivemessaging.nackSuspending
 import org.eclipse.microprofile.reactive.messaging.Message
 
-internal interface MessageHandler<T> {
+interface MessageHandler<T> {
 
     suspend fun Message<String>.deserialize(): T
 
@@ -54,6 +51,21 @@ internal interface MessageHandler<T> {
     val onCompleteTest: (Message<String>, T?) -> Unit
 
     val onFailureTest: (Message<String>, Throwable?) -> Unit
+
+    /**
+     * Called when a retry attempt starts. Override to integrate with health checks.
+     */
+    fun onRetryStarted() {}
+
+    /**
+     * Called when a retry succeeds. Override to integrate with health checks.
+     */
+    fun onRetrySucceeded() {}
+
+    /**
+     * Called when all retry attempts are exhausted. Override to integrate with health checks.
+     */
+    fun onRetryExhausted() {}
 
     // Retrieve workflowInfo if present
     val T?.workflowInfo get() = (this as? WithOptionalWorkflowInfo)?.workflowInfo
@@ -104,7 +116,7 @@ internal interface MessageHandler<T> {
      * - **Success path**: If [block] completes normally, its result is wrapped in
      *   [Result.success] and returned. The caller is responsible for any final ACK.
      * - **Compensation path**: If [block] throws a [CompensationException],
-     *   the exception’s `run` callback is invoked to perform compensating work
+     *   the exception's `run` callback is invoked to perform compensating work
      *   (e.g. persisting failure details). If compensation succeeds, the message is
      *   acknowledged via [acknowledgeWithRetry] and a failed [Result] containing the
      *   original [CompensationException] is returned.
@@ -190,9 +202,9 @@ internal interface MessageHandler<T> {
         maxAttempts = maxAttempts,
         totalBudgetMs = totalBudgetMs,
         singleAttemptTimeoutMs = singleAttemptTimeoutMs,
-        onRetry = { readinessDownDuringRetries.set(true) },
-        onSuccess = { readinessDownDuringRetries.set(false) },
-        onFailure = { _, _, _ -> livenessDownOnFailure.set(true) }
+        onRetry = { onRetryStarted() },
+        onSuccess = { onRetrySucceeded() },
+        onFailure = { _, _, _ -> onRetryExhausted() }
     ) {
         ackSuspending()
     }
@@ -220,7 +232,7 @@ internal interface MessageHandler<T> {
     /**
      * Attempts to negatively acknowledge a message multiple times with retry logic.
      * This method supports configurable retry attempts, a total time budget for retries,
-     * and a timeout for each individual attempt. The negative acknowledgment is performed
+     * and a timeout for each individual retry attempt. The negative acknowledgment is performed
      * asynchronously, with detailed handling for failed attempts.
      *
      * @param cause The exception or error that caused the message to be negatively acknowledged.
@@ -239,9 +251,9 @@ internal interface MessageHandler<T> {
         maxAttempts = maxAttempts,
         totalBudgetMs = totalBudgetMs,
         singleAttemptTimeoutMs = singleAttemptTimeoutMs,
-        onRetry = { readinessDownDuringRetries.set(true) },
-        onSuccess = { readinessDownDuringRetries.set(false) },
-        onFailure = { _, _, _ -> livenessDownOnFailure.set(true) }
+        onRetry = { onRetryStarted() },
+        onSuccess = { onRetrySucceeded() },
+        onFailure = { _, _, _ -> onRetryExhausted() }
     ) {
         nackSuspending(cause)
     }
