@@ -3,7 +3,11 @@ package com.lemline.runner.gateway.grpc
 
 import com.lemline.common.values.IDV7
 import com.lemline.common.values.WorkflowId
-import com.lemline.runner.gateway.analytics.WorkflowWatchService
+import com.lemline.gateway.v1.StartWorkflowRequest
+import com.lemline.gateway.v1.StartWorkflowResponse
+import com.lemline.gateway.v1.WatchWorkflowRequest
+import com.lemline.gateway.v1.WorkflowAnalyticsEvent
+import com.lemline.gateway.v1.WorkflowGatewayGrpc
 import com.lemline.runner.gateway.auth.GatewayAuthContext
 import com.lemline.runner.gateway.errors.GatewayBadRequestException
 import com.lemline.runner.gateway.errors.GatewayConflictException
@@ -11,11 +15,7 @@ import com.lemline.runner.gateway.errors.GatewayNotFoundException
 import com.lemline.runner.gateway.errors.GatewayPermissionDeniedException
 import com.lemline.runner.gateway.start.GatewayStartResult
 import com.lemline.runner.gateway.start.WorkflowStartService
-import com.lemline.gateway.v1.StartWorkflowRequest
-import com.lemline.gateway.v1.StartWorkflowResponse
-import com.lemline.gateway.v1.WatchWorkflowRequest
-import com.lemline.gateway.v1.WorkflowAnalyticsEvent
-import com.lemline.gateway.v1.WorkflowGatewayGrpc
+import com.lemline.runner.gateway.watch.WorkflowWatchService
 import io.grpc.Status
 import io.grpc.StatusRuntimeException
 import io.grpc.stub.ServerCallStreamObserver
@@ -45,7 +45,9 @@ class WorkflowGatewayGrpcService : WorkflowGatewayGrpc.WorkflowGatewayImplBase()
 
     override fun startWorkflow(request: StartWorkflowRequest, responseObserver: StreamObserver<StartWorkflowResponse>) {
         val principal = GatewayAuthContext.getOrNull()
-            ?: return responseObserver.onError(Status.UNAUTHENTICATED.withDescription("Missing authenticated principal").asRuntimeException())
+            ?: return responseObserver.onError(
+                Status.UNAUTHENTICATED.withDescription("Missing authenticated principal").asRuntimeException()
+            )
 
         val callObserver = responseObserver as? ServerCallStreamObserver<StartWorkflowResponse>
         scope.launch {
@@ -72,9 +74,14 @@ class WorkflowGatewayGrpcService : WorkflowGatewayGrpc.WorkflowGatewayImplBase()
         }
     }
 
-    override fun watchWorkflow(request: WatchWorkflowRequest, responseObserver: StreamObserver<WorkflowAnalyticsEvent>) {
+    override fun watchWorkflow(
+        request: WatchWorkflowRequest,
+        responseObserver: StreamObserver<WorkflowAnalyticsEvent>
+    ) {
         val principal = GatewayAuthContext.getOrNull()
-            ?: return responseObserver.onError(Status.UNAUTHENTICATED.withDescription("Missing authenticated principal").asRuntimeException())
+            ?: return responseObserver.onError(
+                Status.UNAUTHENTICATED.withDescription("Missing authenticated principal").asRuntimeException()
+            )
 
         val callObserver = responseObserver as? ServerCallStreamObserver<WorkflowAnalyticsEvent>
         scope.launch {
