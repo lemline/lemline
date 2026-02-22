@@ -1,123 +1,86 @@
-# Spec Command
+---
+description: Interview in-depth about a feature/idea to produce a detailed specification
+---
 
-Create a detailed technical specification for a new feature in the Lemline workflow orchestration runtime.
+$ARGUMENTS
 
-**Feature request:** {{placeholderText}}
+You are conducting a comprehensive specification interview. Your goal is to extract every detail needed to write a
+complete, unambiguous spec.
 
-## Process
+## Interview Protocol
 
-1. **Review documentation** to understand project standards:
-    - `/CLAUDE.md` - Project overview and architecture
-    - `/lemline-core/docs/` - Developer guides for core logic
-    - `/lemline-runner/docs/` - Developer guides for infrastructure
-    - `/docs/adr/` - Architecture Decision Records
+1. **Start by understanding the core concept** - what is being built and why
+2. **Go deep, not shallow** - avoid obvious questions, dig into:
+    - Edge cases and boundary conditions
+    - Error states and failure modes
+    - Performance implications and scale considerations
+    - Security concerns and attack vectors
+    - Data modeling and state management
+    - Integration points and dependencies
+    - Migration and backwards compatibility
+    - Observability, logging, and debugging
+    - User mental models and expectations
+    - Accessibility requirements
+    - Internationalization concerns
+3. **Challenge assumptions** - ask "what if" and "why not" questions
+4. **Explore tradeoffs** - when there are multiple approaches, understand the reasoning
+5. **Clarify ambiguity** - never assume, always ask
 
-2. **Read the codebase** to understand existing patterns:
-    - Explore similar task types, instances, repositories
-    - Check existing nodes in `lemline-core/src/main/kotlin/com/lemline/core/nodes/`
-    - Review outbox patterns in `lemline-runner/src/main/kotlin/com/lemline/runner/outbox/`
-    - Check existing migrations in `db/migration/`
+## Interview Style
 
-3. **Create specification with sensible defaults:**
-    - **State Management**: Use exception-driven control flow (WaitStartedException, TaskRetriedException, etc.)
-    - **Data model**: UUID v7 primary keys (IDV7), created_at/updated_at timestamps, snake_case DB names
-    - **Repositories**: Use Kotlin coroutines (`suspend` functions), implement `findByUUID(uuid: IDV7): T?`
-    - **Outbox pattern**: PENDING → processing → SENT, use FOR UPDATE SKIP LOCKED
-    - **Messaging**: Distinguish commands-in/out (high-throughput) vs events-out (durable operations)
-    - **Testing**: Use Kotest with `@QuarkusTest`, test with PostgreSQL/MySQL/H2
+- Ask 2-4 focused questions per round using AskUserQuestion
+- Questions should be specific and contextual, not generic
+- Build on previous answers to go deeper
+- When you sense completeness in one area, pivot to another
+- Continue interviewing until you have covered ALL aspects thoroughly
 
-4. **Write specification to `/docs/features/spec_[feature_name].md`** containing:
-   ```markdown
-   # Feature: [Name]
+## When to Ask vs. Recommend
 
-   ## Overview
-   Brief description and purpose in the workflow execution context
+**ASK the user** for domain-specific decisions where they are the expert:
 
-   ## Workflow Integration
+- Business rules and logic
+- User experience preferences
+- Feature scope and priorities
+- Naming conventions specific to their domain
+- Workflow and process choices
 
-   ### Task Type (if adding new task)
-   - **Task Name**: `taskName`
-   - **Model Location**: `lemline-core/src/main/kotlin/com/lemline/core/models/tasks/`
-   - **Instance Location**: `lemline-core/src/main/kotlin/com/lemline/core/instances/`
-   - **Control Flow**: Describe exception-based control (e.g., throws WaitStartedException)
+**MAKE a recommendation** for technical/best-practice decisions where you are the expert:
 
-   ### State Management
-   - **NodeState**: What state needs to persist between steps
-   - **NodePosition**: How position navigates through the task
+- Security patterns and practices
+- Performance optimization approaches
+- Error handling strategies
+- API design conventions
+- Database modeling patterns
+- Testing strategies
+- Code architecture patterns
+- Accessibility implementation details
 
-   ## Data Model
+When recommending, state your recommendation clearly with brief reasoning, then ask if they want to override or have
+constraints you should consider. Example: "I recommend using optimistic locking for concurrent edits - it's simpler and
+handles the common case well. Any reason to consider pessimistic locking instead?"
 
-   ### Entity: [EntityName]
+## Completion Criteria
 
-   ### Repository
+Only stop interviewing when you have clarity on:
 
-   ## Database Migration
+- Functional requirements (what it does)
+- Non-functional requirements (how well it does it)
+- User experience flow (how users interact)
+- Technical architecture (how it's built)
+- Data model (what's stored and how)
+- API contracts (if applicable)
+- Error handling strategy
+- Testing approach
+- Rollout/migration plan (if applicable)
 
-   ## Implementation Files
+## Output
 
-   ### lemline-core (workflow logic)
-    - `lemline-core/src/main/kotlin/com/lemline/core/models/tasks/[Task].kt`
-    - `lemline-core/src/main/kotlin/com/lemline/core/instances/[Task]Instance.kt`
+When the interview is complete, write a comprehensive specification to:
+`tmp/specs/spec-[subject-slug].md`
 
-   ### lemline-runner (infrastructure)
-    - `lemline-runner/src/main/kotlin/com/lemline/runner/models/[Entity]Model.kt`
-    - `lemline-runner/src/main/kotlin/com/lemline/runner/repositories/[Entity]Repository.kt`
-    - `lemline-runner/src/main/kotlin/com/lemline/runner/outbox/[Entity]Outbox.kt` (if outbox needed)
-    - `lemline-runner/src/main/resources/db/migration/postgresql/V[N]__[description].sql`
-    - `lemline-runner/src/main/resources/db/migration/mysql/V[N]__[description].sql`
-    - `lemline-runner/src/main/resources/db/migration/h2/V[N]__[description].sql`
+The spec should be structured, detailed, and actionable - a developer should be able to implement from it without
+further clarification.
 
-   ### Tests
-    - `lemline-core/src/test/kotlin/com/lemline/core/tests/[Feature]Test.kt`
-    - `lemline-runner/src/test/kotlin/com/lemline/runner/tests/[Feature]Test.kt`
+---
 
-   ## Messaging Flow
-
-   Describe how the feature integrates with messaging channels:
-    - **commands-in**: [what messages trigger this feature]
-    - **commands-out**: [what messages this feature emits]
-    - **events-out**: [what database operations are needed]
-
-   ## Key Implementation Details
-    - Exception-driven control flow specifics
-    - State serialization requirements
-    - Retry/backoff policies if applicable
-    - Parent-child workflow interactions if applicable
-
-   ## Testing Checklist
-    - [ ] Unit tests for task logic (lemline-core)
-    - [ ] Integration tests with database (lemline-runner)
-    - [ ] Test with PostgreSQL, MySQL, and H2
-    - [ ] Test retry/error scenarios
-    - [ ] Test state persistence across restarts
-
-   ## Open Questions
-    - [Only if genuinely ambiguous]
-   ```
-
-5. **Present the specification** to the user with:
-    - Summary of the proposed solution
-    - Key decisions made (and why)
-    - Any questions (only if truly needed)
-    - Ask: "Should I proceed with implementation?"
-
-## Best Practice Defaults
-
-**When in doubt:**
-
-- Use exception-driven control flow for async operations
-- Add to outbox tables for durable operations (waits, retries, parent tracking)
-- Include standard timestamps (created_at, updated_at)
-- Use IDV7 (time-sortable UUIDs) for all primary keys
-- Add indexes for foreign keys and frequently queried fields (workflow_id, status)
-- Use `suspend` functions for all database operations
-- Use batch operations for performance (`insertBatch`, `updateBatch`)
-- Test with all supported databases (PostgreSQL, MySQL, H2)
-- Follow existing naming conventions in the codebase
-
-**Only ask questions when:**
-
-- Business logic is fundamentally ambiguous
-- Multiple architectural approaches have significant tradeoffs
-- The request conflicts with existing patterns
-- The feature significantly changes the execution model
+Begin the interview now. Start with understanding the core concept, then systematically explore all dimensions.
