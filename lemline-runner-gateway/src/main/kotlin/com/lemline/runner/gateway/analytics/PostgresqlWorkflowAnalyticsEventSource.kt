@@ -55,7 +55,7 @@ class PostgresqlWorkflowAnalyticsEventSource(
                         while (rs.next()) {
                             add(
                                 WorkflowAnalyticsEventRow(
-                                    sequence = rs.getLong("id"),
+                                    cursor = rs.getLong("id"),
                                     eventType = rs.getString("type"),
                                     cloudEventJson = rs.getString("payload_json")
                                 )

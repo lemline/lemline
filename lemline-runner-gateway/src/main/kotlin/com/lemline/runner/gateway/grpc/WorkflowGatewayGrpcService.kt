@@ -86,7 +86,7 @@ class WorkflowGatewayGrpcService : WorkflowGatewayGrpc.WorkflowGatewayImplBase()
 
                     responseObserver.onNext(
                         WorkflowAnalyticsEvent.newBuilder()
-                            .setSequence(event.sequence)
+                            .setCursor(event.cursor)
                             .setCloudeventJson(event.cloudEventJson)
                             .build()
                     )

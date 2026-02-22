@@ -65,7 +65,7 @@ class WorkflowWatchService(
             for (row in rows) {
                 val shouldContinue = onEvent(row)
                 if (!shouldContinue) return
-                lastSequence = row.sequence
+                lastSequence = row.cursor
                 if (row.eventType in TERMINAL_EVENT_TYPES) return
             }
         }

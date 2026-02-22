@@ -4,7 +4,7 @@ package com.lemline.runner.gateway.analytics
 import com.lemline.common.values.WorkflowId
 
 data class WorkflowAnalyticsEventRow(
-    val sequence: Long,
+    val cursor: Long,
     val eventType: String,
     val cloudEventJson: String,
 )
