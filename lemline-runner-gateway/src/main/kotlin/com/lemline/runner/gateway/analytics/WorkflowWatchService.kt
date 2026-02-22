@@ -9,7 +9,7 @@ import com.lemline.runner.gateway.config.GatewayConfigConstants.GATEWAY_WATCH_BA
 import com.lemline.runner.gateway.config.GatewayConfigConstants.GATEWAY_WATCH_BATCH_SIZE_DEFAULT
 import com.lemline.runner.gateway.config.GatewayConfigConstants.GATEWAY_WATCH_POLL_INTERVAL_MS
 import com.lemline.runner.gateway.config.GatewayConfigConstants.GATEWAY_WATCH_POLL_INTERVAL_MS_DEFAULT
-import com.lemline.runner.gateway.start.GatewayWorkflowReservationRepository
+import com.lemline.runner.gateway.outbox.GatewayCommandOutboxRepository
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
 import kotlin.coroutines.coroutineContext
@@ -28,7 +28,7 @@ class WorkflowWatchService(
     lateinit var authorizer: GatewayAuthorizer
 
     @Inject
-    lateinit var reservationRepository: GatewayWorkflowReservationRepository
+    lateinit var gatewayOutboxRepository: GatewayCommandOutboxRepository
 
     @Inject
     lateinit var eventSource: WorkflowAnalyticsEventSource
@@ -41,9 +41,9 @@ class WorkflowWatchService(
         authorizer.requireScope(principal, "lemline.watch")
 
         while (coroutineContext.isActive) {
-            val reservation = reservationRepository.findByWorkflowId(workflowId)
-            if (reservation != null) {
-                authorizer.requireNamespace(principal, reservation.workflowNamespace)
+            val outboxEntry = gatewayOutboxRepository.findByWorkflowId(workflowId)
+            if (outboxEntry != null) {
+                authorizer.requireNamespace(principal, outboxEntry.workflowNamespace.toString())
                 break
             }
             delay(pollIntervalMs)

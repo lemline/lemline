@@ -54,6 +54,10 @@ dependencies {
     testImplementation("io.kotest:kotest-runner-junit5")
     testImplementation("io.kotest:kotest-assertions-core")
     testImplementation(libs.mockk)
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test")
+    testImplementation(testFixtures(project(":lemline-runner-common")))
+    testImplementation(testFixtures(project(":lemline-common")))
+    testImplementation(testFixtures(project(":lemline-core")))
 }
 
 val compileKotlin: KotlinCompile by tasks

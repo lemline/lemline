@@ -28,8 +28,7 @@ message StartWorkflowResponse {
   }
 
   string workflow_id = 1;
-  string version = 2;
-  Result result = 3;
+  Result result = 2;
 }
 
 message WatchWorkflowRequest {

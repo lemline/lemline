@@ -55,7 +55,6 @@ class WorkflowGatewayGrpcService : WorkflowGatewayGrpc.WorkflowGatewayImplBase()
 
                 val response = StartWorkflowResponse.newBuilder()
                     .setWorkflowId(startResult.workflowId.toString())
-                    .setVersion(startResult.version.toString())
                     .setResult(
                         when (startResult.result) {
                             GatewayStartResult.ACCEPTED_NEW -> StartWorkflowResponse.Result.START_WORKFLOW_RESULT_ACCEPTED_NEW

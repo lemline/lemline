@@ -533,6 +533,7 @@ interface LemlineConfiguration {
         fun retry(): Optional<ProcessOutboxConfig>
         fun schedule(): Optional<ProcessOutboxConfig>
         fun listener(): Optional<ProcessOutboxConfig>
+        fun gateway(): Optional<ProcessOutboxConfig>
         fun parent(): Optional<CleanupOutboxConfig>
         fun fork(): Optional<CleanupOutboxConfig>
     }
