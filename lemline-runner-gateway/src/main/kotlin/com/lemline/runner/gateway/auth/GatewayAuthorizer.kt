@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.gateway.auth
 
+import com.lemline.runner.gateway.config.GatewayConfigConstants.GATEWAY_SECURITY_ENABLED
+import com.lemline.runner.gateway.config.GatewayConfigConstants.GATEWAY_SECURITY_ENABLED_DEFAULT
 import com.lemline.runner.gateway.config.GatewayConfigConstants.GATEWAY_NAMESPACES_FIELD
 import com.lemline.runner.gateway.config.GatewayConfigConstants.GATEWAY_NAMESPACES_FIELD_DEFAULT
 import com.lemline.runner.gateway.config.GatewayConfigConstants.GATEWAY_SCOPE_FIELD
@@ -12,12 +14,22 @@ import org.eclipse.microprofile.jwt.JsonWebToken
 
 @ApplicationScoped
 class GatewayAuthorizer(
+    @ConfigProperty(name = GATEWAY_SECURITY_ENABLED, defaultValue = GATEWAY_SECURITY_ENABLED_DEFAULT)
+    private val securityEnabled: Boolean,
     @ConfigProperty(name = GATEWAY_SCOPE_FIELD, defaultValue = GATEWAY_SCOPE_FIELD_DEFAULT)
     private val scopeField: String,
     @ConfigProperty(name = GATEWAY_NAMESPACES_FIELD, defaultValue = GATEWAY_NAMESPACES_FIELD_DEFAULT)
     private val namespacesField: String,
 ) {
     fun principalFrom(jwt: JsonWebToken): GatewayPrincipal {
+        if (!securityEnabled) {
+            return GatewayPrincipal(
+                subject = null,
+                scopes = setOf("*"),
+                namespaces = setOf("*")
+            )
+        }
+
         val scopes = parseClaimAsSet(jwt, scopeField)
         val namespaces = parseClaimAsSet(jwt, namespacesField)
         return GatewayPrincipal(
@@ -28,12 +40,14 @@ class GatewayAuthorizer(
     }
 
     fun requireScope(principal: GatewayPrincipal, scope: String) {
+        if (!securityEnabled) return
         if (!principal.hasScope(scope)) {
             throw GatewayPermissionDeniedException("Missing required scope '$scope'")
         }
     }
 
     fun requireNamespace(principal: GatewayPrincipal, namespace: String) {
+        if (!securityEnabled) return
         if (!principal.canAccessNamespace(namespace)) {
             throw GatewayPermissionDeniedException("Not authorized for namespace '$namespace'")
         }

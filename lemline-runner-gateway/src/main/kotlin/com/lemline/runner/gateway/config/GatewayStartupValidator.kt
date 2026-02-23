@@ -18,6 +18,11 @@ class GatewayStartupValidator(
         defaultValue = GatewayConfigConstants.GATEWAY_ENABLED_DEFAULT
     )
     private val gatewayEnabled: Boolean,
+    @param:ConfigProperty(
+        name = GatewayConfigConstants.GATEWAY_SECURITY_ENABLED,
+        defaultValue = GatewayConfigConstants.GATEWAY_SECURITY_ENABLED_DEFAULT
+    )
+    private val securityEnabled: Boolean,
     @param:ConfigProperty(name = GatewayConfigConstants.GATEWAY_TLS_CERTIFICATE)
     private val tlsCertificate: Optional<String>,
     @param:ConfigProperty(name = GatewayConfigConstants.GATEWAY_TLS_PRIVATE_KEY)
@@ -40,8 +45,10 @@ class GatewayStartupValidator(
         requireConfigured(tlsCertificate, GatewayConfigConstants.GATEWAY_TLS_CERTIFICATE)
         requireConfigured(tlsPrivateKey, GatewayConfigConstants.GATEWAY_TLS_PRIVATE_KEY)
         requireConfigured(tlsTrustStore, GatewayConfigConstants.GATEWAY_TLS_TRUST_STORE)
-        requireConfigured(jwtIssuer, GatewayConfigConstants.GATEWAY_JWT_ISSUER)
-        requireConfigured(jwtJwksUrl, GatewayConfigConstants.GATEWAY_JWT_JWKS_URL)
+        if (securityEnabled) {
+            requireConfigured(jwtIssuer, GatewayConfigConstants.GATEWAY_JWT_ISSUER)
+            requireConfigured(jwtJwksUrl, GatewayConfigConstants.GATEWAY_JWT_JWKS_URL)
+        }
 
         runBlocking {
             analyticsEventSource.validate()

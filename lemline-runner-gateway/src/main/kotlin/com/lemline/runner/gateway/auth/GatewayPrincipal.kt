@@ -9,4 +9,12 @@ data class GatewayPrincipal(
     fun hasScope(scope: String): Boolean = scopes.contains(scope) || scopes.contains("*")
 
     fun canAccessNamespace(namespace: String): Boolean = namespaces.contains("*") || namespaces.contains(namespace)
+
+    companion object {
+        val dashboardAnonymous: GatewayPrincipal = GatewayPrincipal(
+            subject = null,
+            scopes = setOf("*"),
+            namespaces = setOf("*")
+        )
+    }
 }

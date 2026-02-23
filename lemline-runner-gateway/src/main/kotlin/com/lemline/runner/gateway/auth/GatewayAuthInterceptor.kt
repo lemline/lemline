@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.gateway.auth
 
+import com.lemline.runner.gateway.config.GatewayConfigConstants.GATEWAY_SECURITY_ENABLED
+import com.lemline.runner.gateway.config.GatewayConfigConstants.GATEWAY_SECURITY_ENABLED_DEFAULT
 import io.grpc.Contexts
 import io.grpc.Metadata
 import io.grpc.ServerCall
@@ -11,10 +13,14 @@ import io.quarkus.grpc.GlobalInterceptor
 import io.smallrye.jwt.auth.principal.JWTParser
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
+import org.eclipse.microprofile.config.inject.ConfigProperty
 
 @GlobalInterceptor
 @ApplicationScoped
-class GatewayAuthInterceptor : ServerInterceptor {
+class GatewayAuthInterceptor(
+    @param:ConfigProperty(name = GATEWAY_SECURITY_ENABLED, defaultValue = GATEWAY_SECURITY_ENABLED_DEFAULT)
+    private val securityEnabled: Boolean,
+) : ServerInterceptor {
 
     @Inject
     lateinit var jwtParser: JWTParser
@@ -27,6 +33,10 @@ class GatewayAuthInterceptor : ServerInterceptor {
         headers: Metadata,
         next: ServerCallHandler<ReqT, RespT>
     ): ServerCall.Listener<ReqT> {
+        if (!securityEnabled) {
+            return next.startCall(call, headers)
+        }
+
         val authorizationHeader = headers.get(AUTHORIZATION_METADATA_KEY)
             ?: return closeUnauthenticated(call, "Missing Authorization metadata header")
 

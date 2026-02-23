@@ -62,6 +62,47 @@ class LemlineGatewayConfigSourceTest {
         }
     }
 
+    @Test
+    fun `enables grpc web and dashboard cors defaults when gateway is enabled`() {
+        withSystemProperties(
+            mapOf(
+                GatewayConfigConstants.GATEWAY_ENABLED to "true",
+            )
+        ) {
+            val source = LemlineGatewayConfigSource()
+            assertEquals("true", source.getValue("quarkus.grpc.server.enable-grpc-web"))
+            assertEquals("true", source.getValue("quarkus.http.cors"))
+            assertEquals(
+                GatewayConfigConstants.GATEWAY_DASHBOARD_CORS_ORIGINS_DEFAULT,
+                source.getValue("quarkus.http.cors.origins")
+            )
+            assertEquals(
+                GatewayConfigConstants.GATEWAY_DASHBOARD_CORS_METHODS_DEFAULT,
+                source.getValue("quarkus.http.cors.methods")
+            )
+            assertEquals(
+                GatewayConfigConstants.GATEWAY_DASHBOARD_CORS_HEADERS_DEFAULT,
+                source.getValue("quarkus.http.cors.headers")
+            )
+        }
+    }
+
+    @Test
+    fun `disables grpc client auth when security is disabled`() {
+        withSystemProperties(
+            mapOf(
+                GatewayConfigConstants.GATEWAY_ENABLED to "true",
+                GatewayConfigConstants.GATEWAY_SECURITY_ENABLED to "false",
+                GatewayConfigConstants.GATEWAY_TLS_CLIENT_AUTH to "required",
+            )
+        ) {
+            val source = LemlineGatewayConfigSource()
+            assertEquals("none", source.getValue("quarkus.grpc.server.ssl.client-auth"))
+            assertNull(source.getValue("mp.jwt.verify.issuer"))
+            assertNull(source.getValue("smallrye.jwt.verify.key.location"))
+        }
+    }
+
     private fun withSystemProperties(
         overrides: Map<String, String>,
         block: () -> Unit

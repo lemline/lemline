@@ -22,11 +22,21 @@ object GatewayConfigConstants {
 
     const val GATEWAY_JWT_ISSUER = "lemline.gateway.security.jwt.issuer"
     const val GATEWAY_JWT_JWKS_URL = "lemline.gateway.security.jwt.jwks-url"
+    const val GATEWAY_SECURITY_ENABLED = "lemline.gateway.security.enabled"
+    const val GATEWAY_SECURITY_ENABLED_DEFAULT = "true"
 
     const val GATEWAY_SCOPE_FIELD = "lemline.gateway.security.claims.scope-field"
     const val GATEWAY_SCOPE_FIELD_DEFAULT = "scope"
     const val GATEWAY_NAMESPACES_FIELD = "lemline.gateway.security.claims.namespaces-field"
     const val GATEWAY_NAMESPACES_FIELD_DEFAULT = "lemline_namespaces"
+
+    const val GATEWAY_DASHBOARD_CORS_ORIGINS = "lemline.gateway.dashboard.cors.origins"
+    const val GATEWAY_DASHBOARD_CORS_ORIGINS_DEFAULT = "http://localhost:5173"
+    const val GATEWAY_DASHBOARD_CORS_METHODS = "lemline.gateway.dashboard.cors.methods"
+    const val GATEWAY_DASHBOARD_CORS_METHODS_DEFAULT = "GET,POST,OPTIONS"
+    const val GATEWAY_DASHBOARD_CORS_HEADERS = "lemline.gateway.dashboard.cors.headers"
+    const val GATEWAY_DASHBOARD_CORS_HEADERS_DEFAULT =
+        "Accept,Authorization,Content-Type,Grpc-Timeout,X-Grpc-Web,X-User-Agent"
 
     const val GATEWAY_WATCH_POLL_INTERVAL_MS = "lemline.gateway.watch.poll-interval-ms"
     const val GATEWAY_WATCH_POLL_INTERVAL_MS_DEFAULT = "250"
