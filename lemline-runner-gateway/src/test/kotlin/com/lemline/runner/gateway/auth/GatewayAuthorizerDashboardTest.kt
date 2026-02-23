@@ -10,7 +10,7 @@ class GatewayAuthorizerDashboardTest {
     @Test
     fun `security disabled allows all scope and namespace checks`() {
         val authorizer = GatewayAuthorizer(
-            securityEnabled = false,
+            authenticationEnabled = false,
             scopeField = "scope",
             namespacesField = "lemline_namespaces",
         )
@@ -28,7 +28,7 @@ class GatewayAuthorizerDashboardTest {
     @Test
     fun `security enabled preserves scope and namespace enforcement`() {
         val authorizer = GatewayAuthorizer(
-            securityEnabled = true,
+            authenticationEnabled = true,
             scopeField = "scope",
             namespacesField = "lemline_namespaces",
         )

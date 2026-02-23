@@ -30,8 +30,8 @@ import com.lemline.gateway.v1.WorkflowInstance
 import com.lemline.gateway.v1.WorkflowDefinitionSummary
 import com.lemline.runner.gateway.auth.GatewayAuthContext
 import com.lemline.runner.gateway.auth.GatewayPrincipal
-import com.lemline.runner.gateway.config.GatewayConfigConstants.GATEWAY_SECURITY_ENABLED
-import com.lemline.runner.gateway.config.GatewayConfigConstants.GATEWAY_SECURITY_ENABLED_DEFAULT
+import com.lemline.runner.gateway.config.GatewayConfigConstants.GATEWAY_AUTHENTICATION_ENABLED
+import com.lemline.runner.gateway.config.GatewayConfigConstants.GATEWAY_AUTHENTICATION_ENABLED_DEFAULT
 import com.lemline.runner.gateway.dashboard.DefinitionQueryService
 import com.lemline.runner.gateway.dashboard.InstanceQueryService
 import com.lemline.runner.gateway.dashboard.InstanceStreamService
@@ -69,8 +69,11 @@ import org.eclipse.microprofile.config.inject.ConfigProperty
 @GrpcService
 @Singleton
 class WorkflowGatewayGrpcService(
-    @param:ConfigProperty(name = GATEWAY_SECURITY_ENABLED, defaultValue = GATEWAY_SECURITY_ENABLED_DEFAULT)
-    private val securityEnabled: Boolean,
+    @param:ConfigProperty(
+        name = GATEWAY_AUTHENTICATION_ENABLED,
+        defaultValue = GATEWAY_AUTHENTICATION_ENABLED_DEFAULT
+    )
+    private val authenticationEnabled: Boolean,
 ) : WorkflowGatewayGrpc.WorkflowGatewayImplBase() {
 
     @Inject
@@ -506,7 +509,7 @@ class WorkflowGatewayGrpcService(
     }
 
     private fun resolvePrincipalOrNull(): GatewayPrincipal? {
-        return GatewayAuthContext.getOrNull() ?: if (!securityEnabled) GatewayPrincipal.dashboardAnonymous else null
+        return GatewayAuthContext.getOrNull() ?: if (!authenticationEnabled) GatewayPrincipal.dashboardAnonymous else null
     }
 
     private fun parseWorkflowId(request: WatchWorkflowRequest): WorkflowId {

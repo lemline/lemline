@@ -2,8 +2,8 @@
 package com.lemline.runner.gateway.config
 
 import com.lemline.runner.gateway.analytics.AnalyticsBackend
-import com.lemline.runner.gateway.config.GatewayConfigConstants.ANALYTICS_BACKEND
-import com.lemline.runner.gateway.config.GatewayConfigConstants.ANALYTICS_BACKEND_DEFAULT
+import com.lemline.runner.gateway.config.GatewayConfigConstants.ANALYTICS_TYPE
+import com.lemline.runner.gateway.config.GatewayConfigConstants.ANALYTICS_TYPE_DEFAULT
 import io.smallrye.config.PropertiesConfigSource
 import io.smallrye.config.source.yaml.YamlConfigSource
 import java.nio.file.Paths
@@ -47,13 +47,16 @@ class LemlineGatewayConfigSource : PropertiesConfigSource(
 
             val enabled = lemlineProps[GatewayConfigConstants.GATEWAY_ENABLED]?.toBooleanStrictOrNull()
                 ?: GatewayConfigConstants.GATEWAY_ENABLED_DEFAULT.toBoolean()
-            val securityEnabled = lemlineProps[GatewayConfigConstants.GATEWAY_SECURITY_ENABLED]?.toBooleanStrictOrNull()
-                ?: GatewayConfigConstants.GATEWAY_SECURITY_ENABLED_DEFAULT.toBoolean()
+            val tlsEnabled = lemlineProps[GatewayConfigConstants.GATEWAY_TLS_ENABLED]?.toBooleanStrictOrNull()
+                ?: GatewayConfigConstants.GATEWAY_TLS_ENABLED_DEFAULT.toBoolean()
+            val authenticationEnabled =
+                lemlineProps[GatewayConfigConstants.GATEWAY_AUTHENTICATION_ENABLED]?.toBooleanStrictOrNull()
+                    ?: GatewayConfigConstants.GATEWAY_AUTHENTICATION_ENABLED_DEFAULT.toBoolean()
 
             val generatedProps = mutableMapOf<String, String>()
-            generatedProps.putAll(generateGatewayGrpcProperties(lemlineProps, enabled, securityEnabled))
+            generatedProps.putAll(generateGatewayGrpcProperties(lemlineProps, enabled, tlsEnabled))
             if (enabled) {
-                if (securityEnabled) {
+                if (authenticationEnabled) {
                     generatedProps.putAll(generateGatewayJwtProperties(lemlineProps))
                 }
                 generatedProps.putAll(generateAnalyticsDatasourceProperties(lemlineProps))
@@ -68,7 +71,7 @@ class LemlineGatewayConfigSource : PropertiesConfigSource(
         private fun generateGatewayGrpcProperties(
             props: Map<String, String>,
             enabled: Boolean,
-            securityEnabled: Boolean
+            tlsEnabled: Boolean
         ): Map<String, String> {
             val generated = mutableMapOf<String, String>()
 
@@ -81,34 +84,39 @@ class LemlineGatewayConfigSource : PropertiesConfigSource(
                 props[GatewayConfigConstants.GATEWAY_GRPC_HOST] ?: GatewayConfigConstants.GATEWAY_GRPC_HOST_DEFAULT
             generated["quarkus.grpc.server.port"] =
                 props[GatewayConfigConstants.GATEWAY_GRPC_PORT] ?: GatewayConfigConstants.GATEWAY_GRPC_PORT_DEFAULT
-            generated["quarkus.grpc.server.plain-text"] = "false"
+            generated["quarkus.grpc.server.plain-text"] = (!tlsEnabled).toString()
             generated["quarkus.grpc.server.enable-grpc-web"] = "true"
-            generated["quarkus.http.cors"] = "true"
-            generated["quarkus.http.cors.origins"] = props[GatewayConfigConstants.GATEWAY_DASHBOARD_CORS_ORIGINS]
-                ?: GatewayConfigConstants.GATEWAY_DASHBOARD_CORS_ORIGINS_DEFAULT
-            generated["quarkus.http.cors.methods"] = props[GatewayConfigConstants.GATEWAY_DASHBOARD_CORS_METHODS]
-                ?: GatewayConfigConstants.GATEWAY_DASHBOARD_CORS_METHODS_DEFAULT
-            generated["quarkus.http.cors.headers"] = props[GatewayConfigConstants.GATEWAY_DASHBOARD_CORS_HEADERS]
-                ?: GatewayConfigConstants.GATEWAY_DASHBOARD_CORS_HEADERS_DEFAULT
-            generated["quarkus.http.cors.access-control-allow-credentials"] = "false"
-            generated["quarkus.grpc.server.ssl.client-auth"] =
-                if (securityEnabled) {
-                    props[GatewayConfigConstants.GATEWAY_TLS_CLIENT_AUTH] ?: GatewayConfigConstants.GATEWAY_TLS_CLIENT_AUTH_DEFAULT
-                } else {
-                    "none"
-                }
+            val corsEnabled = props[GatewayConfigConstants.GATEWAY_CORS_ENABLED]?.toBooleanStrictOrNull()
+                ?: GatewayConfigConstants.GATEWAY_CORS_ENABLED_DEFAULT.toBoolean()
+            generated["quarkus.http.cors"] = corsEnabled.toString()
+            if (corsEnabled) {
+                generated["quarkus.http.cors.origins"] = props[GatewayConfigConstants.GATEWAY_CORS_ORIGINS]
+                    ?: GatewayConfigConstants.GATEWAY_CORS_ORIGINS_DEFAULT
+                generated["quarkus.http.cors.methods"] = props[GatewayConfigConstants.GATEWAY_CORS_METHODS]
+                    ?: GatewayConfigConstants.GATEWAY_CORS_METHODS_DEFAULT
+                generated["quarkus.http.cors.headers"] = props[GatewayConfigConstants.GATEWAY_CORS_HEADERS]
+                    ?: GatewayConfigConstants.GATEWAY_CORS_HEADERS_DEFAULT
+                generated["quarkus.http.cors.access-control-allow-credentials"] = "false"
+            }
 
-            props[GatewayConfigConstants.GATEWAY_TLS_CERTIFICATE]?.let {
-                generated["quarkus.grpc.server.ssl.certificate"] = it
-            }
-            props[GatewayConfigConstants.GATEWAY_TLS_PRIVATE_KEY]?.let {
-                generated["quarkus.grpc.server.ssl.key"] = it
-            }
-            props[GatewayConfigConstants.GATEWAY_TLS_TRUST_STORE]?.let {
-                generated["quarkus.grpc.server.ssl.trust-store"] = it
-            }
-            props[GatewayConfigConstants.GATEWAY_TLS_TRUST_STORE_PASSWORD]?.let {
-                generated["quarkus.grpc.server.ssl.trust-store-password"] = it
+            if (tlsEnabled) {
+                generated["quarkus.grpc.server.ssl.client-auth"] =
+                    props[GatewayConfigConstants.GATEWAY_TLS_CLIENT_AUTH] ?: GatewayConfigConstants.GATEWAY_TLS_CLIENT_AUTH_DEFAULT
+
+                props[GatewayConfigConstants.GATEWAY_TLS_CERTIFICATE]?.let {
+                    generated["quarkus.grpc.server.ssl.certificate"] = it
+                }
+                props[GatewayConfigConstants.GATEWAY_TLS_PRIVATE_KEY]?.let {
+                    generated["quarkus.grpc.server.ssl.key"] = it
+                }
+                props[GatewayConfigConstants.GATEWAY_TLS_TRUST_STORE]?.let {
+                    generated["quarkus.grpc.server.ssl.trust-store"] = it
+                }
+                props[GatewayConfigConstants.GATEWAY_TLS_TRUST_STORE_PASSWORD]?.let {
+                    generated["quarkus.grpc.server.ssl.trust-store-password"] = it
+                }
+            } else {
+                generated["quarkus.grpc.server.ssl.client-auth"] = "none"
             }
 
             return generated
@@ -116,8 +124,8 @@ class LemlineGatewayConfigSource : PropertiesConfigSource(
 
         private fun generateGatewayJwtProperties(props: Map<String, String>): Map<String, String> {
             val generated = mutableMapOf<String, String>()
-            props[GatewayConfigConstants.GATEWAY_JWT_ISSUER]?.let { generated["mp.jwt.verify.issuer"] = it }
-            props[GatewayConfigConstants.GATEWAY_JWT_JWKS_URL]?.let {
+            props[GatewayConfigConstants.GATEWAY_AUTHENTICATION_JWT_ISSUER]?.let { generated["mp.jwt.verify.issuer"] = it }
+            props[GatewayConfigConstants.GATEWAY_AUTHENTICATION_JWT_JWKS_URL]?.let {
                 generated["smallrye.jwt.verify.key.location"] = it
             }
             return generated
@@ -126,10 +134,10 @@ class LemlineGatewayConfigSource : PropertiesConfigSource(
         private fun generateAnalyticsDatasourceProperties(props: Map<String, String>): Map<String, String> {
             val analytics = "lemline.analytics"
             val analyticsPostgresql = "$analytics.postgresql"
-            val analyticsBackendRaw = props[ANALYTICS_BACKEND] ?: ANALYTICS_BACKEND_DEFAULT
-            val analyticsBackend = AnalyticsBackend.parse(analyticsBackendRaw)
+            val analyticsTypeRaw = props[ANALYTICS_TYPE] ?: ANALYTICS_TYPE_DEFAULT
+            val analyticsType = AnalyticsBackend.parse(analyticsTypeRaw)
 
-            if (analyticsBackend == AnalyticsBackend.CLICKHOUSE) {
+            if (analyticsType == AnalyticsBackend.CLICKHOUSE) {
                 return emptyMap()
             }
 

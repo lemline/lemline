@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.gateway.auth
 
-import com.lemline.runner.gateway.config.GatewayConfigConstants.GATEWAY_SECURITY_ENABLED
-import com.lemline.runner.gateway.config.GatewayConfigConstants.GATEWAY_SECURITY_ENABLED_DEFAULT
-import com.lemline.runner.gateway.config.GatewayConfigConstants.GATEWAY_NAMESPACES_FIELD
-import com.lemline.runner.gateway.config.GatewayConfigConstants.GATEWAY_NAMESPACES_FIELD_DEFAULT
-import com.lemline.runner.gateway.config.GatewayConfigConstants.GATEWAY_SCOPE_FIELD
-import com.lemline.runner.gateway.config.GatewayConfigConstants.GATEWAY_SCOPE_FIELD_DEFAULT
+import com.lemline.runner.gateway.config.GatewayConfigConstants.GATEWAY_AUTHENTICATION_ENABLED
+import com.lemline.runner.gateway.config.GatewayConfigConstants.GATEWAY_AUTHENTICATION_ENABLED_DEFAULT
+import com.lemline.runner.gateway.config.GatewayConfigConstants.GATEWAY_AUTHENTICATION_NAMESPACES_FIELD
+import com.lemline.runner.gateway.config.GatewayConfigConstants.GATEWAY_AUTHENTICATION_NAMESPACES_FIELD_DEFAULT
+import com.lemline.runner.gateway.config.GatewayConfigConstants.GATEWAY_AUTHENTICATION_SCOPE_FIELD
+import com.lemline.runner.gateway.config.GatewayConfigConstants.GATEWAY_AUTHENTICATION_SCOPE_FIELD_DEFAULT
 import com.lemline.runner.gateway.errors.GatewayPermissionDeniedException
 import jakarta.enterprise.context.ApplicationScoped
 import org.eclipse.microprofile.config.inject.ConfigProperty
@@ -14,15 +14,18 @@ import org.eclipse.microprofile.jwt.JsonWebToken
 
 @ApplicationScoped
 class GatewayAuthorizer(
-    @ConfigProperty(name = GATEWAY_SECURITY_ENABLED, defaultValue = GATEWAY_SECURITY_ENABLED_DEFAULT)
-    private val securityEnabled: Boolean,
-    @ConfigProperty(name = GATEWAY_SCOPE_FIELD, defaultValue = GATEWAY_SCOPE_FIELD_DEFAULT)
+    @ConfigProperty(name = GATEWAY_AUTHENTICATION_ENABLED, defaultValue = GATEWAY_AUTHENTICATION_ENABLED_DEFAULT)
+    private val authenticationEnabled: Boolean,
+    @ConfigProperty(name = GATEWAY_AUTHENTICATION_SCOPE_FIELD, defaultValue = GATEWAY_AUTHENTICATION_SCOPE_FIELD_DEFAULT)
     private val scopeField: String,
-    @ConfigProperty(name = GATEWAY_NAMESPACES_FIELD, defaultValue = GATEWAY_NAMESPACES_FIELD_DEFAULT)
+    @ConfigProperty(
+        name = GATEWAY_AUTHENTICATION_NAMESPACES_FIELD,
+        defaultValue = GATEWAY_AUTHENTICATION_NAMESPACES_FIELD_DEFAULT
+    )
     private val namespacesField: String,
 ) {
     fun principalFrom(jwt: JsonWebToken): GatewayPrincipal {
-        if (!securityEnabled) {
+        if (!authenticationEnabled) {
             return GatewayPrincipal(
                 subject = null,
                 scopes = setOf("*"),
@@ -40,14 +43,14 @@ class GatewayAuthorizer(
     }
 
     fun requireScope(principal: GatewayPrincipal, scope: String) {
-        if (!securityEnabled) return
+        if (!authenticationEnabled) return
         if (!principal.hasScope(scope)) {
             throw GatewayPermissionDeniedException("Missing required scope '$scope'")
         }
     }
 
     fun requireNamespace(principal: GatewayPrincipal, namespace: String) {
-        if (!securityEnabled) return
+        if (!authenticationEnabled) return
         if (!principal.canAccessNamespace(namespace)) {
             throw GatewayPermissionDeniedException("Not authorized for namespace '$namespace'")
         }

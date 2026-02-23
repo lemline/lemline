@@ -19,19 +19,26 @@ class GatewayStartupValidator(
     )
     private val gatewayEnabled: Boolean,
     @param:ConfigProperty(
-        name = GatewayConfigConstants.GATEWAY_SECURITY_ENABLED,
-        defaultValue = GatewayConfigConstants.GATEWAY_SECURITY_ENABLED_DEFAULT
+        name = GatewayConfigConstants.GATEWAY_TLS_ENABLED,
+        defaultValue = GatewayConfigConstants.GATEWAY_TLS_ENABLED_DEFAULT
     )
-    private val securityEnabled: Boolean,
+    private val tlsEnabled: Boolean,
+    @param:ConfigProperty(name = GatewayConfigConstants.GATEWAY_TLS_CLIENT_AUTH)
+    private val tlsClientAuth: Optional<String>,
     @param:ConfigProperty(name = GatewayConfigConstants.GATEWAY_TLS_CERTIFICATE)
     private val tlsCertificate: Optional<String>,
     @param:ConfigProperty(name = GatewayConfigConstants.GATEWAY_TLS_PRIVATE_KEY)
     private val tlsPrivateKey: Optional<String>,
     @param:ConfigProperty(name = GatewayConfigConstants.GATEWAY_TLS_TRUST_STORE)
     private val tlsTrustStore: Optional<String>,
-    @param:ConfigProperty(name = GatewayConfigConstants.GATEWAY_JWT_ISSUER)
+    @param:ConfigProperty(
+        name = GatewayConfigConstants.GATEWAY_AUTHENTICATION_ENABLED,
+        defaultValue = GatewayConfigConstants.GATEWAY_AUTHENTICATION_ENABLED_DEFAULT
+    )
+    private val authenticationEnabled: Boolean,
+    @param:ConfigProperty(name = GatewayConfigConstants.GATEWAY_AUTHENTICATION_JWT_ISSUER)
     private val jwtIssuer: Optional<String>,
-    @param:ConfigProperty(name = GatewayConfigConstants.GATEWAY_JWT_JWKS_URL)
+    @param:ConfigProperty(name = GatewayConfigConstants.GATEWAY_AUTHENTICATION_JWT_JWKS_URL)
     private val jwtJwksUrl: Optional<String>,
 ) {
 
@@ -42,12 +49,30 @@ class GatewayStartupValidator(
     fun onStart(@Observes @Priority(0) event: StartupEvent) {
         if (!gatewayEnabled) return
 
-        requireConfigured(tlsCertificate, GatewayConfigConstants.GATEWAY_TLS_CERTIFICATE)
-        requireConfigured(tlsPrivateKey, GatewayConfigConstants.GATEWAY_TLS_PRIVATE_KEY)
-        requireConfigured(tlsTrustStore, GatewayConfigConstants.GATEWAY_TLS_TRUST_STORE)
-        if (securityEnabled) {
-            requireConfigured(jwtIssuer, GatewayConfigConstants.GATEWAY_JWT_ISSUER)
-            requireConfigured(jwtJwksUrl, GatewayConfigConstants.GATEWAY_JWT_JWKS_URL)
+        if (authenticationEnabled && !tlsEnabled) {
+            throw IllegalStateException(
+                "Invalid gateway configuration: '${GatewayConfigConstants.GATEWAY_AUTHENTICATION_ENABLED}' " +
+                    "requires '${GatewayConfigConstants.GATEWAY_TLS_ENABLED}=true'"
+            )
+        }
+
+        if (tlsEnabled) {
+            requireConfigured(tlsCertificate, GatewayConfigConstants.GATEWAY_TLS_CERTIFICATE)
+            requireConfigured(tlsPrivateKey, GatewayConfigConstants.GATEWAY_TLS_PRIVATE_KEY)
+
+            val clientAuth = tlsClientAuth
+                .map { it.trim().lowercase(Locale.ROOT) }
+                .filter { it.isNotEmpty() }
+                .orElse(GatewayConfigConstants.GATEWAY_TLS_CLIENT_AUTH_DEFAULT)
+
+            if (clientAuth == "request" || clientAuth == "required") {
+                requireConfigured(tlsTrustStore, GatewayConfigConstants.GATEWAY_TLS_TRUST_STORE)
+            }
+        }
+
+        if (authenticationEnabled) {
+            requireConfigured(jwtIssuer, GatewayConfigConstants.GATEWAY_AUTHENTICATION_JWT_ISSUER)
+            requireConfigured(jwtJwksUrl, GatewayConfigConstants.GATEWAY_AUTHENTICATION_JWT_JWKS_URL)
         }
 
         runBlocking {
