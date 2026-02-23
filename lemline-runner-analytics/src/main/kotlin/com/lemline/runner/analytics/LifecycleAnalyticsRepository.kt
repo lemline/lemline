@@ -4,6 +4,8 @@ package com.lemline.runner.analytics
 import com.lemline.runner.analytics.config.AnalyticsConfigConstants.ANALYTICS_POSTGRES_SCHEMA_DEFAULT
 import com.lemline.runner.analytics.config.AnalyticsConfigConstants.ANALYTICS_POSTGRES_TABLE_DEFAULT
 import com.lemline.runner.common.config.ANALYTICS_CONSUMER_ENABLED
+import com.lemline.runner.common.config.ANALYTICS_POSTGRES_SCHEMA
+import com.lemline.runner.common.config.ANALYTICS_POSTGRES_TABLE
 import io.agroal.api.AgroalDataSource
 import io.quarkus.agroal.DataSource
 import jakarta.enterprise.context.ApplicationScoped
@@ -17,9 +19,9 @@ import org.eclipse.microprofile.config.inject.ConfigProperty
 
 @ApplicationScoped
 class LifecycleAnalyticsRepository(
-    @ConfigProperty(name = "lemline.analytics.postgresql.schema", defaultValue = ANALYTICS_POSTGRES_SCHEMA_DEFAULT)
+    @ConfigProperty(name = ANALYTICS_POSTGRES_SCHEMA, defaultValue = ANALYTICS_POSTGRES_SCHEMA_DEFAULT)
     schema: String,
-    @ConfigProperty(name = "lemline.analytics.postgresql.table", defaultValue = ANALYTICS_POSTGRES_TABLE_DEFAULT)
+    @ConfigProperty(name = ANALYTICS_POSTGRES_TABLE, defaultValue = ANALYTICS_POSTGRES_TABLE_DEFAULT)
     table: String,
 ) {
     @Inject

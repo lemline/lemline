@@ -3,11 +3,12 @@ package com.lemline.runner.tests.profiles
 
 import com.lemline.runner.common.config.ANALYTICS_BACKEND_CLICKHOUSE
 import com.lemline.runner.common.config.ANALYTICS_TYPE
+import com.lemline.runner.common.config.DATABASE_TYPE
 import com.lemline.runner.common.config.DatabaseType
+import com.lemline.runner.common.config.GATEWAY_AUTHENTICATION_CLAIMS_NAMESPACES_FIELD
+import com.lemline.runner.common.config.GATEWAY_AUTHENTICATION_CLAIMS_SCOPE_FIELD
 import com.lemline.runner.common.config.GATEWAY_AUTHENTICATION_JWT_ISSUER
 import com.lemline.runner.common.config.GATEWAY_AUTHENTICATION_JWT_JWKS_URL
-import com.lemline.runner.common.config.GATEWAY_AUTHENTICATION_NAMESPACES_FIELD
-import com.lemline.runner.common.config.GATEWAY_AUTHENTICATION_SCOPE_FIELD
 import com.lemline.runner.common.config.GATEWAY_CORS_ENABLED
 import com.lemline.runner.common.config.GATEWAY_CORS_HEADERS
 import com.lemline.runner.common.config.GATEWAY_CORS_METHODS
@@ -18,6 +19,7 @@ import com.lemline.runner.common.config.GATEWAY_GRPC_PORT
 import com.lemline.runner.common.config.GATEWAY_TLS_CLIENT_AUTH
 import com.lemline.runner.common.config.GATEWAY_WATCH_BATCH_SIZE
 import com.lemline.runner.common.config.GATEWAY_WATCH_POLL_INTERVAL_MS
+import com.lemline.runner.common.config.MESSAGING_TYPE
 import com.lemline.runner.common.config.MessagingType
 import io.quarkus.test.junit.QuarkusTestProfile
 
@@ -28,8 +30,8 @@ class GatewayConfigMappingProfile : QuarkusTestProfile {
 
     override fun getConfigOverrides(): Map<String, String> =
         mapOf(
-            "lemline.database.type" to DatabaseType.H2.configValue,
-            "lemline.messaging.type" to MessagingType.IN_MEMORY.configValue,
+            DATABASE_TYPE to DatabaseType.H2.configValue,
+            MESSAGING_TYPE to MessagingType.IN_MEMORY.configValue,
 
             GATEWAY_ENABLED to "false",
             GATEWAY_GRPC_HOST to "127.0.0.1",
@@ -37,8 +39,8 @@ class GatewayConfigMappingProfile : QuarkusTestProfile {
             GATEWAY_TLS_CLIENT_AUTH to "request",
             GATEWAY_AUTHENTICATION_JWT_ISSUER to "https://issuer.example.test",
             GATEWAY_AUTHENTICATION_JWT_JWKS_URL to "https://issuer.example.test/jwks.json",
-            GATEWAY_AUTHENTICATION_SCOPE_FIELD to "scp",
-            GATEWAY_AUTHENTICATION_NAMESPACES_FIELD to "tenant_scopes",
+            GATEWAY_AUTHENTICATION_CLAIMS_SCOPE_FIELD to "scp",
+            GATEWAY_AUTHENTICATION_CLAIMS_NAMESPACES_FIELD to "tenant_scopes",
             GATEWAY_CORS_ENABLED to "true",
             GATEWAY_CORS_ORIGINS to "http://localhost:3000",
             GATEWAY_CORS_METHODS to "GET,POST",

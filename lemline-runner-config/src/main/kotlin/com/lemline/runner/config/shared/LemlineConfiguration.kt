@@ -11,12 +11,14 @@ import com.lemline.runner.config.shared.LemlineConfigConstants.ANALYTICS_POSTGRE
 import com.lemline.runner.config.shared.LemlineConfigConstants.ANALYTICS_POSTGRES_MIGRATE_AT_START_DEFAULT
 import com.lemline.runner.config.shared.LemlineConfigConstants.ANALYTICS_POSTGRES_SCHEMA_DEFAULT
 import com.lemline.runner.config.shared.LemlineConfigConstants.ANALYTICS_POSTGRES_TABLE_DEFAULT
+import com.lemline.runner.config.shared.LemlineConfigConstants.CLOUDEVENTS_TOPIC_DEFAULT
 import com.lemline.runner.config.shared.LemlineConfigConstants.COMMANDS_TOPIC_DEFAULT
 import com.lemline.runner.config.shared.LemlineConfigConstants.CONSUMER_CONCURRENCY_DEFAULT
 import com.lemline.runner.config.shared.LemlineConfigConstants.DB_BASELINE_ON_MIGRATE_DEFAULT
 import com.lemline.runner.config.shared.LemlineConfigConstants.DB_MIGRATE_AT_START_DEFAULT
 import com.lemline.runner.config.shared.LemlineConfigConstants.EVENTS_TOPIC_DEFAULT
 import com.lemline.runner.config.shared.LemlineConfigConstants.KAFKA_BROKERS_DEFAULT
+import com.lemline.runner.config.shared.LemlineConfigConstants.KAFKA_CLOUDEVENTS_GROUP_ID_DEFAULT
 import com.lemline.runner.config.shared.LemlineConfigConstants.KAFKA_DATABASE_GROUP_ID_DEFAULT
 import com.lemline.runner.config.shared.LemlineConfigConstants.KAFKA_OFFSET_RESET_DEFAULT
 import com.lemline.runner.config.shared.LemlineConfigConstants.KAFKA_WORKFLOWS_GROUP_ID_DEFAULT
@@ -393,7 +395,15 @@ interface LemlineConfiguration {
 
         fun commands(): KafkaCommandsConfig
         fun events(): KafkaEventsConfig
+        fun cloudevents(): Optional<KafkaCloudEventsConfig>
         fun lifecycleevents(): Optional<KafkaLifecycleEventsConfig>
+    }
+
+    interface KafkaCloudEventsConfig {
+        @WithDefault(CLOUDEVENTS_TOPIC_DEFAULT)
+        fun topic(): String
+        fun consumer(): KafkaConsumerCloudEventsConfig
+        fun producer(): KafkaProducerConfig
     }
 
     /**
@@ -452,6 +462,22 @@ interface LemlineConfiguration {
         fun topicOut(): Optional<String>
     }
 
+    interface KafkaConsumerCloudEventsConfig {
+        @WithDefault(CONSUMER_CONCURRENCY_DEFAULT)
+        fun concurrency(): Int
+
+        @WithDefault(KAFKA_CLOUDEVENTS_GROUP_ID_DEFAULT)
+        fun groupId(): String
+
+        @Pattern(regexp = "latest|earliest")
+        @WithDefault(KAFKA_OFFSET_RESET_DEFAULT)
+        fun offsetReset(): String
+
+        fun topicDlq(): Optional<String>
+
+        fun topicOut(): Optional<String>
+    }
+
     interface KafkaProducerConfig {
         fun topicOut(): Optional<String>
     }
@@ -471,7 +497,15 @@ interface LemlineConfiguration {
 
         fun commands(): RabbitCommandsConfig
         fun events(): RabbitEventsConfig
+        fun cloudevents(): Optional<RabbitCloudEventsConfig>
         fun lifecycleevents(): Optional<RabbitLifecycleEventsConfig>
+    }
+
+    interface RabbitCloudEventsConfig {
+        @WithDefault(CLOUDEVENTS_TOPIC_DEFAULT)
+        fun queue(): String
+        fun consumer(): RabbitConsumerConfig
+        fun producer(): RabbitProducerConfig
     }
 
     /**
