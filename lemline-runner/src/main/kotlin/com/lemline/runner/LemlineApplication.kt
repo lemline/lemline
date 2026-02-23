@@ -8,7 +8,7 @@ import com.lemline.runner.cli.gateway.GatewayStartCommand
 import com.lemline.runner.cli.instances.InstanceStartCommand
 import com.lemline.runner.cli.listen.ListenCommand
 import com.lemline.runner.cli.setup
-import com.lemline.runner.common.config.LEMLINE_ANALYTICS_CONSUMER_ENABLED
+import com.lemline.runner.common.config.LEMLINE_MESSAGING_LIFECYCLE_EVENTS_CONSUMER_ENABLED
 import com.lemline.runner.common.config.LEMLINE_DATABASE_ENABLED
 import com.lemline.runner.common.config.LEMLINE_GATEWAY_ENABLED
 import com.lemline.runner.common.config.LEMLINE_GATEWAY_GRPC_PORT
@@ -320,7 +320,7 @@ private fun configureGatewayToggles() {
     System.setProperty(LEMLINE_MESSAGING_CLOUDEVENTS_PRODUCER_ENABLED, "false")
     System.setProperty(LEMLINE_MESSAGING_CLOUDEVENTS_CONSUMER_ENABLED, "false")
     System.setProperty(LEMLINE_MESSAGING_LIFECYCLE_EVENTS_PRODUCER_ENABLED, "false")
-    System.setProperty(LEMLINE_ANALYTICS_CONSUMER_ENABLED, "false")
+    System.setProperty(LEMLINE_MESSAGING_LIFECYCLE_EVENTS_CONSUMER_ENABLED, "false")
 
     System.setProperty("quarkus.http.port", "0")
     System.setProperty("quarkus.http.ssl-port", "0")

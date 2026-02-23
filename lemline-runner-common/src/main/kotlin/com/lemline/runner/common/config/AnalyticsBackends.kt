@@ -3,4 +3,4 @@ package com.lemline.runner.common.config
 
 const val ANALYTICS_BACKEND_POSTGRESQL = "postgresql"
 const val ANALYTICS_BACKEND_CLICKHOUSE = "clickhouse"
-const val ANALYTICS_BACKEND_DEFAULT = ANALYTICS_BACKEND_POSTGRESQL
+const val ANALYTICS_TYPE_DEFAULT = ANALYTICS_BACKEND_POSTGRESQL

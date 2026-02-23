@@ -3,7 +3,7 @@ package com.lemline.runner.analytics
 
 import com.lemline.runner.analytics.config.AnalyticsConfigConstants.ANALYTICS_POSTGRES_SCHEMA_DEFAULT
 import com.lemline.runner.analytics.config.AnalyticsConfigConstants.ANALYTICS_POSTGRES_TABLE_DEFAULT
-import com.lemline.runner.common.config.LEMLINE_ANALYTICS_CONSUMER_ENABLED
+import com.lemline.runner.common.config.LEMLINE_MESSAGING_LIFECYCLE_EVENTS_CONSUMER_ENABLED
 import com.lemline.runner.common.config.LEMLINE_ANALYTICS_POSTGRES
 import com.lemline.runner.common.config.LEMLINE_ANALYTICS_POSTGRES_SCHEMA
 import com.lemline.runner.common.config.LEMLINE_ANALYTICS_POSTGRES_TABLE
@@ -87,7 +87,7 @@ class LifecycleAnalyticsRepository(
 
         throw IllegalStateException(
             "Analytics datasource 'analytics' is not available. " +
-                "Enable '$LEMLINE_ANALYTICS_CONSUMER_ENABLED' and configure $LEMLINE_ANALYTICS_POSTGRES.*"
+                "Enable '$LEMLINE_MESSAGING_LIFECYCLE_EVENTS_CONSUMER_ENABLED' and configure $LEMLINE_ANALYTICS_POSTGRES.*"
         )
     }
 

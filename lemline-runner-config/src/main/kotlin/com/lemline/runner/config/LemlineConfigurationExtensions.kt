@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.config
 
-import com.lemline.runner.common.config.ANALYTICS_BACKEND_DEFAULT
+import com.lemline.runner.common.config.ANALYTICS_TYPE_DEFAULT
 import kotlin.jvm.optionals.getOrNull
 
 val LemlineConfiguration.gatewayEnabled: Boolean
@@ -51,7 +51,7 @@ val LemlineConfiguration.gatewayWatchBatchSize: Int
         ?: LemlineConfigConstants.GATEWAY_WATCH_BATCH_SIZE_DEFAULT.toInt()
 
 val LemlineConfiguration.analyticsTypeResolved: String
-    get() = analytics().getOrNull()?.type() ?: ANALYTICS_BACKEND_DEFAULT
+    get() = analytics().getOrNull()?.type() ?: ANALYTICS_TYPE_DEFAULT
 
 val LemlineConfiguration.analyticsSchemaResolved: String
     get() = analytics().getOrNull()?.postgresql()?.schema() ?: LemlineConfigConstants.ANALYTICS_POSTGRES_SCHEMA_DEFAULT

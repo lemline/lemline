@@ -15,8 +15,6 @@ object LemlineConfigConstants {
 
     // Consumer concurrency
     const val CONSUMER_CONCURRENCY_DEFAULT = "64"
-    const val ANALYTICS_CONSUMER_ENABLED_DEFAULT = "false"
-    const val ANALYTICS_CONSUMER_CONCURRENCY_DEFAULT = CONSUMER_CONCURRENCY_DEFAULT
 
     // Messaging connectors
     const val IN_MEMORY_CONNECTOR = "smallrye-in-memory"
@@ -24,8 +22,8 @@ object LemlineConfigConstants {
     const val RABBITMQ_CONNECTOR = "smallrye-rabbitmq"
     const val PGMQ_CONNECTOR = "smallrye-pgmq"
 
-    const val COMMANDS_TOPIC_DEFAULT = "lemline-commands"
-    const val EVENTS_TOPIC_DEFAULT = "lemline-events"
+    const val WORKFLOW_COMMANDS_TOPIC_DEFAULT = "lemline-commands"
+    const val WORKFLOW_EVENTS_TOPIC_DEFAULT = "lemline-events"
     const val CLOUDEVENTS_TOPIC_DEFAULT = "lemline-cloudevents"
     const val LIFECYCLE_EVENTS_TOPIC_DEFAULT = "lemline-lifecycle-events"
 
@@ -90,8 +88,7 @@ object LemlineConfigConstants {
     const val GATEWAY_CORS_ENABLED_DEFAULT = "true"
     const val GATEWAY_CORS_ORIGINS_DEFAULT = "http://localhost:5173"
     const val GATEWAY_CORS_METHODS_DEFAULT = "GET,POST,OPTIONS"
-    const val GATEWAY_CORS_HEADERS_DEFAULT =
-        "Accept,Authorization,Content-Type,Grpc-Timeout,X-Grpc-Web,X-User-Agent"
+    const val GATEWAY_CORS_HEADERS_DEFAULT = "Accept,Authorization,Content-Type,Grpc-Timeout,X-Grpc-Web,X-User-Agent"
 
     const val GATEWAY_WATCH_POLL_INTERVAL_MS_DEFAULT = "250"
     const val GATEWAY_WATCH_BATCH_SIZE_DEFAULT = "256"

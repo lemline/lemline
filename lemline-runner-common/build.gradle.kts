@@ -283,7 +283,7 @@ val generatedLemlineConfigKeysDir = layout.buildDirectory.dir("generated/sources
 val generateLemlineConfigKeys by tasks.registering(GenerateLemlineConfigKeysTask::class) {
     sourceFile.set(
         rootProject.layout.projectDirectory.file(
-            "lemline-runner-config/src/main/kotlin/com/lemline/runner/config/shared/LemlineConfiguration.kt"
+            "lemline-runner-config/src/main/kotlin/com/lemline/runner/config/LemlineConfiguration.kt"
         )
     )
     outputDir.set(generatedLemlineConfigKeysDir)

@@ -2,26 +2,24 @@
 package com.lemline.runner.config
 
 import com.lemline.runner.common.config.ANALYTICS_BACKEND_CLICKHOUSE
-import com.lemline.runner.common.config.ANALYTICS_BACKEND_DEFAULT
 import com.lemline.runner.common.config.ANALYTICS_BACKEND_POSTGRESQL
-import com.lemline.runner.config.LemlineConfigConstants.ANALYTICS_CONSUMER_CONCURRENCY_DEFAULT
-import com.lemline.runner.config.LemlineConfigConstants.ANALYTICS_CONSUMER_ENABLED_DEFAULT
+import com.lemline.runner.common.config.ANALYTICS_TYPE_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.ANALYTICS_POSTGRES_BASELINE_ON_MIGRATE_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.ANALYTICS_POSTGRES_DATABASE_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.ANALYTICS_POSTGRES_MIGRATE_AT_START_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.ANALYTICS_POSTGRES_SCHEMA_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.ANALYTICS_POSTGRES_TABLE_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.CLOUDEVENTS_TOPIC_DEFAULT
-import com.lemline.runner.config.LemlineConfigConstants.COMMANDS_TOPIC_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.CONSUMER_CONCURRENCY_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.DB_BASELINE_ON_MIGRATE_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.DB_MIGRATE_AT_START_DEFAULT
-import com.lemline.runner.config.LemlineConfigConstants.EVENTS_TOPIC_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.KAFKA_BROKERS_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.KAFKA_CLOUDEVENTS_GROUP_ID_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.KAFKA_DATABASE_GROUP_ID_DEFAULT
+import com.lemline.runner.config.LemlineConfigConstants.KAFKA_LIFECYCLE_EVENTS_GROUP_ID_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.KAFKA_OFFSET_RESET_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.KAFKA_WORKFLOWS_GROUP_ID_DEFAULT
+import com.lemline.runner.config.LemlineConfigConstants.LIFECYCLE_EVENTS_TOPIC_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.METRICS_PATH_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.METRICS_PORT_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.MYSQL_DATABASE_DEFAULT
@@ -29,12 +27,18 @@ import com.lemline.runner.config.LemlineConfigConstants.MYSQL_HOST_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.MYSQL_PASSWORD_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.MYSQL_PORT_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.MYSQL_USERNAME_DEFAULT
+import com.lemline.runner.config.LemlineConfigConstants.PGMQ_BATCH_SIZE_DEFAULT
+import com.lemline.runner.config.LemlineConfigConstants.PGMQ_MAX_RETRIES_DEFAULT
+import com.lemline.runner.config.LemlineConfigConstants.PGMQ_POLL_INTERVAL_DEFAULT
+import com.lemline.runner.config.LemlineConfigConstants.PGMQ_VISIBILITY_TIMEOUT_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.POSTGRES_DATABASE_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.POSTGRES_HOST_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.POSTGRES_PASSWORD_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.POSTGRES_PORT_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.POSTGRES_USERNAME_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.RABBITMQ_VHOST_DEFAULT
+import com.lemline.runner.config.LemlineConfigConstants.WORKFLOW_COMMANDS_TOPIC_DEFAULT
+import com.lemline.runner.config.LemlineConfigConstants.WORKFLOW_EVENTS_TOPIC_DEFAULT
 import io.smallrye.config.ConfigMapping
 import io.smallrye.config.WithDefault
 import jakarta.validation.constraints.Min
@@ -123,16 +127,12 @@ interface LemlineConfiguration {
     }
 
     /**
-     * Analytics ingestion configuration.
-     * Controls lifecycle events consumption and analytics PostgreSQL destination.
+     * Analytics storage configuration.
+     * Controls analytics backend and analytics PostgreSQL destination settings.
      */
     interface AnalyticsConfig {
-        fun consumer(): AnalyticsConsumerConfig
-
-        @Pattern(
-            regexp = "$ANALYTICS_BACKEND_POSTGRESQL|$ANALYTICS_BACKEND_CLICKHOUSE"
-        )
-        @WithDefault(ANALYTICS_BACKEND_DEFAULT)
+        @Pattern(regexp = "$ANALYTICS_BACKEND_POSTGRESQL|$ANALYTICS_BACKEND_CLICKHOUSE")
+        @WithDefault(ANALYTICS_TYPE_DEFAULT)
         fun type(): String
 
         @WithDefault(ANALYTICS_POSTGRES_MIGRATE_AT_START_DEFAULT)
@@ -142,14 +142,6 @@ interface LemlineConfiguration {
         fun baselineOnMigrate(): Boolean
 
         fun postgresql(): AnalyticsPostgreSQLConfig
-    }
-
-    interface AnalyticsConsumerConfig {
-        @WithDefault(ANALYTICS_CONSUMER_ENABLED_DEFAULT)
-        fun enabled(): Boolean
-
-        @WithDefault(ANALYTICS_CONSUMER_CONCURRENCY_DEFAULT)
-        fun concurrency(): Long
     }
 
     interface AnalyticsPostgreSQLConfig {
@@ -373,11 +365,12 @@ interface LemlineConfiguration {
 
     /**
      * Lifecycle events channel configuration.
-     * Used for emitting workflow and task lifecycle events as CloudEvents to external systems.
-     * This is a producer-only channel - lifecycle events are for external consumption.
+     * Producer emits workflow/task lifecycle CloudEvents.
+     * Consumer receives lifecycle CloudEvents (typically for analytics ingestion).
      */
     interface LifecycleEventsChannelConfig {
         fun producer(): ProducerConfig
+        fun consumer(): ConsumerConfig
     }
 
     /**
@@ -393,8 +386,8 @@ interface LemlineConfiguration {
         fun saslUsername(): Optional<String>
         fun saslPassword(): Optional<String>
 
-        fun commands(): KafkaCommandsConfig
-        fun events(): KafkaEventsConfig
+        fun commands(): KafkaWorkflowCommandsConfig
+        fun events(): KafkaWorkflowEventsConfig
         fun cloudevents(): Optional<KafkaCloudEventsConfig>
         fun lifecycleevents(): Optional<KafkaLifecycleEventsConfig>
     }
@@ -402,7 +395,7 @@ interface LemlineConfiguration {
     interface KafkaCloudEventsConfig {
         @WithDefault(CLOUDEVENTS_TOPIC_DEFAULT)
         fun topic(): String
-        fun consumer(): KafkaConsumerCloudEventsConfig
+        fun consumer(): KafkaCloudEventsConsumerConfig
         fun producer(): KafkaProducerConfig
     }
 
@@ -411,26 +404,26 @@ interface LemlineConfiguration {
      * Producer-only configuration for emitting lifecycle events.
      */
     interface KafkaLifecycleEventsConfig {
-        @WithDefault(LemlineConfigConstants.LIFECYCLE_EVENTS_TOPIC_DEFAULT)
+        @WithDefault(LIFECYCLE_EVENTS_TOPIC_DEFAULT)
         fun topic(): String
         fun producer(): KafkaProducerConfig
     }
 
-    interface KafkaCommandsConfig {
-        @WithDefault(COMMANDS_TOPIC_DEFAULT)
+    interface KafkaWorkflowCommandsConfig {
+        @WithDefault(WORKFLOW_COMMANDS_TOPIC_DEFAULT)
         fun topic(): String
-        fun consumer(): KafkaConsumerWorkflowsConfig
+        fun consumer(): KafkaWorkflowCommandsConsumerConfig
         fun producer(): KafkaProducerConfig
     }
 
-    interface KafkaEventsConfig {
-        @WithDefault(EVENTS_TOPIC_DEFAULT)
+    interface KafkaWorkflowEventsConfig {
+        @WithDefault(WORKFLOW_EVENTS_TOPIC_DEFAULT)
         fun topic(): String
-        fun consumer(): KafkaConsumerDatabaseConfig
+        fun consumer(): KafkaWorkflowEventsConsumerConfig
         fun producer(): KafkaProducerConfig
     }
 
-    interface KafkaConsumerWorkflowsConfig {
+    interface KafkaWorkflowCommandsConsumerConfig {
         @WithDefault(CONSUMER_CONCURRENCY_DEFAULT)
         fun concurrency(): Int
 
@@ -446,7 +439,7 @@ interface LemlineConfiguration {
         fun topicOut(): Optional<String>
     }
 
-    interface KafkaConsumerDatabaseConfig {
+    interface KafkaWorkflowEventsConsumerConfig {
         @WithDefault(CONSUMER_CONCURRENCY_DEFAULT)
         fun concurrency(): Int
 
@@ -462,11 +455,27 @@ interface LemlineConfiguration {
         fun topicOut(): Optional<String>
     }
 
-    interface KafkaConsumerCloudEventsConfig {
+    interface KafkaCloudEventsConsumerConfig {
         @WithDefault(CONSUMER_CONCURRENCY_DEFAULT)
         fun concurrency(): Int
 
         @WithDefault(KAFKA_CLOUDEVENTS_GROUP_ID_DEFAULT)
+        fun groupId(): String
+
+        @Pattern(regexp = "latest|earliest")
+        @WithDefault(KAFKA_OFFSET_RESET_DEFAULT)
+        fun offsetReset(): String
+
+        fun topicDlq(): Optional<String>
+
+        fun topicOut(): Optional<String>
+    }
+
+    interface KafkaLifecycleEventsConsumerConfig {
+        @WithDefault(CONSUMER_CONCURRENCY_DEFAULT)
+        fun concurrency(): Int
+
+        @WithDefault(KAFKA_LIFECYCLE_EVENTS_GROUP_ID_DEFAULT)
         fun groupId(): String
 
         @Pattern(regexp = "latest|earliest")
@@ -495,10 +504,30 @@ interface LemlineConfiguration {
         fun sslEnabled(): Optional<Boolean>
         fun virtualHost(): Optional<String>
 
-        fun commands(): RabbitCommandsConfig
-        fun events(): RabbitEventsConfig
+        fun commands(): RabbitWorkflowCommandsConfig
+        fun events(): RabbitWorkflowEventsConfig
         fun cloudevents(): Optional<RabbitCloudEventsConfig>
         fun lifecycleevents(): Optional<RabbitLifecycleEventsConfig>
+    }
+
+    interface RabbitWorkflowCommandsConfig {
+        @WithDefault(RABBITMQ_VHOST_DEFAULT)
+        fun virtualHost(): Optional<String>
+
+        @WithDefault(WORKFLOW_COMMANDS_TOPIC_DEFAULT)
+        fun queue(): String
+        fun producer(): RabbitProducerConfig
+        fun consumer(): RabbitConsumerConfig
+    }
+
+    interface RabbitWorkflowEventsConfig {
+        @WithDefault(RABBITMQ_VHOST_DEFAULT)
+        fun virtualHost(): Optional<String>
+
+        @WithDefault(WORKFLOW_EVENTS_TOPIC_DEFAULT)
+        fun queue(): String
+        fun producer(): RabbitProducerConfig
+        fun consumer(): RabbitConsumerConfig
     }
 
     interface RabbitCloudEventsConfig {
@@ -508,34 +537,11 @@ interface LemlineConfiguration {
         fun producer(): RabbitProducerConfig
     }
 
-    /**
-     * RabbitMQ lifecycle events configuration.
-     * Producer-only configuration for emitting lifecycle events.
-     */
     interface RabbitLifecycleEventsConfig {
-        @WithDefault(LemlineConfigConstants.LIFECYCLE_EVENTS_TOPIC_DEFAULT)
+        @WithDefault(LIFECYCLE_EVENTS_TOPIC_DEFAULT)
         fun queue(): String
         fun producer(): RabbitProducerConfig
-    }
-
-    interface RabbitCommandsConfig {
-        @WithDefault(RABBITMQ_VHOST_DEFAULT)
-        fun virtualHost(): Optional<String>
-
-        @WithDefault(COMMANDS_TOPIC_DEFAULT)
-        fun queue(): String
         fun consumer(): RabbitConsumerConfig
-        fun producer(): RabbitProducerConfig
-    }
-
-    interface RabbitEventsConfig {
-        @WithDefault(RABBITMQ_VHOST_DEFAULT)
-        fun virtualHost(): Optional<String>
-
-        @WithDefault(EVENTS_TOPIC_DEFAULT)
-        fun queue(): String
-        fun consumer(): RabbitConsumerConfig
-        fun producer(): RabbitProducerConfig
     }
 
     interface RabbitConsumerConfig {
@@ -569,31 +575,41 @@ interface LemlineConfiguration {
         @WithDefault(POSTGRES_PASSWORD_DEFAULT)
         fun password(): Optional<String>
 
-        fun commands(): PgmqChannelConfig
-        fun events(): PgmqChannelConfig
-        fun cloudevents(): Optional<PgmqChannelConfig>
+        fun commands(): PgmqWorkflowCommandsConfig
+        fun events(): PgmqWorkflowEventsConfig
+        fun cloudevents(): Optional<PgmqCloudEventsConfig>
         fun lifecycleevents(): Optional<PgmqLifecycleEventsConfig>
     }
 
     /**
      * PGMQ channel configuration.
      */
-    interface PgmqChannelConfig {
-        @WithDefault(COMMANDS_TOPIC_DEFAULT)
+    interface PgmqWorkflowCommandsConfig {
+        @WithDefault(WORKFLOW_COMMANDS_TOPIC_DEFAULT)
         fun queue(): String
-
-        fun consumer(): PgmqConsumerConfig
         fun producer(): PgmqProducerConfig
+        fun consumer(): PgmqConsumerConfig
     }
 
-    /**
-     * PGMQ lifecycle events configuration.
-     * Producer-only configuration for emitting lifecycle events.
-     */
-    interface PgmqLifecycleEventsConfig {
-        @WithDefault(LemlineConfigConstants.LIFECYCLE_EVENTS_TOPIC_DEFAULT)
+    interface PgmqWorkflowEventsConfig {
+        @WithDefault(WORKFLOW_EVENTS_TOPIC_DEFAULT)
         fun queue(): String
         fun producer(): PgmqProducerConfig
+        fun consumer(): PgmqConsumerConfig
+    }
+
+    interface PgmqCloudEventsConfig {
+        @WithDefault(CLOUDEVENTS_TOPIC_DEFAULT)
+        fun queue(): String
+        fun producer(): PgmqProducerConfig
+        fun consumer(): PgmqConsumerConfig
+    }
+
+    interface PgmqLifecycleEventsConfig {
+        @WithDefault(LIFECYCLE_EVENTS_TOPIC_DEFAULT)
+        fun queue(): String
+        fun producer(): PgmqProducerConfig
+        fun consumer(): PgmqConsumerConfig
     }
 
     /**
@@ -603,16 +619,16 @@ interface LemlineConfiguration {
         @WithDefault(CONSUMER_CONCURRENCY_DEFAULT)
         fun concurrency(): Int
 
-        @WithDefault(LemlineConfigConstants.PGMQ_VISIBILITY_TIMEOUT_DEFAULT)
+        @WithDefault(PGMQ_VISIBILITY_TIMEOUT_DEFAULT)
         fun visibilityTimeout(): Int
 
-        @WithDefault(LemlineConfigConstants.PGMQ_POLL_INTERVAL_DEFAULT)
+        @WithDefault(PGMQ_POLL_INTERVAL_DEFAULT)
         fun pollInterval(): Long
 
-        @WithDefault(LemlineConfigConstants.PGMQ_BATCH_SIZE_DEFAULT)
+        @WithDefault(PGMQ_BATCH_SIZE_DEFAULT)
         fun batchSize(): Int
 
-        @WithDefault(LemlineConfigConstants.PGMQ_MAX_RETRIES_DEFAULT)
+        @WithDefault(PGMQ_MAX_RETRIES_DEFAULT)
         fun maxRetries(): Int
 
         fun queueDlq(): Optional<String>

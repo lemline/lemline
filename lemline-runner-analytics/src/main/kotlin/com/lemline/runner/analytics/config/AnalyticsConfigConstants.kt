@@ -6,8 +6,8 @@ package com.lemline.runner.analytics.config
  * Property keys are centralized in lemline-runner-common/config/LemlineConfigKeys.kt.
  */
 object AnalyticsConfigConstants {
-    const val ANALYTICS_CONSUMER_ENABLED_DEFAULT = "false"
-    const val ANALYTICS_CONSUMER_CONCURRENCY_DEFAULT = "64"
+    const val LIFECYCLE_EVENTS_CONSUMER_ENABLED_DEFAULT = "false"
+    const val LIFECYCLE_EVENTS_CONSUMER_CONCURRENCY_DEFAULT = "64"
     const val ANALYTICS_POSTGRES_SCHEMA_DEFAULT = "public"
     const val ANALYTICS_POSTGRES_TABLE_DEFAULT = "lemline_lifecycle_events"
     const val ANALYTICS_POSTGRES_MIGRATE_AT_START_DEFAULT = "true"

@@ -3,8 +3,8 @@ package com.lemline.runner.analytics.config
 
 import com.lemline.common.info
 import com.lemline.common.logger
-import com.lemline.runner.analytics.config.AnalyticsConfigConstants.ANALYTICS_CONSUMER_ENABLED_DEFAULT
-import com.lemline.runner.common.config.LEMLINE_ANALYTICS_CONSUMER_ENABLED
+import com.lemline.runner.analytics.config.AnalyticsConfigConstants.LIFECYCLE_EVENTS_CONSUMER_ENABLED_DEFAULT
+import com.lemline.runner.common.config.LEMLINE_MESSAGING_LIFECYCLE_EVENTS_CONSUMER_ENABLED
 import io.quarkus.runtime.StartupEvent
 import jakarta.annotation.Priority
 import jakarta.enterprise.context.ApplicationScoped
@@ -15,8 +15,8 @@ import org.eclipse.microprofile.config.inject.ConfigProperty
 
 @ApplicationScoped
 internal class AnalyticsStartupValidator(
-    @param:ConfigProperty(name = LEMLINE_ANALYTICS_CONSUMER_ENABLED, defaultValue = ANALYTICS_CONSUMER_ENABLED_DEFAULT)
-    val analyticsEnabled: Boolean,
+    @param:ConfigProperty(name = LEMLINE_MESSAGING_LIFECYCLE_EVENTS_CONSUMER_ENABLED, defaultValue = LIFECYCLE_EVENTS_CONSUMER_ENABLED_DEFAULT)
+    val lifecycleConsumerEnabled: Boolean,
 ) {
     private val logger = logger()
 
@@ -25,7 +25,7 @@ internal class AnalyticsStartupValidator(
 
     @Suppress("unused")
     fun onStart(@Observes @Priority(0) event: StartupEvent) {
-        if (!analyticsEnabled) return
+        if (!lifecycleConsumerEnabled) return
         verifyAnalyticsDatabaseConnectivity()
     }
 

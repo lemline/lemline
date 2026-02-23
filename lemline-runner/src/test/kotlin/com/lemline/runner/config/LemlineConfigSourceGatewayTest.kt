@@ -3,6 +3,11 @@ package com.lemline.runner.config
 
 import com.lemline.runner.cli.config.ConfigPathHolder
 import com.lemline.runner.common.config.ANALYTICS_BACKEND_CLICKHOUSE
+import com.lemline.runner.common.config.LEMLINE_ANALYTICS_POSTGRES_DATABASE
+import com.lemline.runner.common.config.LEMLINE_ANALYTICS_POSTGRES_HOST
+import com.lemline.runner.common.config.LEMLINE_ANALYTICS_POSTGRES_PASSWORD
+import com.lemline.runner.common.config.LEMLINE_ANALYTICS_POSTGRES_PORT
+import com.lemline.runner.common.config.LEMLINE_ANALYTICS_POSTGRES_USERNAME
 import com.lemline.runner.common.config.LEMLINE_ANALYTICS_TYPE
 import com.lemline.runner.common.config.LEMLINE_GATEWAY_AUTHENTICATION_ENABLED
 import com.lemline.runner.common.config.LEMLINE_GATEWAY_AUTHENTICATION_JWT_ISSUER
@@ -11,6 +16,7 @@ import com.lemline.runner.common.config.LEMLINE_GATEWAY_CORS_ENABLED
 import com.lemline.runner.common.config.LEMLINE_GATEWAY_ENABLED
 import com.lemline.runner.common.config.LEMLINE_GATEWAY_TLS_CLIENT_AUTH
 import com.lemline.runner.common.config.LEMLINE_GATEWAY_TLS_ENABLED
+import com.lemline.runner.common.config.LEMLINE_MESSAGING_LIFECYCLE_EVENTS_CONSUMER_ENABLED
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -24,11 +30,11 @@ class LemlineConfigSourceGatewayTest {
         withSystemProperties(
             mapOf(
                 LEMLINE_GATEWAY_ENABLED to "true",
-                com.lemline.runner.common.config.LEMLINE_ANALYTICS_POSTGRES_HOST to "analytics-db",
-                com.lemline.runner.common.config.LEMLINE_ANALYTICS_POSTGRES_PORT to "5544",
-                com.lemline.runner.common.config.LEMLINE_ANALYTICS_POSTGRES_DATABASE to "analytics",
-                com.lemline.runner.common.config.LEMLINE_ANALYTICS_POSTGRES_USERNAME to "analytics_user",
-                com.lemline.runner.common.config.LEMLINE_ANALYTICS_POSTGRES_PASSWORD to "analytics_pass",
+                LEMLINE_ANALYTICS_POSTGRES_HOST to "analytics-db",
+                LEMLINE_ANALYTICS_POSTGRES_PORT to "5544",
+                LEMLINE_ANALYTICS_POSTGRES_DATABASE to "analytics",
+                LEMLINE_ANALYTICS_POSTGRES_USERNAME to "analytics_user",
+                LEMLINE_ANALYTICS_POSTGRES_PASSWORD to "analytics_pass",
             )
         ) {
             val source = LemlineConfigSource()
@@ -52,8 +58,8 @@ class LemlineConfigSourceGatewayTest {
             mapOf(
                 LEMLINE_GATEWAY_ENABLED to "true",
                 LEMLINE_ANALYTICS_TYPE to ANALYTICS_BACKEND_CLICKHOUSE,
-                com.lemline.runner.common.config.LEMLINE_ANALYTICS_CONSUMER_ENABLED to "false",
-                com.lemline.runner.common.config.LEMLINE_ANALYTICS_POSTGRES_HOST to "analytics-db",
+                LEMLINE_MESSAGING_LIFECYCLE_EVENTS_CONSUMER_ENABLED to "false",
+                LEMLINE_ANALYTICS_POSTGRES_HOST to "analytics-db",
             )
         ) {
             val source = LemlineConfigSource()
@@ -69,8 +75,8 @@ class LemlineConfigSourceGatewayTest {
             mapOf(
                 LEMLINE_GATEWAY_ENABLED to "true",
                 LEMLINE_ANALYTICS_TYPE to ANALYTICS_BACKEND_CLICKHOUSE,
-                com.lemline.runner.common.config.LEMLINE_ANALYTICS_CONSUMER_ENABLED to "true",
-                com.lemline.runner.common.config.LEMLINE_ANALYTICS_POSTGRES_HOST to "analytics-db",
+                LEMLINE_MESSAGING_LIFECYCLE_EVENTS_CONSUMER_ENABLED to "true",
+                LEMLINE_ANALYTICS_POSTGRES_HOST to "analytics-db",
             )
         ) {
             val source = LemlineConfigSource()
