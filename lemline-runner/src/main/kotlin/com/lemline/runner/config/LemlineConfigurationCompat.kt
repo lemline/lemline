@@ -2,6 +2,11 @@
 package com.lemline.runner.config
 
 typealias LemlineConfiguration = com.lemline.runner.config.shared.LemlineConfiguration
+typealias LemlineConfigSource = com.lemline.runner.config.shared.LemlineConfigSource
+typealias ExtraFileConfigFactory = com.lemline.runner.config.shared.ExtraFileConfigFactory
+
+const val LIFECYCLEEVENTS_IN_CHANNEL = "lifecycleevents-in"
+const val LIFECYCLEEVENTS_OUT_CHANNEL = "lifecycleevents-out"
 
 /**
  * Backward-compatible aliases for code that still imports constants from

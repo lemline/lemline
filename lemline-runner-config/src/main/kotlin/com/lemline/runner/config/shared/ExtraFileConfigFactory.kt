@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-package com.lemline.runner.config
+package com.lemline.runner.config.shared
 
 import io.smallrye.config.AbstractLocationConfigSourceLoader
 import io.smallrye.config.source.yaml.YamlConfigSource

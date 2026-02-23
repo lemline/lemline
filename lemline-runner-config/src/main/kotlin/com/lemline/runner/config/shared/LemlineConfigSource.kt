@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
-package com.lemline.runner.config
+package com.lemline.runner.config.shared
 
 import com.lemline.common.logger.logger
-import com.lemline.runner.cli.config.ConfigPathHolder
 import com.lemline.runner.common.config.ANALYTICS_BACKEND_CLICKHOUSE
 import com.lemline.runner.common.config.ANALYTICS_BACKEND_DEFAULT
 import com.lemline.runner.common.config.ANALYTICS_BACKEND_POSTGRESQL
@@ -25,71 +24,68 @@ import com.lemline.runner.common.config.GATEWAY_TLS_PRIVATE_KEY
 import com.lemline.runner.common.config.GATEWAY_TLS_TRUST_STORE
 import com.lemline.runner.common.config.GATEWAY_TLS_TRUST_STORE_PASSWORD
 import com.lemline.runner.common.config.MessagingType
-import com.lemline.runner.config.LemlineConfigConstants.ANALYTICS_POSTGRES_BASELINE_ON_MIGRATE_DEFAULT
-import com.lemline.runner.config.LemlineConfigConstants.ANALYTICS_POSTGRES_DATABASE_DEFAULT
-import com.lemline.runner.config.LemlineConfigConstants.ANALYTICS_POSTGRES_MIGRATE_AT_START_DEFAULT
-import com.lemline.runner.config.LemlineConfigConstants.CLOUDEVENTS_TOPIC_DEFAULT
-import com.lemline.runner.config.LemlineConfigConstants.COMMANDS_TOPIC_DEFAULT
-import com.lemline.runner.config.LemlineConfigConstants.CONSUMER_CONCURRENCY_DEFAULT
-import com.lemline.runner.config.LemlineConfigConstants.EVENTS_TOPIC_DEFAULT
-import com.lemline.runner.config.LemlineConfigConstants.GATEWAY_AUTHENTICATION_ENABLED_DEFAULT
-import com.lemline.runner.config.LemlineConfigConstants.GATEWAY_CORS_ENABLED_DEFAULT
-import com.lemline.runner.config.LemlineConfigConstants.GATEWAY_CORS_HEADERS_DEFAULT
-import com.lemline.runner.config.LemlineConfigConstants.GATEWAY_CORS_METHODS_DEFAULT
-import com.lemline.runner.config.LemlineConfigConstants.GATEWAY_CORS_ORIGINS_DEFAULT
-import com.lemline.runner.config.LemlineConfigConstants.GATEWAY_ENABLED_DEFAULT
-import com.lemline.runner.config.LemlineConfigConstants.GATEWAY_GRPC_HOST_DEFAULT
-import com.lemline.runner.config.LemlineConfigConstants.GATEWAY_GRPC_PORT_DEFAULT
-import com.lemline.runner.config.LemlineConfigConstants.GATEWAY_TLS_CLIENT_AUTH_DEFAULT
-import com.lemline.runner.config.LemlineConfigConstants.GATEWAY_TLS_ENABLED_DEFAULT
-import com.lemline.runner.config.LemlineConfigConstants.H2_DB_NAME_DEFAULT
-import com.lemline.runner.config.LemlineConfigConstants.H2_PASSWORD_DEFAULT
-import com.lemline.runner.config.LemlineConfigConstants.H2_USERNAME_DEFAULT
-import com.lemline.runner.config.LemlineConfigConstants.IN_MEMORY_CONNECTOR
-import com.lemline.runner.config.LemlineConfigConstants.KAFKA_BROKERS_DEFAULT
-import com.lemline.runner.config.LemlineConfigConstants.KAFKA_CLOUDEVENTS_GROUP_ID_DEFAULT
-import com.lemline.runner.config.LemlineConfigConstants.KAFKA_CONNECTOR
-import com.lemline.runner.config.LemlineConfigConstants.KAFKA_DATABASE_GROUP_ID_DEFAULT
-import com.lemline.runner.config.LemlineConfigConstants.KAFKA_LIFECYCLE_EVENTS_GROUP_ID_DEFAULT
-import com.lemline.runner.config.LemlineConfigConstants.KAFKA_OFFSET_RESET_DEFAULT
-import com.lemline.runner.config.LemlineConfigConstants.KAFKA_STRING_DESERIALIZER
-import com.lemline.runner.config.LemlineConfigConstants.KAFKA_STRING_SERIALIZER
-import com.lemline.runner.config.LemlineConfigConstants.KAFKA_WORKFLOWS_GROUP_ID_DEFAULT
-import com.lemline.runner.config.LemlineConfigConstants.LIFECYCLE_EVENTS_TOPIC_DEFAULT
-import com.lemline.runner.config.LemlineConfigConstants.MYSQL_HOST_DEFAULT
-import com.lemline.runner.config.LemlineConfigConstants.MYSQL_DATABASE_DEFAULT
-import com.lemline.runner.config.LemlineConfigConstants.MYSQL_PASSWORD_DEFAULT
-import com.lemline.runner.config.LemlineConfigConstants.MYSQL_PORT_DEFAULT
-import com.lemline.runner.config.LemlineConfigConstants.MYSQL_USERNAME_DEFAULT
-import com.lemline.runner.config.LemlineConfigConstants.PGMQ_BATCH_SIZE_DEFAULT
-import com.lemline.runner.config.LemlineConfigConstants.PGMQ_CONNECTOR
-import com.lemline.runner.config.LemlineConfigConstants.PGMQ_MAX_RETRIES_DEFAULT
-import com.lemline.runner.config.LemlineConfigConstants.PGMQ_POLL_INTERVAL_DEFAULT
-import com.lemline.runner.config.LemlineConfigConstants.PGMQ_VISIBILITY_TIMEOUT_DEFAULT
-import com.lemline.runner.config.LemlineConfigConstants.POSTGRES_HOST_DEFAULT
-import com.lemline.runner.config.LemlineConfigConstants.POSTGRES_DATABASE_DEFAULT
-import com.lemline.runner.config.LemlineConfigConstants.POSTGRES_PASSWORD_DEFAULT
-import com.lemline.runner.config.LemlineConfigConstants.POSTGRES_PORT_DEFAULT
-import com.lemline.runner.config.LemlineConfigConstants.POSTGRES_USERNAME_DEFAULT
-import com.lemline.runner.config.LemlineConfigConstants.RABBITMQ_CONNECTOR
-import com.lemline.runner.config.LemlineConfigConstants.RABBITMQ_HOST_DEFAULT
-import com.lemline.runner.config.LemlineConfigConstants.RABBITMQ_PASSWORD_DEFAULT
-import com.lemline.runner.config.LemlineConfigConstants.RABBITMQ_PORT_DEFAULT
-import com.lemline.runner.config.LemlineConfigConstants.RABBITMQ_STRING_SERIALIZER
-import com.lemline.runner.config.LemlineConfigConstants.RABBITMQ_USER_DEFAULT
-import com.lemline.runner.config.LemlineConfigConstants.RABBITMQ_VHOST_DEFAULT
-import com.lemline.runner.messaging.cloudevents.CLOUDEVENTS_IN_CHANNEL
-import com.lemline.runner.messaging.cloudevents.CLOUDEVENTS_OUT_CHANNEL
-import com.lemline.runner.messaging.commands.COMMANDS_IN_CHANNEL
-import com.lemline.runner.messaging.commands.COMMANDS_OUT_CHANNEL
-import com.lemline.runner.messaging.events.EVENTS_IN_CHANNEL
-import com.lemline.runner.messaging.events.EVENTS_OUT_CHANNEL
+import com.lemline.runner.config.shared.LemlineConfigConstants.ANALYTICS_POSTGRES_BASELINE_ON_MIGRATE_DEFAULT
+import com.lemline.runner.config.shared.LemlineConfigConstants.ANALYTICS_POSTGRES_DATABASE_DEFAULT
+import com.lemline.runner.config.shared.LemlineConfigConstants.ANALYTICS_POSTGRES_MIGRATE_AT_START_DEFAULT
+import com.lemline.runner.config.shared.LemlineConfigConstants.CLOUDEVENTS_TOPIC_DEFAULT
+import com.lemline.runner.config.shared.LemlineConfigConstants.COMMANDS_TOPIC_DEFAULT
+import com.lemline.runner.config.shared.LemlineConfigConstants.CONSUMER_CONCURRENCY_DEFAULT
+import com.lemline.runner.config.shared.LemlineConfigConstants.EVENTS_TOPIC_DEFAULT
+import com.lemline.runner.config.shared.LemlineConfigConstants.GATEWAY_AUTHENTICATION_ENABLED_DEFAULT
+import com.lemline.runner.config.shared.LemlineConfigConstants.GATEWAY_CORS_ENABLED_DEFAULT
+import com.lemline.runner.config.shared.LemlineConfigConstants.GATEWAY_CORS_HEADERS_DEFAULT
+import com.lemline.runner.config.shared.LemlineConfigConstants.GATEWAY_CORS_METHODS_DEFAULT
+import com.lemline.runner.config.shared.LemlineConfigConstants.GATEWAY_CORS_ORIGINS_DEFAULT
+import com.lemline.runner.config.shared.LemlineConfigConstants.GATEWAY_ENABLED_DEFAULT
+import com.lemline.runner.config.shared.LemlineConfigConstants.GATEWAY_GRPC_HOST_DEFAULT
+import com.lemline.runner.config.shared.LemlineConfigConstants.GATEWAY_GRPC_PORT_DEFAULT
+import com.lemline.runner.config.shared.LemlineConfigConstants.GATEWAY_TLS_CLIENT_AUTH_DEFAULT
+import com.lemline.runner.config.shared.LemlineConfigConstants.GATEWAY_TLS_ENABLED_DEFAULT
+import com.lemline.runner.config.shared.LemlineConfigConstants.H2_DB_NAME_DEFAULT
+import com.lemline.runner.config.shared.LemlineConfigConstants.H2_PASSWORD_DEFAULT
+import com.lemline.runner.config.shared.LemlineConfigConstants.H2_USERNAME_DEFAULT
+import com.lemline.runner.config.shared.LemlineConfigConstants.IN_MEMORY_CONNECTOR
+import com.lemline.runner.config.shared.LemlineConfigConstants.KAFKA_BROKERS_DEFAULT
+import com.lemline.runner.config.shared.LemlineConfigConstants.KAFKA_CLOUDEVENTS_GROUP_ID_DEFAULT
+import com.lemline.runner.config.shared.LemlineConfigConstants.KAFKA_CONNECTOR
+import com.lemline.runner.config.shared.LemlineConfigConstants.KAFKA_DATABASE_GROUP_ID_DEFAULT
+import com.lemline.runner.config.shared.LemlineConfigConstants.KAFKA_LIFECYCLE_EVENTS_GROUP_ID_DEFAULT
+import com.lemline.runner.config.shared.LemlineConfigConstants.KAFKA_OFFSET_RESET_DEFAULT
+import com.lemline.runner.config.shared.LemlineConfigConstants.KAFKA_STRING_DESERIALIZER
+import com.lemline.runner.config.shared.LemlineConfigConstants.KAFKA_STRING_SERIALIZER
+import com.lemline.runner.config.shared.LemlineConfigConstants.KAFKA_WORKFLOWS_GROUP_ID_DEFAULT
+import com.lemline.runner.config.shared.LemlineConfigConstants.LIFECYCLE_EVENTS_TOPIC_DEFAULT
+import com.lemline.runner.config.shared.LemlineConfigConstants.MYSQL_HOST_DEFAULT
+import com.lemline.runner.config.shared.LemlineConfigConstants.MYSQL_DATABASE_DEFAULT
+import com.lemline.runner.config.shared.LemlineConfigConstants.MYSQL_PASSWORD_DEFAULT
+import com.lemline.runner.config.shared.LemlineConfigConstants.MYSQL_PORT_DEFAULT
+import com.lemline.runner.config.shared.LemlineConfigConstants.MYSQL_USERNAME_DEFAULT
+import com.lemline.runner.config.shared.LemlineConfigConstants.PGMQ_BATCH_SIZE_DEFAULT
+import com.lemline.runner.config.shared.LemlineConfigConstants.PGMQ_CONNECTOR
+import com.lemline.runner.config.shared.LemlineConfigConstants.PGMQ_MAX_RETRIES_DEFAULT
+import com.lemline.runner.config.shared.LemlineConfigConstants.PGMQ_POLL_INTERVAL_DEFAULT
+import com.lemline.runner.config.shared.LemlineConfigConstants.PGMQ_VISIBILITY_TIMEOUT_DEFAULT
+import com.lemline.runner.config.shared.LemlineConfigConstants.POSTGRES_HOST_DEFAULT
+import com.lemline.runner.config.shared.LemlineConfigConstants.POSTGRES_DATABASE_DEFAULT
+import com.lemline.runner.config.shared.LemlineConfigConstants.POSTGRES_PASSWORD_DEFAULT
+import com.lemline.runner.config.shared.LemlineConfigConstants.POSTGRES_PORT_DEFAULT
+import com.lemline.runner.config.shared.LemlineConfigConstants.POSTGRES_USERNAME_DEFAULT
+import com.lemline.runner.config.shared.LemlineConfigConstants.RABBITMQ_CONNECTOR
+import com.lemline.runner.config.shared.LemlineConfigConstants.RABBITMQ_HOST_DEFAULT
+import com.lemline.runner.config.shared.LemlineConfigConstants.RABBITMQ_PASSWORD_DEFAULT
+import com.lemline.runner.config.shared.LemlineConfigConstants.RABBITMQ_PORT_DEFAULT
+import com.lemline.runner.config.shared.LemlineConfigConstants.RABBITMQ_STRING_SERIALIZER
+import com.lemline.runner.config.shared.LemlineConfigConstants.RABBITMQ_USER_DEFAULT
+import com.lemline.runner.config.shared.LemlineConfigConstants.RABBITMQ_VHOST_DEFAULT
 import io.smallrye.config.PropertiesConfigSource
 import java.util.Locale
 
-/**
- * Channel names for lifecycle events.
- */
+internal const val COMMANDS_IN_CHANNEL = "commands-in"
+internal const val COMMANDS_OUT_CHANNEL = "commands-out"
+internal const val EVENTS_IN_CHANNEL = "events-in"
+internal const val EVENTS_OUT_CHANNEL = "events-out"
+internal const val CLOUDEVENTS_IN_CHANNEL = "cloudevents-in"
+internal const val CLOUDEVENTS_OUT_CHANNEL = "cloudevents-out"
 internal const val LIFECYCLEEVENTS_IN_CHANNEL = "lifecycleevents-in"
 internal const val LIFECYCLEEVENTS_OUT_CHANNEL = "lifecycleevents-out"
 
