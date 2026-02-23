@@ -9,7 +9,6 @@ package com.lemline.runner.analytics.config
 object AnalyticsConfigConstants {
     const val ANALYTICS_CONSUMER_ENABLED = "lemline.analytics.consumer.enabled"
     const val ANALYTICS_CONSUMER_CONCURRENCY = "lemline.analytics.consumer.concurrency"
-    const val LIFECYCLEEVENTS_IN_CHANNEL = "lifecycleevents-in"
 
     const val ANALYTICS_CONSUMER_ENABLED_DEFAULT = "false"
     const val ANALYTICS_CONSUMER_CONCURRENCY_DEFAULT = "64"

@@ -8,7 +8,7 @@ import com.lemline.runner.config.shared.LemlineConfigConstants.PGMQ_BATCH_SIZE_D
 import com.lemline.runner.config.shared.LemlineConfigConstants.PGMQ_MAX_RETRIES_DEFAULT
 import com.lemline.runner.config.shared.LemlineConfigConstants.PGMQ_POLL_INTERVAL_DEFAULT
 import com.lemline.runner.config.shared.LemlineConfigConstants.PGMQ_VISIBILITY_TIMEOUT_DEFAULT
-import com.lemline.runner.messaging.lifecycle.LIFECYCLEEVENTS_IN_CHANNEL
+import com.lemline.runner.common.messaging.LIFECYCLEEVENTS_IN_CHANNEL
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull

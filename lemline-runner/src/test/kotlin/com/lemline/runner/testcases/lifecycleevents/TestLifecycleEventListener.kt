@@ -6,6 +6,7 @@ import com.lemline.common.values.WorkflowId
 import com.lemline.core.lifecycleevents.LifecycleEventData
 import com.lemline.core.lifecycleevents.LifecycleEventType
 import com.lemline.core.testcases.impl.WorkflowTestResult
+import com.lemline.runner.common.messaging.LIFECYCLEEVENTS_IN_CHANNEL
 import io.cloudevents.CloudEvent
 import io.cloudevents.jackson.JsonFormat
 import io.quarkus.runtime.Startup
@@ -66,7 +67,7 @@ class TestLifecycleEventListener {
     /**
      * Incoming handler for lifecycle events from the broker.
      */
-    @Incoming("lifecycleevents-in")
+    @Incoming(LIFECYCLEEVENTS_IN_CHANNEL)
     fun onLifecycleEvent(payload: String) {
         try {
             val cloudEvent = cloudEventFormat.deserialize(payload.toByteArray())

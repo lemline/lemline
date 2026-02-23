@@ -24,6 +24,8 @@ import com.lemline.runner.common.config.GATEWAY_TLS_PRIVATE_KEY
 import com.lemline.runner.common.config.GATEWAY_TLS_TRUST_STORE
 import com.lemline.runner.common.config.GATEWAY_TLS_TRUST_STORE_PASSWORD
 import com.lemline.runner.common.config.MessagingType
+import com.lemline.runner.common.messaging.LIFECYCLEEVENTS_IN_CHANNEL
+import com.lemline.runner.common.messaging.LIFECYCLEEVENTS_OUT_CHANNEL
 import com.lemline.runner.config.shared.LemlineConfigConstants.ANALYTICS_POSTGRES_BASELINE_ON_MIGRATE_DEFAULT
 import com.lemline.runner.config.shared.LemlineConfigConstants.ANALYTICS_POSTGRES_DATABASE_DEFAULT
 import com.lemline.runner.config.shared.LemlineConfigConstants.ANALYTICS_POSTGRES_MIGRATE_AT_START_DEFAULT
@@ -86,8 +88,6 @@ internal const val EVENTS_IN_CHANNEL = "events-in"
 internal const val EVENTS_OUT_CHANNEL = "events-out"
 internal const val CLOUDEVENTS_IN_CHANNEL = "cloudevents-in"
 internal const val CLOUDEVENTS_OUT_CHANNEL = "cloudevents-out"
-internal const val LIFECYCLEEVENTS_IN_CHANNEL = "lifecycleevents-in"
-internal const val LIFECYCLEEVENTS_OUT_CHANNEL = "lifecycleevents-out"
 
 enum class TopicType(
     val type: String,
