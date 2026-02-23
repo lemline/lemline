@@ -267,7 +267,6 @@ private fun checkConfigLocation(filePath: Path, provided: Boolean): Boolean {
     }
     if (fileExists && isRegularFile) {
         ConfigPathHolder.configPath = path
-        System.setProperty("lemline.config.path", path.toAbsolutePath().toString())
         return true
     }
     return false

@@ -1,15 +1,18 @@
 // SPDX-License-Identifier: BUSL-1.1
-package com.lemline.runner.gateway.config
+package com.lemline.runner.config
 
+import com.lemline.runner.cli.config.ConfigPathHolder
+import com.lemline.runner.gateway.config.GatewayConfigConstants
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
-class LemlineGatewayConfigSourceTest {
+class LemlineConfigSourceGatewayTest {
 
     @Test
-    fun `generates analytics postgres datasource properties by default`() {
+    fun `generates analytics postgres datasource properties when gateway is enabled`() {
         withSystemProperties(
             mapOf(
                 GatewayConfigConstants.GATEWAY_ENABLED to "true",
@@ -20,7 +23,7 @@ class LemlineGatewayConfigSourceTest {
                 "lemline.analytics.postgresql.password" to "analytics_pass",
             )
         ) {
-            val source = LemlineGatewayConfigSource()
+            val source = LemlineConfigSource()
             assertEquals("postgresql", source.getValue("quarkus.datasource.analytics.db-kind"))
             assertEquals("analytics_user", source.getValue("quarkus.datasource.analytics.username"))
             assertEquals("analytics_pass", source.getValue("quarkus.datasource.analytics.password"))
@@ -33,15 +36,16 @@ class LemlineGatewayConfigSourceTest {
     }
 
     @Test
-    fun `does not generate analytics datasource for clickhouse type`() {
+    fun `does not generate analytics datasource for clickhouse type when lifecycle consumer is disabled`() {
         withSystemProperties(
             mapOf(
                 GatewayConfigConstants.GATEWAY_ENABLED to "true",
                 GatewayConfigConstants.ANALYTICS_TYPE to GatewayConfigConstants.ANALYTICS_TYPE_CLICKHOUSE,
+                LIFECYCLE_EVENTS_CONSUMER_ENABLED to "false",
                 "lemline.analytics.postgresql.host" to "analytics-db",
             )
         ) {
-            val source = LemlineGatewayConfigSource()
+            val source = LemlineConfigSource()
             assertNull(source.getValue("quarkus.datasource.analytics.db-kind"))
             assertNull(source.getValue("quarkus.datasource.analytics.jdbc.url"))
             assertNull(source.getValue("quarkus.flyway.analytics.locations"))
@@ -49,7 +53,31 @@ class LemlineGatewayConfigSourceTest {
     }
 
     @Test
-    fun `fails fast on unsupported analytics type`() {
+    fun `still generates analytics datasource for clickhouse type when lifecycle consumer is enabled`() {
+        withSystemProperties(
+            mapOf(
+                GatewayConfigConstants.GATEWAY_ENABLED to "true",
+                GatewayConfigConstants.ANALYTICS_TYPE to GatewayConfigConstants.ANALYTICS_TYPE_CLICKHOUSE,
+                LIFECYCLE_EVENTS_CONSUMER_ENABLED to "true",
+                "lemline.analytics.postgresql.host" to "analytics-db",
+            )
+        ) {
+            val source = LemlineConfigSource()
+            val jdbcUrl = source.getValue("quarkus.datasource.analytics.jdbc.url")
+            assertTrue(
+                jdbcUrl.startsWith("jdbc:postgresql://analytics-db:"),
+                "Expected analytics JDBC URL to use overridden host, but was: $jdbcUrl"
+            )
+            assertEquals("postgresql", source.getValue("quarkus.datasource.analytics.db-kind"))
+            assertEquals(
+                "classpath:db/migration/analytics/postgresql",
+                source.getValue("quarkus.flyway.analytics.locations")
+            )
+        }
+    }
+
+    @Test
+    fun `fails fast on unsupported analytics type when gateway is enabled`() {
         withSystemProperties(
             mapOf(
                 GatewayConfigConstants.GATEWAY_ENABLED to "true",
@@ -57,7 +85,7 @@ class LemlineGatewayConfigSourceTest {
             )
         ) {
             assertFailsWith<IllegalStateException> {
-                LemlineGatewayConfigSource()
+                LemlineConfigSource()
             }
         }
     }
@@ -69,7 +97,7 @@ class LemlineGatewayConfigSourceTest {
                 GatewayConfigConstants.GATEWAY_ENABLED to "true",
             )
         ) {
-            val source = LemlineGatewayConfigSource()
+            val source = LemlineConfigSource()
             assertEquals("true", source.getValue("quarkus.grpc.server.enable-grpc-web"))
             assertEquals("true", source.getValue("quarkus.http.cors"))
             assertEquals("false", source.getValue("quarkus.grpc.server.plain-text"))
@@ -96,7 +124,7 @@ class LemlineGatewayConfigSourceTest {
                 GatewayConfigConstants.GATEWAY_CORS_ENABLED to "false",
             )
         ) {
-            val source = LemlineGatewayConfigSource()
+            val source = LemlineConfigSource()
             assertEquals("false", source.getValue("quarkus.http.cors"))
             assertNull(source.getValue("quarkus.http.cors.origins"))
             assertNull(source.getValue("quarkus.http.cors.methods"))
@@ -112,7 +140,7 @@ class LemlineGatewayConfigSourceTest {
                 GatewayConfigConstants.GATEWAY_TLS_ENABLED to "false",
             )
         ) {
-            val source = LemlineGatewayConfigSource()
+            val source = LemlineConfigSource()
             assertEquals("true", source.getValue("quarkus.grpc.server.plain-text"))
             assertEquals("none", source.getValue("quarkus.grpc.server.ssl.client-auth"))
         }
@@ -128,7 +156,7 @@ class LemlineGatewayConfigSourceTest {
                 GatewayConfigConstants.GATEWAY_AUTHENTICATION_ENABLED to "false",
             )
         ) {
-            val source = LemlineGatewayConfigSource()
+            val source = LemlineConfigSource()
             assertEquals("false", source.getValue("quarkus.grpc.server.plain-text"))
             assertEquals("required", source.getValue("quarkus.grpc.server.ssl.client-auth"))
             assertNull(source.getValue("mp.jwt.verify.issuer"))
@@ -147,7 +175,7 @@ class LemlineGatewayConfigSourceTest {
                     "https://issuer.example.com/.well-known/jwks.json",
             )
         ) {
-            val source = LemlineGatewayConfigSource()
+            val source = LemlineConfigSource()
             assertEquals("https://issuer.example.com", source.getValue("mp.jwt.verify.issuer"))
             assertEquals(
                 "https://issuer.example.com/.well-known/jwks.json",
@@ -161,10 +189,10 @@ class LemlineGatewayConfigSourceTest {
         block: () -> Unit
     ) {
         val previousValues = overrides.mapValues { System.getProperty(it.key) }
-        val previousConfigPath = System.getProperty("lemline.config.path")
+        val previousConfigPath = ConfigPathHolder.configPath
 
         try {
-            System.clearProperty("lemline.config.path")
+            ConfigPathHolder.configPath = null
             overrides.forEach { (key, value) -> System.setProperty(key, value) }
             block()
         } finally {
@@ -176,11 +204,7 @@ class LemlineGatewayConfigSourceTest {
                     System.setProperty(key, previous)
                 }
             }
-            if (previousConfigPath == null) {
-                System.clearProperty("lemline.config.path")
-            } else {
-                System.setProperty("lemline.config.path", previousConfigPath)
-            }
+            ConfigPathHolder.configPath = previousConfigPath
         }
     }
 }

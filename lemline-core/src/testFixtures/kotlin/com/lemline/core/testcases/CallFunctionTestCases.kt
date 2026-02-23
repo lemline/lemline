@@ -9,6 +9,7 @@ import io.serverlessworkflow.api.types.SetTask
 import io.serverlessworkflow.api.types.SetTaskConfiguration
 import io.serverlessworkflow.api.types.Task
 import java.net.URI
+import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
@@ -748,7 +749,7 @@ object CallFunctionTestCases {
             tags = setOf("function", "execution", "fork"),
             validate = expectOutput(
                 buildJsonObject {
-                    put("results", kotlinx.serialization.json.buildJsonArray {
+                    put("results", buildJsonArray {
                         add(kotlinx.serialization.json.JsonPrimitive("branch1-result"))
                         add(kotlinx.serialization.json.JsonPrimitive("branch2-result"))
                     })
@@ -855,7 +856,7 @@ object CallFunctionTestCases {
             tags = setOf("function", "execution", "for"),
             validate = expectOutput(
                 buildJsonObject {
-                    put("results", kotlinx.serialization.json.buildJsonArray {
+                    put("results", buildJsonArray {
                         add(kotlinx.serialization.json.JsonPrimitive(20))
                         add(kotlinx.serialization.json.JsonPrimitive(40))
                         add(kotlinx.serialization.json.JsonPrimitive(60))
@@ -942,7 +943,7 @@ object CallFunctionTestCases {
                 )
             ),
             validate = expectOutput(
-                kotlinx.serialization.json.buildJsonArray {
+                buildJsonArray {
                     add(buildJsonObject {
                         put("processed", buildJsonObject { put("id", 1); put("name", "item1") })
                     })

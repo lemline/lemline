@@ -19,17 +19,18 @@ import com.lemline.runner.config.LemlineConfigConstants.KAFKA_OFFSET_RESET_DEFAU
 import com.lemline.runner.config.LemlineConfigConstants.KAFKA_WORKFLOWS_GROUP_ID_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.METRICS_PATH_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.METRICS_PORT_DEFAULT
-import com.lemline.runner.config.LemlineConfigConstants.MYSQL_HOST_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.MYSQL_DATABASE_DEFAULT
+import com.lemline.runner.config.LemlineConfigConstants.MYSQL_HOST_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.MYSQL_PASSWORD_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.MYSQL_PORT_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.MYSQL_USERNAME_DEFAULT
-import com.lemline.runner.config.LemlineConfigConstants.POSTGRES_HOST_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.POSTGRES_DATABASE_DEFAULT
+import com.lemline.runner.config.LemlineConfigConstants.POSTGRES_HOST_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.POSTGRES_PASSWORD_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.POSTGRES_PORT_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.POSTGRES_USERNAME_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.RABBITMQ_VHOST_DEFAULT
+import com.lemline.runner.gateway.config.GatewayConfigConstants
 import io.smallrye.config.ConfigMapping
 import io.smallrye.config.WithDefault
 import jakarta.validation.constraints.Min
@@ -97,6 +98,7 @@ interface LemlineConfiguration {
     fun orchestrator(): OrchestratorConfig
     fun outbox(): OutboxConfig
     fun metrics(): MetricsConfig
+    fun gateway(): Optional<GatewayConfig>
     fun definitions(): Optional<DefinitionsConfig>
 
     /**
@@ -147,6 +149,12 @@ interface LemlineConfiguration {
      */
     interface AnalyticsConfig {
         fun consumer(): AnalyticsConsumerConfig
+
+        @Pattern(
+            regexp = "${GatewayConfigConstants.ANALYTICS_TYPE_POSTGRESQL}|${GatewayConfigConstants.ANALYTICS_TYPE_CLICKHOUSE}"
+        )
+        @WithDefault(GatewayConfigConstants.ANALYTICS_TYPE_DEFAULT)
+        fun type(): String
 
         @WithDefault(ANALYTICS_POSTGRES_MIGRATE_AT_START_DEFAULT)
         fun migrateAtStart(): Boolean
@@ -200,6 +208,85 @@ interface LemlineConfiguration {
          */
         @WithDefault("true")
         fun enabled(): Boolean
+    }
+
+    /**
+     * Gateway configuration consumed by the gRPC ingress module.
+     */
+    interface GatewayConfig {
+        @WithDefault(GatewayConfigConstants.GATEWAY_ENABLED_DEFAULT)
+        fun enabled(): Boolean
+
+        fun grpc(): Optional<GatewayGrpcConfig>
+        fun tls(): Optional<GatewayTlsConfig>
+        fun authentication(): Optional<GatewayAuthenticationConfig>
+        fun cors(): Optional<GatewayCorsConfig>
+        fun watch(): Optional<GatewayWatchConfig>
+    }
+
+    interface GatewayGrpcConfig {
+        @WithDefault(GatewayConfigConstants.GATEWAY_GRPC_HOST_DEFAULT)
+        fun host(): String
+
+        @WithDefault(GatewayConfigConstants.GATEWAY_GRPC_PORT_DEFAULT)
+        fun port(): Int
+    }
+
+    interface GatewayTlsConfig {
+        @WithDefault(GatewayConfigConstants.GATEWAY_TLS_ENABLED_DEFAULT)
+        fun enabled(): Boolean
+
+        fun certificate(): Optional<String>
+        fun privateKey(): Optional<String>
+        fun trustStore(): Optional<String>
+        fun trustStorePassword(): Optional<String>
+
+        @Pattern(regexp = "none|request|required")
+        @WithDefault(GatewayConfigConstants.GATEWAY_TLS_CLIENT_AUTH_DEFAULT)
+        fun clientAuth(): String
+    }
+
+    interface GatewayAuthenticationConfig {
+        @WithDefault(GatewayConfigConstants.GATEWAY_AUTHENTICATION_ENABLED_DEFAULT)
+        fun enabled(): Boolean
+
+        fun jwt(): Optional<GatewayJwtConfig>
+        fun claims(): Optional<GatewayClaimsConfig>
+    }
+
+    interface GatewayJwtConfig {
+        fun issuer(): Optional<String>
+        fun jwksUrl(): Optional<String>
+    }
+
+    interface GatewayClaimsConfig {
+        @WithDefault(GatewayConfigConstants.GATEWAY_AUTHENTICATION_SCOPE_FIELD_DEFAULT)
+        fun scopeField(): String
+
+        @WithDefault(GatewayConfigConstants.GATEWAY_AUTHENTICATION_NAMESPACES_FIELD_DEFAULT)
+        fun namespacesField(): String
+    }
+
+    interface GatewayCorsConfig {
+        @WithDefault(GatewayConfigConstants.GATEWAY_CORS_ENABLED_DEFAULT)
+        fun enabled(): Boolean
+
+        @WithDefault(GatewayConfigConstants.GATEWAY_CORS_ORIGINS_DEFAULT)
+        fun origins(): String
+
+        @WithDefault(GatewayConfigConstants.GATEWAY_CORS_METHODS_DEFAULT)
+        fun methods(): String
+
+        @WithDefault(GatewayConfigConstants.GATEWAY_CORS_HEADERS_DEFAULT)
+        fun headers(): String
+    }
+
+    interface GatewayWatchConfig {
+        @WithDefault(GatewayConfigConstants.GATEWAY_WATCH_POLL_INTERVAL_MS_DEFAULT)
+        fun pollIntervalMs(): Long
+
+        @WithDefault(GatewayConfigConstants.GATEWAY_WATCH_BATCH_SIZE_DEFAULT)
+        fun batchSize(): Int
     }
 
     /**

@@ -50,6 +50,7 @@ import com.lemline.runner.config.LemlineConfigConstants.RABBITMQ_PORT_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.RABBITMQ_STRING_SERIALIZER
 import com.lemline.runner.config.LemlineConfigConstants.RABBITMQ_USER_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.RABBITMQ_VHOST_DEFAULT
+import com.lemline.runner.gateway.config.GatewayConfigConstants
 import com.lemline.runner.messaging.cloudevents.CLOUDEVENTS_IN_CHANNEL
 import com.lemline.runner.messaging.cloudevents.CLOUDEVENTS_OUT_CHANNEL
 import com.lemline.runner.messaging.commands.COMMANDS_IN_CHANNEL
@@ -57,6 +58,7 @@ import com.lemline.runner.messaging.commands.COMMANDS_OUT_CHANNEL
 import com.lemline.runner.messaging.events.EVENTS_IN_CHANNEL
 import com.lemline.runner.messaging.events.EVENTS_OUT_CHANNEL
 import io.smallrye.config.PropertiesConfigSource
+import java.util.Locale
 
 /**
  * Channel names for lifecycle events.
@@ -106,6 +108,11 @@ class LemlineConfigSource : PropertiesConfigSource(
     companion object {
         private val logger = logger()
 
+        private enum class GatewayAnalyticsBackend {
+            POSTGRESQL,
+            CLICKHOUSE,
+        }
+
         private fun buildProperties(): Map<String, String> {
             val lemlineProps = mutableMapOf<String, String>()
 
@@ -144,6 +151,7 @@ class LemlineConfigSource : PropertiesConfigSource(
             generatedProps.putAll(generateDatabaseProperties(lemlineProps))
             generatedProps.putAll(generateAnalyticsDatabaseProperties(lemlineProps))
             generatedProps.putAll(generateMessagingProperties(lemlineProps))
+            generatedProps.putAll(generateGatewayProperties(lemlineProps))
             generatedProps.putAll(generateMetricsProperties(lemlineProps))
 
             logger.info { "Lemline generated properties:\n${generatedProps.toPrint()}" }
@@ -214,7 +222,15 @@ class LemlineConfigSource : PropertiesConfigSource(
         }
 
         private fun generateAnalyticsDatabaseProperties(props: Map<String, String>): Map<String, String> {
-            if (!props[LIFECYCLE_EVENTS_CONSUMER_ENABLED].toBoolean()) return emptyMap()
+            val lifecycleConsumerEnabled = props[LIFECYCLE_EVENTS_CONSUMER_ENABLED].toBoolean()
+            val gatewayEnabled = props[GatewayConfigConstants.GATEWAY_ENABLED]?.toBooleanStrictOrNull()
+                ?: GatewayConfigConstants.GATEWAY_ENABLED_DEFAULT.toBoolean()
+            val gatewayAnalyticsBackend = resolveGatewayAnalyticsBackend(props, gatewayEnabled)
+
+            val needsAnalyticsDatasource = lifecycleConsumerEnabled ||
+                (gatewayEnabled && gatewayAnalyticsBackend == GatewayAnalyticsBackend.POSTGRESQL)
+
+            if (!needsAnalyticsDatasource) return emptyMap()
 
             val generated = mutableMapOf<String, String>()
             val analytics = "lemline.analytics"
@@ -241,6 +257,107 @@ class LemlineConfigSource : PropertiesConfigSource(
             generated["quarkus.flyway.analytics.baseline-on-migrate"] = baselineOnMigrate
             generated["quarkus.flyway.analytics.locations"] = "classpath:db/migration/analytics/postgresql"
 
+            return generated
+        }
+
+        private fun resolveGatewayAnalyticsBackend(
+            props: Map<String, String>,
+            gatewayEnabled: Boolean
+        ): GatewayAnalyticsBackend? {
+            if (!gatewayEnabled) return null
+
+            val rawType = props[GatewayConfigConstants.ANALYTICS_TYPE] ?: GatewayConfigConstants.ANALYTICS_TYPE_DEFAULT
+            return when (rawType.trim().lowercase(Locale.ROOT)) {
+                GatewayConfigConstants.ANALYTICS_TYPE_POSTGRESQL -> GatewayAnalyticsBackend.POSTGRESQL
+                GatewayConfigConstants.ANALYTICS_TYPE_CLICKHOUSE -> GatewayAnalyticsBackend.CLICKHOUSE
+                else -> throw IllegalStateException(
+                    "Unsupported analytics type '$rawType'. Supported values: " +
+                        "'${GatewayConfigConstants.ANALYTICS_TYPE_POSTGRESQL}', '${GatewayConfigConstants.ANALYTICS_TYPE_CLICKHOUSE}'."
+                )
+            }
+        }
+
+        private fun generateGatewayProperties(props: Map<String, String>): Map<String, String> {
+            val enabled = props[GatewayConfigConstants.GATEWAY_ENABLED]?.toBooleanStrictOrNull()
+                ?: GatewayConfigConstants.GATEWAY_ENABLED_DEFAULT.toBoolean()
+            val tlsEnabled = props[GatewayConfigConstants.GATEWAY_TLS_ENABLED]?.toBooleanStrictOrNull()
+                ?: GatewayConfigConstants.GATEWAY_TLS_ENABLED_DEFAULT.toBoolean()
+            val authenticationEnabled =
+                props[GatewayConfigConstants.GATEWAY_AUTHENTICATION_ENABLED]?.toBooleanStrictOrNull()
+                    ?: GatewayConfigConstants.GATEWAY_AUTHENTICATION_ENABLED_DEFAULT.toBoolean()
+
+            val generatedProps = mutableMapOf<String, String>()
+            generatedProps.putAll(generateGatewayGrpcProperties(props, enabled, tlsEnabled))
+            if (enabled && authenticationEnabled) {
+                generatedProps.putAll(generateGatewayJwtProperties(props))
+            }
+            return generatedProps
+        }
+
+        private fun generateGatewayGrpcProperties(
+            props: Map<String, String>,
+            enabled: Boolean,
+            tlsEnabled: Boolean
+        ): Map<String, String> {
+            val generated = mutableMapOf<String, String>()
+
+            if (!enabled) {
+                generated["quarkus.grpc.server.port"] = "0"
+                return generated
+            }
+
+            generated["quarkus.grpc.server.host"] =
+                props[GatewayConfigConstants.GATEWAY_GRPC_HOST] ?: GatewayConfigConstants.GATEWAY_GRPC_HOST_DEFAULT
+            generated["quarkus.grpc.server.port"] =
+                props[GatewayConfigConstants.GATEWAY_GRPC_PORT] ?: GatewayConfigConstants.GATEWAY_GRPC_PORT_DEFAULT
+            generated["quarkus.grpc.server.plain-text"] = (!tlsEnabled).toString()
+            generated["quarkus.grpc.server.enable-grpc-web"] = "true"
+
+            val corsEnabled = props[GatewayConfigConstants.GATEWAY_CORS_ENABLED]?.toBooleanStrictOrNull()
+                ?: GatewayConfigConstants.GATEWAY_CORS_ENABLED_DEFAULT.toBoolean()
+            generated["quarkus.http.cors"] = corsEnabled.toString()
+            if (corsEnabled) {
+                generated["quarkus.http.cors.origins"] =
+                    props[GatewayConfigConstants.GATEWAY_CORS_ORIGINS] ?: GatewayConfigConstants.GATEWAY_CORS_ORIGINS_DEFAULT
+                generated["quarkus.http.cors.methods"] =
+                    props[GatewayConfigConstants.GATEWAY_CORS_METHODS] ?: GatewayConfigConstants.GATEWAY_CORS_METHODS_DEFAULT
+                generated["quarkus.http.cors.headers"] =
+                    props[GatewayConfigConstants.GATEWAY_CORS_HEADERS] ?: GatewayConfigConstants.GATEWAY_CORS_HEADERS_DEFAULT
+                generated["quarkus.http.cors.access-control-allow-credentials"] = "false"
+            }
+
+            if (tlsEnabled) {
+                generated["quarkus.grpc.server.ssl.client-auth"] =
+                    props[GatewayConfigConstants.GATEWAY_TLS_CLIENT_AUTH]
+                        ?: GatewayConfigConstants.GATEWAY_TLS_CLIENT_AUTH_DEFAULT
+
+                props[GatewayConfigConstants.GATEWAY_TLS_CERTIFICATE]?.let {
+                    generated["quarkus.grpc.server.ssl.certificate"] = it
+                }
+                props[GatewayConfigConstants.GATEWAY_TLS_PRIVATE_KEY]?.let {
+                    generated["quarkus.grpc.server.ssl.key"] = it
+                }
+                props[GatewayConfigConstants.GATEWAY_TLS_TRUST_STORE]?.let {
+                    generated["quarkus.grpc.server.ssl.trust-store"] = it
+                }
+                props[GatewayConfigConstants.GATEWAY_TLS_TRUST_STORE_PASSWORD]?.let {
+                    generated["quarkus.grpc.server.ssl.trust-store-password"] = it
+                }
+            } else {
+                generated["quarkus.grpc.server.ssl.client-auth"] = "none"
+            }
+
+            return generated
+        }
+
+        private fun generateGatewayJwtProperties(props: Map<String, String>): Map<String, String> {
+            val generated = mutableMapOf<String, String>()
+            props[GatewayConfigConstants.GATEWAY_AUTHENTICATION_JWT_ISSUER]?.let {
+                generated["mp.jwt.verify.issuer"] = it
+            }
+            props[GatewayConfigConstants.GATEWAY_AUTHENTICATION_JWT_JWKS_URL]?.let {
+                generated["smallrye.jwt.verify.key.location"] = it
+            }
             return generated
         }
 

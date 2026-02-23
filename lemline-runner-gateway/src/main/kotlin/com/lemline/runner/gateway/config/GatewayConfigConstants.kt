@@ -2,9 +2,6 @@
 package com.lemline.runner.gateway.config
 
 object GatewayConfigConstants {
-    const val CONFIG_SOURCE_NAME = "LemlineGatewayConfigSource"
-    const val CONFIG_ORDINAL = 276
-
     const val GATEWAY_ENABLED = "lemline.gateway.enabled"
     const val GATEWAY_ENABLED_DEFAULT = "false"
 
