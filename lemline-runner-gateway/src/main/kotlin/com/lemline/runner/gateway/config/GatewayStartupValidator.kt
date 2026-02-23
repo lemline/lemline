@@ -8,6 +8,8 @@ import com.lemline.runner.common.config.GATEWAY_TLS_CERTIFICATE
 import com.lemline.runner.common.config.GATEWAY_TLS_ENABLED
 import com.lemline.runner.common.config.GATEWAY_TLS_PRIVATE_KEY
 import com.lemline.runner.common.config.GATEWAY_TLS_TRUST_STORE
+import com.lemline.runner.config.shared.LemlineConfiguration
+import com.lemline.runner.config.shared.*
 import com.lemline.runner.gateway.analytics.WorkflowAnalyticsEventSource
 import io.quarkus.runtime.StartupEvent
 import jakarta.annotation.Priority
@@ -19,7 +21,7 @@ import kotlinx.coroutines.runBlocking
 
 @ApplicationScoped
 class GatewayStartupValidator(
-    private val config: GatewayRuntimeConfig,
+    private val config: LemlineConfiguration,
 ) {
 
     @Inject
@@ -27,29 +29,29 @@ class GatewayStartupValidator(
 
     @Suppress("unused")
     fun onStart(@Observes @Priority(0) event: StartupEvent) {
-        if (!config.enabled) return
+        if (!config.gatewayEnabled) return
 
-        if (config.authenticationEnabled && !config.tlsEnabled) {
+        if (config.gatewayAuthenticationEnabled && !config.gatewayTlsEnabled) {
             throw IllegalStateException(
                 "Invalid gateway configuration: '$GATEWAY_AUTHENTICATION_ENABLED' " +
                     "requires '$GATEWAY_TLS_ENABLED=true'"
             )
         }
 
-        if (config.tlsEnabled) {
-            requireConfigured(config.tlsCertificate, GATEWAY_TLS_CERTIFICATE)
-            requireConfigured(config.tlsPrivateKey, GATEWAY_TLS_PRIVATE_KEY)
+        if (config.gatewayTlsEnabled) {
+            requireConfigured(config.gatewayTlsCertificate, GATEWAY_TLS_CERTIFICATE)
+            requireConfigured(config.gatewayTlsPrivateKey, GATEWAY_TLS_PRIVATE_KEY)
 
-            val clientAuth = config.tlsClientAuth.trim().lowercase(Locale.ROOT).ifBlank { "none" }
+            val clientAuth = config.gatewayTlsClientAuth.trim().lowercase(Locale.ROOT).ifBlank { "none" }
 
             if (clientAuth == "request" || clientAuth == "required") {
-                requireConfigured(config.tlsTrustStore, GATEWAY_TLS_TRUST_STORE)
+                requireConfigured(config.gatewayTlsTrustStore, GATEWAY_TLS_TRUST_STORE)
             }
         }
 
-        if (config.authenticationEnabled) {
-            requireConfigured(config.authenticationJwtIssuer, GATEWAY_AUTHENTICATION_JWT_ISSUER)
-            requireConfigured(config.authenticationJwtJwksUrl, GATEWAY_AUTHENTICATION_JWT_JWKS_URL)
+        if (config.gatewayAuthenticationEnabled) {
+            requireConfigured(config.gatewayAuthenticationJwtIssuer, GATEWAY_AUTHENTICATION_JWT_ISSUER)
+            requireConfigured(config.gatewayAuthenticationJwtJwksUrl, GATEWAY_AUTHENTICATION_JWT_JWKS_URL)
         }
 
         runBlocking {

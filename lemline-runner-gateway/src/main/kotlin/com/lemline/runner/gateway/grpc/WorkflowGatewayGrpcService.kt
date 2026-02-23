@@ -30,7 +30,8 @@ import com.lemline.gateway.v1.WorkflowInstance
 import com.lemline.gateway.v1.WorkflowDefinitionSummary
 import com.lemline.runner.gateway.auth.GatewayAuthContext
 import com.lemline.runner.gateway.auth.GatewayPrincipal
-import com.lemline.runner.gateway.config.GatewayRuntimeConfig
+import com.lemline.runner.config.shared.LemlineConfiguration
+import com.lemline.runner.config.shared.*
 import com.lemline.runner.gateway.dashboard.DefinitionQueryService
 import com.lemline.runner.gateway.dashboard.InstanceQueryService
 import com.lemline.runner.gateway.dashboard.InstanceStreamService
@@ -67,7 +68,7 @@ import kotlinx.coroutines.launch
 @GrpcService
 @Singleton
 class WorkflowGatewayGrpcService(
-    private val config: GatewayRuntimeConfig,
+    private val config: LemlineConfiguration,
 ) : WorkflowGatewayGrpc.WorkflowGatewayImplBase() {
 
     @Inject
@@ -503,7 +504,7 @@ class WorkflowGatewayGrpcService(
     }
 
     private fun resolvePrincipalOrNull(): GatewayPrincipal? {
-        return GatewayAuthContext.getOrNull() ?: if (!config.authenticationEnabled) GatewayPrincipal.dashboardAnonymous else null
+        return GatewayAuthContext.getOrNull() ?: if (!config.gatewayAuthenticationEnabled) GatewayPrincipal.dashboardAnonymous else null
     }
 
     private fun parseWorkflowId(request: WatchWorkflowRequest): WorkflowId {

@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.gateway.dashboard
 
-import com.lemline.runner.gateway.config.GatewayRuntimeConfig
+import com.lemline.runner.config.shared.LemlineConfiguration
+import com.lemline.runner.config.shared.*
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
 import kotlinx.coroutines.currentCoroutineContext
@@ -10,10 +11,10 @@ import kotlinx.coroutines.isActive
 
 @ApplicationScoped
 class InstanceStreamService(
-    private val config: GatewayRuntimeConfig,
+    private val config: LemlineConfiguration,
 ) {
-    private val pollIntervalMs: Long get() = config.watchPollIntervalMs
-    private val batchSize: Int get() = config.watchBatchSize
+    private val pollIntervalMs: Long get() = config.gatewayWatchPollIntervalMs
+    private val batchSize: Int get() = config.gatewayWatchBatchSize
 
     @Inject
     lateinit var statsQueryService: StatsQueryService

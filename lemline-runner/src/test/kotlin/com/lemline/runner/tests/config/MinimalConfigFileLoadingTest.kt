@@ -5,7 +5,7 @@ import com.lemline.runner.common.config.DatabaseType
 import com.lemline.runner.config.LemlineConfigConstants.METRICS_PATH_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.METRICS_PORT_DEFAULT
 import com.lemline.runner.common.config.MessagingType
-import com.lemline.runner.config.LemlineConfiguration
+import com.lemline.runner.config.shared.LemlineConfiguration
 import com.lemline.runner.tests.profiles.MinimalConfigFileProfile
 import io.quarkus.test.junit.QuarkusTest
 import io.quarkus.test.junit.TestProfile

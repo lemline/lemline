@@ -2,7 +2,8 @@
 package com.lemline.runner.gateway.dashboard
 
 import com.lemline.core.lifecycleevents.LifecycleEventType
-import com.lemline.runner.gateway.config.GatewayRuntimeConfig
+import com.lemline.runner.config.shared.LemlineConfiguration
+import com.lemline.runner.config.shared.*
 import io.agroal.api.AgroalDataSource
 import io.quarkus.agroal.DataSource
 import jakarta.enterprise.context.ApplicationScoped
@@ -16,14 +17,14 @@ import kotlinx.coroutines.withContext
 
 @ApplicationScoped
 class InstanceQueryService(
-    config: GatewayRuntimeConfig,
+    config: LemlineConfiguration,
 ) {
 
     @Inject
     @DataSource("analytics")
     lateinit var analyticsDataSource: Instance<AgroalDataSource>
 
-    private val analyticsQualifiedTable = DashboardSqlSupport.qualifiedTable(config.analyticsSchema, config.analyticsTable)
+    private val analyticsQualifiedTable = DashboardSqlSupport.qualifiedTable(config.analyticsSchemaResolved, config.analyticsTableResolved)
 
     suspend fun listInstances(filter: InstanceQueryFilter): ListInstancesResult = withContext(Dispatchers.IO) {
         val normalizedPageSize = normalizePageSize(filter.pageSize)

@@ -6,7 +6,8 @@ import com.lemline.runner.gateway.analytics.WorkflowAnalyticsEventRow
 import com.lemline.runner.gateway.analytics.WorkflowAnalyticsEventSource
 import com.lemline.runner.gateway.auth.GatewayAuthorizer
 import com.lemline.runner.gateway.auth.GatewayPrincipal
-import com.lemline.runner.gateway.config.GatewayRuntimeConfig
+import com.lemline.runner.config.shared.LemlineConfiguration
+import com.lemline.runner.config.shared.*
 import com.lemline.runner.gateway.outbox.GatewayCommandOutboxRepository
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
@@ -16,10 +17,10 @@ import kotlinx.coroutines.isActive
 
 @ApplicationScoped
 class WorkflowWatchService(
-    private val config: GatewayRuntimeConfig,
+    private val config: LemlineConfiguration,
 ) {
-    private val pollIntervalMs: Long get() = config.watchPollIntervalMs
-    private val batchSize: Int get() = config.watchBatchSize
+    private val pollIntervalMs: Long get() = config.gatewayWatchPollIntervalMs
+    private val batchSize: Int get() = config.gatewayWatchBatchSize
 
     @Inject
     lateinit var authorizer: GatewayAuthorizer

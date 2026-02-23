@@ -4,7 +4,8 @@ package com.lemline.runner.gateway.dashboard
 import com.lemline.core.lifecycleevents.LifecycleEventType
 import com.lemline.core.workflows.WorkflowCache
 import com.lemline.core.workflows.WorkflowParser
-import com.lemline.runner.gateway.config.GatewayRuntimeConfig
+import com.lemline.runner.config.shared.LemlineConfiguration
+import com.lemline.runner.config.shared.*
 import io.agroal.api.AgroalDataSource
 import io.quarkus.agroal.DataSource
 import jakarta.enterprise.context.ApplicationScoped
@@ -16,7 +17,7 @@ import kotlinx.coroutines.withContext
 
 @ApplicationScoped
 class TimelineQueryService(
-    config: GatewayRuntimeConfig,
+    config: LemlineConfiguration,
 ) {
 
     @Inject
@@ -26,7 +27,7 @@ class TimelineQueryService(
     @Inject
     lateinit var definitionQueryService: DefinitionQueryService
 
-    private val analyticsQualifiedTable = DashboardSqlSupport.qualifiedTable(config.analyticsSchema, config.analyticsTable)
+    private val analyticsQualifiedTable = DashboardSqlSupport.qualifiedTable(config.analyticsSchemaResolved, config.analyticsTableResolved)
 
     suspend fun getInstanceTimeline(
         workflowId: UUID,

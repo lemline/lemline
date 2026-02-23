@@ -16,6 +16,8 @@ import com.lemline.runner.parents.ParentFeatureConfig
 import com.lemline.runner.retries.RetryConfig
 import com.lemline.runner.schedules.ScheduleConfig
 import com.lemline.runner.waits.WaitConfig
+import com.lemline.runner.config.shared.LemlineConfiguration as SharedLemlineConfiguration
+import com.lemline.runner.config.shared.gatewayEnabled
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.enterprise.inject.Produces
 import jakarta.inject.Inject
@@ -35,7 +37,7 @@ import kotlin.time.Duration.Companion.seconds
 class ConfigProducer {
 
     @Inject
-    lateinit var config: LemlineConfiguration
+    lateinit var config: SharedLemlineConfiguration
 
     @Inject
     internal lateinit var workflowCommandEmitter: WorkflowCommandEmitter
@@ -118,7 +120,7 @@ class ConfigProducer {
             get() = config.definitions().getOrNull()?.cache()?.getOrNull()?.syncEvery ?: 10.seconds
     }
 
-    private fun LemlineConfiguration.OutboxProcessingConfig.toOutboxProcessingConfig(): OutboxConfig =
+    private fun SharedLemlineConfiguration.OutboxProcessingConfig.toOutboxProcessingConfig(): OutboxConfig =
         object : OutboxConfig {
             override val every: Duration get() = this@toOutboxProcessingConfig.every
             override val batchSize: Int get() = this@toOutboxProcessingConfig.batchSize
@@ -127,7 +129,7 @@ class ConfigProducer {
             override val maxAttempts: Int get() = this@toOutboxProcessingConfig.maxAttempts
         }
 
-    private fun LemlineConfiguration.OutboxCleanupConfig.toOutboxCleanupConfig(): CleanupConfig =
+    private fun SharedLemlineConfiguration.OutboxCleanupConfig.toOutboxCleanupConfig(): CleanupConfig =
         object : CleanupConfig {
             override val every: Duration get() = this@toOutboxCleanupConfig.every
             override val initialJitter: Duration get() = this@toOutboxCleanupConfig.initialJitter

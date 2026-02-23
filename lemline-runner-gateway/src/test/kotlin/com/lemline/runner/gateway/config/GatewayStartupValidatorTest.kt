@@ -19,8 +19,8 @@ class GatewayStartupValidatorTest {
         coEvery { eventSource.validate() } returns Unit
 
         val validator = GatewayStartupValidator(
-            config = TestGatewayRuntimeConfig(
-                enabled = true,
+            config = testLemlineConfiguration(
+                gatewayEnabled = true,
                 authenticationEnabled = true,
                 tlsEnabled = false,
             ),
@@ -41,8 +41,8 @@ class GatewayStartupValidatorTest {
         coEvery { eventSource.validate() } returns Unit
 
         val validator = GatewayStartupValidator(
-            config = TestGatewayRuntimeConfig(
-                enabled = true,
+            config = testLemlineConfiguration(
+                gatewayEnabled = true,
                 authenticationEnabled = false,
                 tlsEnabled = true,
                 tlsCertificate = null,
@@ -63,8 +63,8 @@ class GatewayStartupValidatorTest {
         coEvery { eventSource.validate() } returns Unit
 
         val validator = GatewayStartupValidator(
-            config = TestGatewayRuntimeConfig(
-                enabled = true,
+            config = testLemlineConfiguration(
+                gatewayEnabled = true,
                 authenticationEnabled = true,
                 authenticationJwtIssuer = "https://issuer.example.test",
                 authenticationJwtJwksUrl = "https://issuer.example.test/jwks.json",

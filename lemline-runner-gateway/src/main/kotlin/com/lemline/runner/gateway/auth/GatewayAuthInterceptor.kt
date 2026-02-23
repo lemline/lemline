@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.gateway.auth
 
-import com.lemline.runner.gateway.config.GatewayRuntimeConfig
+import com.lemline.runner.config.shared.LemlineConfiguration
+import com.lemline.runner.config.shared.*
 import io.grpc.Contexts
 import io.grpc.Metadata
 import io.grpc.ServerCall
@@ -16,7 +17,7 @@ import jakarta.inject.Inject
 @GlobalInterceptor
 @ApplicationScoped
 class GatewayAuthInterceptor(
-    private val config: GatewayRuntimeConfig,
+    private val config: LemlineConfiguration,
 ) : ServerInterceptor {
 
     @Inject
@@ -30,7 +31,7 @@ class GatewayAuthInterceptor(
         headers: Metadata,
         next: ServerCallHandler<ReqT, RespT>
     ): ServerCall.Listener<ReqT> {
-        if (!config.authenticationEnabled) {
+        if (!config.gatewayAuthenticationEnabled) {
             return next.startCall(call, headers)
         }
 

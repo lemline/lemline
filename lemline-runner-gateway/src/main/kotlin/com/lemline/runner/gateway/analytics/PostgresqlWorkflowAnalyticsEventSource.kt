@@ -10,20 +10,21 @@ import jakarta.enterprise.inject.Typed
 import jakarta.inject.Inject
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import com.lemline.runner.gateway.config.GatewayRuntimeConfig
+import com.lemline.runner.config.shared.LemlineConfiguration
+import com.lemline.runner.config.shared.*
 
 @ApplicationScoped
 @Typed(PostgresqlWorkflowAnalyticsEventSource::class)
 class PostgresqlWorkflowAnalyticsEventSource(
-    config: GatewayRuntimeConfig,
+    config: LemlineConfiguration,
 ) : WorkflowAnalyticsEventSource {
 
     @Inject
     @DataSource("analytics")
     lateinit var analyticsDataSource: Instance<AgroalDataSource>
 
-    private val validatedSchema = validateIdentifier("schema", config.analyticsSchema)
-    private val validatedTable = validateIdentifier("table", config.analyticsTable)
+    private val validatedSchema = validateIdentifier("schema", config.analyticsSchemaResolved)
+    private val validatedTable = validateIdentifier("table", config.analyticsTableResolved)
     private val qualifiedTable = "\"$validatedSchema\".\"$validatedTable\""
 
     override suspend fun listByWorkflowIdAfter(

@@ -1,18 +1,19 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.gateway.auth
 
-import com.lemline.runner.gateway.config.GatewayRuntimeConfig
+import com.lemline.runner.config.shared.LemlineConfiguration
+import com.lemline.runner.config.shared.*
 import com.lemline.runner.gateway.errors.GatewayPermissionDeniedException
 import jakarta.enterprise.context.ApplicationScoped
 import org.eclipse.microprofile.jwt.JsonWebToken
 
 @ApplicationScoped
 class GatewayAuthorizer(
-    private val config: GatewayRuntimeConfig,
+    private val config: LemlineConfiguration,
 ) {
-    private val authenticationEnabled: Boolean get() = config.authenticationEnabled
-    private val scopeField: String get() = config.authenticationScopeField
-    private val namespacesField: String get() = config.authenticationNamespacesField
+    private val authenticationEnabled: Boolean get() = config.gatewayAuthenticationEnabled
+    private val scopeField: String get() = config.gatewayAuthenticationScopeField
+    private val namespacesField: String get() = config.gatewayAuthenticationNamespacesField
 
     fun principalFrom(jwt: JsonWebToken): GatewayPrincipal {
         if (!authenticationEnabled) {

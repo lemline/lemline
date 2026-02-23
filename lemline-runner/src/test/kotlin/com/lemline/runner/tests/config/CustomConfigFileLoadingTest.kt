@@ -3,7 +3,7 @@ package com.lemline.runner.tests.config
 
 import com.lemline.runner.common.config.DatabaseType
 import com.lemline.runner.common.config.MessagingType
-import com.lemline.runner.config.LemlineConfiguration
+import com.lemline.runner.config.shared.LemlineConfiguration
 import com.lemline.runner.tests.profiles.CustomConfigFileProfile
 import io.quarkus.test.junit.QuarkusTest
 import io.quarkus.test.junit.TestProfile

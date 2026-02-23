@@ -3,20 +3,21 @@ package com.lemline.runner.gateway.analytics
 
 import com.lemline.common.values.WorkflowId
 import com.lemline.runner.common.config.ANALYTICS_BACKEND_POSTGRESQL
-import com.lemline.runner.gateway.config.GatewayRuntimeConfig
+import com.lemline.runner.config.shared.LemlineConfiguration
+import com.lemline.runner.config.shared.*
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.enterprise.inject.Instance
 import jakarta.inject.Inject
 
 @ApplicationScoped
 class WorkflowAnalyticsEventSourceSelector(
-    private val config: GatewayRuntimeConfig,
+    private val config: LemlineConfiguration,
 ) : WorkflowAnalyticsEventSource {
 
     @Inject
     lateinit var postgresqlEventSource: Instance<PostgresqlWorkflowAnalyticsEventSource>
 
-    private val backend get() = AnalyticsBackend.parse(config.analyticsType)
+    private val backend get() = AnalyticsBackend.parse(config.analyticsTypeResolved)
 
     override suspend fun listByWorkflowIdAfter(
         workflowId: WorkflowId,

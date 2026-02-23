@@ -30,6 +30,7 @@ dependencies {
     implementation(project(":lemline-common"))
     implementation(project(":lemline-core"))
     implementation(project(":lemline-runner-common"))
+    implementation(project(":lemline-runner-config"))
     implementation(project(":lemline-runner-definitions"))
     implementation(project(":lemline-runner-schedules"))
 
