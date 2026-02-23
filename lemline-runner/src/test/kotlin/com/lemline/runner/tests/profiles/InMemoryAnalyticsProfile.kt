@@ -1,9 +1,13 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.tests.profiles
 
-import com.lemline.runner.config.LIFECYCLE_EVENTS_CONSUMER_CONCURRENCY
-import com.lemline.runner.config.LIFECYCLE_EVENTS_CONSUMER_ENABLED
-import com.lemline.runner.config.LIFECYCLE_EVENTS_PRODUCER_ENABLED
+import com.lemline.runner.common.config.LEMLINE_ANALYTICS_BASELINE_ON_MIGRATE
+import com.lemline.runner.common.config.LEMLINE_ANALYTICS_MIGRATE_AT_START
+import com.lemline.runner.common.config.LEMLINE_MESSAGING_LIFECYCLE_EVENTS_CONSUMER_CONCURRENCY
+import com.lemline.runner.common.config.LEMLINE_MESSAGING_LIFECYCLE_EVENTS_CONSUMER_ENABLED
+import com.lemline.runner.common.config.LEMLINE_MESSAGING_LIFECYCLE_EVENTS_PRODUCER_ENABLED
+import com.lemline.runner.common.config.LEMLINE_OUTBOX_ENABLED
+import com.lemline.runner.common.config.LEMLINE_SCHEDULED_ENABLED
 import com.lemline.runner.tests.resources.AnalyticsPostgresTestResource
 import io.quarkus.test.junit.QuarkusTestProfile
 
@@ -12,13 +16,13 @@ class InMemoryAnalyticsProfile : QuarkusTestProfile {
 
     override fun getConfigOverrides(): Map<String, String> {
         return base.configOverrides + mapOf(
-            LIFECYCLE_EVENTS_CONSUMER_ENABLED to "true",
-            LIFECYCLE_EVENTS_CONSUMER_CONCURRENCY to "16",
-            LIFECYCLE_EVENTS_PRODUCER_ENABLED to "false",
-            "lemline.analytics.migrate-at-start" to "true",
-            "lemline.analytics.baseline-on-migrate" to "false",
-            "lemline.outbox.enabled" to "false",
-            "lemline.scheduled.enabled" to "false"
+            LEMLINE_MESSAGING_LIFECYCLE_EVENTS_CONSUMER_ENABLED to "true",
+            LEMLINE_MESSAGING_LIFECYCLE_EVENTS_CONSUMER_CONCURRENCY to "16",
+            LEMLINE_MESSAGING_LIFECYCLE_EVENTS_PRODUCER_ENABLED to "false",
+            LEMLINE_ANALYTICS_MIGRATE_AT_START to "true",
+            LEMLINE_ANALYTICS_BASELINE_ON_MIGRATE to "false",
+            LEMLINE_OUTBOX_ENABLED to "false",
+            LEMLINE_SCHEDULED_ENABLED to "false"
         )
     }
 

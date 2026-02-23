@@ -7,6 +7,7 @@ import com.lemline.runner.common.config.CleanupConfig
 import com.lemline.runner.common.config.OutboxConfig
 import com.lemline.runner.common.messaging.CommandEmitter
 import com.lemline.runner.common.messaging.InstanceMessage
+import com.lemline.runner.config.LemlineConfiguration as SharedLemlineConfiguration
 import com.lemline.runner.definitions.DefinitionConfig
 import com.lemline.runner.forks.ForkFeatureConfig
 import com.lemline.runner.gateway.outbox.GatewayOutboxConfig
@@ -20,7 +21,6 @@ import jakarta.enterprise.context.ApplicationScoped
 import jakarta.enterprise.inject.Produces
 import jakarta.inject.Inject
 import kotlin.jvm.optionals.getOrNull
-import org.eclipse.microprofile.config.inject.ConfigProperty
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.hours
@@ -29,21 +29,17 @@ import kotlin.time.Duration.Companion.seconds
 
 /**
  * CDI producer for feature configuration beans and infrastructure interfaces.
- * Converts [LemlineConfiguration] to feature-specific configuration interfaces
+ * Converts [SharedLemlineConfiguration] to feature-specific configuration interfaces
  * and provides [CommandEmitter] for use by feature modules.
  */
 @ApplicationScoped
 class ConfigProducer {
 
     @Inject
-    lateinit var config: LemlineConfiguration
+    lateinit var config: SharedLemlineConfiguration
 
     @Inject
     internal lateinit var workflowCommandEmitter: WorkflowCommandEmitter
-
-    @Inject
-    @ConfigProperty(name = "lemline.gateway.enabled", defaultValue = "false")
-    lateinit var gatewayEnabled: String
 
     @Produces
     @ApplicationScoped
@@ -109,8 +105,9 @@ class ConfigProducer {
     @ApplicationScoped
     fun gatewayOutboxConfig(): GatewayOutboxConfig = object : GatewayOutboxConfig {
         private val source = config.outbox().gateway().getOrNull()
-        override val enabled: Boolean get() = gatewayEnabled == "true" && (source?.enabled() ?: true)
-        override val outbox: OutboxConfig get() = source?.outbox()?.toOutboxProcessingConfig() ?: defaultGatewayOutboxConfig()
+        override val enabled: Boolean get() = config.gatewayEnabled && (source?.enabled() ?: true)
+        override val outbox: OutboxConfig
+            get() = source?.outbox()?.toOutboxProcessingConfig() ?: defaultGatewayOutboxConfig()
         override val cleanup: CleanupConfig get() = source?.cleanup()?.toOutboxCleanupConfig() ?: defaultCleanupConfig()
     }
 
@@ -123,7 +120,7 @@ class ConfigProducer {
             get() = config.definitions().getOrNull()?.cache()?.getOrNull()?.syncEvery ?: 10.seconds
     }
 
-    private fun LemlineConfiguration.OutboxProcessingConfig.toOutboxProcessingConfig(): OutboxConfig =
+    private fun SharedLemlineConfiguration.OutboxProcessingConfig.toOutboxProcessingConfig(): OutboxConfig =
         object : OutboxConfig {
             override val every: Duration get() = this@toOutboxProcessingConfig.every
             override val batchSize: Int get() = this@toOutboxProcessingConfig.batchSize
@@ -132,7 +129,7 @@ class ConfigProducer {
             override val maxAttempts: Int get() = this@toOutboxProcessingConfig.maxAttempts
         }
 
-    private fun LemlineConfiguration.OutboxCleanupConfig.toOutboxCleanupConfig(): CleanupConfig =
+    private fun SharedLemlineConfiguration.OutboxCleanupConfig.toOutboxCleanupConfig(): CleanupConfig =
         object : CleanupConfig {
             override val every: Duration get() = this@toOutboxCleanupConfig.every
             override val initialJitter: Duration get() = this@toOutboxCleanupConfig.initialJitter

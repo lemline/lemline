@@ -17,19 +17,15 @@ import jakarta.inject.Inject
 import java.sql.Connection
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import org.eclipse.microprofile.config.inject.ConfigProperty
 import org.flywaydb.core.Flyway
 
 @ApplicationScoped
-class DatabaseManager : DatabaseConfig, MigrationManager {
+class DatabaseManager(
+    private val config: LemlineConfiguration
+) : DatabaseConfig, MigrationManager {
     private val log = logger()
 
-    @ConfigProperty(name = DATABASE_TYPE)
-    private lateinit var _dbTypeConfig: String
-
-    override val dbType: DatabaseType by lazy {
-        DatabaseType.fromConfigValue(_dbTypeConfig)
-    }
+    override val dbType: DatabaseType by lazy { DatabaseType.fromConfigValue(config.database().type()) }
 
     @Inject
     @IfBuildProfile("test")

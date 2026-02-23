@@ -54,7 +54,7 @@ To guarantee that repeated starts with the same `workflow_id` do not restart wor
 
 For replay and tail:
 
-1. Introduce a pluggable analytics event source selected by `lemline.analytics.backend`.
+1. Introduce a pluggable analytics event source selected by `lemline.analytics.type`.
 2. Support `postgresql` in v1, reusing `lemline_lifecycle_events` as canonical event source.
 3. Reserve `clickhouse` as a future backend without changing the public gRPC contract.
 4. Stream events ordered by analytics sequence (`id ASC`).

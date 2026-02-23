@@ -1,23 +1,31 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.gateway.auth
 
-import com.lemline.runner.gateway.config.GatewayConfigConstants.GATEWAY_NAMESPACES_FIELD
-import com.lemline.runner.gateway.config.GatewayConfigConstants.GATEWAY_NAMESPACES_FIELD_DEFAULT
-import com.lemline.runner.gateway.config.GatewayConfigConstants.GATEWAY_SCOPE_FIELD
-import com.lemline.runner.gateway.config.GatewayConfigConstants.GATEWAY_SCOPE_FIELD_DEFAULT
+import com.lemline.runner.config.LemlineConfiguration
+import com.lemline.runner.config.gatewayAuthenticationEnabled
+import com.lemline.runner.config.gatewayAuthenticationNamespacesField
+import com.lemline.runner.config.gatewayAuthenticationScopeField
 import com.lemline.runner.gateway.errors.GatewayPermissionDeniedException
 import jakarta.enterprise.context.ApplicationScoped
-import org.eclipse.microprofile.config.inject.ConfigProperty
 import org.eclipse.microprofile.jwt.JsonWebToken
 
 @ApplicationScoped
 class GatewayAuthorizer(
-    @ConfigProperty(name = GATEWAY_SCOPE_FIELD, defaultValue = GATEWAY_SCOPE_FIELD_DEFAULT)
-    private val scopeField: String,
-    @ConfigProperty(name = GATEWAY_NAMESPACES_FIELD, defaultValue = GATEWAY_NAMESPACES_FIELD_DEFAULT)
-    private val namespacesField: String,
+    private val config: LemlineConfiguration,
 ) {
+    private val authenticationEnabled: Boolean get() = config.gatewayAuthenticationEnabled
+    private val scopeField: String get() = config.gatewayAuthenticationScopeField
+    private val namespacesField: String get() = config.gatewayAuthenticationNamespacesField
+
     fun principalFrom(jwt: JsonWebToken): GatewayPrincipal {
+        if (!authenticationEnabled) {
+            return GatewayPrincipal(
+                subject = null,
+                scopes = setOf("*"),
+                namespaces = setOf("*")
+            )
+        }
+
         val scopes = parseClaimAsSet(jwt, scopeField)
         val namespaces = parseClaimAsSet(jwt, namespacesField)
         return GatewayPrincipal(
@@ -28,12 +36,14 @@ class GatewayAuthorizer(
     }
 
     fun requireScope(principal: GatewayPrincipal, scope: String) {
+        if (!authenticationEnabled) return
         if (!principal.hasScope(scope)) {
             throw GatewayPermissionDeniedException("Missing required scope '$scope'")
         }
     }
 
     fun requireNamespace(principal: GatewayPrincipal, namespace: String) {
+        if (!authenticationEnabled) return
         if (!principal.canAccessNamespace(namespace)) {
             throw GatewayPermissionDeniedException("Not authorized for namespace '$namespace'")
         }

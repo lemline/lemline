@@ -47,18 +47,18 @@ class PgmqTestResource : QuarkusTestResourceLifecycleManager {
         // Using the same PostgreSQL container for both lets Flyway run PGMQ migrations
         val properties = mapOf(
             // PostgreSQL main database connection (Flyway runs migrations here)
-            "lemline.database.postgresql.host" to host,
-            "lemline.database.postgresql.port" to port,
-            "lemline.database.postgresql.database" to database,
-            "lemline.database.postgresql.username" to username,
-            "lemline.database.postgresql.password" to password,
+            com.lemline.runner.common.config.LEMLINE_DATABASE_POSTGRES_HOST to host,
+            com.lemline.runner.common.config.LEMLINE_DATABASE_POSTGRES_PORT to port,
+            com.lemline.runner.common.config.LEMLINE_DATABASE_POSTGRES_DATABASE to database,
+            com.lemline.runner.common.config.LEMLINE_DATABASE_POSTGRES_USERNAME to username,
+            com.lemline.runner.common.config.LEMLINE_DATABASE_POSTGRES_PASSWORD to password,
             // PGMQ messaging connection (uses same PostgreSQL with pgmq schema)
             // LemlineConfigSource will translate these to pgmq.* global connector defaults
-            "lemline.messaging.pgmq.host" to host,
-            "lemline.messaging.pgmq.port" to port,
-            "lemline.messaging.pgmq.database" to database,
-            "lemline.messaging.pgmq.username" to username,
-            "lemline.messaging.pgmq.password" to password,
+            com.lemline.runner.common.config.LEMLINE_MESSAGING_PGMQ_HOST to host,
+            com.lemline.runner.common.config.LEMLINE_MESSAGING_PGMQ_PORT to port,
+            com.lemline.runner.common.config.LEMLINE_MESSAGING_PGMQ_DATABASE to database,
+            com.lemline.runner.common.config.LEMLINE_MESSAGING_PGMQ_USERNAME to username,
+            com.lemline.runner.common.config.LEMLINE_MESSAGING_PGMQ_PASSWORD to password,
         )
 
         // Set as system properties so that LemlineConfigSource can see them
@@ -77,16 +77,16 @@ class PgmqTestResource : QuarkusTestResourceLifecycleManager {
 
     override fun stop() {
         // Clear system properties to prevent conflicts with other test profiles
-        System.clearProperty("lemline.database.postgresql.host")
-        System.clearProperty("lemline.database.postgresql.port")
-        System.clearProperty("lemline.database.postgresql.database")
-        System.clearProperty("lemline.database.postgresql.username")
-        System.clearProperty("lemline.database.postgresql.password")
-        System.clearProperty("lemline.messaging.pgmq.host")
-        System.clearProperty("lemline.messaging.pgmq.port")
-        System.clearProperty("lemline.messaging.pgmq.database")
-        System.clearProperty("lemline.messaging.pgmq.username")
-        System.clearProperty("lemline.messaging.pgmq.password")
+        System.clearProperty(com.lemline.runner.common.config.LEMLINE_DATABASE_POSTGRES_HOST)
+        System.clearProperty(com.lemline.runner.common.config.LEMLINE_DATABASE_POSTGRES_PORT)
+        System.clearProperty(com.lemline.runner.common.config.LEMLINE_DATABASE_POSTGRES_DATABASE)
+        System.clearProperty(com.lemline.runner.common.config.LEMLINE_DATABASE_POSTGRES_USERNAME)
+        System.clearProperty(com.lemline.runner.common.config.LEMLINE_DATABASE_POSTGRES_PASSWORD)
+        System.clearProperty(com.lemline.runner.common.config.LEMLINE_MESSAGING_PGMQ_HOST)
+        System.clearProperty(com.lemline.runner.common.config.LEMLINE_MESSAGING_PGMQ_PORT)
+        System.clearProperty(com.lemline.runner.common.config.LEMLINE_MESSAGING_PGMQ_DATABASE)
+        System.clearProperty(com.lemline.runner.common.config.LEMLINE_MESSAGING_PGMQ_USERNAME)
+        System.clearProperty(com.lemline.runner.common.config.LEMLINE_MESSAGING_PGMQ_PASSWORD)
         System.clearProperty("test.workflow.timeout.seconds")
         System.clearProperty("test.workflow.cloudevent-send-interval-ms")
 

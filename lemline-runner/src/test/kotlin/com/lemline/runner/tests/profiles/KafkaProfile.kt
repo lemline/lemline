@@ -1,14 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.tests.profiles
 
-import com.lemline.runner.config.COMMANDS_CONSUMER_ENABLED
-import com.lemline.runner.config.COMMANDS_PRODUCER_ENABLED
-import com.lemline.runner.config.DATABASE_TYPE
-import com.lemline.runner.config.EVENTS_CONSUMER_ENABLED
-import com.lemline.runner.config.EVENTS_PRODUCER_ENABLED
 import com.lemline.runner.common.config.DatabaseType
 import com.lemline.runner.common.config.MessagingType
-import com.lemline.runner.config.MESSAGING_TYPE
 import com.lemline.runner.tests.resources.KafkaTestResource
 import io.quarkus.test.junit.QuarkusTestProfile
 import io.quarkus.test.junit.QuarkusTestProfile.TestResourceEntry
@@ -39,24 +33,24 @@ class KafkaProfile : QuarkusTestProfile {
             // =============================================================
 
             // Database configuration
-            DATABASE_TYPE to DatabaseType.H2.configValue,
+            com.lemline.runner.common.config.LEMLINE_DATABASE_TYPE to DatabaseType.H2.configValue,
 
             // Messaging type
-            MESSAGING_TYPE to MessagingType.KAFKA.configValue,
+            com.lemline.runner.common.config.LEMLINE_MESSAGING_TYPE to MessagingType.KAFKA.configValue,
 
             // Channel enabled flags
-            COMMANDS_CONSUMER_ENABLED to "true",
-            COMMANDS_PRODUCER_ENABLED to "true",
-            EVENTS_CONSUMER_ENABLED to "true",
-            EVENTS_PRODUCER_ENABLED to "true",
+            com.lemline.runner.common.config.LEMLINE_MESSAGING_COMMANDS_CONSUMER_ENABLED to "true",
+            com.lemline.runner.common.config.LEMLINE_MESSAGING_COMMANDS_PRODUCER_ENABLED to "true",
+            com.lemline.runner.common.config.LEMLINE_MESSAGING_EVENTS_CONSUMER_ENABLED to "true",
+            com.lemline.runner.common.config.LEMLINE_MESSAGING_EVENTS_PRODUCER_ENABLED to "true",
 
             // Topic names for test isolation (transformed by LemlineConfigSource)
             // Note: Consumer and producer use different topics for testing
             // (production would typically use the same topic)
-            "lemline.messaging.kafka.commands.topic" to "lemline-commands-in",
-            "lemline.messaging.kafka.commands.producer.topic-out" to "lemline-commands-out",
-            "lemline.messaging.kafka.events.topic" to "lemline-events-in",
-            "lemline.messaging.kafka.events.producer.topic-out" to "lemline-events-out",
+            com.lemline.runner.common.config.LEMLINE_MESSAGING_KAFKA_COMMANDS_TOPIC to "lemline-commands-in",
+            com.lemline.runner.common.config.LEMLINE_MESSAGING_KAFKA_COMMANDS_PRODUCER_TOPIC_OUT to "lemline-commands-out",
+            com.lemline.runner.common.config.LEMLINE_MESSAGING_KAFKA_EVENTS_TOPIC to "lemline-events-in",
+            com.lemline.runner.common.config.LEMLINE_MESSAGING_KAFKA_EVENTS_PRODUCER_TOPIC_OUT to "lemline-events-out",
 
             // =============================================================
             // Test-only infrastructure tweaks (bypass LemlineConfigSource)

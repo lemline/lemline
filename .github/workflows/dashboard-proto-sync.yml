@@ -1,0 +1,37 @@
+name: Dashboard Proto Sync Check
+
+on:
+  pull_request:
+    paths:
+      - "lemline-runner-gateway/src/main/proto/lemline/gateway/v1/workflow_gateway.proto"
+      - "lemline-dashboard/proto/lemline/gateway/v1/workflow_gateway.proto"
+      - "lemline-dashboard/scripts/proto-*.mjs"
+      - "lemline-dashboard/package.json"
+      - ".github/workflows/dashboard-proto-sync.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "lemline-runner-gateway/src/main/proto/lemline/gateway/v1/workflow_gateway.proto"
+      - "lemline-dashboard/proto/lemline/gateway/v1/workflow_gateway.proto"
+      - "lemline-dashboard/scripts/proto-*.mjs"
+      - "lemline-dashboard/package.json"
+      - ".github/workflows/dashboard-proto-sync.yml"
+
+jobs:
+  check-sync:
+    name: Check Dashboard Proto Sync
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Verify proto sync
+        run: node lemline-dashboard/scripts/proto-check.mjs

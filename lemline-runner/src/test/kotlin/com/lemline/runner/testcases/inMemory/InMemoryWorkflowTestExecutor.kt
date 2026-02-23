@@ -8,6 +8,8 @@ import com.lemline.core.states.WorkflowCommand
 import com.lemline.core.testcases.impl.WorkflowTestResult
 import com.lemline.runner.common.activities.TestModeConfiguration
 import com.lemline.runner.common.messaging.InstanceMessage
+import com.lemline.runner.common.messaging.LIFECYCLEEVENTS_IN_CHANNEL
+import com.lemline.runner.common.messaging.LIFECYCLEEVENTS_OUT_CHANNEL
 import com.lemline.runner.config.DatabaseManager
 import com.lemline.runner.definitions.DefinitionRepository
 import com.lemline.runner.listeners.ListenerRepository
@@ -26,9 +28,6 @@ import jakarta.inject.Singleton
 import java.util.concurrent.TimeoutException
 import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.delay
-
-private const val LIFECYCLEEVENTS_OUT_CHANNEL = "lifecycleevents-out"
-private const val LIFECYCLEEVENTS_IN_CHANNEL = "lifecycleevents-in"
 
 /**
  * Workflow test executor using in-memory channels with manual message routing.

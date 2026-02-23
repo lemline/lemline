@@ -20,7 +20,7 @@ When enabled, Lemline consumes lifecycle events and writes them to a dedicated a
 Lifecycle analytics requires both:
 
 1. Lifecycle event production enabled
-2. Analytics consumer enabled
+2. Lifecycle event consumer enabled
 
 Example:
 
@@ -31,14 +31,14 @@ lemline:
     lifecycleevents:
       producer:
         enabled: true
+      consumer:
+        enabled: true
+        concurrency: 64
     kafka:
       lifecycleevents:
         topic: lemline-lifecycle-events
 
   analytics:
-    consumer:
-      enabled: true
-      concurrency: 64
     migrate-at-start: true
     baseline-on-migrate: false
     postgresql:
@@ -55,8 +55,8 @@ lemline:
 
 | Property | Default | Description |
 |----------|---------|-------------|
-| `lemline.analytics.consumer.enabled` | `false` | Enables lifecycle analytics ingestion consumer |
-| `lemline.analytics.consumer.concurrency` | `64` | Max concurrent lifecycle analytics message handling |
+| `lemline.messaging.lifecycleevents.consumer.enabled` | `false` | Enables lifecycle events consumer used for analytics ingestion |
+| `lemline.messaging.lifecycleevents.consumer.concurrency` | `64` | Max concurrent lifecycle analytics message handling |
 | `lemline.analytics.migrate-at-start` | `true` | Runs analytics Flyway migration on startup |
 | `lemline.analytics.baseline-on-migrate` | `false` | Enables Flyway baseline behavior for analytics DB |
 | `lemline.analytics.postgresql.host` | `localhost` | Analytics PostgreSQL host |
@@ -85,5 +85,5 @@ Important columns:
 - If startup fails with analytics connectivity errors, verify `lemline.analytics.postgresql.*` and PostgreSQL availability.
 - If no rows are inserted, verify both producer and consumer are enabled:
   - `lemline.messaging.lifecycleevents.producer.enabled=true`
-  - `lemline.analytics.consumer.enabled=true`
+  - `lemline.messaging.lifecycleevents.consumer.enabled=true`
 - If rows are missing unexpectedly, check deduplication collisions on `(source, event_id)`.

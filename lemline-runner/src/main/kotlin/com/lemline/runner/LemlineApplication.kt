@@ -8,16 +8,18 @@ import com.lemline.runner.cli.gateway.GatewayStartCommand
 import com.lemline.runner.cli.instances.InstanceStartCommand
 import com.lemline.runner.cli.listen.ListenCommand
 import com.lemline.runner.cli.setup
-import com.lemline.runner.config.CLOUDEVENTS_CONSUMER_ENABLED
-import com.lemline.runner.config.CLOUDEVENTS_PRODUCER_ENABLED
-import com.lemline.runner.config.COMMANDS_CONSUMER_ENABLED
-import com.lemline.runner.config.COMMANDS_PRODUCER_ENABLED
-import com.lemline.runner.config.DATABASE_ENABLED
-import com.lemline.runner.config.EVENTS_CONSUMER_ENABLED
-import com.lemline.runner.config.EVENTS_PRODUCER_ENABLED
-import com.lemline.runner.config.LIFECYCLE_EVENTS_CONSUMER_ENABLED
-import com.lemline.runner.config.LIFECYCLE_EVENTS_PRODUCER_ENABLED
-import com.lemline.runner.config.SCHEDULED_ENABLED
+import com.lemline.runner.common.config.LEMLINE_MESSAGING_LIFECYCLE_EVENTS_CONSUMER_ENABLED
+import com.lemline.runner.common.config.LEMLINE_DATABASE_ENABLED
+import com.lemline.runner.common.config.LEMLINE_GATEWAY_ENABLED
+import com.lemline.runner.common.config.LEMLINE_GATEWAY_GRPC_PORT
+import com.lemline.runner.common.config.LEMLINE_MESSAGING_CLOUDEVENTS_CONSUMER_ENABLED
+import com.lemline.runner.common.config.LEMLINE_MESSAGING_CLOUDEVENTS_PRODUCER_ENABLED
+import com.lemline.runner.common.config.LEMLINE_MESSAGING_COMMANDS_CONSUMER_ENABLED
+import com.lemline.runner.common.config.LEMLINE_MESSAGING_COMMANDS_PRODUCER_ENABLED
+import com.lemline.runner.common.config.LEMLINE_MESSAGING_EVENTS_CONSUMER_ENABLED
+import com.lemline.runner.common.config.LEMLINE_MESSAGING_EVENTS_PRODUCER_ENABLED
+import com.lemline.runner.common.config.LEMLINE_MESSAGING_LIFECYCLE_EVENTS_PRODUCER_ENABLED
+import com.lemline.runner.common.config.LEMLINE_SCHEDULED_ENABLED
 import io.quarkus.picocli.runtime.annotations.TopCommand
 import io.quarkus.runtime.Quarkus
 import io.quarkus.runtime.QuarkusApplication
@@ -125,7 +127,7 @@ class LemlineApplication : QuarkusApplication {
                     // the instance start command, if any
                     val start = parseResults.command<InstanceStartCommand>()
                     if (start != null) {
-                        System.setProperty(COMMANDS_PRODUCER_ENABLED, "true")
+                        System.setProperty(LEMLINE_MESSAGING_COMMANDS_PRODUCER_ENABLED, "true")
                     }
 
                     // the gateway start command, if any
@@ -133,7 +135,7 @@ class LemlineApplication : QuarkusApplication {
                     if (gatewayStart != null) {
                         configureGatewayToggles()
                         gatewayStart.port?.let {
-                            System.setProperty("lemline.gateway.grpc.port", it.toString())
+                            System.setProperty(LEMLINE_GATEWAY_GRPC_PORT, it.toString())
                         }
                     }
                 }
@@ -267,7 +269,6 @@ private fun checkConfigLocation(filePath: Path, provided: Boolean): Boolean {
     }
     if (fileExists && isRegularFile) {
         ConfigPathHolder.configPath = path
-        System.setProperty("lemline.config.path", path.toAbsolutePath().toString())
         return true
     }
     return false
@@ -286,40 +287,40 @@ private fun disableMetricsEndpoint() {
 }
 
 private fun enableMessaging() {
-    System.setProperty(EVENTS_CONSUMER_ENABLED, "true")
-    System.setProperty(COMMANDS_CONSUMER_ENABLED, "true")
-    System.setProperty(EVENTS_PRODUCER_ENABLED, "true")
-    System.setProperty(COMMANDS_PRODUCER_ENABLED, "true")
+    System.setProperty(LEMLINE_MESSAGING_EVENTS_CONSUMER_ENABLED, "true")
+    System.setProperty(LEMLINE_MESSAGING_COMMANDS_CONSUMER_ENABLED, "true")
+    System.setProperty(LEMLINE_MESSAGING_EVENTS_PRODUCER_ENABLED, "true")
+    System.setProperty(LEMLINE_MESSAGING_COMMANDS_PRODUCER_ENABLED, "true")
 }
 
 private fun disableMessaging() {
-    System.setProperty(EVENTS_CONSUMER_ENABLED, "false")
-    System.setProperty(COMMANDS_CONSUMER_ENABLED, "false")
-    System.setProperty(EVENTS_PRODUCER_ENABLED, "false")
-    System.setProperty(COMMANDS_PRODUCER_ENABLED, "false")
+    System.setProperty(LEMLINE_MESSAGING_EVENTS_CONSUMER_ENABLED, "false")
+    System.setProperty(LEMLINE_MESSAGING_COMMANDS_CONSUMER_ENABLED, "false")
+    System.setProperty(LEMLINE_MESSAGING_EVENTS_PRODUCER_ENABLED, "false")
+    System.setProperty(LEMLINE_MESSAGING_COMMANDS_PRODUCER_ENABLED, "false")
 }
 
 private fun disableDatabase() {
-    System.setProperty(DATABASE_ENABLED, "false")
+    System.setProperty(LEMLINE_DATABASE_ENABLED, "false")
 }
 
 private fun disableScheduled() {
-    System.setProperty(SCHEDULED_ENABLED, "false")
+    System.setProperty(LEMLINE_SCHEDULED_ENABLED, "false")
 }
 
 private fun configureGatewayToggles() {
-    System.setProperty("lemline.gateway.enabled", "true")
-    System.setProperty(DATABASE_ENABLED, "true")
-    System.setProperty(SCHEDULED_ENABLED, "false")
+    System.setProperty(LEMLINE_GATEWAY_ENABLED, "true")
+    System.setProperty(LEMLINE_DATABASE_ENABLED, "true")
+    System.setProperty(LEMLINE_SCHEDULED_ENABLED, "false")
 
-    System.setProperty(COMMANDS_PRODUCER_ENABLED, "true")
-    System.setProperty(COMMANDS_CONSUMER_ENABLED, "false")
-    System.setProperty(EVENTS_PRODUCER_ENABLED, "false")
-    System.setProperty(EVENTS_CONSUMER_ENABLED, "false")
-    System.setProperty(CLOUDEVENTS_PRODUCER_ENABLED, "false")
-    System.setProperty(CLOUDEVENTS_CONSUMER_ENABLED, "false")
-    System.setProperty(LIFECYCLE_EVENTS_PRODUCER_ENABLED, "false")
-    System.setProperty(LIFECYCLE_EVENTS_CONSUMER_ENABLED, "false")
+    System.setProperty(LEMLINE_MESSAGING_COMMANDS_PRODUCER_ENABLED, "true")
+    System.setProperty(LEMLINE_MESSAGING_COMMANDS_CONSUMER_ENABLED, "false")
+    System.setProperty(LEMLINE_MESSAGING_EVENTS_PRODUCER_ENABLED, "false")
+    System.setProperty(LEMLINE_MESSAGING_EVENTS_CONSUMER_ENABLED, "false")
+    System.setProperty(LEMLINE_MESSAGING_CLOUDEVENTS_PRODUCER_ENABLED, "false")
+    System.setProperty(LEMLINE_MESSAGING_CLOUDEVENTS_CONSUMER_ENABLED, "false")
+    System.setProperty(LEMLINE_MESSAGING_LIFECYCLE_EVENTS_PRODUCER_ENABLED, "false")
+    System.setProperty(LEMLINE_MESSAGING_LIFECYCLE_EVENTS_CONSUMER_ENABLED, "false")
 
     System.setProperty("quarkus.http.port", "0")
     System.setProperty("quarkus.http.ssl-port", "0")

@@ -150,6 +150,9 @@ lemline:
     # lifecycleevents:
     #   producer:
     #     enabled: true  # Set to true to enable lifecycle event publishing
+    #   consumer:
+    #     enabled: ${LEMLINE_MESSAGING_LIFECYCLE_EVENTS_CONSUMER_ENABLED:false}
+    #     concurrency: ${LEMLINE_MESSAGING_LIFECYCLE_EVENTS_CONSUMER_CONCURRENCY:64}
     #
     #   # Kafka-specific lifecycle events settings (when using kafka)
     #   # Topic defaults to 'lemline-lifecycle-events' if not specified
@@ -165,9 +168,6 @@ lemline:
   # Consumes the same lifecycle events stream and stores CloudEvents in a dedicated
   # PostgreSQL analytics database.
   analytics:
-    consumer:
-      enabled: ${LEMLINE_ANALYTICS_CONSUMER_ENABLED:false}
-      concurrency: ${LEMLINE_ANALYTICS_CONSUMER_CONCURRENCY:64}
     migrate-at-start: ${LEMLINE_ANALYTICS_MIGRATE_AT_START:true}
     baseline-on-migrate: ${LEMLINE_ANALYTICS_BASELINE_ON_MIGRATE:false}
 

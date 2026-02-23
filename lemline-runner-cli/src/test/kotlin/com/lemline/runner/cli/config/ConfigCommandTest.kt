@@ -33,10 +33,10 @@ class ConfigCommandTest {
 
     // Sample configuration properties for testing
     private val testProperties = mapOf(
-        "lemline.database.type" to "postgresql",
-        "lemline.database.host" to "localhost",
-        "lemline.database.port" to "5432",
-        "lemline.messaging.type" to "kafka",
+        com.lemline.runner.common.config.LEMLINE_DATABASE_TYPE to "postgresql",
+        com.lemline.runner.common.config.LEMLINE_DATABASE_POSTGRES_HOST to "localhost",
+        com.lemline.runner.common.config.LEMLINE_DATABASE_POSTGRES_PORT to "5432",
+        com.lemline.runner.common.config.LEMLINE_MESSAGING_TYPE to "kafka",
         "quarkus.log.level" to "INFO",
         "quarkus.http.port" to "8080"
     )
@@ -135,7 +135,7 @@ class ConfigCommandTest {
         val output2 = outStream.toString()
 
         listOf(output1, output2).forEach { output ->
-            output shouldContain "lemline.database.type="
+            output shouldContain "${com.lemline.runner.common.config.LEMLINE_DATABASE_TYPE}="
             output shouldNotContain "quarkus.log.level="
         }
     }
@@ -189,7 +189,7 @@ class ConfigCommandTest {
 
         listOf(output1, output2).forEach { output ->
             // Verify Lemline properties are present in the output
-            output shouldContain "lemline.database.type="
+            output shouldContain "${com.lemline.runner.common.config.LEMLINE_DATABASE_TYPE}="
             // Verify Quarkus properties are present in the output
             output shouldContain "quarkus.log.level="
         }

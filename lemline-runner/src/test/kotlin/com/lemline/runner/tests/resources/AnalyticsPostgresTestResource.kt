@@ -22,13 +22,13 @@ class AnalyticsPostgresTestResource : QuarkusTestResourceLifecycleManager {
         postgres.start()
 
         val properties = mapOf(
-            "lemline.analytics.postgresql.host" to postgres.host,
-            "lemline.analytics.postgresql.port" to postgres.firstMappedPort.toString(),
-            "lemline.analytics.postgresql.database" to postgres.databaseName,
-            "lemline.analytics.postgresql.username" to postgres.username,
-            "lemline.analytics.postgresql.password" to postgres.password,
-            "lemline.analytics.postgresql.schema" to "public",
-            "lemline.analytics.postgresql.table" to "lemline_lifecycle_events"
+            com.lemline.runner.common.config.LEMLINE_ANALYTICS_POSTGRES_HOST to postgres.host,
+            com.lemline.runner.common.config.LEMLINE_ANALYTICS_POSTGRES_PORT to postgres.firstMappedPort.toString(),
+            com.lemline.runner.common.config.LEMLINE_ANALYTICS_POSTGRES_DATABASE to postgres.databaseName,
+            com.lemline.runner.common.config.LEMLINE_ANALYTICS_POSTGRES_USERNAME to postgres.username,
+            com.lemline.runner.common.config.LEMLINE_ANALYTICS_POSTGRES_PASSWORD to postgres.password,
+            com.lemline.runner.common.config.LEMLINE_ANALYTICS_POSTGRES_SCHEMA to "public",
+            com.lemline.runner.common.config.LEMLINE_ANALYTICS_POSTGRES_TABLE to "lemline_lifecycle_events"
         )
 
         properties.forEach { (k, v) -> System.setProperty(k, v) }
@@ -37,13 +37,13 @@ class AnalyticsPostgresTestResource : QuarkusTestResourceLifecycleManager {
     }
 
     override fun stop() {
-        System.clearProperty("lemline.analytics.postgresql.host")
-        System.clearProperty("lemline.analytics.postgresql.port")
-        System.clearProperty("lemline.analytics.postgresql.database")
-        System.clearProperty("lemline.analytics.postgresql.username")
-        System.clearProperty("lemline.analytics.postgresql.password")
-        System.clearProperty("lemline.analytics.postgresql.schema")
-        System.clearProperty("lemline.analytics.postgresql.table")
+        System.clearProperty(com.lemline.runner.common.config.LEMLINE_ANALYTICS_POSTGRES_HOST)
+        System.clearProperty(com.lemline.runner.common.config.LEMLINE_ANALYTICS_POSTGRES_PORT)
+        System.clearProperty(com.lemline.runner.common.config.LEMLINE_ANALYTICS_POSTGRES_DATABASE)
+        System.clearProperty(com.lemline.runner.common.config.LEMLINE_ANALYTICS_POSTGRES_USERNAME)
+        System.clearProperty(com.lemline.runner.common.config.LEMLINE_ANALYTICS_POSTGRES_PASSWORD)
+        System.clearProperty(com.lemline.runner.common.config.LEMLINE_ANALYTICS_POSTGRES_SCHEMA)
+        System.clearProperty(com.lemline.runner.common.config.LEMLINE_ANALYTICS_POSTGRES_TABLE)
 
         if (::postgres.isInitialized) {
             postgres.stop()

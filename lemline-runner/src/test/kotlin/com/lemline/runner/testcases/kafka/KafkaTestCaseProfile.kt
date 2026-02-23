@@ -3,16 +3,6 @@ package com.lemline.runner.testcases.kafka
 
 import com.lemline.runner.common.config.DatabaseType
 import com.lemline.runner.common.config.MessagingType
-import com.lemline.runner.config.CLOUDEVENTS_CONSUMER_ENABLED
-import com.lemline.runner.config.CLOUDEVENTS_PRODUCER_ENABLED
-import com.lemline.runner.config.COMMANDS_CONSUMER_ENABLED
-import com.lemline.runner.config.COMMANDS_PRODUCER_ENABLED
-import com.lemline.runner.config.DATABASE_TYPE
-import com.lemline.runner.config.EVENTS_CONSUMER_ENABLED
-import com.lemline.runner.config.EVENTS_PRODUCER_ENABLED
-import com.lemline.runner.config.LIFECYCLE_EVENTS_PRODUCER_ENABLED
-import com.lemline.runner.config.MESSAGING_TYPE
-import com.lemline.runner.config.ORCHESTRATOR_MODE
 import com.lemline.runner.tests.resources.KafkaTestResource
 import io.quarkus.test.junit.QuarkusTestProfile
 
@@ -33,21 +23,21 @@ class KafkaTestCaseProfile : QuarkusTestProfile {
     override fun getConfigOverrides(): Map<String, String> {
         return mapOf(
             // Database configuration
-            DATABASE_TYPE to DatabaseType.H2.configValue,
+            com.lemline.runner.common.config.LEMLINE_DATABASE_TYPE to DatabaseType.H2.configValue,
             // Messaging configuration
-            MESSAGING_TYPE to MessagingType.KAFKA.configValue,
-            COMMANDS_CONSUMER_ENABLED to "true",
-            COMMANDS_PRODUCER_ENABLED to "true",
-            EVENTS_CONSUMER_ENABLED to "true",
-            EVENTS_PRODUCER_ENABLED to "true",
-            CLOUDEVENTS_CONSUMER_ENABLED to "true",
-            CLOUDEVENTS_PRODUCER_ENABLED to "true",
+            com.lemline.runner.common.config.LEMLINE_MESSAGING_TYPE to MessagingType.KAFKA.configValue,
+            com.lemline.runner.common.config.LEMLINE_MESSAGING_COMMANDS_CONSUMER_ENABLED to "true",
+            com.lemline.runner.common.config.LEMLINE_MESSAGING_COMMANDS_PRODUCER_ENABLED to "true",
+            com.lemline.runner.common.config.LEMLINE_MESSAGING_EVENTS_CONSUMER_ENABLED to "true",
+            com.lemline.runner.common.config.LEMLINE_MESSAGING_EVENTS_PRODUCER_ENABLED to "true",
+            com.lemline.runner.common.config.LEMLINE_MESSAGING_CLOUDEVENTS_CONSUMER_ENABLED to "true",
+            com.lemline.runner.common.config.LEMLINE_MESSAGING_CLOUDEVENTS_PRODUCER_ENABLED to "true",
 
             // Enable lifecycle events producer so events flow through the broker
-            LIFECYCLE_EVENTS_PRODUCER_ENABLED to "true",
+            com.lemline.runner.common.config.LEMLINE_MESSAGING_LIFECYCLE_EVENTS_PRODUCER_ENABLED to "true",
 
             // Orchestrator mode: ALL generates more messages for thorough end-to-end testing
-            ORCHESTRATOR_MODE to "all",
+            com.lemline.runner.common.config.LEMLINE_ORCHESTRATOR_MODE to "all",
 
             // Use SAME topic for in/out to create loopback
             "mp.messaging.incoming.commands-in.topic" to "lemline-commands",
@@ -70,17 +60,17 @@ class KafkaTestCaseProfile : QuarkusTestProfile {
             "smallrye.messaging.kafka.topic.creation.enable" to "true",
 
             // Enable outbox schedulers for Wait/Fork/Retry tests
-            "lemline.outbox.enabled" to "true",
+            com.lemline.runner.common.config.LEMLINE_OUTBOX_ENABLED to "true",
             // Fast polling for tests (no jitter - start immediately for deterministic testing)
-            "lemline.outbox.wait.outbox.every" to "1s",
-            "lemline.outbox.wait.outbox.initial-jitter" to "0s",
-            "lemline.outbox.retry.outbox.every" to "1s",
-            "lemline.outbox.retry.outbox.initial-jitter" to "0s",
-            "lemline.outbox.schedule.outbox.every" to "1s",
-            "lemline.outbox.schedule.outbox.initial-jitter" to "0s",
+            com.lemline.runner.common.config.LEMLINE_OUTBOX_WAIT_OUTBOX_EVERY to "1s",
+            com.lemline.runner.common.config.LEMLINE_OUTBOX_WAIT_OUTBOX_INITIAL_JITTER to "0s",
+            com.lemline.runner.common.config.LEMLINE_OUTBOX_RETRY_OUTBOX_EVERY to "1s",
+            com.lemline.runner.common.config.LEMLINE_OUTBOX_RETRY_OUTBOX_INITIAL_JITTER to "0s",
+            com.lemline.runner.common.config.LEMLINE_OUTBOX_SCHEDULE_OUTBOX_EVERY to "1s",
+            com.lemline.runner.common.config.LEMLINE_OUTBOX_SCHEDULE_OUTBOX_INITIAL_JITTER to "0s",
             // Listener outbox config (for listen task tests)
-            "lemline.outbox.listener.outbox.every" to "1s",
-            "lemline.outbox.listener.outbox.initial-jitter" to "0s"
+            com.lemline.runner.common.config.LEMLINE_OUTBOX_LISTENER_OUTBOX_EVERY to "1s",
+            com.lemline.runner.common.config.LEMLINE_OUTBOX_LISTENER_OUTBOX_INITIAL_JITTER to "0s"
         )
     }
 

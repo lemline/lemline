@@ -4,7 +4,7 @@ package com.lemline.runner.messaging
 import com.lemline.common.logger.logger
 import com.lemline.common.values.IDV7
 import com.lemline.runner.common.config.MessagingType
-import com.lemline.runner.config.MESSAGING_TYPE
+import com.lemline.runner.config.LemlineConfiguration
 import com.lemline.runner.messaging.pgmq.connector.PgmqIncomingMetadata
 import com.lemline.runner.messaging.pgmq.connector.PgmqOutgoingMetadata
 import io.smallrye.reactive.messaging.kafka.api.IncomingKafkaRecordMetadata
@@ -17,18 +17,13 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import org.apache.kafka.common.header.internals.RecordHeaders
-import org.eclipse.microprofile.config.inject.ConfigProperty
 import org.eclipse.microprofile.reactive.messaging.Message
 
 @ApplicationScoped
-class MessageMetaData {
-
-    @ConfigProperty(name = MESSAGING_TYPE, defaultValue = "in-memory")
-    private lateinit var _messagingTypeConfig: String
-
-    private val messagingType: MessagingType by lazy {
-        MessagingType.fromConfigValue(_messagingTypeConfig)
-    }
+class MessageMetaData(
+    private val config: LemlineConfiguration
+) {
+    private val messagingType: MessagingType by lazy { MessagingType.fromConfigValue(config.messaging().type()) }
 
     private val logger = logger()
 

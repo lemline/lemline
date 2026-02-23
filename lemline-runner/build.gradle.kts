@@ -45,6 +45,7 @@ dependencies {
     implementation(project(":lemline-common"))
     implementation(project(":lemline-core"))
     implementation(project(":lemline-runner-common"))
+    implementation(project(":lemline-runner-config"))
     implementation(project(":lemline-runner-waits"))
     implementation(project(":lemline-runner-retries"))
     implementation(project(":lemline-runner-schedules"))
@@ -168,6 +169,7 @@ dependencies {
     testFixturesImplementation("io.quarkus:quarkus-junit5")
     testFixturesImplementation(libs.serverlessworkflow.api)
     testFixturesImplementation(project(":lemline-runner-common"))
+    testFixturesImplementation(project(":lemline-runner-config"))
     testFixturesImplementation(project(":lemline-runner-failures"))
     testFixturesImplementation(project(":lemline-runner-waits"))
     testFixturesImplementation(project(":lemline-runner-retries"))
@@ -275,4 +277,3 @@ tasks.register("syncDocsVersion") {
         println("Updated v.list with version: $baseVersion")
     }
 }
-

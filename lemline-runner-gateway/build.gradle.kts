@@ -30,6 +30,7 @@ dependencies {
     implementation(project(":lemline-common"))
     implementation(project(":lemline-core"))
     implementation(project(":lemline-runner-common"))
+    implementation(project(":lemline-runner-config"))
     implementation(project(":lemline-runner-definitions"))
     implementation(project(":lemline-runner-schedules"))
 
@@ -48,6 +49,7 @@ dependencies {
     implementation("io.quarkus:quarkus-micrometer")
     implementation("io.quarkus:quarkus-micrometer-registry-prometheus")
     implementation("com.google.protobuf:protobuf-kotlin")
+    implementation(libs.serverlessworkflow.api)
 
     testImplementation(kotlin("test"))
     testImplementation(enforcedPlatform(libs.kotest.bom))

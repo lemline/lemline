@@ -2,24 +2,24 @@
 package com.lemline.runner.gateway.analytics
 
 import com.lemline.common.values.WorkflowId
-import com.lemline.runner.gateway.config.GatewayConfigConstants.ANALYTICS_BACKEND
-import com.lemline.runner.gateway.config.GatewayConfigConstants.ANALYTICS_BACKEND_DEFAULT
-import com.lemline.runner.gateway.config.GatewayConfigConstants.ANALYTICS_BACKEND_POSTGRESQL
+import com.lemline.runner.common.config.ANALYTICS_BACKEND_POSTGRESQL
+import com.lemline.runner.common.config.LEMLINE_ANALYTICS_POSTGRES
+import com.lemline.runner.common.config.LEMLINE_ANALYTICS_TYPE
+import com.lemline.runner.config.LemlineConfiguration
+import com.lemline.runner.config.analyticsTypeResolved
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.enterprise.inject.Instance
 import jakarta.inject.Inject
-import org.eclipse.microprofile.config.inject.ConfigProperty
 
 @ApplicationScoped
 class WorkflowAnalyticsEventSourceSelector(
-    @ConfigProperty(name = ANALYTICS_BACKEND, defaultValue = ANALYTICS_BACKEND_DEFAULT)
-    analyticsBackend: String,
+    private val config: LemlineConfiguration,
 ) : WorkflowAnalyticsEventSource {
 
     @Inject
     lateinit var postgresqlEventSource: Instance<PostgresqlWorkflowAnalyticsEventSource>
 
-    private val backend = AnalyticsBackend.parse(analyticsBackend)
+    private val backend get() = AnalyticsBackend.parse(config.analyticsTypeResolved)
 
     override suspend fun listByWorkflowIdAfter(
         workflowId: WorkflowId,
@@ -36,16 +36,16 @@ class WorkflowAnalyticsEventSourceSelector(
                 postgresqlEventSource.get()
             } else {
                 throw IllegalStateException(
-                    "Analytics backend '$ANALYTICS_BACKEND_POSTGRESQL' requires datasource 'analytics'. " +
-                        "Configure lemline.analytics.postgresql.*"
+                    "Analytics type '$ANALYTICS_BACKEND_POSTGRESQL' requires datasource 'analytics'. " +
+                        "Configure $LEMLINE_ANALYTICS_POSTGRES.*"
                 )
             }
         }
 
         AnalyticsBackend.CLICKHOUSE -> {
             throw IllegalStateException(
-                "Analytics backend 'clickhouse' is not implemented yet in lemline-gateway. " +
-                    "Use lemline.analytics.backend=postgresql."
+                "Analytics type 'clickhouse' is not implemented yet in lemline-gateway. " +
+                    "Use $LEMLINE_ANALYTICS_TYPE=$ANALYTICS_BACKEND_POSTGRESQL."
             )
         }
     }

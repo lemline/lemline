@@ -1,13 +1,16 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.cli.config
 
+import com.lemline.runner.config.ConfigPathHolder as SharedConfigPathHolder
 import java.nio.file.Path
 
 /**
- * Holder for the configuration file path.
- * This is set by the main application before Quarkus starts.
+ * Backward-compatible access point for the shared configuration file path holder.
  */
 object ConfigPathHolder {
-    @Volatile
-    var configPath: Path? = null
+    var configPath: Path?
+        get() = SharedConfigPathHolder.configPath
+        set(value) {
+            SharedConfigPathHolder.configPath = value
+        }
 }

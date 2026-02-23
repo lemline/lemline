@@ -8,34 +8,24 @@ import io.quarkus.runtime.StartupEvent
 import jakarta.annotation.Priority
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.enterprise.event.Observes
-import jakarta.inject.Inject
 import java.sql.DriverManager
 import java.util.*
 import java.util.concurrent.TimeUnit
 import org.apache.kafka.clients.admin.AdminClient
 import org.apache.kafka.clients.admin.AdminClientConfig
-import org.eclipse.microprofile.config.inject.ConfigProperty
 
 /**
  * Validates broker connectivity during application startup.
  * Provides clear, actionable error messages when the broker is unreachable.
  */
 @ApplicationScoped
-class MessagingStartupValidator {
+class MessagingStartupValidator(
+    private val config: LemlineConfiguration
+) {
     private val logger = logger()
 
-    @ConfigProperty(name = MESSAGING_TYPE, defaultValue = "in-memory")
-    private lateinit var _messagingTypeConfig: String
-
-    private val messagingType: MessagingType by lazy {
-        MessagingType.fromConfigValue(_messagingTypeConfig)
-    }
-
-    @ConfigProperty(name = DATABASE_ENABLED, defaultValue = "true")
-    var databaseEnabled: Boolean = true
-
-    @Inject
-    lateinit var config: LemlineConfiguration
+    private val messagingType: MessagingType by lazy { MessagingType.fromConfigValue(config.messaging().type()) }
+    private val databaseEnabled: Boolean get() = config.database().enabled()
 
     @Suppress("unused")
     fun onStart(@Observes @Priority(2) event: StartupEvent) {

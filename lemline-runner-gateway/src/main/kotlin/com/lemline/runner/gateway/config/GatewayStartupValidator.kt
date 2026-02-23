@@ -1,6 +1,23 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.gateway.config
 
+import com.lemline.runner.common.config.LEMLINE_GATEWAY_AUTHENTICATION_ENABLED
+import com.lemline.runner.common.config.LEMLINE_GATEWAY_AUTHENTICATION_JWT_ISSUER
+import com.lemline.runner.common.config.LEMLINE_GATEWAY_AUTHENTICATION_JWT_JWKS_URL
+import com.lemline.runner.common.config.LEMLINE_GATEWAY_TLS_CERTIFICATE
+import com.lemline.runner.common.config.LEMLINE_GATEWAY_TLS_ENABLED
+import com.lemline.runner.common.config.LEMLINE_GATEWAY_TLS_PRIVATE_KEY
+import com.lemline.runner.common.config.LEMLINE_GATEWAY_TLS_TRUST_STORE
+import com.lemline.runner.config.LemlineConfiguration
+import com.lemline.runner.config.gatewayAuthenticationEnabled
+import com.lemline.runner.config.gatewayAuthenticationJwtIssuer
+import com.lemline.runner.config.gatewayAuthenticationJwtJwksUrl
+import com.lemline.runner.config.gatewayEnabled
+import com.lemline.runner.config.gatewayTlsCertificate
+import com.lemline.runner.config.gatewayTlsClientAuth
+import com.lemline.runner.config.gatewayTlsEnabled
+import com.lemline.runner.config.gatewayTlsPrivateKey
+import com.lemline.runner.config.gatewayTlsTrustStore
 import com.lemline.runner.gateway.analytics.WorkflowAnalyticsEventSource
 import io.quarkus.runtime.StartupEvent
 import jakarta.annotation.Priority
@@ -9,25 +26,10 @@ import jakarta.enterprise.event.Observes
 import jakarta.inject.Inject
 import java.util.*
 import kotlinx.coroutines.runBlocking
-import org.eclipse.microprofile.config.inject.ConfigProperty
 
 @ApplicationScoped
 class GatewayStartupValidator(
-    @param:ConfigProperty(
-        name = GatewayConfigConstants.GATEWAY_ENABLED,
-        defaultValue = GatewayConfigConstants.GATEWAY_ENABLED_DEFAULT
-    )
-    private val gatewayEnabled: Boolean,
-    @param:ConfigProperty(name = GatewayConfigConstants.GATEWAY_TLS_CERTIFICATE)
-    private val tlsCertificate: Optional<String>,
-    @param:ConfigProperty(name = GatewayConfigConstants.GATEWAY_TLS_PRIVATE_KEY)
-    private val tlsPrivateKey: Optional<String>,
-    @param:ConfigProperty(name = GatewayConfigConstants.GATEWAY_TLS_TRUST_STORE)
-    private val tlsTrustStore: Optional<String>,
-    @param:ConfigProperty(name = GatewayConfigConstants.GATEWAY_JWT_ISSUER)
-    private val jwtIssuer: Optional<String>,
-    @param:ConfigProperty(name = GatewayConfigConstants.GATEWAY_JWT_JWKS_URL)
-    private val jwtJwksUrl: Optional<String>,
+    private val config: LemlineConfiguration,
 ) {
 
     @Inject
@@ -35,21 +37,38 @@ class GatewayStartupValidator(
 
     @Suppress("unused")
     fun onStart(@Observes @Priority(0) event: StartupEvent) {
-        if (!gatewayEnabled) return
+        if (!config.gatewayEnabled) return
 
-        requireConfigured(tlsCertificate, GatewayConfigConstants.GATEWAY_TLS_CERTIFICATE)
-        requireConfigured(tlsPrivateKey, GatewayConfigConstants.GATEWAY_TLS_PRIVATE_KEY)
-        requireConfigured(tlsTrustStore, GatewayConfigConstants.GATEWAY_TLS_TRUST_STORE)
-        requireConfigured(jwtIssuer, GatewayConfigConstants.GATEWAY_JWT_ISSUER)
-        requireConfigured(jwtJwksUrl, GatewayConfigConstants.GATEWAY_JWT_JWKS_URL)
+        if (config.gatewayAuthenticationEnabled && !config.gatewayTlsEnabled) {
+            throw IllegalStateException(
+                "Invalid gateway configuration: '$LEMLINE_GATEWAY_AUTHENTICATION_ENABLED' " +
+                    "requires '$LEMLINE_GATEWAY_TLS_ENABLED=true'"
+            )
+        }
+
+        if (config.gatewayTlsEnabled) {
+            requireConfigured(config.gatewayTlsCertificate, LEMLINE_GATEWAY_TLS_CERTIFICATE)
+            requireConfigured(config.gatewayTlsPrivateKey, LEMLINE_GATEWAY_TLS_PRIVATE_KEY)
+
+            val clientAuth = config.gatewayTlsClientAuth.trim().lowercase(Locale.ROOT).ifBlank { "none" }
+
+            if (clientAuth == "request" || clientAuth == "required") {
+                requireConfigured(config.gatewayTlsTrustStore, LEMLINE_GATEWAY_TLS_TRUST_STORE)
+            }
+        }
+
+        if (config.gatewayAuthenticationEnabled) {
+            requireConfigured(config.gatewayAuthenticationJwtIssuer, LEMLINE_GATEWAY_AUTHENTICATION_JWT_ISSUER)
+            requireConfigured(config.gatewayAuthenticationJwtJwksUrl, LEMLINE_GATEWAY_AUTHENTICATION_JWT_JWKS_URL)
+        }
 
         runBlocking {
             analyticsEventSource.validate()
         }
     }
 
-    private fun requireConfigured(value: Optional<String>, key: String) {
-        val configured = value.filter { it.isNotBlank() }.isPresent
+    private fun requireConfigured(value: String?, key: String) {
+        val configured = value?.isNotBlank() == true
         if (!configured) {
             throw IllegalStateException("Missing required gateway configuration: '$key'")
         }

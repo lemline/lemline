@@ -2,7 +2,7 @@
 package com.lemline.runner.analytics
 
 import com.lemline.runner.common.test.RequiresDocker
-import com.lemline.runner.config.LIFECYCLEEVENTS_IN_CHANNEL
+import com.lemline.runner.common.messaging.LIFECYCLEEVENTS_IN_CHANNEL
 import com.lemline.runner.listeners.CloudEventService
 import com.lemline.runner.tests.profiles.InMemoryAnalyticsProfile
 import io.agroal.api.AgroalDataSource

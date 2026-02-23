@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.gateway.auth
 
+import com.lemline.runner.config.LemlineConfiguration
+import com.lemline.runner.config.gatewayAuthenticationEnabled
 import io.grpc.Contexts
 import io.grpc.Metadata
 import io.grpc.ServerCall
@@ -14,7 +16,9 @@ import jakarta.inject.Inject
 
 @GlobalInterceptor
 @ApplicationScoped
-class GatewayAuthInterceptor : ServerInterceptor {
+class GatewayAuthInterceptor(
+    private val config: LemlineConfiguration,
+) : ServerInterceptor {
 
     @Inject
     lateinit var jwtParser: JWTParser
@@ -27,6 +31,10 @@ class GatewayAuthInterceptor : ServerInterceptor {
         headers: Metadata,
         next: ServerCallHandler<ReqT, RespT>
     ): ServerCall.Listener<ReqT> {
+        if (!config.gatewayAuthenticationEnabled) {
+            return next.startCall(call, headers)
+        }
+
         val authorizationHeader = headers.get(AUTHORIZATION_METADATA_KEY)
             ?: return closeUnauthenticated(call, "Missing Authorization metadata header")
 
