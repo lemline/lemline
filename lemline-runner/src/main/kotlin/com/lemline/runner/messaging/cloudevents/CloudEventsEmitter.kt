@@ -2,7 +2,7 @@
 package com.lemline.runner.messaging.cloudevents
 
 import com.lemline.common.logger.logger
-import com.lemline.runner.config.CLOUDEVENTS_PRODUCER_ENABLED
+import com.lemline.runner.config.shared.LemlineConfiguration
 import com.lemline.runner.listeners.CloudEventService
 import io.cloudevents.CloudEvent
 import io.cloudevents.core.builder.CloudEventBuilder
@@ -11,7 +11,7 @@ import io.smallrye.mutiny.coroutines.awaitSuspending
 import io.smallrye.reactive.messaging.MutinyEmitter
 import jakarta.annotation.PostConstruct
 import jakarta.enterprise.context.ApplicationScoped
-import org.eclipse.microprofile.config.inject.ConfigProperty
+import kotlin.jvm.optionals.getOrNull
 import org.eclipse.microprofile.reactive.messaging.Channel
 import org.eclipse.microprofile.reactive.messaging.Message
 
@@ -30,8 +30,10 @@ internal const val CLOUDEVENTS_OUT_CHANNEL = "cloudevents-out"
 @Startup
 @ApplicationScoped
 internal class CloudEventsEmitter(
-    @param:ConfigProperty(name = CLOUDEVENTS_PRODUCER_ENABLED) private val enabled: Boolean
+    config: LemlineConfiguration
 ) {
+    private val enabled: Boolean = config.messaging().cloudevents().getOrNull()?.producer()?.enabled() ?: false
+
     private val logger = logger()
 
     @PostConstruct

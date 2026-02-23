@@ -30,7 +30,7 @@ import kotlin.time.Duration.Companion.seconds
 
 /**
  * CDI producer for feature configuration beans and infrastructure interfaces.
- * Converts [LemlineConfiguration] to feature-specific configuration interfaces
+ * Converts [SharedLemlineConfiguration] to feature-specific configuration interfaces
  * and provides [CommandEmitter] for use by feature modules.
  */
 @ApplicationScoped

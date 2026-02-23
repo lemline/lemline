@@ -4,13 +4,12 @@ package com.lemline.runner.config
 import com.lemline.common.info
 import com.lemline.common.logger
 import com.lemline.runner.common.config.DatabaseType
+import com.lemline.runner.config.shared.LemlineConfiguration
 import io.quarkus.runtime.StartupEvent
 import jakarta.annotation.Priority
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.enterprise.event.Observes
-import jakarta.inject.Inject
 import java.sql.SQLException
-import org.eclipse.microprofile.config.inject.ConfigProperty
 
 /**
  * Validates database connectivity during application startup.
@@ -20,20 +19,13 @@ import org.eclipse.microprofile.config.inject.ConfigProperty
  */
 @ApplicationScoped
 class DatabaseStartupValidator(
-    @param:ConfigProperty(name = DATABASE_TYPE)
-    val db: String,
-
-    @param:ConfigProperty(name = DATABASE_ENABLED, defaultValue = "true")
-    val databaseEnabled: Boolean,
+    private val config: LemlineConfiguration,
+    private val databaseManager: DatabaseManager,
 ) {
     private val logger = logger()
 
-    private val dbType: DatabaseType by lazy {
-        DatabaseType.fromConfigValue(db)
-    }
-
-    @Inject
-    lateinit var databaseManager: DatabaseManager
+    private val dbType: DatabaseType by lazy { DatabaseType.fromConfigValue(config.database().type()) }
+    private val databaseEnabled: Boolean get() = config.database().enabled()
 
     @Suppress("unused")
     fun onStart(@Observes @Priority(0) event: StartupEvent) {

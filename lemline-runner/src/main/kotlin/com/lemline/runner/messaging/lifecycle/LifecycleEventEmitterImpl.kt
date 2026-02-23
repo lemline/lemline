@@ -4,7 +4,7 @@ package com.lemline.runner.messaging.lifecycle
 import com.lemline.common.logger.logger
 import com.lemline.core.cloudevents.CloudEventParser.toReadableString
 import com.lemline.core.lifecycleevents.LifecycleEventEmitter
-import com.lemline.runner.config.LIFECYCLEEVENTS_OUT_CHANNEL
+import com.lemline.runner.messaging.lifecycle.LIFECYCLEEVENTS_OUT_CHANNEL
 import com.lemline.runner.listeners.CloudEventService
 import io.cloudevents.CloudEvent
 import io.quarkus.runtime.Startup

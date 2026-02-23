@@ -3,16 +3,6 @@ package com.lemline.runner.testcases.rabbitmq
 
 import com.lemline.runner.common.config.DatabaseType
 import com.lemline.runner.common.config.MessagingType
-import com.lemline.runner.config.CLOUDEVENTS_CONSUMER_ENABLED
-import com.lemline.runner.config.CLOUDEVENTS_PRODUCER_ENABLED
-import com.lemline.runner.config.COMMANDS_CONSUMER_ENABLED
-import com.lemline.runner.config.COMMANDS_PRODUCER_ENABLED
-import com.lemline.runner.config.DATABASE_TYPE
-import com.lemline.runner.config.EVENTS_CONSUMER_ENABLED
-import com.lemline.runner.config.EVENTS_PRODUCER_ENABLED
-import com.lemline.runner.config.LIFECYCLE_EVENTS_PRODUCER_ENABLED
-import com.lemline.runner.config.MESSAGING_TYPE
-import com.lemline.runner.config.ORCHESTRATOR_MODE
 import com.lemline.runner.tests.resources.RabbitMQTestResource
 import io.quarkus.test.junit.QuarkusTestProfile
 
@@ -33,21 +23,21 @@ class RabbitMQTestCaseProfile : QuarkusTestProfile {
     override fun getConfigOverrides(): Map<String, String> {
         return mapOf(
             // Database configuration
-            DATABASE_TYPE to DatabaseType.H2.configValue,
+            "lemline.database.type" to DatabaseType.H2.configValue,
             // Messaging configuration
-            MESSAGING_TYPE to MessagingType.RABBITMQ.configValue,
-            COMMANDS_CONSUMER_ENABLED to "true",
-            COMMANDS_PRODUCER_ENABLED to "true",
-            EVENTS_CONSUMER_ENABLED to "true",
-            EVENTS_PRODUCER_ENABLED to "true",
-            CLOUDEVENTS_CONSUMER_ENABLED to "true",
-            CLOUDEVENTS_PRODUCER_ENABLED to "true",
+            "lemline.messaging.type" to MessagingType.RABBITMQ.configValue,
+            "lemline.messaging.commands.consumer.enabled" to "true",
+            "lemline.messaging.commands.producer.enabled" to "true",
+            "lemline.messaging.events.consumer.enabled" to "true",
+            "lemline.messaging.events.producer.enabled" to "true",
+            "lemline.messaging.cloudevents.consumer.enabled" to "true",
+            "lemline.messaging.cloudevents.producer.enabled" to "true",
 
             // Enable lifecycle events producer so events flow through the broker
-            LIFECYCLE_EVENTS_PRODUCER_ENABLED to "true",
+            "lemline.messaging.lifecycleevents.producer.enabled" to "true",
 
             // Orchestrator mode: ALL generates more messages for thorough end-to-end testing
-            ORCHESTRATOR_MODE to "all",
+            "lemline.orchestrator.mode" to "all",
 
             // Loopback configuration using shared exchanges
             // Commands: input queue binds to the same exchange that output publishes to

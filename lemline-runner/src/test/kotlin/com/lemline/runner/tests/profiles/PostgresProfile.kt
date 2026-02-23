@@ -2,9 +2,7 @@
 package com.lemline.runner.tests.profiles
 
 import com.lemline.runner.common.config.DatabaseType
-import com.lemline.runner.config.DATABASE_TYPE
 import com.lemline.runner.common.config.MessagingType
-import com.lemline.runner.config.MESSAGING_TYPE
 import com.lemline.runner.tests.resources.PostgresTestResource
 import io.quarkus.test.junit.QuarkusTestProfile
 
@@ -26,9 +24,9 @@ class PostgresProfile : QuarkusTestProfile {
     override fun getConfigOverrides(): Map<String, String> {
         return mapOf(
             // Database configuration
-            DATABASE_TYPE to DatabaseType.POSTGRESQL.configValue,
+            "lemline.database.type" to DatabaseType.POSTGRESQL.configValue,
             // Messaging configuration
-            MESSAGING_TYPE to MessagingType.IN_MEMORY.configValue,
+            "lemline.messaging.type" to MessagingType.IN_MEMORY.configValue,
         )
     }
 

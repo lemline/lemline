@@ -11,6 +11,8 @@ import com.lemline.runner.common.config.GATEWAY_CORS_ENABLED
 import com.lemline.runner.common.config.GATEWAY_ENABLED
 import com.lemline.runner.common.config.GATEWAY_TLS_CLIENT_AUTH
 import com.lemline.runner.common.config.GATEWAY_TLS_ENABLED
+import com.lemline.runner.config.shared.LemlineConfigConstants
+import com.lemline.runner.config.shared.LemlineConfigSource
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -49,7 +51,7 @@ class LemlineConfigSourceGatewayTest {
             mapOf(
                 GATEWAY_ENABLED to "true",
                 ANALYTICS_TYPE to ANALYTICS_BACKEND_CLICKHOUSE,
-                LIFECYCLE_EVENTS_CONSUMER_ENABLED to "false",
+                "lemline.analytics.consumer.enabled" to "false",
                 "lemline.analytics.postgresql.host" to "analytics-db",
             )
         ) {
@@ -66,7 +68,7 @@ class LemlineConfigSourceGatewayTest {
             mapOf(
                 GATEWAY_ENABLED to "true",
                 ANALYTICS_TYPE to ANALYTICS_BACKEND_CLICKHOUSE,
-                LIFECYCLE_EVENTS_CONSUMER_ENABLED to "true",
+                "lemline.analytics.consumer.enabled" to "true",
                 "lemline.analytics.postgresql.host" to "analytics-db",
             )
         ) {

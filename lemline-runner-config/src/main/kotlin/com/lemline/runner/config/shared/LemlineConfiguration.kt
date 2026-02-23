@@ -39,31 +39,6 @@ import jakarta.validation.constraints.Min
 import jakarta.validation.constraints.Pattern
 import java.util.*
 
-const val DATABASE_TYPE = "lemline.database.type"
-const val MIGRATE_AT_START = "lemline.database.migrate-at-start"
-const val MESSAGING_TYPE = "lemline.messaging.type"
-
-const val COMMANDS_PRODUCER_ENABLED = "lemline.messaging.commands.producer.enabled"
-const val COMMANDS_CONSUMER_ENABLED = "lemline.messaging.commands.consumer.enabled"
-const val COMMANDS_CONSUMER_CONCURRENCY = "lemline.messaging.commands.consumer.concurrency"
-
-const val EVENTS_PRODUCER_ENABLED = "lemline.messaging.events.producer.enabled"
-const val EVENTS_CONSUMER_ENABLED = "lemline.messaging.events.consumer.enabled"
-const val EVENTS_CONSUMER_CONCURRENCY = "lemline.messaging.events.consumer.concurrency"
-
-const val CLOUDEVENTS_PRODUCER_ENABLED = "lemline.messaging.cloudevents.producer.enabled"
-const val CLOUDEVENTS_CONSUMER_ENABLED = "lemline.messaging.cloudevents.consumer.enabled"
-const val CLOUDEVENTS_CONSUMER_CONCURRENCY = "lemline.messaging.cloudevents.consumer.concurrency"
-
-const val LIFECYCLE_EVENTS_PRODUCER_ENABLED = "lemline.messaging.lifecycleevents.producer.enabled"
-const val LIFECYCLE_EVENTS_CONSUMER_ENABLED = "lemline.analytics.consumer.enabled"
-const val LIFECYCLE_EVENTS_CONSUMER_CONCURRENCY = "lemline.analytics.consumer.concurrency"
-
-const val DATABASE_ENABLED = "lemline.database.enabled"
-const val SCHEDULED_ENABLED = "lemline.scheduled.enabled"
-
-const val ORCHESTRATOR_MODE = "lemline.orchestrator.mode"
-
 /**
  * Type-safe configuration mapping for Lemline.
  * This interface defines the structure of Lemline's configuration using Quarkus's @ConfigMapping.

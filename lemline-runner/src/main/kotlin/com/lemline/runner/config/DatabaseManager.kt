@@ -7,6 +7,7 @@ import com.lemline.common.trace
 import com.lemline.runner.common.config.DatabaseConfig
 import com.lemline.runner.common.config.DatabaseType
 import com.lemline.runner.common.config.MigrationManager
+import com.lemline.runner.config.shared.LemlineConfiguration
 import io.agroal.api.AgroalDataSource
 import io.quarkus.agroal.DataSource
 import io.quarkus.arc.profile.IfBuildProfile
@@ -17,19 +18,15 @@ import jakarta.inject.Inject
 import java.sql.Connection
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import org.eclipse.microprofile.config.inject.ConfigProperty
 import org.flywaydb.core.Flyway
 
 @ApplicationScoped
-class DatabaseManager : DatabaseConfig, MigrationManager {
+class DatabaseManager(
+    private val config: LemlineConfiguration
+) : DatabaseConfig, MigrationManager {
     private val log = logger()
 
-    @ConfigProperty(name = DATABASE_TYPE)
-    private lateinit var _dbTypeConfig: String
-
-    override val dbType: DatabaseType by lazy {
-        DatabaseType.fromConfigValue(_dbTypeConfig)
-    }
+    override val dbType: DatabaseType by lazy { DatabaseType.fromConfigValue(config.database().type()) }
 
     @Inject
     @IfBuildProfile("test")

@@ -2,12 +2,12 @@
 package com.lemline.runner.messaging.cloudevents
 
 import com.lemline.runner.common.messaging.MessageSubscriber
-import com.lemline.runner.config.CLOUDEVENTS_CONSUMER_CONCURRENCY
-import com.lemline.runner.config.CLOUDEVENTS_CONSUMER_ENABLED
+import com.lemline.runner.config.shared.LemlineConfigConstants.CONSUMER_CONCURRENCY_DEFAULT
+import com.lemline.runner.config.shared.LemlineConfiguration
 import io.cloudevents.CloudEvent
 import io.quarkus.runtime.Startup
 import jakarta.enterprise.context.ApplicationScoped
-import org.eclipse.microprofile.config.inject.ConfigProperty
+import kotlin.jvm.optionals.getOrNull
 import org.eclipse.microprofile.reactive.messaging.Channel
 import org.eclipse.microprofile.reactive.messaging.Message
 import org.reactivestreams.Publisher
@@ -29,9 +29,14 @@ internal const val CLOUDEVENTS_IN_CHANNEL = "cloudevents-in"
 @Startup
 @ApplicationScoped
 internal class CloudEventSubscriber(
-    @param:ConfigProperty(name = CLOUDEVENTS_CONSUMER_CONCURRENCY) override val maxConcurrency: Long,
-    @param:ConfigProperty(name = CLOUDEVENTS_CONSUMER_ENABLED) override val enabled: Boolean,
+    config: LemlineConfiguration,
     @param:Channel(CLOUDEVENTS_IN_CHANNEL) override val publisher: Publisher<Message<String>>,
     override val handler: CloudEventHandler,
     override val metrics: CloudEventSubscriberMetrics,
-) : MessageSubscriber<CloudEvent>()
+) : MessageSubscriber<CloudEvent>() {
+    private val consumerConfig = config.messaging().cloudevents().getOrNull()?.consumer()
+
+    override val maxConcurrency: Long = consumerConfig?.concurrency() ?: CONSUMER_CONCURRENCY_DEFAULT.toLong()
+
+    override val enabled: Boolean = consumerConfig?.enabled() ?: false
+}

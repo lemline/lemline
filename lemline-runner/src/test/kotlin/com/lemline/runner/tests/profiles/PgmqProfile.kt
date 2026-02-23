@@ -1,15 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.tests.profiles
 
-import com.lemline.runner.config.CLOUDEVENTS_CONSUMER_ENABLED
-import com.lemline.runner.config.CLOUDEVENTS_PRODUCER_ENABLED
-import com.lemline.runner.config.COMMANDS_CONSUMER_ENABLED
-import com.lemline.runner.config.COMMANDS_PRODUCER_ENABLED
-import com.lemline.runner.config.EVENTS_CONSUMER_ENABLED
-import com.lemline.runner.config.EVENTS_PRODUCER_ENABLED
-import com.lemline.runner.config.LIFECYCLE_EVENTS_PRODUCER_ENABLED
 import com.lemline.runner.common.config.MessagingType
-import com.lemline.runner.config.MESSAGING_TYPE
 import com.lemline.runner.tests.resources.PgmqTestResource
 import io.quarkus.test.junit.QuarkusTestProfile
 import io.quarkus.test.junit.QuarkusTestProfile.TestResourceEntry
@@ -45,16 +37,16 @@ class PgmqProfile : QuarkusTestProfile {
             // Database configuration is provided by PgmqTestResource via lemline.database.postgresql.*
 
             // Messaging type
-            MESSAGING_TYPE to MessagingType.PGMQ.configValue,
+            "lemline.messaging.type" to MessagingType.PGMQ.configValue,
 
             // Channel enabled flags
-            COMMANDS_CONSUMER_ENABLED to "true",
-            COMMANDS_PRODUCER_ENABLED to "true",
-            EVENTS_CONSUMER_ENABLED to "true",
-            EVENTS_PRODUCER_ENABLED to "true",
-            CLOUDEVENTS_CONSUMER_ENABLED to "true",
-            CLOUDEVENTS_PRODUCER_ENABLED to "true",
-            LIFECYCLE_EVENTS_PRODUCER_ENABLED to "true",
+            "lemline.messaging.commands.consumer.enabled" to "true",
+            "lemline.messaging.commands.producer.enabled" to "true",
+            "lemline.messaging.events.consumer.enabled" to "true",
+            "lemline.messaging.events.producer.enabled" to "true",
+            "lemline.messaging.cloudevents.consumer.enabled" to "true",
+            "lemline.messaging.cloudevents.producer.enabled" to "true",
+            "lemline.messaging.lifecycleevents.producer.enabled" to "true",
 
             // Queue names for test isolation (transformed by LemlineConfigSource)
             // Note: Consumer and producer use different queues for testing

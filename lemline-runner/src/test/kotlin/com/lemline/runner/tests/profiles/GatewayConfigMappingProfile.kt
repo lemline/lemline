@@ -19,8 +19,6 @@ import com.lemline.runner.common.config.GATEWAY_TLS_CLIENT_AUTH
 import com.lemline.runner.common.config.GATEWAY_WATCH_BATCH_SIZE
 import com.lemline.runner.common.config.GATEWAY_WATCH_POLL_INTERVAL_MS
 import com.lemline.runner.common.config.MessagingType
-import com.lemline.runner.config.DATABASE_TYPE
-import com.lemline.runner.config.MESSAGING_TYPE
 import io.quarkus.test.junit.QuarkusTestProfile
 
 /**
@@ -30,8 +28,8 @@ class GatewayConfigMappingProfile : QuarkusTestProfile {
 
     override fun getConfigOverrides(): Map<String, String> =
         mapOf(
-            DATABASE_TYPE to DatabaseType.H2.configValue,
-            MESSAGING_TYPE to MessagingType.IN_MEMORY.configValue,
+            "lemline.database.type" to DatabaseType.H2.configValue,
+            "lemline.messaging.type" to MessagingType.IN_MEMORY.configValue,
 
             GATEWAY_ENABLED to "false",
             GATEWAY_GRPC_HOST to "127.0.0.1",

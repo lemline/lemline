@@ -2,15 +2,6 @@
 package com.lemline.runner.testcases.pgmq
 
 import com.lemline.runner.common.config.MessagingType
-import com.lemline.runner.config.CLOUDEVENTS_CONSUMER_ENABLED
-import com.lemline.runner.config.CLOUDEVENTS_PRODUCER_ENABLED
-import com.lemline.runner.config.COMMANDS_CONSUMER_ENABLED
-import com.lemline.runner.config.COMMANDS_PRODUCER_ENABLED
-import com.lemline.runner.config.EVENTS_CONSUMER_ENABLED
-import com.lemline.runner.config.EVENTS_PRODUCER_ENABLED
-import com.lemline.runner.config.LIFECYCLE_EVENTS_PRODUCER_ENABLED
-import com.lemline.runner.config.MESSAGING_TYPE
-import com.lemline.runner.config.ORCHESTRATOR_MODE
 import com.lemline.runner.tests.resources.PgmqTestResource
 import io.quarkus.test.junit.QuarkusTestProfile
 
@@ -32,19 +23,19 @@ class PgmqTestCaseProfile : QuarkusTestProfile {
         return mapOf(
             // Database configuration is provided by PgmqTestResource via lemline.database.postgresql.*
             // Messaging configuration
-            MESSAGING_TYPE to MessagingType.PGMQ.configValue,
-            COMMANDS_CONSUMER_ENABLED to "true",
-            COMMANDS_PRODUCER_ENABLED to "true",
-            EVENTS_CONSUMER_ENABLED to "true",
-            EVENTS_PRODUCER_ENABLED to "true",
-            CLOUDEVENTS_CONSUMER_ENABLED to "true",
-            CLOUDEVENTS_PRODUCER_ENABLED to "true",
+            "lemline.messaging.type" to MessagingType.PGMQ.configValue,
+            "lemline.messaging.commands.consumer.enabled" to "true",
+            "lemline.messaging.commands.producer.enabled" to "true",
+            "lemline.messaging.events.consumer.enabled" to "true",
+            "lemline.messaging.events.producer.enabled" to "true",
+            "lemline.messaging.cloudevents.consumer.enabled" to "true",
+            "lemline.messaging.cloudevents.producer.enabled" to "true",
 
             // Enable lifecycle events producer so events flow through the broker
-            LIFECYCLE_EVENTS_PRODUCER_ENABLED to "true",
+            "lemline.messaging.lifecycleevents.producer.enabled" to "true",
 
             // Orchestrator mode: ALL generates more messages for thorough end-to-end testing
-            ORCHESTRATOR_MODE to "all",
+            "lemline.orchestrator.mode" to "all",
 
             // Use SAME queue for in/out to create loopback
             "mp.messaging.incoming.commands-in.queue" to "lemline-commands",

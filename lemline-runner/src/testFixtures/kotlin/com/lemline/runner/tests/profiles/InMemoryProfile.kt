@@ -3,15 +3,6 @@ package com.lemline.runner.tests.profiles
 
 import com.lemline.runner.common.config.DatabaseType
 import com.lemline.runner.common.config.MessagingType
-import com.lemline.runner.config.CLOUDEVENTS_CONSUMER_ENABLED
-import com.lemline.runner.config.CLOUDEVENTS_PRODUCER_ENABLED
-import com.lemline.runner.config.COMMANDS_CONSUMER_ENABLED
-import com.lemline.runner.config.COMMANDS_PRODUCER_ENABLED
-import com.lemline.runner.config.DATABASE_TYPE
-import com.lemline.runner.config.EVENTS_CONSUMER_ENABLED
-import com.lemline.runner.config.EVENTS_PRODUCER_ENABLED
-import com.lemline.runner.config.LIFECYCLE_EVENTS_PRODUCER_ENABLED
-import com.lemline.runner.config.MESSAGING_TYPE
 import io.quarkus.test.junit.QuarkusTestProfile
 
 /**
@@ -28,18 +19,18 @@ class InMemoryProfile : QuarkusTestProfile {
     override fun getConfigOverrides(): Map<String, String> {
         return mapOf(
             // Database configuration
-            DATABASE_TYPE to DatabaseType.H2.configValue,
+            "lemline.database.type" to DatabaseType.H2.configValue,
             // Messaging configuration
-            MESSAGING_TYPE to MessagingType.IN_MEMORY.configValue,
-            COMMANDS_CONSUMER_ENABLED to "true",
-            COMMANDS_PRODUCER_ENABLED to "true",
-            EVENTS_CONSUMER_ENABLED to "true",
-            EVENTS_PRODUCER_ENABLED to "true",
-            CLOUDEVENTS_CONSUMER_ENABLED to "true",
-            CLOUDEVENTS_PRODUCER_ENABLED to "true",
+            "lemline.messaging.type" to MessagingType.IN_MEMORY.configValue,
+            "lemline.messaging.commands.consumer.enabled" to "true",
+            "lemline.messaging.commands.producer.enabled" to "true",
+            "lemline.messaging.events.consumer.enabled" to "true",
+            "lemline.messaging.events.producer.enabled" to "true",
+            "lemline.messaging.cloudevents.consumer.enabled" to "true",
+            "lemline.messaging.cloudevents.producer.enabled" to "true",
 
             // Enable lifecycle events producer so events flow through the broker
-            LIFECYCLE_EVENTS_PRODUCER_ENABLED to "true",
+            "lemline.messaging.lifecycleevents.producer.enabled" to "true",
             // Configure lifecycleevents-in channel for test listener (loopback)
             "mp.messaging.incoming.lifecycleevents-in.connector" to "smallrye-in-memory",
 

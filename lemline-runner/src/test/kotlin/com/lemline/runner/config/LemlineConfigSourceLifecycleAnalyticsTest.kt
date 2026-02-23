@@ -2,11 +2,13 @@
 package com.lemline.runner.config
 
 import com.lemline.runner.cli.config.ConfigPathHolder
-import com.lemline.runner.config.LemlineConfigConstants.KAFKA_LIFECYCLE_EVENTS_GROUP_ID_DEFAULT
-import com.lemline.runner.config.LemlineConfigConstants.PGMQ_BATCH_SIZE_DEFAULT
-import com.lemline.runner.config.LemlineConfigConstants.PGMQ_MAX_RETRIES_DEFAULT
-import com.lemline.runner.config.LemlineConfigConstants.PGMQ_POLL_INTERVAL_DEFAULT
-import com.lemline.runner.config.LemlineConfigConstants.PGMQ_VISIBILITY_TIMEOUT_DEFAULT
+import com.lemline.runner.config.shared.LemlineConfigSource
+import com.lemline.runner.config.shared.LemlineConfigConstants.KAFKA_LIFECYCLE_EVENTS_GROUP_ID_DEFAULT
+import com.lemline.runner.config.shared.LemlineConfigConstants.PGMQ_BATCH_SIZE_DEFAULT
+import com.lemline.runner.config.shared.LemlineConfigConstants.PGMQ_MAX_RETRIES_DEFAULT
+import com.lemline.runner.config.shared.LemlineConfigConstants.PGMQ_POLL_INTERVAL_DEFAULT
+import com.lemline.runner.config.shared.LemlineConfigConstants.PGMQ_VISIBILITY_TIMEOUT_DEFAULT
+import com.lemline.runner.messaging.lifecycle.LIFECYCLEEVENTS_IN_CHANNEL
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -18,9 +20,9 @@ class LemlineConfigSourceLifecycleAnalyticsTest {
     fun `generates kafka lifecycleevents analytics consumer properties`() {
         withSystemProperties(
             mapOf(
-                MESSAGING_TYPE to "kafka",
-                LIFECYCLE_EVENTS_CONSUMER_ENABLED to "true",
-                LIFECYCLE_EVENTS_CONSUMER_CONCURRENCY to "17",
+                "lemline.messaging.type" to "kafka",
+                "lemline.analytics.consumer.enabled" to "true",
+                "lemline.analytics.consumer.concurrency" to "17",
                 "lemline.messaging.kafka.lifecycleevents.topic" to "lemline-lifecycle-events-custom"
             )
         ) { source ->
@@ -29,7 +31,7 @@ class LemlineConfigSourceLifecycleAnalyticsTest {
             assertEquals("lemline-lifecycle-events-custom", source.getValue("$incoming.topic"))
             assertEquals("true", source.getValue("$incoming.broadcast"))
             assertEquals(KAFKA_LIFECYCLE_EVENTS_GROUP_ID_DEFAULT, source.getValue("$incoming.group.id"))
-            assertEquals("17", source.getValue(LIFECYCLE_EVENTS_CONSUMER_CONCURRENCY))
+            assertEquals("17", source.getValue("lemline.analytics.consumer.concurrency"))
         }
     }
 
@@ -37,8 +39,8 @@ class LemlineConfigSourceLifecycleAnalyticsTest {
     fun `generates rabbit lifecycleevents analytics consumer properties`() {
         withSystemProperties(
             mapOf(
-                MESSAGING_TYPE to "rabbitmq",
-                LIFECYCLE_EVENTS_CONSUMER_ENABLED to "true",
+                "lemline.messaging.type" to "rabbitmq",
+                "lemline.analytics.consumer.enabled" to "true",
                 "lemline.messaging.rabbitmq.lifecycleevents.queue" to "lemline-lifecycle-events-custom",
                 "lemline.messaging.rabbitmq.lifecycleevents.producer.exchange-name" to "lemline-lifecycle-events-exchange"
             )
@@ -56,8 +58,8 @@ class LemlineConfigSourceLifecycleAnalyticsTest {
     fun `generates pgmq lifecycleevents analytics consumer properties`() {
         withSystemProperties(
             mapOf(
-                MESSAGING_TYPE to "pgmq",
-                LIFECYCLE_EVENTS_CONSUMER_ENABLED to "true",
+                "lemline.messaging.type" to "pgmq",
+                "lemline.analytics.consumer.enabled" to "true",
                 "lemline.messaging.pgmq.lifecycleevents.queue" to "lemline-lifecycle-events-custom"
             )
         ) { source ->
@@ -76,8 +78,8 @@ class LemlineConfigSourceLifecycleAnalyticsTest {
     fun `generates analytics datasource properties only when enabled`() {
         withSystemProperties(
             mapOf(
-                MESSAGING_TYPE to "in-memory",
-                LIFECYCLE_EVENTS_CONSUMER_ENABLED to "true",
+                "lemline.messaging.type" to "in-memory",
+                "lemline.analytics.consumer.enabled" to "true",
                 "lemline.analytics.postgresql.host" to "analytics-db",
                 "lemline.analytics.postgresql.port" to "5544",
                 "lemline.analytics.postgresql.database" to "analytics",
@@ -109,8 +111,8 @@ class LemlineConfigSourceLifecycleAnalyticsTest {
 
         withSystemProperties(
             mapOf(
-                MESSAGING_TYPE to "in-memory",
-                LIFECYCLE_EVENTS_CONSUMER_ENABLED to "false",
+                "lemline.messaging.type" to "in-memory",
+                "lemline.analytics.consumer.enabled" to "false",
                 "lemline.analytics.postgresql.host" to "analytics-db"
             )
         ) { source ->
@@ -134,8 +136,8 @@ class LemlineConfigSourceLifecycleAnalyticsTest {
 
             withSystemProperties(
                 mapOf(
-                    MESSAGING_TYPE to "in-memory",
-                    LIFECYCLE_EVENTS_CONSUMER_ENABLED to "true",
+                    "lemline.messaging.type" to "in-memory",
+                    "lemline.analytics.consumer.enabled" to "true",
                     "lemline.analytics.postgresql.host" to "analytics-db",
                     "lemline.analytics.postgresql.migrate-at-start" to "false",
                     "lemline.analytics.postgresql.baseline-on-migrate" to "true"

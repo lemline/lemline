@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.config
 
+import com.lemline.runner.config.shared.toDuration
 import com.lemline.runner.tests.profiles.InMemoryProfile
 import io.quarkus.test.junit.QuarkusTest
 import io.quarkus.test.junit.TestProfile

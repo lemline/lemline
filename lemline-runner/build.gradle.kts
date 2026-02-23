@@ -169,6 +169,7 @@ dependencies {
     testFixturesImplementation("io.quarkus:quarkus-junit5")
     testFixturesImplementation(libs.serverlessworkflow.api)
     testFixturesImplementation(project(":lemline-runner-common"))
+    testFixturesImplementation(project(":lemline-runner-config"))
     testFixturesImplementation(project(":lemline-runner-failures"))
     testFixturesImplementation(project(":lemline-runner-waits"))
     testFixturesImplementation(project(":lemline-runner-retries"))

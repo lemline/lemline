@@ -55,8 +55,8 @@ import com.lemline.runner.config.shared.LemlineConfigConstants.KAFKA_STRING_DESE
 import com.lemline.runner.config.shared.LemlineConfigConstants.KAFKA_STRING_SERIALIZER
 import com.lemline.runner.config.shared.LemlineConfigConstants.KAFKA_WORKFLOWS_GROUP_ID_DEFAULT
 import com.lemline.runner.config.shared.LemlineConfigConstants.LIFECYCLE_EVENTS_TOPIC_DEFAULT
-import com.lemline.runner.config.shared.LemlineConfigConstants.MYSQL_HOST_DEFAULT
 import com.lemline.runner.config.shared.LemlineConfigConstants.MYSQL_DATABASE_DEFAULT
+import com.lemline.runner.config.shared.LemlineConfigConstants.MYSQL_HOST_DEFAULT
 import com.lemline.runner.config.shared.LemlineConfigConstants.MYSQL_PASSWORD_DEFAULT
 import com.lemline.runner.config.shared.LemlineConfigConstants.MYSQL_PORT_DEFAULT
 import com.lemline.runner.config.shared.LemlineConfigConstants.MYSQL_USERNAME_DEFAULT
@@ -65,8 +65,8 @@ import com.lemline.runner.config.shared.LemlineConfigConstants.PGMQ_CONNECTOR
 import com.lemline.runner.config.shared.LemlineConfigConstants.PGMQ_MAX_RETRIES_DEFAULT
 import com.lemline.runner.config.shared.LemlineConfigConstants.PGMQ_POLL_INTERVAL_DEFAULT
 import com.lemline.runner.config.shared.LemlineConfigConstants.PGMQ_VISIBILITY_TIMEOUT_DEFAULT
-import com.lemline.runner.config.shared.LemlineConfigConstants.POSTGRES_HOST_DEFAULT
 import com.lemline.runner.config.shared.LemlineConfigConstants.POSTGRES_DATABASE_DEFAULT
+import com.lemline.runner.config.shared.LemlineConfigConstants.POSTGRES_HOST_DEFAULT
 import com.lemline.runner.config.shared.LemlineConfigConstants.POSTGRES_PASSWORD_DEFAULT
 import com.lemline.runner.config.shared.LemlineConfigConstants.POSTGRES_PORT_DEFAULT
 import com.lemline.runner.config.shared.LemlineConfigConstants.POSTGRES_USERNAME_DEFAULT
@@ -78,7 +78,7 @@ import com.lemline.runner.config.shared.LemlineConfigConstants.RABBITMQ_STRING_S
 import com.lemline.runner.config.shared.LemlineConfigConstants.RABBITMQ_USER_DEFAULT
 import com.lemline.runner.config.shared.LemlineConfigConstants.RABBITMQ_VHOST_DEFAULT
 import io.smallrye.config.PropertiesConfigSource
-import java.util.Locale
+import java.util.*
 
 internal const val COMMANDS_IN_CHANNEL = "commands-in"
 internal const val COMMANDS_OUT_CHANNEL = "commands-out"
@@ -106,9 +106,9 @@ enum class TopicType(
         COMMANDS_TOPIC_DEFAULT,
         COMMANDS_IN_CHANNEL,
         COMMANDS_OUT_CHANNEL,
-        COMMANDS_CONSUMER_ENABLED,
-        COMMANDS_PRODUCER_ENABLED,
-        COMMANDS_CONSUMER_CONCURRENCY,
+        "lemline.messaging.commands.consumer.enabled",
+        "lemline.messaging.commands.producer.enabled",
+        "lemline.messaging.commands.consumer.concurrency",
         KAFKA_WORKFLOWS_GROUP_ID_DEFAULT
     ),
     EVENTS(
@@ -116,9 +116,9 @@ enum class TopicType(
         EVENTS_TOPIC_DEFAULT,
         EVENTS_IN_CHANNEL,
         EVENTS_OUT_CHANNEL,
-        EVENTS_CONSUMER_ENABLED,
-        EVENTS_PRODUCER_ENABLED,
-        EVENTS_CONSUMER_CONCURRENCY,
+        "lemline.messaging.events.consumer.enabled",
+        "lemline.messaging.events.producer.enabled",
+        "lemline.messaging.events.consumer.concurrency",
         KAFKA_DATABASE_GROUP_ID_DEFAULT
     );
 }
@@ -190,11 +190,11 @@ class LemlineConfigSource : PropertiesConfigSource(
             val usePostgres = props.keys.any { it.startsWith("lemline.database.postgresql.") }
             val useMysql = props.keys.any { it.startsWith("lemline.database.mysql.") }
 
-            val type = props[DATABASE_TYPE]?.let { DatabaseType.fromConfigValue(it) } ?: run {
+            val type = props["lemline.database.type"]?.let { DatabaseType.fromConfigValue(it) } ?: run {
                 when {
                     usePostgres && useMysql -> throw IllegalArgumentException(
                         "Both properties 'postgresql' and 'mysql' are defined. " +
-                            "Explicitly set '$DATABASE_TYPE' to '${DatabaseType.POSTGRESQL.configValue}' or '${DatabaseType.MYSQL.configValue}'."
+                            "Explicitly set 'lemline.database.type' to '${DatabaseType.POSTGRESQL.configValue}' or '${DatabaseType.MYSQL.configValue}'."
                     )
 
                     usePostgres -> DatabaseType.POSTGRESQL
@@ -202,7 +202,7 @@ class LemlineConfigSource : PropertiesConfigSource(
                     else -> DatabaseType.H2
                 }
             }
-            generated[DATABASE_TYPE] = type.configValue
+            generated["lemline.database.type"] = type.configValue
 
             when (type) {
                 DatabaseType.POSTGRESQL -> {
@@ -244,7 +244,7 @@ class LemlineConfigSource : PropertiesConfigSource(
         }
 
         private fun generateAnalyticsDatabaseProperties(props: Map<String, String>): Map<String, String> {
-            val lifecycleConsumerEnabled = props[LIFECYCLE_EVENTS_CONSUMER_ENABLED].toBoolean()
+            val lifecycleConsumerEnabled = props["lemline.analytics.consumer.enabled"].toBoolean()
             val gatewayEnabled = props[GATEWAY_ENABLED]?.toBooleanStrictOrNull()
                 ?: GATEWAY_ENABLED_DEFAULT.toBoolean()
             val gatewayAnalyticsBackend = resolveGatewayAnalyticsBackend(props, gatewayEnabled)
@@ -395,11 +395,11 @@ class LemlineConfigSource : PropertiesConfigSource(
                 if (usePgmq) MessagingType.PGMQ else null
             )
 
-            val type = props[MESSAGING_TYPE]?.let { MessagingType.fromConfigValue(it) } ?: run {
+            val type = props["lemline.messaging.type"]?.let { MessagingType.fromConfigValue(it) } ?: run {
                 when {
                     messagingTypes.size > 1 -> throw IllegalArgumentException(
                         "Multiple messaging types defined: ${messagingTypes.joinToString { it.configValue }}. " +
-                            "Explicitly set '$MESSAGING_TYPE' to one of: ${MessagingType.KAFKA.configValue}, ${MessagingType.RABBITMQ.configValue}, ${MessagingType.PGMQ.configValue}."
+                            "Explicitly set 'lemline.messaging.type' to one of: ${MessagingType.KAFKA.configValue}, ${MessagingType.RABBITMQ.configValue}, ${MessagingType.PGMQ.configValue}."
                     )
 
                     useKafka -> MessagingType.KAFKA
@@ -408,7 +408,7 @@ class LemlineConfigSource : PropertiesConfigSource(
                     else -> MessagingType.IN_MEMORY
                 }
             }
-            generated[MESSAGING_TYPE] = type.configValue
+            generated["lemline.messaging.type"] = type.configValue
 
             when (type) {
                 MessagingType.KAFKA -> generated.configureKafka(props)
@@ -442,10 +442,10 @@ class LemlineConfigSource : PropertiesConfigSource(
             // Log the enabled flags for debugging
             logger.info {
                 "Kafka channel enabled flags: " +
-                    "commands.consumer=${props[COMMANDS_CONSUMER_ENABLED]}, " +
-                    "commands.producer=${props[COMMANDS_PRODUCER_ENABLED]}, " +
-                    "events.consumer=${props[EVENTS_CONSUMER_ENABLED]}, " +
-                    "events.producer=${props[EVENTS_PRODUCER_ENABLED]}"
+                    "commands.consumer=${props["lemline.messaging.commands.consumer.enabled"]}, " +
+                    "commands.producer=${props["lemline.messaging.commands.producer.enabled"]}, " +
+                    "events.consumer=${props["lemline.messaging.events.consumer.enabled"]}, " +
+                    "events.producer=${props["lemline.messaging.events.producer.enabled"]}"
             }
 
             configureKafkaTopic(props, TopicType.COMMANDS)
@@ -496,7 +496,7 @@ class LemlineConfigSource : PropertiesConfigSource(
             val topic = props["$type.topic"] ?: CLOUDEVENTS_TOPIC_DEFAULT
 
             // Consumer configuration for listen tasks
-            if (props[CLOUDEVENTS_CONSUMER_ENABLED].toBoolean()) {
+            if (props["lemline.messaging.cloudevents.consumer.enabled"].toBoolean()) {
                 val consumer = "$type.consumer"
                 val incoming = "mp.messaging.incoming.$CLOUDEVENTS_IN_CHANNEL"
                 val topicDLQ = props["$consumer.topic-dlq"] ?: "$topic.dlq"
@@ -507,11 +507,14 @@ class LemlineConfigSource : PropertiesConfigSource(
                 set("$incoming.value.deserializer", KAFKA_STRING_DESERIALIZER)
                 set("$incoming.failure-strategy", "dead-letter-queue")
                 set("$incoming.dead-letter-queue.topic", topicDLQ)
-                set(CLOUDEVENTS_CONSUMER_CONCURRENCY, props["$consumer.concurrency"] ?: CONSUMER_CONCURRENCY_DEFAULT)
+                set(
+                    "lemline.messaging.cloudevents.consumer.concurrency",
+                    props["$consumer.concurrency"] ?: CONSUMER_CONCURRENCY_DEFAULT
+                )
             }
 
             // Producer configuration for emit tasks
-            if (props[CLOUDEVENTS_PRODUCER_ENABLED].toBoolean()) {
+            if (props["lemline.messaging.cloudevents.producer.enabled"].toBoolean()) {
                 val producer = "$type.producer"
                 val outgoing = "mp.messaging.outgoing.$CLOUDEVENTS_OUT_CHANNEL"
                 set("$outgoing.connector", KAFKA_CONNECTOR)
@@ -530,7 +533,7 @@ class LemlineConfigSource : PropertiesConfigSource(
             val type = "lemline.messaging.kafka.lifecycleevents"
             val topic = props["$type.topic"] ?: LIFECYCLE_EVENTS_TOPIC_DEFAULT
 
-            if (props[LIFECYCLE_EVENTS_CONSUMER_ENABLED].toBoolean()) {
+            if (props["lemline.analytics.consumer.enabled"].toBoolean()) {
                 val incoming = "mp.messaging.incoming.$LIFECYCLEEVENTS_IN_CHANNEL"
                 val topicDLQ = "$topic.dlq"
                 set("$incoming.connector", KAFKA_CONNECTOR)
@@ -542,12 +545,12 @@ class LemlineConfigSource : PropertiesConfigSource(
                 set("$incoming.failure-strategy", "dead-letter-queue")
                 set("$incoming.dead-letter-queue.topic", topicDLQ)
                 set(
-                    LIFECYCLE_EVENTS_CONSUMER_CONCURRENCY,
-                    props[LIFECYCLE_EVENTS_CONSUMER_CONCURRENCY] ?: CONSUMER_CONCURRENCY_DEFAULT
+                    "lemline.analytics.consumer.concurrency",
+                    props["lemline.analytics.consumer.concurrency"] ?: CONSUMER_CONCURRENCY_DEFAULT
                 )
             }
 
-            if (props[LIFECYCLE_EVENTS_PRODUCER_ENABLED].toBoolean()) {
+            if (props["lemline.messaging.lifecycleevents.producer.enabled"].toBoolean()) {
                 val producer = "$type.producer"
                 val outgoing = "mp.messaging.outgoing.$LIFECYCLEEVENTS_OUT_CHANNEL"
                 set("$outgoing.connector", KAFKA_CONNECTOR)
@@ -622,7 +625,7 @@ class LemlineConfigSource : PropertiesConfigSource(
             val queue = props["$type.queue"] ?: CLOUDEVENTS_TOPIC_DEFAULT
 
             // Consumer configuration for listen tasks
-            if (props[CLOUDEVENTS_CONSUMER_ENABLED].toBoolean()) {
+            if (props["lemline.messaging.cloudevents.consumer.enabled"].toBoolean()) {
                 val consumer = "$type.consumer"
                 val incoming = "mp.messaging.incoming.$CLOUDEVENTS_IN_CHANNEL"
                 val queueDLQ = props["$consumer.queue-dlq"] ?: "$queue.dlq"
@@ -638,11 +641,14 @@ class LemlineConfigSource : PropertiesConfigSource(
                 set("$incoming.dead-letter-exchange", "$CLOUDEVENTS_IN_CHANNEL.dlx")
                 set("$incoming.dead-letter-exchange-type", "direct")
                 set("$incoming.dead-letter-routing-key", queueDLQ)
-                set(CLOUDEVENTS_CONSUMER_CONCURRENCY, props["$consumer.concurrency"] ?: CONSUMER_CONCURRENCY_DEFAULT)
+                set(
+                    "lemline.messaging.cloudevents.consumer.concurrency",
+                    props["$consumer.concurrency"] ?: CONSUMER_CONCURRENCY_DEFAULT
+                )
             }
 
             // Producer configuration for emit tasks
-            if (props[CLOUDEVENTS_PRODUCER_ENABLED].toBoolean()) {
+            if (props["lemline.messaging.cloudevents.producer.enabled"].toBoolean()) {
                 val producer = "$type.producer"
                 val outgoing = "mp.messaging.outgoing.$CLOUDEVENTS_OUT_CHANNEL"
                 set("$outgoing.connector", RABBITMQ_CONNECTOR)
@@ -662,7 +668,7 @@ class LemlineConfigSource : PropertiesConfigSource(
             val type = "lemline.messaging.rabbitmq.lifecycleevents"
             val queue = props["$type.queue"] ?: LIFECYCLE_EVENTS_TOPIC_DEFAULT
 
-            if (props[LIFECYCLE_EVENTS_CONSUMER_ENABLED].toBoolean()) {
+            if (props["lemline.analytics.consumer.enabled"].toBoolean()) {
                 val incoming = "mp.messaging.incoming.$LIFECYCLEEVENTS_IN_CHANNEL"
                 val queueDLQ = "$queue.dlq"
                 set("$incoming.connector", RABBITMQ_CONNECTOR)
@@ -682,12 +688,12 @@ class LemlineConfigSource : PropertiesConfigSource(
                     set("$incoming.exchange.name", exchange)
                 }
                 set(
-                    LIFECYCLE_EVENTS_CONSUMER_CONCURRENCY,
-                    props[LIFECYCLE_EVENTS_CONSUMER_CONCURRENCY] ?: CONSUMER_CONCURRENCY_DEFAULT
+                    "lemline.analytics.consumer.concurrency",
+                    props["lemline.analytics.consumer.concurrency"] ?: CONSUMER_CONCURRENCY_DEFAULT
                 )
             }
 
-            if (props[LIFECYCLE_EVENTS_PRODUCER_ENABLED].toBoolean()) {
+            if (props["lemline.messaging.lifecycleevents.producer.enabled"].toBoolean()) {
                 val producer = "$type.producer"
                 val outgoing = "mp.messaging.outgoing.$LIFECYCLEEVENTS_OUT_CHANNEL"
                 set("$outgoing.connector", RABBITMQ_CONNECTOR)
@@ -791,7 +797,7 @@ class LemlineConfigSource : PropertiesConfigSource(
             val queue = props["$type.queue"] ?: CLOUDEVENTS_TOPIC_DEFAULT
 
             // Consumer configuration for listen tasks
-            if (props[CLOUDEVENTS_CONSUMER_ENABLED].toBoolean()) {
+            if (props["lemline.messaging.cloudevents.consumer.enabled"].toBoolean()) {
                 val consumer = "$type.consumer"
                 val incoming = "mp.messaging.incoming.$CLOUDEVENTS_IN_CHANNEL"
                 val queueDLQ = props["$consumer.queue-dlq"] ?: "$queue.dlq"
@@ -812,11 +818,14 @@ class LemlineConfigSource : PropertiesConfigSource(
                 set("$incoming.max-retries", props["$consumer.max-retries"] ?: PGMQ_MAX_RETRIES_DEFAULT)
                 set("$incoming.dead-letter-queue", queueDLQ)
                 set("$incoming.auto-create-queue", "false")
-                set(CLOUDEVENTS_CONSUMER_CONCURRENCY, props["$consumer.concurrency"] ?: CONSUMER_CONCURRENCY_DEFAULT)
+                set(
+                    "lemline.messaging.cloudevents.consumer.concurrency",
+                    props["$consumer.concurrency"] ?: CONSUMER_CONCURRENCY_DEFAULT
+                )
             }
 
             // Producer configuration for emit tasks
-            if (props[CLOUDEVENTS_PRODUCER_ENABLED].toBoolean()) {
+            if (props["lemline.messaging.cloudevents.producer.enabled"].toBoolean()) {
                 val producer = "$type.producer"
                 val outgoing = "mp.messaging.outgoing.$CLOUDEVENTS_OUT_CHANNEL"
 
@@ -847,7 +856,7 @@ class LemlineConfigSource : PropertiesConfigSource(
             val type = "lemline.messaging.pgmq.lifecycleevents"
             val queue = props["$type.queue"] ?: LIFECYCLE_EVENTS_TOPIC_DEFAULT
 
-            if (props[LIFECYCLE_EVENTS_CONSUMER_ENABLED].toBoolean()) {
+            if (props["lemline.analytics.consumer.enabled"].toBoolean()) {
                 val consumer = "$type.consumer"
                 val incoming = "mp.messaging.incoming.$LIFECYCLEEVENTS_IN_CHANNEL"
                 val queueDLQ = props["$consumer.queue-dlq"] ?: "$queue.dlq"
@@ -870,12 +879,12 @@ class LemlineConfigSource : PropertiesConfigSource(
                 set("$incoming.dead-letter-queue", queueDLQ)
                 set("$incoming.auto-create-queue", "false")
                 set(
-                    LIFECYCLE_EVENTS_CONSUMER_CONCURRENCY,
-                    props[LIFECYCLE_EVENTS_CONSUMER_CONCURRENCY] ?: CONSUMER_CONCURRENCY_DEFAULT
+                    "lemline.analytics.consumer.concurrency",
+                    props["lemline.analytics.consumer.concurrency"] ?: CONSUMER_CONCURRENCY_DEFAULT
                 )
             }
 
-            if (props[LIFECYCLE_EVENTS_PRODUCER_ENABLED].toBoolean()) {
+            if (props["lemline.messaging.lifecycleevents.producer.enabled"].toBoolean()) {
                 val producer = "$type.producer"
                 val outgoing = "mp.messaging.outgoing.$LIFECYCLEEVENTS_OUT_CHANNEL"
 
@@ -903,7 +912,7 @@ class LemlineConfigSource : PropertiesConfigSource(
 
             // Lifecycle events producer channel is always configured for emission.
             // Consumer channel is created only when analytics ingestion is enabled.
-            if (props[LIFECYCLE_EVENTS_CONSUMER_ENABLED].toBoolean()) {
+            if (props["lemline.analytics.consumer.enabled"].toBoolean()) {
                 set("mp.messaging.incoming.$LIFECYCLEEVENTS_IN_CHANNEL.connector", IN_MEMORY_CONNECTOR)
                 set("mp.messaging.incoming.$LIFECYCLEEVENTS_IN_CHANNEL.broadcast", "true")
             }

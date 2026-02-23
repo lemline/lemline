@@ -16,8 +16,8 @@ val LemlineConfiguration.gatewayAuthenticationScopeField: String
         ?: LemlineConfigConstants.GATEWAY_AUTHENTICATION_SCOPE_FIELD_DEFAULT
 
 val LemlineConfiguration.gatewayAuthenticationNamespacesField: String
-    get() = gateway().getOrNull()?.authentication()?.getOrNull()?.claims()?.getOrNull()?.namespacesField() ?:
-        LemlineConfigConstants.GATEWAY_AUTHENTICATION_NAMESPACES_FIELD_DEFAULT
+    get() = gateway().getOrNull()?.authentication()?.getOrNull()?.claims()?.getOrNull()?.namespacesField()
+        ?: LemlineConfigConstants.GATEWAY_AUTHENTICATION_NAMESPACES_FIELD_DEFAULT
 
 val LemlineConfiguration.gatewayAuthenticationJwtIssuer: String?
     get() = gateway().getOrNull()?.authentication()?.getOrNull()?.jwt()?.getOrNull()?.issuer()?.getOrNull()
@@ -26,10 +26,12 @@ val LemlineConfiguration.gatewayAuthenticationJwtJwksUrl: String?
     get() = gateway().getOrNull()?.authentication()?.getOrNull()?.jwt()?.getOrNull()?.jwksUrl()?.getOrNull()
 
 val LemlineConfiguration.gatewayTlsEnabled: Boolean
-    get() = gateway().getOrNull()?.tls()?.getOrNull()?.enabled() ?: LemlineConfigConstants.GATEWAY_TLS_ENABLED_DEFAULT.toBoolean()
+    get() = gateway().getOrNull()?.tls()?.getOrNull()?.enabled()
+        ?: LemlineConfigConstants.GATEWAY_TLS_ENABLED_DEFAULT.toBoolean()
 
 val LemlineConfiguration.gatewayTlsClientAuth: String
-    get() = gateway().getOrNull()?.tls()?.getOrNull()?.clientAuth() ?: LemlineConfigConstants.GATEWAY_TLS_CLIENT_AUTH_DEFAULT
+    get() = gateway().getOrNull()?.tls()?.getOrNull()?.clientAuth()
+        ?: LemlineConfigConstants.GATEWAY_TLS_CLIENT_AUTH_DEFAULT
 
 val LemlineConfiguration.gatewayTlsCertificate: String?
     get() = gateway().getOrNull()?.tls()?.getOrNull()?.certificate()?.getOrNull()
@@ -39,9 +41,6 @@ val LemlineConfiguration.gatewayTlsPrivateKey: String?
 
 val LemlineConfiguration.gatewayTlsTrustStore: String?
     get() = gateway().getOrNull()?.tls()?.getOrNull()?.trustStore()?.getOrNull()
-
-val LemlineConfiguration.gatewayTlsTrustStorePassword: String?
-    get() = gateway().getOrNull()?.tls()?.getOrNull()?.trustStorePassword()?.getOrNull()
 
 val LemlineConfiguration.gatewayWatchPollIntervalMs: Long
     get() = gateway().getOrNull()?.watch()?.getOrNull()?.pollIntervalMs()

@@ -1,14 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.tests.profiles
 
-import com.lemline.runner.config.COMMANDS_CONSUMER_ENABLED
-import com.lemline.runner.config.COMMANDS_PRODUCER_ENABLED
-import com.lemline.runner.config.DATABASE_TYPE
-import com.lemline.runner.config.EVENTS_CONSUMER_ENABLED
-import com.lemline.runner.config.EVENTS_PRODUCER_ENABLED
 import com.lemline.runner.common.config.DatabaseType
 import com.lemline.runner.common.config.MessagingType
-import com.lemline.runner.config.MESSAGING_TYPE
 import com.lemline.runner.tests.resources.RabbitMQTestResource
 import io.quarkus.test.junit.QuarkusTestProfile
 import io.quarkus.test.junit.QuarkusTestProfile.TestResourceEntry
@@ -39,16 +33,16 @@ class RabbitMQProfile : QuarkusTestProfile {
             // =============================================================
 
             // Database configuration
-            DATABASE_TYPE to DatabaseType.H2.configValue,
+            "lemline.database.type" to DatabaseType.H2.configValue,
 
             // Messaging type
-            MESSAGING_TYPE to MessagingType.RABBITMQ.configValue,
+            "lemline.messaging.type" to MessagingType.RABBITMQ.configValue,
 
             // Channel enabled flags
-            COMMANDS_CONSUMER_ENABLED to "true",
-            COMMANDS_PRODUCER_ENABLED to "true",
-            EVENTS_CONSUMER_ENABLED to "true",
-            EVENTS_PRODUCER_ENABLED to "true",
+            "lemline.messaging.commands.consumer.enabled" to "true",
+            "lemline.messaging.commands.producer.enabled" to "true",
+            "lemline.messaging.events.consumer.enabled" to "true",
+            "lemline.messaging.events.producer.enabled" to "true",
 
             // Queue names for test isolation (transformed by LemlineConfigSource)
             // Note: Consumer and producer use different queues for testing
