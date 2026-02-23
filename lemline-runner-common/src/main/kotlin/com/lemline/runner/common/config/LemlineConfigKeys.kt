@@ -1,6 +1,26 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.common.config
 
+const val DATABASE_ENABLED = "lemline.database.enabled"
+const val SCHEDULED_ENABLED = "lemline.scheduled.enabled"
+
+const val MESSAGING_COMMANDS_CONSUMER_ENABLED = "lemline.messaging.commands.consumer.enabled"
+const val MESSAGING_COMMANDS_PRODUCER_ENABLED = "lemline.messaging.commands.producer.enabled"
+const val MESSAGING_COMMANDS_CONSUMER_CONCURRENCY = "lemline.messaging.commands.consumer.concurrency"
+
+const val MESSAGING_EVENTS_CONSUMER_ENABLED = "lemline.messaging.events.consumer.enabled"
+const val MESSAGING_EVENTS_PRODUCER_ENABLED = "lemline.messaging.events.producer.enabled"
+const val MESSAGING_EVENTS_CONSUMER_CONCURRENCY = "lemline.messaging.events.consumer.concurrency"
+
+const val MESSAGING_CLOUDEVENTS_CONSUMER_ENABLED = "lemline.messaging.cloudevents.consumer.enabled"
+const val MESSAGING_CLOUDEVENTS_PRODUCER_ENABLED = "lemline.messaging.cloudevents.producer.enabled"
+const val MESSAGING_CLOUDEVENTS_CONSUMER_CONCURRENCY = "lemline.messaging.cloudevents.consumer.concurrency"
+
+const val MESSAGING_LIFECYCLE_EVENTS_PRODUCER_ENABLED = "lemline.messaging.lifecycleevents.producer.enabled"
+
+const val ANALYTICS_CONSUMER_ENABLED = "lemline.analytics.consumer.enabled"
+const val ANALYTICS_CONSUMER_CONCURRENCY = "lemline.analytics.consumer.concurrency"
+
 const val GATEWAY_ENABLED = "lemline.gateway.enabled"
 
 const val GATEWAY_GRPC_HOST = "lemline.gateway.grpc.host"
@@ -28,5 +48,3 @@ const val GATEWAY_WATCH_POLL_INTERVAL_MS = "lemline.gateway.watch.poll-interval-
 const val GATEWAY_WATCH_BATCH_SIZE = "lemline.gateway.watch.batch-size"
 
 const val ANALYTICS_TYPE = "lemline.analytics.type"
-const val ANALYTICS_POSTGRES_SCHEMA = "lemline.analytics.postgresql.schema"
-const val ANALYTICS_POSTGRES_TABLE = "lemline.analytics.postgresql.table"

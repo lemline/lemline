@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.analytics
 
-import com.lemline.runner.analytics.config.AnalyticsConfigConstants.ANALYTICS_CONSUMER_ENABLED
 import com.lemline.runner.analytics.config.AnalyticsConfigConstants.ANALYTICS_POSTGRES_SCHEMA_DEFAULT
 import com.lemline.runner.analytics.config.AnalyticsConfigConstants.ANALYTICS_POSTGRES_TABLE_DEFAULT
+import com.lemline.runner.common.config.ANALYTICS_CONSUMER_ENABLED
 import io.agroal.api.AgroalDataSource
 import io.quarkus.agroal.DataSource
 import jakarta.enterprise.context.ApplicationScoped

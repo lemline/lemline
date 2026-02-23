@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.analytics
 
-import com.lemline.runner.analytics.config.AnalyticsConfigConstants.ANALYTICS_CONSUMER_CONCURRENCY
 import com.lemline.runner.analytics.config.AnalyticsConfigConstants.ANALYTICS_CONSUMER_CONCURRENCY_DEFAULT
-import com.lemline.runner.analytics.config.AnalyticsConfigConstants.ANALYTICS_CONSUMER_ENABLED
 import com.lemline.runner.analytics.config.AnalyticsConfigConstants.ANALYTICS_CONSUMER_ENABLED_DEFAULT
+import com.lemline.runner.common.config.ANALYTICS_CONSUMER_CONCURRENCY
+import com.lemline.runner.common.config.ANALYTICS_CONSUMER_ENABLED
 import com.lemline.runner.common.messaging.LIFECYCLEEVENTS_IN_CHANNEL
 import com.lemline.runner.common.messaging.MessageSubscriber
 import io.cloudevents.CloudEvent

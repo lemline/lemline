@@ -5,6 +5,8 @@ import com.lemline.common.logger.logger
 import com.lemline.runner.common.config.ANALYTICS_BACKEND_CLICKHOUSE
 import com.lemline.runner.common.config.ANALYTICS_BACKEND_DEFAULT
 import com.lemline.runner.common.config.ANALYTICS_BACKEND_POSTGRESQL
+import com.lemline.runner.common.config.ANALYTICS_CONSUMER_CONCURRENCY
+import com.lemline.runner.common.config.ANALYTICS_CONSUMER_ENABLED
 import com.lemline.runner.common.config.ANALYTICS_TYPE
 import com.lemline.runner.common.config.DatabaseType
 import com.lemline.runner.common.config.GATEWAY_AUTHENTICATION_ENABLED
@@ -23,6 +25,16 @@ import com.lemline.runner.common.config.GATEWAY_TLS_ENABLED
 import com.lemline.runner.common.config.GATEWAY_TLS_PRIVATE_KEY
 import com.lemline.runner.common.config.GATEWAY_TLS_TRUST_STORE
 import com.lemline.runner.common.config.GATEWAY_TLS_TRUST_STORE_PASSWORD
+import com.lemline.runner.common.config.MESSAGING_CLOUDEVENTS_CONSUMER_CONCURRENCY
+import com.lemline.runner.common.config.MESSAGING_CLOUDEVENTS_CONSUMER_ENABLED
+import com.lemline.runner.common.config.MESSAGING_CLOUDEVENTS_PRODUCER_ENABLED
+import com.lemline.runner.common.config.MESSAGING_COMMANDS_CONSUMER_CONCURRENCY
+import com.lemline.runner.common.config.MESSAGING_COMMANDS_CONSUMER_ENABLED
+import com.lemline.runner.common.config.MESSAGING_COMMANDS_PRODUCER_ENABLED
+import com.lemline.runner.common.config.MESSAGING_EVENTS_CONSUMER_CONCURRENCY
+import com.lemline.runner.common.config.MESSAGING_EVENTS_CONSUMER_ENABLED
+import com.lemline.runner.common.config.MESSAGING_EVENTS_PRODUCER_ENABLED
+import com.lemline.runner.common.config.MESSAGING_LIFECYCLE_EVENTS_PRODUCER_ENABLED
 import com.lemline.runner.common.config.MessagingType
 import com.lemline.runner.common.messaging.LIFECYCLEEVENTS_IN_CHANNEL
 import com.lemline.runner.common.messaging.LIFECYCLEEVENTS_OUT_CHANNEL
@@ -106,9 +118,9 @@ enum class TopicType(
         COMMANDS_TOPIC_DEFAULT,
         COMMANDS_IN_CHANNEL,
         COMMANDS_OUT_CHANNEL,
-        "lemline.messaging.commands.consumer.enabled",
-        "lemline.messaging.commands.producer.enabled",
-        "lemline.messaging.commands.consumer.concurrency",
+        MESSAGING_COMMANDS_CONSUMER_ENABLED,
+        MESSAGING_COMMANDS_PRODUCER_ENABLED,
+        MESSAGING_COMMANDS_CONSUMER_CONCURRENCY,
         KAFKA_WORKFLOWS_GROUP_ID_DEFAULT
     ),
     EVENTS(
@@ -116,9 +128,9 @@ enum class TopicType(
         EVENTS_TOPIC_DEFAULT,
         EVENTS_IN_CHANNEL,
         EVENTS_OUT_CHANNEL,
-        "lemline.messaging.events.consumer.enabled",
-        "lemline.messaging.events.producer.enabled",
-        "lemline.messaging.events.consumer.concurrency",
+        MESSAGING_EVENTS_CONSUMER_ENABLED,
+        MESSAGING_EVENTS_PRODUCER_ENABLED,
+        MESSAGING_EVENTS_CONSUMER_CONCURRENCY,
         KAFKA_DATABASE_GROUP_ID_DEFAULT
     );
 }
@@ -244,7 +256,7 @@ class LemlineConfigSource : PropertiesConfigSource(
         }
 
         private fun generateAnalyticsDatabaseProperties(props: Map<String, String>): Map<String, String> {
-            val lifecycleConsumerEnabled = props["lemline.analytics.consumer.enabled"].toBoolean()
+            val lifecycleConsumerEnabled = props[ANALYTICS_CONSUMER_ENABLED].toBoolean()
             val gatewayEnabled = props[GATEWAY_ENABLED]?.toBooleanStrictOrNull()
                 ?: GATEWAY_ENABLED_DEFAULT.toBoolean()
             val gatewayAnalyticsBackend = resolveGatewayAnalyticsBackend(props, gatewayEnabled)
@@ -442,10 +454,10 @@ class LemlineConfigSource : PropertiesConfigSource(
             // Log the enabled flags for debugging
             logger.info {
                 "Kafka channel enabled flags: " +
-                    "commands.consumer=${props["lemline.messaging.commands.consumer.enabled"]}, " +
-                    "commands.producer=${props["lemline.messaging.commands.producer.enabled"]}, " +
-                    "events.consumer=${props["lemline.messaging.events.consumer.enabled"]}, " +
-                    "events.producer=${props["lemline.messaging.events.producer.enabled"]}"
+                    "commands.consumer=${props[MESSAGING_COMMANDS_CONSUMER_ENABLED]}, " +
+                    "commands.producer=${props[MESSAGING_COMMANDS_PRODUCER_ENABLED]}, " +
+                    "events.consumer=${props[MESSAGING_EVENTS_CONSUMER_ENABLED]}, " +
+                    "events.producer=${props[MESSAGING_EVENTS_PRODUCER_ENABLED]}"
             }
 
             configureKafkaTopic(props, TopicType.COMMANDS)
@@ -496,7 +508,7 @@ class LemlineConfigSource : PropertiesConfigSource(
             val topic = props["$type.topic"] ?: CLOUDEVENTS_TOPIC_DEFAULT
 
             // Consumer configuration for listen tasks
-            if (props["lemline.messaging.cloudevents.consumer.enabled"].toBoolean()) {
+            if (props[MESSAGING_CLOUDEVENTS_CONSUMER_ENABLED].toBoolean()) {
                 val consumer = "$type.consumer"
                 val incoming = "mp.messaging.incoming.$CLOUDEVENTS_IN_CHANNEL"
                 val topicDLQ = props["$consumer.topic-dlq"] ?: "$topic.dlq"
@@ -508,13 +520,13 @@ class LemlineConfigSource : PropertiesConfigSource(
                 set("$incoming.failure-strategy", "dead-letter-queue")
                 set("$incoming.dead-letter-queue.topic", topicDLQ)
                 set(
-                    "lemline.messaging.cloudevents.consumer.concurrency",
+                    MESSAGING_CLOUDEVENTS_CONSUMER_CONCURRENCY,
                     props["$consumer.concurrency"] ?: CONSUMER_CONCURRENCY_DEFAULT
                 )
             }
 
             // Producer configuration for emit tasks
-            if (props["lemline.messaging.cloudevents.producer.enabled"].toBoolean()) {
+            if (props[MESSAGING_CLOUDEVENTS_PRODUCER_ENABLED].toBoolean()) {
                 val producer = "$type.producer"
                 val outgoing = "mp.messaging.outgoing.$CLOUDEVENTS_OUT_CHANNEL"
                 set("$outgoing.connector", KAFKA_CONNECTOR)
@@ -533,7 +545,7 @@ class LemlineConfigSource : PropertiesConfigSource(
             val type = "lemline.messaging.kafka.lifecycleevents"
             val topic = props["$type.topic"] ?: LIFECYCLE_EVENTS_TOPIC_DEFAULT
 
-            if (props["lemline.analytics.consumer.enabled"].toBoolean()) {
+            if (props[ANALYTICS_CONSUMER_ENABLED].toBoolean()) {
                 val incoming = "mp.messaging.incoming.$LIFECYCLEEVENTS_IN_CHANNEL"
                 val topicDLQ = "$topic.dlq"
                 set("$incoming.connector", KAFKA_CONNECTOR)
@@ -545,12 +557,12 @@ class LemlineConfigSource : PropertiesConfigSource(
                 set("$incoming.failure-strategy", "dead-letter-queue")
                 set("$incoming.dead-letter-queue.topic", topicDLQ)
                 set(
-                    "lemline.analytics.consumer.concurrency",
-                    props["lemline.analytics.consumer.concurrency"] ?: CONSUMER_CONCURRENCY_DEFAULT
+                    ANALYTICS_CONSUMER_CONCURRENCY,
+                    props[ANALYTICS_CONSUMER_CONCURRENCY] ?: CONSUMER_CONCURRENCY_DEFAULT
                 )
             }
 
-            if (props["lemline.messaging.lifecycleevents.producer.enabled"].toBoolean()) {
+            if (props[MESSAGING_LIFECYCLE_EVENTS_PRODUCER_ENABLED].toBoolean()) {
                 val producer = "$type.producer"
                 val outgoing = "mp.messaging.outgoing.$LIFECYCLEEVENTS_OUT_CHANNEL"
                 set("$outgoing.connector", KAFKA_CONNECTOR)
@@ -625,7 +637,7 @@ class LemlineConfigSource : PropertiesConfigSource(
             val queue = props["$type.queue"] ?: CLOUDEVENTS_TOPIC_DEFAULT
 
             // Consumer configuration for listen tasks
-            if (props["lemline.messaging.cloudevents.consumer.enabled"].toBoolean()) {
+            if (props[MESSAGING_CLOUDEVENTS_CONSUMER_ENABLED].toBoolean()) {
                 val consumer = "$type.consumer"
                 val incoming = "mp.messaging.incoming.$CLOUDEVENTS_IN_CHANNEL"
                 val queueDLQ = props["$consumer.queue-dlq"] ?: "$queue.dlq"
@@ -642,13 +654,13 @@ class LemlineConfigSource : PropertiesConfigSource(
                 set("$incoming.dead-letter-exchange-type", "direct")
                 set("$incoming.dead-letter-routing-key", queueDLQ)
                 set(
-                    "lemline.messaging.cloudevents.consumer.concurrency",
+                    MESSAGING_CLOUDEVENTS_CONSUMER_CONCURRENCY,
                     props["$consumer.concurrency"] ?: CONSUMER_CONCURRENCY_DEFAULT
                 )
             }
 
             // Producer configuration for emit tasks
-            if (props["lemline.messaging.cloudevents.producer.enabled"].toBoolean()) {
+            if (props[MESSAGING_CLOUDEVENTS_PRODUCER_ENABLED].toBoolean()) {
                 val producer = "$type.producer"
                 val outgoing = "mp.messaging.outgoing.$CLOUDEVENTS_OUT_CHANNEL"
                 set("$outgoing.connector", RABBITMQ_CONNECTOR)
@@ -668,7 +680,7 @@ class LemlineConfigSource : PropertiesConfigSource(
             val type = "lemline.messaging.rabbitmq.lifecycleevents"
             val queue = props["$type.queue"] ?: LIFECYCLE_EVENTS_TOPIC_DEFAULT
 
-            if (props["lemline.analytics.consumer.enabled"].toBoolean()) {
+            if (props[ANALYTICS_CONSUMER_ENABLED].toBoolean()) {
                 val incoming = "mp.messaging.incoming.$LIFECYCLEEVENTS_IN_CHANNEL"
                 val queueDLQ = "$queue.dlq"
                 set("$incoming.connector", RABBITMQ_CONNECTOR)
@@ -688,12 +700,12 @@ class LemlineConfigSource : PropertiesConfigSource(
                     set("$incoming.exchange.name", exchange)
                 }
                 set(
-                    "lemline.analytics.consumer.concurrency",
-                    props["lemline.analytics.consumer.concurrency"] ?: CONSUMER_CONCURRENCY_DEFAULT
+                    ANALYTICS_CONSUMER_CONCURRENCY,
+                    props[ANALYTICS_CONSUMER_CONCURRENCY] ?: CONSUMER_CONCURRENCY_DEFAULT
                 )
             }
 
-            if (props["lemline.messaging.lifecycleevents.producer.enabled"].toBoolean()) {
+            if (props[MESSAGING_LIFECYCLE_EVENTS_PRODUCER_ENABLED].toBoolean()) {
                 val producer = "$type.producer"
                 val outgoing = "mp.messaging.outgoing.$LIFECYCLEEVENTS_OUT_CHANNEL"
                 set("$outgoing.connector", RABBITMQ_CONNECTOR)
@@ -797,7 +809,7 @@ class LemlineConfigSource : PropertiesConfigSource(
             val queue = props["$type.queue"] ?: CLOUDEVENTS_TOPIC_DEFAULT
 
             // Consumer configuration for listen tasks
-            if (props["lemline.messaging.cloudevents.consumer.enabled"].toBoolean()) {
+            if (props[MESSAGING_CLOUDEVENTS_CONSUMER_ENABLED].toBoolean()) {
                 val consumer = "$type.consumer"
                 val incoming = "mp.messaging.incoming.$CLOUDEVENTS_IN_CHANNEL"
                 val queueDLQ = props["$consumer.queue-dlq"] ?: "$queue.dlq"
@@ -819,13 +831,13 @@ class LemlineConfigSource : PropertiesConfigSource(
                 set("$incoming.dead-letter-queue", queueDLQ)
                 set("$incoming.auto-create-queue", "false")
                 set(
-                    "lemline.messaging.cloudevents.consumer.concurrency",
+                    MESSAGING_CLOUDEVENTS_CONSUMER_CONCURRENCY,
                     props["$consumer.concurrency"] ?: CONSUMER_CONCURRENCY_DEFAULT
                 )
             }
 
             // Producer configuration for emit tasks
-            if (props["lemline.messaging.cloudevents.producer.enabled"].toBoolean()) {
+            if (props[MESSAGING_CLOUDEVENTS_PRODUCER_ENABLED].toBoolean()) {
                 val producer = "$type.producer"
                 val outgoing = "mp.messaging.outgoing.$CLOUDEVENTS_OUT_CHANNEL"
 
@@ -856,7 +868,7 @@ class LemlineConfigSource : PropertiesConfigSource(
             val type = "lemline.messaging.pgmq.lifecycleevents"
             val queue = props["$type.queue"] ?: LIFECYCLE_EVENTS_TOPIC_DEFAULT
 
-            if (props["lemline.analytics.consumer.enabled"].toBoolean()) {
+            if (props[ANALYTICS_CONSUMER_ENABLED].toBoolean()) {
                 val consumer = "$type.consumer"
                 val incoming = "mp.messaging.incoming.$LIFECYCLEEVENTS_IN_CHANNEL"
                 val queueDLQ = props["$consumer.queue-dlq"] ?: "$queue.dlq"
@@ -879,12 +891,12 @@ class LemlineConfigSource : PropertiesConfigSource(
                 set("$incoming.dead-letter-queue", queueDLQ)
                 set("$incoming.auto-create-queue", "false")
                 set(
-                    "lemline.analytics.consumer.concurrency",
-                    props["lemline.analytics.consumer.concurrency"] ?: CONSUMER_CONCURRENCY_DEFAULT
+                    ANALYTICS_CONSUMER_CONCURRENCY,
+                    props[ANALYTICS_CONSUMER_CONCURRENCY] ?: CONSUMER_CONCURRENCY_DEFAULT
                 )
             }
 
-            if (props["lemline.messaging.lifecycleevents.producer.enabled"].toBoolean()) {
+            if (props[MESSAGING_LIFECYCLE_EVENTS_PRODUCER_ENABLED].toBoolean()) {
                 val producer = "$type.producer"
                 val outgoing = "mp.messaging.outgoing.$LIFECYCLEEVENTS_OUT_CHANNEL"
 
@@ -912,7 +924,7 @@ class LemlineConfigSource : PropertiesConfigSource(
 
             // Lifecycle events producer channel is always configured for emission.
             // Consumer channel is created only when analytics ingestion is enabled.
-            if (props["lemline.analytics.consumer.enabled"].toBoolean()) {
+            if (props[ANALYTICS_CONSUMER_ENABLED].toBoolean()) {
                 set("mp.messaging.incoming.$LIFECYCLEEVENTS_IN_CHANNEL.connector", IN_MEMORY_CONNECTOR)
                 set("mp.messaging.incoming.$LIFECYCLEEVENTS_IN_CHANNEL.broadcast", "true")
             }
