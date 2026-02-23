@@ -1,15 +1,23 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.gateway.config
 
-import com.lemline.runner.common.config.GATEWAY_AUTHENTICATION_ENABLED
-import com.lemline.runner.common.config.GATEWAY_AUTHENTICATION_JWT_ISSUER
-import com.lemline.runner.common.config.GATEWAY_AUTHENTICATION_JWT_JWKS_URL
-import com.lemline.runner.common.config.GATEWAY_TLS_CERTIFICATE
-import com.lemline.runner.common.config.GATEWAY_TLS_ENABLED
-import com.lemline.runner.common.config.GATEWAY_TLS_PRIVATE_KEY
-import com.lemline.runner.common.config.GATEWAY_TLS_TRUST_STORE
-import com.lemline.runner.config.shared.LemlineConfiguration
-import com.lemline.runner.config.shared.*
+import com.lemline.runner.common.config.LEMLINE_GATEWAY_AUTHENTICATION_ENABLED
+import com.lemline.runner.common.config.LEMLINE_GATEWAY_AUTHENTICATION_JWT_ISSUER
+import com.lemline.runner.common.config.LEMLINE_GATEWAY_AUTHENTICATION_JWT_JWKS_URL
+import com.lemline.runner.common.config.LEMLINE_GATEWAY_TLS_CERTIFICATE
+import com.lemline.runner.common.config.LEMLINE_GATEWAY_TLS_ENABLED
+import com.lemline.runner.common.config.LEMLINE_GATEWAY_TLS_PRIVATE_KEY
+import com.lemline.runner.common.config.LEMLINE_GATEWAY_TLS_TRUST_STORE
+import com.lemline.runner.config.LemlineConfiguration
+import com.lemline.runner.config.gatewayAuthenticationEnabled
+import com.lemline.runner.config.gatewayAuthenticationJwtIssuer
+import com.lemline.runner.config.gatewayAuthenticationJwtJwksUrl
+import com.lemline.runner.config.gatewayEnabled
+import com.lemline.runner.config.gatewayTlsCertificate
+import com.lemline.runner.config.gatewayTlsClientAuth
+import com.lemline.runner.config.gatewayTlsEnabled
+import com.lemline.runner.config.gatewayTlsPrivateKey
+import com.lemline.runner.config.gatewayTlsTrustStore
 import com.lemline.runner.gateway.analytics.WorkflowAnalyticsEventSource
 import io.quarkus.runtime.StartupEvent
 import jakarta.annotation.Priority
@@ -33,25 +41,25 @@ class GatewayStartupValidator(
 
         if (config.gatewayAuthenticationEnabled && !config.gatewayTlsEnabled) {
             throw IllegalStateException(
-                "Invalid gateway configuration: '$GATEWAY_AUTHENTICATION_ENABLED' " +
-                    "requires '$GATEWAY_TLS_ENABLED=true'"
+                "Invalid gateway configuration: '$LEMLINE_GATEWAY_AUTHENTICATION_ENABLED' " +
+                    "requires '$LEMLINE_GATEWAY_TLS_ENABLED=true'"
             )
         }
 
         if (config.gatewayTlsEnabled) {
-            requireConfigured(config.gatewayTlsCertificate, GATEWAY_TLS_CERTIFICATE)
-            requireConfigured(config.gatewayTlsPrivateKey, GATEWAY_TLS_PRIVATE_KEY)
+            requireConfigured(config.gatewayTlsCertificate, LEMLINE_GATEWAY_TLS_CERTIFICATE)
+            requireConfigured(config.gatewayTlsPrivateKey, LEMLINE_GATEWAY_TLS_PRIVATE_KEY)
 
             val clientAuth = config.gatewayTlsClientAuth.trim().lowercase(Locale.ROOT).ifBlank { "none" }
 
             if (clientAuth == "request" || clientAuth == "required") {
-                requireConfigured(config.gatewayTlsTrustStore, GATEWAY_TLS_TRUST_STORE)
+                requireConfigured(config.gatewayTlsTrustStore, LEMLINE_GATEWAY_TLS_TRUST_STORE)
             }
         }
 
         if (config.gatewayAuthenticationEnabled) {
-            requireConfigured(config.gatewayAuthenticationJwtIssuer, GATEWAY_AUTHENTICATION_JWT_ISSUER)
-            requireConfigured(config.gatewayAuthenticationJwtJwksUrl, GATEWAY_AUTHENTICATION_JWT_JWKS_URL)
+            requireConfigured(config.gatewayAuthenticationJwtIssuer, LEMLINE_GATEWAY_AUTHENTICATION_JWT_ISSUER)
+            requireConfigured(config.gatewayAuthenticationJwtJwksUrl, LEMLINE_GATEWAY_AUTHENTICATION_JWT_JWKS_URL)
         }
 
         runBlocking {

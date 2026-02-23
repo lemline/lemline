@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.cli.config
 
-import com.lemline.runner.config.shared.ConfigPathHolder as SharedConfigPathHolder
+import com.lemline.runner.config.ConfigPathHolder as SharedConfigPathHolder
 import java.nio.file.Path
 
 /**

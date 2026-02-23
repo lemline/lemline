@@ -7,7 +7,6 @@ import com.lemline.common.trace
 import com.lemline.runner.common.config.DatabaseConfig
 import com.lemline.runner.common.config.DatabaseType
 import com.lemline.runner.common.config.MigrationManager
-import com.lemline.runner.config.shared.LemlineConfiguration
 import io.agroal.api.AgroalDataSource
 import io.quarkus.agroal.DataSource
 import io.quarkus.arc.profile.IfBuildProfile

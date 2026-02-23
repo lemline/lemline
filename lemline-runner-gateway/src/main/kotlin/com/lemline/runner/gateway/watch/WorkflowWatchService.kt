@@ -2,12 +2,13 @@
 package com.lemline.runner.gateway.watch
 
 import com.lemline.common.values.WorkflowId
+import com.lemline.runner.config.LemlineConfiguration
+import com.lemline.runner.config.gatewayWatchBatchSize
+import com.lemline.runner.config.gatewayWatchPollIntervalMs
 import com.lemline.runner.gateway.analytics.WorkflowAnalyticsEventRow
 import com.lemline.runner.gateway.analytics.WorkflowAnalyticsEventSource
 import com.lemline.runner.gateway.auth.GatewayAuthorizer
 import com.lemline.runner.gateway.auth.GatewayPrincipal
-import com.lemline.runner.config.shared.LemlineConfiguration
-import com.lemline.runner.config.shared.*
 import com.lemline.runner.gateway.outbox.GatewayCommandOutboxRepository
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject

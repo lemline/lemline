@@ -2,13 +2,12 @@
 package com.lemline.runner.config
 
 import com.lemline.runner.cli.config.ConfigPathHolder
-import com.lemline.runner.config.shared.LemlineConfigSource
-import com.lemline.runner.config.shared.LemlineConfigConstants.KAFKA_LIFECYCLE_EVENTS_GROUP_ID_DEFAULT
-import com.lemline.runner.config.shared.LemlineConfigConstants.PGMQ_BATCH_SIZE_DEFAULT
-import com.lemline.runner.config.shared.LemlineConfigConstants.PGMQ_MAX_RETRIES_DEFAULT
-import com.lemline.runner.config.shared.LemlineConfigConstants.PGMQ_POLL_INTERVAL_DEFAULT
-import com.lemline.runner.config.shared.LemlineConfigConstants.PGMQ_VISIBILITY_TIMEOUT_DEFAULT
 import com.lemline.runner.common.messaging.LIFECYCLEEVENTS_IN_CHANNEL
+import com.lemline.runner.config.LemlineConfigConstants.KAFKA_LIFECYCLE_EVENTS_GROUP_ID_DEFAULT
+import com.lemline.runner.config.LemlineConfigConstants.PGMQ_BATCH_SIZE_DEFAULT
+import com.lemline.runner.config.LemlineConfigConstants.PGMQ_MAX_RETRIES_DEFAULT
+import com.lemline.runner.config.LemlineConfigConstants.PGMQ_POLL_INTERVAL_DEFAULT
+import com.lemline.runner.config.LemlineConfigConstants.PGMQ_VISIBILITY_TIMEOUT_DEFAULT
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -20,10 +19,10 @@ class LemlineConfigSourceLifecycleAnalyticsTest {
     fun `generates kafka lifecycleevents analytics consumer properties`() {
         withSystemProperties(
             mapOf(
-                "lemline.messaging.type" to "kafka",
-                "lemline.analytics.consumer.enabled" to "true",
-                "lemline.analytics.consumer.concurrency" to "17",
-                "lemline.messaging.kafka.lifecycleevents.topic" to "lemline-lifecycle-events-custom"
+                com.lemline.runner.common.config.LEMLINE_MESSAGING_TYPE to "kafka",
+                com.lemline.runner.common.config.LEMLINE_ANALYTICS_CONSUMER_ENABLED to "true",
+                com.lemline.runner.common.config.LEMLINE_ANALYTICS_CONSUMER_CONCURRENCY to "17",
+                com.lemline.runner.common.config.LEMLINE_MESSAGING_KAFKA_LIFECYCLE_EVENTS_TOPIC to "lemline-lifecycle-events-custom"
             )
         ) { source ->
             val incoming = "mp.messaging.incoming.$LIFECYCLEEVENTS_IN_CHANNEL"
@@ -31,7 +30,7 @@ class LemlineConfigSourceLifecycleAnalyticsTest {
             assertEquals("lemline-lifecycle-events-custom", source.getValue("$incoming.topic"))
             assertEquals("true", source.getValue("$incoming.broadcast"))
             assertEquals(KAFKA_LIFECYCLE_EVENTS_GROUP_ID_DEFAULT, source.getValue("$incoming.group.id"))
-            assertEquals("17", source.getValue("lemline.analytics.consumer.concurrency"))
+            assertEquals("17", source.getValue(com.lemline.runner.common.config.LEMLINE_ANALYTICS_CONSUMER_CONCURRENCY))
         }
     }
 
@@ -39,10 +38,10 @@ class LemlineConfigSourceLifecycleAnalyticsTest {
     fun `generates rabbit lifecycleevents analytics consumer properties`() {
         withSystemProperties(
             mapOf(
-                "lemline.messaging.type" to "rabbitmq",
-                "lemline.analytics.consumer.enabled" to "true",
-                "lemline.messaging.rabbitmq.lifecycleevents.queue" to "lemline-lifecycle-events-custom",
-                "lemline.messaging.rabbitmq.lifecycleevents.producer.exchange-name" to "lemline-lifecycle-events-exchange"
+                com.lemline.runner.common.config.LEMLINE_MESSAGING_TYPE to "rabbitmq",
+                com.lemline.runner.common.config.LEMLINE_ANALYTICS_CONSUMER_ENABLED to "true",
+                com.lemline.runner.common.config.LEMLINE_MESSAGING_RABBITMQ_LIFECYCLE_EVENTS_QUEUE to "lemline-lifecycle-events-custom",
+                com.lemline.runner.common.config.LEMLINE_MESSAGING_RABBITMQ_LIFECYCLE_EVENTS_PRODUCER_EXCHANGE_NAME to "lemline-lifecycle-events-exchange"
             )
         ) { source ->
             val incoming = "mp.messaging.incoming.$LIFECYCLEEVENTS_IN_CHANNEL"
@@ -58,9 +57,9 @@ class LemlineConfigSourceLifecycleAnalyticsTest {
     fun `generates pgmq lifecycleevents analytics consumer properties`() {
         withSystemProperties(
             mapOf(
-                "lemline.messaging.type" to "pgmq",
-                "lemline.analytics.consumer.enabled" to "true",
-                "lemline.messaging.pgmq.lifecycleevents.queue" to "lemline-lifecycle-events-custom"
+                com.lemline.runner.common.config.LEMLINE_MESSAGING_TYPE to "pgmq",
+                com.lemline.runner.common.config.LEMLINE_ANALYTICS_CONSUMER_ENABLED to "true",
+                com.lemline.runner.common.config.LEMLINE_MESSAGING_PGMQ_LIFECYCLE_EVENTS_QUEUE to "lemline-lifecycle-events-custom"
             )
         ) { source ->
             val incoming = "mp.messaging.incoming.$LIFECYCLEEVENTS_IN_CHANNEL"
@@ -78,21 +77,24 @@ class LemlineConfigSourceLifecycleAnalyticsTest {
     fun `generates analytics datasource properties only when enabled`() {
         withSystemProperties(
             mapOf(
-                "lemline.messaging.type" to "in-memory",
-                "lemline.analytics.consumer.enabled" to "true",
-                "lemline.analytics.postgresql.host" to "analytics-db",
-                "lemline.analytics.postgresql.port" to "5544",
-                "lemline.analytics.postgresql.database" to "analytics",
-                "lemline.analytics.postgresql.username" to "analytics_user",
-                "lemline.analytics.postgresql.password" to "analytics_pass",
-                "lemline.analytics.migrate-at-start" to "false",
-                "lemline.analytics.baseline-on-migrate" to "true"
+                com.lemline.runner.common.config.LEMLINE_MESSAGING_TYPE to "in-memory",
+                com.lemline.runner.common.config.LEMLINE_ANALYTICS_CONSUMER_ENABLED to "true",
+                com.lemline.runner.common.config.LEMLINE_ANALYTICS_POSTGRES_HOST to "analytics-db",
+                com.lemline.runner.common.config.LEMLINE_ANALYTICS_POSTGRES_PORT to "5544",
+                com.lemline.runner.common.config.LEMLINE_ANALYTICS_POSTGRES_DATABASE to "analytics",
+                com.lemline.runner.common.config.LEMLINE_ANALYTICS_POSTGRES_USERNAME to "analytics_user",
+                com.lemline.runner.common.config.LEMLINE_ANALYTICS_POSTGRES_PASSWORD to "analytics_pass",
+                com.lemline.runner.common.config.LEMLINE_ANALYTICS_MIGRATE_AT_START to "false",
+                com.lemline.runner.common.config.LEMLINE_ANALYTICS_BASELINE_ON_MIGRATE to "true"
             )
         ) { source ->
             assertEquals("postgresql", source.getValue("quarkus.datasource.analytics.db-kind"))
             assertEquals("analytics_user", source.getValue("quarkus.datasource.analytics.username"))
             assertEquals("analytics_pass", source.getValue("quarkus.datasource.analytics.password"))
-            assertEquals("jdbc:postgresql://analytics-db:5544/analytics", source.getValue("quarkus.datasource.analytics.jdbc.url"))
+            assertEquals(
+                "jdbc:postgresql://analytics-db:5544/analytics",
+                source.getValue("quarkus.datasource.analytics.jdbc.url")
+            )
             assertEquals("false", source.getValue("quarkus.flyway.analytics.migrate-at-start"))
             assertEquals("true", source.getValue("quarkus.flyway.analytics.baseline-on-migrate"))
             assertEquals(
@@ -111,9 +113,9 @@ class LemlineConfigSourceLifecycleAnalyticsTest {
 
         withSystemProperties(
             mapOf(
-                "lemline.messaging.type" to "in-memory",
-                "lemline.analytics.consumer.enabled" to "false",
-                "lemline.analytics.postgresql.host" to "analytics-db"
+                com.lemline.runner.common.config.LEMLINE_MESSAGING_TYPE to "in-memory",
+                com.lemline.runner.common.config.LEMLINE_ANALYTICS_CONSUMER_ENABLED to "false",
+                com.lemline.runner.common.config.LEMLINE_ANALYTICS_POSTGRES_HOST to "analytics-db"
             )
         ) { source ->
             assertNull(source.getValue("quarkus.datasource.analytics.jdbc.url"))
@@ -125,8 +127,10 @@ class LemlineConfigSourceLifecycleAnalyticsTest {
 
     @Test
     fun `supports legacy analytics migrate keys under postgresql`() {
-        val newMigrateKey = "lemline.analytics.migrate-at-start"
-        val newBaselineKey = "lemline.analytics.baseline-on-migrate"
+        val newMigrateKey = com.lemline.runner.common.config.LEMLINE_ANALYTICS_MIGRATE_AT_START
+        val newBaselineKey = com.lemline.runner.common.config.LEMLINE_ANALYTICS_BASELINE_ON_MIGRATE
+        val legacyMigrateKey = "${com.lemline.runner.common.config.LEMLINE_ANALYTICS_POSTGRES}.migrate-at-start"
+        val legacyBaselineKey = "${com.lemline.runner.common.config.LEMLINE_ANALYTICS_POSTGRES}.baseline-on-migrate"
         val previousNewMigrate = System.getProperty(newMigrateKey)
         val previousNewBaseline = System.getProperty(newBaselineKey)
 
@@ -136,11 +140,11 @@ class LemlineConfigSourceLifecycleAnalyticsTest {
 
             withSystemProperties(
                 mapOf(
-                    "lemline.messaging.type" to "in-memory",
-                    "lemline.analytics.consumer.enabled" to "true",
-                    "lemline.analytics.postgresql.host" to "analytics-db",
-                    "lemline.analytics.postgresql.migrate-at-start" to "false",
-                    "lemline.analytics.postgresql.baseline-on-migrate" to "true"
+                    com.lemline.runner.common.config.LEMLINE_MESSAGING_TYPE to "in-memory",
+                    com.lemline.runner.common.config.LEMLINE_ANALYTICS_CONSUMER_ENABLED to "true",
+                    com.lemline.runner.common.config.LEMLINE_ANALYTICS_POSTGRES_HOST to "analytics-db",
+                    legacyMigrateKey to "false",
+                    legacyBaselineKey to "true"
                 )
             ) { source ->
                 val jdbcUrl = source.getValue("quarkus.datasource.analytics.jdbc.url")

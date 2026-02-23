@@ -5,7 +5,7 @@ import com.lemline.common.info
 import com.lemline.common.logger
 import com.lemline.runner.analytics.config.AnalyticsConfigConstants.ANALYTICS_CONSUMER_ENABLED_DEFAULT
 import com.lemline.runner.analytics.config.AnalyticsConfigConstants.ANALYTICS_POSTGRES_MIGRATE_AT_START_DEFAULT
-import com.lemline.runner.common.config.ANALYTICS_CONSUMER_ENABLED
+import com.lemline.runner.common.config.LEMLINE_ANALYTICS_CONSUMER_ENABLED
 import io.quarkus.runtime.StartupEvent
 import jakarta.annotation.Priority
 import jakarta.enterprise.context.ApplicationScoped
@@ -15,7 +15,7 @@ import org.eclipse.microprofile.config.inject.ConfigProperty
 
 @ApplicationScoped
 internal class AnalyticsMigration(
-    @param:ConfigProperty(name = ANALYTICS_CONSUMER_ENABLED, defaultValue = ANALYTICS_CONSUMER_ENABLED_DEFAULT)
+    @param:ConfigProperty(name = LEMLINE_ANALYTICS_CONSUMER_ENABLED, defaultValue = ANALYTICS_CONSUMER_ENABLED_DEFAULT)
     val analyticsEnabled: Boolean,
     @param:ConfigProperty(
         name = "quarkus.flyway.analytics.migrate-at-start",

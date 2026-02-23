@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.gateway.auth
 
-import com.lemline.runner.config.shared.LemlineConfiguration
-import com.lemline.runner.config.shared.*
+import com.lemline.runner.config.LemlineConfiguration
+import com.lemline.runner.config.gatewayAuthenticationEnabled
 import io.grpc.Contexts
 import io.grpc.Metadata
 import io.grpc.ServerCall

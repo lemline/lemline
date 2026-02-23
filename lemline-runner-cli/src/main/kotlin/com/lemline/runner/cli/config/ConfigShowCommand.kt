@@ -4,6 +4,7 @@ package com.lemline.runner.cli.config
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory
 import com.fasterxml.jackson.dataformat.yaml.YAMLGenerator
+import com.lemline.runner.common.config.LEMLINE_PREFIX
 import com.lemline.runner.cli.GlobalMixin
 import io.quarkus.arc.Unremovable
 import jakarta.inject.Inject
@@ -48,7 +49,7 @@ class ConfigShowCommand : Runnable {
     override fun run() {
 
         val properties = lemlineConfig.propertyNames.asSequence()
-            .filter { all || it.startsWith("lemline.") }
+            .filter { all || it.startsWith(LEMLINE_PREFIX) }
             .filter { it.isNotBlank() } // Skip empty property names
             .sorted()
             .associateWith {

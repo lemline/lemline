@@ -10,26 +10,26 @@ import io.quarkus.test.junit.QuarkusTestProfile
 class PgmqAnalyticsProfile : QuarkusTestProfile {
     override fun getConfigOverrides(): Map<String, String> {
         return mapOf(
-            "lemline.database.type" to DatabaseType.POSTGRESQL.configValue,
-            "lemline.messaging.type" to MessagingType.PGMQ.configValue,
-            "lemline.messaging.commands.consumer.enabled" to "false",
-            "lemline.messaging.commands.producer.enabled" to "false",
-            "lemline.messaging.events.consumer.enabled" to "false",
-            "lemline.messaging.events.producer.enabled" to "false",
-            "lemline.messaging.cloudevents.consumer.enabled" to "false",
-            "lemline.messaging.cloudevents.producer.enabled" to "false",
-            "lemline.messaging.lifecycleevents.producer.enabled" to "true",
-            "lemline.analytics.consumer.enabled" to "true",
-            "lemline.analytics.consumer.concurrency" to "16",
-            "lemline.messaging.pgmq.lifecycleevents.queue" to "lemline-lifecycle-analytics-pgmq",
+            com.lemline.runner.common.config.LEMLINE_DATABASE_TYPE to DatabaseType.POSTGRESQL.configValue,
+            com.lemline.runner.common.config.LEMLINE_MESSAGING_TYPE to MessagingType.PGMQ.configValue,
+            com.lemline.runner.common.config.LEMLINE_MESSAGING_COMMANDS_CONSUMER_ENABLED to "false",
+            com.lemline.runner.common.config.LEMLINE_MESSAGING_COMMANDS_PRODUCER_ENABLED to "false",
+            com.lemline.runner.common.config.LEMLINE_MESSAGING_EVENTS_CONSUMER_ENABLED to "false",
+            com.lemline.runner.common.config.LEMLINE_MESSAGING_EVENTS_PRODUCER_ENABLED to "false",
+            com.lemline.runner.common.config.LEMLINE_MESSAGING_CLOUDEVENTS_CONSUMER_ENABLED to "false",
+            com.lemline.runner.common.config.LEMLINE_MESSAGING_CLOUDEVENTS_PRODUCER_ENABLED to "false",
+            com.lemline.runner.common.config.LEMLINE_MESSAGING_LIFECYCLE_EVENTS_PRODUCER_ENABLED to "true",
+            com.lemline.runner.common.config.LEMLINE_ANALYTICS_CONSUMER_ENABLED to "true",
+            com.lemline.runner.common.config.LEMLINE_ANALYTICS_CONSUMER_CONCURRENCY to "16",
+            com.lemline.runner.common.config.LEMLINE_MESSAGING_PGMQ_LIFECYCLE_EVENTS_QUEUE to "lemline-lifecycle-analytics-pgmq",
             "quarkus.arc.exclude-types" to
                 "com.lemline.runner.testcases.lifecycleevents.TestLifecycleEventListener," +
                 "com.lemline.runner.testcases.inMemory.InMemoryWorkflowTestExecutor," +
                 "com.lemline.runner.testcases.bases.BrokerWorkflowTestExecutor",
-            "lemline.analytics.migrate-at-start" to "true",
-            "lemline.analytics.baseline-on-migrate" to "false",
-            "lemline.outbox.enabled" to "false",
-            "lemline.scheduled.enabled" to "false"
+            com.lemline.runner.common.config.LEMLINE_ANALYTICS_MIGRATE_AT_START to "true",
+            com.lemline.runner.common.config.LEMLINE_ANALYTICS_BASELINE_ON_MIGRATE to "false",
+            com.lemline.runner.common.config.LEMLINE_OUTBOX_ENABLED to "false",
+            com.lemline.runner.common.config.LEMLINE_SCHEDULED_ENABLED to "false"
         )
     }
 

@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.analytics.config
 
-import com.lemline.runner.common.config.ANALYTICS_CONSUMER_ENABLED
+import com.lemline.runner.common.config.LEMLINE_ANALYTICS_CONSUMER_ENABLED
+import com.lemline.runner.common.config.LEMLINE_ANALYTICS_POSTGRES
 import io.agroal.api.AgroalDataSource
 import io.quarkus.agroal.DataSource
 import io.quarkus.flyway.FlywayDataSource
@@ -27,7 +28,7 @@ internal class AnalyticsManager {
         } else {
             throw IllegalStateException(
                 "Analytics datasource 'analytics' is not available. " +
-                    "Enable '$ANALYTICS_CONSUMER_ENABLED' and configure lemline.analytics.postgresql.*"
+                    "Enable '$LEMLINE_ANALYTICS_CONSUMER_ENABLED' and configure $LEMLINE_ANALYTICS_POSTGRES.*"
             )
         }
 
@@ -37,7 +38,7 @@ internal class AnalyticsManager {
         } else {
             throw IllegalStateException(
                 "Analytics Flyway datasource 'analytics' is not available. " +
-                    "Enable '$ANALYTICS_CONSUMER_ENABLED' and configure lemline.analytics.postgresql.*"
+                    "Enable '$LEMLINE_ANALYTICS_CONSUMER_ENABLED' and configure $LEMLINE_ANALYTICS_POSTGRES.*"
             )
         }
 }

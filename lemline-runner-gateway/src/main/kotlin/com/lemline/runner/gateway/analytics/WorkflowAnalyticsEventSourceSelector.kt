@@ -3,8 +3,10 @@ package com.lemline.runner.gateway.analytics
 
 import com.lemline.common.values.WorkflowId
 import com.lemline.runner.common.config.ANALYTICS_BACKEND_POSTGRESQL
-import com.lemline.runner.config.shared.LemlineConfiguration
-import com.lemline.runner.config.shared.*
+import com.lemline.runner.common.config.LEMLINE_ANALYTICS_POSTGRES
+import com.lemline.runner.common.config.LEMLINE_ANALYTICS_TYPE
+import com.lemline.runner.config.LemlineConfiguration
+import com.lemline.runner.config.analyticsTypeResolved
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.enterprise.inject.Instance
 import jakarta.inject.Inject
@@ -35,7 +37,7 @@ class WorkflowAnalyticsEventSourceSelector(
             } else {
                 throw IllegalStateException(
                     "Analytics type '$ANALYTICS_BACKEND_POSTGRESQL' requires datasource 'analytics'. " +
-                        "Configure lemline.analytics.postgresql.*"
+                        "Configure $LEMLINE_ANALYTICS_POSTGRES.*"
                 )
             }
         }
@@ -43,7 +45,7 @@ class WorkflowAnalyticsEventSourceSelector(
         AnalyticsBackend.CLICKHOUSE -> {
             throw IllegalStateException(
                 "Analytics type 'clickhouse' is not implemented yet in lemline-gateway. " +
-                    "Use lemline.analytics.type=postgresql."
+                    "Use $LEMLINE_ANALYTICS_TYPE=$ANALYTICS_BACKEND_POSTGRESQL."
             )
         }
     }

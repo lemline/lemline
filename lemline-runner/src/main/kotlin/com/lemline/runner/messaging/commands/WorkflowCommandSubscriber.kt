@@ -4,8 +4,8 @@ package com.lemline.runner.messaging.commands
 import com.lemline.core.states.WorkflowCommand
 import com.lemline.runner.common.messaging.InstanceMessage
 import com.lemline.runner.common.messaging.MessageSubscriber
-import com.lemline.runner.config.shared.LemlineConfigConstants.CONSUMER_CONCURRENCY_DEFAULT
-import com.lemline.runner.config.shared.LemlineConfiguration
+import com.lemline.runner.config.LemlineConfigConstants.CONSUMER_CONCURRENCY_DEFAULT
+import com.lemline.runner.config.LemlineConfiguration
 import io.quarkus.runtime.Startup
 import jakarta.enterprise.context.ApplicationScoped
 import kotlin.jvm.optionals.getOrNull

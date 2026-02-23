@@ -3,16 +3,14 @@ package com.lemline.runner.config
 
 import com.lemline.runner.cli.config.ConfigPathHolder
 import com.lemline.runner.common.config.ANALYTICS_BACKEND_CLICKHOUSE
-import com.lemline.runner.common.config.ANALYTICS_TYPE
-import com.lemline.runner.common.config.GATEWAY_AUTHENTICATION_ENABLED
-import com.lemline.runner.common.config.GATEWAY_AUTHENTICATION_JWT_ISSUER
-import com.lemline.runner.common.config.GATEWAY_AUTHENTICATION_JWT_JWKS_URL
-import com.lemline.runner.common.config.GATEWAY_CORS_ENABLED
-import com.lemline.runner.common.config.GATEWAY_ENABLED
-import com.lemline.runner.common.config.GATEWAY_TLS_CLIENT_AUTH
-import com.lemline.runner.common.config.GATEWAY_TLS_ENABLED
-import com.lemline.runner.config.shared.LemlineConfigConstants
-import com.lemline.runner.config.shared.LemlineConfigSource
+import com.lemline.runner.common.config.LEMLINE_ANALYTICS_TYPE
+import com.lemline.runner.common.config.LEMLINE_GATEWAY_AUTHENTICATION_ENABLED
+import com.lemline.runner.common.config.LEMLINE_GATEWAY_AUTHENTICATION_JWT_ISSUER
+import com.lemline.runner.common.config.LEMLINE_GATEWAY_AUTHENTICATION_JWT_JWKS_URL
+import com.lemline.runner.common.config.LEMLINE_GATEWAY_CORS_ENABLED
+import com.lemline.runner.common.config.LEMLINE_GATEWAY_ENABLED
+import com.lemline.runner.common.config.LEMLINE_GATEWAY_TLS_CLIENT_AUTH
+import com.lemline.runner.common.config.LEMLINE_GATEWAY_TLS_ENABLED
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -25,19 +23,22 @@ class LemlineConfigSourceGatewayTest {
     fun `generates analytics postgres datasource properties when gateway is enabled`() {
         withSystemProperties(
             mapOf(
-                GATEWAY_ENABLED to "true",
-                "lemline.analytics.postgresql.host" to "analytics-db",
-                "lemline.analytics.postgresql.port" to "5544",
-                "lemline.analytics.postgresql.database" to "analytics",
-                "lemline.analytics.postgresql.username" to "analytics_user",
-                "lemline.analytics.postgresql.password" to "analytics_pass",
+                LEMLINE_GATEWAY_ENABLED to "true",
+                com.lemline.runner.common.config.LEMLINE_ANALYTICS_POSTGRES_HOST to "analytics-db",
+                com.lemline.runner.common.config.LEMLINE_ANALYTICS_POSTGRES_PORT to "5544",
+                com.lemline.runner.common.config.LEMLINE_ANALYTICS_POSTGRES_DATABASE to "analytics",
+                com.lemline.runner.common.config.LEMLINE_ANALYTICS_POSTGRES_USERNAME to "analytics_user",
+                com.lemline.runner.common.config.LEMLINE_ANALYTICS_POSTGRES_PASSWORD to "analytics_pass",
             )
         ) {
             val source = LemlineConfigSource()
             assertEquals("postgresql", source.getValue("quarkus.datasource.analytics.db-kind"))
             assertEquals("analytics_user", source.getValue("quarkus.datasource.analytics.username"))
             assertEquals("analytics_pass", source.getValue("quarkus.datasource.analytics.password"))
-            assertEquals("jdbc:postgresql://analytics-db:5544/analytics", source.getValue("quarkus.datasource.analytics.jdbc.url"))
+            assertEquals(
+                "jdbc:postgresql://analytics-db:5544/analytics",
+                source.getValue("quarkus.datasource.analytics.jdbc.url")
+            )
             assertEquals(
                 "classpath:db/migration/analytics/postgresql",
                 source.getValue("quarkus.flyway.analytics.locations")
@@ -49,10 +50,10 @@ class LemlineConfigSourceGatewayTest {
     fun `does not generate analytics datasource for clickhouse type when lifecycle consumer is disabled`() {
         withSystemProperties(
             mapOf(
-                GATEWAY_ENABLED to "true",
-                ANALYTICS_TYPE to ANALYTICS_BACKEND_CLICKHOUSE,
-                "lemline.analytics.consumer.enabled" to "false",
-                "lemline.analytics.postgresql.host" to "analytics-db",
+                LEMLINE_GATEWAY_ENABLED to "true",
+                LEMLINE_ANALYTICS_TYPE to ANALYTICS_BACKEND_CLICKHOUSE,
+                com.lemline.runner.common.config.LEMLINE_ANALYTICS_CONSUMER_ENABLED to "false",
+                com.lemline.runner.common.config.LEMLINE_ANALYTICS_POSTGRES_HOST to "analytics-db",
             )
         ) {
             val source = LemlineConfigSource()
@@ -66,10 +67,10 @@ class LemlineConfigSourceGatewayTest {
     fun `still generates analytics datasource for clickhouse type when lifecycle consumer is enabled`() {
         withSystemProperties(
             mapOf(
-                GATEWAY_ENABLED to "true",
-                ANALYTICS_TYPE to ANALYTICS_BACKEND_CLICKHOUSE,
-                "lemline.analytics.consumer.enabled" to "true",
-                "lemline.analytics.postgresql.host" to "analytics-db",
+                LEMLINE_GATEWAY_ENABLED to "true",
+                LEMLINE_ANALYTICS_TYPE to ANALYTICS_BACKEND_CLICKHOUSE,
+                com.lemline.runner.common.config.LEMLINE_ANALYTICS_CONSUMER_ENABLED to "true",
+                com.lemline.runner.common.config.LEMLINE_ANALYTICS_POSTGRES_HOST to "analytics-db",
             )
         ) {
             val source = LemlineConfigSource()
@@ -90,8 +91,8 @@ class LemlineConfigSourceGatewayTest {
     fun `fails fast on unsupported analytics type when gateway is enabled`() {
         withSystemProperties(
             mapOf(
-                GATEWAY_ENABLED to "true",
-                ANALYTICS_TYPE to "oracle",
+                LEMLINE_GATEWAY_ENABLED to "true",
+                LEMLINE_ANALYTICS_TYPE to "oracle",
             )
         ) {
             assertFailsWith<IllegalStateException> {
@@ -104,7 +105,7 @@ class LemlineConfigSourceGatewayTest {
     fun `enables grpc web and gateway cors defaults when gateway is enabled`() {
         withSystemProperties(
             mapOf(
-                GATEWAY_ENABLED to "true",
+                LEMLINE_GATEWAY_ENABLED to "true",
             )
         ) {
             val source = LemlineConfigSource()
@@ -130,8 +131,8 @@ class LemlineConfigSourceGatewayTest {
     fun `disables cors when gateway cors enabled is false`() {
         withSystemProperties(
             mapOf(
-                GATEWAY_ENABLED to "true",
-                GATEWAY_CORS_ENABLED to "false",
+                LEMLINE_GATEWAY_ENABLED to "true",
+                LEMLINE_GATEWAY_CORS_ENABLED to "false",
             )
         ) {
             val source = LemlineConfigSource()
@@ -146,8 +147,8 @@ class LemlineConfigSourceGatewayTest {
     fun `enables plaintext grpc when tls is disabled`() {
         withSystemProperties(
             mapOf(
-                GATEWAY_ENABLED to "true",
-                GATEWAY_TLS_ENABLED to "false",
+                LEMLINE_GATEWAY_ENABLED to "true",
+                LEMLINE_GATEWAY_TLS_ENABLED to "false",
             )
         ) {
             val source = LemlineConfigSource()
@@ -160,10 +161,10 @@ class LemlineConfigSourceGatewayTest {
     fun `keeps tls client-auth when authentication is disabled`() {
         withSystemProperties(
             mapOf(
-                GATEWAY_ENABLED to "true",
-                GATEWAY_TLS_ENABLED to "true",
-                GATEWAY_TLS_CLIENT_AUTH to "required",
-                GATEWAY_AUTHENTICATION_ENABLED to "false",
+                LEMLINE_GATEWAY_ENABLED to "true",
+                LEMLINE_GATEWAY_TLS_ENABLED to "true",
+                LEMLINE_GATEWAY_TLS_CLIENT_AUTH to "required",
+                LEMLINE_GATEWAY_AUTHENTICATION_ENABLED to "false",
             )
         ) {
             val source = LemlineConfigSource()
@@ -178,10 +179,10 @@ class LemlineConfigSourceGatewayTest {
     fun `generates jwt verification settings when authentication is enabled`() {
         withSystemProperties(
             mapOf(
-                GATEWAY_ENABLED to "true",
-                GATEWAY_AUTHENTICATION_ENABLED to "true",
-                GATEWAY_AUTHENTICATION_JWT_ISSUER to "https://issuer.example.com",
-                GATEWAY_AUTHENTICATION_JWT_JWKS_URL to
+                LEMLINE_GATEWAY_ENABLED to "true",
+                LEMLINE_GATEWAY_AUTHENTICATION_ENABLED to "true",
+                LEMLINE_GATEWAY_AUTHENTICATION_JWT_ISSUER to "https://issuer.example.com",
+                LEMLINE_GATEWAY_AUTHENTICATION_JWT_JWKS_URL to
                     "https://issuer.example.com/.well-known/jwks.json",
             )
         ) {

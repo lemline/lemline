@@ -3,7 +3,7 @@ package com.lemline.runner.messaging.commands
 
 import com.lemline.core.states.WorkflowCommand
 import com.lemline.runner.common.messaging.InstanceMessage
-import com.lemline.runner.config.shared.LemlineConfiguration
+import com.lemline.runner.config.LemlineConfiguration
 import com.lemline.runner.messaging.MessageEmitter
 import io.quarkus.runtime.Startup
 import io.smallrye.reactive.messaging.MutinyEmitter

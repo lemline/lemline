@@ -4,7 +4,7 @@ package com.lemline.runner.analytics.config
 import com.lemline.common.info
 import com.lemline.common.logger
 import com.lemline.runner.analytics.config.AnalyticsConfigConstants.ANALYTICS_CONSUMER_ENABLED_DEFAULT
-import com.lemline.runner.common.config.ANALYTICS_CONSUMER_ENABLED
+import com.lemline.runner.common.config.LEMLINE_ANALYTICS_CONSUMER_ENABLED
 import io.quarkus.runtime.StartupEvent
 import jakarta.annotation.Priority
 import jakarta.enterprise.context.ApplicationScoped
@@ -15,7 +15,7 @@ import org.eclipse.microprofile.config.inject.ConfigProperty
 
 @ApplicationScoped
 internal class AnalyticsStartupValidator(
-    @param:ConfigProperty(name = ANALYTICS_CONSUMER_ENABLED, defaultValue = ANALYTICS_CONSUMER_ENABLED_DEFAULT)
+    @param:ConfigProperty(name = LEMLINE_ANALYTICS_CONSUMER_ENABLED, defaultValue = ANALYTICS_CONSUMER_ENABLED_DEFAULT)
     val analyticsEnabled: Boolean,
 ) {
     private val logger = logger()
@@ -40,7 +40,7 @@ internal class AnalyticsStartupValidator(
                 """
                 |
                 |═══════════════════════════════════════════════════════════════════════════════
-                |  ANALYTICS DATABASE CONNECTION FAILED
+                |  LEMLINE_ANALYTICS LEMLINE_DATABASE CONNECTION FAILED
                 |═══════════════════════════════════════════════════════════════════════════════
                 |
                 |  Unable to connect to the analytics PostgreSQL database.

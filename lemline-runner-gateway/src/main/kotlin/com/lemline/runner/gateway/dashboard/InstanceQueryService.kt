@@ -2,16 +2,17 @@
 package com.lemline.runner.gateway.dashboard
 
 import com.lemline.core.lifecycleevents.LifecycleEventType
-import com.lemline.runner.config.shared.LemlineConfiguration
-import com.lemline.runner.config.shared.*
+import com.lemline.runner.common.config.LEMLINE_ANALYTICS_POSTGRES
+import com.lemline.runner.config.LemlineConfiguration
+import com.lemline.runner.config.analyticsSchemaResolved
+import com.lemline.runner.config.analyticsTableResolved
 import io.agroal.api.AgroalDataSource
 import io.quarkus.agroal.DataSource
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.enterprise.inject.Instance
 import jakarta.inject.Inject
 import java.nio.charset.StandardCharsets
-import java.util.Base64
-import java.util.UUID
+import java.util.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -24,7 +25,8 @@ class InstanceQueryService(
     @DataSource("analytics")
     lateinit var analyticsDataSource: Instance<AgroalDataSource>
 
-    private val analyticsQualifiedTable = DashboardSqlSupport.qualifiedTable(config.analyticsSchemaResolved, config.analyticsTableResolved)
+    private val analyticsQualifiedTable =
+        DashboardSqlSupport.qualifiedTable(config.analyticsSchemaResolved, config.analyticsTableResolved)
 
     suspend fun listInstances(filter: InstanceQueryFilter): ListInstancesResult = withContext(Dispatchers.IO) {
         val normalizedPageSize = normalizePageSize(filter.pageSize)
@@ -424,7 +426,7 @@ class InstanceQueryService(
     private fun requireAnalyticsDataSource(): AgroalDataSource {
         if (analyticsDataSource.isResolvable) return analyticsDataSource.get()
         throw IllegalStateException(
-            "Analytics datasource 'analytics' is not available. Configure lemline.analytics.postgresql.*"
+            "Analytics datasource 'analytics' is not available. Configure $LEMLINE_ANALYTICS_POSTGRES.*"
         )
     }
 

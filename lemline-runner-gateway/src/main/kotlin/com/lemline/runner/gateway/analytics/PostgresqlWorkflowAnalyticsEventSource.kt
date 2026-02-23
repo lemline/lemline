@@ -2,6 +2,10 @@
 package com.lemline.runner.gateway.analytics
 
 import com.lemline.common.values.WorkflowId
+import com.lemline.runner.common.config.LEMLINE_ANALYTICS_POSTGRES
+import com.lemline.runner.config.LemlineConfiguration
+import com.lemline.runner.config.analyticsSchemaResolved
+import com.lemline.runner.config.analyticsTableResolved
 import io.agroal.api.AgroalDataSource
 import io.quarkus.agroal.DataSource
 import jakarta.enterprise.context.ApplicationScoped
@@ -10,8 +14,6 @@ import jakarta.enterprise.inject.Typed
 import jakarta.inject.Inject
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import com.lemline.runner.config.shared.LemlineConfiguration
-import com.lemline.runner.config.shared.*
 
 @ApplicationScoped
 @Typed(PostgresqlWorkflowAnalyticsEventSource::class)
@@ -77,7 +79,7 @@ class PostgresqlWorkflowAnalyticsEventSource(
     private fun requireAnalyticsDataSource(): AgroalDataSource {
         if (analyticsDataSource.isResolvable) return analyticsDataSource.get()
         throw IllegalStateException(
-            "Analytics datasource 'analytics' is not available. Configure lemline.analytics.postgresql.*"
+            "Analytics datasource 'analytics' is not available. Configure $LEMLINE_ANALYTICS_POSTGRES.*"
         )
     }
 

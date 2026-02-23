@@ -37,27 +37,27 @@ class PgmqProfile : QuarkusTestProfile {
             // Database configuration is provided by PgmqTestResource via lemline.database.postgresql.*
 
             // Messaging type
-            "lemline.messaging.type" to MessagingType.PGMQ.configValue,
+            com.lemline.runner.common.config.LEMLINE_MESSAGING_TYPE to MessagingType.PGMQ.configValue,
 
             // Channel enabled flags
-            "lemline.messaging.commands.consumer.enabled" to "true",
-            "lemline.messaging.commands.producer.enabled" to "true",
-            "lemline.messaging.events.consumer.enabled" to "true",
-            "lemline.messaging.events.producer.enabled" to "true",
-            "lemline.messaging.cloudevents.consumer.enabled" to "true",
-            "lemline.messaging.cloudevents.producer.enabled" to "true",
-            "lemline.messaging.lifecycleevents.producer.enabled" to "true",
+            com.lemline.runner.common.config.LEMLINE_MESSAGING_COMMANDS_CONSUMER_ENABLED to "true",
+            com.lemline.runner.common.config.LEMLINE_MESSAGING_COMMANDS_PRODUCER_ENABLED to "true",
+            com.lemline.runner.common.config.LEMLINE_MESSAGING_EVENTS_CONSUMER_ENABLED to "true",
+            com.lemline.runner.common.config.LEMLINE_MESSAGING_EVENTS_PRODUCER_ENABLED to "true",
+            com.lemline.runner.common.config.LEMLINE_MESSAGING_CLOUDEVENTS_CONSUMER_ENABLED to "true",
+            com.lemline.runner.common.config.LEMLINE_MESSAGING_CLOUDEVENTS_PRODUCER_ENABLED to "true",
+            com.lemline.runner.common.config.LEMLINE_MESSAGING_LIFECYCLE_EVENTS_PRODUCER_ENABLED to "true",
 
             // Queue names for test isolation (transformed by LemlineConfigSource)
             // Note: Consumer and producer use different queues for testing
             // (production would typically use the same queue)
-            "lemline.messaging.pgmq.commands.queue" to "lemline-commands-in",
-            "lemline.messaging.pgmq.commands.producer.queue-out" to "lemline-commands-out",
-            "lemline.messaging.pgmq.events.queue" to "lemline-events-in",
-            "lemline.messaging.pgmq.events.producer.queue-out" to "lemline-events-out",
-            "lemline.messaging.pgmq.cloudevents.queue" to "lemline-cloudevents-in",
-            "lemline.messaging.pgmq.cloudevents.producer.queue-out" to "lemline-cloudevents-out",
-            "lemline.messaging.pgmq.lifecycleevents.queue" to "lemline-lifecycleevents",
+            com.lemline.runner.common.config.LEMLINE_MESSAGING_PGMQ_COMMANDS_QUEUE to "lemline-commands-in",
+            com.lemline.runner.common.config.LEMLINE_MESSAGING_PGMQ_COMMANDS_PRODUCER_QUEUE_OUT to "lemline-commands-out",
+            com.lemline.runner.common.config.LEMLINE_MESSAGING_PGMQ_EVENTS_QUEUE to "lemline-events-in",
+            com.lemline.runner.common.config.LEMLINE_MESSAGING_PGMQ_EVENTS_PRODUCER_QUEUE_OUT to "lemline-events-out",
+            com.lemline.runner.common.config.LEMLINE_MESSAGING_PGMQ_CLOUDEVENTS_QUEUE to "lemline-cloudevents-in",
+            com.lemline.runner.common.config.LEMLINE_MESSAGING_PGMQ_CLOUDEVENTS_PRODUCER_QUEUE_OUT to "lemline-cloudevents-out",
+            com.lemline.runner.common.config.LEMLINE_MESSAGING_PGMQ_LIFECYCLE_EVENTS_QUEUE to "lemline-lifecycleevents",
 
             // =============================================================
             // Test-only infrastructure tweaks (bypass LemlineConfigSource)

@@ -9,13 +9,13 @@ class InMemoryAnalyticsProfile : QuarkusTestProfile {
 
     override fun getConfigOverrides(): Map<String, String> {
         return base.configOverrides + mapOf(
-            "lemline.analytics.consumer.enabled" to "true",
-            "lemline.analytics.consumer.concurrency" to "16",
-            "lemline.messaging.lifecycleevents.producer.enabled" to "false",
-            "lemline.analytics.migrate-at-start" to "true",
-            "lemline.analytics.baseline-on-migrate" to "false",
-            "lemline.outbox.enabled" to "false",
-            "lemline.scheduled.enabled" to "false"
+            com.lemline.runner.common.config.LEMLINE_ANALYTICS_CONSUMER_ENABLED to "true",
+            com.lemline.runner.common.config.LEMLINE_ANALYTICS_CONSUMER_CONCURRENCY to "16",
+            com.lemline.runner.common.config.LEMLINE_MESSAGING_LIFECYCLE_EVENTS_PRODUCER_ENABLED to "false",
+            com.lemline.runner.common.config.LEMLINE_ANALYTICS_MIGRATE_AT_START to "true",
+            com.lemline.runner.common.config.LEMLINE_ANALYTICS_BASELINE_ON_MIGRATE to "false",
+            com.lemline.runner.common.config.LEMLINE_OUTBOX_ENABLED to "false",
+            com.lemline.runner.common.config.LEMLINE_SCHEDULED_ENABLED to "false"
         )
     }
 

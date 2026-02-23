@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.tests.profiles
 
-import com.lemline.runner.common.test.RequiresDocker
 import com.lemline.runner.common.config.DatabaseType
 import com.lemline.runner.common.config.MessagingType
-import com.lemline.runner.config.shared.LemlineConfiguration
+import com.lemline.runner.common.test.RequiresDocker
+import com.lemline.runner.config.LemlineConfiguration
 import io.quarkus.test.junit.QuarkusTest
 import io.quarkus.test.junit.TestProfile
 import jakarta.inject.Inject

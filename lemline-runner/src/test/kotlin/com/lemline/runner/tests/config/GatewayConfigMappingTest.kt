@@ -2,7 +2,7 @@
 package com.lemline.runner.tests.config
 
 import com.lemline.runner.common.config.ANALYTICS_BACKEND_CLICKHOUSE
-import com.lemline.runner.config.shared.LemlineConfiguration
+import com.lemline.runner.config.LemlineConfiguration
 import com.lemline.runner.tests.profiles.GatewayConfigMappingProfile
 import io.quarkus.test.junit.QuarkusTest
 import io.quarkus.test.junit.TestProfile

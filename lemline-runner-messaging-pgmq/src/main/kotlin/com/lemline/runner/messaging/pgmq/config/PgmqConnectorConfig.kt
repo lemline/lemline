@@ -29,7 +29,7 @@ class PgmqConnectorConfig(
         // Configuration property names
         const val HOST = "host"
         const val PORT = "port"
-        const val DATABASE = "database"
+        const val LEMLINE_DATABASE = "database"
         const val USERNAME = "username"
         const val PASSWORD = "password"
         const val QUEUE = "queue"
@@ -74,7 +74,7 @@ class PgmqConnectorConfig(
         get() = getProperty(PORT)?.toIntOrNull() ?: DEFAULT_PORT
 
     val database: String
-        get() = getProperty(DATABASE) ?: DEFAULT_DATABASE
+        get() = getProperty(LEMLINE_DATABASE) ?: DEFAULT_DATABASE
 
     val username: String
         get() = getProperty(USERNAME) ?: DEFAULT_USERNAME

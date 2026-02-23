@@ -16,7 +16,7 @@ import com.lemline.runner.activities.functions.FunctionResolver
 import com.lemline.runner.common.messaging.CompensationException
 import com.lemline.runner.common.messaging.InstanceMessage
 import com.lemline.runner.common.messaging.toLogString
-import com.lemline.runner.config.shared.LemlineConfiguration
+import com.lemline.runner.config.LemlineConfiguration
 import com.lemline.runner.definitions.DefinitionRepository
 import com.lemline.runner.failures.FailureModel
 import com.lemline.runner.failures.FailureReasons.DEFINITION_MISSING

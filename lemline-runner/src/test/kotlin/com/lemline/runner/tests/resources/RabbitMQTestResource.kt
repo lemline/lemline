@@ -40,10 +40,10 @@ class RabbitMQTestResource : QuarkusTestResourceLifecycleManager {
         // and rabbitmq-* properties (for SmallRye RabbitMQ connector)
         val properties = mapOf(
             // Lemline config properties (read by MessagingStartupValidator via LemlineConfiguration)
-            "lemline.messaging.rabbitmq.hostname" to rabbitmq.host,
-            "lemline.messaging.rabbitmq.port" to rabbitmq.getMappedPort(5672).toString(),
-            "lemline.messaging.rabbitmq.username" to rabbitmq.adminUsername,
-            "lemline.messaging.rabbitmq.password" to rabbitmq.adminPassword,
+            com.lemline.runner.common.config.LEMLINE_MESSAGING_RABBITMQ_HOSTNAME to rabbitmq.host,
+            com.lemline.runner.common.config.LEMLINE_MESSAGING_RABBITMQ_PORT to rabbitmq.getMappedPort(5672).toString(),
+            com.lemline.runner.common.config.LEMLINE_MESSAGING_RABBITMQ_USERNAME to rabbitmq.adminUsername,
+            com.lemline.runner.common.config.LEMLINE_MESSAGING_RABBITMQ_PASSWORD to rabbitmq.adminPassword,
             // SmallRye connector properties (used by reactive messaging)
             "rabbitmq-host" to rabbitmq.host,
             "rabbitmq-port" to rabbitmq.getMappedPort(5672).toString(),
@@ -59,10 +59,10 @@ class RabbitMQTestResource : QuarkusTestResourceLifecycleManager {
 
     override fun stop() {
         // Clear system properties to prevent conflicts with other test profiles
-        System.clearProperty("lemline.messaging.rabbitmq.hostname")
-        System.clearProperty("lemline.messaging.rabbitmq.port")
-        System.clearProperty("lemline.messaging.rabbitmq.username")
-        System.clearProperty("lemline.messaging.rabbitmq.password")
+        System.clearProperty(com.lemline.runner.common.config.LEMLINE_MESSAGING_RABBITMQ_HOSTNAME)
+        System.clearProperty(com.lemline.runner.common.config.LEMLINE_MESSAGING_RABBITMQ_PORT)
+        System.clearProperty(com.lemline.runner.common.config.LEMLINE_MESSAGING_RABBITMQ_USERNAME)
+        System.clearProperty(com.lemline.runner.common.config.LEMLINE_MESSAGING_RABBITMQ_PASSWORD)
         System.clearProperty("rabbitmq-host")
         System.clearProperty("rabbitmq-port")
         System.clearProperty("rabbitmq-username")

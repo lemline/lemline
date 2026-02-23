@@ -1,8 +1,10 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.gateway.auth
 
-import com.lemline.runner.config.shared.LemlineConfiguration
-import com.lemline.runner.config.shared.*
+import com.lemline.runner.config.LemlineConfiguration
+import com.lemline.runner.config.gatewayAuthenticationEnabled
+import com.lemline.runner.config.gatewayAuthenticationNamespacesField
+import com.lemline.runner.config.gatewayAuthenticationScopeField
 import com.lemline.runner.gateway.errors.GatewayPermissionDeniedException
 import jakarta.enterprise.context.ApplicationScoped
 import org.eclipse.microprofile.jwt.JsonWebToken

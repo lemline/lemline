@@ -2,9 +2,10 @@
 package com.lemline.runner.gateway.dashboard
 
 import com.lemline.runner.common.config.DatabaseConfig
+import com.lemline.runner.config.LemlineConfiguration
+import com.lemline.runner.config.analyticsSchemaResolved
+import com.lemline.runner.config.analyticsTableResolved
 import com.lemline.runner.definitions.DEFINITION_TABLE
-import com.lemline.runner.config.shared.LemlineConfiguration
-import com.lemline.runner.config.shared.*
 import io.agroal.api.AgroalDataSource
 import io.quarkus.agroal.DataSource
 import jakarta.enterprise.context.ApplicationScoped
@@ -26,7 +27,8 @@ class DefinitionQueryService(
     @DataSource("analytics")
     lateinit var analyticsDataSource: Instance<AgroalDataSource>
 
-    private val analyticsQualifiedTable = DashboardSqlSupport.qualifiedTable(config.analyticsSchemaResolved, config.analyticsTableResolved)
+    private val analyticsQualifiedTable =
+        DashboardSqlSupport.qualifiedTable(config.analyticsSchemaResolved, config.analyticsTableResolved)
 
     suspend fun listNamespaces(): List<String> {
         val primary = listPrimaryNamespaces()

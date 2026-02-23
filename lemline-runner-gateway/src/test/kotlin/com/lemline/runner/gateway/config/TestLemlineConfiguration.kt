@@ -2,10 +2,10 @@
 package com.lemline.runner.gateway.config
 
 import com.lemline.runner.common.config.ANALYTICS_BACKEND_POSTGRESQL
-import com.lemline.runner.config.shared.LemlineConfiguration
+import com.lemline.runner.config.LemlineConfiguration
 import io.mockk.every
 import io.mockk.mockk
-import java.util.Optional
+import java.util.*
 
 internal fun testLemlineConfiguration(
     gatewayEnabled: Boolean = false,

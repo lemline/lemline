@@ -10,25 +10,25 @@ import io.quarkus.test.junit.QuarkusTestProfile
 class RabbitMQAnalyticsProfile : QuarkusTestProfile {
     override fun getConfigOverrides(): Map<String, String> {
         return mapOf(
-            "lemline.database.type" to DatabaseType.H2.configValue,
-            "lemline.messaging.type" to MessagingType.RABBITMQ.configValue,
-            "lemline.messaging.commands.consumer.enabled" to "false",
-            "lemline.messaging.commands.producer.enabled" to "false",
-            "lemline.messaging.events.consumer.enabled" to "false",
-            "lemline.messaging.events.producer.enabled" to "false",
-            "lemline.messaging.cloudevents.consumer.enabled" to "false",
-            "lemline.messaging.cloudevents.producer.enabled" to "false",
-            "lemline.messaging.lifecycleevents.producer.enabled" to "true",
-            "lemline.analytics.consumer.enabled" to "true",
-            "lemline.analytics.consumer.concurrency" to "16",
-            "lemline.messaging.rabbitmq.lifecycleevents.queue" to "lemline-lifecycle-analytics-rabbitmq",
-            "lemline.messaging.rabbitmq.lifecycleevents.producer.exchange-name" to "lemline-lifecycle-analytics-exchange",
+            com.lemline.runner.common.config.LEMLINE_DATABASE_TYPE to DatabaseType.H2.configValue,
+            com.lemline.runner.common.config.LEMLINE_MESSAGING_TYPE to MessagingType.RABBITMQ.configValue,
+            com.lemline.runner.common.config.LEMLINE_MESSAGING_COMMANDS_CONSUMER_ENABLED to "false",
+            com.lemline.runner.common.config.LEMLINE_MESSAGING_COMMANDS_PRODUCER_ENABLED to "false",
+            com.lemline.runner.common.config.LEMLINE_MESSAGING_EVENTS_CONSUMER_ENABLED to "false",
+            com.lemline.runner.common.config.LEMLINE_MESSAGING_EVENTS_PRODUCER_ENABLED to "false",
+            com.lemline.runner.common.config.LEMLINE_MESSAGING_CLOUDEVENTS_CONSUMER_ENABLED to "false",
+            com.lemline.runner.common.config.LEMLINE_MESSAGING_CLOUDEVENTS_PRODUCER_ENABLED to "false",
+            com.lemline.runner.common.config.LEMLINE_MESSAGING_LIFECYCLE_EVENTS_PRODUCER_ENABLED to "true",
+            com.lemline.runner.common.config.LEMLINE_ANALYTICS_CONSUMER_ENABLED to "true",
+            com.lemline.runner.common.config.LEMLINE_ANALYTICS_CONSUMER_CONCURRENCY to "16",
+            com.lemline.runner.common.config.LEMLINE_MESSAGING_RABBITMQ_LIFECYCLE_EVENTS_QUEUE to "lemline-lifecycle-analytics-rabbitmq",
+            com.lemline.runner.common.config.LEMLINE_MESSAGING_RABBITMQ_LIFECYCLE_EVENTS_PRODUCER_EXCHANGE_NAME to "lemline-lifecycle-analytics-exchange",
             "mp.messaging.incoming.lifecycleevents-in.exchange.type" to "fanout",
             "mp.messaging.outgoing.lifecycleevents-out.exchange.type" to "fanout",
-            "lemline.analytics.migrate-at-start" to "true",
-            "lemline.analytics.baseline-on-migrate" to "false",
-            "lemline.outbox.enabled" to "false",
-            "lemline.scheduled.enabled" to "false"
+            com.lemline.runner.common.config.LEMLINE_ANALYTICS_MIGRATE_AT_START to "true",
+            com.lemline.runner.common.config.LEMLINE_ANALYTICS_BASELINE_ON_MIGRATE to "false",
+            com.lemline.runner.common.config.LEMLINE_OUTBOX_ENABLED to "false",
+            com.lemline.runner.common.config.LEMLINE_SCHEDULED_ENABLED to "false"
         )
     }
 

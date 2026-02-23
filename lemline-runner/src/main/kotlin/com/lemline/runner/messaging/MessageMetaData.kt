@@ -4,7 +4,7 @@ package com.lemline.runner.messaging
 import com.lemline.common.logger.logger
 import com.lemline.common.values.IDV7
 import com.lemline.runner.common.config.MessagingType
-import com.lemline.runner.config.shared.LemlineConfiguration
+import com.lemline.runner.config.LemlineConfiguration
 import com.lemline.runner.messaging.pgmq.connector.PgmqIncomingMetadata
 import com.lemline.runner.messaging.pgmq.connector.PgmqOutgoingMetadata
 import io.smallrye.reactive.messaging.kafka.api.IncomingKafkaRecordMetadata

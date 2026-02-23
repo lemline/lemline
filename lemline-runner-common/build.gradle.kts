@@ -238,7 +238,8 @@ abstract class GenerateLemlineConfigKeysTask : DefaultTask() {
                 .split('.')
                 .flatMap(::segmentToTokens)
                 .joinToString("_") { it.uppercase(Locale.ROOT) }
-            return if (name.firstOrNull()?.isDigit() == true) "_$name" else name
+            val prefixed = "LEMLINE_$name"
+            return if (prefixed.firstOrNull()?.isDigit() == true) "_$prefixed" else prefixed
         }
 
         val constantsByName = linkedMapOf<String, String>()
@@ -261,6 +262,8 @@ abstract class GenerateLemlineConfigKeysTask : DefaultTask() {
                 appendLine("// SPDX-License-Identifier: BUSL-1.1")
                 appendLine("// Generated from lemline-runner-config/LemlineConfiguration.kt. Do not edit manually.")
                 appendLine("package com.lemline.runner.common.config")
+                appendLine()
+                appendLine("const val LEMLINE_PREFIX = \"$prefix.\"")
                 appendLine()
                 constantsByName.toSortedMap().forEach { (name, key) ->
                     appendLine("const val $name = \"$key\"")
@@ -286,12 +289,19 @@ val generateLemlineConfigKeys by tasks.registering(GenerateLemlineConfigKeysTask
     outputDir.set(generatedLemlineConfigKeysDir)
 }
 
-sourceSets {
-    named("main") {
-        java.srcDir(generatedLemlineConfigKeysDir)
-    }
+sourceSets.named("main") {
+    // Task-backed source dir ensures generated keys are recreated after clean before compilation/testing.
+    java.srcDir(generateLemlineConfigKeys)
 }
 
 tasks.withType<KotlinCompile>().configureEach {
+    dependsOn(generateLemlineConfigKeys)
+}
+
+tasks.named("classes") {
+    dependsOn(generateLemlineConfigKeys)
+}
+
+tasks.named("testClasses") {
     dependsOn(generateLemlineConfigKeys)
 }

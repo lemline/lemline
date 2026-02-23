@@ -24,9 +24,9 @@ class PostgresProfile : QuarkusTestProfile {
     override fun getConfigOverrides(): Map<String, String> {
         return mapOf(
             // Database configuration
-            "lemline.database.type" to DatabaseType.POSTGRESQL.configValue,
+            com.lemline.runner.common.config.LEMLINE_DATABASE_TYPE to DatabaseType.POSTGRESQL.configValue,
             // Messaging configuration
-            "lemline.messaging.type" to MessagingType.IN_MEMORY.configValue,
+            com.lemline.runner.common.config.LEMLINE_MESSAGING_TYPE to MessagingType.IN_MEMORY.configValue,
         )
     }
 

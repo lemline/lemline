@@ -25,18 +25,18 @@ import com.lemline.gateway.v1.WatchDefinitionStatsRequest
 import com.lemline.gateway.v1.WatchInstancesRequest
 import com.lemline.gateway.v1.WatchWorkflowRequest
 import com.lemline.gateway.v1.WorkflowAnalyticsEvent
+import com.lemline.gateway.v1.WorkflowDefinitionSummary
 import com.lemline.gateway.v1.WorkflowGatewayGrpc
 import com.lemline.gateway.v1.WorkflowInstance
-import com.lemline.gateway.v1.WorkflowDefinitionSummary
+import com.lemline.runner.config.LemlineConfiguration
+import com.lemline.runner.config.gatewayAuthenticationEnabled
 import com.lemline.runner.gateway.auth.GatewayAuthContext
 import com.lemline.runner.gateway.auth.GatewayPrincipal
-import com.lemline.runner.config.shared.LemlineConfiguration
-import com.lemline.runner.config.shared.*
 import com.lemline.runner.gateway.dashboard.DefinitionQueryService
+import com.lemline.runner.gateway.dashboard.InstanceQueryFilter
 import com.lemline.runner.gateway.dashboard.InstanceQueryService
 import com.lemline.runner.gateway.dashboard.InstanceStreamService
 import com.lemline.runner.gateway.dashboard.InstanceUpdateType
-import com.lemline.runner.gateway.dashboard.InstanceQueryFilter
 import com.lemline.runner.gateway.dashboard.StatsQueryFilter
 import com.lemline.runner.gateway.dashboard.TimelineQueryService
 import com.lemline.runner.gateway.dashboard.WatchInstancesFilter
@@ -58,7 +58,7 @@ import jakarta.enterprise.event.Observes
 import jakarta.inject.Inject
 import jakarta.inject.Singleton
 import java.time.Instant
-import java.util.UUID
+import java.util.*
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -504,7 +504,8 @@ class WorkflowGatewayGrpcService(
     }
 
     private fun resolvePrincipalOrNull(): GatewayPrincipal? {
-        return GatewayAuthContext.getOrNull() ?: if (!config.gatewayAuthenticationEnabled) GatewayPrincipal.dashboardAnonymous else null
+        return GatewayAuthContext.getOrNull()
+            ?: if (!config.gatewayAuthenticationEnabled) GatewayPrincipal.dashboardAnonymous else null
     }
 
     private fun parseWorkflowId(request: WatchWorkflowRequest): WorkflowId {

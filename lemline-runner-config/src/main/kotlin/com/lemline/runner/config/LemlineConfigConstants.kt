@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-package com.lemline.runner.config.shared
+package com.lemline.runner.config
 
 /**
  * Constants for Lemline configuration.
@@ -100,8 +100,5 @@ object LemlineConfigConstants {
     const val PGMQ_VISIBILITY_TIMEOUT_DEFAULT = "30"
     const val PGMQ_POLL_INTERVAL_DEFAULT = "100"
     const val PGMQ_BATCH_SIZE_DEFAULT = "10"
-    const val PGMQ_MAX_POOL_SIZE_DEFAULT = "5"
     const val PGMQ_MAX_RETRIES_DEFAULT = "3"
-    const val PGMQ_COMMANDS_GROUP_ID_DEFAULT = "lemline-commands-group"
-    const val PGMQ_EVENTS_GROUP_ID_DEFAULT = "lemline-events-group"
 }

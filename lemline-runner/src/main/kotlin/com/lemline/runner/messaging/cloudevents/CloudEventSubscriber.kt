@@ -2,8 +2,8 @@
 package com.lemline.runner.messaging.cloudevents
 
 import com.lemline.runner.common.messaging.MessageSubscriber
-import com.lemline.runner.config.shared.LemlineConfigConstants.CONSUMER_CONCURRENCY_DEFAULT
-import com.lemline.runner.config.shared.LemlineConfiguration
+import com.lemline.runner.config.LemlineConfigConstants.CONSUMER_CONCURRENCY_DEFAULT
+import com.lemline.runner.config.LemlineConfiguration
 import io.cloudevents.CloudEvent
 import io.quarkus.runtime.Startup
 import jakarta.enterprise.context.ApplicationScoped

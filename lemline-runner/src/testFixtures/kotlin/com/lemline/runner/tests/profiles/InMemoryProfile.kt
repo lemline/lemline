@@ -19,33 +19,33 @@ class InMemoryProfile : QuarkusTestProfile {
     override fun getConfigOverrides(): Map<String, String> {
         return mapOf(
             // Database configuration
-            "lemline.database.type" to DatabaseType.H2.configValue,
+            com.lemline.runner.common.config.LEMLINE_DATABASE_TYPE to DatabaseType.H2.configValue,
             // Messaging configuration
-            "lemline.messaging.type" to MessagingType.IN_MEMORY.configValue,
-            "lemline.messaging.commands.consumer.enabled" to "true",
-            "lemline.messaging.commands.producer.enabled" to "true",
-            "lemline.messaging.events.consumer.enabled" to "true",
-            "lemline.messaging.events.producer.enabled" to "true",
-            "lemline.messaging.cloudevents.consumer.enabled" to "true",
-            "lemline.messaging.cloudevents.producer.enabled" to "true",
+            com.lemline.runner.common.config.LEMLINE_MESSAGING_TYPE to MessagingType.IN_MEMORY.configValue,
+            com.lemline.runner.common.config.LEMLINE_MESSAGING_COMMANDS_CONSUMER_ENABLED to "true",
+            com.lemline.runner.common.config.LEMLINE_MESSAGING_COMMANDS_PRODUCER_ENABLED to "true",
+            com.lemline.runner.common.config.LEMLINE_MESSAGING_EVENTS_CONSUMER_ENABLED to "true",
+            com.lemline.runner.common.config.LEMLINE_MESSAGING_EVENTS_PRODUCER_ENABLED to "true",
+            com.lemline.runner.common.config.LEMLINE_MESSAGING_CLOUDEVENTS_CONSUMER_ENABLED to "true",
+            com.lemline.runner.common.config.LEMLINE_MESSAGING_CLOUDEVENTS_PRODUCER_ENABLED to "true",
 
             // Enable lifecycle events producer so events flow through the broker
-            "lemline.messaging.lifecycleevents.producer.enabled" to "true",
+            com.lemline.runner.common.config.LEMLINE_MESSAGING_LIFECYCLE_EVENTS_PRODUCER_ENABLED to "true",
             // Configure lifecycleevents-in channel for test listener (loopback)
             "mp.messaging.incoming.lifecycleevents-in.connector" to "smallrye-in-memory",
 
             // Enable outbox schedulers for tests that need them (Listen, Wait, Retry, etc.)
-            "lemline.outbox.enabled" to "true",
+            com.lemline.runner.common.config.LEMLINE_OUTBOX_ENABLED to "true",
             // Fast polling for tests (no jitter - start immediately for deterministic testing)
-            "lemline.outbox.wait.outbox.every" to "1s",
-            "lemline.outbox.wait.outbox.initial-jitter" to "0s",
-            "lemline.outbox.retry.outbox.every" to "1s",
-            "lemline.outbox.retry.outbox.initial-jitter" to "0s",
-            "lemline.outbox.schedule.outbox.every" to "1s",
-            "lemline.outbox.schedule.outbox.initial-jitter" to "0s",
+            com.lemline.runner.common.config.LEMLINE_OUTBOX_WAIT_OUTBOX_EVERY to "1s",
+            com.lemline.runner.common.config.LEMLINE_OUTBOX_WAIT_OUTBOX_INITIAL_JITTER to "0s",
+            com.lemline.runner.common.config.LEMLINE_OUTBOX_RETRY_OUTBOX_EVERY to "1s",
+            com.lemline.runner.common.config.LEMLINE_OUTBOX_RETRY_OUTBOX_INITIAL_JITTER to "0s",
+            com.lemline.runner.common.config.LEMLINE_OUTBOX_SCHEDULE_OUTBOX_EVERY to "1s",
+            com.lemline.runner.common.config.LEMLINE_OUTBOX_SCHEDULE_OUTBOX_INITIAL_JITTER to "0s",
             // Listener outbox config (for listen task tests, includes foreach processing)
-            "lemline.outbox.listener.outbox.every" to "1s",
-            "lemline.outbox.listener.outbox.initial-jitter" to "0s"
+            com.lemline.runner.common.config.LEMLINE_OUTBOX_LISTENER_OUTBOX_EVERY to "1s",
+            com.lemline.runner.common.config.LEMLINE_OUTBOX_LISTENER_OUTBOX_INITIAL_JITTER to "0s"
         )
     }
 

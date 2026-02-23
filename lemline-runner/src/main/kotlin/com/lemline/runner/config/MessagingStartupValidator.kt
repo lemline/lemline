@@ -4,7 +4,6 @@ package com.lemline.runner.config
 import com.lemline.common.info
 import com.lemline.common.logger
 import com.lemline.runner.common.config.MessagingType
-import com.lemline.runner.config.shared.LemlineConfiguration
 import io.quarkus.runtime.StartupEvent
 import jakarta.annotation.Priority
 import jakarta.enterprise.context.ApplicationScoped

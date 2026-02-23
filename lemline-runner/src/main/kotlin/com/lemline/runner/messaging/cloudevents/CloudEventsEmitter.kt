@@ -2,7 +2,7 @@
 package com.lemline.runner.messaging.cloudevents
 
 import com.lemline.common.logger.logger
-import com.lemline.runner.config.shared.LemlineConfiguration
+import com.lemline.runner.config.LemlineConfiguration
 import com.lemline.runner.listeners.CloudEventService
 import io.cloudevents.CloudEvent
 import io.cloudevents.core.builder.CloudEventBuilder

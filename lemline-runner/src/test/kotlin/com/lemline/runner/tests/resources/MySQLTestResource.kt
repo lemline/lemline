@@ -24,11 +24,11 @@ class MySQLTestResource : QuarkusTestResourceLifecycleManager {
 
         // Return the profile setting
         val properties = mapOf(
-            "lemline.database.mysql.host" to mysql.host,
-            "lemline.database.mysql.port" to mysql.firstMappedPort.toString(),
-            "lemline.database.mysql.database" to mysql.databaseName,
-            "lemline.database.mysql.username" to mysql.username,
-            "lemline.database.mysql.password" to mysql.password,
+            com.lemline.runner.common.config.LEMLINE_DATABASE_MYSQL_HOST to mysql.host,
+            com.lemline.runner.common.config.LEMLINE_DATABASE_MYSQL_PORT to mysql.firstMappedPort.toString(),
+            com.lemline.runner.common.config.LEMLINE_DATABASE_MYSQL_DATABASE to mysql.databaseName,
+            com.lemline.runner.common.config.LEMLINE_DATABASE_MYSQL_USERNAME to mysql.username,
+            com.lemline.runner.common.config.LEMLINE_DATABASE_MYSQL_PASSWORD to mysql.password,
         )
 
         // Set as system properties so that [LemlineConfigSource] can see them.
@@ -39,11 +39,11 @@ class MySQLTestResource : QuarkusTestResourceLifecycleManager {
 
     override fun stop() {
         // Clear system properties to prevent conflicts with other test profiles
-        System.clearProperty("lemline.database.mysql.host")
-        System.clearProperty("lemline.database.mysql.port")
-        System.clearProperty("lemline.database.mysql.database")
-        System.clearProperty("lemline.database.mysql.username")
-        System.clearProperty("lemline.database.mysql.password")
+        System.clearProperty(com.lemline.runner.common.config.LEMLINE_DATABASE_MYSQL_HOST)
+        System.clearProperty(com.lemline.runner.common.config.LEMLINE_DATABASE_MYSQL_PORT)
+        System.clearProperty(com.lemline.runner.common.config.LEMLINE_DATABASE_MYSQL_DATABASE)
+        System.clearProperty(com.lemline.runner.common.config.LEMLINE_DATABASE_MYSQL_USERNAME)
+        System.clearProperty(com.lemline.runner.common.config.LEMLINE_DATABASE_MYSQL_PASSWORD)
 
         if (::mysql.isInitialized) {
             mysql.stop()

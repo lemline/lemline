@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.gateway.config
 
-import com.lemline.runner.common.config.GATEWAY_AUTHENTICATION_ENABLED
-import com.lemline.runner.common.config.GATEWAY_TLS_ENABLED
+import com.lemline.runner.common.config.LEMLINE_GATEWAY_AUTHENTICATION_ENABLED
+import com.lemline.runner.common.config.LEMLINE_GATEWAY_TLS_ENABLED
 import com.lemline.runner.gateway.analytics.WorkflowAnalyticsEventSource
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -31,8 +31,8 @@ class GatewayStartupValidatorTest {
         val ex = assertFailsWith<IllegalStateException> {
             validator.onStart(mockk())
         }
-        assertTrue(ex.message!!.contains(GATEWAY_AUTHENTICATION_ENABLED))
-        assertTrue(ex.message!!.contains(GATEWAY_TLS_ENABLED))
+        assertTrue(ex.message!!.contains(LEMLINE_GATEWAY_AUTHENTICATION_ENABLED))
+        assertTrue(ex.message!!.contains(LEMLINE_GATEWAY_TLS_ENABLED))
     }
 
     @Test

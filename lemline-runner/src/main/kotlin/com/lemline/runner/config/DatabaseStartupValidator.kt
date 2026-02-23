@@ -4,7 +4,6 @@ package com.lemline.runner.config
 import com.lemline.common.info
 import com.lemline.common.logger
 import com.lemline.runner.common.config.DatabaseType
-import com.lemline.runner.config.shared.LemlineConfiguration
 import io.quarkus.runtime.StartupEvent
 import jakarta.annotation.Priority
 import jakarta.enterprise.context.ApplicationScoped
@@ -56,7 +55,7 @@ class DatabaseStartupValidator(
                 """
                 |
                 |═══════════════════════════════════════════════════════════════════════════════
-                |  DATABASE CONNECTION FAILED
+                |  LEMLINE_DATABASE CONNECTION FAILED
                 |═══════════════════════════════════════════════════════════════════════════════
                 |
                 |  Unable to connect to the $dbType database.

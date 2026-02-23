@@ -30,7 +30,7 @@ class KafkaTestResource : QuarkusTestResourceLifecycleManager {
 
         // Return the bootstrap servers configuration using lemline.* property
         // LemlineConfigSource transforms lemline.messaging.kafka.brokers to kafka.bootstrap.servers
-        val properties = mapOf("lemline.messaging.kafka.brokers" to servers)
+        val properties = mapOf(com.lemline.runner.common.config.LEMLINE_MESSAGING_KAFKA_BROKERS to servers)
 
         // Set as system properties so that [LemlineConfigSource] can see them.
         properties.forEach { (k, v) -> System.setProperty(k, v) }
@@ -61,7 +61,7 @@ class KafkaTestResource : QuarkusTestResourceLifecycleManager {
 
     override fun stop() {
         // Clear system properties to prevent conflicts with other test profiles
-        System.clearProperty("lemline.messaging.kafka.brokers")
+        System.clearProperty(com.lemline.runner.common.config.LEMLINE_MESSAGING_KAFKA_BROKERS)
 
         if (::kafka.isInitialized) {
             kafka.stop()

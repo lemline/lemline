@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.gateway.dashboard
 
-import com.lemline.runner.config.shared.LemlineConfiguration
-import com.lemline.runner.config.shared.*
+import com.lemline.runner.config.LemlineConfiguration
+import com.lemline.runner.config.gatewayWatchBatchSize
+import com.lemline.runner.config.gatewayWatchPollIntervalMs
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
 import kotlinx.coroutines.currentCoroutineContext

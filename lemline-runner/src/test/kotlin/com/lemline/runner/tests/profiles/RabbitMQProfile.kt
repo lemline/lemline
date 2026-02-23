@@ -33,24 +33,24 @@ class RabbitMQProfile : QuarkusTestProfile {
             // =============================================================
 
             // Database configuration
-            "lemline.database.type" to DatabaseType.H2.configValue,
+            com.lemline.runner.common.config.LEMLINE_DATABASE_TYPE to DatabaseType.H2.configValue,
 
             // Messaging type
-            "lemline.messaging.type" to MessagingType.RABBITMQ.configValue,
+            com.lemline.runner.common.config.LEMLINE_MESSAGING_TYPE to MessagingType.RABBITMQ.configValue,
 
             // Channel enabled flags
-            "lemline.messaging.commands.consumer.enabled" to "true",
-            "lemline.messaging.commands.producer.enabled" to "true",
-            "lemline.messaging.events.consumer.enabled" to "true",
-            "lemline.messaging.events.producer.enabled" to "true",
+            com.lemline.runner.common.config.LEMLINE_MESSAGING_COMMANDS_CONSUMER_ENABLED to "true",
+            com.lemline.runner.common.config.LEMLINE_MESSAGING_COMMANDS_PRODUCER_ENABLED to "true",
+            com.lemline.runner.common.config.LEMLINE_MESSAGING_EVENTS_CONSUMER_ENABLED to "true",
+            com.lemline.runner.common.config.LEMLINE_MESSAGING_EVENTS_PRODUCER_ENABLED to "true",
 
             // Queue names for test isolation (transformed by LemlineConfigSource)
             // Note: Consumer and producer use different queues for testing
             // (production would typically use the same queue)
-            "lemline.messaging.rabbitmq.commands.queue" to "lemline-commands-in",
-            "lemline.messaging.rabbitmq.commands.producer.queue-out" to "lemline-commands-out",
-            "lemline.messaging.rabbitmq.events.queue" to "lemline-events-in",
-            "lemline.messaging.rabbitmq.events.producer.queue-out" to "lemline-events-out",
+            com.lemline.runner.common.config.LEMLINE_MESSAGING_RABBITMQ_COMMANDS_QUEUE to "lemline-commands-in",
+            com.lemline.runner.common.config.LEMLINE_MESSAGING_RABBITMQ_COMMANDS_PRODUCER_QUEUE_OUT to "lemline-commands-out",
+            com.lemline.runner.common.config.LEMLINE_MESSAGING_RABBITMQ_EVENTS_QUEUE to "lemline-events-in",
+            com.lemline.runner.common.config.LEMLINE_MESSAGING_RABBITMQ_EVENTS_PRODUCER_QUEUE_OUT to "lemline-events-out",
         )
     }
 

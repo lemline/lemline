@@ -2,7 +2,7 @@
 package com.lemline.runner.common.scheduled
 
 import com.lemline.common.logger.logger
-import com.lemline.runner.common.config.SCHEDULED_ENABLED
+import com.lemline.runner.common.config.LEMLINE_SCHEDULED_ENABLED
 import io.quarkus.runtime.ShutdownEvent
 import io.quarkus.runtime.StartupEvent
 import jakarta.annotation.Priority
@@ -65,7 +65,7 @@ abstract class AbstractScheduledTask {
 
     /** Global kill switch for all scheduled tasks (set to false for non-listen commands) */
     @Inject
-    @ConfigProperty(name = SCHEDULED_ENABLED, defaultValue = "true")
+    @ConfigProperty(name = LEMLINE_SCHEDULED_ENABLED, defaultValue = "true")
     lateinit var scheduledEnabled: String
 
     /** Coroutine scope for async work */

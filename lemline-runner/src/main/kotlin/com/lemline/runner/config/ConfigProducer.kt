@@ -7,6 +7,7 @@ import com.lemline.runner.common.config.CleanupConfig
 import com.lemline.runner.common.config.OutboxConfig
 import com.lemline.runner.common.messaging.CommandEmitter
 import com.lemline.runner.common.messaging.InstanceMessage
+import com.lemline.runner.config.LemlineConfiguration as SharedLemlineConfiguration
 import com.lemline.runner.definitions.DefinitionConfig
 import com.lemline.runner.forks.ForkFeatureConfig
 import com.lemline.runner.gateway.outbox.GatewayOutboxConfig
@@ -16,8 +17,6 @@ import com.lemline.runner.parents.ParentFeatureConfig
 import com.lemline.runner.retries.RetryConfig
 import com.lemline.runner.schedules.ScheduleConfig
 import com.lemline.runner.waits.WaitConfig
-import com.lemline.runner.config.shared.LemlineConfiguration as SharedLemlineConfiguration
-import com.lemline.runner.config.shared.gatewayEnabled
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.enterprise.inject.Produces
 import jakarta.inject.Inject
@@ -107,7 +106,8 @@ class ConfigProducer {
     fun gatewayOutboxConfig(): GatewayOutboxConfig = object : GatewayOutboxConfig {
         private val source = config.outbox().gateway().getOrNull()
         override val enabled: Boolean get() = config.gatewayEnabled && (source?.enabled() ?: true)
-        override val outbox: OutboxConfig get() = source?.outbox()?.toOutboxProcessingConfig() ?: defaultGatewayOutboxConfig()
+        override val outbox: OutboxConfig
+            get() = source?.outbox()?.toOutboxProcessingConfig() ?: defaultGatewayOutboxConfig()
         override val cleanup: CleanupConfig get() = source?.cleanup()?.toOutboxCleanupConfig() ?: defaultCleanupConfig()
     }
 
