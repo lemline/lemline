@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.config
 
+import com.lemline.runner.common.config.ANALYTICS_BACKEND_CLICKHOUSE
+import com.lemline.runner.common.config.ANALYTICS_BACKEND_DEFAULT
+import com.lemline.runner.common.config.ANALYTICS_BACKEND_POSTGRESQL
 import com.lemline.runner.config.LemlineConfigConstants.ANALYTICS_CONSUMER_CONCURRENCY_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.ANALYTICS_CONSUMER_ENABLED_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.ANALYTICS_POSTGRES_BASELINE_ON_MIGRATE_DEFAULT
@@ -30,7 +33,6 @@ import com.lemline.runner.config.LemlineConfigConstants.POSTGRES_PASSWORD_DEFAUL
 import com.lemline.runner.config.LemlineConfigConstants.POSTGRES_PORT_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.POSTGRES_USERNAME_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.RABBITMQ_VHOST_DEFAULT
-import com.lemline.runner.gateway.config.GatewayConfigConstants
 import io.smallrye.config.ConfigMapping
 import io.smallrye.config.WithDefault
 import jakarta.validation.constraints.Min
@@ -151,9 +153,9 @@ interface LemlineConfiguration {
         fun consumer(): AnalyticsConsumerConfig
 
         @Pattern(
-            regexp = "${GatewayConfigConstants.ANALYTICS_TYPE_POSTGRESQL}|${GatewayConfigConstants.ANALYTICS_TYPE_CLICKHOUSE}"
+            regexp = "$ANALYTICS_BACKEND_POSTGRESQL|$ANALYTICS_BACKEND_CLICKHOUSE"
         )
-        @WithDefault(GatewayConfigConstants.ANALYTICS_TYPE_DEFAULT)
+        @WithDefault(ANALYTICS_BACKEND_DEFAULT)
         fun type(): String
 
         @WithDefault(ANALYTICS_POSTGRES_MIGRATE_AT_START_DEFAULT)
@@ -214,7 +216,7 @@ interface LemlineConfiguration {
      * Gateway configuration consumed by the gRPC ingress module.
      */
     interface GatewayConfig {
-        @WithDefault(GatewayConfigConstants.GATEWAY_ENABLED_DEFAULT)
+        @WithDefault("false")
         fun enabled(): Boolean
 
         fun grpc(): Optional<GatewayGrpcConfig>
@@ -225,15 +227,15 @@ interface LemlineConfiguration {
     }
 
     interface GatewayGrpcConfig {
-        @WithDefault(GatewayConfigConstants.GATEWAY_GRPC_HOST_DEFAULT)
+        @WithDefault("0.0.0.0")
         fun host(): String
 
-        @WithDefault(GatewayConfigConstants.GATEWAY_GRPC_PORT_DEFAULT)
+        @WithDefault("9000")
         fun port(): Int
     }
 
     interface GatewayTlsConfig {
-        @WithDefault(GatewayConfigConstants.GATEWAY_TLS_ENABLED_DEFAULT)
+        @WithDefault("true")
         fun enabled(): Boolean
 
         fun certificate(): Optional<String>
@@ -242,12 +244,12 @@ interface LemlineConfiguration {
         fun trustStorePassword(): Optional<String>
 
         @Pattern(regexp = "none|request|required")
-        @WithDefault(GatewayConfigConstants.GATEWAY_TLS_CLIENT_AUTH_DEFAULT)
+        @WithDefault("none")
         fun clientAuth(): String
     }
 
     interface GatewayAuthenticationConfig {
-        @WithDefault(GatewayConfigConstants.GATEWAY_AUTHENTICATION_ENABLED_DEFAULT)
+        @WithDefault("true")
         fun enabled(): Boolean
 
         fun jwt(): Optional<GatewayJwtConfig>
@@ -260,32 +262,32 @@ interface LemlineConfiguration {
     }
 
     interface GatewayClaimsConfig {
-        @WithDefault(GatewayConfigConstants.GATEWAY_AUTHENTICATION_SCOPE_FIELD_DEFAULT)
+        @WithDefault("scope")
         fun scopeField(): String
 
-        @WithDefault(GatewayConfigConstants.GATEWAY_AUTHENTICATION_NAMESPACES_FIELD_DEFAULT)
+        @WithDefault("lemline_namespaces")
         fun namespacesField(): String
     }
 
     interface GatewayCorsConfig {
-        @WithDefault(GatewayConfigConstants.GATEWAY_CORS_ENABLED_DEFAULT)
+        @WithDefault("true")
         fun enabled(): Boolean
 
-        @WithDefault(GatewayConfigConstants.GATEWAY_CORS_ORIGINS_DEFAULT)
+        @WithDefault("http://localhost:5173")
         fun origins(): String
 
-        @WithDefault(GatewayConfigConstants.GATEWAY_CORS_METHODS_DEFAULT)
+        @WithDefault("GET,POST,OPTIONS")
         fun methods(): String
 
-        @WithDefault(GatewayConfigConstants.GATEWAY_CORS_HEADERS_DEFAULT)
+        @WithDefault("Accept,Authorization,Content-Type,Grpc-Timeout,X-Grpc-Web,X-User-Agent")
         fun headers(): String
     }
 
     interface GatewayWatchConfig {
-        @WithDefault(GatewayConfigConstants.GATEWAY_WATCH_POLL_INTERVAL_MS_DEFAULT)
+        @WithDefault("250")
         fun pollIntervalMs(): Long
 
-        @WithDefault(GatewayConfigConstants.GATEWAY_WATCH_BATCH_SIZE_DEFAULT)
+        @WithDefault("256")
         fun batchSize(): Int
     }
 

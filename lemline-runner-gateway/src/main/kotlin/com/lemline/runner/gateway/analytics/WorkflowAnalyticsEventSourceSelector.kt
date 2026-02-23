@@ -2,24 +2,21 @@
 package com.lemline.runner.gateway.analytics
 
 import com.lemline.common.values.WorkflowId
-import com.lemline.runner.gateway.config.GatewayConfigConstants.ANALYTICS_TYPE
-import com.lemline.runner.gateway.config.GatewayConfigConstants.ANALYTICS_TYPE_DEFAULT
-import com.lemline.runner.gateway.config.GatewayConfigConstants.ANALYTICS_TYPE_POSTGRESQL
+import com.lemline.runner.common.config.ANALYTICS_BACKEND_POSTGRESQL
+import com.lemline.runner.gateway.config.GatewayRuntimeConfig
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.enterprise.inject.Instance
 import jakarta.inject.Inject
-import org.eclipse.microprofile.config.inject.ConfigProperty
 
 @ApplicationScoped
 class WorkflowAnalyticsEventSourceSelector(
-    @ConfigProperty(name = ANALYTICS_TYPE, defaultValue = ANALYTICS_TYPE_DEFAULT)
-    analyticsBackend: String,
+    private val config: GatewayRuntimeConfig,
 ) : WorkflowAnalyticsEventSource {
 
     @Inject
     lateinit var postgresqlEventSource: Instance<PostgresqlWorkflowAnalyticsEventSource>
 
-    private val backend = AnalyticsBackend.parse(analyticsBackend)
+    private val backend get() = AnalyticsBackend.parse(config.analyticsType)
 
     override suspend fun listByWorkflowIdAfter(
         workflowId: WorkflowId,
@@ -36,7 +33,7 @@ class WorkflowAnalyticsEventSourceSelector(
                 postgresqlEventSource.get()
             } else {
                 throw IllegalStateException(
-                    "Analytics type '$ANALYTICS_TYPE_POSTGRESQL' requires datasource 'analytics'. " +
+                    "Analytics type '$ANALYTICS_BACKEND_POSTGRESQL' requires datasource 'analytics'. " +
                         "Configure lemline.analytics.postgresql.*"
                 )
             }

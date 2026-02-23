@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.tests.config
 
+import com.lemline.runner.common.config.ANALYTICS_BACKEND_CLICKHOUSE
 import com.lemline.runner.config.LemlineConfiguration
-import com.lemline.runner.gateway.config.GatewayConfigConstants
 import com.lemline.runner.tests.profiles.GatewayConfigMappingProfile
 import io.quarkus.test.junit.QuarkusTest
 import io.quarkus.test.junit.TestProfile
@@ -26,11 +26,11 @@ class GatewayConfigMappingTest {
         assertFalse(gateway.enabled())
         assertEquals("127.0.0.1", gateway.grpc().orElseThrow().host())
         assertEquals(9101, gateway.grpc().orElseThrow().port())
-        assertFalse(gateway.tls().orElseThrow().enabled())
+        assertTrue(gateway.tls().orElseThrow().enabled())
         assertEquals("request", gateway.tls().orElseThrow().clientAuth())
 
         val auth = gateway.authentication().orElseThrow()
-        assertFalse(auth.enabled())
+        assertTrue(auth.enabled())
         assertEquals("https://issuer.example.test", auth.jwt().orElseThrow().issuer().orElseThrow())
         assertEquals("https://issuer.example.test/jwks.json", auth.jwt().orElseThrow().jwksUrl().orElseThrow())
         assertEquals("scp", auth.claims().orElseThrow().scopeField())
@@ -48,6 +48,6 @@ class GatewayConfigMappingTest {
     @Test
     fun `analytics type key is mapped`() {
         val analytics = config.analytics().orElseThrow()
-        assertEquals(GatewayConfigConstants.ANALYTICS_TYPE_CLICKHOUSE, analytics.type())
+        assertEquals(ANALYTICS_BACKEND_CLICKHOUSE, analytics.type())
     }
 }

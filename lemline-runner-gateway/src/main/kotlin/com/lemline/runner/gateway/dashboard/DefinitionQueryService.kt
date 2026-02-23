@@ -3,6 +3,7 @@ package com.lemline.runner.gateway.dashboard
 
 import com.lemline.runner.common.config.DatabaseConfig
 import com.lemline.runner.definitions.DEFINITION_TABLE
+import com.lemline.runner.gateway.config.GatewayRuntimeConfig
 import io.agroal.api.AgroalDataSource
 import io.quarkus.agroal.DataSource
 import jakarta.enterprise.context.ApplicationScoped
@@ -11,14 +12,10 @@ import jakarta.inject.Inject
 import java.time.Instant
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import org.eclipse.microprofile.config.inject.ConfigProperty
 
 @ApplicationScoped
 class DefinitionQueryService(
-    @ConfigProperty(name = "lemline.analytics.postgresql.schema", defaultValue = "public")
-    analyticsSchema: String,
-    @ConfigProperty(name = "lemline.analytics.postgresql.table", defaultValue = "lemline_lifecycle_events")
-    analyticsTable: String,
+    config: GatewayRuntimeConfig,
 ) {
 
     @Inject
@@ -28,7 +25,7 @@ class DefinitionQueryService(
     @DataSource("analytics")
     lateinit var analyticsDataSource: Instance<AgroalDataSource>
 
-    private val analyticsQualifiedTable = DashboardSqlSupport.qualifiedTable(analyticsSchema, analyticsTable)
+    private val analyticsQualifiedTable = DashboardSqlSupport.qualifiedTable(config.analyticsSchema, config.analyticsTable)
 
     suspend fun listNamespaces(): List<String> {
         val primary = listPrimaryNamespaces()

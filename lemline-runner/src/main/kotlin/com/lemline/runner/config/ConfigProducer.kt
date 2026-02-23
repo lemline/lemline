@@ -20,7 +20,6 @@ import jakarta.enterprise.context.ApplicationScoped
 import jakarta.enterprise.inject.Produces
 import jakarta.inject.Inject
 import kotlin.jvm.optionals.getOrNull
-import org.eclipse.microprofile.config.inject.ConfigProperty
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.hours
@@ -40,10 +39,6 @@ class ConfigProducer {
 
     @Inject
     internal lateinit var workflowCommandEmitter: WorkflowCommandEmitter
-
-    @Inject
-    @ConfigProperty(name = "lemline.gateway.enabled", defaultValue = "false")
-    lateinit var gatewayEnabled: String
 
     @Produces
     @ApplicationScoped
@@ -109,7 +104,7 @@ class ConfigProducer {
     @ApplicationScoped
     fun gatewayOutboxConfig(): GatewayOutboxConfig = object : GatewayOutboxConfig {
         private val source = config.outbox().gateway().getOrNull()
-        override val enabled: Boolean get() = gatewayEnabled == "true" && (source?.enabled() ?: true)
+        override val enabled: Boolean get() = config.gatewayEnabled && (source?.enabled() ?: true)
         override val outbox: OutboxConfig get() = source?.outbox()?.toOutboxProcessingConfig() ?: defaultGatewayOutboxConfig()
         override val cleanup: CleanupConfig get() = source?.cleanup()?.toOutboxCleanupConfig() ?: defaultCleanupConfig()
     }

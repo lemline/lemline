@@ -1,27 +1,19 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.gateway.dashboard
 
-import com.lemline.runner.gateway.config.GatewayConfigConstants
+import com.lemline.runner.gateway.config.GatewayRuntimeConfig
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
-import org.eclipse.microprofile.config.inject.ConfigProperty
 
 @ApplicationScoped
 class InstanceStreamService(
-    @ConfigProperty(
-        name = GatewayConfigConstants.GATEWAY_WATCH_POLL_INTERVAL_MS,
-        defaultValue = GatewayConfigConstants.GATEWAY_WATCH_POLL_INTERVAL_MS_DEFAULT
-    )
-    private val pollIntervalMs: Long,
-    @ConfigProperty(
-        name = GatewayConfigConstants.GATEWAY_WATCH_BATCH_SIZE,
-        defaultValue = GatewayConfigConstants.GATEWAY_WATCH_BATCH_SIZE_DEFAULT
-    )
-    private val batchSize: Int,
+    private val config: GatewayRuntimeConfig,
 ) {
+    private val pollIntervalMs: Long get() = config.watchPollIntervalMs
+    private val batchSize: Int get() = config.watchBatchSize
 
     @Inject
     lateinit var statsQueryService: StatsQueryService

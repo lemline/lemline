@@ -7,6 +7,7 @@ import com.lemline.runner.gateway.analytics.WorkflowAnalyticsEventRow
 import com.lemline.runner.gateway.analytics.WorkflowAnalyticsEventSource
 import com.lemline.runner.gateway.auth.GatewayAuthorizer
 import com.lemline.runner.gateway.auth.GatewayPrincipal
+import com.lemline.runner.gateway.config.TestGatewayRuntimeConfig
 import com.lemline.runner.gateway.errors.GatewayPermissionDeniedException
 import com.lemline.runner.gateway.outbox.GatewayCommandOutboxModel
 import com.lemline.runner.gateway.outbox.GatewayCommandOutboxRepository
@@ -36,8 +37,10 @@ class WorkflowWatchServiceTest {
     private val batchSize = 100
 
     private val service = WorkflowWatchService(
-        pollIntervalMs = pollIntervalMs,
-        batchSize = batchSize,
+        config = TestGatewayRuntimeConfig(
+            watchPollIntervalMs = pollIntervalMs,
+            watchBatchSize = batchSize,
+        ),
     ).apply {
         this.authorizer = this@WorkflowWatchServiceTest.authorizer
         this.gatewayOutboxRepository = this@WorkflowWatchServiceTest.outboxRepository

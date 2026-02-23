@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.gateway.analytics
 
-import com.lemline.runner.gateway.config.GatewayConfigConstants.ANALYTICS_TYPE_CLICKHOUSE
-import com.lemline.runner.gateway.config.GatewayConfigConstants.ANALYTICS_TYPE_POSTGRESQL
+import com.lemline.runner.common.config.ANALYTICS_BACKEND_CLICKHOUSE
+import com.lemline.runner.common.config.ANALYTICS_BACKEND_POSTGRESQL
 import java.util.Locale
 
 enum class AnalyticsBackend(val value: String) {
-    POSTGRESQL(ANALYTICS_TYPE_POSTGRESQL),
-    CLICKHOUSE(ANALYTICS_TYPE_CLICKHOUSE),
+    POSTGRESQL(ANALYTICS_BACKEND_POSTGRESQL),
+    CLICKHOUSE(ANALYTICS_BACKEND_CLICKHOUSE),
     ;
 
     companion object {
@@ -16,7 +16,7 @@ enum class AnalyticsBackend(val value: String) {
             return entries.firstOrNull { it.value == normalized }
                 ?: throw IllegalStateException(
                     "Unsupported analytics type '$raw'. Supported values: " +
-                        "'$ANALYTICS_TYPE_POSTGRESQL', '$ANALYTICS_TYPE_CLICKHOUSE'."
+                        "'$ANALYTICS_BACKEND_POSTGRESQL', '$ANALYTICS_BACKEND_CLICKHOUSE'."
                 )
         }
     }

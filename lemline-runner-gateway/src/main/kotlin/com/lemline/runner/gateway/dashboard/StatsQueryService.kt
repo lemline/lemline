@@ -2,6 +2,7 @@
 package com.lemline.runner.gateway.dashboard
 
 import com.lemline.core.lifecycleevents.LifecycleEventType
+import com.lemline.runner.gateway.config.GatewayRuntimeConfig
 import io.agroal.api.AgroalDataSource
 import io.quarkus.agroal.DataSource
 import jakarta.enterprise.context.ApplicationScoped
@@ -9,21 +10,17 @@ import jakarta.enterprise.inject.Instance
 import jakarta.inject.Inject
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import org.eclipse.microprofile.config.inject.ConfigProperty
 
 @ApplicationScoped
 class StatsQueryService(
-    @ConfigProperty(name = "lemline.analytics.postgresql.schema", defaultValue = "public")
-    analyticsSchema: String,
-    @ConfigProperty(name = "lemline.analytics.postgresql.table", defaultValue = "lemline_lifecycle_events")
-    analyticsTable: String,
+    config: GatewayRuntimeConfig,
 ) {
 
     @Inject
     @DataSource("analytics")
     lateinit var analyticsDataSource: Instance<AgroalDataSource>
 
-    private val analyticsQualifiedTable = DashboardSqlSupport.qualifiedTable(analyticsSchema, analyticsTable)
+    private val analyticsQualifiedTable = DashboardSqlSupport.qualifiedTable(config.analyticsSchema, config.analyticsTable)
 
     suspend fun queryStats(filter: StatsQueryFilter): List<DefinitionStatsRow> = withContext(Dispatchers.IO) {
         val where = mutableListOf<String>()

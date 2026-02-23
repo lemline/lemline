@@ -3,7 +3,27 @@ package com.lemline.runner.config
 
 import com.lemline.common.logger.logger
 import com.lemline.runner.cli.config.ConfigPathHolder
+import com.lemline.runner.common.config.ANALYTICS_BACKEND_CLICKHOUSE
+import com.lemline.runner.common.config.ANALYTICS_BACKEND_DEFAULT
+import com.lemline.runner.common.config.ANALYTICS_BACKEND_POSTGRESQL
+import com.lemline.runner.common.config.ANALYTICS_TYPE
 import com.lemline.runner.common.config.DatabaseType
+import com.lemline.runner.common.config.GATEWAY_AUTHENTICATION_ENABLED
+import com.lemline.runner.common.config.GATEWAY_AUTHENTICATION_JWT_ISSUER
+import com.lemline.runner.common.config.GATEWAY_AUTHENTICATION_JWT_JWKS_URL
+import com.lemline.runner.common.config.GATEWAY_CORS_ENABLED
+import com.lemline.runner.common.config.GATEWAY_CORS_HEADERS
+import com.lemline.runner.common.config.GATEWAY_CORS_METHODS
+import com.lemline.runner.common.config.GATEWAY_CORS_ORIGINS
+import com.lemline.runner.common.config.GATEWAY_ENABLED
+import com.lemline.runner.common.config.GATEWAY_GRPC_HOST
+import com.lemline.runner.common.config.GATEWAY_GRPC_PORT
+import com.lemline.runner.common.config.GATEWAY_TLS_CERTIFICATE
+import com.lemline.runner.common.config.GATEWAY_TLS_CLIENT_AUTH
+import com.lemline.runner.common.config.GATEWAY_TLS_ENABLED
+import com.lemline.runner.common.config.GATEWAY_TLS_PRIVATE_KEY
+import com.lemline.runner.common.config.GATEWAY_TLS_TRUST_STORE
+import com.lemline.runner.common.config.GATEWAY_TLS_TRUST_STORE_PASSWORD
 import com.lemline.runner.common.config.MessagingType
 import com.lemline.runner.config.LemlineConfigConstants.ANALYTICS_POSTGRES_BASELINE_ON_MIGRATE_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.ANALYTICS_POSTGRES_DATABASE_DEFAULT
@@ -12,6 +32,16 @@ import com.lemline.runner.config.LemlineConfigConstants.CLOUDEVENTS_TOPIC_DEFAUL
 import com.lemline.runner.config.LemlineConfigConstants.COMMANDS_TOPIC_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.CONSUMER_CONCURRENCY_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.EVENTS_TOPIC_DEFAULT
+import com.lemline.runner.config.LemlineConfigConstants.GATEWAY_AUTHENTICATION_ENABLED_DEFAULT
+import com.lemline.runner.config.LemlineConfigConstants.GATEWAY_CORS_ENABLED_DEFAULT
+import com.lemline.runner.config.LemlineConfigConstants.GATEWAY_CORS_HEADERS_DEFAULT
+import com.lemline.runner.config.LemlineConfigConstants.GATEWAY_CORS_METHODS_DEFAULT
+import com.lemline.runner.config.LemlineConfigConstants.GATEWAY_CORS_ORIGINS_DEFAULT
+import com.lemline.runner.config.LemlineConfigConstants.GATEWAY_ENABLED_DEFAULT
+import com.lemline.runner.config.LemlineConfigConstants.GATEWAY_GRPC_HOST_DEFAULT
+import com.lemline.runner.config.LemlineConfigConstants.GATEWAY_GRPC_PORT_DEFAULT
+import com.lemline.runner.config.LemlineConfigConstants.GATEWAY_TLS_CLIENT_AUTH_DEFAULT
+import com.lemline.runner.config.LemlineConfigConstants.GATEWAY_TLS_ENABLED_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.H2_DB_NAME_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.H2_PASSWORD_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.H2_USERNAME_DEFAULT
@@ -26,8 +56,6 @@ import com.lemline.runner.config.LemlineConfigConstants.KAFKA_STRING_DESERIALIZE
 import com.lemline.runner.config.LemlineConfigConstants.KAFKA_STRING_SERIALIZER
 import com.lemline.runner.config.LemlineConfigConstants.KAFKA_WORKFLOWS_GROUP_ID_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.LIFECYCLE_EVENTS_TOPIC_DEFAULT
-import com.lemline.runner.config.LemlineConfigConstants.METRICS_PATH_DEFAULT
-import com.lemline.runner.config.LemlineConfigConstants.METRICS_PORT_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.MYSQL_HOST_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.MYSQL_DATABASE_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.MYSQL_PASSWORD_DEFAULT
@@ -50,7 +78,6 @@ import com.lemline.runner.config.LemlineConfigConstants.RABBITMQ_PORT_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.RABBITMQ_STRING_SERIALIZER
 import com.lemline.runner.config.LemlineConfigConstants.RABBITMQ_USER_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.RABBITMQ_VHOST_DEFAULT
-import com.lemline.runner.gateway.config.GatewayConfigConstants
 import com.lemline.runner.messaging.cloudevents.CLOUDEVENTS_IN_CHANNEL
 import com.lemline.runner.messaging.cloudevents.CLOUDEVENTS_OUT_CHANNEL
 import com.lemline.runner.messaging.commands.COMMANDS_IN_CHANNEL
@@ -152,7 +179,6 @@ class LemlineConfigSource : PropertiesConfigSource(
             generatedProps.putAll(generateAnalyticsDatabaseProperties(lemlineProps))
             generatedProps.putAll(generateMessagingProperties(lemlineProps))
             generatedProps.putAll(generateGatewayProperties(lemlineProps))
-            generatedProps.putAll(generateMetricsProperties(lemlineProps))
 
             logger.info { "Lemline generated properties:\n${generatedProps.toPrint()}" }
 
@@ -223,8 +249,8 @@ class LemlineConfigSource : PropertiesConfigSource(
 
         private fun generateAnalyticsDatabaseProperties(props: Map<String, String>): Map<String, String> {
             val lifecycleConsumerEnabled = props[LIFECYCLE_EVENTS_CONSUMER_ENABLED].toBoolean()
-            val gatewayEnabled = props[GatewayConfigConstants.GATEWAY_ENABLED]?.toBooleanStrictOrNull()
-                ?: GatewayConfigConstants.GATEWAY_ENABLED_DEFAULT.toBoolean()
+            val gatewayEnabled = props[GATEWAY_ENABLED]?.toBooleanStrictOrNull()
+                ?: GATEWAY_ENABLED_DEFAULT.toBoolean()
             val gatewayAnalyticsBackend = resolveGatewayAnalyticsBackend(props, gatewayEnabled)
 
             val needsAnalyticsDatasource = lifecycleConsumerEnabled ||
@@ -266,25 +292,25 @@ class LemlineConfigSource : PropertiesConfigSource(
         ): GatewayAnalyticsBackend? {
             if (!gatewayEnabled) return null
 
-            val rawType = props[GatewayConfigConstants.ANALYTICS_TYPE] ?: GatewayConfigConstants.ANALYTICS_TYPE_DEFAULT
+            val rawType = props[ANALYTICS_TYPE] ?: ANALYTICS_BACKEND_DEFAULT
             return when (rawType.trim().lowercase(Locale.ROOT)) {
-                GatewayConfigConstants.ANALYTICS_TYPE_POSTGRESQL -> GatewayAnalyticsBackend.POSTGRESQL
-                GatewayConfigConstants.ANALYTICS_TYPE_CLICKHOUSE -> GatewayAnalyticsBackend.CLICKHOUSE
+                ANALYTICS_BACKEND_POSTGRESQL -> GatewayAnalyticsBackend.POSTGRESQL
+                ANALYTICS_BACKEND_CLICKHOUSE -> GatewayAnalyticsBackend.CLICKHOUSE
                 else -> throw IllegalStateException(
                     "Unsupported analytics type '$rawType'. Supported values: " +
-                        "'${GatewayConfigConstants.ANALYTICS_TYPE_POSTGRESQL}', '${GatewayConfigConstants.ANALYTICS_TYPE_CLICKHOUSE}'."
+                        "'$ANALYTICS_BACKEND_POSTGRESQL', '$ANALYTICS_BACKEND_CLICKHOUSE'."
                 )
             }
         }
 
         private fun generateGatewayProperties(props: Map<String, String>): Map<String, String> {
-            val enabled = props[GatewayConfigConstants.GATEWAY_ENABLED]?.toBooleanStrictOrNull()
-                ?: GatewayConfigConstants.GATEWAY_ENABLED_DEFAULT.toBoolean()
-            val tlsEnabled = props[GatewayConfigConstants.GATEWAY_TLS_ENABLED]?.toBooleanStrictOrNull()
-                ?: GatewayConfigConstants.GATEWAY_TLS_ENABLED_DEFAULT.toBoolean()
+            val enabled = props[GATEWAY_ENABLED]?.toBooleanStrictOrNull()
+                ?: GATEWAY_ENABLED_DEFAULT.toBoolean()
+            val tlsEnabled = props[GATEWAY_TLS_ENABLED]?.toBooleanStrictOrNull()
+                ?: GATEWAY_TLS_ENABLED_DEFAULT.toBoolean()
             val authenticationEnabled =
-                props[GatewayConfigConstants.GATEWAY_AUTHENTICATION_ENABLED]?.toBooleanStrictOrNull()
-                    ?: GatewayConfigConstants.GATEWAY_AUTHENTICATION_ENABLED_DEFAULT.toBoolean()
+                props[GATEWAY_AUTHENTICATION_ENABLED]?.toBooleanStrictOrNull()
+                    ?: GATEWAY_AUTHENTICATION_ENABLED_DEFAULT.toBoolean()
 
             val generatedProps = mutableMapOf<String, String>()
             generatedProps.putAll(generateGatewayGrpcProperties(props, enabled, tlsEnabled))
@@ -307,40 +333,40 @@ class LemlineConfigSource : PropertiesConfigSource(
             }
 
             generated["quarkus.grpc.server.host"] =
-                props[GatewayConfigConstants.GATEWAY_GRPC_HOST] ?: GatewayConfigConstants.GATEWAY_GRPC_HOST_DEFAULT
+                props[GATEWAY_GRPC_HOST] ?: GATEWAY_GRPC_HOST_DEFAULT
             generated["quarkus.grpc.server.port"] =
-                props[GatewayConfigConstants.GATEWAY_GRPC_PORT] ?: GatewayConfigConstants.GATEWAY_GRPC_PORT_DEFAULT
+                props[GATEWAY_GRPC_PORT] ?: GATEWAY_GRPC_PORT_DEFAULT
             generated["quarkus.grpc.server.plain-text"] = (!tlsEnabled).toString()
             generated["quarkus.grpc.server.enable-grpc-web"] = "true"
 
-            val corsEnabled = props[GatewayConfigConstants.GATEWAY_CORS_ENABLED]?.toBooleanStrictOrNull()
-                ?: GatewayConfigConstants.GATEWAY_CORS_ENABLED_DEFAULT.toBoolean()
+            val corsEnabled = props[GATEWAY_CORS_ENABLED]?.toBooleanStrictOrNull()
+                ?: GATEWAY_CORS_ENABLED_DEFAULT.toBoolean()
             generated["quarkus.http.cors"] = corsEnabled.toString()
             if (corsEnabled) {
                 generated["quarkus.http.cors.origins"] =
-                    props[GatewayConfigConstants.GATEWAY_CORS_ORIGINS] ?: GatewayConfigConstants.GATEWAY_CORS_ORIGINS_DEFAULT
+                    props[GATEWAY_CORS_ORIGINS] ?: GATEWAY_CORS_ORIGINS_DEFAULT
                 generated["quarkus.http.cors.methods"] =
-                    props[GatewayConfigConstants.GATEWAY_CORS_METHODS] ?: GatewayConfigConstants.GATEWAY_CORS_METHODS_DEFAULT
+                    props[GATEWAY_CORS_METHODS] ?: GATEWAY_CORS_METHODS_DEFAULT
                 generated["quarkus.http.cors.headers"] =
-                    props[GatewayConfigConstants.GATEWAY_CORS_HEADERS] ?: GatewayConfigConstants.GATEWAY_CORS_HEADERS_DEFAULT
+                    props[GATEWAY_CORS_HEADERS] ?: GATEWAY_CORS_HEADERS_DEFAULT
                 generated["quarkus.http.cors.access-control-allow-credentials"] = "false"
             }
 
             if (tlsEnabled) {
                 generated["quarkus.grpc.server.ssl.client-auth"] =
-                    props[GatewayConfigConstants.GATEWAY_TLS_CLIENT_AUTH]
-                        ?: GatewayConfigConstants.GATEWAY_TLS_CLIENT_AUTH_DEFAULT
+                    props[GATEWAY_TLS_CLIENT_AUTH]
+                        ?: GATEWAY_TLS_CLIENT_AUTH_DEFAULT
 
-                props[GatewayConfigConstants.GATEWAY_TLS_CERTIFICATE]?.let {
+                props[GATEWAY_TLS_CERTIFICATE]?.let {
                     generated["quarkus.grpc.server.ssl.certificate"] = it
                 }
-                props[GatewayConfigConstants.GATEWAY_TLS_PRIVATE_KEY]?.let {
+                props[GATEWAY_TLS_PRIVATE_KEY]?.let {
                     generated["quarkus.grpc.server.ssl.key"] = it
                 }
-                props[GatewayConfigConstants.GATEWAY_TLS_TRUST_STORE]?.let {
+                props[GATEWAY_TLS_TRUST_STORE]?.let {
                     generated["quarkus.grpc.server.ssl.trust-store"] = it
                 }
-                props[GatewayConfigConstants.GATEWAY_TLS_TRUST_STORE_PASSWORD]?.let {
+                props[GATEWAY_TLS_TRUST_STORE_PASSWORD]?.let {
                     generated["quarkus.grpc.server.ssl.trust-store-password"] = it
                 }
             } else {
@@ -352,10 +378,10 @@ class LemlineConfigSource : PropertiesConfigSource(
 
         private fun generateGatewayJwtProperties(props: Map<String, String>): Map<String, String> {
             val generated = mutableMapOf<String, String>()
-            props[GatewayConfigConstants.GATEWAY_AUTHENTICATION_JWT_ISSUER]?.let {
+            props[GATEWAY_AUTHENTICATION_JWT_ISSUER]?.let {
                 generated["mp.jwt.verify.issuer"] = it
             }
-            props[GatewayConfigConstants.GATEWAY_AUTHENTICATION_JWT_JWKS_URL]?.let {
+            props[GATEWAY_AUTHENTICATION_JWT_JWKS_URL]?.let {
                 generated["smallrye.jwt.verify.key.location"] = it
             }
             return generated
@@ -886,20 +912,6 @@ class LemlineConfigSource : PropertiesConfigSource(
                 set("mp.messaging.incoming.$LIFECYCLEEVENTS_IN_CHANNEL.broadcast", "true")
             }
             set("mp.messaging.outgoing.$LIFECYCLEEVENTS_OUT_CHANNEL.connector", IN_MEMORY_CONNECTOR)
-        }
-
-        private fun generateMetricsProperties(props: Map<String, String>): Map<String, String> {
-            val generated = mutableMapOf<String, String>()
-            val prefix = "lemline.metrics"
-            val port = props["$prefix.port"] ?: METRICS_PORT_DEFAULT
-            val path = props["$prefix.path"] ?: METRICS_PATH_DEFAULT
-
-            // apply quarkus properties
-            generated["quarkus.http.port"] = port
-            generated["quarkus.http.ssl-port"] = port
-            generated["quarkus.micrometer.export.prometheus.path"] = path
-
-            return generated
         }
 
         /**

@@ -8,6 +8,8 @@ import com.lemline.runner.cli.gateway.GatewayStartCommand
 import com.lemline.runner.cli.instances.InstanceStartCommand
 import com.lemline.runner.cli.listen.ListenCommand
 import com.lemline.runner.cli.setup
+import com.lemline.runner.common.config.GATEWAY_ENABLED
+import com.lemline.runner.common.config.GATEWAY_GRPC_PORT
 import com.lemline.runner.config.CLOUDEVENTS_CONSUMER_ENABLED
 import com.lemline.runner.config.CLOUDEVENTS_PRODUCER_ENABLED
 import com.lemline.runner.config.COMMANDS_CONSUMER_ENABLED
@@ -133,7 +135,7 @@ class LemlineApplication : QuarkusApplication {
                     if (gatewayStart != null) {
                         configureGatewayToggles()
                         gatewayStart.port?.let {
-                            System.setProperty("lemline.gateway.grpc.port", it.toString())
+                            System.setProperty(GATEWAY_GRPC_PORT, it.toString())
                         }
                     }
                 }
@@ -307,7 +309,7 @@ private fun disableScheduled() {
 }
 
 private fun configureGatewayToggles() {
-    System.setProperty("lemline.gateway.enabled", "true")
+    System.setProperty(GATEWAY_ENABLED, "true")
     System.setProperty(DATABASE_ENABLED, "true")
     System.setProperty(SCHEDULED_ENABLED, "false")
 

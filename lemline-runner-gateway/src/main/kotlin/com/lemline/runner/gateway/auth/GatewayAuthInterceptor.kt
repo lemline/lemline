@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.gateway.auth
 
-import com.lemline.runner.gateway.config.GatewayConfigConstants.GATEWAY_AUTHENTICATION_ENABLED
-import com.lemline.runner.gateway.config.GatewayConfigConstants.GATEWAY_AUTHENTICATION_ENABLED_DEFAULT
+import com.lemline.runner.gateway.config.GatewayRuntimeConfig
 import io.grpc.Contexts
 import io.grpc.Metadata
 import io.grpc.ServerCall
@@ -13,16 +12,11 @@ import io.quarkus.grpc.GlobalInterceptor
 import io.smallrye.jwt.auth.principal.JWTParser
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
-import org.eclipse.microprofile.config.inject.ConfigProperty
 
 @GlobalInterceptor
 @ApplicationScoped
 class GatewayAuthInterceptor(
-    @param:ConfigProperty(
-        name = GATEWAY_AUTHENTICATION_ENABLED,
-        defaultValue = GATEWAY_AUTHENTICATION_ENABLED_DEFAULT
-    )
-    private val authenticationEnabled: Boolean,
+    private val config: GatewayRuntimeConfig,
 ) : ServerInterceptor {
 
     @Inject
@@ -36,7 +30,7 @@ class GatewayAuthInterceptor(
         headers: Metadata,
         next: ServerCallHandler<ReqT, RespT>
     ): ServerCall.Listener<ReqT> {
-        if (!authenticationEnabled) {
+        if (!config.authenticationEnabled) {
             return next.startCall(call, headers)
         }
 
