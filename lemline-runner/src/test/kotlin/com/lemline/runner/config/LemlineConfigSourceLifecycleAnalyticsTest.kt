@@ -104,13 +104,13 @@ class LemlineConfigSourceLifecycleAnalyticsTest {
             )
         ) { source ->
             assertEquals("postgresql", source.getValue("quarkus.datasource.analytics.db-kind"))
+            assertEquals("true", source.getValue("quarkus.datasource.analytics.active"))
             assertEquals("analytics_user", source.getValue("quarkus.datasource.analytics.username"))
             assertEquals("analytics_pass", source.getValue("quarkus.datasource.analytics.password"))
             assertEquals(
                 "jdbc:postgresql://analytics-db:5544/analytics",
                 source.getValue("quarkus.datasource.analytics.jdbc.url")
             )
-            assertEquals("false", source.getValue("quarkus.flyway.analytics.migrate-at-start"))
             assertEquals("true", source.getValue("quarkus.flyway.analytics.baseline-on-migrate"))
             assertEquals(
                 "smallrye-in-memory",
@@ -133,6 +133,7 @@ class LemlineConfigSourceLifecycleAnalyticsTest {
                 LEMLINE_ANALYTICS_POSTGRES_HOST to "analytics-db"
             )
         ) { source ->
+            assertNull(source.getValue("quarkus.datasource.analytics.active"))
             assertNull(source.getValue("quarkus.datasource.analytics.jdbc.url"))
             assertNull(source.getValue("quarkus.flyway.analytics.locations"))
             assertNull(source.getValue("mp.messaging.incoming.$LIFECYCLEEVENTS_IN_CHANNEL.connector"))
@@ -158,7 +159,7 @@ class LemlineConfigSourceLifecycleAnalyticsTest {
                 jdbcUrl.startsWith("jdbc:postgresql://analytics-db:"),
                 "Expected analytics JDBC URL to use overridden host, but was: $jdbcUrl"
             )
-            assertEquals("true", source.getValue("quarkus.flyway.analytics.migrate-at-start"))
+            assertNull(source.getValue("quarkus.flyway.analytics.migrate-at-start"))
             assertEquals("false", source.getValue("quarkus.flyway.analytics.baseline-on-migrate"))
         }
     }

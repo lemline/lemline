@@ -1,0 +1,95 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: lemline
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  runner-image:
+    image: lemline-runner-e2e:local
+    pull_policy: never
+    build:
+      context: ../..
+      dockerfile: lemline-runner/Dockerfile
+    command: ["--version"]
+    restart: "no"
+
+  worker:
+    image: lemline-runner-e2e:local
+    pull_policy: never
+    depends_on:
+      postgres:
+        condition: service_healthy
+      runner-image:
+        condition: service_completed_successfully
+      seed-definitions:
+        condition: service_completed_successfully
+    command: ["--config=/config/lemline.yaml", "listen"]
+    volumes:
+      - ./config/lemline.yaml:/config/lemline.yaml:ro
+      - ../../lemline-runner/src/test/resources/examples:/workflows:ro
+    ports:
+      - "8080:8080"
+
+  gateway:
+    image: lemline-runner-e2e:local
+    pull_policy: never
+    depends_on:
+      postgres:
+        condition: service_healthy
+      runner-image:
+        condition: service_completed_successfully
+      seed-definitions:
+        condition: service_completed_successfully
+    command: ["--config=/config/lemline.yaml", "gateway", "start"]
+    volumes:
+      - ./config/lemline.yaml:/config/lemline.yaml:ro
+    ports:
+      - "9000:9000"
+
+  seed-definitions:
+    image: lemline-runner-e2e:local
+    pull_policy: never
+    depends_on:
+      postgres:
+        condition: service_healthy
+      runner-image:
+        condition: service_completed_successfully
+    entrypoint: ["/bin/sh", "-lc"]
+    command:
+      - |
+        for _ in 1 2 3 4 5; do
+          java -jar /app/quarkus-app/quarkus-run.jar --config=/config/lemline.yaml definition post -d /workflows -r -F && exit 0
+          echo "seed-definitions failed, retrying in 5s..."
+          sleep 5
+        done
+        exit 1
+    volumes:
+      - ./config/lemline.yaml:/config/lemline.yaml:ro
+      - ../../lemline-runner/src/test/resources/examples:/workflows:ro
+
+  dashboard:
+    build:
+      context: ../..
+      dockerfile: docker/e2e/dashboard/Dockerfile
+    depends_on:
+      gateway:
+        condition: service_started
+    ports:
+      - "5173:80"
+    volumes:
+      - ./dashboard/config.js:/usr/share/nginx/html/config.js:ro
+
+volumes:
+  postgres_data:

@@ -5,6 +5,7 @@ import com.lemline.common.info
 import com.lemline.common.logger
 import com.lemline.runner.analytics.config.AnalyticsConfigConstants.LIFECYCLE_EVENTS_CONSUMER_ENABLED_DEFAULT
 import com.lemline.runner.analytics.config.AnalyticsConfigConstants.ANALYTICS_POSTGRES_MIGRATE_AT_START_DEFAULT
+import com.lemline.runner.common.config.LEMLINE_ANALYTICS_MIGRATE_AT_START
 import com.lemline.runner.common.config.LEMLINE_MESSAGING_LIFECYCLE_EVENTS_CONSUMER_ENABLED
 import io.quarkus.runtime.StartupEvent
 import jakarta.annotation.Priority
@@ -18,7 +19,7 @@ internal class AnalyticsMigration(
     @param:ConfigProperty(name = LEMLINE_MESSAGING_LIFECYCLE_EVENTS_CONSUMER_ENABLED, defaultValue = LIFECYCLE_EVENTS_CONSUMER_ENABLED_DEFAULT)
     val lifecycleConsumerEnabled: Boolean,
     @param:ConfigProperty(
-        name = "quarkus.flyway.analytics.migrate-at-start",
+        name = LEMLINE_ANALYTICS_MIGRATE_AT_START,
         defaultValue = ANALYTICS_POSTGRES_MIGRATE_AT_START_DEFAULT
     )
     val migrateAtStart: Boolean,

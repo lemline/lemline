@@ -407,6 +407,7 @@ interface LemlineConfiguration {
         @WithDefault(LIFECYCLE_EVENTS_TOPIC_DEFAULT)
         fun topic(): String
         fun producer(): KafkaProducerConfig
+        fun consumer(): KafkaLifecycleEventsConsumerConfig
     }
 
     interface KafkaWorkflowCommandsConfig {
