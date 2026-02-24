@@ -160,6 +160,7 @@ import com.lemline.runner.config.LemlineConfigConstants.CLOUDEVENTS_TOPIC_DEFAUL
 import com.lemline.runner.config.LemlineConfigConstants.CONSUMER_CONCURRENCY_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.GATEWAY_AUTHENTICATION_ENABLED_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.GATEWAY_CORS_ENABLED_DEFAULT
+import com.lemline.runner.config.LemlineConfigConstants.GATEWAY_CORS_EXPOSED_HEADERS_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.GATEWAY_CORS_HEADERS_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.GATEWAY_CORS_METHODS_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.GATEWAY_CORS_ORIGINS_DEFAULT
@@ -449,14 +450,21 @@ class LemlineConfigSource : PropertiesConfigSource(
                 return generated
             }
 
+            val gatewayPort = props[LEMLINE_GATEWAY_GRPC_PORT] ?: GATEWAY_GRPC_PORT_DEFAULT
             generated["quarkus.grpc.server.host"] = props[LEMLINE_GATEWAY_GRPC_HOST] ?: GATEWAY_GRPC_HOST_DEFAULT
-            generated["quarkus.grpc.server.port"] = props[LEMLINE_GATEWAY_GRPC_PORT] ?: GATEWAY_GRPC_PORT_DEFAULT
+            generated["quarkus.grpc.server.port"] = gatewayPort
             generated["quarkus.grpc.server.plain-text"] = (!tlsEnabled).toString()
-            generated["quarkus.grpc.server.enable-grpc-web"] = "true"
+            generated["quarkus.grpc.server.use-separate-server"] = "false"
+            // gRPC-Web runs through the HTTP server, so bind the active transport port.
+            if (tlsEnabled) {
+                generated["quarkus.http.ssl-port"] = gatewayPort
+            } else {
+                generated["quarkus.http.port"] = gatewayPort
+            }
 
             val corsEnabled = props[LEMLINE_GATEWAY_CORS_ENABLED]?.toBooleanStrictOrNull()
                 ?: GATEWAY_CORS_ENABLED_DEFAULT.toBoolean()
-            generated["quarkus.http.cors"] = corsEnabled.toString()
+            generated["quarkus.http.cors.enabled"] = corsEnabled.toString()
             if (corsEnabled) {
                 generated["quarkus.http.cors.origins"] =
                     props[LEMLINE_GATEWAY_CORS_ORIGINS] ?: GATEWAY_CORS_ORIGINS_DEFAULT
@@ -464,10 +472,12 @@ class LemlineConfigSource : PropertiesConfigSource(
                     props[LEMLINE_GATEWAY_CORS_METHODS] ?: GATEWAY_CORS_METHODS_DEFAULT
                 generated["quarkus.http.cors.headers"] =
                     props[LEMLINE_GATEWAY_CORS_HEADERS] ?: GATEWAY_CORS_HEADERS_DEFAULT
+                generated["quarkus.http.cors.exposed-headers"] = GATEWAY_CORS_EXPOSED_HEADERS_DEFAULT
                 generated["quarkus.http.cors.access-control-allow-credentials"] = "false"
             }
 
             if (tlsEnabled) {
+                // Keep gRPC SSL config for deployments using a separate gRPC server.
                 generated["quarkus.grpc.server.ssl.client-auth"] =
                     props[LEMLINE_GATEWAY_TLS_CLIENT_AUTH] ?: GATEWAY_TLS_CLIENT_AUTH_DEFAULT
 
@@ -483,6 +493,15 @@ class LemlineConfigSource : PropertiesConfigSource(
                 props[LEMLINE_GATEWAY_TLS_TRUST_STORE_PASSWORD]?.let {
                     generated["quarkus.grpc.server.ssl.trust-store-password"] = it
                 }
+
+                // With use-separate-server=false, TLS is terminated by the main HTTP server.
+                props[LEMLINE_GATEWAY_TLS_CERTIFICATE]?.let {
+                    generated["quarkus.http.ssl.certificate.files"] = it
+                }
+                props[LEMLINE_GATEWAY_TLS_PRIVATE_KEY]?.let {
+                    generated["quarkus.http.ssl.certificate.key-files"] = it
+                }
+                generated["quarkus.http.http2"] = "true"
             } else {
                 generated["quarkus.grpc.server.ssl.client-auth"] = "none"
             }

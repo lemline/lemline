@@ -89,6 +89,7 @@ object LemlineConfigConstants {
     const val GATEWAY_CORS_ORIGINS_DEFAULT = "http://localhost:5173"
     const val GATEWAY_CORS_METHODS_DEFAULT = "GET,POST,OPTIONS"
     const val GATEWAY_CORS_HEADERS_DEFAULT = "Accept,Authorization,Content-Type,Grpc-Timeout,X-Grpc-Web,X-User-Agent"
+    const val GATEWAY_CORS_EXPOSED_HEADERS_DEFAULT = "Grpc-Status,Grpc-Message,Grpc-Status-Details-Bin"
 
     const val GATEWAY_WATCH_POLL_INTERVAL_MS_DEFAULT = "250"
     const val GATEWAY_WATCH_BATCH_SIZE_DEFAULT = "256"

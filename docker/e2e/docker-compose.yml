@@ -55,8 +55,20 @@ services:
     command: ["--config=/config/lemline.yaml", "gateway", "start"]
     volumes:
       - ./config/lemline.yaml:/config/lemline.yaml:ro
+      - ./certs:/config/certs:ro
     ports:
-      - "9000:9000"
+      - "9443:9443"
+
+  grpc-web-proxy:
+    image: envoyproxy/envoy:v1.31-latest
+    depends_on:
+      gateway:
+        condition: service_started
+    command: ["-c", "/etc/envoy/envoy.yaml", "--log-level", "warning"]
+    volumes:
+      - ./grpc-web-proxy/envoy.yaml:/etc/envoy/envoy.yaml:ro
+    ports:
+      - "18080:8080"
 
   seed-definitions:
     image: lemline-runner-e2e:local
@@ -84,7 +96,7 @@ services:
       context: ../..
       dockerfile: docker/e2e/dashboard/Dockerfile
     depends_on:
-      gateway:
+      grpc-web-proxy:
         condition: service_started
     ports:
       - "5173:80"

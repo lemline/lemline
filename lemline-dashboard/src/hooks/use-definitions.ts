@@ -2,6 +2,8 @@ import { useQuery } from "@tanstack/react-query";
 import { gatewayClient } from "../lib/grpc-client";
 import { ListDefinitionsRequest } from "../gen/proto/lemline/gateway/v1/workflow_gateway_pb";
 
+const SCOPE_REFRESH_INTERVAL_MS = 5_000;
+
 interface UseDefinitionsOptions {
   namespace?: string;
   name?: string;
@@ -22,5 +24,8 @@ export function useDefinitions(options: UseDefinitionsOptions) {
       const response = await gatewayClient.listDefinitions(request);
       return response.definitions;
     },
+    retry: 3,
+    refetchOnMount: "always",
+    refetchInterval: SCOPE_REFRESH_INTERVAL_MS,
   });
 }

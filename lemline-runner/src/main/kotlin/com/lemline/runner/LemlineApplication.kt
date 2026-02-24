@@ -111,11 +111,15 @@ class LemlineApplication : QuarkusApplication {
                     disableMessaging()
                     disableDatabase()
                 } else {
+                    // the gateway start command, if any
+                    val gatewayStart = parseResults.command<GatewayStartCommand>()
+
                     // The listen command, if any
                     val listen = parseResults.command<ListenCommand>()
 
                     if (listen == null) {
-                        disableMetricsEndpoint()
+                        // Gateway mode serves gRPC-Web over the HTTP server; keep HTTP port enabled.
+                        if (gatewayStart == null) disableMetricsEndpoint()
                         disableMessaging()
                         disableScheduled()
                         if (isConfigCreate) disableDatabase()
@@ -130,8 +134,6 @@ class LemlineApplication : QuarkusApplication {
                         System.setProperty(LEMLINE_MESSAGING_COMMANDS_PRODUCER_ENABLED, "true")
                     }
 
-                    // the gateway start command, if any
-                    val gatewayStart = parseResults.command<GatewayStartCommand>()
                     if (gatewayStart != null) {
                         enableGateway()
                         gatewayStart.port?.let {
@@ -316,6 +318,7 @@ private fun enableGateway() {
     System.setProperty(LEMLINE_GATEWAY_ENABLED, "true")
     System.setProperty(LEMLINE_DATABASE_ENABLED, "true")
     System.setProperty(LEMLINE_SCHEDULED_ENABLED, "false")
+    System.setProperty("quarkus.smallrye-health.enabled", "true")
 
     System.setProperty(LEMLINE_MESSAGING_COMMANDS_PRODUCER_ENABLED, "true")
     System.setProperty(LEMLINE_MESSAGING_COMMANDS_CONSUMER_ENABLED, "false")

@@ -17,7 +17,7 @@ export function CascadingSelects() {
   const params = useParams();
   const navigate = useNavigate();
   const location = useLocation();
-  const { data: namespaces = [] } = useNamespaces();
+  const namespacesQuery = useNamespaces();
 
   const namespace = params.namespace;
   const name = params.name;
@@ -71,9 +71,9 @@ export function CascadingSelects() {
   const namespaceOptions = useMemo(
     () => [
       { value: "all", label: "All namespaces" },
-      ...namespaces.map((item) => ({ value: item, label: item })),
+      ...(namespacesQuery.data ?? []).map((item) => ({ value: item, label: item })),
     ],
-    [namespaces],
+    [namespacesQuery.data],
   );
 
   const nameOptions = useMemo(() => {
@@ -166,6 +166,7 @@ export function CascadingSelects() {
 
   const disableName = !resolvedNamespace;
   const disableVersion = !resolvedNamespace || !resolvedName;
+  const disableNamespace = namespacesQuery.isLoading || namespacesQuery.isError;
 
   return (
     <div className="space-y-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-950">
@@ -228,6 +229,8 @@ export function CascadingSelects() {
           value={resolvedNamespace ?? "all"}
           options={namespaceOptions}
           onChange={(event) => onNamespaceChange(event.target.value)}
+          disabled={disableNamespace}
+          className={disableNamespace ? "cursor-not-allowed opacity-50" : undefined}
         />
         <Select
           value={resolvedName ?? "all"}
@@ -252,6 +255,14 @@ export function CascadingSelects() {
           ? "Viewing a specific instance. Use Workflow ID or selectors to navigate to related workflows."
           : "Use selectors to drill down by namespace, workflow name, and version."}
       </p>
+      {namespacesQuery.isLoading && (
+        <p className="text-xs text-slate-500 dark:text-slate-400">Loading namespaces...</p>
+      )}
+      {namespacesQuery.isError && (
+        <p className="text-xs text-red-600 dark:text-red-300">
+          Namespaces unavailable: {toErrorMessage(namespacesQuery.error)}
+        </p>
+      )}
     </div>
   );
 }
@@ -267,4 +278,8 @@ function useDebouncedValue(value: string, delayMs: number): string {
   }, [delayMs, value]);
 
   return debouncedValue;
+}
+
+function toErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : "Unknown error";
 }

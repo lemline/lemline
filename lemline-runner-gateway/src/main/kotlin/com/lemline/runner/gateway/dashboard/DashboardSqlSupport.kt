@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.gateway.dashboard
 
+import java.sql.PreparedStatement
 import java.sql.ResultSet
 import java.sql.Timestamp
 import java.time.Instant
@@ -33,5 +34,12 @@ internal fun ResultSet.getInstantOrNull(column: String): Instant? {
         is Timestamp -> raw.toInstant()
         is LocalDateTime -> raw.toInstant(ZoneOffset.UTC)
         else -> getTimestamp(column)?.toInstant()
+    }
+}
+
+internal fun PreparedStatement.setDashboardObject(index: Int, value: Any) {
+    when (value) {
+        is Instant -> setTimestamp(index, Timestamp.from(value))
+        else -> setObject(index, value)
     }
 }

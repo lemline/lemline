@@ -7,11 +7,69 @@ This setup starts a full local E2E environment with:
 - Automatic workflow definition seeding at startup
 - Lemline worker (`listen`)
 - Lemline gateway (`gateway start`)
+- gRPC-Web proxy (Envoy)
 - Lemline dashboard
 
 ## Prerequisites
 
 - Docker Engine + Docker Compose
+- `mkcert` (for local TLS certificates trusted by browsers)
+
+Install `mkcert` (examples):
+
+- macOS: `brew install mkcert`
+- Windows: `choco install mkcert` or `winget install FiloSottile.mkcert`
+- Linux: use your distro package manager or binary release from the mkcert project
+
+One-time trust setup on each machine:
+
+```bash
+mkcert -install
+```
+
+Generate local certs (from repository root):
+
+```bash
+mkdir -p docker/e2e/certs
+mkcert -cert-file docker/e2e/certs/localhost.pem \
+  -key-file docker/e2e/certs/localhost-key.pem \
+  localhost 127.0.0.1
+```
+
+The `docker/e2e/certs` directory is ignored by git.
+
+If you still see certificate warnings in browser, restart the browser after `mkcert -install`.
+
+## TLS Troubleshooting
+
+If the gateway cannot start TLS or local cert trust is broken:
+
+1. Reinstall trust and regenerate certificates from repository root:
+
+```bash
+mkcert -install
+mkdir -p docker/e2e/certs
+mkcert -cert-file docker/e2e/certs/localhost.pem \
+  -key-file docker/e2e/certs/localhost-key.pem \
+  localhost 127.0.0.1
+```
+
+2. Restart the gateway so it reloads the new certificate:
+
+```bash
+docker compose -f docker/e2e/docker-compose.yml restart gateway
+```
+
+3. Verify TLS trust and HTTP/2 from terminal:
+
+```bash
+curl -v --http2 https://localhost:9443/q/health
+```
+
+Expected: TLS certificate verify is OK and ALPN negotiates `h2`.  
+Note: `/q/health` may still return `404` depending on health endpoint configuration.
+
+4. Fully quit and reopen your browser after `mkcert -install` (especially Safari).
 
 ## Start
 
@@ -37,7 +95,8 @@ docker compose -f docker/e2e/docker-compose.yml ps
 ## Endpoints
 
 - Dashboard: http://localhost:5173
-- Gateway (gRPC / gRPC-Web plaintext): http://localhost:9000
+- gRPC-Web proxy (used by dashboard): http://localhost:18080
+- Gateway (native gRPC over TLS): https://localhost:9443
 - PostgreSQL: localhost:5432
 
 ## Shared configuration

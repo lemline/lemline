@@ -70,7 +70,7 @@ class StatsQueryService(
         requireAnalyticsDataSource().connection.use { conn ->
             conn.prepareStatement(sql).use { stmt ->
                 params.forEachIndexed { index, value ->
-                    stmt.setObject(index + 1, value)
+                    stmt.setDashboardObject(index + 1, value)
                 }
                 stmt.executeQuery().use { rs ->
                     buildList {

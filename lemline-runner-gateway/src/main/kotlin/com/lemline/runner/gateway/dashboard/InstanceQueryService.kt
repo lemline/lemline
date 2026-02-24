@@ -41,7 +41,7 @@ class InstanceQueryService(
         val allRows = requireAnalyticsDataSource().connection.use { conn ->
             conn.prepareStatement(selectQuery.sql).use { stmt ->
                 selectQuery.params.forEachIndexed { index, value ->
-                    stmt.setObject(index + 1, value)
+                    stmt.setDashboardObject(index + 1, value)
                 }
                 stmt.executeQuery().use { rs ->
                     buildList {
@@ -153,7 +153,7 @@ class InstanceQueryService(
         requireAnalyticsDataSource().connection.use { conn ->
             conn.prepareStatement(sql).use { stmt ->
                 params.forEachIndexed { index, value ->
-                    stmt.setObject(index + 1, value)
+                    stmt.setDashboardObject(index + 1, value)
                 }
                 stmt.setInt(params.size + 1, normalizedLimit)
                 stmt.executeQuery().use { rs ->
@@ -204,7 +204,7 @@ class InstanceQueryService(
         requireAnalyticsDataSource().connection.use { conn ->
             conn.prepareStatement(countQuery.sql).use { stmt ->
                 countQuery.params.forEachIndexed { index, value ->
-                    stmt.setObject(index + 1, value)
+                    stmt.setDashboardObject(index + 1, value)
                 }
                 stmt.executeQuery().use { rs ->
                     if (rs.next()) rs.getLong("total_count") else 0L

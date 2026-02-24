@@ -19,7 +19,8 @@ interface StartFormProps {
 
 export function StartForm({ initialNamespace, initialName, initialVersion }: StartFormProps) {
   const navigate = useNavigate();
-  const { data: namespaces = [] } = useNamespaces();
+  const namespacesQuery = useNamespaces();
+  const namespaces = namespacesQuery.data ?? [];
   const [namespace, setNamespace] = useState(initialNamespace ?? "");
   const [name, setName] = useState(initialName ?? "");
   const [version, setVersion] = useState(initialVersion ?? "");
@@ -141,6 +142,7 @@ export function StartForm({ initialNamespace, initialName, initialVersion }: Sta
                 setVersion("");
               }}
               options={namespaces.map((item) => ({ value: item, label: item }))}
+              disabled={namespacesQuery.isLoading || namespacesQuery.isError}
             />
           </div>
           <div>
@@ -187,6 +189,14 @@ export function StartForm({ initialNamespace, initialName, initialVersion }: Sta
         </div>
 
         {error && <p className="text-sm text-red-600 dark:text-red-300">{error}</p>}
+        {namespacesQuery.isLoading && (
+          <p className="text-sm text-slate-500 dark:text-slate-400">Loading namespaces...</p>
+        )}
+        {namespacesQuery.isError && (
+          <p className="text-sm text-red-600 dark:text-red-300">
+            Unable to load namespaces: {toErrorMessage(namespacesQuery.error)}
+          </p>
+        )}
 
         <Button type="submit" disabled={loading || !namespace || !name || !version}>
           {loading ? "Starting..." : "Start workflow"}
@@ -194,4 +204,8 @@ export function StartForm({ initialNamespace, initialName, initialVersion }: Sta
       </form>
     </Card>
   );
+}
+
+function toErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : "Unknown error";
 }
