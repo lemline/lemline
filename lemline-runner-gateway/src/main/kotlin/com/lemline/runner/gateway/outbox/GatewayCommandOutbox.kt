@@ -25,6 +25,8 @@ class GatewayCommandOutbox : AbstractOutbox<GatewayCommandOutboxModel>() {
 
     override val jobName: String get() = "Gateway command outbox"
 
+    override val runWhenScheduledDisabled: Boolean get() = true
+
     @Inject
     override lateinit var commandEmitter: CommandEmitter
 
