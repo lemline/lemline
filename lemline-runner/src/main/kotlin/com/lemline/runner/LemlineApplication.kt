@@ -289,10 +289,14 @@ private fun disableMetricsEndpoint() {
 }
 
 private fun enableMessaging() {
-    System.setProperty(LEMLINE_MESSAGING_EVENTS_CONSUMER_ENABLED, "true")
     System.setProperty(LEMLINE_MESSAGING_COMMANDS_CONSUMER_ENABLED, "true")
-    System.setProperty(LEMLINE_MESSAGING_EVENTS_PRODUCER_ENABLED, "true")
     System.setProperty(LEMLINE_MESSAGING_COMMANDS_PRODUCER_ENABLED, "true")
+    System.setProperty(LEMLINE_MESSAGING_EVENTS_CONSUMER_ENABLED, "true")
+    System.setProperty(LEMLINE_MESSAGING_EVENTS_PRODUCER_ENABLED, "true")
+    System.setProperty(LEMLINE_MESSAGING_CLOUDEVENTS_CONSUMER_ENABLED, "true")
+    System.setProperty(LEMLINE_MESSAGING_CLOUDEVENTS_PRODUCER_ENABLED, "true")
+    System.setProperty(LEMLINE_MESSAGING_LIFECYCLE_EVENTS_CONSUMER_ENABLED, "true")
+    System.setProperty(LEMLINE_MESSAGING_LIFECYCLE_EVENTS_PRODUCER_ENABLED, "true")
 }
 
 private fun disableMessaging() {

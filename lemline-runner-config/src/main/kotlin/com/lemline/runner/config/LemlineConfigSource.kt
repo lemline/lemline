@@ -725,7 +725,9 @@ class LemlineConfigSource : PropertiesConfigSource(
                 set("$incoming.dead-letter-queue.topic", topicDLQ)
                 set(
                     LEMLINE_MESSAGING_LIFECYCLE_EVENTS_CONSUMER_CONCURRENCY,
-                    props[LEMLINE_MESSAGING_KAFKA_LIFECYCLE_EVENTS_CONSUMER_CONCURRENCY] ?: CONSUMER_CONCURRENCY_DEFAULT
+                    props[LEMLINE_MESSAGING_KAFKA_LIFECYCLE_EVENTS_CONSUMER_CONCURRENCY]
+                        ?: props[LEMLINE_MESSAGING_LIFECYCLE_EVENTS_CONSUMER_CONCURRENCY]
+                        ?: CONSUMER_CONCURRENCY_DEFAULT
                 )
             }
 
@@ -882,7 +884,9 @@ class LemlineConfigSource : PropertiesConfigSource(
                 }
                 set(
                     LEMLINE_MESSAGING_LIFECYCLE_EVENTS_CONSUMER_CONCURRENCY,
-                    props[LEMLINE_MESSAGING_RABBITMQ_LIFECYCLE_EVENTS_CONSUMER_CONCURRENCY] ?: CONSUMER_CONCURRENCY_DEFAULT
+                    props[LEMLINE_MESSAGING_RABBITMQ_LIFECYCLE_EVENTS_CONSUMER_CONCURRENCY]
+                        ?: props[LEMLINE_MESSAGING_LIFECYCLE_EVENTS_CONSUMER_CONCURRENCY]
+                        ?: CONSUMER_CONCURRENCY_DEFAULT
                 )
             }
 
@@ -1127,7 +1131,9 @@ class LemlineConfigSource : PropertiesConfigSource(
                 set("$incoming.auto-create-queue", "false")
                 set(
                     LEMLINE_MESSAGING_LIFECYCLE_EVENTS_CONSUMER_CONCURRENCY,
-                    props[LEMLINE_MESSAGING_PGMQ_LIFECYCLE_EVENTS_CONSUMER_CONCURRENCY] ?: CONSUMER_CONCURRENCY_DEFAULT
+                    props[LEMLINE_MESSAGING_PGMQ_LIFECYCLE_EVENTS_CONSUMER_CONCURRENCY]
+                        ?: props[LEMLINE_MESSAGING_LIFECYCLE_EVENTS_CONSUMER_CONCURRENCY]
+                        ?: CONSUMER_CONCURRENCY_DEFAULT
                 )
             }
 

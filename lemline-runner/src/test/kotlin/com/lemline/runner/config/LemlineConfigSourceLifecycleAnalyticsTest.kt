@@ -10,10 +10,13 @@ import com.lemline.runner.common.config.LEMLINE_ANALYTICS_POSTGRES_HOST
 import com.lemline.runner.common.config.LEMLINE_ANALYTICS_POSTGRES_PASSWORD
 import com.lemline.runner.common.config.LEMLINE_ANALYTICS_POSTGRES_PORT
 import com.lemline.runner.common.config.LEMLINE_ANALYTICS_POSTGRES_USERNAME
+import com.lemline.runner.common.config.LEMLINE_MESSAGING_KAFKA_LIFECYCLE_EVENTS_CONSUMER_CONCURRENCY
 import com.lemline.runner.common.config.LEMLINE_MESSAGING_KAFKA_LIFECYCLE_EVENTS_TOPIC
 import com.lemline.runner.common.config.LEMLINE_MESSAGING_LIFECYCLE_EVENTS_CONSUMER_CONCURRENCY
 import com.lemline.runner.common.config.LEMLINE_MESSAGING_LIFECYCLE_EVENTS_CONSUMER_ENABLED
+import com.lemline.runner.common.config.LEMLINE_MESSAGING_PGMQ_LIFECYCLE_EVENTS_CONSUMER_CONCURRENCY
 import com.lemline.runner.common.config.LEMLINE_MESSAGING_PGMQ_LIFECYCLE_EVENTS_QUEUE
+import com.lemline.runner.common.config.LEMLINE_MESSAGING_RABBITMQ_LIFECYCLE_EVENTS_CONSUMER_CONCURRENCY
 import com.lemline.runner.common.config.LEMLINE_MESSAGING_RABBITMQ_LIFECYCLE_EVENTS_PRODUCER_EXCHANGE_NAME
 import com.lemline.runner.common.config.LEMLINE_MESSAGING_RABBITMQ_LIFECYCLE_EVENTS_QUEUE
 import com.lemline.runner.common.config.LEMLINE_MESSAGING_TYPE
@@ -50,11 +53,26 @@ class LemlineConfigSourceLifecycleAnalyticsTest {
     }
 
     @Test
+    fun `kafka lifecycleevents backend-specific concurrency overrides generic value`() {
+        withSystemProperties(
+            mapOf(
+                LEMLINE_MESSAGING_TYPE to "kafka",
+                LEMLINE_MESSAGING_LIFECYCLE_EVENTS_CONSUMER_ENABLED to "true",
+                LEMLINE_MESSAGING_LIFECYCLE_EVENTS_CONSUMER_CONCURRENCY to "17",
+                LEMLINE_MESSAGING_KAFKA_LIFECYCLE_EVENTS_CONSUMER_CONCURRENCY to "29"
+            )
+        ) { source ->
+            assertEquals("29", source.getValue(LEMLINE_MESSAGING_LIFECYCLE_EVENTS_CONSUMER_CONCURRENCY))
+        }
+    }
+
+    @Test
     fun `generates rabbit lifecycleevents analytics consumer properties`() {
         withSystemProperties(
             mapOf(
                 LEMLINE_MESSAGING_TYPE to "rabbitmq",
                 LEMLINE_MESSAGING_LIFECYCLE_EVENTS_CONSUMER_ENABLED to "true",
+                LEMLINE_MESSAGING_LIFECYCLE_EVENTS_CONSUMER_CONCURRENCY to "19",
                 LEMLINE_MESSAGING_RABBITMQ_LIFECYCLE_EVENTS_QUEUE to "lemline-lifecycle-events-custom",
                 LEMLINE_MESSAGING_RABBITMQ_LIFECYCLE_EVENTS_PRODUCER_EXCHANGE_NAME to "lemline-lifecycle-events-exchange"
             )
@@ -65,6 +83,21 @@ class LemlineConfigSourceLifecycleAnalyticsTest {
             assertEquals("true", source.getValue("$incoming.broadcast"))
             assertEquals("lemline-lifecycle-events-exchange", source.getValue("$incoming.exchange.name"))
             assertEquals("reject", source.getValue("$incoming.failure-strategy"))
+            assertEquals("19", source.getValue(LEMLINE_MESSAGING_LIFECYCLE_EVENTS_CONSUMER_CONCURRENCY))
+        }
+    }
+
+    @Test
+    fun `rabbit lifecycleevents backend-specific concurrency overrides generic value`() {
+        withSystemProperties(
+            mapOf(
+                LEMLINE_MESSAGING_TYPE to "rabbitmq",
+                LEMLINE_MESSAGING_LIFECYCLE_EVENTS_CONSUMER_ENABLED to "true",
+                LEMLINE_MESSAGING_LIFECYCLE_EVENTS_CONSUMER_CONCURRENCY to "19",
+                LEMLINE_MESSAGING_RABBITMQ_LIFECYCLE_EVENTS_CONSUMER_CONCURRENCY to "31"
+            )
+        ) { source ->
+            assertEquals("31", source.getValue(LEMLINE_MESSAGING_LIFECYCLE_EVENTS_CONSUMER_CONCURRENCY))
         }
     }
 
@@ -74,6 +107,7 @@ class LemlineConfigSourceLifecycleAnalyticsTest {
             mapOf(
                 LEMLINE_MESSAGING_TYPE to "pgmq",
                 LEMLINE_MESSAGING_LIFECYCLE_EVENTS_CONSUMER_ENABLED to "true",
+                LEMLINE_MESSAGING_LIFECYCLE_EVENTS_CONSUMER_CONCURRENCY to "23",
                 LEMLINE_MESSAGING_PGMQ_LIFECYCLE_EVENTS_QUEUE to "lemline-lifecycle-events-custom"
             )
         ) { source ->
@@ -85,6 +119,21 @@ class LemlineConfigSourceLifecycleAnalyticsTest {
             assertEquals(PGMQ_POLL_INTERVAL_DEFAULT, source.getValue("$incoming.poll-interval"))
             assertEquals(PGMQ_BATCH_SIZE_DEFAULT, source.getValue("$incoming.batch-size"))
             assertEquals(PGMQ_MAX_RETRIES_DEFAULT, source.getValue("$incoming.max-retries"))
+            assertEquals("23", source.getValue(LEMLINE_MESSAGING_LIFECYCLE_EVENTS_CONSUMER_CONCURRENCY))
+        }
+    }
+
+    @Test
+    fun `pgmq lifecycleevents backend-specific concurrency overrides generic value`() {
+        withSystemProperties(
+            mapOf(
+                LEMLINE_MESSAGING_TYPE to "pgmq",
+                LEMLINE_MESSAGING_LIFECYCLE_EVENTS_CONSUMER_ENABLED to "true",
+                LEMLINE_MESSAGING_LIFECYCLE_EVENTS_CONSUMER_CONCURRENCY to "23",
+                LEMLINE_MESSAGING_PGMQ_LIFECYCLE_EVENTS_CONSUMER_CONCURRENCY to "37"
+            )
+        ) { source ->
+            assertEquals("37", source.getValue(LEMLINE_MESSAGING_LIFECYCLE_EVENTS_CONSUMER_CONCURRENCY))
         }
     }
 
