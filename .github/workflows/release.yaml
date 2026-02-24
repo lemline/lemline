@@ -137,14 +137,18 @@ jobs:
       - name: Build uber-jar (Linux)
         if: ${{ matrix.platform == 'linux-x86_64' }}
         run: |
-          ./gradlew -p lemline-runner quarkusBuild \
+          ./gradlew --no-daemon \
+          -Dorg.gradle.jvmargs="-Xmx2g -XX:MaxMetaspaceSize=768m -Dfile.encoding=UTF-8" \
+          -p lemline-runner quarkusBuild \
           -Dquarkus.package.jar.type=uber-jar
 
       # **🐧 Linux**
       - name: Build native image (Unix)
         if: ${{ matrix.platform == 'linux-x86_64' }}
         run: |
-          ./gradlew -p lemline-runner quarkusBuild \
+          ./gradlew --no-daemon \
+            -Dorg.gradle.jvmargs="-Xmx2g -XX:MaxMetaspaceSize=768m -Dfile.encoding=UTF-8" \
+            -p lemline-runner quarkusBuild \
             -Dquarkus.native.enabled=true \
             -Dquarkus.package.jar.enabled=false \
             -Dquarkus.native.native-image-xmx=5g
@@ -153,7 +157,9 @@ jobs:
       - name: Build native image (MacOs)
         if: runner.os == 'macOS'
         run: |
-          ./gradlew -p lemline-runner quarkusBuild \
+          ./gradlew --no-daemon \
+            -Dorg.gradle.jvmargs="-Xmx2g -XX:MaxMetaspaceSize=768m -Dfile.encoding=UTF-8" \
+            -p lemline-runner quarkusBuild \
             -Dquarkus.native.enabled=true \
             -Dquarkus.package.jar.enabled=false \
             -Dquarkus.native.native-image-xmx=5g 
@@ -163,7 +169,9 @@ jobs:
         if: ${{ runner.os == 'Windows' }}
         shell: cmd
         run: |
-          gradlew.bat -p lemline-runner quarkusBuild ^
+          gradlew.bat --no-daemon ^
+            -Dorg.gradle.jvmargs="-Xmx2g -XX:MaxMetaspaceSize=768m -Dfile.encoding=UTF-8" ^
+            -p lemline-runner quarkusBuild ^
             -Dquarkus.native.enabled=true ^
             -Dquarkus.package.jar.enabled=false ^
             -Dquarkus.native.native-image-xmx=5g
