@@ -156,7 +156,7 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
           )
           .slice(0, 40)
           .map((definition) => {
-            const path = `/ns/${encodeURIComponent(definition.namespace)}/name/${encodeURIComponent(definition.name)}/v/${encodeURIComponent(definition.version)}`;
+            const path = `/ns/${encodeURIComponent(definition.namespace)}/name/${encodeURIComponent(definition.name)}/version/${encodeURIComponent(definition.version)}`;
             return {
               id: `definition:${definition.namespace}/${definition.name}/${definition.version}`,
               section: "Definitions",

@@ -27,9 +27,10 @@ export function DashboardRoutes() {
       <Route path="/ns/:namespace" element={withSuspense(<NamespaceOverviewPage />)} />
       <Route path="/ns/:namespace/name/:name" element={withSuspense(<WorkflowOverviewPage />)} />
       <Route
-        path="/ns/:namespace/name/:name/v/:version"
+        path="/ns/:namespace/name/:name/version/:version"
         element={withSuspense(<VersionOverviewPage />)}
       />
+      <Route path="/ns/:namespace/name/:name/v/:version" element={withSuspense(<VersionOverviewPage />)} />
       <Route path="/id/:workflowId" element={withSuspense(<InstanceDetailPage />)} />
       <Route path="/start" element={withSuspense(<StartWorkflowPage />)} />
       <Route path="*" element={<Navigate to="/" replace />} />

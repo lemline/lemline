@@ -286,7 +286,7 @@ export function OverviewContent({ level, namespace, name, version }: OverviewCon
     }
     if (level === "workflow" && namespace && name) {
       navigate(
-        `/ns/${encodeURIComponent(namespace)}/name/${encodeURIComponent(name)}/v/${encodeURIComponent(row.label)}`,
+        `/ns/${encodeURIComponent(namespace)}/name/${encodeURIComponent(name)}/version/${encodeURIComponent(row.label)}`,
       );
     }
   };

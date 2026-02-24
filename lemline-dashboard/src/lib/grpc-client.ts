@@ -24,11 +24,35 @@ function summarizeCause(cause: unknown): unknown {
   return cause;
 }
 
+function isExpectedCancellation(connectError: ConnectError): boolean {
+  if (connectError.code === Code.Canceled) {
+    return true;
+  }
+
+  const message = `${connectError.message} ${connectError.rawMessage ?? ""}`.toLowerCase();
+  if (message.includes("abort") || message.includes("cancel")) {
+    return true;
+  }
+
+  if (connectError.cause instanceof Error) {
+    const causeMessage = `${connectError.cause.name} ${connectError.cause.message}`.toLowerCase();
+    if (causeMessage.includes("abort") || causeMessage.includes("cancel")) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 const grpcErrorLoggingInterceptor: Interceptor = (next) => async (request) => {
   try {
     return await next(request);
   } catch (error) {
     const connectError = ConnectError.from(error);
+    if (isExpectedCancellation(connectError)) {
+      throw error;
+    }
+
     const diagnostics = {
       service: request.service.typeName,
       method: request.method.name,
