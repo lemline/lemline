@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.tests.profiles
 
+import com.lemline.runner.common.config.AnalyticsType
 import com.lemline.runner.common.config.DatabaseType
+import com.lemline.runner.common.config.LEMLINE_ANALYTICS_TYPE
 import com.lemline.runner.common.config.LEMLINE_DATABASE_TYPE
 import com.lemline.runner.common.config.LEMLINE_MESSAGING_CLOUDEVENTS_CONSUMER_ENABLED
 import com.lemline.runner.common.config.LEMLINE_MESSAGING_CLOUDEVENTS_PRODUCER_ENABLED
@@ -37,10 +39,12 @@ import io.quarkus.test.junit.QuarkusTestProfile
 class InMemoryProfile : QuarkusTestProfile {
     override fun getConfigOverrides(): Map<String, String> {
         return mapOf(
-            // Database configuration
+            // Configuration
             LEMLINE_DATABASE_TYPE to DatabaseType.H2.configValue,
-            // Messaging configuration
             LEMLINE_MESSAGING_TYPE to MessagingType.IN_MEMORY.configValue,
+            LEMLINE_ANALYTICS_TYPE to AnalyticsType.H2.configValue,
+
+            // Messaging configuration
             LEMLINE_MESSAGING_COMMANDS_CONSUMER_ENABLED to "true",
             LEMLINE_MESSAGING_COMMANDS_PRODUCER_ENABLED to "true",
             LEMLINE_MESSAGING_EVENTS_CONSUMER_ENABLED to "true",
@@ -49,8 +53,6 @@ class InMemoryProfile : QuarkusTestProfile {
             LEMLINE_MESSAGING_CLOUDEVENTS_PRODUCER_ENABLED to "true",
             LEMLINE_MESSAGING_LIFECYCLE_EVENTS_CONSUMER_ENABLED to "true",
             LEMLINE_MESSAGING_LIFECYCLE_EVENTS_PRODUCER_ENABLED to "true",
-            // Keep lifecycleevents-in bound for loopback lifecycle analytics ingestion in tests.
-            "mp.messaging.incoming.lifecycleevents-in.connector" to "smallrye-in-memory",
 
             // Enable outbox schedulers for tests that need them (Listen, Wait, Retry, etc.)
             LEMLINE_OUTBOX_ENABLED to "true",
