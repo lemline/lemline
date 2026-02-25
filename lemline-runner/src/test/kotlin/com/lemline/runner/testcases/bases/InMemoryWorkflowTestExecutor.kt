@@ -19,7 +19,7 @@ import com.lemline.runner.messaging.commands.COMMANDS_OUT_CHANNEL
 import com.lemline.runner.messaging.events.EVENTS_IN_CHANNEL
 import com.lemline.runner.messaging.events.EVENTS_OUT_CHANNEL
 import com.lemline.runner.starters.Starter
-import com.lemline.runner.testcases.lifecycleevents.AnalyticsWorkflowResultAwaiter
+import com.lemline.runner.testcases.AnalyticsWorkflowResultAwaiter
 import io.smallrye.reactive.messaging.memory.InMemoryConnector
 import jakarta.enterprise.inject.Any
 import jakarta.inject.Inject

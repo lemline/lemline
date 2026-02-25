@@ -20,7 +20,7 @@ import com.lemline.runner.definitions.DefinitionModel
 import com.lemline.runner.definitions.DefinitionRepository
 import com.lemline.runner.listeners.ListenerRepository
 import com.lemline.runner.starters.Starter
-import com.lemline.runner.testcases.lifecycleevents.AnalyticsWorkflowResultAwaiter
+import com.lemline.runner.testcases.AnalyticsWorkflowResultAwaiter
 import io.cloudevents.CloudEvent
 import io.cloudevents.jackson.JsonFormat
 import java.util.concurrent.TimeoutException

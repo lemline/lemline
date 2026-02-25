@@ -14,7 +14,7 @@ import com.lemline.runner.listeners.ListenerRepository
 import com.lemline.runner.messaging.cloudevents.CLOUDEVENTS_OUT_CHANNEL
 import com.lemline.runner.messaging.commands.WorkflowCommandEmitter
 import com.lemline.runner.starters.Starter
-import com.lemline.runner.testcases.lifecycleevents.AnalyticsWorkflowResultAwaiter
+import com.lemline.runner.testcases.AnalyticsWorkflowResultAwaiter
 import io.smallrye.mutiny.coroutines.awaitSuspending
 import io.smallrye.reactive.messaging.MutinyEmitter
 import jakarta.enterprise.inject.Instance

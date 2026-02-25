@@ -1,5 +1,4 @@
-// SPDX-License-Identifier: BUSL-1.1
-package com.lemline.runner.testcases.lifecycleevents
+package com.lemline.runner.testcases
 
 import com.lemline.common.logger.logger
 import com.lemline.common.values.WorkflowId
