@@ -2,6 +2,8 @@
 package com.lemline.core.lifecycleevents
 
 import com.lemline.common.values.NodePosition
+import com.lemline.common.ids.IdGenerator
+import com.lemline.common.values.IDV7
 import com.lemline.common.values.WorkflowId
 import com.lemline.common.values.WorkflowInfo
 import com.lemline.core.errors.InternalException
@@ -318,19 +320,19 @@ class CloudEventLifecycleHook(
     }
 
     /**
-     * Derives a deterministic event ID for idempotency.
+     * Derives a deterministic UUIDv7 event ID for idempotency.
      *
-     * The ID is derived from workflow instance, execution key, and event type to ensure
-     * the same event produces the same ID on replay.
+     * Uses the same derivation mechanism as other idempotent IDs in the system
+     * (messages, database records) to produce a standard-format UUID from the
+     * workflow instance, execution context, and event type.
      */
     private fun deriveEventId(
         workflowId: WorkflowId,
         executionKey: String,
         idSuffix: String,
     ): String {
-        // Use a deterministic format: workflowId-executionKey-suffix
-        // This ensures idempotent event IDs for replay scenarios
-        return "$workflowId-$executionKey-$idSuffix"
+        val salt = "$executionKey:$idSuffix"
+        return IDV7(IdGenerator.deriveUuidV7FromV7(workflowId.value.value, salt)).toString()
     }
 
     /**

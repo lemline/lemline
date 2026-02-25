@@ -16,10 +16,13 @@ import com.lemline.core.orchestrator.FullOrchestrator
 import com.lemline.core.orchestrator.StepByStepOrchestrator
 import com.lemline.core.states.NodeStack
 import com.lemline.core.workflows.WorkflowCache
+import io.cloudevents.CloudEvent
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.shouldBe
+import io.kotest.matchers.shouldNotBe
 import java.util.concurrent.CopyOnWriteArrayList
 import kotlin.time.Clock
+import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.buildJsonObject
@@ -145,6 +148,18 @@ class LifecycleEventHookTest : FunSpec() {
         }
     }
 
+    /**
+     * Simple emitter that captures CloudEvents for inspection.
+     */
+    private class CapturingEmitter : LifecycleEventEmitter {
+        private val _events = CopyOnWriteArrayList<CloudEvent>()
+        val events: List<CloudEvent> get() = _events.toList()
+
+        override suspend fun emit(cloudEvent: CloudEvent) {
+            _events.add(cloudEvent)
+        }
+    }
+
     private suspend fun executeWorkflow(
         yaml: String,
         input: JsonElement = buildJsonObject { },
@@ -181,6 +196,48 @@ class LifecycleEventHookTest : FunSpec() {
         )
 
         return outcome.value()
+    }
+
+    /**
+     * Executes a workflow with a fixed workflowId and startedAt for deterministic event IDs.
+     */
+    @OptIn(ExperimentalTime::class)
+    private suspend fun executeWorkflowDeterministic(
+        yaml: String,
+        workflowId: WorkflowId,
+        startedAt: Instant,
+        emitter: CapturingEmitter,
+        input: JsonElement = buildJsonObject { },
+        namespace: String = "default",
+        name: String = "test",
+        version: String = "0.1.0",
+    ) {
+        val workflow = getWorkflowToTest(yaml, namespace, name, version)
+        val workflowInfo = WorkflowInfo(
+            WorkflowNamespace(namespace),
+            WorkflowName(name),
+            WorkflowVersion(version)
+        )
+        val lifecycleHook = CloudEventLifecycleHook(emitter)
+
+        val startState = StepByStepOrchestrator.initCmd(
+            workflowId = workflowId,
+            workflowInput = input,
+            hasWaitingParent = false,
+            startedAt = startedAt,
+        )
+
+        lifecycleHook.onWorkflowCreated(workflowInfo, startState.nodeStack)
+
+        FullOrchestrator.resume(
+            workflow = workflow,
+            command = startState,
+            serde = true,
+            activityExecutor = MockActivityExecutor.empty(),
+            functionResolver = MockFunctionResolver(),
+            cloudEventHook = InMemoryCloudEventHook(),
+            lifecycleHook = lifecycleHook,
+        )
     }
 
     /**
@@ -630,6 +687,83 @@ class LifecycleEventHookTest : FunSpec() {
                 "task.completed:do",
                 "workflow.completed"
             )
+        }
+
+        // ========================================
+        // Idempotency Tests
+        // ========================================
+
+        test("lifecycle event IDs are deterministic - same workflow produces same IDs on replay") {
+            val yaml = """
+                do:
+                  - step1:
+                      set:
+                        a: 1
+                  - step2:
+                      set:
+                        b: 2
+            """
+
+            val workflowId = WorkflowId.random()
+            val startedAt = Clock.System.now()
+
+            // First execution
+            val emitter1 = CapturingEmitter()
+            executeWorkflowDeterministic(yaml, workflowId, startedAt, emitter1)
+
+            // Second execution (replay) with same workflowId and startedAt
+            val emitter2 = CapturingEmitter()
+            executeWorkflowDeterministic(yaml, workflowId, startedAt, emitter2)
+
+            // Both runs should produce the same number of events
+            emitter1.events.size shouldBe emitter2.events.size
+
+            // Each event should have the same ID and type
+            emitter1.events.zip(emitter2.events).forEach { (event1, event2) ->
+                event1.id shouldBe event2.id
+                event1.type shouldBe event2.type
+                event1.source shouldBe event2.source
+            }
+        }
+
+        test("lifecycle event IDs are UUIDv7 format") {
+            val yaml = """
+                do:
+                  - step1:
+                      set:
+                        a: 1
+            """
+
+            val emitter = CapturingEmitter()
+            executeWorkflowDeterministic(yaml, WorkflowId.random(), Clock.System.now(), emitter)
+
+            val uuidRegex = Regex("^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$")
+            emitter.events.forEach { event ->
+                event.id.matches(uuidRegex) shouldBe true
+            }
+        }
+
+        test("different workflowIds produce different event IDs") {
+            val yaml = """
+                do:
+                  - step1:
+                      set:
+                        a: 1
+            """
+
+            val startedAt = Clock.System.now()
+
+            val emitter1 = CapturingEmitter()
+            executeWorkflowDeterministic(yaml, WorkflowId.random(), startedAt, emitter1)
+
+            val emitter2 = CapturingEmitter()
+            executeWorkflowDeterministic(yaml, WorkflowId.random(), startedAt, emitter2)
+
+            // Same number of events but different IDs
+            emitter1.events.size shouldBe emitter2.events.size
+            emitter1.events.zip(emitter2.events).forEach { (event1, event2) ->
+                event1.id shouldNotBe event2.id
+            }
         }
 
         test("fork in compete mode - first branch wins") {
