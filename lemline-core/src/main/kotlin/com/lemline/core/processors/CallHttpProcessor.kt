@@ -113,9 +113,11 @@ class CallHttpProcessor(
             it.value.toJsonPrimitive().content
         } ?: emptyMap()
 
-        // Extract query parameters
+        // Extract query parameters (evaluate runtime expressions)
+        // Note: The SDK pre-strips ${ } wrappers, so values like ".searchQuery"
+        // need to be evaluated as JQ expressions directly.
         val query = httpArgs.query?.additionalProperties?.mapValues {
-            it.value.toJsonPrimitive().content
+            evalString(transformedInput, it.value.toJsonPrimitive().content, "query.${it.key}", scope)
         } ?: emptyMap()
 
         // Extract body

@@ -84,8 +84,8 @@ data class MockConfiguration(
      * Find HTTP mock matching URL and method.
      * First matching rule wins.
      */
-    fun findHttpMock(url: String, method: String): HttpMockRule? =
-        httpMocks.firstOrNull { it.matches(url, method) }
+    fun findHttpMock(url: String, method: String, query: Map<String, String> = emptyMap()): HttpMockRule? =
+        httpMocks.firstOrNull { it.matches(url, method, query) }
 
     /**
      * Find function mock matching function reference.
@@ -194,13 +194,16 @@ data class HttpMockRule(
     val response: HttpMockResponse
 ) {
     /**
-     * Check if this rule matches the given URL and method.
+     * Check if this rule matches the given URL, method, and query parameters.
      */
-    fun matches(url: String, method: String): Boolean {
+    fun matches(url: String, method: String, query: Map<String, String> = emptyMap()): Boolean {
         if (match.method != null && !match.method.equals(method, ignoreCase = true)) {
             return false
         }
         if (match.url != null && !globMatches(match.url, url)) {
+            return false
+        }
+        if (match.query != null && !match.query.all { (key, value) -> query[key] == value }) {
             return false
         }
         return true
@@ -210,7 +213,8 @@ data class HttpMockRule(
 @Serializable
 data class HttpMockMatcher(
     val url: String? = null,
-    val method: String? = null
+    val method: String? = null,
+    val query: Map<String, String>? = null
 )
 
 @Serializable
