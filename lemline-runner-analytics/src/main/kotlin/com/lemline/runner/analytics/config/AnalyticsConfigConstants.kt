@@ -8,6 +8,6 @@ package com.lemline.runner.analytics.config
 object AnalyticsConfigConstants {
     const val LIFECYCLE_EVENTS_CONSUMER_ENABLED_DEFAULT = "false"
     const val LIFECYCLE_EVENTS_CONSUMER_CONCURRENCY_DEFAULT = "64"
-    const val ANALYTICS_POSTGRES_SCHEMA_DEFAULT = "public"
+    const val ANALYTICS_POSTGRES_SCHEMA_DEFAULT = "lemline"
     const val ANALYTICS_POSTGRES_MIGRATE_AT_START_DEFAULT = "true"
 }

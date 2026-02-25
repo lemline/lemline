@@ -337,7 +337,7 @@ class LemlineConfigSource : PropertiesConfigSource(
                     val postgres = "quarkus.datasource.postgresql"
                     generated["$postgres.username"] = username
                     generated["$postgres.password"] = password
-                    generated["$postgres.jdbc.url"] = "jdbc:postgresql://$host:$port/$database"
+                    generated["$postgres.jdbc.url"] = "jdbc:postgresql://$host:$port/$database?currentSchema=lemline"
                 }
 
                 DatabaseType.MYSQL -> {
@@ -397,7 +397,7 @@ class LemlineConfigSource : PropertiesConfigSource(
 
             generated["$datasource.username"] = username
             generated["$datasource.password"] = password
-            generated["$datasource.jdbc.url"] = "jdbc:postgresql://$host:$port/$database"
+            generated["$datasource.jdbc.url"] = "jdbc:postgresql://$host:$port/$database?currentSchema=lemline"
             generated["$flyway.baseline-on-migrate"] = baselineOnMigrate
             generated["$flyway.locations"] = "classpath:db/migration/analytics/postgresql"
 
