@@ -40,17 +40,19 @@ services:
       - ../../lemline-runner/src/test/resources/examples:/workflows:ro
     ports:
       - "8080:8080"
+    healthcheck:
+      test: ["CMD", "bash", "-c", "echo > /dev/tcp/localhost/8080"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 15s
 
   gateway:
     image: lemline-runner-e2e:local
     pull_policy: never
     depends_on:
-      postgres:
+      worker:
         condition: service_healthy
-      runner-image:
-        condition: service_completed_successfully
-      seed-definitions:
-        condition: service_completed_successfully
     command: ["--config=/config/lemline.yaml", "gateway", "start"]
     volumes:
       - ./config/lemline.yaml:/config/lemline.yaml:ro

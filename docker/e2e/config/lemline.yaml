@@ -46,7 +46,7 @@ lemline:
   analytics:
     type: postgresql
     migrate-at-start: true
-    baseline-on-migrate: false
+    baseline-on-migrate: true
     postgresql:
       host: postgres
       port: 5432
