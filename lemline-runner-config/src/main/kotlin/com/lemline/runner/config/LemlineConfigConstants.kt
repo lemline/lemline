@@ -33,7 +33,7 @@ object LemlineConfigConstants {
     const val POSTGRES_DATABASE_DEFAULT = "lemline"
     const val POSTGRES_USERNAME_DEFAULT = "postgres"
     const val POSTGRES_PASSWORD_DEFAULT = "postgres"
-    const val ANALYTICS_POSTGRES_DATABASE_DEFAULT = "lemline_analytics"
+    const val ANALYTICS_POSTGRES_DATABASE_DEFAULT = "lemline"
     const val ANALYTICS_POSTGRES_SCHEMA_DEFAULT = "public"
     const val ANALYTICS_POSTGRES_TABLE_DEFAULT = "lemline_lifecycle_events"
     const val ANALYTICS_POSTGRES_MIGRATE_AT_START_DEFAULT = "true"

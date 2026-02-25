@@ -65,11 +65,7 @@ object CallFunctionTestCases {
                         lastName: Doe
             """.trimIndent(),
             tags = setOf("function", "execution"),
-            validate = expectOutput(
-                buildJsonObject {
-                    put("fullName", "John Doe")
-                }
-            )
+            validate = expectOutput(buildJsonObject { put("fullName", "John Doe") })
         ),
 
         WorkflowTestCase(
@@ -90,11 +86,7 @@ object CallFunctionTestCases {
                 put("input", 21)
             },
             tags = setOf("function", "execution"),
-            validate = expectOutput(
-                buildJsonObject {
-                    put("result", 42)
-                }
-            )
+            validate = expectOutput(buildJsonObject { put("result", 42) })
         ),
 
         WorkflowTestCase(
@@ -111,12 +103,7 @@ object CallFunctionTestCases {
                       call: getConstant
             """.trimIndent(),
             tags = setOf("function", "execution"),
-            validate = expectOutput(
-                buildJsonObject {
-                    put("value", 42)
-                    put("type", "constant")
-                }
-            )
+            validate = expectOutput(buildJsonObject { put("value", 42); put("type", "constant") })
         ),
 
         // ─────────────────────────────────────────────────────────────────────
@@ -140,12 +127,7 @@ object CallFunctionTestCases {
                         as: '${ {userId: .id, displayName: .name} }'
             """.trimIndent(),
             tags = setOf("function", "execution"),
-            validate = expectOutput(
-                buildJsonObject {
-                    put("userId", 123)
-                    put("displayName", "Alice")
-                }
-            )
+            validate = expectOutput(buildJsonObject { put("userId", 123); put("displayName", "Alice") })
         ),
 
         WorkflowTestCase(
@@ -167,11 +149,7 @@ object CallFunctionTestCases {
                         deployEnv: "${ $context.env }"
             """.trimIndent(),
             tags = setOf("function", "execution"),
-            validate = expectOutput(
-                buildJsonObject {
-                    put("deployEnv", "production")
-                }
-            )
+            validate = expectOutput(buildJsonObject { put("deployEnv", "production") })
         ),
 
         // ─────────────────────────────────────────────────────────────────────
@@ -196,11 +174,7 @@ object CallFunctionTestCases {
                       call: step2
             """.trimIndent(),
             tags = setOf("function", "execution"),
-            validate = expectOutput(
-                buildJsonObject {
-                    put("doubled", 20)
-                }
-            )
+            validate = expectOutput(buildJsonObject { put("doubled", 20) })
         ),
 
         WorkflowTestCase(
@@ -221,11 +195,7 @@ object CallFunctionTestCases {
                       call: processOrder
             """.trimIndent(),
             tags = setOf("function", "execution"),
-            validate = expectOutput(
-                buildJsonObject {
-                    put("total", 100.50)
-                }
-            )
+            validate = expectOutput(buildJsonObject { put("total", 100.50) })
         ),
 
         WorkflowTestCase(
@@ -244,11 +214,7 @@ object CallFunctionTestCases {
                         discountedPrice: "${ .price * 0.9 }"
             """.trimIndent(),
             tags = setOf("function", "execution"),
-            validate = expectOutput(
-                buildJsonObject {
-                    put("discountedPrice", 89.991)
-                }
-            )
+            validate = expectOutput(buildJsonObject { put("discountedPrice", 89.991) })
         ),
 
         // ─────────────────────────────────────────────────────────────────────
@@ -276,12 +242,7 @@ object CallFunctionTestCases {
                       call: outerFunc
             """.trimIndent(),
             tags = setOf("function", "execution", "nested"),
-            validate = expectOutput(
-                buildJsonObject {
-                    put("wrapped", "from inner")
-                    put("outerAdded", true)
-                }
-            )
+            validate = expectOutput(buildJsonObject { put("wrapped", "from inner"); put("outerAdded", true) })
         ),
 
         WorkflowTestCase(
@@ -315,11 +276,7 @@ object CallFunctionTestCases {
                         acc: 1
             """.trimIndent(),
             tags = setOf("function", "execution", "recursion"),
-            validate = expectOutput(
-                buildJsonObject {
-                    put("result", 120)
-                }
-            )
+            validate = expectOutput(buildJsonObject { put("result", 120) })
         ),
 
         WorkflowTestCase(

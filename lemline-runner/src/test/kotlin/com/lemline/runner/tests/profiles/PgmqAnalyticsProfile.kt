@@ -40,7 +40,7 @@ class PgmqAnalyticsProfile : QuarkusTestProfile {
             LEMLINE_MESSAGING_PGMQ_LIFECYCLE_EVENTS_QUEUE to "lemline-lifecycle-analytics-pgmq",
             "quarkus.arc.exclude-types" to
                 "com.lemline.runner.testcases.lifecycleevents.TestLifecycleEventListener," +
-                "com.lemline.runner.testcases.inMemory.InMemoryWorkflowTestExecutor," +
+                "com.lemline.runner.testcases.bases.InMemoryWorkflowTestExecutor," +
                 "com.lemline.runner.testcases.bases.BrokerWorkflowTestExecutor",
             LEMLINE_ANALYTICS_MIGRATE_AT_START to "true",
             LEMLINE_ANALYTICS_BASELINE_ON_MIGRATE to "false",

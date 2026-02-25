@@ -16,6 +16,7 @@ import com.lemline.core.testcases.SetTaskTestCases
 import com.lemline.core.testcases.SwitchTaskTestCases
 import com.lemline.core.testcases.TryTaskTestCases
 import com.lemline.core.testcases.WaitTestCases
+import com.lemline.runner.testcases.bases.InMemoryWorkflowTest
 import com.lemline.runner.tests.profiles.InMemoryProfile
 import io.quarkus.test.junit.QuarkusTest
 import io.quarkus.test.junit.TestProfile

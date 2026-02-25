@@ -23,7 +23,10 @@ internal class LifecycleAnalyticsSubscriber(
         defaultValue = LIFECYCLE_EVENTS_CONSUMER_CONCURRENCY_DEFAULT
     )
     override val maxConcurrency: Long,
-    @param:ConfigProperty(name = LEMLINE_MESSAGING_LIFECYCLE_EVENTS_CONSUMER_ENABLED, defaultValue = LIFECYCLE_EVENTS_CONSUMER_ENABLED_DEFAULT)
+    @param:ConfigProperty(
+        name = LEMLINE_MESSAGING_LIFECYCLE_EVENTS_CONSUMER_ENABLED,
+        defaultValue = LIFECYCLE_EVENTS_CONSUMER_ENABLED_DEFAULT
+    )
     override val enabled: Boolean,
     @param:Channel(LIFECYCLEEVENTS_IN_CHANNEL)
     override val publisher: Publisher<Message<String>>,
