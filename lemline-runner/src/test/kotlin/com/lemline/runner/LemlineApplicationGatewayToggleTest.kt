@@ -56,7 +56,7 @@ class LemlineApplicationGatewayToggleTest {
         assertEquals("false", System.getProperty(LEMLINE_MESSAGING_EVENTS_CONSUMER_ENABLED))
         assertEquals("false", System.getProperty(LEMLINE_MESSAGING_CLOUDEVENTS_PRODUCER_ENABLED))
         assertEquals("false", System.getProperty(LEMLINE_MESSAGING_CLOUDEVENTS_CONSUMER_ENABLED))
-        assertEquals("false", System.getProperty(LEMLINE_MESSAGING_LIFECYCLE_EVENTS_PRODUCER_ENABLED))
+        assertEquals("true", System.getProperty(LEMLINE_MESSAGING_LIFECYCLE_EVENTS_PRODUCER_ENABLED))
         assertEquals("false", System.getProperty(LEMLINE_MESSAGING_LIFECYCLE_EVENTS_CONSUMER_ENABLED))
     }
 }

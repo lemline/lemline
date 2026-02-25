@@ -117,9 +117,11 @@ class LemlineApplication : QuarkusApplication {
                     // The listen command, if any
                     val listen = parseResults.command<ListenCommand>()
 
+                    if (listen == null && gatewayStart == null) {
+                        disableMetricsEndpoint()
+                    }
+
                     if (listen == null) {
-                        // Gateway mode serves gRPC-Web over the HTTP server; keep HTTP port enabled.
-                        if (gatewayStart == null) disableMetricsEndpoint()
                         disableMessaging()
                         disableScheduled()
                         if (isConfigCreate) disableDatabase()
@@ -330,7 +332,7 @@ private fun enableGateway() {
     System.setProperty(LEMLINE_MESSAGING_EVENTS_CONSUMER_ENABLED, "false")
     System.setProperty(LEMLINE_MESSAGING_CLOUDEVENTS_PRODUCER_ENABLED, "false")
     System.setProperty(LEMLINE_MESSAGING_CLOUDEVENTS_CONSUMER_ENABLED, "false")
-    System.setProperty(LEMLINE_MESSAGING_LIFECYCLE_EVENTS_PRODUCER_ENABLED, "false")
+    System.setProperty(LEMLINE_MESSAGING_LIFECYCLE_EVENTS_PRODUCER_ENABLED, "true")
     System.setProperty(LEMLINE_MESSAGING_LIFECYCLE_EVENTS_CONSUMER_ENABLED, "false")
 }
 
