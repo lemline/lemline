@@ -19,13 +19,11 @@ import com.lemline.runner.messaging.commands.COMMANDS_OUT_CHANNEL
 import com.lemline.runner.messaging.events.EVENTS_IN_CHANNEL
 import com.lemline.runner.messaging.events.EVENTS_OUT_CHANNEL
 import com.lemline.runner.starters.Starter
-import com.lemline.runner.testcases.lifecycleevents.TestLifecycleEventListener
+import com.lemline.runner.testcases.lifecycleevents.AnalyticsWorkflowResultAwaiter
 import io.smallrye.reactive.messaging.memory.InMemoryConnector
 import jakarta.enterprise.inject.Any
 import jakarta.inject.Inject
 import jakarta.inject.Singleton
-import java.util.concurrent.TimeoutException
-import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.delay
 
 /**
@@ -36,8 +34,8 @@ import kotlinx.coroutines.delay
  * - events-out → events-in
  * - lifecycleevents-out → lifecycleevents-in
  *
- * Lifecycle CloudEvents are captured via [com.lemline.runner.testcases.lifecycleevents.TestLifecycleEventListener] which subscribes
- * to the in-memory channel, verifying that events flow through the messaging infrastructure.
+ * Workflow completion is detected from analytics-ingested lifecycle events, ensuring
+ * full-chain verification even with in-memory message routing.
  */
 @Singleton
 internal class InMemoryWorkflowTestExecutor : AbstractWorkflowTestExecutor() {
@@ -56,7 +54,7 @@ internal class InMemoryWorkflowTestExecutor : AbstractWorkflowTestExecutor() {
     override lateinit var databaseManager: DatabaseManager
 
     @Inject
-    override lateinit var lifecycleListener: TestLifecycleEventListener
+    override lateinit var workflowResultAwaiter: AnalyticsWorkflowResultAwaiter
 
     @Inject
     override lateinit var starter: Starter
@@ -101,19 +99,15 @@ internal class InMemoryWorkflowTestExecutor : AbstractWorkflowTestExecutor() {
             while (System.currentTimeMillis() < deadline) {
                 routeMessages()
 
-                try {
-                    return lifecycleListener.awaitWorkflowResult(workflowId, timeout = 0.seconds)
-                } catch (_: TimeoutException) {
-                    // Not yet completed
-                }
+                workflowResultAwaiter.findWorkflowResult(workflowId)?.let { return it }
 
                 delay(COMPLETION_POLL_INTERVAL_MS)
             }
 
             return WorkflowTestResult.Failure(
                 error = "Workflow did not complete within $timeoutSeconds seconds. " +
-                    "Captured events: ${lifecycleListener.summary()}",
-                exception = TimeoutException("Workflow execution timeout")
+                    "Captured events: ${workflowResultAwaiter.summary(workflowId)}",
+                exception = java.util.concurrent.TimeoutException("Workflow execution timeout")
             )
         } finally {
             commandsOut.clear()

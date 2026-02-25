@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.testcases.pgmq
 
+import com.lemline.runner.common.config.LEMLINE_ANALYTICS_BASELINE_ON_MIGRATE
+import com.lemline.runner.common.config.LEMLINE_ANALYTICS_MIGRATE_AT_START
 import com.lemline.runner.common.config.LEMLINE_MESSAGING_CLOUDEVENTS_CONSUMER_ENABLED
 import com.lemline.runner.common.config.LEMLINE_MESSAGING_CLOUDEVENTS_PRODUCER_ENABLED
 import com.lemline.runner.common.config.LEMLINE_MESSAGING_COMMANDS_CONSUMER_ENABLED
@@ -21,6 +23,7 @@ import com.lemline.runner.common.config.LEMLINE_OUTBOX_SCHEDULE_OUTBOX_INITIAL_J
 import com.lemline.runner.common.config.LEMLINE_OUTBOX_WAIT_OUTBOX_EVERY
 import com.lemline.runner.common.config.LEMLINE_OUTBOX_WAIT_OUTBOX_INITIAL_JITTER
 import com.lemline.runner.common.config.MessagingType
+import com.lemline.runner.tests.resources.AnalyticsPostgresTestResource
 import com.lemline.runner.tests.resources.PgmqTestResource
 import io.quarkus.test.junit.QuarkusTestProfile
 
@@ -51,6 +54,8 @@ class PgmqTestCaseProfile : QuarkusTestProfile {
             LEMLINE_MESSAGING_CLOUDEVENTS_PRODUCER_ENABLED to "true",
             LEMLINE_MESSAGING_LIFECYCLE_EVENTS_PRODUCER_ENABLED to "true",
             LEMLINE_MESSAGING_LIFECYCLE_EVENTS_CONSUMER_ENABLED to "true",
+            LEMLINE_ANALYTICS_MIGRATE_AT_START to "true",
+            LEMLINE_ANALYTICS_BASELINE_ON_MIGRATE to "false",
 
             // Orchestrator mode: ALL generates more messages for thorough end-to-end testing
             LEMLINE_ORCHESTRATOR_MODE to "all",
@@ -90,6 +95,8 @@ class PgmqTestCaseProfile : QuarkusTestProfile {
             "mp.messaging.incoming.lifecycleevents-in.visibility-timeout" to "30",
             "mp.messaging.incoming.lifecycleevents-in.poll-interval" to "100",
             "mp.messaging.incoming.lifecycleevents-in.batch-size" to "10",
+            "mp.messaging.incoming.lifecycleevents-in.auto-create-queue" to "true",
+            "mp.messaging.outgoing.lifecycleevents-out.auto-create-queue" to "true",
 
             // Enable outbox schedulers for Wait/Fork/Retry tests
             LEMLINE_OUTBOX_ENABLED to "true",
@@ -106,7 +113,10 @@ class PgmqTestCaseProfile : QuarkusTestProfile {
     }
 
     override fun testResources(): List<QuarkusTestProfile.TestResourceEntry> {
-        return listOf(QuarkusTestProfile.TestResourceEntry(PgmqTestResource::class.java))
+        return listOf(
+            QuarkusTestProfile.TestResourceEntry(PgmqTestResource::class.java),
+            QuarkusTestProfile.TestResourceEntry(AnalyticsPostgresTestResource::class.java)
+        )
     }
 
     override fun tags(): Set<String> {

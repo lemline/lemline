@@ -2,6 +2,8 @@
 package com.lemline.runner.testcases.rabbitmq
 
 import com.lemline.runner.common.config.DatabaseType
+import com.lemline.runner.common.config.LEMLINE_ANALYTICS_BASELINE_ON_MIGRATE
+import com.lemline.runner.common.config.LEMLINE_ANALYTICS_MIGRATE_AT_START
 import com.lemline.runner.common.config.LEMLINE_DATABASE_TYPE
 import com.lemline.runner.common.config.LEMLINE_MESSAGING_CLOUDEVENTS_CONSUMER_ENABLED
 import com.lemline.runner.common.config.LEMLINE_MESSAGING_CLOUDEVENTS_PRODUCER_ENABLED
@@ -23,6 +25,7 @@ import com.lemline.runner.common.config.LEMLINE_OUTBOX_SCHEDULE_OUTBOX_INITIAL_J
 import com.lemline.runner.common.config.LEMLINE_OUTBOX_WAIT_OUTBOX_EVERY
 import com.lemline.runner.common.config.LEMLINE_OUTBOX_WAIT_OUTBOX_INITIAL_JITTER
 import com.lemline.runner.common.config.MessagingType
+import com.lemline.runner.tests.resources.AnalyticsPostgresTestResource
 import com.lemline.runner.tests.resources.RabbitMQTestResource
 import io.quarkus.test.junit.QuarkusTestProfile
 
@@ -54,6 +57,8 @@ class RabbitMQTestCaseProfile : QuarkusTestProfile {
             LEMLINE_MESSAGING_CLOUDEVENTS_PRODUCER_ENABLED to "true",
             LEMLINE_MESSAGING_LIFECYCLE_EVENTS_PRODUCER_ENABLED to "true",
             LEMLINE_MESSAGING_LIFECYCLE_EVENTS_CONSUMER_ENABLED to "true",
+            LEMLINE_ANALYTICS_MIGRATE_AT_START to "true",
+            LEMLINE_ANALYTICS_BASELINE_ON_MIGRATE to "false",
 
             // Orchestrator mode: ALL generates more messages for thorough end-to-end testing
             LEMLINE_ORCHESTRATOR_MODE to "all",
@@ -73,9 +78,7 @@ class RabbitMQTestCaseProfile : QuarkusTestProfile {
             "mp.messaging.outgoing.events-out.exchange.name" to "lemline-events-exchange",
             "mp.messaging.outgoing.events-out.exchange.type" to "fanout",
 
-            // Lifecycle events loopback - same exchange for producer and test listener
-            "mp.messaging.incoming.lifecycleevents-out.connector" to "smallrye-rabbitmq",
-            "mp.messaging.incoming.lifecycleevents-out.queue.name" to "lemline-lifecycle-test",
+            // Lifecycle events loopback - same exchange for producer and analytics consumer
             "mp.messaging.outgoing.lifecycleevents-out.exchange.name" to "lemline-lifecycle-exchange",
             "mp.messaging.outgoing.lifecycleevents-out.exchange.type" to "fanout",
             "mp.messaging.incoming.lifecycleevents-in.connector" to "smallrye-rabbitmq",
@@ -104,7 +107,10 @@ class RabbitMQTestCaseProfile : QuarkusTestProfile {
     }
 
     override fun testResources(): List<QuarkusTestProfile.TestResourceEntry> {
-        return listOf(QuarkusTestProfile.TestResourceEntry(RabbitMQTestResource::class.java))
+        return listOf(
+            QuarkusTestProfile.TestResourceEntry(RabbitMQTestResource::class.java),
+            QuarkusTestProfile.TestResourceEntry(AnalyticsPostgresTestResource::class.java)
+        )
     }
 
     override fun tags(): Set<String> {

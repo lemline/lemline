@@ -47,9 +47,9 @@ class InMemoryProfile : QuarkusTestProfile {
             LEMLINE_MESSAGING_EVENTS_PRODUCER_ENABLED to "true",
             LEMLINE_MESSAGING_CLOUDEVENTS_CONSUMER_ENABLED to "true",
             LEMLINE_MESSAGING_CLOUDEVENTS_PRODUCER_ENABLED to "true",
-            LEMLINE_MESSAGING_LIFECYCLE_EVENTS_CONSUMER_ENABLED to "true",
+            LEMLINE_MESSAGING_LIFECYCLE_EVENTS_CONSUMER_ENABLED to "false",
             LEMLINE_MESSAGING_LIFECYCLE_EVENTS_PRODUCER_ENABLED to "true",
-            // Configure lifecycleevents-in channel for test listener (loopback)
+            // Keep lifecycleevents-in available for tests that explicitly enable the consumer.
             "mp.messaging.incoming.lifecycleevents-in.connector" to "smallrye-in-memory",
 
             // Enable outbox schedulers for tests that need them (Listen, Wait, Retry, etc.)

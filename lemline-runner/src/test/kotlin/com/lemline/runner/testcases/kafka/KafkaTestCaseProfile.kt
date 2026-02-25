@@ -2,6 +2,8 @@
 package com.lemline.runner.testcases.kafka
 
 import com.lemline.runner.common.config.DatabaseType
+import com.lemline.runner.common.config.LEMLINE_ANALYTICS_BASELINE_ON_MIGRATE
+import com.lemline.runner.common.config.LEMLINE_ANALYTICS_MIGRATE_AT_START
 import com.lemline.runner.common.config.LEMLINE_DATABASE_TYPE
 import com.lemline.runner.common.config.LEMLINE_MESSAGING_CLOUDEVENTS_CONSUMER_ENABLED
 import com.lemline.runner.common.config.LEMLINE_MESSAGING_CLOUDEVENTS_PRODUCER_ENABLED
@@ -23,6 +25,7 @@ import com.lemline.runner.common.config.LEMLINE_OUTBOX_SCHEDULE_OUTBOX_INITIAL_J
 import com.lemline.runner.common.config.LEMLINE_OUTBOX_WAIT_OUTBOX_EVERY
 import com.lemline.runner.common.config.LEMLINE_OUTBOX_WAIT_OUTBOX_INITIAL_JITTER
 import com.lemline.runner.common.config.MessagingType
+import com.lemline.runner.tests.resources.AnalyticsPostgresTestResource
 import com.lemline.runner.tests.resources.KafkaTestResource
 import io.quarkus.test.junit.QuarkusTestProfile
 
@@ -52,8 +55,10 @@ class KafkaTestCaseProfile : QuarkusTestProfile {
             LEMLINE_MESSAGING_EVENTS_PRODUCER_ENABLED to "true",
             LEMLINE_MESSAGING_CLOUDEVENTS_CONSUMER_ENABLED to "true",
             LEMLINE_MESSAGING_CLOUDEVENTS_PRODUCER_ENABLED to "true",
-            LEMLINE_MESSAGING_LIFECYCLE_EVENTS_PRODUCER_ENABLED to "false",
-            LEMLINE_MESSAGING_LIFECYCLE_EVENTS_CONSUMER_ENABLED to "false",
+            LEMLINE_MESSAGING_LIFECYCLE_EVENTS_PRODUCER_ENABLED to "true",
+            LEMLINE_MESSAGING_LIFECYCLE_EVENTS_CONSUMER_ENABLED to "true",
+            LEMLINE_ANALYTICS_MIGRATE_AT_START to "true",
+            LEMLINE_ANALYTICS_BASELINE_ON_MIGRATE to "false",
 
             // Orchestrator mode: ALL generates more messages for thorough end-to-end testing
             LEMLINE_ORCHESTRATOR_MODE to "all",
@@ -93,7 +98,10 @@ class KafkaTestCaseProfile : QuarkusTestProfile {
     }
 
     override fun testResources(): List<QuarkusTestProfile.TestResourceEntry> {
-        return listOf(QuarkusTestProfile.TestResourceEntry(KafkaTestResource::class.java))
+        return listOf(
+            QuarkusTestProfile.TestResourceEntry(KafkaTestResource::class.java),
+            QuarkusTestProfile.TestResourceEntry(AnalyticsPostgresTestResource::class.java)
+        )
     }
 
     override fun tags(): Set<String> {

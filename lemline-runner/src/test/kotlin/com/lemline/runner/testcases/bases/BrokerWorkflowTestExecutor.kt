@@ -14,7 +14,7 @@ import com.lemline.runner.listeners.ListenerRepository
 import com.lemline.runner.messaging.cloudevents.CLOUDEVENTS_OUT_CHANNEL
 import com.lemline.runner.messaging.commands.WorkflowCommandEmitter
 import com.lemline.runner.starters.Starter
-import com.lemline.runner.testcases.lifecycleevents.TestLifecycleEventListener
+import com.lemline.runner.testcases.lifecycleevents.AnalyticsWorkflowResultAwaiter
 import io.smallrye.mutiny.coroutines.awaitSuspending
 import io.smallrye.reactive.messaging.MutinyEmitter
 import jakarta.enterprise.inject.Instance
@@ -36,8 +36,8 @@ import org.eclipse.microprofile.reactive.messaging.Message
  * 3. Sends CloudEvents to the broker
  * 4. Waits for workflow completion
  *
- * Lifecycle CloudEvents are captured via [TestLifecycleEventListener] which subscribes
- * to the broker, verifying that events actually flow through the messaging infrastructure.
+ * Workflow completion is detected from analytics-ingested lifecycle events, ensuring
+ * full-chain verification through the broker and analytics sink.
  */
 @Singleton
 internal class BrokerWorkflowTestExecutor : AbstractWorkflowTestExecutor() {
@@ -59,7 +59,7 @@ internal class BrokerWorkflowTestExecutor : AbstractWorkflowTestExecutor() {
     override lateinit var databaseManager: DatabaseManager
 
     @Inject
-    override lateinit var lifecycleListener: TestLifecycleEventListener
+    override lateinit var workflowResultAwaiter: AnalyticsWorkflowResultAwaiter
 
     @Inject
     override lateinit var starter: Starter

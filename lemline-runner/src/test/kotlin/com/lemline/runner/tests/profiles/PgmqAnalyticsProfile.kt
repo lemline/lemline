@@ -39,7 +39,6 @@ class PgmqAnalyticsProfile : QuarkusTestProfile {
             LEMLINE_MESSAGING_LIFECYCLE_EVENTS_CONSUMER_CONCURRENCY to "16",
             LEMLINE_MESSAGING_PGMQ_LIFECYCLE_EVENTS_QUEUE to "lemline-lifecycle-analytics-pgmq",
             "quarkus.arc.exclude-types" to
-                "com.lemline.runner.testcases.lifecycleevents.TestLifecycleEventListener," +
                 "com.lemline.runner.testcases.bases.InMemoryWorkflowTestExecutor," +
                 "com.lemline.runner.testcases.bases.BrokerWorkflowTestExecutor",
             LEMLINE_ANALYTICS_MIGRATE_AT_START to "true",

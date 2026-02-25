@@ -20,7 +20,7 @@ import com.lemline.runner.definitions.DefinitionModel
 import com.lemline.runner.definitions.DefinitionRepository
 import com.lemline.runner.listeners.ListenerRepository
 import com.lemline.runner.starters.Starter
-import com.lemline.runner.testcases.lifecycleevents.TestLifecycleEventListener
+import com.lemline.runner.testcases.lifecycleevents.AnalyticsWorkflowResultAwaiter
 import io.cloudevents.CloudEvent
 import io.cloudevents.jackson.JsonFormat
 import java.util.concurrent.TimeoutException
@@ -42,9 +42,9 @@ import kotlinx.serialization.json.JsonElement
  * 3. Send CloudEvents via [sendCloudEvents]
  * 4. Wait for completion
  *
- * All executors detect workflow completion via lifecycle CloudEvents captured by
- * [TestLifecycleEventListener] which subscribes to the broker, ensuring that events
- * actually flow through the messaging infrastructure.
+ * All executors detect workflow completion via lifecycle CloudEvents ingested in
+ * analytics storage. This ensures tests assert the full lifecycle-events chain:
+ * emission -> transport -> analytics subscriber -> durable ingestion.
  */
 internal abstract class AbstractWorkflowTestExecutor : WorkflowTestExecutor {
 
@@ -55,7 +55,7 @@ internal abstract class AbstractWorkflowTestExecutor : WorkflowTestExecutor {
 
     protected abstract val definitionRepository: DefinitionRepository
     protected abstract val databaseManager: DatabaseManager
-    protected abstract val lifecycleListener: TestLifecycleEventListener
+    protected abstract val workflowResultAwaiter: AnalyticsWorkflowResultAwaiter
     protected abstract val starter: Starter
     protected abstract val lifecycleHook: LifecycleEventHook
     protected abstract val listenerRepository: ListenerRepository
@@ -137,7 +137,6 @@ internal abstract class AbstractWorkflowTestExecutor : WorkflowTestExecutor {
 
         testModeConfiguration.setMockConfiguration(mockConfig)
         return try {
-            lifecycleListener.clear()
             registerDependencies(dependencies, validateDefinition)
             registerWorkflowInDatabase(yaml, namespace, uniqueName, version, validateDefinition)
 
@@ -270,11 +269,11 @@ internal abstract class AbstractWorkflowTestExecutor : WorkflowTestExecutor {
         timeoutSeconds: Long
     ): WorkflowTestResult {
         return try {
-            lifecycleListener.awaitWorkflowResult(workflowId, timeout = timeoutSeconds.seconds)
+            workflowResultAwaiter.awaitWorkflowResult(workflowId, timeout = timeoutSeconds.seconds)
         } catch (e: TimeoutException) {
             WorkflowTestResult.Failure(
                 error = "Workflow did not complete within $timeoutSeconds seconds. " +
-                    "Captured events: ${lifecycleListener.summary()}",
+                    "Captured events: ${workflowResultAwaiter.summary(workflowId)}",
                 exception = e
             )
         }
