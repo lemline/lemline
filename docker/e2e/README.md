@@ -2,7 +2,7 @@
 
 This setup starts a full local E2E environment with:
 
-- PostgreSQL (`lemline` + `lemline_analytics`)
+- PostgreSQL (`lemline`)
 - PGMQ messaging on PostgreSQL (no Kafka, no ZooKeeper)
 - Automatic workflow definition seeding at startup
 - Lemline worker (`listen`)
@@ -27,18 +27,13 @@ One-time trust setup on each machine:
 mkcert -install
 ```
 
-Generate local certs (from repository root):
+Generate local certs (from repository root) in docker/e2e/certs:
 
 ```bash
-mkdir -p docker/e2e/certs
 mkcert -cert-file docker/e2e/certs/localhost.pem \
   -key-file docker/e2e/certs/localhost-key.pem \
   localhost 127.0.0.1
 ```
-
-The `docker/e2e/certs` directory is ignored by git.
-
-If you still see certificate warnings in browser, restart the browser after `mkcert -install`.
 
 ## TLS Troubleshooting
 
@@ -48,7 +43,6 @@ If the gateway cannot start TLS or local cert trust is broken:
 
 ```bash
 mkcert -install
-mkdir -p docker/e2e/certs
 mkcert -cert-file docker/e2e/certs/localhost.pem \
   -key-file docker/e2e/certs/localhost-key.pem \
   localhost 127.0.0.1
@@ -82,8 +76,10 @@ docker compose -f docker/e2e/docker-compose.yml up --build -d
 Notes:
 
 - The first build can take several minutes (Gradle dependencies + compile).
-- A bootstrap service (`runner-image`) builds `lemline-runner-e2e:local` once, then `worker`, `gateway`, and `seed-definitions` reuse it.
-- During `worker` image build, the longest step is `./gradlew :lemline-runner:quarkusBuild`; it can be quiet for a while on first run.
+- A bootstrap service (`runner-image`) builds `lemline-runner-e2e:local` once, then `worker`, `gateway`, and
+  `seed-definitions` reuse it.
+- During `worker` image build, the longest step is `./gradlew :lemline-runner:quarkusBuild`; it can be quiet for a while
+  on first run.
 - Runner Docker build tunes Gradle memory/workers by default (`Xmx=4g`, metaspace `1g`, workers `6`).
 
 Check status:
