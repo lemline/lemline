@@ -6,14 +6,19 @@ Standalone React dashboard for Lemline workflow observability and start actions.
 
 - Node.js 22+
 - npm 10+
-- `buf` CLI (`buf --version`)
+- `buf` CLI (`buf --version`) only when regenerating protobuf clients
 
 ## Run locally
 
 ```bash
 npm install
-npm run proto:generate
 npm run dev
+```
+
+If the gateway proto changed, regenerate clients first:
+
+```bash
+npm run proto:generate
 ```
 
 ## Configure Gateway Access
@@ -59,6 +64,12 @@ npm run proto:check
 
 ```bash
 npm run build
+```
+
+Build with proto regeneration (CI / release checks):
+
+```bash
+npm run build:with-proto
 ```
 
 ## Lint

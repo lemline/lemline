@@ -1,0 +1,56 @@
+lemline:
+  database:
+    type: postgresql
+    migrate-at-start: true
+    baseline-on-migrate: false
+    postgresql:
+      host: postgres
+      port: 5432
+      database: lemline
+      username: postgres
+      password: postgres
+
+  messaging:
+    type: pgmq
+    pgmq:
+      host: postgres
+      port: 5432
+      database: lemline
+      username: postgres
+      password: postgres
+    lifecycleevents:
+      producer:
+        enabled: true
+      consumer:
+        enabled: true
+        concurrency: 64
+
+  gateway:
+    grpc:
+      host: 0.0.0.0
+      port: 9443
+    cors:
+      enabled: true
+      origins: https://localhost:9443,http://localhost:5173
+    tls:
+      enabled: true
+      certificate: /config/certs/localhost.pem
+      private-key: /config/certs/localhost-key.pem
+      client-auth: none
+    authentication:
+      enabled: false
+    watch:
+      poll-interval-ms: 250
+      batch-size: 256
+
+  analytics:
+    type: postgresql
+    migrate-at-start: true
+    baseline-on-migrate: true
+    postgresql:
+      host: postgres
+      port: 5432
+      database: lemline
+      username: postgres
+      password: postgres
+      schema: public

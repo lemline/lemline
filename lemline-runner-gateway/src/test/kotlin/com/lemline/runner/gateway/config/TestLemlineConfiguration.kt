@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.gateway.config
 
-import com.lemline.runner.common.config.ANALYTICS_BACKEND_POSTGRESQL
+import com.lemline.runner.common.config.ANALYTICS_TYPE_POSTGRESQL
 import com.lemline.runner.config.LemlineConfiguration
 import io.mockk.every
 import io.mockk.mockk
@@ -22,9 +22,8 @@ internal fun testLemlineConfiguration(
     tlsTrustStorePassword: String? = null,
     watchPollIntervalMs: Long = 250L,
     watchBatchSize: Int = 256,
-    analyticsType: String = ANALYTICS_BACKEND_POSTGRESQL,
+    analyticsType: String = ANALYTICS_TYPE_POSTGRESQL,
     analyticsSchema: String = "public",
-    analyticsTable: String = "lemline_lifecycle_events",
 ): LemlineConfiguration {
     val config = mockk<LemlineConfiguration>()
 
@@ -66,7 +65,6 @@ internal fun testLemlineConfiguration(
     every { analytics.type() } returns analyticsType
     every { analytics.postgresql() } returns analyticsPostgresql
     every { analyticsPostgresql.schema() } returns analyticsSchema
-    every { analyticsPostgresql.table() } returns analyticsTable
 
     every { config.gateway() } returns Optional.of(gateway)
     every { config.analytics() } returns Optional.of(analytics)

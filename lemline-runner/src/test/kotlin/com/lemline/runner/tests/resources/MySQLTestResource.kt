@@ -1,6 +1,11 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.tests.resources
 
+import com.lemline.runner.common.config.LEMLINE_DATABASE_MYSQL_DATABASE
+import com.lemline.runner.common.config.LEMLINE_DATABASE_MYSQL_HOST
+import com.lemline.runner.common.config.LEMLINE_DATABASE_MYSQL_PASSWORD
+import com.lemline.runner.common.config.LEMLINE_DATABASE_MYSQL_PORT
+import com.lemline.runner.common.config.LEMLINE_DATABASE_MYSQL_USERNAME
 import com.lemline.runner.common.test.DockerAvailability
 import io.quarkus.test.common.QuarkusTestResourceLifecycleManager
 import org.testcontainers.containers.MySQLContainer
@@ -24,11 +29,11 @@ class MySQLTestResource : QuarkusTestResourceLifecycleManager {
 
         // Return the profile setting
         val properties = mapOf(
-            com.lemline.runner.common.config.LEMLINE_DATABASE_MYSQL_HOST to mysql.host,
-            com.lemline.runner.common.config.LEMLINE_DATABASE_MYSQL_PORT to mysql.firstMappedPort.toString(),
-            com.lemline.runner.common.config.LEMLINE_DATABASE_MYSQL_DATABASE to mysql.databaseName,
-            com.lemline.runner.common.config.LEMLINE_DATABASE_MYSQL_USERNAME to mysql.username,
-            com.lemline.runner.common.config.LEMLINE_DATABASE_MYSQL_PASSWORD to mysql.password,
+            LEMLINE_DATABASE_MYSQL_HOST to mysql.host,
+            LEMLINE_DATABASE_MYSQL_PORT to mysql.firstMappedPort.toString(),
+            LEMLINE_DATABASE_MYSQL_DATABASE to mysql.databaseName,
+            LEMLINE_DATABASE_MYSQL_USERNAME to mysql.username,
+            LEMLINE_DATABASE_MYSQL_PASSWORD to mysql.password,
         )
 
         // Set as system properties so that [LemlineConfigSource] can see them.
@@ -39,11 +44,11 @@ class MySQLTestResource : QuarkusTestResourceLifecycleManager {
 
     override fun stop() {
         // Clear system properties to prevent conflicts with other test profiles
-        System.clearProperty(com.lemline.runner.common.config.LEMLINE_DATABASE_MYSQL_HOST)
-        System.clearProperty(com.lemline.runner.common.config.LEMLINE_DATABASE_MYSQL_PORT)
-        System.clearProperty(com.lemline.runner.common.config.LEMLINE_DATABASE_MYSQL_DATABASE)
-        System.clearProperty(com.lemline.runner.common.config.LEMLINE_DATABASE_MYSQL_USERNAME)
-        System.clearProperty(com.lemline.runner.common.config.LEMLINE_DATABASE_MYSQL_PASSWORD)
+        System.clearProperty(LEMLINE_DATABASE_MYSQL_HOST)
+        System.clearProperty(LEMLINE_DATABASE_MYSQL_PORT)
+        System.clearProperty(LEMLINE_DATABASE_MYSQL_DATABASE)
+        System.clearProperty(LEMLINE_DATABASE_MYSQL_USERNAME)
+        System.clearProperty(LEMLINE_DATABASE_MYSQL_PASSWORD)
 
         if (::mysql.isInitialized) {
             mysql.stop()

@@ -63,10 +63,16 @@ import org.eclipse.microprofile.config.inject.ConfigProperty
 abstract class AbstractScheduledTask {
     protected val logger by lazy { logger() }
 
-    /** Global kill switch for all scheduled tasks (set to false for non-listen commands) */
+    /** Global kill switch for scheduled tasks (set to false for non-listen commands) */
     @Inject
     @ConfigProperty(name = LEMLINE_SCHEDULED_ENABLED, defaultValue = "true")
     lateinit var scheduledEnabled: String
+
+    /**
+     * Allows specific tasks to run even when [scheduledEnabled] is false.
+     * Use sparingly for tasks that are essential in commands where global scheduling is disabled.
+     */
+    protected open val runWhenScheduledDisabled: Boolean = false
 
     /** Coroutine scope for async work */
     protected val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
@@ -103,7 +109,7 @@ abstract class AbstractScheduledTask {
     @Suppress("unused")
     fun onStart(@Observes @Priority(100) event: StartupEvent) {
         // Global kill switch - disabled for non-listen commands (migrate, config, etc.)
-        if (scheduledEnabled != "true") {
+        if (scheduledEnabled != "true" && !runWhenScheduledDisabled) {
             logger.debug { "$jobName disabled globally (scheduled tasks off)" }
             return
         }

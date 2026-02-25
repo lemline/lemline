@@ -1,15 +1,14 @@
 // SPDX-License-Identifier: BUSL-1.1
-package com.lemline.runner.testcases.inMemory
+package com.lemline.runner.testcases.bases
 
 import com.lemline.core.testcases.impl.WorkflowTestCase
 import com.lemline.core.testcases.impl.WorkflowTestExecutor
-import com.lemline.runner.testcases.bases.AbstractWorkflowTest
 import jakarta.inject.Inject
 
 /**
  * Abstract base class for in-memory workflow execution tests.
  *
- * This class uses JUnit5's dynamic tests to execute shared [WorkflowTestCase]s
+ * This class uses JUnit5's dynamic tests to execute shared [com.lemline.core.testcases.impl.WorkflowTestCase]s
  * from lemline-core's testFixtures using in-memory message channels.
  *
  * Unlike broker-based tests, this uses [InMemoryWorkflowTestExecutor] which routes

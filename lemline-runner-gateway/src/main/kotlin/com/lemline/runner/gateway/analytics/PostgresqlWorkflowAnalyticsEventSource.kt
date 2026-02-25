@@ -2,32 +2,43 @@
 package com.lemline.runner.gateway.analytics
 
 import com.lemline.common.values.WorkflowId
-import com.lemline.runner.common.config.LEMLINE_ANALYTICS_POSTGRES
+import com.lemline.runner.common.config.ANALYTICS_TYPE_DEFAULT
+import com.lemline.runner.common.config.ANALYTICS_LIFECYCLE_EVENTS_TABLE
+import com.lemline.runner.common.config.AnalyticsType
+import com.lemline.runner.common.config.LEMLINE_ANALYTICS_TYPE
 import com.lemline.runner.config.LemlineConfiguration
 import com.lemline.runner.config.analyticsSchemaResolved
-import com.lemline.runner.config.analyticsTableResolved
-import io.agroal.api.AgroalDataSource
-import io.quarkus.agroal.DataSource
 import jakarta.enterprise.context.ApplicationScoped
-import jakarta.enterprise.inject.Instance
 import jakarta.enterprise.inject.Typed
 import jakarta.inject.Inject
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import org.eclipse.microprofile.config.inject.ConfigProperty
 
 @ApplicationScoped
 @Typed(PostgresqlWorkflowAnalyticsEventSource::class)
 class PostgresqlWorkflowAnalyticsEventSource(
     config: LemlineConfiguration,
+    @ConfigProperty(name = LEMLINE_ANALYTICS_TYPE, defaultValue = ANALYTICS_TYPE_DEFAULT)
+    analyticsType: String,
 ) : WorkflowAnalyticsEventSource {
 
     @Inject
-    @DataSource("analytics")
-    lateinit var analyticsDataSource: Instance<AgroalDataSource>
+    lateinit var analyticsDataSourceProvider: AnalyticsDataSourceProvider
 
-    private val validatedSchema = validateIdentifier("schema", config.analyticsSchemaResolved)
-    private val validatedTable = validateIdentifier("table", config.analyticsTableResolved)
-    private val qualifiedTable = "\"$validatedSchema\".\"$validatedTable\""
+    private val resolvedAnalyticsType = AnalyticsType.fromConfigValue(analyticsType)
+    private val validatedTable = validateIdentifier("table", ANALYTICS_LIFECYCLE_EVENTS_TABLE)
+    private val qualifiedTable = when (resolvedAnalyticsType) {
+        AnalyticsType.POSTGRESQL -> {
+            val validatedSchema = validateIdentifier("schema", config.analyticsSchemaResolved)
+            "\"$validatedSchema\".\"$validatedTable\""
+        }
+        AnalyticsType.H2 -> "\"$validatedTable\""
+    }
+    private val payloadProjection = when (resolvedAnalyticsType) {
+        AnalyticsType.POSTGRESQL -> "payload::text"
+        AnalyticsType.H2 -> "payload"
+    }
 
     override suspend fun listByWorkflowIdAfter(
         workflowId: WorkflowId,
@@ -37,7 +48,7 @@ class PostgresqlWorkflowAnalyticsEventSource(
         require(limit > 0) { "limit must be > 0" }
 
         val sql = """
-            SELECT id, type, payload::text AS payload_json
+            SELECT id, type, $payloadProjection AS payload_json
             FROM $qualifiedTable
             WHERE lemline_workflow_id = ?
               AND id > ?
@@ -45,7 +56,7 @@ class PostgresqlWorkflowAnalyticsEventSource(
             LIMIT ?
         """.trimIndent()
 
-        requireAnalyticsDataSource().connection.use { conn ->
+        analyticsDataSourceProvider.require().connection.use { conn ->
             conn.prepareStatement(sql).use { stmt ->
                 stmt.setObject(1, workflowId.value.value)
                 stmt.setLong(2, afterSequenceExclusive)
@@ -69,18 +80,11 @@ class PostgresqlWorkflowAnalyticsEventSource(
 
     override suspend fun validate(): Unit = withContext(Dispatchers.IO) {
         val sql = "SELECT id FROM $qualifiedTable ORDER BY id DESC LIMIT 1"
-        requireAnalyticsDataSource().connection.use { conn ->
+        analyticsDataSourceProvider.require().connection.use { conn ->
             conn.prepareStatement(sql).use { stmt ->
                 stmt.executeQuery().use { _ -> }
             }
         }
-    }
-
-    private fun requireAnalyticsDataSource(): AgroalDataSource {
-        if (analyticsDataSource.isResolvable) return analyticsDataSource.get()
-        throw IllegalStateException(
-            "Analytics datasource 'analytics' is not available. Configure $LEMLINE_ANALYTICS_POSTGRES.*"
-        )
     }
 
     private fun validateIdentifier(kind: String, value: String): String {

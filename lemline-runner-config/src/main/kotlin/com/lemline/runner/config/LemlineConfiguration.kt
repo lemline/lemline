@@ -1,14 +1,13 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.config
 
-import com.lemline.runner.common.config.ANALYTICS_BACKEND_CLICKHOUSE
-import com.lemline.runner.common.config.ANALYTICS_BACKEND_POSTGRESQL
+import com.lemline.runner.common.config.ANALYTICS_TYPE_H2
+import com.lemline.runner.common.config.ANALYTICS_TYPE_POSTGRESQL
 import com.lemline.runner.common.config.ANALYTICS_TYPE_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.ANALYTICS_POSTGRES_BASELINE_ON_MIGRATE_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.ANALYTICS_POSTGRES_DATABASE_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.ANALYTICS_POSTGRES_MIGRATE_AT_START_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.ANALYTICS_POSTGRES_SCHEMA_DEFAULT
-import com.lemline.runner.config.LemlineConfigConstants.ANALYTICS_POSTGRES_TABLE_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.CLOUDEVENTS_TOPIC_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.CONSUMER_CONCURRENCY_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.DB_BASELINE_ON_MIGRATE_DEFAULT
@@ -131,7 +130,7 @@ interface LemlineConfiguration {
      * Controls analytics backend and analytics PostgreSQL destination settings.
      */
     interface AnalyticsConfig {
-        @Pattern(regexp = "$ANALYTICS_BACKEND_POSTGRESQL|$ANALYTICS_BACKEND_CLICKHOUSE")
+        @Pattern(regexp = "$ANALYTICS_TYPE_H2|$ANALYTICS_TYPE_POSTGRESQL")
         @WithDefault(ANALYTICS_TYPE_DEFAULT)
         fun type(): String
 
@@ -162,9 +161,6 @@ interface LemlineConfiguration {
 
         @WithDefault(ANALYTICS_POSTGRES_SCHEMA_DEFAULT)
         fun schema(): String
-
-        @WithDefault(ANALYTICS_POSTGRES_TABLE_DEFAULT)
-        fun table(): String
     }
 
     /**
@@ -407,6 +403,7 @@ interface LemlineConfiguration {
         @WithDefault(LIFECYCLE_EVENTS_TOPIC_DEFAULT)
         fun topic(): String
         fun producer(): KafkaProducerConfig
+        fun consumer(): KafkaLifecycleEventsConsumerConfig
     }
 
     interface KafkaWorkflowCommandsConfig {

@@ -1,6 +1,12 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.tests.resources
 
+import com.lemline.runner.common.config.LEMLINE_DATABASE_POSTGRES_DATABASE
+import com.lemline.runner.common.config.LEMLINE_DATABASE_POSTGRES_HOST
+import com.lemline.runner.common.config.LEMLINE_DATABASE_POSTGRES_PASSWORD
+import com.lemline.runner.common.config.LEMLINE_DATABASE_POSTGRES_PORT
+import com.lemline.runner.common.config.LEMLINE_DATABASE_POSTGRES_USERNAME
+import com.lemline.runner.common.config.LEMLINE_DATABASE_TYPE
 import com.lemline.runner.common.test.DockerAvailability
 import io.quarkus.test.common.QuarkusTestResourceLifecycleManager
 import org.testcontainers.containers.PostgreSQLContainer
@@ -22,12 +28,12 @@ class PostgresTestResource : QuarkusTestResourceLifecycleManager {
         postgres.start()
 
         val properties = mapOf(
-            com.lemline.runner.common.config.LEMLINE_DATABASE_TYPE to "postgresql",
-            com.lemline.runner.common.config.LEMLINE_DATABASE_POSTGRES_HOST to postgres.host,
-            com.lemline.runner.common.config.LEMLINE_DATABASE_POSTGRES_PORT to postgres.firstMappedPort.toString(),
-            com.lemline.runner.common.config.LEMLINE_DATABASE_POSTGRES_DATABASE to postgres.databaseName,
-            com.lemline.runner.common.config.LEMLINE_DATABASE_POSTGRES_USERNAME to postgres.username,
-            com.lemline.runner.common.config.LEMLINE_DATABASE_POSTGRES_PASSWORD to postgres.password
+            LEMLINE_DATABASE_TYPE to "postgresql",
+            LEMLINE_DATABASE_POSTGRES_HOST to postgres.host,
+            LEMLINE_DATABASE_POSTGRES_PORT to postgres.firstMappedPort.toString(),
+            LEMLINE_DATABASE_POSTGRES_DATABASE to postgres.databaseName,
+            LEMLINE_DATABASE_POSTGRES_USERNAME to postgres.username,
+            LEMLINE_DATABASE_POSTGRES_PASSWORD to postgres.password
         )
 
         // Set as system properties so that [LemlineConfigSource] can see them.
@@ -38,12 +44,12 @@ class PostgresTestResource : QuarkusTestResourceLifecycleManager {
 
     override fun stop() {
         // Clear system properties to prevent conflicts with other test profiles
-        System.clearProperty(com.lemline.runner.common.config.LEMLINE_DATABASE_TYPE)
-        System.clearProperty(com.lemline.runner.common.config.LEMLINE_DATABASE_POSTGRES_HOST)
-        System.clearProperty(com.lemline.runner.common.config.LEMLINE_DATABASE_POSTGRES_PORT)
-        System.clearProperty(com.lemline.runner.common.config.LEMLINE_DATABASE_POSTGRES_DATABASE)
-        System.clearProperty(com.lemline.runner.common.config.LEMLINE_DATABASE_POSTGRES_USERNAME)
-        System.clearProperty(com.lemline.runner.common.config.LEMLINE_DATABASE_POSTGRES_PASSWORD)
+        System.clearProperty(LEMLINE_DATABASE_TYPE)
+        System.clearProperty(LEMLINE_DATABASE_POSTGRES_HOST)
+        System.clearProperty(LEMLINE_DATABASE_POSTGRES_PORT)
+        System.clearProperty(LEMLINE_DATABASE_POSTGRES_DATABASE)
+        System.clearProperty(LEMLINE_DATABASE_POSTGRES_USERNAME)
+        System.clearProperty(LEMLINE_DATABASE_POSTGRES_PASSWORD)
 
         if (::postgres.isInitialized) {
             postgres.stop()

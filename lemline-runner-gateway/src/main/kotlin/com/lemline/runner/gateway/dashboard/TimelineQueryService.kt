@@ -4,14 +4,13 @@ package com.lemline.runner.gateway.dashboard
 import com.lemline.core.lifecycleevents.LifecycleEventType
 import com.lemline.core.workflows.WorkflowCache
 import com.lemline.core.workflows.WorkflowParser
-import com.lemline.runner.common.config.LEMLINE_ANALYTICS_POSTGRES
+import com.lemline.runner.gateway.analytics.AnalyticsDataSourceProvider
+import com.lemline.runner.common.config.ANALYTICS_LIFECYCLE_EVENTS_TABLE
+import com.lemline.runner.common.config.AnalyticsType
 import com.lemline.runner.config.LemlineConfiguration
 import com.lemline.runner.config.analyticsSchemaResolved
-import com.lemline.runner.config.analyticsTableResolved
-import io.agroal.api.AgroalDataSource
-import io.quarkus.agroal.DataSource
+import com.lemline.runner.config.analyticsTypeResolved
 import jakarta.enterprise.context.ApplicationScoped
-import jakarta.enterprise.inject.Instance
 import jakarta.inject.Inject
 import java.util.*
 import kotlinx.coroutines.Dispatchers
@@ -23,14 +22,17 @@ class TimelineQueryService(
 ) {
 
     @Inject
-    @DataSource("analytics")
-    lateinit var analyticsDataSource: Instance<AgroalDataSource>
+    lateinit var analyticsDataSourceProvider: AnalyticsDataSourceProvider
 
     @Inject
     lateinit var definitionQueryService: DefinitionQueryService
 
     private val analyticsQualifiedTable =
-        DashboardSqlSupport.qualifiedTable(config.analyticsSchemaResolved, config.analyticsTableResolved)
+        DashboardSqlSupport.qualifiedAnalyticsTable(
+            analyticsType = AnalyticsType.fromConfigValue(config.analyticsTypeResolved),
+            schema = config.analyticsSchemaResolved,
+            table = ANALYTICS_LIFECYCLE_EVENTS_TABLE
+        )
 
     suspend fun getInstanceTimeline(
         workflowId: UUID,
@@ -96,7 +98,7 @@ class TimelineQueryService(
             ORDER BY event_time ASC NULLS FIRST, id ASC
         """.trimIndent()
 
-        requireAnalyticsDataSource().connection.use { conn ->
+        analyticsDataSourceProvider.require().connection.use { conn ->
             conn.prepareStatement(sql).use { stmt ->
                 stmt.setObject(1, workflowId)
                 stmt.executeQuery().use { rs ->
@@ -194,13 +196,6 @@ class TimelineQueryService(
 
     private fun decodePointerToken(raw: String): String =
         raw.replace("~1", "/").replace("~0", "~")
-
-    private fun requireAnalyticsDataSource(): AgroalDataSource {
-        if (analyticsDataSource.isResolvable) return analyticsDataSource.get()
-        throw IllegalStateException(
-            "Analytics datasource 'analytics' is not available. Configure $LEMLINE_ANALYTICS_POSTGRES.*"
-        )
-    }
 
     private data class RawTimelineRow(
         val sequence: Long,

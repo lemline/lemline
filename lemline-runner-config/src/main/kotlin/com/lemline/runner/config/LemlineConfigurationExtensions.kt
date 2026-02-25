@@ -55,6 +55,3 @@ val LemlineConfiguration.analyticsTypeResolved: String
 
 val LemlineConfiguration.analyticsSchemaResolved: String
     get() = analytics().getOrNull()?.postgresql()?.schema() ?: LemlineConfigConstants.ANALYTICS_POSTGRES_SCHEMA_DEFAULT
-
-val LemlineConfiguration.analyticsTableResolved: String
-    get() = analytics().getOrNull()?.postgresql()?.table() ?: LemlineConfigConstants.ANALYTICS_POSTGRES_TABLE_DEFAULT

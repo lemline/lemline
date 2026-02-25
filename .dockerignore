@@ -1,0 +1,14 @@
+.git
+.github
+.gradle
+.idea
+.kotlin
+
+**/.gradle
+**/.idea
+**/.kotlin
+**/build
+**/node_modules
+**/dist
+
+tmp

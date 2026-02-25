@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Plus } from "lucide-react";
-import { useLocation, useNavigate, useParams } from "react-router-dom";
+import { matchPath, useLocation, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { useNamespaces } from "../../hooks/use-namespaces";
 import { useDefinitions } from "../../hooks/use-definitions";
@@ -14,16 +14,16 @@ import { Button } from "../ui/button";
 import { StatusBadge } from "../instances/status-badge";
 
 export function CascadingSelects() {
-  const params = useParams();
   const navigate = useNavigate();
   const location = useLocation();
-  const { data: namespaces = [] } = useNamespaces();
+  const namespacesQuery = useNamespaces();
+  const scope = useMemo(() => resolveScopeFromPathname(location.pathname), [location.pathname]);
 
-  const namespace = params.namespace;
-  const name = params.name;
-  const version = params.version;
-  const workflowIdParam = params.workflowId;
-  const isInstanceRoute = location.pathname.startsWith("/id/");
+  const namespace = scope.namespace;
+  const name = scope.name;
+  const version = scope.version;
+  const workflowIdParam = scope.workflowId;
+  const isInstanceRoute = scope.isInstanceRoute;
   const [workflowIdQuery, setWorkflowIdQuery] = useState("");
   const [workflowInputFocused, setWorkflowInputFocused] = useState(false);
   const [highlightedSuggestion, setHighlightedSuggestion] = useState(-1);
@@ -71,9 +71,9 @@ export function CascadingSelects() {
   const namespaceOptions = useMemo(
     () => [
       { value: "all", label: "All namespaces" },
-      ...namespaces.map((item) => ({ value: item, label: item })),
+      ...(namespacesQuery.data ?? []).map((item) => ({ value: item, label: item })),
     ],
-    [namespaces],
+    [namespacesQuery.data],
   );
 
   const nameOptions = useMemo(() => {
@@ -110,7 +110,7 @@ export function CascadingSelects() {
       return;
     }
     navigate(
-      `/ns/${encodeURIComponent(resolvedNamespace)}/name/${encodeURIComponent(resolvedName)}/v/${encodeURIComponent(value)}`,
+      `/ns/${encodeURIComponent(resolvedNamespace)}/name/${encodeURIComponent(resolvedName)}/version/${encodeURIComponent(value)}`,
     );
   };
 
@@ -166,6 +166,7 @@ export function CascadingSelects() {
 
   const disableName = !resolvedNamespace;
   const disableVersion = !resolvedNamespace || !resolvedName;
+  const disableNamespace = namespacesQuery.isLoading || namespacesQuery.isError;
 
   return (
     <div className="space-y-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-950">
@@ -228,6 +229,8 @@ export function CascadingSelects() {
           value={resolvedNamespace ?? "all"}
           options={namespaceOptions}
           onChange={(event) => onNamespaceChange(event.target.value)}
+          disabled={disableNamespace}
+          className={disableNamespace ? "cursor-not-allowed opacity-50" : undefined}
         />
         <Select
           value={resolvedName ?? "all"}
@@ -252,6 +255,14 @@ export function CascadingSelects() {
           ? "Viewing a specific instance. Use Workflow ID or selectors to navigate to related workflows."
           : "Use selectors to drill down by namespace, workflow name, and version."}
       </p>
+      {namespacesQuery.isLoading && (
+        <p className="text-xs text-slate-500 dark:text-slate-400">Loading namespaces...</p>
+      )}
+      {namespacesQuery.isError && (
+        <p className="text-xs text-red-600 dark:text-red-300">
+          Namespaces unavailable: {toErrorMessage(namespacesQuery.error)}
+        </p>
+      )}
     </div>
   );
 }
@@ -267,4 +278,57 @@ function useDebouncedValue(value: string, delayMs: number): string {
   }, [delayMs, value]);
 
   return debouncedValue;
+}
+
+export interface ScopeFromPathname {
+  namespace?: string;
+  name?: string;
+  version?: string;
+  workflowId?: string;
+  isInstanceRoute: boolean;
+}
+
+export function resolveScopeFromPathname(pathname: string): ScopeFromPathname {
+  const versionScope =
+    matchPath("/ns/:namespace/name/:name/version/:version", pathname) ??
+    matchPath("/ns/:namespace/name/:name/v/:version", pathname);
+  if (versionScope) {
+    return {
+      namespace: versionScope.params.namespace,
+      name: versionScope.params.name,
+      version: versionScope.params.version,
+      isInstanceRoute: false,
+    };
+  }
+
+  const nameScope = matchPath("/ns/:namespace/name/:name", pathname);
+  if (nameScope) {
+    return {
+      namespace: nameScope.params.namespace,
+      name: nameScope.params.name,
+      isInstanceRoute: false,
+    };
+  }
+
+  const namespaceScope = matchPath("/ns/:namespace", pathname);
+  if (namespaceScope) {
+    return {
+      namespace: namespaceScope.params.namespace,
+      isInstanceRoute: false,
+    };
+  }
+
+  const instanceScope = matchPath("/id/:workflowId", pathname);
+  if (instanceScope) {
+    return {
+      workflowId: instanceScope.params.workflowId,
+      isInstanceRoute: true,
+    };
+  }
+
+  return { isInstanceRoute: false };
+}
+
+function toErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : "Unknown error";
 }

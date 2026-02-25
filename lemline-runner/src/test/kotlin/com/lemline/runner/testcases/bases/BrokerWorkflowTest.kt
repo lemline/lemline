@@ -11,7 +11,7 @@ import jakarta.inject.Inject
  * This class uses JUnit5's dynamic tests to execute shared [WorkflowTestCase]s
  * from lemline-core's testFixtures against real message brokers (Kafka/RabbitMQ).
  *
- * Unlike [com.lemline.runner.testcases.inMemory.InMemoryWorkflowTest] which uses in-memory channels,
+ * Unlike [InMemoryWorkflowTest] which uses in-memory channels,
  * this class tests workflows through actual broker infrastructure.
  *
  * Subclasses must:

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.tests.profiles
 
-import com.lemline.runner.common.config.ANALYTICS_BACKEND_CLICKHOUSE
+import com.lemline.runner.common.config.ANALYTICS_TYPE_H2
 import com.lemline.runner.common.config.LEMLINE_ANALYTICS_TYPE
 import com.lemline.runner.common.config.LEMLINE_DATABASE_TYPE
 import com.lemline.runner.common.config.DatabaseType
@@ -47,6 +47,6 @@ class GatewayConfigMappingProfile : QuarkusTestProfile {
             LEMLINE_GATEWAY_CORS_HEADERS to "Authorization,Content-Type",
             LEMLINE_GATEWAY_WATCH_POLL_INTERVAL_MS to "777",
             LEMLINE_GATEWAY_WATCH_BATCH_SIZE to "17",
-            LEMLINE_ANALYTICS_TYPE to ANALYTICS_BACKEND_CLICKHOUSE,
+            LEMLINE_ANALYTICS_TYPE to ANALYTICS_TYPE_H2,
         )
 }

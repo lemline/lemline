@@ -11,7 +11,7 @@ node_modules
 dist
 dist-ssr
 *.local
-src/gen
+src/gen/proto-link-test/
 
 # Editor directories and files
 .vscode/*

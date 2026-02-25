@@ -19,7 +19,6 @@ import com.lemline.runner.common.config.LEMLINE_MESSAGING_TYPE
 import com.lemline.runner.common.config.LEMLINE_OUTBOX_ENABLED
 import com.lemline.runner.common.config.LEMLINE_SCHEDULED_ENABLED
 import com.lemline.runner.common.config.MessagingType
-import com.lemline.runner.tests.resources.AnalyticsPostgresTestResource
 import com.lemline.runner.tests.resources.PgmqAnalyticsTestResource
 import io.quarkus.test.junit.QuarkusTestProfile
 
@@ -39,20 +38,18 @@ class PgmqAnalyticsProfile : QuarkusTestProfile {
             LEMLINE_MESSAGING_LIFECYCLE_EVENTS_CONSUMER_CONCURRENCY to "16",
             LEMLINE_MESSAGING_PGMQ_LIFECYCLE_EVENTS_QUEUE to "lemline-lifecycle-analytics-pgmq",
             "quarkus.arc.exclude-types" to
-                "com.lemline.runner.testcases.lifecycleevents.TestLifecycleEventListener," +
-                "com.lemline.runner.testcases.inMemory.InMemoryWorkflowTestExecutor," +
+                "com.lemline.runner.testcases.bases.InMemoryWorkflowTestExecutor," +
                 "com.lemline.runner.testcases.bases.BrokerWorkflowTestExecutor",
             LEMLINE_ANALYTICS_MIGRATE_AT_START to "true",
             LEMLINE_ANALYTICS_BASELINE_ON_MIGRATE to "false",
             LEMLINE_OUTBOX_ENABLED to "false",
             LEMLINE_SCHEDULED_ENABLED to "false"
-        )
+        ) + AnalyticsH2TestProfileSupport.overrides("lemline_analytics_pgmq")
     }
 
     override fun testResources(): List<QuarkusTestProfile.TestResourceEntry> {
         return listOf(
-            QuarkusTestProfile.TestResourceEntry(PgmqAnalyticsTestResource::class.java),
-            QuarkusTestProfile.TestResourceEntry(AnalyticsPostgresTestResource::class.java)
+            QuarkusTestProfile.TestResourceEntry(PgmqAnalyticsTestResource::class.java)
         )
     }
 

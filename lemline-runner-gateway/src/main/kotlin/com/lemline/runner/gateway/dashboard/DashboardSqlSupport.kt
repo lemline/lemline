@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.gateway.dashboard
 
+import com.lemline.runner.common.config.AnalyticsType
+import java.sql.PreparedStatement
 import java.sql.ResultSet
 import java.sql.Timestamp
 import java.time.Instant
@@ -23,6 +25,20 @@ internal object DashboardSqlSupport {
         val validatedTable = validateIdentifier("table", table)
         return "\"$validatedSchema\".\"$validatedTable\""
     }
+
+    fun qualifiedAnalyticsTable(
+        analyticsType: AnalyticsType,
+        schema: String,
+        table: String
+    ): String = when (analyticsType) {
+        AnalyticsType.POSTGRESQL -> qualifiedTable(schema, table)
+        AnalyticsType.H2 -> quotedIdentifier("table", table)
+    }
+
+    private fun quotedIdentifier(kind: String, value: String): String {
+        val validatedValue = validateIdentifier(kind, value)
+        return "\"$validatedValue\""
+    }
 }
 
 internal fun ResultSet.getInstantOrNull(column: String): Instant? {
@@ -33,5 +49,12 @@ internal fun ResultSet.getInstantOrNull(column: String): Instant? {
         is Timestamp -> raw.toInstant()
         is LocalDateTime -> raw.toInstant(ZoneOffset.UTC)
         else -> getTimestamp(column)?.toInstant()
+    }
+}
+
+internal fun PreparedStatement.setDashboardObject(index: Int, value: Any) {
+    when (value) {
+        is Instant -> setTimestamp(index, Timestamp.from(value))
+        else -> setObject(index, value)
     }
 }

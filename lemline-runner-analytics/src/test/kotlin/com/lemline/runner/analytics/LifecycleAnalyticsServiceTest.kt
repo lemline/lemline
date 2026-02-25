@@ -34,7 +34,7 @@ class LifecycleAnalyticsServiceTest {
             .build()
 
         val service = LifecycleAnalyticsService(
-            repository = LifecycleAnalyticsRepository("public", "lemline_lifecycle_events")
+            repository = LifecycleAnalyticsRepository("public")
         )
 
         val row = service.toRow(event)
@@ -68,7 +68,7 @@ class LifecycleAnalyticsServiceTest {
             .build()
 
         val service = LifecycleAnalyticsService(
-            repository = LifecycleAnalyticsRepository("public", "lemline_lifecycle_events")
+            repository = LifecycleAnalyticsRepository("public")
         )
 
         val row = service.toRow(event)

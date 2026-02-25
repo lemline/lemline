@@ -2,14 +2,14 @@
 package com.lemline.runner.gateway.dashboard
 
 import com.lemline.runner.common.config.DatabaseConfig
+import com.lemline.runner.common.config.ANALYTICS_LIFECYCLE_EVENTS_TABLE
+import com.lemline.runner.common.config.AnalyticsType
+import com.lemline.runner.gateway.analytics.AnalyticsDataSourceProvider
 import com.lemline.runner.config.LemlineConfiguration
 import com.lemline.runner.config.analyticsSchemaResolved
-import com.lemline.runner.config.analyticsTableResolved
+import com.lemline.runner.config.analyticsTypeResolved
 import com.lemline.runner.definitions.DEFINITION_TABLE
-import io.agroal.api.AgroalDataSource
-import io.quarkus.agroal.DataSource
 import jakarta.enterprise.context.ApplicationScoped
-import jakarta.enterprise.inject.Instance
 import jakarta.inject.Inject
 import java.time.Instant
 import kotlinx.coroutines.Dispatchers
@@ -24,11 +24,14 @@ class DefinitionQueryService(
     lateinit var databaseConfig: DatabaseConfig
 
     @Inject
-    @DataSource("analytics")
-    lateinit var analyticsDataSource: Instance<AgroalDataSource>
+    lateinit var analyticsDataSourceProvider: AnalyticsDataSourceProvider
 
     private val analyticsQualifiedTable =
-        DashboardSqlSupport.qualifiedTable(config.analyticsSchemaResolved, config.analyticsTableResolved)
+        DashboardSqlSupport.qualifiedAnalyticsTable(
+            analyticsType = AnalyticsType.fromConfigValue(config.analyticsTypeResolved),
+            schema = config.analyticsSchemaResolved,
+            table = ANALYTICS_LIFECYCLE_EVENTS_TABLE
+        )
 
     suspend fun listNamespaces(): List<String> {
         val primary = listPrimaryNamespaces()
@@ -232,7 +235,7 @@ class DefinitionQueryService(
     }
 
     private suspend fun listAnalyticsNamespaces(): List<String> = withContext(Dispatchers.IO) {
-        if (!analyticsDataSource.isResolvable) return@withContext emptyList()
+        val analyticsDataSource = analyticsDataSourceProvider.optional() ?: return@withContext emptyList()
 
         val sql = """
             SELECT DISTINCT lemline_workflow_namespace
@@ -241,7 +244,7 @@ class DefinitionQueryService(
             ORDER BY lemline_workflow_namespace
         """.trimIndent()
 
-        analyticsDataSource.get().connection.use { conn ->
+        analyticsDataSource.connection.use { conn ->
             conn.prepareStatement(sql).use { stmt ->
                 stmt.executeQuery().use { rs ->
                     buildList {

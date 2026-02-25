@@ -43,11 +43,11 @@ internal class AnalyticsStartupValidator(
                 |  LEMLINE_ANALYTICS LEMLINE_DATABASE CONNECTION FAILED
                 |═══════════════════════════════════════════════════════════════════════════════
                 |
-                |  Unable to connect to the analytics PostgreSQL database.
+                |  Unable to connect to the selected analytics database.
                 |
                 |  Please verify:
-                |    • The analytics PostgreSQL server is running
-                |    • The 'lemline.analytics.postgresql.*' settings are correct
+                |    • The selected analytics datasource is reachable
+                |    • For PostgreSQL, 'lemline.analytics.postgresql.*' settings are correct
                 |    • The database user has appropriate permissions
                 |
                 |  Error: ${e.message}

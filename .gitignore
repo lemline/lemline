@@ -72,3 +72,8 @@ docs/roadmap/
 docs/plans/
 docs/features/
 docs/tmp/
+
+**/certs/
+!docker/e2e/certs/
+docker/e2e/certs/*
+!docker/e2e/certs/.gitkeep

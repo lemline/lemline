@@ -178,4 +178,3 @@ lemline:
       username: ${LEMLINE_ANALYTICS_PG_USERNAME:postgres}
       password: ${LEMLINE_ANALYTICS_PG_PASSWORD:postgres}
       schema: ${LEMLINE_ANALYTICS_PG_SCHEMA:public}
-      table: ${LEMLINE_ANALYTICS_PG_TABLE:lemline_lifecycle_events}

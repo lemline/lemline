@@ -193,7 +193,6 @@ lemline:
             username: postgres
             password: postgres
             schema: public
-            table: lemline_lifecycle_events
 ```
 
 Behavior:

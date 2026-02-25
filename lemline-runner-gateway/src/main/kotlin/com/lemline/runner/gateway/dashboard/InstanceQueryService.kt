@@ -2,14 +2,13 @@
 package com.lemline.runner.gateway.dashboard
 
 import com.lemline.core.lifecycleevents.LifecycleEventType
-import com.lemline.runner.common.config.LEMLINE_ANALYTICS_POSTGRES
+import com.lemline.runner.gateway.analytics.AnalyticsDataSourceProvider
+import com.lemline.runner.common.config.ANALYTICS_LIFECYCLE_EVENTS_TABLE
+import com.lemline.runner.common.config.AnalyticsType
 import com.lemline.runner.config.LemlineConfiguration
 import com.lemline.runner.config.analyticsSchemaResolved
-import com.lemline.runner.config.analyticsTableResolved
-import io.agroal.api.AgroalDataSource
-import io.quarkus.agroal.DataSource
+import com.lemline.runner.config.analyticsTypeResolved
 import jakarta.enterprise.context.ApplicationScoped
-import jakarta.enterprise.inject.Instance
 import jakarta.inject.Inject
 import java.nio.charset.StandardCharsets
 import java.util.*
@@ -22,11 +21,14 @@ class InstanceQueryService(
 ) {
 
     @Inject
-    @DataSource("analytics")
-    lateinit var analyticsDataSource: Instance<AgroalDataSource>
+    lateinit var analyticsDataSourceProvider: AnalyticsDataSourceProvider
 
     private val analyticsQualifiedTable =
-        DashboardSqlSupport.qualifiedTable(config.analyticsSchemaResolved, config.analyticsTableResolved)
+        DashboardSqlSupport.qualifiedAnalyticsTable(
+            analyticsType = AnalyticsType.fromConfigValue(config.analyticsTypeResolved),
+            schema = config.analyticsSchemaResolved,
+            table = ANALYTICS_LIFECYCLE_EVENTS_TABLE
+        )
 
     suspend fun listInstances(filter: InstanceQueryFilter): ListInstancesResult = withContext(Dispatchers.IO) {
         val normalizedPageSize = normalizePageSize(filter.pageSize)
@@ -38,10 +40,10 @@ class InstanceQueryService(
             limit = normalizedPageSize + 1,
         )
 
-        val allRows = requireAnalyticsDataSource().connection.use { conn ->
+        val allRows = analyticsDataSourceProvider.require().connection.use { conn ->
             conn.prepareStatement(selectQuery.sql).use { stmt ->
                 selectQuery.params.forEachIndexed { index, value ->
-                    stmt.setObject(index + 1, value)
+                    stmt.setDashboardObject(index + 1, value)
                 }
                 stmt.executeQuery().use { rs ->
                     buildList {
@@ -105,7 +107,7 @@ class InstanceQueryService(
 
     suspend fun latestSequence(): Long = withContext(Dispatchers.IO) {
         val sql = "SELECT COALESCE(MAX(id), 0) AS max_id FROM $analyticsQualifiedTable"
-        requireAnalyticsDataSource().connection.use { conn ->
+        analyticsDataSourceProvider.require().connection.use { conn ->
             conn.prepareStatement(sql).use { stmt ->
                 stmt.executeQuery().use { rs ->
                     if (rs.next()) rs.getLong("max_id") else 0L
@@ -150,10 +152,10 @@ class InstanceQueryService(
             LIMIT ?
         """.trimIndent()
 
-        requireAnalyticsDataSource().connection.use { conn ->
+        analyticsDataSourceProvider.require().connection.use { conn ->
             conn.prepareStatement(sql).use { stmt ->
                 params.forEachIndexed { index, value ->
-                    stmt.setObject(index + 1, value)
+                    stmt.setDashboardObject(index + 1, value)
                 }
                 stmt.setInt(params.size + 1, normalizedLimit)
                 stmt.executeQuery().use { rs ->
@@ -188,7 +190,7 @@ class InstanceQueryService(
             LIMIT 1
         """.trimIndent()
 
-        requireAnalyticsDataSource().connection.use { conn ->
+        analyticsDataSourceProvider.require().connection.use { conn ->
             conn.prepareStatement(sql).use { stmt ->
                 stmt.setObject(1, workflowId)
                 stmt.setLong(2, sequence)
@@ -201,10 +203,10 @@ class InstanceQueryService(
 
     private suspend fun countInstances(filter: InstanceQueryFilter): Long = withContext(Dispatchers.IO) {
         val countQuery = buildInstanceCountQuery(filter)
-        requireAnalyticsDataSource().connection.use { conn ->
+        analyticsDataSourceProvider.require().connection.use { conn ->
             conn.prepareStatement(countQuery.sql).use { stmt ->
                 countQuery.params.forEachIndexed { index, value ->
-                    stmt.setObject(index + 1, value)
+                    stmt.setDashboardObject(index + 1, value)
                 }
                 stmt.executeQuery().use { rs ->
                     if (rs.next()) rs.getLong("total_count") else 0L
@@ -421,13 +423,6 @@ class InstanceQueryService(
         val safeCount = if (totalCount >= 0) totalCount else -1L
         val payload = "$workflowId|$safeCount"
         return Base64.getUrlEncoder().withoutPadding().encodeToString(payload.toByteArray(StandardCharsets.UTF_8))
-    }
-
-    private fun requireAnalyticsDataSource(): AgroalDataSource {
-        if (analyticsDataSource.isResolvable) return analyticsDataSource.get()
-        throw IllegalStateException(
-            "Analytics datasource 'analytics' is not available. Configure $LEMLINE_ANALYTICS_POSTGRES.*"
-        )
     }
 
     private data class SqlQuery(

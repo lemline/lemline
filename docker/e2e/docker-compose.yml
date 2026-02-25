@@ -1,0 +1,108 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: lemline
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  runner-image:
+    image: lemline-runner-e2e:local
+    pull_policy: never
+    build:
+      context: ../..
+      dockerfile: lemline-runner/Dockerfile
+    command: ["--version"]
+    restart: "no"
+
+  worker:
+    image: lemline-runner-e2e:local
+    pull_policy: never
+    depends_on:
+      postgres:
+        condition: service_healthy
+      runner-image:
+        condition: service_completed_successfully
+      seed-definitions:
+        condition: service_completed_successfully
+    command: ["--config=/config/lemline.yaml", "listen"]
+    volumes:
+      - ./config/lemline.yaml:/config/lemline.yaml:ro
+      - ../../lemline-runner/src/test/resources/examples:/workflows:ro
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test: ["CMD", "bash", "-c", "echo > /dev/tcp/localhost/8080"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 15s
+
+  gateway:
+    image: lemline-runner-e2e:local
+    pull_policy: never
+    depends_on:
+      worker:
+        condition: service_healthy
+    command: ["--config=/config/lemline.yaml", "gateway", "start"]
+    volumes:
+      - ./config/lemline.yaml:/config/lemline.yaml:ro
+      - ./certs:/config/certs:ro
+    ports:
+      - "9443:9443"
+
+  grpc-web-proxy:
+    image: envoyproxy/envoy:v1.31-latest
+    depends_on:
+      gateway:
+        condition: service_started
+    command: ["-c", "/etc/envoy/envoy.yaml", "--log-level", "warning"]
+    volumes:
+      - ./grpc-web-proxy/envoy.yaml:/etc/envoy/envoy.yaml:ro
+    ports:
+      - "18080:8080"
+
+  seed-definitions:
+    image: lemline-runner-e2e:local
+    pull_policy: never
+    depends_on:
+      postgres:
+        condition: service_healthy
+      runner-image:
+        condition: service_completed_successfully
+    entrypoint: ["/bin/sh", "-lc"]
+    command:
+      - |
+        for _ in 1 2 3 4 5; do
+          java -jar /app/quarkus-app/quarkus-run.jar --config=/config/lemline.yaml definition post -d /workflows -r -F && exit 0
+          echo "seed-definitions failed, retrying in 5s..."
+          sleep 5
+        done
+        exit 1
+    volumes:
+      - ./config/lemline.yaml:/config/lemline.yaml:ro
+      - ../../lemline-runner/src/test/resources/examples:/workflows:ro
+
+  dashboard:
+    build:
+      context: ../..
+      dockerfile: docker/e2e/dashboard/Dockerfile
+    depends_on:
+      grpc-web-proxy:
+        condition: service_started
+    ports:
+      - "5173:80"
+    volumes:
+      - ./dashboard/config.js:/usr/share/nginx/html/config.js:ro
+
+volumes:
+  postgres_data:

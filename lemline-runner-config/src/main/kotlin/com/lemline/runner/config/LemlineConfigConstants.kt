@@ -33,9 +33,8 @@ object LemlineConfigConstants {
     const val POSTGRES_DATABASE_DEFAULT = "lemline"
     const val POSTGRES_USERNAME_DEFAULT = "postgres"
     const val POSTGRES_PASSWORD_DEFAULT = "postgres"
-    const val ANALYTICS_POSTGRES_DATABASE_DEFAULT = "lemline_analytics"
+    const val ANALYTICS_POSTGRES_DATABASE_DEFAULT = "lemline"
     const val ANALYTICS_POSTGRES_SCHEMA_DEFAULT = "public"
-    const val ANALYTICS_POSTGRES_TABLE_DEFAULT = "lemline_lifecycle_events"
     const val ANALYTICS_POSTGRES_MIGRATE_AT_START_DEFAULT = "true"
     const val ANALYTICS_POSTGRES_BASELINE_ON_MIGRATE_DEFAULT = "false"
 
@@ -89,6 +88,7 @@ object LemlineConfigConstants {
     const val GATEWAY_CORS_ORIGINS_DEFAULT = "http://localhost:5173"
     const val GATEWAY_CORS_METHODS_DEFAULT = "GET,POST,OPTIONS"
     const val GATEWAY_CORS_HEADERS_DEFAULT = "Accept,Authorization,Content-Type,Grpc-Timeout,X-Grpc-Web,X-User-Agent"
+    const val GATEWAY_CORS_EXPOSED_HEADERS_DEFAULT = "Grpc-Status,Grpc-Message,Grpc-Status-Details-Bin"
 
     const val GATEWAY_WATCH_POLL_INTERVAL_MS_DEFAULT = "250"
     const val GATEWAY_WATCH_BATCH_SIZE_DEFAULT = "256"

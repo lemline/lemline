@@ -8,7 +8,6 @@ import com.lemline.runner.common.config.LEMLINE_MESSAGING_LIFECYCLE_EVENTS_CONSU
 import com.lemline.runner.common.messaging.LIFECYCLEEVENTS_IN_CHANNEL
 import com.lemline.runner.common.messaging.MessageSubscriber
 import io.cloudevents.CloudEvent
-import io.quarkus.arc.properties.IfBuildProperty
 import io.quarkus.runtime.Startup
 import jakarta.enterprise.context.ApplicationScoped
 import org.eclipse.microprofile.config.inject.ConfigProperty
@@ -18,14 +17,16 @@ import org.reactivestreams.Publisher
 
 @Startup
 @ApplicationScoped
-@IfBuildProperty(name = LEMLINE_MESSAGING_LIFECYCLE_EVENTS_CONSUMER_ENABLED, stringValue = "true")
 internal class LifecycleAnalyticsSubscriber(
     @param:ConfigProperty(
         name = LEMLINE_MESSAGING_LIFECYCLE_EVENTS_CONSUMER_CONCURRENCY,
         defaultValue = LIFECYCLE_EVENTS_CONSUMER_CONCURRENCY_DEFAULT
     )
     override val maxConcurrency: Long,
-    @param:ConfigProperty(name = LEMLINE_MESSAGING_LIFECYCLE_EVENTS_CONSUMER_ENABLED, defaultValue = LIFECYCLE_EVENTS_CONSUMER_ENABLED_DEFAULT)
+    @param:ConfigProperty(
+        name = LEMLINE_MESSAGING_LIFECYCLE_EVENTS_CONSUMER_ENABLED,
+        defaultValue = LIFECYCLE_EVENTS_CONSUMER_ENABLED_DEFAULT
+    )
     override val enabled: Boolean,
     @param:Channel(LIFECYCLEEVENTS_IN_CHANNEL)
     override val publisher: Publisher<Message<String>>,

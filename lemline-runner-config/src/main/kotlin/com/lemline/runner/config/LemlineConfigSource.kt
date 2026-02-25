@@ -2,12 +2,10 @@
 package com.lemline.runner.config
 
 import com.lemline.common.logger.logger
-import com.lemline.runner.common.config.ANALYTICS_BACKEND_CLICKHOUSE
-import com.lemline.runner.common.config.ANALYTICS_BACKEND_POSTGRESQL
-import com.lemline.runner.common.config.ANALYTICS_TYPE_DEFAULT
+import com.lemline.runner.common.config.AnalyticsType
 import com.lemline.runner.common.config.DatabaseType
 import com.lemline.runner.common.config.LEMLINE_ANALYTICS_BASELINE_ON_MIGRATE
-import com.lemline.runner.common.config.LEMLINE_ANALYTICS_MIGRATE_AT_START
+import com.lemline.runner.common.config.LEMLINE_ANALYTICS_POSTGRES
 import com.lemline.runner.common.config.LEMLINE_ANALYTICS_POSTGRES_DATABASE
 import com.lemline.runner.common.config.LEMLINE_ANALYTICS_POSTGRES_HOST
 import com.lemline.runner.common.config.LEMLINE_ANALYTICS_POSTGRES_PASSWORD
@@ -72,6 +70,10 @@ import com.lemline.runner.common.config.LEMLINE_MESSAGING_KAFKA_EVENTS_CONSUMER_
 import com.lemline.runner.common.config.LEMLINE_MESSAGING_KAFKA_EVENTS_CONSUMER_TOPIC_OUT
 import com.lemline.runner.common.config.LEMLINE_MESSAGING_KAFKA_EVENTS_PRODUCER_TOPIC_OUT
 import com.lemline.runner.common.config.LEMLINE_MESSAGING_KAFKA_EVENTS_TOPIC
+import com.lemline.runner.common.config.LEMLINE_MESSAGING_KAFKA_LIFECYCLE_EVENTS_CONSUMER_CONCURRENCY
+import com.lemline.runner.common.config.LEMLINE_MESSAGING_KAFKA_LIFECYCLE_EVENTS_CONSUMER_GROUP_ID
+import com.lemline.runner.common.config.LEMLINE_MESSAGING_KAFKA_LIFECYCLE_EVENTS_CONSUMER_OFFSET_RESET
+import com.lemline.runner.common.config.LEMLINE_MESSAGING_KAFKA_LIFECYCLE_EVENTS_CONSUMER_TOPIC_DLQ
 import com.lemline.runner.common.config.LEMLINE_MESSAGING_KAFKA_LIFECYCLE_EVENTS_PRODUCER_TOPIC_OUT
 import com.lemline.runner.common.config.LEMLINE_MESSAGING_KAFKA_LIFECYCLE_EVENTS_TOPIC
 import com.lemline.runner.common.config.LEMLINE_MESSAGING_KAFKA_SASL_MECHANISM
@@ -108,9 +110,8 @@ import com.lemline.runner.common.config.LEMLINE_MESSAGING_PGMQ_EVENTS_CONSUMER_V
 import com.lemline.runner.common.config.LEMLINE_MESSAGING_PGMQ_EVENTS_PRODUCER_QUEUE_OUT
 import com.lemline.runner.common.config.LEMLINE_MESSAGING_PGMQ_EVENTS_QUEUE
 import com.lemline.runner.common.config.LEMLINE_MESSAGING_PGMQ_HOST
-import com.lemline.runner.common.config.LEMLINE_MESSAGING_PGMQ_LIFECYCLE_EVENTS_CONSUMER
-import com.lemline.runner.common.config.LEMLINE_MESSAGING_PGMQ_LIFECYCLE_EVENTS_CONSUMER_BATCH_SIZE
 import com.lemline.runner.common.config.LEMLINE_MESSAGING_PGMQ_LIFECYCLE_EVENTS_CONSUMER_CONCURRENCY
+import com.lemline.runner.common.config.LEMLINE_MESSAGING_PGMQ_LIFECYCLE_EVENTS_CONSUMER_BATCH_SIZE
 import com.lemline.runner.common.config.LEMLINE_MESSAGING_PGMQ_LIFECYCLE_EVENTS_CONSUMER_MAX_RETRIES
 import com.lemline.runner.common.config.LEMLINE_MESSAGING_PGMQ_LIFECYCLE_EVENTS_CONSUMER_POLL_INTERVAL
 import com.lemline.runner.common.config.LEMLINE_MESSAGING_PGMQ_LIFECYCLE_EVENTS_CONSUMER_QUEUE_DLQ
@@ -137,6 +138,8 @@ import com.lemline.runner.common.config.LEMLINE_MESSAGING_RABBITMQ_EVENTS_PRODUC
 import com.lemline.runner.common.config.LEMLINE_MESSAGING_RABBITMQ_EVENTS_PRODUCER_QUEUE_OUT
 import com.lemline.runner.common.config.LEMLINE_MESSAGING_RABBITMQ_EVENTS_QUEUE
 import com.lemline.runner.common.config.LEMLINE_MESSAGING_RABBITMQ_HOSTNAME
+import com.lemline.runner.common.config.LEMLINE_MESSAGING_RABBITMQ_LIFECYCLE_EVENTS_CONSUMER_CONCURRENCY
+import com.lemline.runner.common.config.LEMLINE_MESSAGING_RABBITMQ_LIFECYCLE_EVENTS_CONSUMER_QUEUE_DLQ
 import com.lemline.runner.common.config.LEMLINE_MESSAGING_RABBITMQ_LIFECYCLE_EVENTS_PRODUCER_EXCHANGE_NAME
 import com.lemline.runner.common.config.LEMLINE_MESSAGING_RABBITMQ_LIFECYCLE_EVENTS_PRODUCER_QUEUE_OUT
 import com.lemline.runner.common.config.LEMLINE_MESSAGING_RABBITMQ_LIFECYCLE_EVENTS_QUEUE
@@ -152,11 +155,11 @@ import com.lemline.runner.common.messaging.LIFECYCLEEVENTS_IN_CHANNEL
 import com.lemline.runner.common.messaging.LIFECYCLEEVENTS_OUT_CHANNEL
 import com.lemline.runner.config.LemlineConfigConstants.ANALYTICS_POSTGRES_BASELINE_ON_MIGRATE_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.ANALYTICS_POSTGRES_DATABASE_DEFAULT
-import com.lemline.runner.config.LemlineConfigConstants.ANALYTICS_POSTGRES_MIGRATE_AT_START_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.CLOUDEVENTS_TOPIC_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.CONSUMER_CONCURRENCY_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.GATEWAY_AUTHENTICATION_ENABLED_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.GATEWAY_CORS_ENABLED_DEFAULT
+import com.lemline.runner.config.LemlineConfigConstants.GATEWAY_CORS_EXPOSED_HEADERS_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.GATEWAY_CORS_HEADERS_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.GATEWAY_CORS_METHODS_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.GATEWAY_CORS_ORIGINS_DEFAULT
@@ -204,7 +207,6 @@ import com.lemline.runner.config.LemlineConfigConstants.RABBITMQ_VHOST_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.WORKFLOW_COMMANDS_TOPIC_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.WORKFLOW_EVENTS_TOPIC_DEFAULT
 import io.smallrye.config.PropertiesConfigSource
-import java.util.*
 
 internal const val COMMANDS_IN_CHANNEL = "commands-in"
 internal const val COMMANDS_OUT_CHANNEL = "commands-out"
@@ -254,11 +256,8 @@ class LemlineConfigSource : PropertiesConfigSource(
 ) {
     companion object {
         private val logger = logger()
-
-        private enum class GatewayAnalyticsBackend {
-            POSTGRESQL,
-            CLICKHOUSE,
-        }
+        private const val ANALYTICS_H2_DATASOURCE_NAME = "analytics"
+        private const val ANALYTICS_POSTGRES_DATASOURCE_NAME = "analytics-postgresql"
 
         private fun buildProperties(): Map<String, String> {
             val lemlineProps = mutableMapOf<String, String>()
@@ -270,7 +269,7 @@ class LemlineConfigSource : PropertiesConfigSource(
             ConfigPathHolder.configPath?.let { path ->
                 ExtraFileConfigFactory().getConfig(path).properties.forEach { (name, value) ->
                     if (name.startsWith(LEMLINE_PREFIX)) {
-                        lemlineProps[name] = value.split("#").first().trim()
+                        lemlineProps[name] = value.replaceFirst(Regex("""\s+#.*$"""), "").trim()
                     }
                 }
             }
@@ -280,7 +279,7 @@ class LemlineConfigSource : PropertiesConfigSource(
             // Log lemline-related system properties before reading
             val lemlineSysProps = System.getProperties()
                 .filter { (k, _) -> k.toString().startsWith(LEMLINE_PREFIX) }
-                .map { (k, v) -> "$k=$v" }
+                .map { (k, v) -> "$k=${v.toString().maskIfSensitive(k.toString())}" }
             logger.info { "Lemline system properties: $lemlineSysProps" }
 
             // Override with system properties, as they have higher priority,
@@ -295,7 +294,7 @@ class LemlineConfigSource : PropertiesConfigSource(
 
             // Generate and merge transformed properties
             val generatedProps = mutableMapOf<String, String>()
-            generatedProps.putAll(generateDatabaseProperties(lemlineProps))
+            generatedProps.putAll(generateWorkflowDatabaseProperties(lemlineProps))
             generatedProps.putAll(generateAnalyticsDatabaseProperties(lemlineProps))
             generatedProps.putAll(generateMessagingProperties(lemlineProps))
             generatedProps.putAll(generateGatewayProperties(lemlineProps))
@@ -308,7 +307,7 @@ class LemlineConfigSource : PropertiesConfigSource(
             }
         }
 
-        private fun generateDatabaseProperties(props: Map<String, String>): Map<String, String> {
+        private fun generateWorkflowDatabaseProperties(props: Map<String, String>): Map<String, String> {
             val generated = mutableMapOf<String, String>()
 
             val usePostgres = props.keys.any { it.startsWith("$LEMLINE_DATABASE_POSTGRES.") }
@@ -333,11 +332,11 @@ class LemlineConfigSource : PropertiesConfigSource(
                     val host = props[LEMLINE_DATABASE_POSTGRES_HOST] ?: POSTGRES_HOST_DEFAULT
                     val port = props[LEMLINE_DATABASE_POSTGRES_PORT] ?: POSTGRES_PORT_DEFAULT
                     val database = props[LEMLINE_DATABASE_POSTGRES_DATABASE] ?: POSTGRES_DATABASE_DEFAULT
+                    val username = props[LEMLINE_DATABASE_POSTGRES_USERNAME] ?: POSTGRES_USERNAME_DEFAULT
+                    val password = props[LEMLINE_DATABASE_POSTGRES_PASSWORD] ?: POSTGRES_PASSWORD_DEFAULT
                     val postgres = "quarkus.datasource.postgresql"
-                    generated["$postgres.username"] =
-                        props[LEMLINE_DATABASE_POSTGRES_USERNAME] ?: POSTGRES_USERNAME_DEFAULT
-                    generated["$postgres.password"] =
-                        props[LEMLINE_DATABASE_POSTGRES_PASSWORD] ?: POSTGRES_PASSWORD_DEFAULT
+                    generated["$postgres.username"] = username
+                    generated["$postgres.password"] = password
                     generated["$postgres.jdbc.url"] = "jdbc:postgresql://$host:$port/$database"
                 }
 
@@ -345,9 +344,11 @@ class LemlineConfigSource : PropertiesConfigSource(
                     val host = props[LEMLINE_DATABASE_MYSQL_HOST] ?: MYSQL_HOST_DEFAULT
                     val port = props[LEMLINE_DATABASE_MYSQL_PORT] ?: MYSQL_PORT_DEFAULT
                     val database = props[LEMLINE_DATABASE_MYSQL_DATABASE] ?: MYSQL_DATABASE_DEFAULT
+                    val username = props[LEMLINE_DATABASE_MYSQL_USERNAME] ?: MYSQL_USERNAME_DEFAULT
+                    val password = props[LEMLINE_DATABASE_MYSQL_PASSWORD] ?: MYSQL_PASSWORD_DEFAULT
                     val mysql = "quarkus.datasource.mysql"
-                    generated["$mysql.username"] = props[LEMLINE_DATABASE_MYSQL_USERNAME] ?: MYSQL_USERNAME_DEFAULT
-                    generated["$mysql.password"] = props[LEMLINE_DATABASE_MYSQL_PASSWORD] ?: MYSQL_PASSWORD_DEFAULT
+                    generated["$mysql.username"] = username
+                    generated["$mysql.password"] = password
                     generated["$mysql.jdbc.url"] = "jdbc:mysql://$host:$port/$database" +
                         "?useSSL=false" +
                         "&allowPublicKeyRetrieval=true" +
@@ -368,54 +369,39 @@ class LemlineConfigSource : PropertiesConfigSource(
         }
 
         private fun generateAnalyticsDatabaseProperties(props: Map<String, String>): Map<String, String> {
+            val generated = mutableMapOf<String, String>()
             val lifecycleConsumerEnabled = props[LEMLINE_MESSAGING_LIFECYCLE_EVENTS_CONSUMER_ENABLED].toBoolean()
             val gatewayEnabled = props[LEMLINE_GATEWAY_ENABLED]?.toBooleanStrictOrNull()
                 ?: GATEWAY_ENABLED_DEFAULT.toBoolean()
-            val gatewayAnalyticsBackend = resolveGatewayAnalyticsBackend(props, gatewayEnabled)
 
-            val needsAnalyticsDatasource = lifecycleConsumerEnabled ||
-                (gatewayEnabled && gatewayAnalyticsBackend == GatewayAnalyticsBackend.POSTGRESQL)
-
+            val needsAnalyticsDatasource = lifecycleConsumerEnabled || gatewayEnabled
             if (!needsAnalyticsDatasource) return emptyMap()
 
-            val generated = mutableMapOf<String, String>()
+            val hasPostgresqlProps = props.keys.any { it.startsWith("$LEMLINE_ANALYTICS_POSTGRES.") }
+            val type = props[LEMLINE_ANALYTICS_TYPE]?.let { AnalyticsType.fromConfigValue(it) } ?: run {
+                if (hasPostgresqlProps) AnalyticsType.POSTGRESQL else AnalyticsType.H2
+            }
+            generated[LEMLINE_ANALYTICS_TYPE] = type.configValue
+
+            if (type == AnalyticsType.H2) return generated
 
             val host = props[LEMLINE_ANALYTICS_POSTGRES_HOST] ?: POSTGRES_HOST_DEFAULT
             val port = props[LEMLINE_ANALYTICS_POSTGRES_PORT] ?: POSTGRES_PORT_DEFAULT
             val database = props[LEMLINE_ANALYTICS_POSTGRES_DATABASE] ?: ANALYTICS_POSTGRES_DATABASE_DEFAULT
             val username = props[LEMLINE_ANALYTICS_POSTGRES_USERNAME] ?: POSTGRES_USERNAME_DEFAULT
             val password = props[LEMLINE_ANALYTICS_POSTGRES_PASSWORD] ?: POSTGRES_PASSWORD_DEFAULT
-            val migrateAtStart = props[LEMLINE_ANALYTICS_MIGRATE_AT_START]
-                ?: ANALYTICS_POSTGRES_MIGRATE_AT_START_DEFAULT
             val baselineOnMigrate = props[LEMLINE_ANALYTICS_BASELINE_ON_MIGRATE]
                 ?: ANALYTICS_POSTGRES_BASELINE_ON_MIGRATE_DEFAULT
+            val datasource = "quarkus.datasource.$ANALYTICS_POSTGRES_DATASOURCE_NAME"
+            val flyway = "quarkus.flyway.$ANALYTICS_POSTGRES_DATASOURCE_NAME"
 
-            generated["quarkus.datasource.analytics.db-kind"] = "postgresql"
-            generated["quarkus.datasource.analytics.username"] = username
-            generated["quarkus.datasource.analytics.password"] = password
-            generated["quarkus.datasource.analytics.jdbc.url"] = "jdbc:postgresql://$host:$port/$database"
-            generated["quarkus.flyway.analytics.migrate-at-start"] = migrateAtStart
-            generated["quarkus.flyway.analytics.baseline-on-migrate"] = baselineOnMigrate
-            generated["quarkus.flyway.analytics.locations"] = "classpath:db/migration/analytics/postgresql"
+            generated["$datasource.username"] = username
+            generated["$datasource.password"] = password
+            generated["$datasource.jdbc.url"] = "jdbc:postgresql://$host:$port/$database"
+            generated["$flyway.baseline-on-migrate"] = baselineOnMigrate
+            generated["$flyway.locations"] = "classpath:db/migration/analytics/postgresql"
 
             return generated
-        }
-
-        private fun resolveGatewayAnalyticsBackend(
-            props: Map<String, String>,
-            gatewayEnabled: Boolean
-        ): GatewayAnalyticsBackend? {
-            if (!gatewayEnabled) return null
-
-            val rawType = props[LEMLINE_ANALYTICS_TYPE] ?: ANALYTICS_TYPE_DEFAULT
-            return when (rawType.trim().lowercase(Locale.ROOT)) {
-                ANALYTICS_BACKEND_POSTGRESQL -> GatewayAnalyticsBackend.POSTGRESQL
-                ANALYTICS_BACKEND_CLICKHOUSE -> GatewayAnalyticsBackend.CLICKHOUSE
-                else -> throw IllegalStateException(
-                    "Unsupported analytics type '$rawType'. Supported values: " +
-                        "'$ANALYTICS_BACKEND_POSTGRESQL', '$ANALYTICS_BACKEND_CLICKHOUSE'."
-                )
-            }
         }
 
         private fun generateGatewayProperties(props: Map<String, String>): Map<String, String> {
@@ -423,9 +409,8 @@ class LemlineConfigSource : PropertiesConfigSource(
                 ?: GATEWAY_ENABLED_DEFAULT.toBoolean()
             val tlsEnabled = props[LEMLINE_GATEWAY_TLS_ENABLED]?.toBooleanStrictOrNull()
                 ?: GATEWAY_TLS_ENABLED_DEFAULT.toBoolean()
-            val authenticationEnabled =
-                props[LEMLINE_GATEWAY_AUTHENTICATION_ENABLED]?.toBooleanStrictOrNull()
-                    ?: GATEWAY_AUTHENTICATION_ENABLED_DEFAULT.toBoolean()
+            val authenticationEnabled = props[LEMLINE_GATEWAY_AUTHENTICATION_ENABLED]?.toBooleanStrictOrNull()
+                ?: GATEWAY_AUTHENTICATION_ENABLED_DEFAULT.toBoolean()
 
             val generatedProps = mutableMapOf<String, String>()
             generatedProps.putAll(generateGatewayGrpcProperties(props, enabled, tlsEnabled))
@@ -447,16 +432,21 @@ class LemlineConfigSource : PropertiesConfigSource(
                 return generated
             }
 
-            generated["quarkus.grpc.server.host"] =
-                props[LEMLINE_GATEWAY_GRPC_HOST] ?: GATEWAY_GRPC_HOST_DEFAULT
-            generated["quarkus.grpc.server.port"] =
-                props[LEMLINE_GATEWAY_GRPC_PORT] ?: GATEWAY_GRPC_PORT_DEFAULT
+            val gatewayPort = props[LEMLINE_GATEWAY_GRPC_PORT] ?: GATEWAY_GRPC_PORT_DEFAULT
+            generated["quarkus.grpc.server.host"] = props[LEMLINE_GATEWAY_GRPC_HOST] ?: GATEWAY_GRPC_HOST_DEFAULT
+            generated["quarkus.grpc.server.port"] = gatewayPort
             generated["quarkus.grpc.server.plain-text"] = (!tlsEnabled).toString()
-            generated["quarkus.grpc.server.enable-grpc-web"] = "true"
+            generated["quarkus.grpc.server.use-separate-server"] = "false"
+            // gRPC-Web runs through the HTTP server, so bind the active transport port.
+            if (tlsEnabled) {
+                generated["quarkus.http.ssl-port"] = gatewayPort
+            } else {
+                generated["quarkus.http.port"] = gatewayPort
+            }
 
             val corsEnabled = props[LEMLINE_GATEWAY_CORS_ENABLED]?.toBooleanStrictOrNull()
                 ?: GATEWAY_CORS_ENABLED_DEFAULT.toBoolean()
-            generated["quarkus.http.cors"] = corsEnabled.toString()
+            generated["quarkus.http.cors.enabled"] = corsEnabled.toString()
             if (corsEnabled) {
                 generated["quarkus.http.cors.origins"] =
                     props[LEMLINE_GATEWAY_CORS_ORIGINS] ?: GATEWAY_CORS_ORIGINS_DEFAULT
@@ -464,13 +454,14 @@ class LemlineConfigSource : PropertiesConfigSource(
                     props[LEMLINE_GATEWAY_CORS_METHODS] ?: GATEWAY_CORS_METHODS_DEFAULT
                 generated["quarkus.http.cors.headers"] =
                     props[LEMLINE_GATEWAY_CORS_HEADERS] ?: GATEWAY_CORS_HEADERS_DEFAULT
+                generated["quarkus.http.cors.exposed-headers"] = GATEWAY_CORS_EXPOSED_HEADERS_DEFAULT
                 generated["quarkus.http.cors.access-control-allow-credentials"] = "false"
             }
 
             if (tlsEnabled) {
+                // Keep gRPC SSL config for deployments using a separate gRPC server.
                 generated["quarkus.grpc.server.ssl.client-auth"] =
-                    props[LEMLINE_GATEWAY_TLS_CLIENT_AUTH]
-                        ?: GATEWAY_TLS_CLIENT_AUTH_DEFAULT
+                    props[LEMLINE_GATEWAY_TLS_CLIENT_AUTH] ?: GATEWAY_TLS_CLIENT_AUTH_DEFAULT
 
                 props[LEMLINE_GATEWAY_TLS_CERTIFICATE]?.let {
                     generated["quarkus.grpc.server.ssl.certificate"] = it
@@ -484,6 +475,15 @@ class LemlineConfigSource : PropertiesConfigSource(
                 props[LEMLINE_GATEWAY_TLS_TRUST_STORE_PASSWORD]?.let {
                     generated["quarkus.grpc.server.ssl.trust-store-password"] = it
                 }
+
+                // With use-separate-server=false, TLS is terminated by the main HTTP server.
+                props[LEMLINE_GATEWAY_TLS_CERTIFICATE]?.let {
+                    generated["quarkus.http.ssl.certificate.files"] = it
+                }
+                props[LEMLINE_GATEWAY_TLS_PRIVATE_KEY]?.let {
+                    generated["quarkus.http.ssl.certificate.key-files"] = it
+                }
+                generated["quarkus.http.http2"] = "true"
             } else {
                 generated["quarkus.grpc.server.ssl.client-auth"] = "none"
             }
@@ -550,11 +550,15 @@ class LemlineConfigSource : PropertiesConfigSource(
             if (props.containsKey(LEMLINE_MESSAGING_KAFKA_SASL_USERNAME) &&
                 props.containsKey(LEMLINE_MESSAGING_KAFKA_SASL_PASSWORD)
             ) {
+                val saslUsername = props[LEMLINE_MESSAGING_KAFKA_SASL_USERNAME]!!
+                    .replace("\\", "\\\\").replace("\"", "\\\"")
+                val saslPassword = props[LEMLINE_MESSAGING_KAFKA_SASL_PASSWORD]!!
+                    .replace("\\", "\\\\").replace("\"", "\\\"")
                 set(
                     "kafka.sasl.jaas.config",
                     "org.apache.kafka.common.security.plain.PlainLoginModule required " +
-                        "username=\"${props[LEMLINE_MESSAGING_KAFKA_SASL_USERNAME]}\" " +
-                        "password=\"${props[LEMLINE_MESSAGING_KAFKA_SASL_PASSWORD]}\";"
+                        "username=\"$saslUsername\" " +
+                        "password=\"$saslPassword\";"
                 )
                 if (!containsKey("kafka.sasl.mechanism")) set("kafka.sasl.mechanism", "PLAIN")
             }
@@ -684,18 +688,28 @@ class LemlineConfigSource : PropertiesConfigSource(
 
             if (props[LEMLINE_MESSAGING_LIFECYCLE_EVENTS_CONSUMER_ENABLED].toBoolean()) {
                 val incoming = "mp.messaging.incoming.$LIFECYCLEEVENTS_IN_CHANNEL"
-                val topicDLQ = "$topic.dlq"
+                val topicDLQ = props[LEMLINE_MESSAGING_KAFKA_LIFECYCLE_EVENTS_CONSUMER_TOPIC_DLQ] ?: "$topic.dlq"
                 set("$incoming.connector", KAFKA_CONNECTOR)
                 set("$incoming.topic", topic)
                 set("$incoming.broadcast", "true")
-                set("$incoming.group.id", KAFKA_LIFECYCLE_EVENTS_GROUP_ID_DEFAULT)
-                set("$incoming.auto.offset.reset", KAFKA_OFFSET_RESET_DEFAULT)
+                set(
+                    "$incoming.group.id",
+                    props[LEMLINE_MESSAGING_KAFKA_LIFECYCLE_EVENTS_CONSUMER_GROUP_ID]
+                        ?: KAFKA_LIFECYCLE_EVENTS_GROUP_ID_DEFAULT
+                )
+                set(
+                    "$incoming.auto.offset.reset",
+                    props[LEMLINE_MESSAGING_KAFKA_LIFECYCLE_EVENTS_CONSUMER_OFFSET_RESET]
+                        ?: KAFKA_OFFSET_RESET_DEFAULT
+                )
                 set("$incoming.value.deserializer", KAFKA_STRING_DESERIALIZER)
                 set("$incoming.failure-strategy", "dead-letter-queue")
                 set("$incoming.dead-letter-queue.topic", topicDLQ)
                 set(
                     LEMLINE_MESSAGING_LIFECYCLE_EVENTS_CONSUMER_CONCURRENCY,
-                    props[LEMLINE_MESSAGING_LIFECYCLE_EVENTS_CONSUMER_CONCURRENCY] ?: CONSUMER_CONCURRENCY_DEFAULT
+                    props[LEMLINE_MESSAGING_KAFKA_LIFECYCLE_EVENTS_CONSUMER_CONCURRENCY]
+                        ?: props[LEMLINE_MESSAGING_LIFECYCLE_EVENTS_CONSUMER_CONCURRENCY]
+                        ?: CONSUMER_CONCURRENCY_DEFAULT
                 )
             }
 
@@ -791,7 +805,7 @@ class LemlineConfigSource : PropertiesConfigSource(
             if (props[LEMLINE_MESSAGING_CLOUDEVENTS_CONSUMER_ENABLED].toBoolean()) {
                 val incoming = "mp.messaging.incoming.$CLOUDEVENTS_IN_CHANNEL"
                 val queueDLQ = props[LEMLINE_MESSAGING_RABBITMQ_CLOUDEVENTS_CONSUMER_QUEUE_DLQ]
-                    ?: LEMLINE_MESSAGING_RABBITMQ_CLOUDEVENTS_CONSUMER_QUEUE_DLQ
+                    ?: "$queue.dlq"
                 set("$incoming.connector", RABBITMQ_CONNECTOR)
                 set("$incoming.queue.name", queue)
                 set("$incoming.queue.durable", "true")
@@ -833,7 +847,7 @@ class LemlineConfigSource : PropertiesConfigSource(
 
             if (props[LEMLINE_MESSAGING_LIFECYCLE_EVENTS_CONSUMER_ENABLED].toBoolean()) {
                 val incoming = "mp.messaging.incoming.$LIFECYCLEEVENTS_IN_CHANNEL"
-                val queueDLQ = "$queue.dlq"
+                val queueDLQ = props[LEMLINE_MESSAGING_RABBITMQ_LIFECYCLE_EVENTS_CONSUMER_QUEUE_DLQ] ?: "$queue.dlq"
                 set("$incoming.connector", RABBITMQ_CONNECTOR)
                 set("$incoming.queue.name", queue)
                 set("$incoming.broadcast", "true")
@@ -852,7 +866,9 @@ class LemlineConfigSource : PropertiesConfigSource(
                 }
                 set(
                     LEMLINE_MESSAGING_LIFECYCLE_EVENTS_CONSUMER_CONCURRENCY,
-                    props[LEMLINE_MESSAGING_LIFECYCLE_EVENTS_CONSUMER_CONCURRENCY] ?: CONSUMER_CONCURRENCY_DEFAULT
+                    props[LEMLINE_MESSAGING_RABBITMQ_LIFECYCLE_EVENTS_CONSUMER_CONCURRENCY]
+                        ?: props[LEMLINE_MESSAGING_LIFECYCLE_EVENTS_CONSUMER_CONCURRENCY]
+                        ?: CONSUMER_CONCURRENCY_DEFAULT
                 )
             }
 
@@ -1065,7 +1081,6 @@ class LemlineConfigSource : PropertiesConfigSource(
             val queue = props[LEMLINE_MESSAGING_PGMQ_LIFECYCLE_EVENTS_QUEUE] ?: LIFECYCLE_EVENTS_TOPIC_DEFAULT
 
             if (props[LEMLINE_MESSAGING_LIFECYCLE_EVENTS_CONSUMER_ENABLED].toBoolean()) {
-                LEMLINE_MESSAGING_PGMQ_LIFECYCLE_EVENTS_CONSUMER
                 val incoming = "mp.messaging.incoming.$LIFECYCLEEVENTS_IN_CHANNEL"
                 val queueDLQ = props[LEMLINE_MESSAGING_PGMQ_LIFECYCLE_EVENTS_CONSUMER_QUEUE_DLQ] ?: "$queue.dlq"
 
@@ -1098,7 +1113,9 @@ class LemlineConfigSource : PropertiesConfigSource(
                 set("$incoming.auto-create-queue", "false")
                 set(
                     LEMLINE_MESSAGING_LIFECYCLE_EVENTS_CONSUMER_CONCURRENCY,
-                    props[LEMLINE_MESSAGING_PGMQ_LIFECYCLE_EVENTS_CONSUMER_CONCURRENCY] ?: CONSUMER_CONCURRENCY_DEFAULT
+                    props[LEMLINE_MESSAGING_PGMQ_LIFECYCLE_EVENTS_CONSUMER_CONCURRENCY]
+                        ?: props[LEMLINE_MESSAGING_LIFECYCLE_EVENTS_CONSUMER_CONCURRENCY]
+                        ?: CONSUMER_CONCURRENCY_DEFAULT
                 )
             }
 
@@ -1151,13 +1168,22 @@ class LemlineConfigSource : PropertiesConfigSource(
          *   `<key>=<value> (system=<system_value>, env=<env_value>)`
          *   or simply `<key>=<value>` if no system or environment properties are found.
          */
-        private fun Map<String, String>.toPrint() = toSortedMap().map {
-            "\t${it.key}=${it.value}" +
-                mapOf("system" to System.getProperty(it.key), "env" to System.getenv(it.key))
-                    .filter { it.value != null }
+        private val SENSITIVE_KEY_PATTERN = Regex("password|secret|sasl", RegexOption.IGNORE_CASE)
+
+        private fun String.maskIfSensitive(key: String): String =
+            if (SENSITIVE_KEY_PATTERN.containsMatchIn(key)) "****" else this
+
+        private fun Map<String, String>.toPrint() = toSortedMap().map { (key, value) ->
+            "\t$key=${value.maskIfSensitive(key)}" +
+                mapOf("system" to System.getProperty(key), "env" to System.getenv(key))
+                    .filterValues { it != null }
                     .toList()
                     .let { list ->
-                        if (list.isEmpty()) "" else list.joinToString(", ", " (", ")") { "${it.first}=${it.second}" }
+                        if (list.isEmpty()) "" else list.joinToString(
+                            ", ",
+                            " (",
+                            ")"
+                        ) { "${it.first}=${it.second.maskIfSensitive(key)}" }
                     }
         }.joinToString("\n")
     }
