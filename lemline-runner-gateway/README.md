@@ -59,7 +59,7 @@ lemline:
       batch-size: 256
 
   analytics:
-    backend: postgresql
+    type: postgresql
     migrate-at-start: true
     baseline-on-migrate: false
     postgresql:
@@ -69,7 +69,6 @@ lemline:
       username: postgres
       password: postgres
       schema: public
-      table: lemline_lifecycle_events
 ```
 
 Notes:
@@ -78,7 +77,7 @@ Notes:
 2. In this first example, `lemline.gateway.authentication.enabled=false`, so JWT auth and authorization checks are disabled.
 3. CORS configuration is now under `lemline.gateway.cors.*`; set `lemline.gateway.cors.enabled=false` to disable CORS headers.
 4. For secure mode with TLS and JWT claims/scopes, see `Authentication and authorization` below.
-5. `lemline.analytics.type=clickhouse` is currently not implemented in the gateway; use `postgresql`.
+5. `lemline.analytics.type` selects the analytics storage backend (`h2` or `postgresql`).
 6. `gateway start` sets `lemline.gateway.enabled=true` automatically; keeping it in config is still fine.
 
 ## Start the gateway (JVM / Java)

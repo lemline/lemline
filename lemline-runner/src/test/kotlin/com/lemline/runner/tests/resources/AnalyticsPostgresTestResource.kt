@@ -6,7 +6,6 @@ import com.lemline.runner.common.config.LEMLINE_ANALYTICS_POSTGRES_HOST
 import com.lemline.runner.common.config.LEMLINE_ANALYTICS_POSTGRES_PASSWORD
 import com.lemline.runner.common.config.LEMLINE_ANALYTICS_POSTGRES_PORT
 import com.lemline.runner.common.config.LEMLINE_ANALYTICS_POSTGRES_SCHEMA
-import com.lemline.runner.common.config.LEMLINE_ANALYTICS_POSTGRES_TABLE
 import com.lemline.runner.common.config.LEMLINE_ANALYTICS_POSTGRES_USERNAME
 import com.lemline.runner.common.test.DockerAvailability
 import io.quarkus.test.common.QuarkusTestResourceLifecycleManager
@@ -35,7 +34,6 @@ class AnalyticsPostgresTestResource : QuarkusTestResourceLifecycleManager {
             LEMLINE_ANALYTICS_POSTGRES_USERNAME to postgres.username,
             LEMLINE_ANALYTICS_POSTGRES_PASSWORD to postgres.password,
             LEMLINE_ANALYTICS_POSTGRES_SCHEMA to "public",
-            LEMLINE_ANALYTICS_POSTGRES_TABLE to "lemline_lifecycle_events"
         )
 
         properties.forEach { (k, v) -> System.setProperty(k, v) }
@@ -50,7 +48,6 @@ class AnalyticsPostgresTestResource : QuarkusTestResourceLifecycleManager {
         System.clearProperty(LEMLINE_ANALYTICS_POSTGRES_USERNAME)
         System.clearProperty(LEMLINE_ANALYTICS_POSTGRES_PASSWORD)
         System.clearProperty(LEMLINE_ANALYTICS_POSTGRES_SCHEMA)
-        System.clearProperty(LEMLINE_ANALYTICS_POSTGRES_TABLE)
 
         if (::postgres.isInitialized) {
             postgres.stop()

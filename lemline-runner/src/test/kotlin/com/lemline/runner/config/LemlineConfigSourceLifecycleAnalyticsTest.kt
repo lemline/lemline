@@ -20,6 +20,9 @@ import com.lemline.runner.common.config.LEMLINE_MESSAGING_RABBITMQ_LIFECYCLE_EVE
 import com.lemline.runner.common.config.LEMLINE_MESSAGING_RABBITMQ_LIFECYCLE_EVENTS_PRODUCER_EXCHANGE_NAME
 import com.lemline.runner.common.config.LEMLINE_MESSAGING_RABBITMQ_LIFECYCLE_EVENTS_QUEUE
 import com.lemline.runner.common.config.LEMLINE_MESSAGING_TYPE
+import com.lemline.runner.common.config.ANALYTICS_TYPE_H2
+import com.lemline.runner.common.config.ANALYTICS_TYPE_POSTGRESQL
+import com.lemline.runner.common.config.LEMLINE_ANALYTICS_TYPE
 import com.lemline.runner.common.messaging.LIFECYCLEEVENTS_IN_CHANNEL
 import com.lemline.runner.config.LemlineConfigConstants.KAFKA_LIFECYCLE_EVENTS_GROUP_ID_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.PGMQ_BATCH_SIZE_DEFAULT
@@ -152,15 +155,14 @@ class LemlineConfigSourceLifecycleAnalyticsTest {
                 LEMLINE_ANALYTICS_BASELINE_ON_MIGRATE to "true"
             )
         ) { source ->
-            assertEquals("postgresql", source.getValue("quarkus.datasource.analytics.db-kind"))
-            assertEquals("true", source.getValue("quarkus.datasource.analytics.active"))
-            assertEquals("analytics_user", source.getValue("quarkus.datasource.analytics.username"))
-            assertEquals("analytics_pass", source.getValue("quarkus.datasource.analytics.password"))
+            assertEquals(ANALYTICS_TYPE_POSTGRESQL, source.getValue(LEMLINE_ANALYTICS_TYPE))
+            assertEquals("analytics_user", source.getValue("quarkus.datasource.analytics-postgresql.username"))
+            assertEquals("analytics_pass", source.getValue("quarkus.datasource.analytics-postgresql.password"))
             assertEquals(
                 "jdbc:postgresql://analytics-db:5544/analytics",
-                source.getValue("quarkus.datasource.analytics.jdbc.url")
+                source.getValue("quarkus.datasource.analytics-postgresql.jdbc.url")
             )
-            assertEquals("true", source.getValue("quarkus.flyway.analytics.baseline-on-migrate"))
+            assertEquals("true", source.getValue("quarkus.flyway.analytics-postgresql.baseline-on-migrate"))
             assertEquals(
                 "smallrye-in-memory",
                 source.getValue("mp.messaging.incoming.$LIFECYCLEEVENTS_IN_CHANNEL.connector")
@@ -171,7 +173,7 @@ class LemlineConfigSourceLifecycleAnalyticsTest {
             )
             assertEquals(
                 "classpath:db/migration/analytics/postgresql",
-                source.getValue("quarkus.flyway.analytics.locations")
+                source.getValue("quarkus.flyway.analytics-postgresql.locations")
             )
         }
 
@@ -182,11 +184,24 @@ class LemlineConfigSourceLifecycleAnalyticsTest {
                 LEMLINE_ANALYTICS_POSTGRES_HOST to "analytics-db"
             )
         ) { source ->
-            assertNull(source.getValue("quarkus.datasource.analytics.active"))
-            assertNull(source.getValue("quarkus.datasource.analytics.jdbc.url"))
-            assertNull(source.getValue("quarkus.flyway.analytics.locations"))
+            assertNull(source.getValue(LEMLINE_ANALYTICS_TYPE))
+            assertNull(source.getValue("quarkus.datasource.analytics-postgresql.jdbc.url"))
+            assertNull(source.getValue("quarkus.flyway.analytics-postgresql.locations"))
             assertNull(source.getValue("mp.messaging.incoming.$LIFECYCLEEVENTS_IN_CHANNEL.connector"))
             assertNull(source.getValue("mp.messaging.incoming.$LIFECYCLEEVENTS_IN_CHANNEL.broadcast"))
+        }
+    }
+
+    @Test
+    fun `selects analytics h2 datasource by default when lifecycle consumer is enabled`() {
+        withSystemProperties(
+            mapOf(
+                LEMLINE_MESSAGING_TYPE to "in-memory",
+                LEMLINE_MESSAGING_LIFECYCLE_EVENTS_CONSUMER_ENABLED to "true"
+            )
+        ) { source ->
+            assertEquals(ANALYTICS_TYPE_H2, source.getValue(LEMLINE_ANALYTICS_TYPE))
+            assertNull(source.getValue("quarkus.datasource.analytics-postgresql.jdbc.url"))
         }
     }
 
@@ -203,13 +218,14 @@ class LemlineConfigSourceLifecycleAnalyticsTest {
                 legacyBaselineKey to "true"
             )
         ) { source ->
-            val jdbcUrl = source.getValue("quarkus.datasource.analytics.jdbc.url")
+            assertEquals(ANALYTICS_TYPE_POSTGRESQL, source.getValue(LEMLINE_ANALYTICS_TYPE))
+            val jdbcUrl = source.getValue("quarkus.datasource.analytics-postgresql.jdbc.url")
             assertTrue(
                 jdbcUrl.startsWith("jdbc:postgresql://analytics-db:"),
                 "Expected analytics JDBC URL to use overridden host, but was: $jdbcUrl"
             )
-            assertNull(source.getValue("quarkus.flyway.analytics.migrate-at-start"))
-            assertEquals("false", source.getValue("quarkus.flyway.analytics.baseline-on-migrate"))
+            assertNull(source.getValue("quarkus.flyway.analytics-postgresql.migrate-at-start"))
+            assertEquals("false", source.getValue("quarkus.flyway.analytics-postgresql.baseline-on-migrate"))
         }
     }
 
@@ -217,19 +233,23 @@ class LemlineConfigSourceLifecycleAnalyticsTest {
         overrides: Map<String, String>,
         block: (LemlineConfigSource) -> Unit
     ) {
-        val previousValues = overrides.mapValues { System.getProperty(it.key) }
+        val previousLemlineValues = System.getProperties().stringPropertyNames()
+            .filter { it.startsWith("lemline.") }
+            .associateWith { System.getProperty(it) }
         val previousConfigPath = ConfigPathHolder.configPath
 
         try {
             ConfigPathHolder.configPath = null
+            previousLemlineValues.keys.forEach { System.clearProperty(it) }
             overrides.forEach { (key, value) -> System.setProperty(key, value) }
             block(LemlineConfigSource())
         } finally {
-            overrides.keys.forEach { key ->
-                val previous = previousValues[key]
-                if (previous == null) {
-                    System.clearProperty(key)
-                } else {
+            System.getProperties().stringPropertyNames()
+                .filter { it.startsWith("lemline.") }
+                .forEach { System.clearProperty(it) }
+
+            previousLemlineValues.forEach { (key, previous) ->
+                if (previous != null) {
                     System.setProperty(key, previous)
                 }
             }

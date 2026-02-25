@@ -8,7 +8,6 @@ import com.lemline.runner.common.config.LEMLINE_MESSAGING_LIFECYCLE_EVENTS_CONSU
 import com.lemline.runner.common.config.LEMLINE_MESSAGING_LIFECYCLE_EVENTS_PRODUCER_ENABLED
 import com.lemline.runner.common.config.LEMLINE_OUTBOX_ENABLED
 import com.lemline.runner.common.config.LEMLINE_SCHEDULED_ENABLED
-import com.lemline.runner.tests.resources.AnalyticsPostgresTestResource
 import io.quarkus.test.junit.QuarkusTestProfile
 
 class InMemoryAnalyticsProfile : QuarkusTestProfile {
@@ -23,13 +22,11 @@ class InMemoryAnalyticsProfile : QuarkusTestProfile {
             LEMLINE_ANALYTICS_BASELINE_ON_MIGRATE to "false",
             LEMLINE_OUTBOX_ENABLED to "false",
             LEMLINE_SCHEDULED_ENABLED to "false"
-        )
+        ) + AnalyticsH2TestProfileSupport.overrides("lemline_analytics_inmemory")
     }
 
     override fun testResources(): List<QuarkusTestProfile.TestResourceEntry> {
-        return base.testResources() + listOf(
-            QuarkusTestProfile.TestResourceEntry(AnalyticsPostgresTestResource::class.java)
-        )
+        return base.testResources()
     }
 
     override fun tags(): Set<String> {

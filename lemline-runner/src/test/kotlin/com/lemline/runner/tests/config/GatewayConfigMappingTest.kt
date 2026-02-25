@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.tests.config
 
-import com.lemline.runner.common.config.ANALYTICS_BACKEND_CLICKHOUSE
+import com.lemline.runner.common.config.ANALYTICS_TYPE_H2
 import com.lemline.runner.config.LemlineConfiguration
 import com.lemline.runner.tests.profiles.GatewayConfigMappingProfile
 import io.quarkus.test.junit.QuarkusTest
@@ -48,6 +48,6 @@ class GatewayConfigMappingTest {
     @Test
     fun `analytics type key is mapped`() {
         val analytics = config.analytics().orElseThrow()
-        assertEquals(ANALYTICS_BACKEND_CLICKHOUSE, analytics.type())
+        assertEquals(ANALYTICS_TYPE_H2, analytics.type())
     }
 }

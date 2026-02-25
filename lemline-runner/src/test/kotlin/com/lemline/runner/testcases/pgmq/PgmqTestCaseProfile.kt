@@ -23,7 +23,7 @@ import com.lemline.runner.common.config.LEMLINE_OUTBOX_SCHEDULE_OUTBOX_INITIAL_J
 import com.lemline.runner.common.config.LEMLINE_OUTBOX_WAIT_OUTBOX_EVERY
 import com.lemline.runner.common.config.LEMLINE_OUTBOX_WAIT_OUTBOX_INITIAL_JITTER
 import com.lemline.runner.common.config.MessagingType
-import com.lemline.runner.tests.resources.AnalyticsPostgresTestResource
+import com.lemline.runner.tests.profiles.AnalyticsH2TestProfileSupport
 import com.lemline.runner.tests.resources.PgmqTestResource
 import io.quarkus.test.junit.QuarkusTestProfile
 
@@ -109,13 +109,12 @@ class PgmqTestCaseProfile : QuarkusTestProfile {
             LEMLINE_OUTBOX_SCHEDULE_OUTBOX_INITIAL_JITTER to "0s",
             LEMLINE_OUTBOX_LISTENER_OUTBOX_EVERY to "1s",
             LEMLINE_OUTBOX_LISTENER_OUTBOX_INITIAL_JITTER to "0s"
-        )
+        ) + AnalyticsH2TestProfileSupport.overrides("lemline_analytics_pgmq_testcase")
     }
 
     override fun testResources(): List<QuarkusTestProfile.TestResourceEntry> {
         return listOf(
-            QuarkusTestProfile.TestResourceEntry(PgmqTestResource::class.java),
-            QuarkusTestProfile.TestResourceEntry(AnalyticsPostgresTestResource::class.java)
+            QuarkusTestProfile.TestResourceEntry(PgmqTestResource::class.java)
         )
     }
 

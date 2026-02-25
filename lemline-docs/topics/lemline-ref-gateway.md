@@ -228,18 +228,17 @@ For mTLS in production, set `lemline.gateway.tls.client-auth` to `required` and 
 
 | Property | Default | Description |
 |---|---|---|
-| `lemline.analytics.type` | `postgresql` | Analytics type selector |
+| `lemline.analytics.type` | `h2` | Analytics type selector |
 | `lemline.analytics.postgresql.host` | `localhost` | PostgreSQL host |
 | `lemline.analytics.postgresql.port` | `5432` | PostgreSQL port |
 | `lemline.analytics.postgresql.database` | `lemline_analytics` | Database name |
 | `lemline.analytics.postgresql.username` | `postgres` | Database user |
 | `lemline.analytics.postgresql.password` | `postgres` | Database password |
 | `lemline.analytics.postgresql.schema` | `public` | Lifecycle events schema |
-| `lemline.analytics.postgresql.table` | `lemline_lifecycle_events` | Lifecycle events table |
 | `lemline.analytics.migrate-at-start` | `true` | Analytics migration toggle |
 | `lemline.analytics.baseline-on-migrate` | `false` | Flyway baseline toggle |
 
-`clickhouse` is a reserved backend value for future support. Current gateway implementation supports replay/tail with PostgreSQL only.
+Current gateway implementation supports replay/tail with `h2` and `postgresql` analytics backends.
 
 ## Build and Run
 

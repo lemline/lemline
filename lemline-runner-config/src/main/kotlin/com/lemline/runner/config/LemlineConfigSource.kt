@@ -2,11 +2,10 @@
 package com.lemline.runner.config
 
 import com.lemline.common.logger.logger
-import com.lemline.runner.common.config.ANALYTICS_BACKEND_CLICKHOUSE
-import com.lemline.runner.common.config.ANALYTICS_BACKEND_POSTGRESQL
-import com.lemline.runner.common.config.ANALYTICS_TYPE_DEFAULT
+import com.lemline.runner.common.config.AnalyticsType
 import com.lemline.runner.common.config.DatabaseType
 import com.lemline.runner.common.config.LEMLINE_ANALYTICS_BASELINE_ON_MIGRATE
+import com.lemline.runner.common.config.LEMLINE_ANALYTICS_POSTGRES
 import com.lemline.runner.common.config.LEMLINE_ANALYTICS_POSTGRES_DATABASE
 import com.lemline.runner.common.config.LEMLINE_ANALYTICS_POSTGRES_HOST
 import com.lemline.runner.common.config.LEMLINE_ANALYTICS_POSTGRES_PASSWORD
@@ -208,7 +207,6 @@ import com.lemline.runner.config.LemlineConfigConstants.RABBITMQ_VHOST_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.WORKFLOW_COMMANDS_TOPIC_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.WORKFLOW_EVENTS_TOPIC_DEFAULT
 import io.smallrye.config.PropertiesConfigSource
-import java.util.*
 
 internal const val COMMANDS_IN_CHANNEL = "commands-in"
 internal const val COMMANDS_OUT_CHANNEL = "commands-out"
@@ -258,11 +256,8 @@ class LemlineConfigSource : PropertiesConfigSource(
 ) {
     companion object {
         private val logger = logger()
-
-        private enum class GatewayAnalyticsBackend {
-            POSTGRESQL,
-            CLICKHOUSE,
-        }
+        private const val ANALYTICS_H2_DATASOURCE_NAME = "analytics"
+        private const val ANALYTICS_POSTGRES_DATASOURCE_NAME = "analytics-postgresql"
 
         private fun buildProperties(): Map<String, String> {
             val lemlineProps = mutableMapOf<String, String>()
@@ -374,17 +369,21 @@ class LemlineConfigSource : PropertiesConfigSource(
         }
 
         private fun generateAnalyticsDatabaseProperties(props: Map<String, String>): Map<String, String> {
+            val generated = mutableMapOf<String, String>()
             val lifecycleConsumerEnabled = props[LEMLINE_MESSAGING_LIFECYCLE_EVENTS_CONSUMER_ENABLED].toBoolean()
             val gatewayEnabled = props[LEMLINE_GATEWAY_ENABLED]?.toBooleanStrictOrNull()
                 ?: GATEWAY_ENABLED_DEFAULT.toBoolean()
-            val gatewayAnalyticsBackend = resolveGatewayAnalyticsBackend(props, gatewayEnabled)
 
-            val needsAnalyticsDatasource = lifecycleConsumerEnabled ||
-                (gatewayEnabled && gatewayAnalyticsBackend == GatewayAnalyticsBackend.POSTGRESQL)
-
+            val needsAnalyticsDatasource = lifecycleConsumerEnabled || gatewayEnabled
             if (!needsAnalyticsDatasource) return emptyMap()
 
-            val generated = mutableMapOf<String, String>()
+            val hasPostgresqlProps = props.keys.any { it.startsWith("$LEMLINE_ANALYTICS_POSTGRES.") }
+            val type = props[LEMLINE_ANALYTICS_TYPE]?.let { AnalyticsType.fromConfigValue(it) } ?: run {
+                if (hasPostgresqlProps) AnalyticsType.POSTGRESQL else AnalyticsType.H2
+            }
+            generated[LEMLINE_ANALYTICS_TYPE] = type.configValue
+
+            if (type == AnalyticsType.H2) return generated
 
             val host = props[LEMLINE_ANALYTICS_POSTGRES_HOST] ?: POSTGRES_HOST_DEFAULT
             val port = props[LEMLINE_ANALYTICS_POSTGRES_PORT] ?: POSTGRES_PORT_DEFAULT
@@ -393,33 +392,16 @@ class LemlineConfigSource : PropertiesConfigSource(
             val password = props[LEMLINE_ANALYTICS_POSTGRES_PASSWORD] ?: POSTGRES_PASSWORD_DEFAULT
             val baselineOnMigrate = props[LEMLINE_ANALYTICS_BASELINE_ON_MIGRATE]
                 ?: ANALYTICS_POSTGRES_BASELINE_ON_MIGRATE_DEFAULT
+            val datasource = "quarkus.datasource.$ANALYTICS_POSTGRES_DATASOURCE_NAME"
+            val flyway = "quarkus.flyway.$ANALYTICS_POSTGRES_DATASOURCE_NAME"
 
-            generated["quarkus.datasource.analytics.db-kind"] = "postgresql"
-            generated["quarkus.datasource.analytics.active"] = "true"
-            generated["quarkus.datasource.analytics.username"] = username
-            generated["quarkus.datasource.analytics.password"] = password
-            generated["quarkus.datasource.analytics.jdbc.url"] = "jdbc:postgresql://$host:$port/$database"
-            generated["quarkus.flyway.analytics.baseline-on-migrate"] = baselineOnMigrate
-            generated["quarkus.flyway.analytics.locations"] = "classpath:db/migration/analytics/postgresql"
+            generated["$datasource.username"] = username
+            generated["$datasource.password"] = password
+            generated["$datasource.jdbc.url"] = "jdbc:postgresql://$host:$port/$database"
+            generated["$flyway.baseline-on-migrate"] = baselineOnMigrate
+            generated["$flyway.locations"] = "classpath:db/migration/analytics/postgresql"
 
             return generated
-        }
-
-        private fun resolveGatewayAnalyticsBackend(
-            props: Map<String, String>,
-            gatewayEnabled: Boolean
-        ): GatewayAnalyticsBackend? {
-            if (!gatewayEnabled) return null
-
-            val rawType = props[LEMLINE_ANALYTICS_TYPE] ?: ANALYTICS_TYPE_DEFAULT
-            return when (rawType.trim().lowercase(Locale.ROOT)) {
-                ANALYTICS_BACKEND_POSTGRESQL -> GatewayAnalyticsBackend.POSTGRESQL
-                ANALYTICS_BACKEND_CLICKHOUSE -> GatewayAnalyticsBackend.CLICKHOUSE
-                else -> throw IllegalStateException(
-                    "Unsupported analytics type '$rawType'. Supported values: " +
-                        "'$ANALYTICS_BACKEND_POSTGRESQL', '$ANALYTICS_BACKEND_CLICKHOUSE'."
-                )
-            }
         }
 
         private fun generateGatewayProperties(props: Map<String, String>): Map<String, String> {

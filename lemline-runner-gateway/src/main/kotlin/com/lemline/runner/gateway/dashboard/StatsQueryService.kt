@@ -2,14 +2,13 @@
 package com.lemline.runner.gateway.dashboard
 
 import com.lemline.core.lifecycleevents.LifecycleEventType
-import com.lemline.runner.common.config.LEMLINE_ANALYTICS_POSTGRES
+import com.lemline.runner.gateway.analytics.AnalyticsDataSourceProvider
+import com.lemline.runner.common.config.ANALYTICS_LIFECYCLE_EVENTS_TABLE
+import com.lemline.runner.common.config.AnalyticsType
 import com.lemline.runner.config.LemlineConfiguration
 import com.lemline.runner.config.analyticsSchemaResolved
-import com.lemline.runner.config.analyticsTableResolved
-import io.agroal.api.AgroalDataSource
-import io.quarkus.agroal.DataSource
+import com.lemline.runner.config.analyticsTypeResolved
 import jakarta.enterprise.context.ApplicationScoped
-import jakarta.enterprise.inject.Instance
 import jakarta.inject.Inject
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -20,11 +19,14 @@ class StatsQueryService(
 ) {
 
     @Inject
-    @DataSource("analytics")
-    lateinit var analyticsDataSource: Instance<AgroalDataSource>
+    lateinit var analyticsDataSourceProvider: AnalyticsDataSourceProvider
 
     private val analyticsQualifiedTable =
-        DashboardSqlSupport.qualifiedTable(config.analyticsSchemaResolved, config.analyticsTableResolved)
+        DashboardSqlSupport.qualifiedAnalyticsTable(
+            analyticsType = AnalyticsType.fromConfigValue(config.analyticsTypeResolved),
+            schema = config.analyticsSchemaResolved,
+            table = ANALYTICS_LIFECYCLE_EVENTS_TABLE
+        )
 
     suspend fun queryStats(filter: StatsQueryFilter): List<DefinitionStatsRow> = withContext(Dispatchers.IO) {
         val where = mutableListOf<String>()
@@ -67,7 +69,7 @@ class StatsQueryService(
             ORDER BY lemline_workflow_namespace, lemline_workflow_name, lemline_workflow_version DESC
         """.trimIndent()
 
-        requireAnalyticsDataSource().connection.use { conn ->
+        analyticsDataSourceProvider.require().connection.use { conn ->
             conn.prepareStatement(sql).use { stmt ->
                 params.forEachIndexed { index, value ->
                     stmt.setDashboardObject(index + 1, value)
@@ -96,10 +98,4 @@ class StatsQueryService(
         }
     }
 
-    private fun requireAnalyticsDataSource(): AgroalDataSource {
-        if (analyticsDataSource.isResolvable) return analyticsDataSource.get()
-        throw IllegalStateException(
-            "Analytics datasource 'analytics' is not available. Configure $LEMLINE_ANALYTICS_POSTGRES.*"
-        )
-    }
 }

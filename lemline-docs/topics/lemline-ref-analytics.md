@@ -48,7 +48,6 @@ lemline:
       username: postgres
       password: postgres
       schema: public
-      table: lemline_lifecycle_events
 ```
 
 ## Configuration Keys
@@ -65,7 +64,6 @@ lemline:
 | `lemline.analytics.postgresql.username` | `postgres` | Analytics PostgreSQL username |
 | `lemline.analytics.postgresql.password` | `postgres` | Analytics PostgreSQL password |
 | `lemline.analytics.postgresql.schema` | `public` | Target schema for lifecycle analytics table |
-| `lemline.analytics.postgresql.table` | `lemline_lifecycle_events` | Target table for lifecycle analytics rows |
 | `lemline.messaging.lifecycleevents.producer.enabled` | `false` | Enables emitting lifecycle events into the messaging layer |
 
 ## Analytics Table Shape

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.gateway.dashboard
 
+import com.lemline.runner.common.config.AnalyticsType
 import java.sql.PreparedStatement
 import java.sql.ResultSet
 import java.sql.Timestamp
@@ -23,6 +24,20 @@ internal object DashboardSqlSupport {
         val validatedSchema = validateIdentifier("schema", schema)
         val validatedTable = validateIdentifier("table", table)
         return "\"$validatedSchema\".\"$validatedTable\""
+    }
+
+    fun qualifiedAnalyticsTable(
+        analyticsType: AnalyticsType,
+        schema: String,
+        table: String
+    ): String = when (analyticsType) {
+        AnalyticsType.POSTGRESQL -> qualifiedTable(schema, table)
+        AnalyticsType.H2 -> quotedIdentifier("table", table)
+    }
+
+    private fun quotedIdentifier(kind: String, value: String): String {
+        val validatedValue = validateIdentifier(kind, value)
+        return "\"$validatedValue\""
     }
 }
 

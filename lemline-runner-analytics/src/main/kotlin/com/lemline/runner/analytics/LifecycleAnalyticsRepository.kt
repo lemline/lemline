@@ -2,40 +2,39 @@
 package com.lemline.runner.analytics
 
 import com.lemline.runner.analytics.config.AnalyticsConfigConstants.ANALYTICS_POSTGRES_SCHEMA_DEFAULT
-import com.lemline.runner.analytics.config.AnalyticsConfigConstants.ANALYTICS_POSTGRES_TABLE_DEFAULT
-import com.lemline.runner.common.config.LEMLINE_MESSAGING_LIFECYCLE_EVENTS_CONSUMER_ENABLED
-import com.lemline.runner.common.config.LEMLINE_ANALYTICS_POSTGRES
+import com.lemline.runner.common.config.AnalyticsConfig
+import com.lemline.runner.common.config.AnalyticsType
+import com.lemline.runner.common.config.ANALYTICS_LIFECYCLE_EVENTS_TABLE
 import com.lemline.runner.common.config.LEMLINE_ANALYTICS_POSTGRES_SCHEMA
-import com.lemline.runner.common.config.LEMLINE_ANALYTICS_POSTGRES_TABLE
-import io.agroal.api.AgroalDataSource
-import io.quarkus.agroal.DataSource
 import jakarta.enterprise.context.ApplicationScoped
-import jakarta.enterprise.inject.Instance
 import jakarta.inject.Inject
 import java.sql.PreparedStatement
 import java.sql.Types
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import org.eclipse.microprofile.config.inject.ConfigProperty
 
 @ApplicationScoped
 class LifecycleAnalyticsRepository(
     @ConfigProperty(name = LEMLINE_ANALYTICS_POSTGRES_SCHEMA, defaultValue = ANALYTICS_POSTGRES_SCHEMA_DEFAULT)
     schema: String,
-    @ConfigProperty(name = LEMLINE_ANALYTICS_POSTGRES_TABLE, defaultValue = ANALYTICS_POSTGRES_TABLE_DEFAULT)
-    table: String,
 ) {
     @Inject
-    @DataSource("analytics")
-    internal lateinit var analyticsDataSource: Instance<AgroalDataSource>
+    private lateinit var analyticsConfig: AnalyticsConfig
 
     private val validatedSchema = validateIdentifier("schema", schema)
-    private val validatedTable = validateIdentifier("table", table)
+    private val validatedTable = validateIdentifier("table", ANALYTICS_LIFECYCLE_EVENTS_TABLE)
+    private val qualifiedTable: String by lazy {
+        val quotedTable = quoteIdentifier(validatedTable)
 
-    private val qualifiedTable = "${quoteIdentifier(validatedSchema)}.${quoteIdentifier(validatedTable)}"
+        when (analyticsConfig.analyticsType) {
+            AnalyticsType.POSTGRESQL -> "${quoteIdentifier(validatedSchema)}.$quotedTable"
+            AnalyticsType.H2 -> quotedTable
+        }
+    }
 
-    private val insertSql = """
-        INSERT INTO $qualifiedTable (
+    private val insertSql: String by lazy {
+        analyticsConfig.insertIgnoreInto(
+            tableName = qualifiedTable,
+            columns = """
             event_id,
             source,
             type,
@@ -49,46 +48,38 @@ class LifecycleAnalyticsRepository(
             lemline_workflow_name,
             lemline_workflow_version,
             payload
+            """.trimIndent(),
+            values = "?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ${payloadValueExpression()}"
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CAST(? AS JSONB))
-        ON CONFLICT (source, event_id) DO NOTHING
-    """.trimIndent()
+    }
 
-    suspend fun insert(row: LifecycleAnalyticsModel): IngestResult = withContext(Dispatchers.IO) {
-        val dataSource = requireAnalyticsDataSource()
+    suspend fun insert(row: LifecycleAnalyticsModel): IngestResult = analyticsConfig.withConnection { conn ->
+        conn.prepareStatement(insertSql).use { stmt ->
+            stmt.setString(1, row.eventId)
+            stmt.setString(2, row.source)
+            stmt.setString(3, row.type)
+            stmt.setString(4, row.specVersion)
+            stmt.setNullableString(5, row.subject)
+            stmt.setNullableOffsetDateTime(6, row.eventTime)
+            stmt.setNullableString(7, row.dataContentType)
+            stmt.setNullableString(8, row.dataSchema)
+            stmt.setNullableUuid(9, row.workflowId)
+            stmt.setNullableString(10, row.workflowNamespace)
+            stmt.setNullableString(11, row.workflowName)
+            stmt.setNullableString(12, row.workflowVersion)
+            stmt.setString(13, row.payload)
 
-        dataSource.connection.use { conn ->
-            conn.prepareStatement(insertSql).use { stmt ->
-                stmt.setString(1, row.eventId)
-                stmt.setString(2, row.source)
-                stmt.setString(3, row.type)
-                stmt.setString(4, row.specVersion)
-                stmt.setNullableString(5, row.subject)
-                stmt.setNullableOffsetDateTime(6, row.eventTime)
-                stmt.setNullableString(7, row.dataContentType)
-                stmt.setNullableString(8, row.dataSchema)
-                stmt.setNullableUuid(9, row.workflowId)
-                stmt.setNullableString(10, row.workflowNamespace)
-                stmt.setNullableString(11, row.workflowName)
-                stmt.setNullableString(12, row.workflowVersion)
-                stmt.setString(13, row.payload)
-
-                if (stmt.executeUpdate() == 1) {
-                    IngestResult.INSERTED
-                } else {
-                    IngestResult.DUPLICATE
-                }
+            if (stmt.executeUpdate() == 1) {
+                IngestResult.INSERTED
+            } else {
+                IngestResult.DUPLICATE
             }
         }
     }
 
-    private fun requireAnalyticsDataSource(): AgroalDataSource {
-        if (analyticsDataSource.isResolvable) return analyticsDataSource.get()
-
-        throw IllegalStateException(
-            "Analytics datasource 'analytics' is not available. " +
-                "Enable '$LEMLINE_MESSAGING_LIFECYCLE_EVENTS_CONSUMER_ENABLED' and configure $LEMLINE_ANALYTICS_POSTGRES.*"
-        )
+    private fun payloadValueExpression(): String = when (analyticsConfig.analyticsType) {
+        AnalyticsType.POSTGRESQL -> "CAST(? AS JSONB)"
+        AnalyticsType.H2 -> "?"
     }
 
     private fun validateIdentifier(kind: String, value: String): String {

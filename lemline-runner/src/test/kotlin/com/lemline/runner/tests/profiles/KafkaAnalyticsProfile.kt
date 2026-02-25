@@ -19,7 +19,6 @@ import com.lemline.runner.common.config.LEMLINE_MESSAGING_TYPE
 import com.lemline.runner.common.config.LEMLINE_OUTBOX_ENABLED
 import com.lemline.runner.common.config.LEMLINE_SCHEDULED_ENABLED
 import com.lemline.runner.common.config.MessagingType
-import com.lemline.runner.tests.resources.AnalyticsPostgresTestResource
 import com.lemline.runner.tests.resources.KafkaTestResource
 import io.quarkus.test.junit.QuarkusTestProfile
 
@@ -44,13 +43,12 @@ class KafkaAnalyticsProfile : QuarkusTestProfile {
             LEMLINE_ANALYTICS_BASELINE_ON_MIGRATE to "false",
             LEMLINE_OUTBOX_ENABLED to "false",
             LEMLINE_SCHEDULED_ENABLED to "false"
-        )
+        ) + AnalyticsH2TestProfileSupport.overrides("lemline_analytics_kafka")
     }
 
     override fun testResources(): List<QuarkusTestProfile.TestResourceEntry> {
         return listOf(
-            QuarkusTestProfile.TestResourceEntry(KafkaTestResource::class.java),
-            QuarkusTestProfile.TestResourceEntry(AnalyticsPostgresTestResource::class.java)
+            QuarkusTestProfile.TestResourceEntry(KafkaTestResource::class.java)
         )
     }
 

@@ -34,6 +34,6 @@ internal class AnalyticsMigration(
         if (!lifecycleConsumerEnabled || !migrateAtStart) return
 
         analyticsManager.flyway.migrate()
-        logger.info { "Flyway migrations applied successfully on analytics PostgreSQL database." }
+        logger.info { "Flyway migrations applied successfully on selected analytics datasource." }
     }
 }
