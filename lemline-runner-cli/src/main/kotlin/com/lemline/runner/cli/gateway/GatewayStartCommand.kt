@@ -21,8 +21,11 @@ class GatewayStartCommand : Runnable {
     @Mixin
     lateinit var mixin: GlobalMixin
 
-    @Option(names = ["-p", "--port"], description = ["The gRPC port to use (overrides config)"])
-    var port: Int? = null
+    @Option(names = ["-g", "--grpc-port"], description = ["The gRPC port to use (overrides config)"])
+    var grpcPort: Int? = null
+
+    @Option(names = ["-m", "--metrics-port"], description = ["The metrics endpoint port to use (overrides config)"])
+    var metricsPort: Int? = null
 
     val logger = logger()
 

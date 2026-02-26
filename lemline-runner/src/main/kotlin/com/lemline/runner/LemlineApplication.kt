@@ -110,6 +110,7 @@ class LemlineApplication : QuarkusApplication {
                     disableMetricsEndpoint()
                     disableMessaging()
                     disableDatabase()
+                    disableScheduled()
                 } else {
                     // the gateway start command, if any
                     val gatewayStart = parseResults.command<GatewayStartCommand>()
@@ -117,30 +118,29 @@ class LemlineApplication : QuarkusApplication {
                     // The listen command, if any
                     val listen = parseResults.command<ListenCommand>()
 
+                    // the instance start command, if any
+                    val instanceStart = parseResults.command<InstanceStartCommand>()
+
                     if (listen == null && gatewayStart == null) {
                         disableMetricsEndpoint()
-                    }
-
-                    if (listen == null) {
                         disableMessaging()
                         disableScheduled()
                         if (isConfigCreate) disableDatabase()
-                    } else {
-                        listen.port?.let { setMetricsEndpointPort(it) }
-                        enableMessaging()
                     }
 
-                    // the instance start command, if any
-                    val start = parseResults.command<InstanceStartCommand>()
-                    if (start != null) {
+                    if (listen != null) {
+                        listen.metricsPort?.let { setMetricsPort(it) }
+                        enableListening()
+                    }
+
+                    if (instanceStart != null) {
                         System.setProperty(LEMLINE_MESSAGING_COMMANDS_PRODUCER_ENABLED, "true")
                     }
 
                     if (gatewayStart != null) {
+                        gatewayStart.grpcPort?.let { setGrpcPort(it) }
+                        gatewayStart.metricsPort?.let { setMetricsPort(it) }
                         enableGateway()
-                        gatewayStart.port?.let {
-                            System.setProperty(LEMLINE_GATEWAY_GRPC_PORT, it.toString())
-                        }
                     }
                 }
             } catch (ex: Exception) {
@@ -278,9 +278,13 @@ private fun checkConfigLocation(filePath: Path, provided: Boolean): Boolean {
     return false
 }
 
-private fun setMetricsEndpointPort(port: Int) {
+private fun setGrpcPort(port: Int) {
+    System.setProperty(LEMLINE_GATEWAY_GRPC_PORT, port.toString())
+}
+
+private fun setMetricsPort(port: Int) {
     System.setProperty("quarkus.http.port", port.toString())
-    System.setProperty("quarkus.http.ssl-port", port.toString())
+    System.setProperty("quarkus.http.ssl-port", "0")
 }
 
 private fun disableMetricsEndpoint() {
@@ -290,7 +294,7 @@ private fun disableMetricsEndpoint() {
     System.setProperty("quarkus.micrometer.export.prometheus.enabled", "false")
 }
 
-private fun enableMessaging() {
+private fun enableListening() {
     System.setProperty(LEMLINE_MESSAGING_COMMANDS_CONSUMER_ENABLED, "true")
     System.setProperty(LEMLINE_MESSAGING_COMMANDS_PRODUCER_ENABLED, "true")
     System.setProperty(LEMLINE_MESSAGING_EVENTS_CONSUMER_ENABLED, "true")
@@ -324,7 +328,6 @@ private fun enableGateway() {
     System.setProperty(LEMLINE_GATEWAY_ENABLED, "true")
     System.setProperty(LEMLINE_DATABASE_ENABLED, "true")
     System.setProperty(LEMLINE_SCHEDULED_ENABLED, "false")
-    System.setProperty("quarkus.smallrye-health.enabled", "true")
 
     System.setProperty(LEMLINE_MESSAGING_COMMANDS_PRODUCER_ENABLED, "true")
     System.setProperty(LEMLINE_MESSAGING_COMMANDS_CONSUMER_ENABLED, "false")

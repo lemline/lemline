@@ -35,16 +35,16 @@ lemline [global-options] <command> [command-options]
 Starts the workflow and database message consumers. This is the main runtime mode.
 
 ```bash
-lemline listen [--port <port>]
+lemline listen [--metrics-port <port>]
 ```
 
-| Option       | Description                           |
-|--------------|---------------------------------------|
-| `-p, --port` | Metrics endpoint port (default: 8080) |
+| Option                | Description                              |
+|-----------------------|------------------------------------------|
+| `-m, --metrics-port`  | Metrics endpoint port (default: 8080)    |
 
 **Key file**: [ListenCommand.kt](../src/main/kotlin/com/lemline/runner/cli/ListenCommand.kt)
 
-**Example:** `lemline listen --info --port 9090`
+**Example:** `lemline listen --info --metrics-port 9090`
 
 ---
 
@@ -109,6 +109,27 @@ lemline definition post <file>
 ```bash
 lemline definition delete <namespace> <name> <version>
 ```
+
+---
+
+### `gateway`
+
+Manage the gRPC gateway server.
+
+**Key files**: [cli/gateway/](../src/main/kotlin/com/lemline/runner/cli/gateway/)
+
+#### Start Gateway
+
+```bash
+lemline gateway start [--grpc-port <port>] [--metrics-port <port>]
+```
+
+| Option                | Description                              |
+|-----------------------|------------------------------------------|
+| `-g, --grpc-port`     | gRPC port (overrides config)             |
+| `-m, --metrics-port`  | Metrics endpoint port (default: 8080)    |
+
+**Example:** `lemline gateway start --grpc-port 9090 --metrics-port 8081`
 
 ---
 

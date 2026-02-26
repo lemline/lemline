@@ -23,8 +23,8 @@ class ListenCommand : Runnable {
     @Mixin
     lateinit var mixin: GlobalMixin
 
-    @CommandLine.Option(names = ["-p", "--port"], description = ["The metrics port to use"])
-    var port: Int? = null
+    @CommandLine.Option(names = ["-m", "--metrics-port"], description = ["The metrics endpoint port to use"])
+    var metricsPort: Int? = null
 
     @CommandLine.Option(
         names = ["--mock-config"],

@@ -94,10 +94,14 @@ Run:
 java -jar lemline-runner/build/quarkus-app/quarkus-run.jar --config=/absolute/path/.lemline.yaml gateway start
 ```
 
-Optional port override:
+Optional port overrides:
 
 ```bash
-java -jar lemline-runner/build/quarkus-app/quarkus-run.jar --config=/absolute/path/.lemline.yaml gateway start --port 9443
+# Override gRPC port
+java -jar lemline-runner/build/quarkus-app/quarkus-run.jar --config=/absolute/path/.lemline.yaml gateway start --grpc-port 9443
+
+# Override metrics endpoint port
+java -jar lemline-runner/build/quarkus-app/quarkus-run.jar --config=/absolute/path/.lemline.yaml gateway start --metrics-port 8081
 ```
 
 ## Start the gateway (Native)

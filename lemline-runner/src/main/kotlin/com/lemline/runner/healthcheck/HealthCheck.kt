@@ -15,9 +15,9 @@ object RetryReadiness : HealthCheck {
 
     override fun call(): HealthCheckResponse =
         if (readinessDownDuringRetries.get())
-            HealthCheckResponse.down("orders-readiness")
+            HealthCheckResponse.down("worker-readiness")
         else
-            HealthCheckResponse.up("orders-readiness")
+            HealthCheckResponse.up("worker-readiness")
 }
 
 @Liveness
@@ -26,7 +26,7 @@ object FatalAckLiveness : HealthCheck {
 
     override fun call(): HealthCheckResponse =
         if (livenessDownOnFailure.get())
-            HealthCheckResponse.down("orders-liveness")
+            HealthCheckResponse.down("worker-liveness")
         else
-            HealthCheckResponse.up("orders-liveness")
+            HealthCheckResponse.up("worker-liveness")
 }

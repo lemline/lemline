@@ -34,14 +34,14 @@ services:
         condition: service_completed_successfully
       seed-definitions:
         condition: service_completed_successfully
-    command: ["--config=/config/lemline.yaml", "listen"]
+    command: ["--config=/config/lemline.yaml", "listen", "--metrics-port", "9445"]
     volumes:
       - ./config/lemline.yaml:/config/lemline.yaml:ro
       - ../../lemline-runner/src/test/resources/examples:/workflows:ro
     ports:
-      - "8080:8080"
+      - "9445:9445"
     healthcheck:
-      test: ["CMD", "bash", "-c", "echo > /dev/tcp/localhost/8080"]
+      test: ["CMD", "bash", "-c", "echo > /dev/tcp/localhost/9445"]
       interval: 5s
       timeout: 5s
       retries: 20
@@ -53,23 +53,30 @@ services:
     depends_on:
       worker:
         condition: service_healthy
-    command: ["--config=/config/lemline.yaml", "gateway", "start"]
+    command: ["--config=/config/lemline.yaml", "gateway", "start", "--grpc-port", "9443", "--metrics-port", "9444"]
     volumes:
       - ./config/lemline.yaml:/config/lemline.yaml:ro
       - ./certs:/config/certs:ro
     ports:
       - "9443:9443"
+      - "9444:9444"
+    healthcheck:
+      test: ["CMD", "bash", "-c", "echo > /dev/tcp/localhost/9444"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 15s
 
   grpc-web-proxy:
     image: envoyproxy/envoy:v1.31-latest
     depends_on:
       gateway:
-        condition: service_started
+        condition: service_healthy
     command: ["-c", "/etc/envoy/envoy.yaml", "--log-level", "warning"]
     volumes:
       - ./grpc-web-proxy/envoy.yaml:/etc/envoy/envoy.yaml:ro
     ports:
-      - "18080:8080"
+      - "9446:8080"
 
   seed-definitions:
     image: lemline-runner-e2e:local
