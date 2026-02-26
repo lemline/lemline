@@ -58,10 +58,12 @@ docker compose -f docker/e2e/docker-compose.yml restart gateway
 
 ```bash
 curl -v --http2 https://localhost:9443/q/health
+# Or via HTTP metrics port:
+curl http://localhost:9444/q/health/ready
 ```
 
 Expected: TLS certificate verify is OK and ALPN negotiates `h2`.  
-Note: `/q/health` may still return `404` depending on health endpoint configuration.
+Note: `/q/health` over gRPC TLS port may return `404`; use the metrics port (`9444`) for health checks.
 
 4. Fully quit and reopen your browser after `mkcert -install` (especially Safari).
 
@@ -91,8 +93,10 @@ docker compose -f docker/e2e/docker-compose.yml ps
 ## Endpoints
 
 - Dashboard: http://localhost:5173
-- gRPC-Web proxy (used by dashboard): http://localhost:18080
-- Gateway (native gRPC over TLS): https://localhost:9443
+- gRPC-Web proxy (used by dashboard): http://localhost:9446
+- Gateway gRPC (TLS): https://localhost:9443
+- Gateway metrics + health: http://localhost:9444
+- Worker metrics + health: http://localhost:9445
 - PostgreSQL: localhost:5432
 
 ## Shared configuration

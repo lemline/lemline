@@ -53,4 +53,3 @@ lemline:
       database: lemline
       username: postgres
       password: postgres
-      schema: public

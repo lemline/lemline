@@ -125,7 +125,7 @@ runtime.
   according to defined workflows.
     * Usage: `./lemline-runner listen [OPTIONS]`
     * Options:
-        * `-p`, `--port <port>`: Specifies the metrics port to use. Overrides the `lemline.metrics.port` configuration.
+        * `-m`, `--metrics-port <port>`: Specifies the metrics endpoint port to use. Overrides the `lemline.metrics.port` configuration.
 * **`config`**: Displays the current configuration of the Lemline runner.
     * Usage: `./lemline-runner config [OPTIONS]`
     * Options:

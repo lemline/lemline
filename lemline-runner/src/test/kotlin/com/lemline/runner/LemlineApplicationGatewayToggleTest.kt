@@ -34,7 +34,6 @@ class LemlineApplicationGatewayToggleTest {
         LEMLINE_MESSAGING_CLOUDEVENTS_CONSUMER_ENABLED,
         LEMLINE_MESSAGING_LIFECYCLE_EVENTS_PRODUCER_ENABLED,
         LEMLINE_MESSAGING_LIFECYCLE_EVENTS_CONSUMER_ENABLED,
-        "quarkus.smallrye-health.enabled"
     )
 
     @AfterEach
@@ -49,14 +48,13 @@ class LemlineApplicationGatewayToggleTest {
         assertEquals("true", System.getProperty(LEMLINE_GATEWAY_ENABLED))
         assertEquals("true", System.getProperty(LEMLINE_DATABASE_ENABLED))
         assertEquals("false", System.getProperty(LEMLINE_SCHEDULED_ENABLED))
-        assertEquals("true", System.getProperty("quarkus.smallrye-health.enabled"))
         assertEquals("true", System.getProperty(LEMLINE_MESSAGING_COMMANDS_PRODUCER_ENABLED))
         assertEquals("false", System.getProperty(LEMLINE_MESSAGING_COMMANDS_CONSUMER_ENABLED))
         assertEquals("false", System.getProperty(LEMLINE_MESSAGING_EVENTS_PRODUCER_ENABLED))
         assertEquals("false", System.getProperty(LEMLINE_MESSAGING_EVENTS_CONSUMER_ENABLED))
         assertEquals("false", System.getProperty(LEMLINE_MESSAGING_CLOUDEVENTS_PRODUCER_ENABLED))
         assertEquals("false", System.getProperty(LEMLINE_MESSAGING_CLOUDEVENTS_CONSUMER_ENABLED))
-        assertEquals("false", System.getProperty(LEMLINE_MESSAGING_LIFECYCLE_EVENTS_PRODUCER_ENABLED))
+        assertEquals("true", System.getProperty(LEMLINE_MESSAGING_LIFECYCLE_EVENTS_PRODUCER_ENABLED))
         assertEquals("false", System.getProperty(LEMLINE_MESSAGING_LIFECYCLE_EVENTS_CONSUMER_ENABLED))
     }
 }

@@ -33,7 +33,7 @@ class AnalyticsPostgresTestResource : QuarkusTestResourceLifecycleManager {
             LEMLINE_ANALYTICS_POSTGRES_DATABASE to postgres.databaseName,
             LEMLINE_ANALYTICS_POSTGRES_USERNAME to postgres.username,
             LEMLINE_ANALYTICS_POSTGRES_PASSWORD to postgres.password,
-            LEMLINE_ANALYTICS_POSTGRES_SCHEMA to "public",
+            LEMLINE_ANALYTICS_POSTGRES_SCHEMA to "lemline",
         )
 
         properties.forEach { (k, v) -> System.setProperty(k, v) }

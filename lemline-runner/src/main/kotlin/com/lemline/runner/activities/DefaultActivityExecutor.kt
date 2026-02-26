@@ -101,8 +101,6 @@ class DefaultActivityExecutor(
     // ========================================
 
     private suspend fun executeHttp(config: CallHttpConfig): JsonElement {
-        logger.debug { "Executing HTTP ${config.method} ${config.url}" }
-
         val method = HttpMethod.parse(config.method)
 
         // Build URL with query parameters
@@ -111,6 +109,7 @@ class DefaultActivityExecutor(
             urlBuilder.parameters.append(key, value)
         }
         val url = urlBuilder.build()
+        logger.debug { "Executing HTTP ${config.method} $url (query=${config.query}, redirect=${config.redirect})" }
 
         val response: HttpResponse = httpClient.config {
             followRedirects = config.redirect
@@ -146,13 +145,15 @@ class DefaultActivityExecutor(
             }
         }
 
+        logger.debug { "HTTP response received: ${response.status} from $url" }
+
         // Check status
         if (!response.status.isSuccess()) {
             val body = response.bodyAsText()
             throw RuntimeException("HTTP ${response.status.value}: $body")
         }
 
-        return when (config.output) {
+        val result = when (config.output) {
             HTTPOutput.RAW -> JsonPrimitive(Base64.getEncoder().encodeToString(response.body<ByteArray>()))
             HTTPOutput.CONTENT -> parseResponseContent(response)
             HTTPOutput.RESPONSE -> buildJsonObject {
@@ -176,6 +177,8 @@ class DefaultActivityExecutor(
                 put("content", parseResponseContent(response))
             }
         }
+        logger.debug { "HTTP response parsed as ${config.output}: $result" }
+        return result
     }
 
     private suspend fun parseResponseContent(response: HttpResponse): JsonElement {

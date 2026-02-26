@@ -43,7 +43,7 @@ class LemlineConfigSourceGatewayTest {
             assertEquals("analytics_user", source.getValue("quarkus.datasource.analytics-postgresql.username"))
             assertEquals("analytics_pass", source.getValue("quarkus.datasource.analytics-postgresql.password"))
             assertEquals(
-                "jdbc:postgresql://analytics-db:5544/analytics",
+                "jdbc:postgresql://analytics-db:5544/analytics?currentSchema=lemline",
                 source.getValue("quarkus.datasource.analytics-postgresql.jdbc.url")
             )
             assertEquals(

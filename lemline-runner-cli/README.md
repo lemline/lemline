@@ -71,12 +71,12 @@ This module provides the Picocli-based CLI for interacting with the Lemline runt
 Start the workflow message consumer.
 
 ```bash
-lemline listen [--port <port>] [--mock-config <path>]
+lemline listen [--metrics-port <port>] [--mock-config <path>]
 ```
 
 | Option | Description |
 |--------|-------------|
-| `-p, --port` | Metrics port (default: from config) |
+| `-m, --metrics-port` | Metrics endpoint port (default: from config) |
 | `--mock-config` | Path to mock config for test mode |
 
 ### config

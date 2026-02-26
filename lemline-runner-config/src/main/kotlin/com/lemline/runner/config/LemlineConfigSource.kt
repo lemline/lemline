@@ -110,8 +110,8 @@ import com.lemline.runner.common.config.LEMLINE_MESSAGING_PGMQ_EVENTS_CONSUMER_V
 import com.lemline.runner.common.config.LEMLINE_MESSAGING_PGMQ_EVENTS_PRODUCER_QUEUE_OUT
 import com.lemline.runner.common.config.LEMLINE_MESSAGING_PGMQ_EVENTS_QUEUE
 import com.lemline.runner.common.config.LEMLINE_MESSAGING_PGMQ_HOST
-import com.lemline.runner.common.config.LEMLINE_MESSAGING_PGMQ_LIFECYCLE_EVENTS_CONSUMER_CONCURRENCY
 import com.lemline.runner.common.config.LEMLINE_MESSAGING_PGMQ_LIFECYCLE_EVENTS_CONSUMER_BATCH_SIZE
+import com.lemline.runner.common.config.LEMLINE_MESSAGING_PGMQ_LIFECYCLE_EVENTS_CONSUMER_CONCURRENCY
 import com.lemline.runner.common.config.LEMLINE_MESSAGING_PGMQ_LIFECYCLE_EVENTS_CONSUMER_MAX_RETRIES
 import com.lemline.runner.common.config.LEMLINE_MESSAGING_PGMQ_LIFECYCLE_EVENTS_CONSUMER_POLL_INTERVAL
 import com.lemline.runner.common.config.LEMLINE_MESSAGING_PGMQ_LIFECYCLE_EVENTS_CONSUMER_QUEUE_DLQ
@@ -337,7 +337,8 @@ class LemlineConfigSource : PropertiesConfigSource(
                     val postgres = "quarkus.datasource.postgresql"
                     generated["$postgres.username"] = username
                     generated["$postgres.password"] = password
-                    generated["$postgres.jdbc.url"] = "jdbc:postgresql://$host:$port/$database"
+                    generated["$postgres.jdbc.url"] = "jdbc:postgresql://$host:$port/$database?currentSchema=lemline"
+                    generated["quarkus.datasource.mysql.active"] = "false"
                 }
 
                 DatabaseType.MYSQL -> {
@@ -354,6 +355,7 @@ class LemlineConfigSource : PropertiesConfigSource(
                         "&allowPublicKeyRetrieval=true" +
                         "&sessionVariables=sql_mode='STRICT_ALL_TABLES,ERROR_FOR_DIVISION_BY_ZERO,NO_ZERO_DATE,NO_ZERO_IN_DATE,NO_ENGINE_SUBSTITUTION'" +
                         "&continueBatchOnError=false"
+                    generated["quarkus.datasource.postgresql.active"] = "false"
                 }
 
                 DatabaseType.H2 -> {
@@ -397,7 +399,7 @@ class LemlineConfigSource : PropertiesConfigSource(
 
             generated["$datasource.username"] = username
             generated["$datasource.password"] = password
-            generated["$datasource.jdbc.url"] = "jdbc:postgresql://$host:$port/$database"
+            generated["$datasource.jdbc.url"] = "jdbc:postgresql://$host:$port/$database?currentSchema=lemline"
             generated["$flyway.baseline-on-migrate"] = baselineOnMigrate
             generated["$flyway.locations"] = "classpath:db/migration/analytics/postgresql"
 

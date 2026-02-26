@@ -1,3 +1,3 @@
 window.__CONFIG__ = {
-  gatewayBaseUrl: "http://localhost:18080",
+  gatewayBaseUrl: "http://localhost:9446",
 };

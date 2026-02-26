@@ -72,8 +72,8 @@ class MockActivityExecutor(
      */
     private fun executeHttp(event: CallHttpStarted): JsonElement {
         val config = event.config
-        val mock = mockConfig.findHttpMock(config.url, config.method)
-            ?: throw MockNotFoundException("No HTTP mock found for ${config.method} ${config.url}")
+        val mock = mockConfig.findHttpMock(config.url, config.method, config.query)
+            ?: throw MockNotFoundException("No HTTP mock found for ${config.method} ${config.url} query=${config.query}")
 
         logger.debug { "Mock: HTTP mock matched for ${config.method} ${config.url}" }
 

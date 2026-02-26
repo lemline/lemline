@@ -1,6 +1,10 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.testcases
 
+import com.lemline.core.activities.mock.HttpMockMatcher
+import com.lemline.core.activities.mock.HttpMockResponse
+import com.lemline.core.activities.mock.HttpMockRule
+import com.lemline.core.activities.mock.MockConfiguration
 import com.lemline.core.testcases.impl.TestMocks
 import com.lemline.core.testcases.impl.TestMocks.commentsForPost1
 import com.lemline.core.testcases.impl.TestMocks.createdPostResponse
@@ -49,6 +53,33 @@ object CallHttpTestCases {
                           postId: 1
             """.trimIndent(),
             tags = setOf("http", "external"),
+            validate = expectOutput(commentsForPost1)
+        ),
+
+        WorkflowTestCase(
+            name = "http call can evaluate expressions in query parameters",
+            mockConfig = MockConfiguration(httpMocks = listOf(
+                HttpMockRule(
+                    match = HttpMockMatcher(
+                        url = "*jsonplaceholder*/comments*",
+                        method = "GET",
+                        query = mapOf("postId" to "1")
+                    ),
+                    response = HttpMockResponse(status = 200, body = commentsForPost1)
+                )
+            )),
+            yaml = $$"""
+                do:
+                  - getComments:
+                      call: http
+                      with:
+                        method: GET
+                        endpoint: https://jsonplaceholder.typicode.com/comments
+                        query:
+                          postId: ${ .targetPostId | tostring }
+            """.trimIndent(),
+            input = buildJsonObject { put("targetPostId", 1) },
+            tags = setOf("http"),
             validate = expectOutput(commentsForPost1)
         ),
 
