@@ -438,13 +438,7 @@ class LemlineConfigSource : PropertiesConfigSource(
             generated["quarkus.grpc.server.host"] = props[LEMLINE_GATEWAY_GRPC_HOST] ?: GATEWAY_GRPC_HOST_DEFAULT
             generated["quarkus.grpc.server.port"] = gatewayPort
             generated["quarkus.grpc.server.plain-text"] = (!tlsEnabled).toString()
-            generated["quarkus.grpc.server.use-separate-server"] = "false"
-            // gRPC-Web runs through the HTTP server, so bind the active transport port.
-            if (tlsEnabled) {
-                generated["quarkus.http.ssl-port"] = gatewayPort
-            } else {
-                generated["quarkus.http.port"] = gatewayPort
-            }
+            generated["quarkus.grpc.server.use-separate-server"] = "true"
 
             val corsEnabled = props[LEMLINE_GATEWAY_CORS_ENABLED]?.toBooleanStrictOrNull()
                 ?: GATEWAY_CORS_ENABLED_DEFAULT.toBoolean()

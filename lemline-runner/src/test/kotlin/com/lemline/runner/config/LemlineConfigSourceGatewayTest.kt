@@ -112,11 +112,9 @@ class LemlineConfigSourceGatewayTest {
     fun `enables gateway cors defaults when gateway is enabled`() {
         withSystemProperties(mapOf(LEMLINE_GATEWAY_ENABLED to "true")) {
             val source = LemlineConfigSource()
-            assertEquals("false", source.getValue("quarkus.grpc.server.use-separate-server"))
+            assertEquals("true", source.getValue("quarkus.grpc.server.use-separate-server"))
             assertEquals("true", source.getValue("quarkus.http.cors.enabled"))
             assertEquals("false", source.getValue("quarkus.grpc.server.plain-text"))
-            assertNull(source.getValue("quarkus.http.port"))
-            assertEquals(LemlineConfigConstants.GATEWAY_GRPC_PORT_DEFAULT, source.getValue("quarkus.http.ssl-port"))
             assertEquals(
                 LemlineConfigConstants.GATEWAY_CORS_ORIGINS_DEFAULT,
                 source.getValue("quarkus.http.cors.origins")
@@ -163,8 +161,6 @@ class LemlineConfigSourceGatewayTest {
             val source = LemlineConfigSource()
             assertEquals("true", source.getValue("quarkus.grpc.server.plain-text"))
             assertEquals("none", source.getValue("quarkus.grpc.server.ssl.client-auth"))
-            assertEquals(LemlineConfigConstants.GATEWAY_GRPC_PORT_DEFAULT, source.getValue("quarkus.http.port"))
-            assertNull(source.getValue("quarkus.http.ssl-port"))
         }
     }
 
