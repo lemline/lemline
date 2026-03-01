@@ -1,0 +1,66 @@
+document:
+  dsl: "1.0.0"
+  namespace: ops
+  name: incident-handler
+  version: "1.0.0"
+  title: Incident Handler
+schedule:
+  on:
+    one:
+      with:
+        type: com.example.alert.high.v1
+do:
+  - waitForDecision:
+      listen:
+        to:
+          any:
+            - with:
+                type: com.example.incident.ack.v1
+            - with:
+                type: com.example.incident.escalate.v1
+          until: ${ (.type == "com.example.incident.ack.v1") or (.type == "com.example.incident.escalate.v1") }
+        read: envelope
+  - routeDecision:
+      switch:
+        - acked:
+            when: ${ (.[0].type == "com.example.incident.ack.v1") }
+            then: notifyChat
+        - escalated:
+            when: ${ (.[0].type == "com.example.incident.escalate.v1") }
+            then: notifyParallel
+        - default:
+            then: publishProcessed
+  - notifyChat:
+      call: http
+      with:
+        method: post
+        endpoint:
+          uri: https://chat.example.com/incidents/notify
+        body:
+          decision: ack
+      then: publishProcessed
+  - notifyParallel:
+      fork:
+        compete: true
+        branches:
+          - - notifyPager:
+                call: http
+                with:
+                  method: post
+                  endpoint:
+                    uri: https://pager.example.com/incidents/notify
+          - - notifyOnCall:
+                call: http
+                with:
+                  method: post
+                  endpoint:
+                    uri: https://oncall.example.com/incidents/notify
+      then: publishProcessed
+  - publishProcessed:
+      emit:
+        event:
+          with:
+            source: https://workflows.example.com/incidents
+            type: com.example.incident.processed.v1
+            data:
+              status: processed
