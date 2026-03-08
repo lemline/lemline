@@ -8,7 +8,7 @@ import com.lemline.core.errors.InternalException
 import com.lemline.core.lifecycleevents.LifecycleEventHook
 import com.lemline.core.nodes.Node
 import com.lemline.core.orchestrator.StepByStepOrchestrator.completeTask
-import com.lemline.core.orchestrator.StepByStepOrchestrator.processInternalWorkflowException
+import com.lemline.core.orchestrator.StepByStepOrchestrator.processTaskFaulted
 import com.lemline.core.orchestrator.StepByStepOrchestrator.tryCatch
 import com.lemline.core.processors.TryProcessor
 import com.lemline.core.processors.scope.withTask
@@ -137,7 +137,7 @@ object StepByStepOrchestrator {
      * events are emitted closer to where they occur:
      * - `task.completed` in [completeTask] for async completions
      * - `task.faulted` in [tryCatch] when errors are caught
-     * - `task.retried` in [processInternalWorkflowException] when retry is scheduled
+     * - `task.retried` in [processTaskFaulted] when retry is scheduled
      *
      * Event mapping:
      * - [WorkflowCompleted] → workflow.completed
@@ -223,6 +223,35 @@ object StepByStepOrchestrator {
         }
     }
 
+    private suspend fun resumeWithHandler(
+        nodeStack: NodeStack,
+        node: Node<*>,
+        rawInput: JsonElement?,
+        rawOutput: JsonElement?,
+        flowDirective: FlowDirective?,
+        workflowInfo: WorkflowInfo,
+        lifecycleHook: LifecycleEventHook,
+        action: suspend () -> WorkflowEvent,
+    ): WorkflowEvent = try {
+        // run the next task within a try-catch block to handle workflow-caught exceptions
+        tryCatch(node, nodeStack, workflowInfo, lifecycleHook) {
+            action()
+        }
+    } catch (e: Exception) {
+        // Uncaught failure within a fork branch
+        hasForkBranchFailed(nodeStack, node, e)
+        // Uncaught failure
+            ?: WorkflowFailed(
+                nodeStack = nodeStack,
+                nodePosition = node.position,
+                rawInput = rawInput,
+                rawOutput = rawOutput,
+                flowDirective = flowDirective?.toKotlin(),
+                exception = e,
+                failedAt = Clock.System.now(),
+            )
+    }
+
     /**
      * Resumes the workflow execution from a specific task.
      *
@@ -235,27 +264,16 @@ object StepByStepOrchestrator {
         flowDirective: FlowDirective? = null,
         workflowInfo: WorkflowInfo,
         lifecycleHook: LifecycleEventHook,
-    ): WorkflowEvent {
-
-        return try {
-            // run the next task within a try-catch block to handle workflow-caught exceptions
-            tryCatch(node, nodeStack, workflowInfo, lifecycleHook) {
-                startTask(nodeStack, node, rawInput, flowDirective, workflowInfo, lifecycleHook)
-            }
-        } catch (e: Exception) {
-            // Uncaught failure within a fork branch
-            forkBranchFailed(nodeStack, node, e)
-            // Uncaught failure
-                ?: WorkflowFailed(
-                    nodeStack = nodeStack,
-                    nodePosition = node.position,
-                    rawInput = rawInput,
-                    rawOutput = null,
-                    flowDirective = flowDirective?.toKotlin(),
-                    exception = e,
-                    failedAt = Clock.System.now(),
-                )
-        }
+    ): WorkflowEvent = resumeWithHandler(
+        nodeStack = nodeStack,
+        node = node,
+        rawInput = rawInput,
+        rawOutput = null,
+        flowDirective = flowDirective,
+        workflowInfo = workflowInfo,
+        lifecycleHook = lifecycleHook
+    ) {
+        startTask(nodeStack, node, rawInput, flowDirective, workflowInfo, lifecycleHook)
     }
 
     /**
@@ -270,26 +288,16 @@ object StepByStepOrchestrator {
         rawOutput: JsonElement,
         workflowInfo: WorkflowInfo,
         lifecycleHook: LifecycleEventHook,
-    ): WorkflowEvent {
-
-        return try {
-            // Resume the completed task (transforms output, updates state)
-            tryCatch(node, nodeStack, workflowInfo, lifecycleHook) {
-                completeTask(nodeStack, node, rawOutput, workflowInfo, lifecycleHook)
-            }
-        } catch (e: Exception) {
-            // Uncaught failure within a fork branch
-            forkBranchFailed(nodeStack, node, e)
-            // Uncaught failure
-                ?: WorkflowFailed(
-                    nodeStack = nodeStack,
-                    nodePosition = node.position,
-                    rawInput = null,
-                    rawOutput = rawOutput,
-                    flowDirective = null,
-                    exception = e
-                )
-        }
+    ): WorkflowEvent = resumeWithHandler(
+        nodeStack = nodeStack,
+        node = node,
+        rawInput = null,
+        rawOutput = rawOutput,
+        flowDirective = null,
+        workflowInfo = workflowInfo,
+        lifecycleHook = lifecycleHook
+    ) {
+        completeTask(nodeStack, node, rawOutput, workflowInfo, lifecycleHook)
     }
 
     /**
@@ -313,7 +321,7 @@ object StepByStepOrchestrator {
             }
         } catch (e: Exception) {
             // Uncaught failure within a fork branch
-            forkBranchFailed(nodeStack, node, e)?.let { return it }
+            hasForkBranchFailed(nodeStack, node, e)?.let { return it }
             // Uncaught failure
             WorkflowFailed(
                 nodeStack = nodeStack,
@@ -350,7 +358,7 @@ object StepByStepOrchestrator {
             error = e.error,
             failedAt = Clock.System.now(),
         )
-        processInternalWorkflowException(e, current, nodeStack, workflowInfo, lifecycleHook)
+        processTaskFaulted(e, current, nodeStack, workflowInfo, lifecycleHook)
     }
 
     /**
@@ -363,7 +371,7 @@ object StepByStepOrchestrator {
      *
      * Emits `task.retried` when a retry is scheduled.
      */
-    private suspend fun processInternalWorkflowException(
+    private suspend fun processTaskFaulted(
         exception: InternalException,
         failingNode: Node<*>,
         nodeStack: NodeStack,
@@ -524,7 +532,7 @@ object StepByStepOrchestrator {
     /**
      * Handles the failure of a branch execution stemming from a Fork task in a workflow (if any)
      */
-    private fun forkBranchFailed(
+    private fun hasForkBranchFailed(
         nodeStack: NodeStack,
         failingNode: Node<*>,
         exception: Exception

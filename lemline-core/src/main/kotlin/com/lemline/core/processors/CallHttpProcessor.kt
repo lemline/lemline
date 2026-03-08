@@ -73,7 +73,7 @@ import kotlinx.serialization.json.JsonPrimitive
  */
 class CallHttpProcessor(
     node: Node<CallHTTP>,
-) : NodeProcessor<CallHTTP, CallState>(node) {
+) : AbstractProcessor<CallHTTP, CallState>(node) {
 
     override val isAsync = true
 

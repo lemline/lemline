@@ -64,7 +64,7 @@ import kotlinx.serialization.json.JsonElement
  */
 class CallFunctionProcessor(
     node: Node<CallFunction>,
-) : NodeProcessor<CallFunction, CallFunctionState>(node) {
+) : AbstractProcessor<CallFunction, CallFunctionState>(node) {
 
     override val isAsync = false  // Control-flow, not async
 
@@ -94,7 +94,7 @@ class CallFunctionProcessor(
         state: CallFunctionState,
         dataset: JsonElement,
         scope: Scope,
-    ): NavigationInfo {
+    ): NextInfo {
         return when (state.entered) {
             false -> {
                 // Navigate into the function
@@ -108,7 +108,7 @@ class CallFunctionProcessor(
                 // Otherwise, pass the current dataset (transformed input) as function input
                 val functionInput = evaluateWithArgs(dataset, scope)
 
-                NavigationInfo(
+                NextInfo(
                     nextNode = createStubNode(functionDoPosition),
                     nextDirective = null,
                     nextInput = functionInput
@@ -117,7 +117,7 @@ class CallFunctionProcessor(
 
             true -> {
                 // Function completed, return to parent
-                NavigationInfo(
+                NextInfo(
                     nextNode = node.parent,
                     nextDirective = getFlowDirective()
                 )
@@ -137,7 +137,7 @@ class CallFunctionProcessor(
      * @return The evaluated input for the function
      */
     private fun evaluateWithArgs(dataset: JsonElement, scope: Scope): JsonElement {
-        val withArgs = node.task.`with` ?: return dataset
+        val withArgs = node.task.with ?: return dataset
 
         // Convert the with arguments to JsonElement and evaluate any expressions
         val withJson = withArgs.additionalProperties.toJsonElement()

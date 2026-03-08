@@ -46,7 +46,7 @@ import kotlinx.serialization.json.JsonElement
  */
 class SetProcessor(
     node: Node<SetTask>,
-) : NodeProcessor<SetTask, SetState>(node) {
+) : AbstractProcessor<SetTask, SetState>(node) {
 
     override fun stateWhenEnteringFromParent(transformedInput: JsonElement, scope: Scope) = SetState()
 

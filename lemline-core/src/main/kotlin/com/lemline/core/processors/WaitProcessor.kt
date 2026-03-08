@@ -44,7 +44,7 @@ import kotlinx.serialization.json.JsonElement
  */
 class WaitProcessor(
     node: Node<WaitTask>,
-) : NodeProcessor<WaitTask, WaitState>(node) {
+) : AbstractProcessor<WaitTask, WaitState>(node) {
     override val isAsync = true
     override fun stateWhenEnteringFromParent(transformedInput: JsonElement, scope: Scope) = WaitState()
 

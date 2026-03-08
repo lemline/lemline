@@ -31,7 +31,7 @@ import kotlinx.serialization.json.JsonElement
  */
 class RaiseProcessor(
     node: Node<RaiseTask>
-) : NodeProcessor<RaiseTask, RaiseState>(node) {
+) : AbstractProcessor<RaiseTask, RaiseState>(node) {
 
     override fun stateWhenEnteringFromParent(transformedInput: JsonElement, scope: Scope) = RaiseState(
         startedAt = Clock.System.now()

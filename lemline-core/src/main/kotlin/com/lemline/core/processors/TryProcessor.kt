@@ -69,7 +69,7 @@ import kotlinx.serialization.json.buildJsonObject
  */
 class TryProcessor(
     node: Node<TryTask>
-) : NodeProcessor<TryTask, TryState>(node) {
+) : AbstractProcessor<TryTask, TryState>(node) {
 
     /**
      * This state is initialized when entering the TryTask node for the first time
@@ -108,14 +108,14 @@ class TryProcessor(
         state: TryState,
         dataset: JsonElement,
         scope: Scope,
-    ): NavigationInfo = when (state.hasStarted) {
+    ): NextInfo = when (state.hasStarted) {
         // First attempt - go to try block
-        false -> NavigationInfo(
+        false -> NextInfo(
             nextNode = getDoTry(),
             nextDirective = null
         )
         // Completed - go to parent
-        true -> NavigationInfo(
+        true -> NextInfo(
             nextNode = node.parent,
             nextDirective = getFlowDirective()
         )

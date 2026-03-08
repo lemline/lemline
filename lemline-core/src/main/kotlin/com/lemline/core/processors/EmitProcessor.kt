@@ -62,7 +62,7 @@ import kotlinx.serialization.json.JsonPrimitive
  */
 class EmitProcessor(
     node: Node<EmitTask>,
-) : NodeProcessor<EmitTask, EmitState>(node) {
+) : AbstractProcessor<EmitTask, EmitState>(node) {
 
     override val isAsync = true
 

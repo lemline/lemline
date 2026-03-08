@@ -109,10 +109,10 @@ sealed class WorkflowEvent : WorkflowState() {
      * Represents the result of a workflow's progression.
      */
     sealed class Outcome : WorkflowEvent() {
+
         /**
          * Extracts the associated value from the [WorkflowEvent.Outcome] based on its type.
          */
-
         fun value(): JsonElement = when (this) {
             is WorkflowCompleted -> output
             is ForkBranchCompleted -> branchOutput

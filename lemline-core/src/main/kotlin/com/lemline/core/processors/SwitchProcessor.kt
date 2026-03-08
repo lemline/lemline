@@ -56,7 +56,7 @@ import kotlinx.serialization.json.JsonElement
  */
 class SwitchProcessor(
     node: Node<SwitchTask>,
-) : NodeProcessor<SwitchTask, SwitchState>(node) {
+) : AbstractProcessor<SwitchTask, SwitchState>(node) {
 
     override fun stateWhenEnteringFromParent(transformedInput: JsonElement, scope: Scope) = SwitchState()
 
@@ -67,7 +67,7 @@ class SwitchProcessor(
         state: SwitchState,
         dataset: JsonElement,
         scope: Scope,
-    ): NavigationInfo {
+    ): NextInfo {
 
         var directive: FlowDirective? = null
 
@@ -92,7 +92,7 @@ class SwitchProcessor(
             raiseError(WorkflowErrorType.EXPRESSION, "No case matches in switch statement")
         }
 
-        return NavigationInfo(
+        return NextInfo(
             nextNode = node.parent,
             nextDirective = directive
         )

@@ -48,7 +48,7 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.boolean
 import kotlinx.serialization.json.booleanOrNull
 
-abstract class NodeProcessor<T : TaskBase, S : NodeState>(
+abstract class AbstractProcessor<T : TaskBase, S : NodeState>(
     val node: Node<T>
 ) {
     val logger = logger()
@@ -109,7 +109,7 @@ abstract class NodeProcessor<T : TaskBase, S : NodeState>(
         state: S,
         dataset: JsonElement,
         scope: Scope,
-    ) = NavigationInfo(
+    ) = NextInfo(
         nextNode = node.parent,
         nextDirective = getFlowDirective()
     )
@@ -672,7 +672,7 @@ abstract class NodeProcessor<T : TaskBase, S : NodeState>(
  * - A `JsonElement?`: Optional input for the next node (overrides default transformedInput)
  *   Used by CallFunction to pass evaluated `with` arguments to the function.
  */
-data class NavigationInfo(
+data class NextInfo(
     val nextNode: Node<*>?,
     val nextDirective: FlowDirective?,
     val nextInput: JsonElement? = null

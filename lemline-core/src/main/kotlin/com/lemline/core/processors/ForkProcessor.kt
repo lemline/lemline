@@ -47,7 +47,7 @@ import kotlinx.serialization.json.JsonElement
  */
 class ForkProcessor(
     node: Node<ForkTask>
-) : NodeProcessor<ForkTask, ForkState>(node) {
+) : AbstractProcessor<ForkTask, ForkState>(node) {
 
     override val isAsync = true
 
