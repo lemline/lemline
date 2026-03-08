@@ -9,7 +9,7 @@ import com.lemline.runner.common.messaging.CommandEmitter
 import com.lemline.runner.common.messaging.InstanceMessage
 import com.lemline.runner.definitions.DefinitionConfig
 import com.lemline.runner.forks.ForkFeatureConfig
-import com.lemline.runner.gateway.outbox.GatewayOutboxConfig
+import com.lemline.runner.gateway.outbox.GatewayCommandConfig
 import com.lemline.runner.listeners.ListenerConfig
 import com.lemline.runner.messaging.commands.WorkflowCommandEmitter
 import com.lemline.runner.parents.ParentFeatureConfig
@@ -103,7 +103,7 @@ class ConfigProducer {
 
     @Produces
     @ApplicationScoped
-    fun gatewayOutboxConfig(): GatewayOutboxConfig = object : GatewayOutboxConfig {
+    fun gatewayOutboxConfig(): GatewayCommandConfig = object : GatewayCommandConfig {
         private val source = config.outbox().gateway().getOrNull()
         override val enabled: Boolean get() = config.gatewayEnabled && (source?.enabled() ?: true)
         override val outbox: OutboxConfig
