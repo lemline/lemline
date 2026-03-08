@@ -34,10 +34,10 @@ import kotlin.time.Instant
 const val GATEWAY_COMMAND_OUTBOX_TABLE = "lemline_gateway_command_outbox"
 
 @ApplicationScoped
-class GatewayCommandOutboxRepository : CrudRepository<GatewayCommandOutboxModel>(),
-    WithIdRepository<GatewayCommandOutboxModel>,
-    WithOutboxRepository<GatewayCommandOutboxModel>,
-    WithCleanerRepository<GatewayCommandOutboxModel> {
+class GatewayCommandRepository : CrudRepository<GatewayCommandModel>(),
+    WithIdRepository<GatewayCommandModel>,
+    WithOutboxRepository<GatewayCommandModel>,
+    WithCleanerRepository<GatewayCommandModel> {
 
     @Inject
     override lateinit var databaseConfig: DatabaseConfig
@@ -66,11 +66,11 @@ class GatewayCommandOutboxRepository : CrudRepository<GatewayCommandOutboxModel>
         cleanerRepository.findEntitiesToDelete(cutoffDate, batchSize, connection)
 
     // Workflow-id lookups (idempotency guard)
-    suspend fun findByWorkflowId(workflowId: WorkflowId, connection: Connection? = null): GatewayCommandOutboxModel? =
+    suspend fun findByWorkflowId(workflowId: WorkflowId, connection: Connection? = null): GatewayCommandModel? =
         instanceRepository.findByWorkflowId(workflowId, connection)
 
-    override val columns: ColumnBindings<GatewayCommandOutboxModel> by lazy {
-        ColumnBindingsBuilder<GatewayCommandOutboxModel>().apply {
+    override val columns: ColumnBindings<GatewayCommandModel> by lazy {
+        ColumnBindingsBuilder<GatewayCommandModel>().apply {
             idColumn(idHelper)
             instanceColumns(idHelper)
             cleanupColumns()
@@ -78,7 +78,7 @@ class GatewayCommandOutboxRepository : CrudRepository<GatewayCommandOutboxModel>
         }.build()
     }
 
-    override fun createModel(rs: ResultSet) = GatewayCommandOutboxModel(
+    override fun createModel(rs: ResultSet) = GatewayCommandModel(
         id = getIDV7(rs, ID_COLUMN)!!,
         instanceMessage = rs.getInstanceMessage<WorkflowCommand.ResumeFromTask>(idHelper)!!,
         outboxScheduledFor = rs.getInstant(OUTBOX_SCHEDULED_FOR_COLUMN),

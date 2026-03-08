@@ -6,7 +6,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 
-class GatewayCommandOutboxModelTest {
+class GatewayCommandModelTest {
 
     @Test
     fun `GatewayCommandOutboxModel can be created and fields accessed`() {
@@ -28,7 +28,7 @@ class GatewayCommandOutboxModelTest {
 
     @Test
     fun `new model has pending outbox state`() {
-        val model = GatewayCommandOutboxModel(
+        val model = GatewayCommandModel(
             id = com.lemline.common.values.IDV7.random(),
             instanceMessage = randomGatewayCommandOutboxModel().instanceMessage,
             outboxScheduledFor = kotlin.time.Clock.System.now(),

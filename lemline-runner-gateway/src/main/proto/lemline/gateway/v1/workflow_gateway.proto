@@ -6,195 +6,615 @@ option java_multiple_files = true;
 option java_package = "com.lemline.gateway.v1";
 option java_outer_classname = "WorkflowGatewayProto";
 
-service WorkflowGateway {
-  rpc StartWorkflow(StartWorkflowRequest) returns (StartWorkflowResponse);
-  rpc WatchWorkflow(WatchWorkflowRequest) returns (stream WorkflowAnalyticsEvent);
-  rpc ListNamespaces(ListNamespacesRequest) returns (ListNamespacesResponse);
+import "google/protobuf/duration.proto";
+import "google/protobuf/struct.proto";
+import "google/protobuf/timestamp.proto";
+
+// Public workflow gateway API.
+//
+// Conventions:
+// - List* RPCs return finite, paginated snapshots with deterministic ordering documented on the response.
+// - Get* RPCs return exactly one resource.
+// - Watch* RPCs return live streams of changes.
+// - Cursors are opaque and scoped to a specific RPC plus exact filter set unless explicitly documented otherwise.
+// - When a paginated List* response includes watch_cursor, all pages belonging to that snapshot return the same watch_cursor.
+//   Clients should finish consuming the final page before using that watch_cursor to continue with the corresponding Watch* RPC.
+// - All time ranges use [from, to): inclusive lower bound, exclusive upper bound.
+service WorkflowGatewayService {
+  // Lists workflow definitions visible to the caller.
+  //
+  // This is the main catalog entry point for building namespace/name/version
+  // selectors without a separate namespaces endpoint.
   rpc ListDefinitions(ListDefinitionsRequest) returns (ListDefinitionsResponse);
+
+  // Returns one workflow definition.
+  //
+  // When version is omitted, the latest version for namespace/name is returned.
   rpc GetDefinition(GetDefinitionRequest) returns (GetDefinitionResponse);
-  rpc GetDefinitionStats(GetDefinitionStatsRequest) returns (GetDefinitionStatsResponse);
+
+  // Lists definition-level execution statistics.
+  //
+  // Each returned row is keyed by namespace/name/version. Clients can aggregate
+  // rows client-side when they need namespace-level or name-level rollups.
+  rpc ListDefinitionStats(ListDefinitionStatsRequest) returns (ListDefinitionStatsResponse);
+
+  // Streams live changes to definition-level execution statistics.
+  //
+  // This stream is delta-oriented. Clients that need a consistent
+  // snapshot-then-tail flow should call ListDefinitionStats first and then pass
+  // the returned watch_cursor into after_cursor.
+  rpc WatchDefinitionStats(WatchDefinitionStatsRequest) returns (stream WatchDefinitionStatsResponse);
+
+  // Starts a workflow instance from a definition.
+  //
+  // When instance_id is provided, the call is idempotent for that identifier.
+  // When version is omitted, the latest version is started.
+  rpc StartInstance(StartInstanceRequest) returns (StartInstanceResponse);
+
+  // Returns the current summary for one instance.
+  rpc GetInstance(GetInstanceRequest) returns (GetInstanceResponse);
+
+  // Lists workflow instances.
+  //
+  // This is intended for dashboards, search results, and operational views.
   rpc ListInstances(ListInstancesRequest) returns (ListInstancesResponse);
-  rpc GetInstanceTimeline(GetInstanceTimelineRequest) returns (GetInstanceTimelineResponse);
-  rpc WatchDefinitionStats(WatchDefinitionStatsRequest) returns (stream DefinitionStatsUpdate);
-  rpc WatchInstances(WatchInstancesRequest) returns (stream InstanceUpdate);
+
+  // Streams live changes to the filtered instance set.
+  //
+  // This stream is delta-oriented. Clients that need a consistent
+  // snapshot-then-tail flow should call ListInstances first and then pass
+  // the returned watch_cursor into after_cursor.
+  rpc WatchInstances(WatchInstancesRequest) returns (stream WatchInstancesResponse);
+
+  // Lists events for one instance as a finite, ordered history query.
+  //
+  // When after_cursor is omitted, the history starts from the first event.
+  rpc ListInstanceEvents(ListInstanceEventsRequest) returns (ListInstanceEventsResponse);
+
+  // Streams events for one instance.
+  //
+  // When after_cursor is omitted, the server replays from the first event and
+  // then tails live events. This is intentionally different from other Watch*
+  // RPCs because full event history is the primary per-instance timeline view.
+  rpc WatchInstanceEvents(WatchInstanceEventsRequest) returns (stream WatchInstanceEventsResponse);
 }
 
-message StartWorkflowRequest {
-  string workflow_id = 1;
-  string namespace = 2;
-  string name = 3;
-  string version = 4;
-  optional string input_json = 5;
-  optional string zone_id = 6;
-}
-
-message StartWorkflowResponse {
-  enum Result {
-    START_WORKFLOW_RESULT_UNSPECIFIED = 0;
-    START_WORKFLOW_RESULT_ACCEPTED_NEW = 1;
-    START_WORKFLOW_RESULT_ACCEPTED_EXISTING = 2;
-  }
-
-  string workflow_id = 1;
-  Result result = 2;
-}
-
-message WatchWorkflowRequest {
-  string workflow_id = 1;
-}
-
-message WorkflowAnalyticsEvent {
-  int64 cursor = 1;
-  string cloudevent_json = 2;
-}
-
-message ListNamespacesRequest {}
-
-message ListNamespacesResponse {
-  repeated string namespaces = 1;
-}
-
-message ListDefinitionsRequest {
+// A lightweight definition row used in catalog and selector views.
+message DefinitionSummary {
+  // Definition namespace.
   string namespace = 1;
-  optional string name = 2;
-  optional bool latest_only = 3;
-}
 
-message ListDefinitionsResponse {
-  repeated WorkflowDefinitionSummary definitions = 1;
-}
-
-message WorkflowDefinitionSummary {
-  string namespace = 1;
+  // Definition name within the namespace.
   string name = 2;
+
+  // Concrete version represented by this row.
   string version = 3;
+
+  // True when this row is the latest known version for namespace/name.
   bool is_latest = 4;
+
+  // Total number of known versions for namespace/name.
   int32 version_count = 5;
-  string created_at = 6;
-  string updated_at = 7;
+
+  // Time when this version was first registered.
+  google.protobuf.Timestamp created_at = 6;
+
+  // Time when this version was last updated, if it was ever updated.
+  google.protobuf.Timestamp updated_at = 7;
 }
 
-message GetDefinitionRequest {
+// The full workflow definition resource.
+message WorkflowDefinition {
+  // Definition namespace.
   string namespace = 1;
-  string name = 2;
-  optional string version = 3;
-}
 
-message GetDefinitionResponse {
-  string namespace = 1;
+  // Definition name within the namespace.
   string name = 2;
+
+  // Concrete version returned by the server.
   string version = 3;
-  string definition = 4;
+
+  // Original workflow definition source as stored by the platform.
+  string source = 4;
+
+  // All available versions for namespace/name, ordered newest first according
+  // to the server's definition version ordering.
   repeated string available_versions = 5;
+
+  // Time when this version was first registered.
+  google.protobuf.Timestamp created_at = 6;
+
+  // Time when this version was last updated, if it was ever updated.
+  google.protobuf.Timestamp updated_at = 7;
 }
 
-message GetDefinitionStatsRequest {
-  optional string namespace = 1;
-  optional string name = 2;
-  optional string time_from = 3;
-  optional string time_to = 4;
-  optional string version = 5;
-}
-
-message GetDefinitionStatsResponse {
-  repeated DefinitionStats stats = 1;
-}
-
+// Aggregated execution counters for one definition version.
 message DefinitionStats {
+  // Definition namespace.
   string namespace = 1;
+
+  // Definition name within the namespace.
   string name = 2;
-  optional string version = 3;
-  int64 started = 4;
-  int64 completed = 5;
-  int64 faulted = 6;
-  int64 running = 7;
+
+  // Definition version represented by this row.
+  string version = 3;
+
+  // Number of started instances in the requested time window.
+  int64 started_count = 4;
+
+  // Number of completed instances in the requested time window.
+  int64 completed_count = 5;
+
+  // Number of faulted instances in the requested time window.
+  int64 faulted_count = 6;
+
+  // Number of instances that were still running at time_to.
+  int64 running_count_at_time_to = 7;
 }
 
-message WatchDefinitionStatsRequest {
-  optional string namespace = 1;
-  optional string name = 2;
-  optional string version = 3;
-  optional string time_from = 4;
-  optional string time_to = 5;
+// Current lifecycle status of one instance.
+enum InstanceStatus {
+  // Default zero value. Not a valid runtime status filter on its own.
+  INSTANCE_STATUS_UNSPECIFIED = 0;
+
+  // Instance was created but has not started yet.
+  INSTANCE_STATUS_PENDING = 1;
+
+  // Instance is currently running.
+  INSTANCE_STATUS_RUNNING = 2;
+
+  // Instance completed successfully.
+  INSTANCE_STATUS_COMPLETED = 3;
+
+  // Instance terminated with a fault.
+  INSTANCE_STATUS_FAULTED = 4;
 }
 
-message DefinitionStatsUpdate {
-  DefinitionStats stats = 1;
-}
-
-message ListInstancesRequest {
-  optional string namespace = 1;
-  optional string name = 2;
-  optional string status = 3;
-  optional string time_from = 4;
-  optional string time_to = 5;
-  optional string workflow_id = 6;
-  int32 page_size = 7;
-  optional string page_cursor = 8;
-  optional string version = 9;
-  optional string workflow_id_prefix = 10;
-}
-
-message ListInstancesResponse {
-  repeated WorkflowInstance instances = 1;
-  optional string next_cursor = 2;
-  int64 total_count = 3;
-}
-
-message WorkflowInstance {
-  string workflow_id = 1;
-  string namespace = 2;
-  string name = 3;
-  string version = 4;
-  string status = 5;
-  string created_at = 6;
-  optional string started_at = 7;
-  optional string completed_at = 8;
-  optional string faulted_at = 9;
-  optional int64 duration_ms = 10;
-  optional ErrorSummary error = 11;
-}
-
+// A compact error payload for faulted instances.
 message ErrorSummary {
+  // Machine-readable error type, typically an RFC 7807 type URI.
   string type = 1;
-  int32 status = 2;
+
+  // Status code associated with the error, when available.
+  optional int32 status = 2;
+
+  // Human-readable short title.
   string title = 3;
 }
 
-message WatchInstancesRequest {
-  optional string namespace = 1;
-  optional string name = 2;
-  optional string version = 3;
-  optional int64 after_sequence = 4;
-}
+// A lightweight instance row used in lists and watch updates.
+message InstanceSummary {
+  // Unique workflow instance identifier.
+  string instance_id = 1;
 
-message InstanceUpdate {
-  WorkflowInstance instance = 1;
-  string update_type = 2;
-  int64 sequence = 3;
-}
-
-message GetInstanceTimelineRequest {
-  string workflow_id = 1;
-  bool include_definition = 2;
-}
-
-message GetInstanceTimelineResponse {
-  string workflow_id = 1;
+  // Definition namespace used by this instance.
   string namespace = 2;
+
+  // Definition name used by this instance.
   string name = 3;
+
+  // Definition version used by this instance.
   string version = 4;
-  string status = 5;
-  repeated TimelineEvent events = 6;
-  optional string definition = 7;
+
+  // Current lifecycle status.
+  InstanceStatus status = 5;
+
+  // Time when the instance was created.
+  google.protobuf.Timestamp created_at = 6;
+
+  // Time when the instance started, if it has started.
+  google.protobuf.Timestamp started_at = 7;
+
+  // Time when the instance completed, if it completed.
+  google.protobuf.Timestamp completed_at = 8;
+
+  // Time when the instance faulted, if it faulted.
+  google.protobuf.Timestamp faulted_at = 9;
+
+  // Runtime duration, when it can be computed from known lifecycle timestamps.
+  google.protobuf.Duration duration = 10;
+
+  // Structured error summary, present when the instance faulted and details exist.
+  ErrorSummary error = 11;
 }
 
-message TimelineEvent {
-  int64 sequence = 1;
-  string event_type = 2;
-  string event_time = 3;
-  string category = 4;
-  optional string task_pointer = 5;
-  optional string task_name = 6;
-  string payload_json = 7;
+// One event belonging to a single instance timeline.
+message InstanceEvent {
+  // Opaque event cursor ordered within this instance event stream.
+  string cursor = 1;
+
+  // Unique workflow instance identifier.
+  string instance_id = 2;
+
+  // Normalized event type for quick filtering and rendering.
+  string event_type = 3;
+
+  // Event timestamp.
+  google.protobuf.Timestamp event_time = 4;
+
+  // Canonical serialized CloudEvent JSON for full-fidelity inspection.
+  //
+  // This allows generic clients to render or persist the original event without
+  // losing fields that are not modeled explicitly in the public API.
+  string cloud_event_json = 5;
+}
+
+// Change type for live definition-stats streams.
+enum DefinitionStatsChangeType {
+  // Default zero value.
+  DEFINITION_STATS_CHANGE_TYPE_UNSPECIFIED = 0;
+
+  // A row was created or updated and should be inserted or replaced client-side.
+  DEFINITION_STATS_CHANGE_TYPE_UPSERT = 1;
+
+  // A row no longer matches the filter and should be removed client-side.
+  DEFINITION_STATS_CHANGE_TYPE_REMOVED = 2;
+}
+
+// One live change to a definition-stats row.
+message DefinitionStatsChange {
+  // Kind of change represented by this message.
+  DefinitionStatsChangeType change_type = 1;
+
+  // Latest known state of the definition stats row that changed.
+  //
+  // For REMOVED, identity fields are guaranteed and counters reflect the latest
+  // known state at the time the row stopped matching the watch filter.
+  DefinitionStats stats = 2;
+}
+
+// Change type for live instance streams.
+enum InstanceChangeType {
+  // Default zero value.
+  INSTANCE_CHANGE_TYPE_UNSPECIFIED = 0;
+
+  // A row was created or updated and should be inserted or replaced client-side.
+  INSTANCE_CHANGE_TYPE_UPSERT = 1;
+
+  // A row no longer matches the filter and should be removed client-side.
+  INSTANCE_CHANGE_TYPE_REMOVED = 2;
+}
+
+// One live change to the filtered instance set.
+message InstanceChange {
+  // Kind of change represented by this message.
+  InstanceChangeType change_type = 1;
+
+  // Latest known state of the instance that changed.
+  //
+  // For REMOVED, the instance is still included so clients can remove the row
+  // while preserving access to the state that caused the removal.
+  InstanceSummary instance = 2;
+}
+
+// Result of a StartInstance call.
+enum StartInstanceResult {
+  // Default zero value.
+  START_INSTANCE_RESULT_UNSPECIFIED = 0;
+
+  // A new instance start was accepted.
+  START_INSTANCE_RESULT_ACCEPTED_NEW = 1;
+
+  // The request matched an existing instance_id and was accepted idempotently.
+  START_INSTANCE_RESULT_ACCEPTED_EXISTING = 2;
+}
+
+// Request for ListDefinitions.
+message ListDefinitionsRequest {
+  // Filter by namespace. Omit to include all accessible namespaces.
+  optional string namespace = 1;
+
+  // Filter by definition name. Omit to include all names.
+  optional string name = 2;
+
+  // When omitted or true, return only the latest version per namespace/name.
+  // Set to false to include all stored versions.
+  optional bool latest_only = 3;
+
+  // Maximum number of rows to return. Zero lets the server choose a default.
+  int32 page_size = 4;
+
+  // Opaque pagination cursor returned by next_page_cursor.
+  // Replay it only with the exact same filter set to continue the same ordered snapshot.
+  optional string page_cursor = 5;
+}
+
+// Response for ListDefinitions.
+message ListDefinitionsResponse {
+  // Returned definition rows, ordered by namespace ascending, name ascending,
+  // and version descending.
+  repeated DefinitionSummary definitions = 1;
+
+  // Opaque cursor for the next page, if more rows exist.
+  optional string next_page_cursor = 2;
+
+  // Optional total row count for the current filter.
+  // Servers may omit this when it would be too expensive to compute.
+  optional int64 total_count = 3;
+}
+
+// Request for GetDefinition.
+message GetDefinitionRequest {
+  // Definition namespace.
+  string namespace = 1;
+
+  // Definition name.
+  string name = 2;
+
+  // Concrete version to fetch.
+  // When omitted, the latest version is returned.
+  optional string version = 3;
+}
+
+// Response for GetDefinition.
+message GetDefinitionResponse {
+  // Full definition resource returned by the server.
+  WorkflowDefinition definition = 1;
+}
+
+// Request for ListDefinitionStats.
+message ListDefinitionStatsRequest {
+  // Filter by namespace. Omit to include all accessible namespaces.
+  optional string namespace = 1;
+
+  // Filter by definition name. Omit to include all names.
+  optional string name = 2;
+
+  // Filter by concrete version. Omit to include all versions.
+  optional string version = 3;
+
+  // Required inclusive lower bound for the aggregation window.
+  google.protobuf.Timestamp time_from = 4;
+
+  // Required exclusive upper bound for the aggregation window.
+  google.protobuf.Timestamp time_to = 5;
+
+  // Maximum number of rows to return. Zero lets the server choose a default.
+  int32 page_size = 6;
+
+  // Opaque pagination cursor returned by next_page_cursor.
+  // Replay it only with the exact same filter set to continue the same ordered snapshot.
+  optional string page_cursor = 7;
+}
+
+// Response for ListDefinitionStats.
+message ListDefinitionStatsResponse {
+  // Returned stats rows, ordered by namespace ascending, name ascending, and
+  // version descending.
+  repeated DefinitionStats stats = 1;
+
+  // Opaque cursor for the next page, if more rows exist.
+  optional string next_page_cursor = 2;
+
+  // Opaque cursor representing the logical end of this snapshot.
+  // All pages belonging to the same snapshot return the same watch_cursor.
+  // Pass this into WatchDefinitionStats.after_cursor after consuming the final
+  // page to continue without gaps.
+  optional string watch_cursor = 3;
+
+  // Optional total row count for the current filter.
+  optional int64 total_count = 4;
+}
+
+// Request for WatchDefinitionStats.
+message WatchDefinitionStatsRequest {
+  // Filter by namespace. Omit to include all accessible namespaces.
+  optional string namespace = 1;
+
+  // Filter by definition name. Omit to include all names.
+  optional string name = 2;
+
+  // Filter by concrete version. Omit to include all versions.
+  optional string version = 3;
+
+  // Required inclusive lower bound for the aggregation window.
+  google.protobuf.Timestamp time_from = 4;
+
+  // Required exclusive upper bound for the aggregation window.
+  google.protobuf.Timestamp time_to = 5;
+
+  // Opaque cursor previously returned by a definition-stats list or watch
+  // response for the exact same filter set.
+  // When omitted, the stream starts from "now" and emits only future changes.
+  optional string after_cursor = 6;
+}
+
+// Response item for WatchDefinitionStats.
+message WatchDefinitionStatsResponse {
+  // Opaque cursor to persist for resuming this watch later.
+  string cursor = 1;
+
+  // Changed stats row.
+  DefinitionStatsChange change = 2;
+}
+
+// Request for StartInstance.
+message StartInstanceRequest {
+  // Target definition namespace.
+  string namespace = 1;
+
+  // Target definition name.
+  string name = 2;
+
+  // Target definition version.
+  // When omitted, the latest version is started.
+  optional string version = 3;
+
+  // Optional caller-supplied identifier for idempotent starts.
+  // When omitted, the server generates a new instance identifier.
+  optional string instance_id = 4;
+
+  // Input payload passed to the workflow.
+  // This may contain any JSON value, though object values are most common.
+  // When omitted, the server behaves as if an empty object was supplied.
+  google.protobuf.Value input = 5;
+
+  // Optional IANA time zone identifier used by time-sensitive expressions.
+  optional string zone_id = 6;
+}
+
+// Response for StartInstance.
+message StartInstanceResponse {
+  // The created or reused instance identifier.
+  string instance_id = 1;
+
+  // Resolved definition namespace.
+  string namespace = 2;
+
+  // Resolved definition name.
+  string name = 3;
+
+  // Resolved definition version actually started.
+  string version = 4;
+
+  // Outcome of the start request.
+  StartInstanceResult result = 5;
+}
+
+// Request for GetInstance.
+message GetInstanceRequest {
+  // Unique workflow instance identifier.
+  string instance_id = 1;
+}
+
+// Response for GetInstance.
+message GetInstanceResponse {
+  // Current instance summary.
+  InstanceSummary instance = 1;
+
+  // Opaque cursor of the latest event included in the returned summary, if known.
+  // Clients can pass this into WatchInstanceEvents.after_cursor to tail live
+  // events after the current state without replaying older events.
+  optional string latest_event_cursor = 2;
+}
+
+// Request for ListInstances.
+message ListInstancesRequest {
+  // Filter by namespace. Omit to include all accessible namespaces.
+  optional string namespace = 1;
+
+  // Filter by definition name. Omit to include all names.
+  optional string name = 2;
+
+  // Filter by concrete version. Omit to include all versions.
+  optional string version = 3;
+
+  // Filter by current lifecycle status. Omit to include all statuses.
+  optional InstanceStatus status = 4;
+
+  // Inclusive lower bound for instance creation time. Omit for an unbounded
+  // lower bound.
+  google.protobuf.Timestamp created_from = 5;
+
+  // Exclusive upper bound for instance creation time. Omit for an unbounded
+  // upper bound.
+  google.protobuf.Timestamp created_to = 6;
+
+  // Maximum number of rows to return. Zero lets the server choose a default.
+  int32 page_size = 7;
+
+  // Opaque pagination cursor returned by next_page_cursor.
+  // Replay it only with the exact same filter set to continue the same ordered snapshot.
+  optional string page_cursor = 8;
+
+  // Optional prefix filter for type-ahead or partial identifier search.
+  optional string instance_id_prefix = 9;
+}
+
+// Response for ListInstances.
+message ListInstancesResponse {
+  // Returned instance rows, ordered by created_at descending and instance_id
+  // descending.
+  repeated InstanceSummary instances = 1;
+
+  // Opaque cursor for the next page, if more rows exist.
+  optional string next_page_cursor = 2;
+
+  // Optional total row count for the current filter.
+  optional int64 total_count = 3;
+
+  // Opaque cursor representing the logical end of this snapshot.
+  // All pages belonging to the same snapshot return the same watch_cursor.
+  // Pass this into WatchInstances.after_cursor after consuming the final page
+  // to continue without gaps.
+  optional string watch_cursor = 4;
+}
+
+// Request for WatchInstances.
+message WatchInstancesRequest {
+  // Filter by namespace. Omit to include all accessible namespaces.
+  optional string namespace = 1;
+
+  // Filter by definition name. Omit to include all names.
+  optional string name = 2;
+
+  // Filter by concrete version. Omit to include all versions.
+  optional string version = 3;
+
+  // Filter by current lifecycle status. Omit to include all statuses.
+  optional InstanceStatus status = 4;
+
+  // Inclusive lower bound for instance creation time. Omit for an unbounded
+  // lower bound.
+  google.protobuf.Timestamp created_from = 5;
+
+  // Exclusive upper bound for instance creation time. Omit for an unbounded
+  // upper bound.
+  google.protobuf.Timestamp created_to = 6;
+
+  // Optional prefix filter for type-ahead or partial identifier search.
+  optional string instance_id_prefix = 7;
+
+  // Opaque cursor previously returned by an instance list or watch response for
+  // the exact same filter set.
+  // When omitted, the stream starts from "now" and emits only future changes.
+  optional string after_cursor = 8;
+}
+
+// Response item for WatchInstances.
+message WatchInstancesResponse {
+  // Opaque cursor to persist for resuming this watch later.
+  string cursor = 1;
+
+  // Changed instance row.
+  InstanceChange change = 2;
+}
+
+// Request for ListInstanceEvents.
+message ListInstanceEventsRequest {
+  // Unique workflow instance identifier.
+  string instance_id = 1;
+
+  // Exclusive lower bound for this instance's event stream.
+  // When omitted, events are returned from the first event onward.
+  optional string after_cursor = 2;
+
+  // Maximum number of events to return. Zero lets the server choose a default.
+  int32 page_size = 3;
+}
+
+// Response for ListInstanceEvents.
+message ListInstanceEventsResponse {
+  // Returned events, ordered by cursor ascending.
+  repeated InstanceEvent events = 1;
+
+  // Opaque cursor to continue the history query, if more events exist.
+  // Pass this back into ListInstanceEvents.after_cursor for the same instance.
+  optional string next_cursor = 2;
+}
+
+// Request for WatchInstanceEvents.
+message WatchInstanceEventsRequest {
+  // Unique workflow instance identifier.
+  string instance_id = 1;
+
+  // Exclusive lower bound for this instance's event stream.
+  // When omitted, the stream replays from the first event and then tails live.
+  optional string after_cursor = 2;
+}
+
+// Response item for WatchInstanceEvents.
+message WatchInstanceEventsResponse {
+  // Next event in the ordered instance timeline.
+  InstanceEvent event = 1;
 }

@@ -1,53 +1,74 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.gateway.grpc
 
+import com.google.protobuf.Duration as ProtoDuration
+import com.google.protobuf.Timestamp as ProtoTimestamp
 import com.lemline.common.values.IDV7
-import com.lemline.common.values.WorkflowId
 import com.lemline.gateway.v1.DefinitionStats
-import com.lemline.gateway.v1.DefinitionStatsUpdate
+import com.lemline.gateway.v1.DefinitionStatsChange
+import com.lemline.gateway.v1.DefinitionStatsChangeType
+import com.lemline.gateway.v1.DefinitionSummary
 import com.lemline.gateway.v1.GetDefinitionRequest
 import com.lemline.gateway.v1.GetDefinitionResponse
-import com.lemline.gateway.v1.GetDefinitionStatsRequest
-import com.lemline.gateway.v1.GetDefinitionStatsResponse
-import com.lemline.gateway.v1.GetInstanceTimelineRequest
-import com.lemline.gateway.v1.GetInstanceTimelineResponse
-import com.lemline.gateway.v1.InstanceUpdate
+import com.lemline.gateway.v1.GetInstanceRequest
+import com.lemline.gateway.v1.GetInstanceResponse
+import com.lemline.gateway.v1.InstanceChange
+import com.lemline.gateway.v1.InstanceChangeType
+import com.lemline.gateway.v1.InstanceEvent
+import com.lemline.gateway.v1.InstanceStatus as ProtoInstanceStatus
+import com.lemline.gateway.v1.InstanceSummary
+import com.lemline.gateway.v1.ListDefinitionStatsRequest
+import com.lemline.gateway.v1.ListDefinitionStatsResponse
 import com.lemline.gateway.v1.ListDefinitionsRequest
 import com.lemline.gateway.v1.ListDefinitionsResponse
+import com.lemline.gateway.v1.ListInstanceEventsRequest
+import com.lemline.gateway.v1.ListInstanceEventsResponse
 import com.lemline.gateway.v1.ListInstancesRequest
 import com.lemline.gateway.v1.ListInstancesResponse
-import com.lemline.gateway.v1.ListNamespacesRequest
-import com.lemline.gateway.v1.ListNamespacesResponse
-import com.lemline.gateway.v1.StartWorkflowRequest
-import com.lemline.gateway.v1.StartWorkflowResponse
-import com.lemline.gateway.v1.TimelineEvent
+import com.lemline.gateway.v1.StartInstanceRequest
+import com.lemline.gateway.v1.StartInstanceResponse
+import com.lemline.gateway.v1.StartInstanceResult
 import com.lemline.gateway.v1.WatchDefinitionStatsRequest
+import com.lemline.gateway.v1.WatchDefinitionStatsResponse
+import com.lemline.gateway.v1.WatchInstanceEventsRequest
+import com.lemline.gateway.v1.WatchInstanceEventsResponse
 import com.lemline.gateway.v1.WatchInstancesRequest
-import com.lemline.gateway.v1.WatchWorkflowRequest
-import com.lemline.gateway.v1.WorkflowAnalyticsEvent
-import com.lemline.gateway.v1.WorkflowDefinitionSummary
-import com.lemline.gateway.v1.WorkflowGatewayGrpc
-import com.lemline.gateway.v1.WorkflowInstance
+import com.lemline.gateway.v1.WatchInstancesResponse
+import com.lemline.gateway.v1.WorkflowDefinition
+import com.lemline.gateway.v1.WorkflowGatewayServiceGrpc
 import com.lemline.runner.config.LemlineConfiguration
 import com.lemline.runner.config.gatewayAuthenticationEnabled
 import com.lemline.runner.gateway.auth.GatewayAuthContext
+import com.lemline.runner.gateway.auth.GatewayAuthorizer
 import com.lemline.runner.gateway.auth.GatewayPrincipal
+import com.lemline.runner.gateway.dashboard.ChangeType
+import com.lemline.runner.gateway.dashboard.DefinitionDetailsRow
+import com.lemline.runner.gateway.dashboard.DefinitionListFilter
+import com.lemline.runner.gateway.dashboard.DefinitionPageBoundary
 import com.lemline.runner.gateway.dashboard.DefinitionQueryService
-import com.lemline.runner.gateway.dashboard.InstanceQueryFilter
+import com.lemline.runner.gateway.dashboard.DefinitionStatsChangeRow
+import com.lemline.runner.gateway.dashboard.DefinitionStatsFilter
+import com.lemline.runner.gateway.dashboard.DefinitionStatsRow
+import com.lemline.runner.gateway.dashboard.ErrorSummaryRow
+import com.lemline.runner.gateway.dashboard.InstanceChangeRow
+import com.lemline.runner.gateway.dashboard.InstanceEventFilter
+import com.lemline.runner.gateway.dashboard.InstanceEventQueryService
+import com.lemline.runner.gateway.dashboard.InstanceEventRow
+import com.lemline.runner.gateway.dashboard.InstanceListFilter
+import com.lemline.runner.gateway.dashboard.InstancePageBoundary
 import com.lemline.runner.gateway.dashboard.InstanceQueryService
+import com.lemline.runner.gateway.dashboard.InstanceStatus
 import com.lemline.runner.gateway.dashboard.InstanceStreamService
-import com.lemline.runner.gateway.dashboard.InstanceUpdateType
-import com.lemline.runner.gateway.dashboard.StatsQueryFilter
-import com.lemline.runner.gateway.dashboard.TimelineQueryService
-import com.lemline.runner.gateway.dashboard.WatchInstancesFilter
-import com.lemline.runner.gateway.dashboard.WorkflowRuntimeStatus
+import com.lemline.runner.gateway.dashboard.InstanceSummaryRow
+import com.lemline.runner.gateway.dashboard.StatsQueryService
 import com.lemline.runner.gateway.errors.GatewayBadRequestException
 import com.lemline.runner.gateway.errors.GatewayConflictException
 import com.lemline.runner.gateway.errors.GatewayNotFoundException
 import com.lemline.runner.gateway.errors.GatewayPermissionDeniedException
-import com.lemline.runner.gateway.start.GatewayStartResult
-import com.lemline.runner.gateway.start.WorkflowStartService
-import com.lemline.runner.gateway.watch.WorkflowWatchService
+import com.lemline.runner.gateway.start.InstanceStartResult
+import com.lemline.runner.gateway.start.InstanceStartService
+import com.lemline.runner.gateway.start.StartInstanceOutcome
+import com.lemline.runner.gateway.watch.InstanceEventStreamService
 import io.grpc.Status
 import io.grpc.StatusRuntimeException
 import io.grpc.stub.ServerCallStreamObserver
@@ -69,153 +90,91 @@ import kotlinx.coroutines.launch
 @Singleton
 class WorkflowGatewayGrpcService(
     private val config: LemlineConfiguration,
-) : WorkflowGatewayGrpc.WorkflowGatewayImplBase() {
+) : WorkflowGatewayServiceGrpc.WorkflowGatewayServiceImplBase() {
 
     @Inject
-    lateinit var startService: WorkflowStartService
+    lateinit var authorizer: GatewayAuthorizer
 
     @Inject
-    lateinit var watchService: WorkflowWatchService
+    lateinit var startService: InstanceStartService
+
+    @Inject
+    lateinit var instanceEventStreamService: InstanceEventStreamService
 
     @Inject
     lateinit var definitionQueryService: DefinitionQueryService
 
     @Inject
-    lateinit var statsQueryService: com.lemline.runner.gateway.dashboard.StatsQueryService
+    lateinit var statsQueryService: StatsQueryService
 
     @Inject
     lateinit var instanceQueryService: InstanceQueryService
 
     @Inject
-    lateinit var timelineQueryService: TimelineQueryService
+    lateinit var instanceEventQueryService: InstanceEventQueryService
 
     @Inject
     lateinit var instanceStreamService: InstanceStreamService
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
-    override fun startWorkflow(request: StartWorkflowRequest, responseObserver: StreamObserver<StartWorkflowResponse>) {
-        val principal = requirePrincipal(responseObserver) ?: return
-
-        val callObserver = responseObserver as? ServerCallStreamObserver<StartWorkflowResponse>
-        scope.launch {
-            try {
-                val startResult = startService.start(request, principal)
-                if (callObserver?.isCancelled == true) return@launch
-
-                val response = StartWorkflowResponse.newBuilder()
-                    .setWorkflowId(startResult.workflowId.toString())
-                    .setResult(
-                        when (startResult.result) {
-                            GatewayStartResult.ACCEPTED_NEW -> StartWorkflowResponse.Result.START_WORKFLOW_RESULT_ACCEPTED_NEW
-                            GatewayStartResult.ACCEPTED_EXISTING -> StartWorkflowResponse.Result.START_WORKFLOW_RESULT_ACCEPTED_EXISTING
-                        }
-                    )
-                    .build()
-
-                responseObserver.onNext(response)
-                responseObserver.onCompleted()
-            } catch (t: Throwable) {
-                if (callObserver?.isCancelled == true) return@launch
-                responseObserver.onError(toStatusException(t))
-            }
-        }
-    }
-
-    override fun watchWorkflow(
-        request: WatchWorkflowRequest,
-        responseObserver: StreamObserver<WorkflowAnalyticsEvent>
-    ) {
-        val principal = requirePrincipal(responseObserver) ?: return
-
-        val callObserver = responseObserver as? ServerCallStreamObserver<WorkflowAnalyticsEvent>
-        scope.launch {
-            try {
-                val workflowId = parseWorkflowId(request)
-
-                watchService.watch(workflowId, principal) { event ->
-                    if (callObserver?.isCancelled == true) return@watch false
-
-                    responseObserver.onNext(
-                        WorkflowAnalyticsEvent.newBuilder()
-                            .setCursor(event.cursor)
-                            .setCloudeventJson(event.cloudEventJson)
-                            .build()
-                    )
-                    true
-                }
-
-                if (callObserver?.isCancelled == true) return@launch
-                responseObserver.onCompleted()
-            } catch (t: Throwable) {
-                if (callObserver?.isCancelled == true) return@launch
-                responseObserver.onError(toStatusException(t))
-            }
-        }
-    }
-
-    override fun listNamespaces(
-        request: ListNamespacesRequest,
-        responseObserver: StreamObserver<ListNamespacesResponse>
-    ) {
-        requirePrincipal(responseObserver) ?: return
-        val callObserver = responseObserver as? ServerCallStreamObserver<ListNamespacesResponse>
-
-        scope.launch {
-            try {
-                val namespaces = definitionQueryService.listNamespaces()
-                if (callObserver?.isCancelled == true) return@launch
-
-                responseObserver.onNext(
-                    ListNamespacesResponse.newBuilder()
-                        .addAllNamespaces(namespaces)
-                        .build()
-                )
-                responseObserver.onCompleted()
-            } catch (t: Throwable) {
-                if (callObserver?.isCancelled == true) return@launch
-                responseObserver.onError(toStatusException(t))
-            }
-        }
-    }
-
     override fun listDefinitions(
         request: ListDefinitionsRequest,
-        responseObserver: StreamObserver<ListDefinitionsResponse>
+        responseObserver: StreamObserver<ListDefinitionsResponse>,
     ) {
-        requirePrincipal(responseObserver) ?: return
+        val principal = requirePrincipal(responseObserver) ?: return
         val callObserver = responseObserver as? ServerCallStreamObserver<ListDefinitionsResponse>
 
         scope.launch {
             try {
-                val namespace = request.namespace.trim()
-                if (namespace.isBlank()) {
-                    throw GatewayBadRequestException("namespace must be provided")
+                val namespace = optionalString(request.hasNamespace(), request.namespace)
+                val allowedNamespaces = allowedNamespacesForRead(principal, namespace)
+                val filter = DefinitionListFilter(
+                    namespace = namespace,
+                    name = optionalString(request.hasName(), request.name),
+                    latestOnly = if (request.hasLatestOnly()) request.latestOnly else true,
+                    allowedNamespaces = allowedNamespaces,
+                    pageSize = request.pageSize,
+                )
+
+                val pageCursor = if (request.hasPageCursor()) {
+                    GatewayCursorCodec.decodeDefinitionPageCursor(request.pageCursor).also {
+                        requireDefinitionPageCursorMatches(it, filter)
+                    }
+                } else {
+                    null
                 }
+                val snapshotAt = pageCursor?.snapshotAt?.let(::parseCursorInstant) ?: Instant.now()
+                val result = definitionQueryService.listDefinitions(
+                    filter = filter,
+                    snapshotAt = snapshotAt,
+                    page = pageCursor?.toBoundary(),
+                )
 
-                val name = request.takeIf { it.hasName() }?.name?.trim()?.ifBlank { null }
-                val latestOnly = if (request.hasLatestOnly()) request.latestOnly else true
-
-                val definitions = definitionQueryService.listDefinitions(namespace, name, latestOnly)
                 if (callObserver?.isCancelled == true) return@launch
 
-                val response = ListDefinitionsResponse.newBuilder()
-                    .addAllDefinitions(
-                        definitions.map { row ->
-                            WorkflowDefinitionSummary.newBuilder()
-                                .setNamespace(row.namespace)
-                                .setName(row.name)
-                                .setVersion(row.version)
-                                .setIsLatest(row.isLatest)
-                                .setVersionCount(row.versionCount)
-                                .setCreatedAt(row.createdAt.toString())
-                                .setUpdatedAt(row.updatedAt?.toString() ?: "")
-                                .build()
-                        }
-                    )
-                    .build()
+                val builder = ListDefinitionsResponse.newBuilder()
+                    .addAllDefinitions(result.definitions.map(::toProtoDefinitionSummary))
+                    .setTotalCount(result.totalCount)
 
-                responseObserver.onNext(response)
+                result.nextPage?.let {
+                    builder.setNextPageCursor(
+                        GatewayCursorCodec.encodeDefinitionPageCursor(
+                            DefinitionPageCursor(
+                                namespace = filter.namespace,
+                                name = filter.name,
+                                latestOnly = filter.latestOnly,
+                                allowedNamespaces = normalizeAllowedNamespaces(filter.allowedNamespaces),
+                                snapshotAt = snapshotAt.toString(),
+                                lastNamespace = it.namespace,
+                                lastName = it.name,
+                                lastVersion = it.version,
+                            )
+                        )
+                    )
+                }
+
+                responseObserver.onNext(builder.build())
                 responseObserver.onCompleted()
             } catch (t: Throwable) {
                 if (callObserver?.isCancelled == true) return@launch
@@ -226,30 +185,28 @@ class WorkflowGatewayGrpcService(
 
     override fun getDefinition(
         request: GetDefinitionRequest,
-        responseObserver: StreamObserver<GetDefinitionResponse>
+        responseObserver: StreamObserver<GetDefinitionResponse>,
     ) {
-        requirePrincipal(responseObserver) ?: return
+        val principal = requirePrincipal(responseObserver) ?: return
         val callObserver = responseObserver as? ServerCallStreamObserver<GetDefinitionResponse>
 
         scope.launch {
             try {
-                val namespace = request.namespace.trim()
-                val name = request.name.trim()
-                if (namespace.isBlank()) throw GatewayBadRequestException("namespace must be provided")
-                if (name.isBlank()) throw GatewayBadRequestException("name must be provided")
+                val namespace = requiredString(request.namespace, "namespace")
+                val name = requiredString(request.name, "name")
+                authorizer.requireNamespace(principal, namespace)
 
-                val version = if (request.hasVersion()) request.version.trim().ifBlank { null } else null
-                val definition = definitionQueryService.getDefinition(namespace, name, version)
-                    ?: throw GatewayNotFoundException("Workflow definition '$namespace/$name${version?.let { ":$it" } ?: ""}' not found")
+                val definition = definitionQueryService.getDefinition(
+                    namespace = namespace,
+                    name = name,
+                    version = optionalString(request.hasVersion(), request.version),
+                ) ?: throw GatewayNotFoundException("Definition '$namespace/$name' not found")
 
                 if (callObserver?.isCancelled == true) return@launch
+
                 responseObserver.onNext(
                     GetDefinitionResponse.newBuilder()
-                        .setNamespace(definition.namespace)
-                        .setName(definition.name)
-                        .setVersion(definition.version)
-                        .setDefinition(definition.definition)
-                        .addAllAvailableVersions(definition.availableVersions)
+                        .setDefinition(toProtoWorkflowDefinition(definition))
                         .build()
                 )
                 responseObserver.onCompleted()
@@ -260,118 +217,69 @@ class WorkflowGatewayGrpcService(
         }
     }
 
-    override fun getDefinitionStats(
-        request: GetDefinitionStatsRequest,
-        responseObserver: StreamObserver<GetDefinitionStatsResponse>
+    override fun listDefinitionStats(
+        request: ListDefinitionStatsRequest,
+        responseObserver: StreamObserver<ListDefinitionStatsResponse>,
     ) {
-        requirePrincipal(responseObserver) ?: return
-        val callObserver = responseObserver as? ServerCallStreamObserver<GetDefinitionStatsResponse>
+        val principal = requirePrincipal(responseObserver) ?: return
+        val callObserver = responseObserver as? ServerCallStreamObserver<ListDefinitionStatsResponse>
 
         scope.launch {
             try {
-                val filter = StatsQueryFilter(
-                    namespace = optionalString(request.hasNamespace(), request.namespace),
-                    name = optionalString(request.hasName(), request.name),
-                    version = optionalString(request.hasVersion(), request.version),
-                    timeFrom = optionalInstant(request.hasTimeFrom(), request.timeFrom, "time_from"),
-                    timeTo = optionalInstant(request.hasTimeTo(), request.timeTo, "time_to"),
+                val filter = parseDefinitionStatsFilter(request, principal)
+                val pageCursor = if (request.hasPageCursor()) {
+                    GatewayCursorCodec.decodeDefinitionStatsPageCursor(request.pageCursor).also {
+                        requireDefinitionStatsPageCursorMatches(it, filter)
+                    }
+                } else {
+                    null
+                }
+                val snapshotSequence = pageCursor?.snapshotSequence ?: instanceQueryService.latestSequence()
+                val result = statsQueryService.listDefinitionStats(
+                    filter = filter,
+                    snapshotSequence = snapshotSequence,
+                    page = pageCursor?.toBoundary(),
                 )
 
-                val stats = statsQueryService.queryStats(filter)
                 if (callObserver?.isCancelled == true) return@launch
 
-                val response = GetDefinitionStatsResponse.newBuilder()
-                    .addAllStats(stats.map(::toProtoStats))
-                    .build()
-
-                responseObserver.onNext(response)
-                responseObserver.onCompleted()
-            } catch (t: Throwable) {
-                if (callObserver?.isCancelled == true) return@launch
-                responseObserver.onError(toStatusException(t))
-            }
-        }
-    }
-
-    override fun listInstances(
-        request: ListInstancesRequest,
-        responseObserver: StreamObserver<ListInstancesResponse>
-    ) {
-        requirePrincipal(responseObserver) ?: return
-        val callObserver = responseObserver as? ServerCallStreamObserver<ListInstancesResponse>
-
-        scope.launch {
-            try {
-                val filter = InstanceQueryFilter(
-                    namespace = optionalString(request.hasNamespace(), request.namespace),
-                    name = optionalString(request.hasName(), request.name),
-                    version = optionalString(request.hasVersion(), request.version),
-                    status = WorkflowRuntimeStatus.fromFilter(optionalString(request.hasStatus(), request.status)),
-                    timeFrom = optionalInstant(request.hasTimeFrom(), request.timeFrom, "time_from"),
-                    timeTo = optionalInstant(request.hasTimeTo(), request.timeTo, "time_to"),
-                    workflowId = optionalUuid(request.hasWorkflowId(), request.workflowId, "workflow_id"),
-                    workflowIdPrefix = optionalString(request.hasWorkflowIdPrefix(), request.workflowIdPrefix),
-                    pageSize = request.pageSize,
-                    pageCursor = optionalString(request.hasPageCursor(), request.pageCursor),
-                )
-
-                val result = instanceQueryService.listInstances(filter)
-                if (callObserver?.isCancelled == true) return@launch
-
-                val responseBuilder = ListInstancesResponse.newBuilder()
-                    .setTotalCount(result.totalCount)
-                    .addAllInstances(result.instances.map(::toProtoInstance))
-
-                result.nextCursor?.let { responseBuilder.nextCursor = it }
-
-                responseObserver.onNext(responseBuilder.build())
-                responseObserver.onCompleted()
-            } catch (t: Throwable) {
-                if (callObserver?.isCancelled == true) return@launch
-                responseObserver.onError(toStatusException(t))
-            }
-        }
-    }
-
-    override fun getInstanceTimeline(
-        request: GetInstanceTimelineRequest,
-        responseObserver: StreamObserver<GetInstanceTimelineResponse>
-    ) {
-        requirePrincipal(responseObserver) ?: return
-        val callObserver = responseObserver as? ServerCallStreamObserver<GetInstanceTimelineResponse>
-
-        scope.launch {
-            try {
-                val workflowId = parseWorkflowId(request.workflowId, "workflow_id")
-                val timeline = timelineQueryService.getInstanceTimeline(workflowId, request.includeDefinition)
-                    ?: throw GatewayNotFoundException("Workflow '$workflowId' not found")
-
-                if (callObserver?.isCancelled == true) return@launch
-
-                val responseBuilder = GetInstanceTimelineResponse.newBuilder()
-                    .setWorkflowId(timeline.workflowId.toString())
-                    .setNamespace(timeline.namespace)
-                    .setName(timeline.name)
-                    .setVersion(timeline.version)
-                    .setStatus(timeline.status.name)
-                    .addAllEvents(
-                        timeline.events.map { event ->
-                            val builder = TimelineEvent.newBuilder()
-                                .setSequence(event.sequence)
-                                .setEventType(event.eventType)
-                                .setEventTime(event.eventTime?.toString() ?: "")
-                                .setCategory(event.category)
-                                .setPayloadJson(event.payloadJson)
-
-                            event.taskPointer?.let { builder.taskPointer = it }
-                            event.taskName?.let { builder.taskName = it }
-                            builder.build()
-                        }
+                val watchCursor = GatewayCursorCodec.encodeDefinitionStatsWatchCursor(
+                    DefinitionStatsWatchCursor(
+                        namespace = filter.namespace,
+                        name = filter.name,
+                        version = filter.version,
+                        allowedNamespaces = normalizeAllowedNamespaces(filter.allowedNamespaces),
+                        timeFrom = filter.timeFrom.toString(),
+                        timeTo = filter.timeTo.toString(),
+                        sequence = result.watchSequence,
                     )
+                )
 
-                timeline.definition?.let { responseBuilder.definition = it }
+                val builder = ListDefinitionStatsResponse.newBuilder()
+                    .addAllStats(result.stats.map(::toProtoDefinitionStats))
+                    .setTotalCount(result.totalCount)
+                    .setWatchCursor(watchCursor)
 
-                responseObserver.onNext(responseBuilder.build())
+                result.nextPage?.let {
+                    builder.setNextPageCursor(
+                        GatewayCursorCodec.encodeDefinitionStatsPageCursor(
+                            DefinitionStatsPageCursor(
+                                namespace = filter.namespace,
+                                name = filter.name,
+                                version = filter.version,
+                                allowedNamespaces = normalizeAllowedNamespaces(filter.allowedNamespaces),
+                                timeFrom = filter.timeFrom.toString(),
+                                timeTo = filter.timeTo.toString(),
+                                snapshotSequence = result.watchSequence,
+                                lastNamespace = it.namespace,
+                                lastName = it.name,
+                                lastVersion = it.version,
+                            )
+                        )
+                    )
+                }
+
+                responseObserver.onNext(builder.build())
                 responseObserver.onCompleted()
             } catch (t: Throwable) {
                 if (callObserver?.isCancelled == true) return@launch
@@ -382,32 +290,191 @@ class WorkflowGatewayGrpcService(
 
     override fun watchDefinitionStats(
         request: WatchDefinitionStatsRequest,
-        responseObserver: StreamObserver<DefinitionStatsUpdate>
+        responseObserver: StreamObserver<WatchDefinitionStatsResponse>,
     ) {
-        requirePrincipal(responseObserver) ?: return
-        val callObserver = responseObserver as? ServerCallStreamObserver<DefinitionStatsUpdate>
+        val principal = requirePrincipal(responseObserver) ?: return
+        val callObserver = responseObserver as? ServerCallStreamObserver<WatchDefinitionStatsResponse>
 
         scope.launch {
             try {
-                val filter = StatsQueryFilter(
-                    namespace = optionalString(request.hasNamespace(), request.namespace),
-                    name = optionalString(request.hasName(), request.name),
-                    version = optionalString(request.hasVersion(), request.version),
-                    timeFrom = optionalInstant(request.hasTimeFrom(), request.timeFrom, "time_from"),
-                    timeTo = optionalInstant(request.hasTimeTo(), request.timeTo, "time_to"),
-                )
+                authorizer.requireScope(principal, "lemline.watch")
+                val filter = parseDefinitionStatsFilter(request, principal)
+                val afterSequence = if (request.hasAfterCursor()) {
+                    GatewayCursorCodec.decodeDefinitionStatsWatchCursor(request.afterCursor).also {
+                        requireDefinitionStatsWatchCursorMatches(it, filter)
+                    }.sequence
+                } else {
+                    null
+                }
 
-                instanceStreamService.watchDefinitionStats(filter) { stats ->
+                instanceStreamService.watchDefinitionStats(filter, afterSequence) { change ->
                     if (callObserver?.isCancelled == true) return@watchDefinitionStats false
+
+                    val cursor = GatewayCursorCodec.encodeDefinitionStatsWatchCursor(
+                        DefinitionStatsWatchCursor(
+                            namespace = filter.namespace,
+                            name = filter.name,
+                            version = filter.version,
+                            allowedNamespaces = normalizeAllowedNamespaces(filter.allowedNamespaces),
+                            timeFrom = filter.timeFrom.toString(),
+                            timeTo = filter.timeTo.toString(),
+                            sequence = change.cursor,
+                        )
+                    )
+
                     responseObserver.onNext(
-                        DefinitionStatsUpdate.newBuilder()
-                            .setStats(toProtoStats(stats))
+                        WatchDefinitionStatsResponse.newBuilder()
+                            .setCursor(cursor)
+                            .setChange(toProtoDefinitionStatsChange(change))
                             .build()
                     )
                     true
                 }
 
                 if (callObserver?.isCancelled == true) return@launch
+                responseObserver.onCompleted()
+            } catch (t: Throwable) {
+                if (callObserver?.isCancelled == true) return@launch
+                responseObserver.onError(toStatusException(t))
+            }
+        }
+    }
+
+    override fun startInstance(
+        request: StartInstanceRequest,
+        responseObserver: StreamObserver<StartInstanceResponse>,
+    ) {
+        val principal = requirePrincipal(responseObserver) ?: return
+        val callObserver = responseObserver as? ServerCallStreamObserver<StartInstanceResponse>
+
+        scope.launch {
+            try {
+                val result = startService.start(request, principal)
+                if (callObserver?.isCancelled == true) return@launch
+
+                responseObserver.onNext(
+                    StartInstanceResponse.newBuilder()
+                        .setInstanceId(result.instanceId.toString())
+                        .setNamespace(result.namespace.toString())
+                        .setName(result.name.toString())
+                        .setVersion(result.version.toString())
+                        .setResult(toProtoStartInstanceResult(result))
+                        .build()
+                )
+                responseObserver.onCompleted()
+            } catch (t: Throwable) {
+                if (callObserver?.isCancelled == true) return@launch
+                responseObserver.onError(toStatusException(t))
+            }
+        }
+    }
+
+    override fun getInstance(
+        request: GetInstanceRequest,
+        responseObserver: StreamObserver<GetInstanceResponse>,
+    ) {
+        val principal = requirePrincipal(responseObserver) ?: return
+        val callObserver = responseObserver as? ServerCallStreamObserver<GetInstanceResponse>
+
+        scope.launch {
+            try {
+                val instanceId = parseInstanceUuid(request.instanceId, "instance_id")
+                val snapshotSequence = instanceQueryService.latestSequence()
+                val row = instanceQueryService.findInstance(instanceId, snapshotSequence)
+                    ?: throw GatewayNotFoundException("Instance '$instanceId' not found")
+                authorizer.requireNamespace(principal, row.instance.namespace)
+
+                if (callObserver?.isCancelled == true) return@launch
+
+                val builder = GetInstanceResponse.newBuilder()
+                    .setInstance(toProtoInstanceSummary(row.instance))
+
+                row.latestEventSequence?.let {
+                    builder.setLatestEventCursor(
+                        GatewayCursorCodec.encodeInstanceEventCursor(
+                            InstanceEventCursor(
+                                instanceId = instanceId.toString(),
+                                sequence = it,
+                            )
+                        )
+                    )
+                }
+
+                responseObserver.onNext(builder.build())
+                responseObserver.onCompleted()
+            } catch (t: Throwable) {
+                if (callObserver?.isCancelled == true) return@launch
+                responseObserver.onError(toStatusException(t))
+            }
+        }
+    }
+
+    override fun listInstances(
+        request: ListInstancesRequest,
+        responseObserver: StreamObserver<ListInstancesResponse>,
+    ) {
+        val principal = requirePrincipal(responseObserver) ?: return
+        val callObserver = responseObserver as? ServerCallStreamObserver<ListInstancesResponse>
+
+        scope.launch {
+            try {
+                val filter = parseInstanceListFilter(request, principal)
+                val pageCursor = if (request.hasPageCursor()) {
+                    GatewayCursorCodec.decodeInstancePageCursor(request.pageCursor).also {
+                        requireInstancePageCursorMatches(it, filter)
+                    }
+                } else {
+                    null
+                }
+                val snapshotSequence = pageCursor?.snapshotSequence ?: instanceQueryService.latestSequence()
+                val result = instanceQueryService.listInstances(
+                    filter = filter,
+                    snapshotSequence = snapshotSequence,
+                    page = pageCursor?.toBoundary(),
+                )
+
+                if (callObserver?.isCancelled == true) return@launch
+
+                val watchCursor = GatewayCursorCodec.encodeInstanceWatchCursor(
+                    InstanceWatchCursor(
+                        namespace = filter.namespace,
+                        name = filter.name,
+                        version = filter.version,
+                        status = filter.status?.name,
+                        createdFrom = filter.createdFrom?.toString(),
+                        createdTo = filter.createdTo?.toString(),
+                        instanceIdPrefix = filter.instanceIdPrefix,
+                        allowedNamespaces = normalizeAllowedNamespaces(filter.allowedNamespaces),
+                        sequence = result.watchSequence,
+                    )
+                )
+
+                val builder = ListInstancesResponse.newBuilder()
+                    .addAllInstances(result.instances.map(::toProtoInstanceSummary))
+                    .setTotalCount(result.totalCount)
+                    .setWatchCursor(watchCursor)
+
+                result.nextPage?.let {
+                    builder.setNextPageCursor(
+                        GatewayCursorCodec.encodeInstancePageCursor(
+                            InstancePageCursor(
+                                namespace = filter.namespace,
+                                name = filter.name,
+                                version = filter.version,
+                                status = filter.status?.name,
+                                createdFrom = filter.createdFrom?.toString(),
+                                createdTo = filter.createdTo?.toString(),
+                                instanceIdPrefix = filter.instanceIdPrefix,
+                                allowedNamespaces = normalizeAllowedNamespaces(filter.allowedNamespaces),
+                                snapshotSequence = result.watchSequence,
+                                lastCreatedAt = it.createdAt.toString(),
+                                lastInstanceId = it.instanceId.toString(),
+                            )
+                        )
+                    )
+                }
+
+                responseObserver.onNext(builder.build())
                 responseObserver.onCompleted()
             } catch (t: Throwable) {
                 if (callObserver?.isCancelled == true) return@launch
@@ -418,32 +485,44 @@ class WorkflowGatewayGrpcService(
 
     override fun watchInstances(
         request: WatchInstancesRequest,
-        responseObserver: StreamObserver<InstanceUpdate>
+        responseObserver: StreamObserver<WatchInstancesResponse>,
     ) {
-        requirePrincipal(responseObserver) ?: return
-        val callObserver = responseObserver as? ServerCallStreamObserver<InstanceUpdate>
+        val principal = requirePrincipal(responseObserver) ?: return
+        val callObserver = responseObserver as? ServerCallStreamObserver<WatchInstancesResponse>
 
         scope.launch {
             try {
-                val filter = WatchInstancesFilter(
-                    namespace = optionalString(request.hasNamespace(), request.namespace),
-                    name = optionalString(request.hasName(), request.name),
-                    version = optionalString(request.hasVersion(), request.version),
-                )
-                val afterSequence = if (request.hasAfterSequence()) request.afterSequence else null
+                authorizer.requireScope(principal, "lemline.watch")
+                val filter = parseInstanceListFilter(request, principal)
+                val afterSequence = if (request.hasAfterCursor()) {
+                    GatewayCursorCodec.decodeInstanceWatchCursor(request.afterCursor).also {
+                        requireInstanceWatchCursorMatches(it, filter)
+                    }.sequence
+                } else {
+                    null
+                }
 
-                instanceStreamService.watchInstances(filter, afterSequence) { update ->
+                instanceStreamService.watchInstances(filter, afterSequence) { change ->
                     if (callObserver?.isCancelled == true) return@watchInstances false
+
+                    val cursor = GatewayCursorCodec.encodeInstanceWatchCursor(
+                        InstanceWatchCursor(
+                            namespace = filter.namespace,
+                            name = filter.name,
+                            version = filter.version,
+                            status = filter.status?.name,
+                            createdFrom = filter.createdFrom?.toString(),
+                            createdTo = filter.createdTo?.toString(),
+                            instanceIdPrefix = filter.instanceIdPrefix,
+                            allowedNamespaces = normalizeAllowedNamespaces(filter.allowedNamespaces),
+                            sequence = change.cursor,
+                        )
+                    )
+
                     responseObserver.onNext(
-                        InstanceUpdate.newBuilder()
-                            .setInstance(toProtoInstance(update.instance))
-                            .setUpdateType(
-                                when (update.updateType) {
-                                    InstanceUpdateType.CREATED -> "CREATED"
-                                    InstanceUpdateType.UPDATED -> "UPDATED"
-                                }
-                            )
-                            .setSequence(update.sequence)
+                        WatchInstancesResponse.newBuilder()
+                            .setCursor(cursor)
+                            .setChange(toProtoInstanceChange(change))
                             .build()
                     )
                     true
@@ -458,89 +537,431 @@ class WorkflowGatewayGrpcService(
         }
     }
 
-    private fun toProtoStats(row: com.lemline.runner.gateway.dashboard.DefinitionStatsRow): DefinitionStats {
-        val builder = DefinitionStats.newBuilder()
-            .setNamespace(row.namespace)
-            .setName(row.name)
-            .setStarted(row.started)
-            .setCompleted(row.completed)
-            .setFaulted(row.faulted)
-            .setRunning(row.running)
+    override fun listInstanceEvents(
+        request: ListInstanceEventsRequest,
+        responseObserver: StreamObserver<ListInstanceEventsResponse>,
+    ) {
+        val principal = requirePrincipal(responseObserver) ?: return
+        val callObserver = responseObserver as? ServerCallStreamObserver<ListInstanceEventsResponse>
 
-        row.version?.let { builder.version = it }
-        return builder.build()
+        scope.launch {
+            try {
+                val instanceId = parseInstanceUuid(request.instanceId, "instance_id")
+                authorizeInstanceRead(principal, instanceId)
+
+                val afterSequence = if (request.hasAfterCursor()) {
+                    GatewayCursorCodec.decodeInstanceEventCursor(request.afterCursor).also {
+                        require(it.instanceId == instanceId.toString()) {
+                            "after_cursor does not match instance_id"
+                        }
+                    }.sequence
+                } else {
+                    null
+                }
+
+                val result = instanceEventQueryService.listEvents(
+                    InstanceEventFilter(
+                        instanceId = instanceId,
+                        afterSequenceExclusive = afterSequence,
+                        pageSize = request.pageSize,
+                    )
+                )
+
+                if (callObserver?.isCancelled == true) return@launch
+
+                val builder = ListInstanceEventsResponse.newBuilder()
+                    .addAllEvents(result.events.map(::toProtoInstanceEvent))
+
+                result.nextCursor?.let {
+                    builder.setNextCursor(
+                        GatewayCursorCodec.encodeInstanceEventCursor(
+                            InstanceEventCursor(
+                                instanceId = instanceId.toString(),
+                                sequence = it,
+                            )
+                        )
+                    )
+                }
+
+                responseObserver.onNext(builder.build())
+                responseObserver.onCompleted()
+            } catch (t: Throwable) {
+                if (callObserver?.isCancelled == true) return@launch
+                responseObserver.onError(toStatusException(t))
+            }
+        }
     }
 
-    private fun toProtoInstance(row: com.lemline.runner.gateway.dashboard.WorkflowInstanceRow): WorkflowInstance {
-        val builder = WorkflowInstance.newBuilder()
-            .setWorkflowId(row.workflowId.toString())
+    override fun watchInstanceEvents(
+        request: WatchInstanceEventsRequest,
+        responseObserver: StreamObserver<WatchInstanceEventsResponse>,
+    ) {
+        val principal = requirePrincipal(responseObserver) ?: return
+        val callObserver = responseObserver as? ServerCallStreamObserver<WatchInstanceEventsResponse>
+
+        scope.launch {
+            try {
+                val instanceId = parseInstanceUuid(request.instanceId, "instance_id")
+                val afterSequence = if (request.hasAfterCursor()) {
+                    GatewayCursorCodec.decodeInstanceEventCursor(request.afterCursor).also {
+                        require(it.instanceId == instanceId.toString()) {
+                            "after_cursor does not match instance_id"
+                        }
+                    }.sequence
+                } else {
+                    null
+                }
+
+                instanceEventStreamService.watch(instanceId, principal, afterSequence) { event ->
+                    if (callObserver?.isCancelled == true) return@watch false
+
+                    responseObserver.onNext(
+                        WatchInstanceEventsResponse.newBuilder()
+                            .setEvent(toProtoInstanceEvent(event))
+                            .build()
+                    )
+                    true
+                }
+
+                if (callObserver?.isCancelled == true) return@launch
+                responseObserver.onCompleted()
+            } catch (t: Throwable) {
+                if (callObserver?.isCancelled == true) return@launch
+                responseObserver.onError(toStatusException(t))
+            }
+        }
+    }
+
+    private fun parseDefinitionStatsFilter(
+        request: ListDefinitionStatsRequest,
+        principal: GatewayPrincipal,
+    ): DefinitionStatsFilter {
+        val namespace = optionalString(request.hasNamespace(), request.namespace)
+        val timeFrom = requiredInstant(request.hasTimeFrom(), request.timeFrom, "time_from")
+        val timeTo = requiredInstant(request.hasTimeTo(), request.timeTo, "time_to")
+        validateTimeRange(timeFrom, timeTo)
+
+        return DefinitionStatsFilter(
+            namespace = namespace,
+            name = optionalString(request.hasName(), request.name),
+            version = optionalString(request.hasVersion(), request.version),
+            allowedNamespaces = allowedNamespacesForRead(principal, namespace),
+            timeFrom = timeFrom,
+            timeTo = timeTo,
+            pageSize = request.pageSize,
+        )
+    }
+
+    private fun parseDefinitionStatsFilter(
+        request: WatchDefinitionStatsRequest,
+        principal: GatewayPrincipal,
+    ): DefinitionStatsFilter {
+        val namespace = optionalString(request.hasNamespace(), request.namespace)
+        val timeFrom = requiredInstant(request.hasTimeFrom(), request.timeFrom, "time_from")
+        val timeTo = requiredInstant(request.hasTimeTo(), request.timeTo, "time_to")
+        validateTimeRange(timeFrom, timeTo)
+
+        return DefinitionStatsFilter(
+            namespace = namespace,
+            name = optionalString(request.hasName(), request.name),
+            version = optionalString(request.hasVersion(), request.version),
+            allowedNamespaces = allowedNamespacesForRead(principal, namespace),
+            timeFrom = timeFrom,
+            timeTo = timeTo,
+        )
+    }
+
+    private fun parseInstanceListFilter(
+        request: ListInstancesRequest,
+        principal: GatewayPrincipal,
+    ): InstanceListFilter {
+        val namespace = optionalString(request.hasNamespace(), request.namespace)
+        return InstanceListFilter(
+            namespace = namespace,
+            name = optionalString(request.hasName(), request.name),
+            version = optionalString(request.hasVersion(), request.version),
+            status = optionalInstanceStatus(request.hasStatus(), request.status),
+            createdFrom = optionalInstant(request.hasCreatedFrom(), request.createdFrom),
+            createdTo = optionalInstant(request.hasCreatedTo(), request.createdTo),
+            instanceIdPrefix = optionalString(request.hasInstanceIdPrefix(), request.instanceIdPrefix),
+            allowedNamespaces = allowedNamespacesForRead(principal, namespace),
+            pageSize = request.pageSize,
+        ).also {
+            validateCreatedRange(it.createdFrom, it.createdTo)
+        }
+    }
+
+    private fun parseInstanceListFilter(
+        request: WatchInstancesRequest,
+        principal: GatewayPrincipal,
+    ): InstanceListFilter {
+        val namespace = optionalString(request.hasNamespace(), request.namespace)
+        return InstanceListFilter(
+            namespace = namespace,
+            name = optionalString(request.hasName(), request.name),
+            version = optionalString(request.hasVersion(), request.version),
+            status = optionalInstanceStatus(request.hasStatus(), request.status),
+            createdFrom = optionalInstant(request.hasCreatedFrom(), request.createdFrom),
+            createdTo = optionalInstant(request.hasCreatedTo(), request.createdTo),
+            instanceIdPrefix = optionalString(request.hasInstanceIdPrefix(), request.instanceIdPrefix),
+            allowedNamespaces = allowedNamespacesForRead(principal, namespace),
+        ).also {
+            validateCreatedRange(it.createdFrom, it.createdTo)
+        }
+    }
+
+    private suspend fun authorizeInstanceRead(principal: GatewayPrincipal, instanceId: UUID) {
+        val snapshotSequence = instanceQueryService.latestSequence()
+        val row = instanceQueryService.findInstance(instanceId, snapshotSequence)
+        if (row != null) {
+            authorizer.requireNamespace(principal, row.instance.namespace)
+            return
+        }
+
+        val firstEvent = instanceEventQueryService.firstEvent(instanceId)
+            ?: throw GatewayNotFoundException("Instance '$instanceId' not found")
+        val namespace = firstEvent.namespace?.takeIf { it.isNotBlank() }
+            ?: throw GatewayPermissionDeniedException(
+                "Not authorized for instance '$instanceId': namespace is missing from lifecycle event"
+            )
+        authorizer.requireNamespace(principal, namespace)
+    }
+
+    private fun allowedNamespacesForRead(
+        principal: GatewayPrincipal,
+        explicitNamespace: String?,
+    ): Set<String>? {
+        explicitNamespace?.let {
+            authorizer.requireNamespace(principal, it)
+            return setOf(it)
+        }
+
+        if (!config.gatewayAuthenticationEnabled) return null
+        if (principal.namespaces.contains("*")) return null
+        return principal.namespaces
+    }
+
+    private fun requireDefinitionPageCursorMatches(
+        cursor: DefinitionPageCursor,
+        filter: DefinitionListFilter,
+    ) {
+        require(cursor.namespace == filter.namespace) { "page_cursor does not match namespace filter" }
+        require(cursor.name == filter.name) { "page_cursor does not match name filter" }
+        require(cursor.latestOnly == filter.latestOnly) { "page_cursor does not match latest_only filter" }
+        require(cursor.allowedNamespaces == normalizeAllowedNamespaces(filter.allowedNamespaces)) {
+            "page_cursor does not match authorized namespaces"
+        }
+    }
+
+    private fun requireDefinitionStatsPageCursorMatches(
+        cursor: DefinitionStatsPageCursor,
+        filter: DefinitionStatsFilter,
+    ) {
+        require(cursor.namespace == filter.namespace) { "page_cursor does not match namespace filter" }
+        require(cursor.name == filter.name) { "page_cursor does not match name filter" }
+        require(cursor.version == filter.version) { "page_cursor does not match version filter" }
+        require(cursor.allowedNamespaces == normalizeAllowedNamespaces(filter.allowedNamespaces)) {
+            "page_cursor does not match authorized namespaces"
+        }
+        require(cursor.timeFrom == filter.timeFrom.toString()) { "page_cursor does not match time_from filter" }
+        require(cursor.timeTo == filter.timeTo.toString()) { "page_cursor does not match time_to filter" }
+    }
+
+    private fun requireDefinitionStatsWatchCursorMatches(
+        cursor: DefinitionStatsWatchCursor,
+        filter: DefinitionStatsFilter,
+    ) {
+        require(cursor.namespace == filter.namespace) { "after_cursor does not match namespace filter" }
+        require(cursor.name == filter.name) { "after_cursor does not match name filter" }
+        require(cursor.version == filter.version) { "after_cursor does not match version filter" }
+        require(cursor.allowedNamespaces == normalizeAllowedNamespaces(filter.allowedNamespaces)) {
+            "after_cursor does not match authorized namespaces"
+        }
+        require(cursor.timeFrom == filter.timeFrom.toString()) { "after_cursor does not match time_from filter" }
+        require(cursor.timeTo == filter.timeTo.toString()) { "after_cursor does not match time_to filter" }
+    }
+
+    private fun requireInstancePageCursorMatches(
+        cursor: InstancePageCursor,
+        filter: InstanceListFilter,
+    ) {
+        require(cursor.namespace == filter.namespace) { "page_cursor does not match namespace filter" }
+        require(cursor.name == filter.name) { "page_cursor does not match name filter" }
+        require(cursor.version == filter.version) { "page_cursor does not match version filter" }
+        require(cursor.status == filter.status?.name) { "page_cursor does not match status filter" }
+        require(cursor.createdFrom == filter.createdFrom?.toString()) { "page_cursor does not match created_from filter" }
+        require(cursor.createdTo == filter.createdTo?.toString()) { "page_cursor does not match created_to filter" }
+        require(cursor.instanceIdPrefix == filter.instanceIdPrefix) {
+            "page_cursor does not match instance_id_prefix filter"
+        }
+        require(cursor.allowedNamespaces == normalizeAllowedNamespaces(filter.allowedNamespaces)) {
+            "page_cursor does not match authorized namespaces"
+        }
+    }
+
+    private fun requireInstanceWatchCursorMatches(
+        cursor: InstanceWatchCursor,
+        filter: InstanceListFilter,
+    ) {
+        require(cursor.namespace == filter.namespace) { "after_cursor does not match namespace filter" }
+        require(cursor.name == filter.name) { "after_cursor does not match name filter" }
+        require(cursor.version == filter.version) { "after_cursor does not match version filter" }
+        require(cursor.status == filter.status?.name) { "after_cursor does not match status filter" }
+        require(cursor.createdFrom == filter.createdFrom?.toString()) { "after_cursor does not match created_from filter" }
+        require(cursor.createdTo == filter.createdTo?.toString()) { "after_cursor does not match created_to filter" }
+        require(cursor.instanceIdPrefix == filter.instanceIdPrefix) {
+            "after_cursor does not match instance_id_prefix filter"
+        }
+        require(cursor.allowedNamespaces == normalizeAllowedNamespaces(filter.allowedNamespaces)) {
+            "after_cursor does not match authorized namespaces"
+        }
+    }
+
+    private fun normalizeAllowedNamespaces(namespaces: Set<String>?): List<String>? =
+        namespaces?.toList()?.sorted()
+
+    private fun toProtoDefinitionSummary(row: com.lemline.runner.gateway.dashboard.DefinitionSummaryRow): DefinitionSummary {
+        val builder = DefinitionSummary.newBuilder()
             .setNamespace(row.namespace)
             .setName(row.name)
             .setVersion(row.version)
-            .setStatus(row.status.name)
-            .setCreatedAt(row.createdAt?.toString() ?: "")
-
-        row.startedAt?.let { builder.startedAt = it.toString() }
-        row.completedAt?.let { builder.completedAt = it.toString() }
-        row.faultedAt?.let { builder.faultedAt = it.toString() }
-        row.durationMs?.let { builder.durationMs = it }
-        row.error?.let {
-            builder.error = com.lemline.gateway.v1.ErrorSummary.newBuilder()
-                .setType(it.type)
-                .setStatus(it.status)
-                .setTitle(it.title)
-                .build()
-        }
+            .setIsLatest(row.isLatest)
+            .setVersionCount(row.versionCount)
+            .setCreatedAt(toProtoTimestamp(row.createdAt))
+        row.updatedAt?.let { builder.setUpdatedAt(toProtoTimestamp(it)) }
         return builder.build()
     }
 
-    private fun requirePrincipal(responseObserver: StreamObserver<*>): GatewayPrincipal? {
-        return resolvePrincipalOrNull() ?: run {
+    private fun toProtoWorkflowDefinition(row: DefinitionDetailsRow): WorkflowDefinition {
+        val builder = WorkflowDefinition.newBuilder()
+            .setNamespace(row.namespace)
+            .setName(row.name)
+            .setVersion(row.version)
+            .setSource(row.source)
+            .addAllAvailableVersions(row.availableVersions)
+            .setCreatedAt(toProtoTimestamp(row.createdAt))
+        row.updatedAt?.let { builder.setUpdatedAt(toProtoTimestamp(it)) }
+        return builder.build()
+    }
+
+    private fun toProtoDefinitionStats(row: DefinitionStatsRow): DefinitionStats =
+        DefinitionStats.newBuilder()
+            .setNamespace(row.namespace)
+            .setName(row.name)
+            .setVersion(row.version)
+            .setStartedCount(row.startedCount)
+            .setCompletedCount(row.completedCount)
+            .setFaultedCount(row.faultedCount)
+            .setRunningCountAtTimeTo(row.runningCountAtTimeTo)
+            .build()
+
+    private fun toProtoDefinitionStatsChange(row: DefinitionStatsChangeRow): DefinitionStatsChange =
+        DefinitionStatsChange.newBuilder()
+            .setChangeType(
+                when (row.changeType) {
+                    ChangeType.UPSERT -> DefinitionStatsChangeType.DEFINITION_STATS_CHANGE_TYPE_UPSERT
+                    ChangeType.REMOVED -> DefinitionStatsChangeType.DEFINITION_STATS_CHANGE_TYPE_REMOVED
+                }
+            )
+            .setStats(toProtoDefinitionStats(row.stats))
+            .build()
+
+    private fun toProtoInstanceSummary(row: InstanceSummaryRow): InstanceSummary {
+        val builder = InstanceSummary.newBuilder()
+            .setInstanceId(row.instanceId.toString())
+            .setNamespace(row.namespace)
+            .setName(row.name)
+            .setVersion(row.version)
+            .setStatus(toProtoInstanceStatus(row.status))
+            .setCreatedAt(toProtoTimestamp(row.createdAt))
+
+        row.startedAt?.let { builder.setStartedAt(toProtoTimestamp(it)) }
+        row.completedAt?.let { builder.setCompletedAt(toProtoTimestamp(it)) }
+        row.faultedAt?.let { builder.setFaultedAt(toProtoTimestamp(it)) }
+        row.durationMs?.let { builder.setDuration(toProtoDuration(it)) }
+        row.error?.let { builder.setError(toProtoErrorSummary(it)) }
+        return builder.build()
+    }
+
+    private fun toProtoInstanceChange(row: InstanceChangeRow): InstanceChange =
+        InstanceChange.newBuilder()
+            .setChangeType(
+                when (row.changeType) {
+                    ChangeType.UPSERT -> InstanceChangeType.INSTANCE_CHANGE_TYPE_UPSERT
+                    ChangeType.REMOVED -> InstanceChangeType.INSTANCE_CHANGE_TYPE_REMOVED
+                }
+            )
+            .setInstance(toProtoInstanceSummary(row.instance))
+            .build()
+
+    private fun toProtoInstanceEvent(row: InstanceEventRow): InstanceEvent {
+        val builder = InstanceEvent.newBuilder()
+            .setCursor(
+                GatewayCursorCodec.encodeInstanceEventCursor(
+                    InstanceEventCursor(
+                        instanceId = row.instanceId.toString(),
+                        sequence = row.cursor,
+                    )
+                )
+            )
+            .setInstanceId(row.instanceId.toString())
+            .setEventType(row.eventType)
+            .setCloudEventJson(row.cloudEventJson)
+        row.eventTime?.let { builder.setEventTime(toProtoTimestamp(it)) }
+        return builder.build()
+    }
+
+    private fun toProtoErrorSummary(row: ErrorSummaryRow): com.lemline.gateway.v1.ErrorSummary {
+        val builder = com.lemline.gateway.v1.ErrorSummary.newBuilder()
+            .setType(row.type)
+            .setTitle(row.title)
+        row.status?.let { builder.setStatus(it) }
+        return builder.build()
+    }
+
+    private fun toProtoInstanceStatus(status: InstanceStatus): ProtoInstanceStatus =
+        when (status) {
+            InstanceStatus.PENDING -> ProtoInstanceStatus.INSTANCE_STATUS_PENDING
+            InstanceStatus.RUNNING -> ProtoInstanceStatus.INSTANCE_STATUS_RUNNING
+            InstanceStatus.COMPLETED -> ProtoInstanceStatus.INSTANCE_STATUS_COMPLETED
+            InstanceStatus.FAULTED -> ProtoInstanceStatus.INSTANCE_STATUS_FAULTED
+        }
+
+    private fun toProtoStartInstanceResult(result: InstanceStartResult): StartInstanceResult =
+        when (result.result) {
+            StartInstanceOutcome.ACCEPTED_NEW -> StartInstanceResult.START_INSTANCE_RESULT_ACCEPTED_NEW
+            StartInstanceOutcome.ACCEPTED_EXISTING -> StartInstanceResult.START_INSTANCE_RESULT_ACCEPTED_EXISTING
+        }
+
+    private fun toProtoTimestamp(value: Instant): ProtoTimestamp =
+        ProtoTimestamp.newBuilder()
+            .setSeconds(value.epochSecond)
+            .setNanos(value.nano)
+            .build()
+
+    private fun toProtoDuration(valueMillis: Long): ProtoDuration {
+        val seconds = valueMillis / 1_000
+        val nanos = ((valueMillis % 1_000) * 1_000_000).toInt()
+        return ProtoDuration.newBuilder()
+            .setSeconds(seconds)
+            .setNanos(nanos)
+            .build()
+    }
+
+    private fun requirePrincipal(responseObserver: StreamObserver<*>): GatewayPrincipal? =
+        resolvePrincipalOrNull() ?: run {
             responseObserver.onError(
                 Status.UNAUTHENTICATED.withDescription("Missing authenticated principal").asRuntimeException()
             )
             null
         }
-    }
 
-    private fun resolvePrincipalOrNull(): GatewayPrincipal? {
-        return GatewayAuthContext.getOrNull()
+    private fun resolvePrincipalOrNull(): GatewayPrincipal? =
+        GatewayAuthContext.getOrNull()
             ?: if (!config.gatewayAuthenticationEnabled) GatewayPrincipal.dashboardAnonymous else null
-    }
 
-    private fun parseWorkflowId(request: WatchWorkflowRequest): WorkflowId {
-        if (request.workflowId.isBlank()) {
-            throw GatewayBadRequestException("workflow_id must be provided")
-        }
-
-        return try {
-            WorkflowId(IDV7.from(request.workflowId.trim()))
-        } catch (_: Exception) {
-            throw GatewayBadRequestException("workflow_id must be a valid UUIDv7 string")
-        }
-    }
-
-    private fun parseWorkflowId(raw: String, field: String): UUID {
-        val trimmed = raw.trim()
-        if (trimmed.isBlank()) {
-            throw GatewayBadRequestException("$field must be provided")
-        }
-
-        return parseUuid(trimmed, field)
-    }
-
-    private fun optionalUuid(hasField: Boolean, raw: String, field: String): UUID? {
-        if (!hasField) return null
-        val trimmed = raw.trim()
-        if (trimmed.isBlank()) return null
-        return parseUuid(trimmed, field)
-    }
-
-    private fun parseUuid(raw: String, field: String): UUID = try {
-        UUID.fromString(raw)
-    } catch (_: Exception) {
-        throw GatewayBadRequestException("$field must be a valid UUID string")
-    }
+    private fun requiredString(raw: String, field: String): String =
+        raw.trim().ifBlank { throw GatewayBadRequestException("$field must be provided") }
 
     private fun optionalString(hasField: Boolean, raw: String): String? =
         if (!hasField) {
@@ -549,16 +970,63 @@ class WorkflowGatewayGrpcService(
             raw.trim().ifBlank { null }
         }
 
-    private fun optionalInstant(hasField: Boolean, raw: String, field: String): Instant? {
-        if (!hasField) return null
+    private fun parseInstanceUuid(raw: String, field: String): UUID {
         val trimmed = raw.trim()
-        if (trimmed.isBlank()) return null
+        if (trimmed.isBlank()) {
+            throw GatewayBadRequestException("$field must be provided")
+        }
 
         return try {
-            Instant.parse(trimmed)
+            IDV7.from(trimmed).value
         } catch (_: Exception) {
-            throw GatewayBadRequestException("$field must be an ISO-8601 timestamp")
+            throw GatewayBadRequestException("$field must be a valid UUIDv7 string")
         }
+    }
+
+    private fun optionalInstanceStatus(hasField: Boolean, raw: ProtoInstanceStatus): InstanceStatus? {
+        if (!hasField) return null
+        return when (raw) {
+            ProtoInstanceStatus.INSTANCE_STATUS_PENDING -> InstanceStatus.PENDING
+            ProtoInstanceStatus.INSTANCE_STATUS_RUNNING -> InstanceStatus.RUNNING
+            ProtoInstanceStatus.INSTANCE_STATUS_COMPLETED -> InstanceStatus.COMPLETED
+            ProtoInstanceStatus.INSTANCE_STATUS_FAULTED -> InstanceStatus.FAULTED
+            ProtoInstanceStatus.INSTANCE_STATUS_UNSPECIFIED,
+            ProtoInstanceStatus.UNRECOGNIZED -> throw GatewayBadRequestException(
+                "status must be one of PENDING, RUNNING, COMPLETED, or FAULTED"
+            )
+        }
+    }
+
+    private fun requiredInstant(hasField: Boolean, raw: ProtoTimestamp, field: String): Instant {
+        if (!hasField) {
+            throw GatewayBadRequestException("$field must be provided")
+        }
+        return optionalInstant(true, raw) ?: throw GatewayBadRequestException("$field must be provided")
+    }
+
+    private fun optionalInstant(hasField: Boolean, raw: ProtoTimestamp): Instant? =
+        if (!hasField) {
+            null
+        } else {
+            Instant.ofEpochSecond(raw.seconds, raw.nanos.toLong())
+        }
+
+    private fun validateTimeRange(timeFrom: Instant, timeTo: Instant) {
+        if (!timeFrom.isBefore(timeTo)) {
+            throw GatewayBadRequestException("time_from must be before time_to")
+        }
+    }
+
+    private fun validateCreatedRange(createdFrom: Instant?, createdTo: Instant?) {
+        if (createdFrom != null && createdTo != null && !createdFrom.isBefore(createdTo)) {
+            throw GatewayBadRequestException("created_from must be before created_to")
+        }
+    }
+
+    private fun parseCursorInstant(raw: String): Instant = try {
+        Instant.parse(raw)
+    } catch (_: Exception) {
+        throw GatewayBadRequestException("Invalid cursor")
     }
 
     private fun toStatusException(t: Throwable): StatusRuntimeException {
@@ -581,3 +1049,23 @@ class WorkflowGatewayGrpcService(
         scope.cancel("Gateway shutting down")
     }
 }
+
+private fun DefinitionPageCursor.toBoundary(): DefinitionPageBoundary =
+    DefinitionPageBoundary(
+        namespace = lastNamespace,
+        name = lastName,
+        version = lastVersion,
+    )
+
+private fun DefinitionStatsPageCursor.toBoundary(): DefinitionPageBoundary =
+    DefinitionPageBoundary(
+        namespace = lastNamespace,
+        name = lastName,
+        version = lastVersion,
+    )
+
+private fun InstancePageCursor.toBoundary(): InstancePageBoundary =
+    InstancePageBoundary(
+        createdAt = Instant.parse(lastCreatedAt),
+        instanceId = UUID.fromString(lastInstanceId),
+    )

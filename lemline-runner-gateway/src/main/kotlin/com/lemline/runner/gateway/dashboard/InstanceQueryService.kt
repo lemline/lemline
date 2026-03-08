@@ -1,17 +1,19 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.gateway.dashboard
 
+import com.fasterxml.jackson.databind.JsonNode
+import com.lemline.common.json.LemlineJson
 import com.lemline.core.lifecycleevents.LifecycleEventType
-import com.lemline.runner.gateway.analytics.AnalyticsDataSourceProvider
 import com.lemline.runner.common.config.ANALYTICS_LIFECYCLE_EVENTS_TABLE
 import com.lemline.runner.common.config.AnalyticsType
 import com.lemline.runner.config.LemlineConfiguration
 import com.lemline.runner.config.analyticsSchemaResolved
 import com.lemline.runner.config.analyticsTypeResolved
+import com.lemline.runner.gateway.analytics.AnalyticsDataSourceProvider
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
-import java.nio.charset.StandardCharsets
-import java.util.*
+import java.time.Instant
+import java.util.UUID
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -23,86 +25,16 @@ class InstanceQueryService(
     @Inject
     lateinit var analyticsDataSourceProvider: AnalyticsDataSourceProvider
 
+    private val analyticsType = AnalyticsType.fromConfigValue(config.analyticsTypeResolved)
     private val analyticsQualifiedTable =
         DashboardSqlSupport.qualifiedAnalyticsTable(
-            analyticsType = AnalyticsType.fromConfigValue(config.analyticsTypeResolved),
+            analyticsType = analyticsType,
             schema = config.analyticsSchemaResolved,
             table = ANALYTICS_LIFECYCLE_EVENTS_TABLE
         )
-
-    suspend fun listInstances(filter: InstanceQueryFilter): ListInstancesResult = withContext(Dispatchers.IO) {
-        val normalizedPageSize = normalizePageSize(filter.pageSize)
-        val decodedCursor = filter.pageCursor?.let { decodeCursor(it) }
-
-        val selectQuery = buildInstanceSelectQuery(
-            filter = filter,
-            cursorWorkflowId = decodedCursor?.workflowId,
-            limit = normalizedPageSize + 1,
-        )
-
-        val allRows = analyticsDataSourceProvider.require().connection.use { conn ->
-            conn.prepareStatement(selectQuery.sql).use { stmt ->
-                selectQuery.params.forEachIndexed { index, value ->
-                    stmt.setDashboardObject(index + 1, value)
-                }
-                stmt.executeQuery().use { rs ->
-                    buildList {
-                        while (rs.next()) {
-                            add(
-                                WorkflowInstanceRow(
-                                    workflowId = rs.getObject("lemline_workflow_id", UUID::class.java),
-                                    namespace = rs.getString("lemline_workflow_namespace") ?: "",
-                                    name = rs.getString("lemline_workflow_name") ?: "",
-                                    version = rs.getString("lemline_workflow_version") ?: "",
-                                    status = parseStatus(rs.getString("status")),
-                                    createdAt = rs.getInstantOrNull("created_at"),
-                                    startedAt = rs.getInstantOrNull("started_at"),
-                                    completedAt = rs.getInstantOrNull("completed_at"),
-                                    faultedAt = rs.getInstantOrNull("faulted_at"),
-                                    durationMs = rs.getObject("duration_ms") as? Long,
-                                    error = parseErrorSummary(
-                                        type = rs.getString("error_type"),
-                                        status = rs.getObject("error_status") as? Int,
-                                        title = rs.getString("error_title"),
-                                    ),
-                                )
-                            )
-                        }
-                    }
-                }
-            }
-        }
-
-        val hasMore = allRows.size > normalizedPageSize
-        val pageRows = if (hasMore) allRows.take(normalizedPageSize) else allRows
-
-        val totalCount = decodedCursor?.totalCount ?: if (decodedCursor == null) {
-            countInstances(filter)
-        } else {
-            -1L
-        }
-
-        val nextCursor = if (hasMore && pageRows.isNotEmpty()) {
-            encodeCursor(pageRows.last().workflowId, totalCount)
-        } else {
-            null
-        }
-
-        ListInstancesResult(
-            instances = pageRows,
-            nextCursor = nextCursor,
-            totalCount = totalCount,
-        )
-    }
-
-    suspend fun findInstance(workflowId: UUID): WorkflowInstanceRow? {
-        val result = listInstances(
-            InstanceQueryFilter(
-                workflowId = workflowId,
-                pageSize = 1,
-            )
-        )
-        return result.instances.firstOrNull()
+    private val payloadTextProjection = when (analyticsType) {
+        AnalyticsType.POSTGRESQL -> "payload::text"
+        AnalyticsType.H2 -> "payload"
     }
 
     suspend fun latestSequence(): Long = withContext(Dispatchers.IO) {
@@ -116,13 +48,75 @@ class InstanceQueryService(
         }
     }
 
-    suspend fun listWorkflowEventsAfter(
+    suspend fun listInstances(
+        filter: InstanceListFilter,
+        snapshotSequence: Long,
+        page: InstancePageBoundary? = null,
+    ): InstanceListResult = withContext(Dispatchers.IO) {
+        if (filter.allowedNamespaces?.isEmpty() == true) {
+            return@withContext InstanceListResult(emptyList(), null, 0L, snapshotSequence)
+        }
+
+        val normalizedPageSize = normalizePageSize(filter.pageSize)
+        val query = buildInstanceListQuery(filter, snapshotSequence, page, normalizedPageSize + 1)
+        val rows = executeInstanceLookupQuery(query)
+
+        val hasMore = rows.size > normalizedPageSize
+        val pageRows = if (hasMore) rows.take(normalizedPageSize) else rows
+        val nextPage = pageRows.lastOrNull()
+            ?.takeIf { hasMore }
+            ?.let { InstancePageBoundary(it.instance.createdAt, it.instance.instanceId) }
+
+        InstanceListResult(
+            instances = pageRows.map { it.instance },
+            nextPage = nextPage,
+            totalCount = countInstances(filter, snapshotSequence),
+            watchSequence = snapshotSequence,
+        )
+    }
+
+    suspend fun findInstance(
+        instanceId: UUID,
+        snapshotSequence: Long,
+    ): InstanceLookupRow? = withContext(Dispatchers.IO) {
+        val query = buildInstanceLookupQuery(
+            filter = InstanceListFilter(instanceId = instanceId, pageSize = 1),
+            snapshotSequence = snapshotSequence,
+        )
+        executeInstanceLookupQuery(query).firstOrNull()
+    }
+
+    suspend fun latestInstanceEventSequence(
+        instanceId: UUID,
+        snapshotSequence: Long? = null,
+    ): Long? = withContext(Dispatchers.IO) {
+        val snapshotWhere = if (snapshotSequence == null) "" else "AND id <= ?"
+        val sql = """
+            SELECT MAX(id) AS max_id
+            FROM $analyticsQualifiedTable
+            WHERE lemline_workflow_id = ?
+            $snapshotWhere
+        """.trimIndent()
+
+        analyticsDataSourceProvider.require().connection.use { conn ->
+            conn.prepareStatement(sql).use { stmt ->
+                stmt.setObject(1, instanceId)
+                if (snapshotSequence != null) {
+                    stmt.setLong(2, snapshotSequence)
+                }
+                stmt.executeQuery().use { rs ->
+                    if (rs.next()) rs.getLong("max_id").takeIf { !rs.wasNull() } else null
+                }
+            }
+        }
+    }
+
+    suspend fun listChangedInstanceSequencesAfter(
         afterSequenceExclusive: Long,
         limit: Int,
-        filter: WatchInstancesFilter,
+        filter: InstanceListFilter,
     ): List<WorkflowEventSequence> = withContext(Dispatchers.IO) {
         val normalizedLimit = limit.coerceIn(1, 1_000)
-
         val where = mutableListOf<String>()
         val params = mutableListOf<Any>()
 
@@ -143,9 +137,17 @@ class InstanceQueryService(
             where += "lemline_workflow_version = ?"
             params += it
         }
+        filter.instanceIdPrefix?.trim()?.takeIf { it.isNotBlank() }?.let {
+            where += "${uuidToVarchar("lemline_workflow_id")} LIKE ?"
+            params += "$it%"
+        }
+        filter.allowedNamespaces?.takeIf { it.isNotEmpty() }?.let { namespaces ->
+            where += "lemline_workflow_namespace IN (${placeholders(namespaces.size)})"
+            params.addAll(namespaces.sorted())
+        }
 
         val sql = """
-            SELECT id, lemline_workflow_id, type
+            SELECT id, lemline_workflow_id
             FROM $analyticsQualifiedTable
             WHERE ${where.joinToString(" AND ")}
             ORDER BY id ASC
@@ -165,7 +167,6 @@ class InstanceQueryService(
                                 WorkflowEventSequence(
                                     sequence = rs.getLong("id"),
                                     workflowId = rs.getObject("lemline_workflow_id", UUID::class.java),
-                                    eventType = rs.getString("type"),
                                 )
                             )
                         }
@@ -175,37 +176,118 @@ class InstanceQueryService(
         }
     }
 
-    suspend fun isFirstWorkflowEvent(workflowId: UUID, sequence: Long): Boolean = withContext(Dispatchers.IO) {
+    suspend fun listInstanceEvents(filter: InstanceEventFilter): InstanceEventListResult = withContext(Dispatchers.IO) {
+        val normalizedPageSize = normalizePageSize(filter.pageSize)
+        val afterWhere = if (filter.afterSequenceExclusive == null) "" else "AND id > ?"
         val sql = """
-            SELECT 1
+            SELECT
+              id,
+              lemline_workflow_id,
+              lemline_workflow_namespace,
+              type,
+              event_time,
+              $payloadTextProjection AS payload_json
             FROM $analyticsQualifiedTable
             WHERE lemline_workflow_id = ?
-              AND id < ?
-              AND type IN (
-                '${LifecycleEventType.WORKFLOW_CREATED.type}',
-                '${LifecycleEventType.WORKFLOW_STARTED.type}',
-                '${LifecycleEventType.WORKFLOW_COMPLETED.type}',
-                '${LifecycleEventType.WORKFLOW_FAULTED.type}'
-              )
-            LIMIT 1
+            $afterWhere
+            ORDER BY id ASC
+            LIMIT ?
         """.trimIndent()
 
-        analyticsDataSourceProvider.require().connection.use { conn ->
+        val rows = analyticsDataSourceProvider.require().connection.use { conn ->
             conn.prepareStatement(sql).use { stmt ->
-                stmt.setObject(1, workflowId)
-                stmt.setLong(2, sequence)
+                stmt.setObject(1, filter.instanceId)
+                var nextIndex = 2
+                filter.afterSequenceExclusive?.let {
+                    stmt.setLong(nextIndex++, it)
+                }
+                stmt.setInt(nextIndex, normalizedPageSize + 1)
                 stmt.executeQuery().use { rs ->
-                    !rs.next()
+                    buildList {
+                        while (rs.next()) {
+                            add(
+                                InstanceEventRow(
+                                    cursor = rs.getLong("id"),
+                                    instanceId = rs.getObject("lemline_workflow_id", UUID::class.java),
+                                    eventType = rs.getString("type"),
+                                    eventTime = rs.getInstantOrNull("event_time"),
+                                    cloudEventJson = rs.getString("payload_json") ?: "{}",
+                                    namespace = rs.getString("lemline_workflow_namespace"),
+                                )
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        val hasMore = rows.size > normalizedPageSize
+        val pageRows = if (hasMore) rows.take(normalizedPageSize) else rows
+        val latestCursor = latestInstanceEventSequence(filter.instanceId)
+
+        InstanceEventListResult(
+            events = pageRows,
+            nextCursor = pageRows.lastOrNull()?.cursor?.takeIf { hasMore },
+            latestCursor = latestCursor,
+        )
+    }
+
+    fun matchesFilter(row: InstanceSummaryRow, filter: InstanceListFilter): Boolean {
+        if (filter.namespace != null && row.namespace != filter.namespace) return false
+        if (filter.name != null && row.name != filter.name) return false
+        if (filter.version != null && row.version != filter.version) return false
+        if (filter.status != null && row.status != filter.status) return false
+        if (filter.instanceId != null && row.instanceId != filter.instanceId) return false
+        if (filter.instanceIdPrefix != null && !row.instanceId.toString().startsWith(filter.instanceIdPrefix)) return false
+        if (filter.createdFrom != null && row.createdAt < filter.createdFrom) return false
+        if (filter.createdTo != null && row.createdAt >= filter.createdTo) return false
+        if (filter.allowedNamespaces != null && row.namespace !in filter.allowedNamespaces) return false
+        return true
+    }
+
+    private suspend fun executeInstanceLookupQuery(query: SqlQuery): List<InstanceLookupRow> = withContext(Dispatchers.IO) {
+        analyticsDataSourceProvider.require().connection.use { conn ->
+            conn.prepareStatement(query.sql).use { stmt ->
+                query.params.forEachIndexed { index, value ->
+                    stmt.setDashboardObject(index + 1, value)
+                }
+                stmt.executeQuery().use { rs ->
+                    buildList {
+                        while (rs.next()) {
+                            val startedAt = rs.getInstantOrNull("started_at")
+                            val completedAt = rs.getInstantOrNull("completed_at")
+                            val faultedAt = rs.getInstantOrNull("faulted_at")
+                            val summary = InstanceSummaryRow(
+                                instanceId = rs.getObject("lemline_workflow_id", UUID::class.java),
+                                namespace = rs.getString("lemline_workflow_namespace") ?: "",
+                                name = rs.getString("lemline_workflow_name") ?: "",
+                                version = rs.getString("lemline_workflow_version") ?: "",
+                                status = InstanceStatus.fromRaw(rs.getString("status")),
+                                createdAt = rs.getInstantOrNull("instance_created_at") ?: Instant.EPOCH,
+                                startedAt = startedAt,
+                                completedAt = completedAt,
+                                faultedAt = faultedAt,
+                                durationMs = calculateDurationMs(startedAt, completedAt, faultedAt),
+                                error = parseErrorSummary(rs.getString("faulted_payload_json")),
+                            )
+                            add(
+                                InstanceLookupRow(
+                                    instance = summary,
+                                    latestEventSequence = rs.getLong("latest_event_sequence").takeIf { !rs.wasNull() },
+                                )
+                            )
+                        }
+                    }
                 }
             }
         }
     }
 
-    private suspend fun countInstances(filter: InstanceQueryFilter): Long = withContext(Dispatchers.IO) {
-        val countQuery = buildInstanceCountQuery(filter)
+    private suspend fun countInstances(filter: InstanceListFilter, snapshotSequence: Long): Long = withContext(Dispatchers.IO) {
+        val query = buildInstanceCountQuery(filter, snapshotSequence)
         analyticsDataSourceProvider.require().connection.use { conn ->
-            conn.prepareStatement(countQuery.sql).use { stmt ->
-                countQuery.params.forEachIndexed { index, value ->
+            conn.prepareStatement(query.sql).use { stmt ->
+                query.params.forEachIndexed { index, value ->
                     stmt.setDashboardObject(index + 1, value)
                 }
                 stmt.executeQuery().use { rs ->
@@ -215,12 +297,28 @@ class InstanceQueryService(
         }
     }
 
-    private fun buildInstanceSelectQuery(
-        filter: InstanceQueryFilter,
-        cursorWorkflowId: UUID?,
+    private fun buildInstanceListQuery(
+        filter: InstanceListFilter,
+        snapshotSequence: Long,
+        page: InstancePageBoundary?,
         limit: Int,
     ): SqlQuery {
-        val queryParts = buildInstanceQueryParts(filter, includeCursor = true, cursorWorkflowId = cursorWorkflowId)
+        val queryParts = buildInstanceQueryParts(filter, snapshotSequence)
+        val pagingWhere = if (page == null) {
+            ""
+        } else {
+            """
+            AND (
+              instance_created_at < ?
+              OR (instance_created_at = ? AND lemline_workflow_id < ?)
+            )
+            """.trimIndent()
+        }
+        val pagingParams = if (page == null) {
+            emptyList()
+        } else {
+            listOf(page.createdAt, page.createdAt, page.instanceId)
+        }
 
         val sql = """
             ${queryParts.cteSql}
@@ -229,201 +327,225 @@ class InstanceQueryService(
               lemline_workflow_namespace,
               lemline_workflow_name,
               lemline_workflow_version,
-              created_at,
+              instance_created_at,
               started_at,
               completed_at,
               faulted_at,
               status,
-              duration_ms,
-              faulted_payload->'data'->'error'->>'type' AS error_type,
-              (faulted_payload->'data'->'error'->>'status')::int AS error_status,
-              faulted_payload->'data'->'error'->>'title' AS error_title
+              faulted_payload_json,
+              latest_event_sequence
             FROM instance_status
             WHERE ${queryParts.outerConditions.joinToString(" AND ")}
-            ORDER BY lemline_workflow_id DESC
+            $pagingWhere
+            ORDER BY instance_created_at DESC, lemline_workflow_id DESC
             LIMIT ?
         """.trimIndent()
 
-        return SqlQuery(sql = sql, params = queryParts.params + limit)
+        return SqlQuery(sql, queryParts.params + pagingParams + limit)
     }
 
-    private fun buildInstanceCountQuery(filter: InstanceQueryFilter): SqlQuery {
-        val queryParts = buildInstanceQueryParts(filter, includeCursor = false, cursorWorkflowId = null)
+    private fun buildInstanceLookupQuery(
+        filter: InstanceListFilter,
+        snapshotSequence: Long,
+    ): SqlQuery {
+        val queryParts = buildInstanceQueryParts(filter, snapshotSequence)
+        val sql = """
+            ${queryParts.cteSql}
+            SELECT
+              lemline_workflow_id,
+              lemline_workflow_namespace,
+              lemline_workflow_name,
+              lemline_workflow_version,
+              instance_created_at,
+              started_at,
+              completed_at,
+              faulted_at,
+              status,
+              faulted_payload_json,
+              latest_event_sequence
+            FROM instance_status
+            WHERE ${queryParts.outerConditions.joinToString(" AND ")}
+            ORDER BY instance_created_at DESC, lemline_workflow_id DESC
+            LIMIT 1
+        """.trimIndent()
+        return SqlQuery(sql, queryParts.params)
+    }
 
+    private fun buildInstanceCountQuery(filter: InstanceListFilter, snapshotSequence: Long): SqlQuery {
+        val queryParts = buildInstanceQueryParts(filter, snapshotSequence)
         val sql = """
             ${queryParts.cteSql}
             SELECT COUNT(*) AS total_count
             FROM instance_status
             WHERE ${queryParts.outerConditions.joinToString(" AND ")}
         """.trimIndent()
-
-        return SqlQuery(sql = sql, params = queryParts.params)
+        return SqlQuery(sql, queryParts.params)
     }
 
-    private fun buildInstanceQueryParts(
-        filter: InstanceQueryFilter,
-        includeCursor: Boolean,
-        cursorWorkflowId: UUID?,
-    ): InstanceQueryParts {
+    private fun buildInstanceQueryParts(filter: InstanceListFilter, snapshotSequence: Long): InstanceQueryParts {
         val innerConditions = mutableListOf<String>()
+        val innerParams = mutableListOf<Any>()
         val outerConditions = mutableListOf<String>()
-        val params = mutableListOf<Any>()
+        val outerParams = mutableListOf<Any>()
 
+        innerConditions += "id <= ?"
+        innerParams += snapshotSequence
         innerConditions += "lemline_workflow_id IS NOT NULL"
-        innerConditions += "type IN ('${LifecycleEventType.WORKFLOW_CREATED.type}', '${LifecycleEventType.WORKFLOW_STARTED.type}', '${LifecycleEventType.WORKFLOW_COMPLETED.type}', '${LifecycleEventType.WORKFLOW_FAULTED.type}')"
+
+        filter.instanceId?.let {
+            innerConditions += "lemline_workflow_id = ?"
+            innerParams += it
+        }
+        filter.instanceIdPrefix?.trim()?.takeIf { it.isNotBlank() }?.let {
+            innerConditions += "${uuidToVarchar("lemline_workflow_id")} LIKE ?"
+            innerParams += "$it%"
+        }
+
+        outerConditions += "instance_created_at IS NOT NULL"
 
         filter.namespace?.trim()?.takeIf { it.isNotBlank() }?.let {
-            innerConditions += "lemline_workflow_namespace = ?"
-            params += it
+            outerConditions += "lemline_workflow_namespace = ?"
+            outerParams += it
         }
-
-        filter.workflowId?.let {
-            innerConditions += "lemline_workflow_id = ?"
-            params += it
-        }
-
-        filter.workflowIdPrefix?.trim()?.takeIf { it.isNotBlank() }?.let {
-            innerConditions += "lemline_workflow_id::text LIKE ?"
-            params += "$it%"
-        }
-
-        outerConditions += "1 = 1"
-
         filter.name?.trim()?.takeIf { it.isNotBlank() }?.let {
             outerConditions += "lemline_workflow_name = ?"
-            params += it
+            outerParams += it
         }
-
         filter.version?.trim()?.takeIf { it.isNotBlank() }?.let {
             outerConditions += "lemline_workflow_version = ?"
-            params += it
+            outerParams += it
         }
-
+        filter.allowedNamespaces?.takeIf { it.isNotEmpty() }?.let { namespaces ->
+            outerConditions += "lemline_workflow_namespace IN (${placeholders(namespaces.size)})"
+            outerParams.addAll(namespaces.sorted())
+        }
         filter.status?.let {
             outerConditions += "status = ?"
-            params += it.name
+            outerParams += it.name
         }
-
-        filter.timeFrom?.let {
-            outerConditions += "COALESCE(started_at, created_at) >= ?"
-            params += it
+        filter.createdFrom?.let {
+            outerConditions += "instance_created_at >= ?"
+            outerParams += it
         }
-
-        filter.timeTo?.let {
-            outerConditions += "COALESCE(started_at, created_at) <= ?"
-            params += it
-        }
-
-        if (includeCursor && cursorWorkflowId != null) {
-            outerConditions += "lemline_workflow_id < ?"
-            params += cursorWorkflowId
+        filter.createdTo?.let {
+            outerConditions += "instance_created_at < ?"
+            outerParams += it
         }
 
         val cteSql = """
-            WITH instance_agg AS (
+            WITH instance_events AS (
+              SELECT
+                id,
+                lemline_workflow_id,
+                lemline_workflow_namespace,
+                lemline_workflow_name,
+                lemline_workflow_version,
+                event_time,
+                type,
+                $payloadTextProjection AS payload_json
+              FROM $analyticsQualifiedTable
+              WHERE ${innerConditions.joinToString(" AND ")}
+            ),
+            instance_agg AS (
               SELECT
                 lemline_workflow_id,
                 MAX(lemline_workflow_namespace) AS lemline_workflow_namespace,
                 MAX(lemline_workflow_name) AS lemline_workflow_name,
                 MAX(lemline_workflow_version) AS lemline_workflow_version,
-                MIN(event_time) FILTER (WHERE type = '${LifecycleEventType.WORKFLOW_CREATED.type}') AS created_at,
-                MIN(event_time) FILTER (WHERE type = '${LifecycleEventType.WORKFLOW_STARTED.type}') AS started_at,
-                MAX(event_time) FILTER (WHERE type = '${LifecycleEventType.WORKFLOW_COMPLETED.type}') AS completed_at,
-                MAX(event_time) FILTER (WHERE type = '${LifecycleEventType.WORKFLOW_FAULTED.type}') AS faulted_at,
-                (array_agg(payload ORDER BY event_time DESC, id DESC) FILTER (WHERE type = '${LifecycleEventType.WORKFLOW_FAULTED.type}'))[1] AS faulted_payload
-              FROM $analyticsQualifiedTable
-              WHERE ${innerConditions.joinToString(" AND ")}
+                MIN(CASE WHEN type = '${LifecycleEventType.WORKFLOW_CREATED.type}' THEN event_time END) AS created_at,
+                MIN(CASE WHEN type = '${LifecycleEventType.WORKFLOW_STARTED.type}' THEN event_time END) AS started_at,
+                MAX(CASE WHEN type = '${LifecycleEventType.WORKFLOW_COMPLETED.type}' THEN event_time END) AS completed_at,
+                MAX(CASE WHEN type = '${LifecycleEventType.WORKFLOW_FAULTED.type}' THEN event_time END) AS faulted_at,
+                MAX(CASE WHEN type = '${LifecycleEventType.WORKFLOW_FAULTED.type}' THEN id END) AS latest_faulted_sequence,
+                MAX(id) AS latest_event_sequence
+              FROM instance_events
               GROUP BY lemline_workflow_id
+            ),
+            latest_faulted AS (
+              SELECT
+                event_row.lemline_workflow_id,
+                event_row.payload_json AS faulted_payload_json
+              FROM instance_events event_row
+              JOIN instance_agg agg
+                ON agg.latest_faulted_sequence = event_row.id
             ),
             instance_status AS (
               SELECT
-                lemline_workflow_id,
-                lemline_workflow_namespace,
-                lemline_workflow_name,
-                lemline_workflow_version,
-                created_at,
-                started_at,
-                completed_at,
-                faulted_at,
-                faulted_payload,
+                agg.lemline_workflow_id,
+                agg.lemline_workflow_namespace,
+                agg.lemline_workflow_name,
+                agg.lemline_workflow_version,
+                agg.created_at AS instance_created_at,
+                agg.started_at,
+                agg.completed_at,
+                agg.faulted_at,
+                agg.latest_event_sequence,
+                faulted.faulted_payload_json,
                 CASE
-                  WHEN completed_at IS NOT NULL AND faulted_at IS NOT NULL THEN
+                  WHEN agg.completed_at IS NOT NULL AND agg.faulted_at IS NOT NULL THEN
                     CASE
-                      WHEN completed_at >= faulted_at THEN 'COMPLETED'
+                      WHEN agg.completed_at >= agg.faulted_at THEN 'COMPLETED'
                       ELSE 'FAULTED'
                     END
-                  WHEN completed_at IS NOT NULL THEN 'COMPLETED'
-                  WHEN faulted_at IS NOT NULL THEN 'FAULTED'
-                  WHEN started_at IS NOT NULL THEN 'RUNNING'
-                  WHEN created_at IS NOT NULL THEN 'PENDING'
-                  ELSE 'UNKNOWN'
-                END AS status,
-                CASE
-                  WHEN started_at IS NULL THEN NULL
-                  WHEN completed_at IS NOT NULL AND (faulted_at IS NULL OR completed_at >= faulted_at) THEN
-                    CAST(EXTRACT(EPOCH FROM (completed_at - started_at)) * 1000 AS BIGINT)
-                  WHEN faulted_at IS NOT NULL THEN
-                    CAST(EXTRACT(EPOCH FROM (faulted_at - started_at)) * 1000 AS BIGINT)
-                  ELSE NULL
-                END AS duration_ms
-              FROM instance_agg
+                  WHEN agg.completed_at IS NOT NULL THEN 'COMPLETED'
+                  WHEN agg.faulted_at IS NOT NULL THEN 'FAULTED'
+                  WHEN agg.started_at IS NOT NULL THEN 'RUNNING'
+                  ELSE 'PENDING'
+                END AS status
+              FROM instance_agg agg
+              LEFT JOIN latest_faulted faulted
+                ON faulted.lemline_workflow_id = agg.lemline_workflow_id
             )
         """.trimIndent()
 
         return InstanceQueryParts(
             cteSql = cteSql,
             outerConditions = outerConditions,
-            params = params,
+            params = innerParams + outerParams,
         )
     }
 
-    private fun parseStatus(raw: String?): WorkflowRuntimeStatus = when (raw) {
-        "PENDING" -> WorkflowRuntimeStatus.PENDING
-        "RUNNING" -> WorkflowRuntimeStatus.RUNNING
-        "COMPLETED" -> WorkflowRuntimeStatus.COMPLETED
-        "FAULTED" -> WorkflowRuntimeStatus.FAULTED
-        else -> WorkflowRuntimeStatus.UNKNOWN
+    private fun calculateDurationMs(
+        startedAt: Instant?,
+        completedAt: Instant?,
+        faultedAt: Instant?,
+    ): Long? {
+        val effectiveEnd = when {
+            startedAt == null -> null
+            completedAt != null && faultedAt != null -> maxOf(completedAt, faultedAt)
+            completedAt != null -> completedAt
+            faultedAt != null -> faultedAt
+            else -> null
+        } ?: return null
+
+        return java.time.Duration.between(startedAt, effectiveEnd).toMillis()
     }
 
-    private fun parseErrorSummary(type: String?, status: Int?, title: String?): ErrorSummaryRow? {
+    private fun parseErrorSummary(faultedPayloadJson: String?): ErrorSummaryRow? {
+        if (faultedPayloadJson.isNullOrBlank()) return null
+        val root = runCatching { LemlineJson.jacksonMapper.readTree(faultedPayloadJson) }.getOrNull() ?: return null
+        val error = root.path("data").path("error")
+        if (error.isMissingNode || error.isNull) return null
+
+        val type = error.path("type").takeIf(JsonNode::isTextual)?.asText()
+        val status = error.path("status").takeIf(JsonNode::canConvertToInt)?.asInt()
+        val title = error.path("title").takeIf(JsonNode::isTextual)?.asText()
+
         if (type.isNullOrBlank() && status == null && title.isNullOrBlank()) return null
         return ErrorSummaryRow(
             type = type ?: "about:blank",
-            status = status ?: 0,
+            status = status,
             title = title ?: "",
         )
     }
 
-    private fun normalizePageSize(rawPageSize: Int): Int = rawPageSize.takeIf { it > 0 }?.coerceAtMost(200) ?: 50
+    private fun uuidToVarchar(column: String): String = "CAST($column AS VARCHAR)"
 
-    private fun decodeCursor(raw: String): DecodedCursor {
-        val trimmed = raw.trim()
-        require(trimmed.isNotBlank()) { "page_cursor must not be blank" }
+    private fun placeholders(size: Int): String =
+        List(size) { "?" }.joinToString(", ")
 
-        runCatching { UUID.fromString(trimmed) }
-            .onSuccess { return DecodedCursor(it, null) }
-
-        val decoded = runCatching {
-            String(Base64.getUrlDecoder().decode(trimmed), StandardCharsets.UTF_8)
-        }.getOrElse {
-            throw IllegalArgumentException("Invalid page_cursor: '$raw'")
-        }
-
-        val parts = decoded.split('|', limit = 2)
-        require(parts.size == 2) { "Invalid page_cursor payload" }
-
-        val workflowId = runCatching { UUID.fromString(parts[0]) }
-            .getOrElse { throw IllegalArgumentException("Invalid page_cursor workflow_id") }
-
-        val totalCount = parts[1].toLongOrNull()?.takeIf { it >= 0 }
-        return DecodedCursor(workflowId, totalCount)
-    }
-
-    private fun encodeCursor(workflowId: UUID, totalCount: Long): String {
-        val safeCount = if (totalCount >= 0) totalCount else -1L
-        val payload = "$workflowId|$safeCount"
-        return Base64.getUrlEncoder().withoutPadding().encodeToString(payload.toByteArray(StandardCharsets.UTF_8))
-    }
+    private fun normalizePageSize(rawPageSize: Int): Int =
+        rawPageSize.takeIf { it > 0 }?.coerceAtMost(200) ?: 50
 
     private data class SqlQuery(
         val sql: String,
@@ -434,10 +556,5 @@ class InstanceQueryService(
         val cteSql: String,
         val outerConditions: List<String>,
         val params: List<Any>,
-    )
-
-    private data class DecodedCursor(
-        val workflowId: UUID,
-        val totalCount: Long?,
     )
 }

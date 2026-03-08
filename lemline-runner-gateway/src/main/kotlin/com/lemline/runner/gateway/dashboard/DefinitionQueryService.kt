@@ -2,12 +2,6 @@
 package com.lemline.runner.gateway.dashboard
 
 import com.lemline.runner.common.config.DatabaseConfig
-import com.lemline.runner.common.config.ANALYTICS_LIFECYCLE_EVENTS_TABLE
-import com.lemline.runner.common.config.AnalyticsType
-import com.lemline.runner.gateway.analytics.AnalyticsDataSourceProvider
-import com.lemline.runner.config.LemlineConfiguration
-import com.lemline.runner.config.analyticsSchemaResolved
-import com.lemline.runner.config.analyticsTypeResolved
 import com.lemline.runner.definitions.DEFINITION_TABLE
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
@@ -16,92 +10,31 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 @ApplicationScoped
-class DefinitionQueryService(
-    config: LemlineConfiguration,
-) {
+class DefinitionQueryService {
 
     @Inject
     lateinit var databaseConfig: DatabaseConfig
 
-    @Inject
-    lateinit var analyticsDataSourceProvider: AnalyticsDataSourceProvider
-
-    private val analyticsQualifiedTable =
-        DashboardSqlSupport.qualifiedAnalyticsTable(
-            analyticsType = AnalyticsType.fromConfigValue(config.analyticsTypeResolved),
-            schema = config.analyticsSchemaResolved,
-            table = ANALYTICS_LIFECYCLE_EVENTS_TABLE
-        )
-
-    suspend fun listNamespaces(): List<String> {
-        val primary = listPrimaryNamespaces()
-        val analytics = listAnalyticsNamespaces()
-        return (primary + analytics)
-            .filter { it.isNotBlank() }
-            .toSet()
-            .sorted()
-    }
-
     suspend fun listDefinitions(
-        namespace: String,
-        name: String?,
-        latestOnly: Boolean,
-    ): List<DefinitionSummaryRow> = withContext(Dispatchers.IO) {
-        val trimmedNamespace = namespace.trim()
-        require(trimmedNamespace.isNotBlank()) { "namespace must be provided" }
-
-        val whereConditions = mutableListOf<String>()
-        val params = mutableListOf<Any>()
-
-        whereConditions += "namespace = ?"
-        params += trimmedNamespace
-
-        name?.trim()?.takeIf { it.isNotBlank() }?.let {
-            whereConditions += "name = ?"
-            params += it
+        filter: DefinitionListFilter,
+        snapshotAt: Instant,
+        page: DefinitionPageBoundary? = null,
+    ): DefinitionListResult = withContext(Dispatchers.IO) {
+        if (filter.allowedNamespaces?.isEmpty() == true) {
+            return@withContext DefinitionListResult(emptyList(), null, 0L)
         }
 
-        val latestWhere = if (latestOnly) "WHERE rn = 1" else ""
+        val normalizedPageSize = normalizePageSize(filter.pageSize)
+        val query = buildListDefinitionsQuery(filter, snapshotAt, page, normalizedPageSize + 1)
 
-        val sql = """
-            SELECT
-              namespace,
-              name,
-              version,
-              created_at,
-              updated_at,
-              CASE WHEN rn = 1 THEN TRUE ELSE FALSE END AS is_latest,
-              version_count
-            FROM (
-              SELECT
-                namespace,
-                name,
-                version,
-                created_at,
-                updated_at,
-                ROW_NUMBER() OVER (
-                    PARTITION BY namespace, name
-                    ORDER BY version DESC
-                ) AS rn,
-                COUNT(*) OVER (
-                    PARTITION BY namespace, name
-                ) AS version_count
-              FROM $DEFINITION_TABLE
-              WHERE ${whereConditions.joinToString(" AND ")}
-            ) ranked
-            $latestWhere
-            ORDER BY name ASC, version DESC
-        """.trimIndent()
-
-        databaseConfig.withConnection { conn ->
-            conn.prepareStatement(sql).use { stmt ->
-                params.forEachIndexed { index, value ->
-                    stmt.setObject(index + 1, value)
+        val rows = databaseConfig.withConnection { conn ->
+            conn.prepareStatement(query.sql).use { stmt ->
+                query.params.forEachIndexed { index, value ->
+                    stmt.setDashboardObject(index + 1, value)
                 }
                 stmt.executeQuery().use { rs ->
                     buildList {
                         while (rs.next()) {
-                            val createdAt = rs.getInstantOrNull("created_at") ?: Instant.EPOCH
                             add(
                                 DefinitionSummaryRow(
                                     namespace = rs.getString("namespace"),
@@ -109,7 +42,7 @@ class DefinitionQueryService(
                                     version = rs.getString("version"),
                                     isLatest = rs.getBoolean("is_latest"),
                                     versionCount = rs.getInt("version_count"),
-                                    createdAt = createdAt,
+                                    createdAt = rs.getInstantOrNull("created_at") ?: Instant.EPOCH,
                                     updatedAt = rs.getInstantOrNull("updated_at"),
                                 )
                             )
@@ -118,6 +51,18 @@ class DefinitionQueryService(
                 }
             }
         }
+
+        val hasMore = rows.size > normalizedPageSize
+        val pageRows = if (hasMore) rows.take(normalizedPageSize) else rows
+        val nextPage = pageRows.lastOrNull()
+            ?.takeIf { hasMore }
+            ?.let { DefinitionPageBoundary(it.namespace, it.name, it.version) }
+
+        DefinitionListResult(
+            definitions = pageRows,
+            nextPage = nextPage,
+            totalCount = countDefinitions(filter, snapshotAt),
+        )
     }
 
     suspend fun getDefinition(
@@ -127,45 +72,46 @@ class DefinitionQueryService(
     ): DefinitionDetailsRow? = withContext(Dispatchers.IO) {
         val trimmedNamespace = namespace.trim()
         val trimmedName = name.trim()
-
         require(trimmedNamespace.isNotBlank()) { "namespace must be provided" }
         require(trimmedName.isNotBlank()) { "name must be provided" }
 
         databaseConfig.withConnection { conn ->
             val selected = if (version.isNullOrBlank()) {
-                val latestSql = """
-                    SELECT namespace, name, version, definition
+                val sql = """
+                    SELECT namespace, name, version, definition, created_at, updated_at
                     FROM $DEFINITION_TABLE
                     WHERE namespace = ? AND name = ?
                     ORDER BY version DESC
                     LIMIT 1
                 """.trimIndent()
 
-                conn.prepareStatement(latestSql).use { stmt ->
+                conn.prepareStatement(sql).use { stmt ->
                     stmt.setString(1, trimmedNamespace)
                     stmt.setString(2, trimmedName)
                     stmt.executeQuery().use { rs ->
                         if (!rs.next()) {
                             null
                         } else {
-                            arrayOf(
-                                rs.getString("namespace"),
-                                rs.getString("name"),
-                                rs.getString("version"),
-                                rs.getString("definition")
+                            SelectedDefinition(
+                                namespace = rs.getString("namespace"),
+                                name = rs.getString("name"),
+                                version = rs.getString("version"),
+                                source = rs.getString("definition"),
+                                createdAt = rs.getInstantOrNull("created_at") ?: Instant.EPOCH,
+                                updatedAt = rs.getInstantOrNull("updated_at"),
                             )
                         }
                     }
                 }
             } else {
-                val exactSql = """
-                    SELECT namespace, name, version, definition
+                val sql = """
+                    SELECT namespace, name, version, definition, created_at, updated_at
                     FROM $DEFINITION_TABLE
                     WHERE namespace = ? AND name = ? AND version = ?
                     LIMIT 1
                 """.trimIndent()
 
-                conn.prepareStatement(exactSql).use { stmt ->
+                conn.prepareStatement(sql).use { stmt ->
                     stmt.setString(1, trimmedNamespace)
                     stmt.setString(2, trimmedName)
                     stmt.setString(3, version.trim())
@@ -173,11 +119,13 @@ class DefinitionQueryService(
                         if (!rs.next()) {
                             null
                         } else {
-                            arrayOf(
-                                rs.getString("namespace"),
-                                rs.getString("name"),
-                                rs.getString("version"),
-                                rs.getString("definition")
+                            SelectedDefinition(
+                                namespace = rs.getString("namespace"),
+                                name = rs.getString("name"),
+                                version = rs.getString("version"),
+                                source = rs.getString("definition"),
+                                createdAt = rs.getInstantOrNull("created_at") ?: Instant.EPOCH,
+                                updatedAt = rs.getInstantOrNull("updated_at"),
                             )
                         }
                     }
@@ -204,56 +152,160 @@ class DefinitionQueryService(
             }
 
             DefinitionDetailsRow(
-                namespace = selected[0],
-                name = selected[1],
-                version = selected[2],
-                definition = selected[3],
+                namespace = selected.namespace,
+                name = selected.name,
+                version = selected.version,
+                source = selected.source,
                 availableVersions = versions,
+                createdAt = selected.createdAt,
+                updatedAt = selected.updatedAt,
             )
         }
     }
 
-    private suspend fun listPrimaryNamespaces(): List<String> = withContext(Dispatchers.IO) {
-        val sql = """
-            SELECT DISTINCT namespace
-            FROM $DEFINITION_TABLE
-            WHERE namespace IS NOT NULL
-            ORDER BY namespace
-        """.trimIndent()
-
+    private suspend fun countDefinitions(filter: DefinitionListFilter, snapshotAt: Instant): Long = withContext(Dispatchers.IO) {
+        val query = buildCountDefinitionsQuery(filter, snapshotAt)
         databaseConfig.withConnection { conn ->
-            conn.prepareStatement(sql).use { stmt ->
+            conn.prepareStatement(query.sql).use { stmt ->
+                query.params.forEachIndexed { index, value ->
+                    stmt.setDashboardObject(index + 1, value)
+                }
                 stmt.executeQuery().use { rs ->
-                    buildList {
-                        while (rs.next()) {
-                            add(rs.getString("namespace"))
-                        }
-                    }
+                    if (rs.next()) rs.getLong("total_count") else 0L
                 }
             }
         }
     }
 
-    private suspend fun listAnalyticsNamespaces(): List<String> = withContext(Dispatchers.IO) {
-        val analyticsDataSource = analyticsDataSourceProvider.optional() ?: return@withContext emptyList()
+    private fun buildListDefinitionsQuery(
+        filter: DefinitionListFilter,
+        snapshotAt: Instant,
+        page: DefinitionPageBoundary?,
+        limit: Int,
+    ): SqlQuery {
+        val queryParts = buildDefinitionQueryParts(filter, snapshotAt)
+        val outerConditions = mutableListOf<String>()
+        if (filter.latestOnly) {
+            outerConditions += "rn = 1"
+        }
+        val pagingWhere = if (page == null) {
+            ""
+        } else {
+            """
+            AND (
+              namespace > ?
+              OR (namespace = ? AND name > ?)
+              OR (namespace = ? AND name = ? AND version < ?)
+            )
+            """.trimIndent()
+        }
+        val pagingParams = if (page == null) {
+            emptyList()
+        } else {
+            listOf(page.namespace, page.namespace, page.name, page.namespace, page.name, page.version)
+        }
+        if (outerConditions.isEmpty()) {
+            outerConditions += "1 = 1"
+        }
 
         val sql = """
-            SELECT DISTINCT lemline_workflow_namespace
-            FROM $analyticsQualifiedTable
-            WHERE lemline_workflow_namespace IS NOT NULL
-            ORDER BY lemline_workflow_namespace
+            ${queryParts.sql}
+            SELECT namespace, name, version, created_at, updated_at, is_latest, version_count
+            FROM ranked
+            WHERE ${outerConditions.joinToString(" AND ")}
+            $pagingWhere
+            ORDER BY namespace ASC, name ASC, version DESC
+            LIMIT ?
         """.trimIndent()
 
-        analyticsDataSource.connection.use { conn ->
-            conn.prepareStatement(sql).use { stmt ->
-                stmt.executeQuery().use { rs ->
-                    buildList {
-                        while (rs.next()) {
-                            add(rs.getString("lemline_workflow_namespace"))
-                        }
-                    }
-                }
-            }
-        }
+        return SqlQuery(sql, queryParts.params + pagingParams + limit)
     }
+
+    private fun buildCountDefinitionsQuery(filter: DefinitionListFilter, snapshotAt: Instant): SqlQuery {
+        val queryParts = buildDefinitionQueryParts(filter, snapshotAt)
+        val sql = if (filter.latestOnly) {
+            """
+            ${queryParts.sql}
+            SELECT COUNT(*) AS total_count
+            FROM ranked
+            WHERE rn = 1
+            """.trimIndent()
+        } else {
+            """
+            ${queryParts.sql}
+            SELECT COUNT(*) AS total_count
+            FROM ranked
+            """.trimIndent()
+        }
+        return SqlQuery(sql, queryParts.params)
+    }
+
+    private fun buildDefinitionQueryParts(filter: DefinitionListFilter, snapshotAt: Instant): SqlQuery {
+        val whereConditions = mutableListOf<String>()
+        val params = mutableListOf<Any>()
+
+        whereConditions += "COALESCE(updated_at, created_at) <= ?"
+        params += snapshotAt
+
+        filter.namespace?.trim()?.takeIf { it.isNotBlank() }?.let {
+            whereConditions += "namespace = ?"
+            params += it
+        }
+
+        filter.name?.trim()?.takeIf { it.isNotBlank() }?.let {
+            whereConditions += "name = ?"
+            params += it
+        }
+
+        filter.allowedNamespaces?.takeIf { it.isNotEmpty() }?.let { namespaces ->
+            whereConditions += "namespace IN (${placeholders(namespaces.size)})"
+            params.addAll(namespaces.sorted())
+        }
+
+        val cteSql = """
+            WITH ranked AS (
+              SELECT
+                namespace,
+                name,
+                version,
+                created_at,
+                updated_at,
+                CASE WHEN ROW_NUMBER() OVER (
+                    PARTITION BY namespace, name
+                    ORDER BY version DESC
+                ) = 1 THEN TRUE ELSE FALSE END AS is_latest,
+                ROW_NUMBER() OVER (
+                    PARTITION BY namespace, name
+                    ORDER BY version DESC
+                ) AS rn,
+                COUNT(*) OVER (
+                    PARTITION BY namespace, name
+                ) AS version_count
+              FROM $DEFINITION_TABLE
+              WHERE ${whereConditions.joinToString(" AND ")}
+            )
+        """.trimIndent()
+
+        return SqlQuery(cteSql, params)
+    }
+
+    private fun placeholders(size: Int): String =
+        List(size) { "?" }.joinToString(", ")
+
+    private fun normalizePageSize(rawPageSize: Int): Int =
+        rawPageSize.takeIf { it > 0 }?.coerceAtMost(200) ?: 50
+
+    private data class SqlQuery(
+        val sql: String,
+        val params: List<Any>,
+    )
+
+    private data class SelectedDefinition(
+        val namespace: String,
+        val name: String,
+        val version: String,
+        val source: String,
+        val createdAt: Instant,
+        val updatedAt: Instant?,
+    )
 }

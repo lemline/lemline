@@ -10,7 +10,7 @@ import com.lemline.runner.common.models.WithInstanceMessage
 import com.lemline.runner.common.models.WithOutbox
 import kotlin.time.Instant
 
-data class GatewayCommandOutboxModel(
+data class GatewayCommandModel(
     override val id: IDV7,
     override var instanceMessage: InstanceMessage<WorkflowCommand.ResumeFromTask>,
     override val outboxScheduledFor: Instant?,

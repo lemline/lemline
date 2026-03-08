@@ -16,7 +16,7 @@ import jakarta.inject.Inject
  */
 @Startup
 @ApplicationScoped
-class GatewayCommandOutboxCleaner : AbstractCleaner<GatewayCommandOutboxModel>() {
+class GatewayCommandCleaner : AbstractCleaner<GatewayCommandModel>() {
     override val runWhenScheduledDisabled: Boolean get() = true
 
     @Inject
@@ -26,13 +26,13 @@ class GatewayCommandOutboxCleaner : AbstractCleaner<GatewayCommandOutboxModel>()
     override lateinit var databaseConfig: DatabaseConfig
 
     @Inject
-    lateinit var gatewayCommandOutboxRepository: GatewayCommandOutboxRepository
+    lateinit var gatewayCommandRepository: GatewayCommandRepository
 
-    override val cleanerRepository: WithCleanerRepository<GatewayCommandOutboxModel>
-        get() = gatewayCommandOutboxRepository
+    override val cleanerRepository: WithCleanerRepository<GatewayCommandModel>
+        get() = gatewayCommandRepository
 
-    override val crudRepository: WithCrudRepository<GatewayCommandOutboxModel>
-        get() = gatewayCommandOutboxRepository
+    override val crudRepository: WithCrudRepository<GatewayCommandModel>
+        get() = gatewayCommandRepository
 
     override val enabled by lazy { gatewayOutboxConfig.enabled }
 

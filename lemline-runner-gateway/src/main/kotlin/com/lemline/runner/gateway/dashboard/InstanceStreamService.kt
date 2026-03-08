@@ -24,55 +24,70 @@ class InstanceStreamService(
     lateinit var instanceQueryService: InstanceQueryService
 
     suspend fun watchDefinitionStats(
-        filter: StatsQueryFilter,
-        onUpdate: suspend (DefinitionStatsRow) -> Boolean,
+        filter: DefinitionStatsFilter,
+        afterSequence: Long?,
+        onUpdate: suspend (DefinitionStatsChangeRow) -> Boolean,
     ) {
-        var previous = emptyMap<StatsKey, DefinitionStatsRow>()
+        var lastSequence = afterSequence ?: instanceQueryService.latestSequence()
+        var previous = statsQueryService.queryDefinitionStatsSnapshot(filter, lastSequence)
+            .associateBy { StatsKey(it.namespace, it.name, it.version) }
 
         while (currentCoroutineContext().isActive) {
-            val currentList = statsQueryService.queryStats(filter)
-            val current = currentList.associateBy { StatsKey(it.namespace, it.name, it.version) }
+            val currentSequence = instanceQueryService.latestSequence()
+            if (currentSequence <= lastSequence) {
+                delay(pollIntervalMs)
+                continue
+            }
+
+            val current = statsQueryService.queryDefinitionStatsSnapshot(filter, currentSequence)
+                .associateBy { StatsKey(it.namespace, it.name, it.version) }
 
             val updates = buildList {
                 current.forEach { (key, value) ->
-                    val old = previous[key]
-                    if (old != value) add(value)
-                }
-
-                previous.keys.minus(current.keys).forEach { removedKey ->
-                    add(
-                        DefinitionStatsRow(
-                            namespace = removedKey.namespace,
-                            name = removedKey.name,
-                            version = removedKey.version,
-                            started = 0,
-                            completed = 0,
-                            faulted = 0,
-                            running = 0,
+                    if (previous[key] != value) {
+                        add(
+                            DefinitionStatsChangeRow(
+                                cursor = currentSequence,
+                                changeType = ChangeType.UPSERT,
+                                stats = value,
+                            )
                         )
-                    )
+                    }
                 }
-            }
+                previous.forEach { (key, value) ->
+                    if (key !in current) {
+                        add(
+                            DefinitionStatsChangeRow(
+                                cursor = currentSequence,
+                                changeType = ChangeType.REMOVED,
+                                stats = value,
+                            )
+                        )
+                    }
+                }
+            }.sortedWith(
+                compareBy<DefinitionStatsChangeRow>({ it.stats.namespace }, { it.stats.name }, { it.stats.version })
+                    .thenBy { it.changeType.name }
+            )
 
-            for (update in updates.sortedWith(compareBy({ it.namespace }, { it.name }, { it.version ?: "" }))) {
-                val shouldContinue = onUpdate(update)
-                if (!shouldContinue) return
+            for (update in updates) {
+                if (!onUpdate(update)) return
             }
 
             previous = current
-            delay(pollIntervalMs)
+            lastSequence = currentSequence
         }
     }
 
     suspend fun watchInstances(
-        filter: WatchInstancesFilter,
+        filter: InstanceListFilter,
         afterSequence: Long?,
-        onUpdate: suspend (InstanceStreamUpdate) -> Boolean,
+        onUpdate: suspend (InstanceChangeRow) -> Boolean,
     ) {
         var lastSequence = afterSequence ?: instanceQueryService.latestSequence()
 
         while (currentCoroutineContext().isActive) {
-            val rows = instanceQueryService.listWorkflowEventsAfter(
+            val rows = instanceQueryService.listChangedInstanceSequencesAfter(
                 afterSequenceExclusive = lastSequence,
                 limit = batchSize,
                 filter = filter,
@@ -84,22 +99,36 @@ class InstanceStreamService(
             }
 
             for (row in rows) {
-                lastSequence = row.sequence
-                val instance = instanceQueryService.findInstance(row.workflowId) ?: continue
-                val updateType = if (instanceQueryService.isFirstWorkflowEvent(row.workflowId, row.sequence)) {
-                    InstanceUpdateType.CREATED
+                val before = if (row.sequence > 0) {
+                    instanceQueryService.findInstance(row.workflowId, row.sequence - 1)
                 } else {
-                    InstanceUpdateType.UPDATED
+                    null
+                }
+                val after = instanceQueryService.findInstance(row.workflowId, row.sequence)
+
+                val beforeInstance = before?.instance
+                val afterInstance = after?.instance
+                val beforeMatches = beforeInstance?.let { instanceQueryService.matchesFilter(it, filter) } == true
+                val afterMatches = afterInstance?.let { instanceQueryService.matchesFilter(it, filter) } == true
+
+                val change = when {
+                    afterMatches -> InstanceChangeRow(
+                        cursor = row.sequence,
+                        changeType = ChangeType.UPSERT,
+                        instance = afterInstance!!,
+                    )
+
+                    beforeMatches -> InstanceChangeRow(
+                        cursor = row.sequence,
+                        changeType = ChangeType.REMOVED,
+                        instance = afterInstance ?: beforeInstance!!,
+                    )
+
+                    else -> null
                 }
 
-                val shouldContinue = onUpdate(
-                    InstanceStreamUpdate(
-                        instance = instance,
-                        updateType = updateType,
-                        sequence = row.sequence,
-                    )
-                )
-                if (!shouldContinue) return
+                if (change != null && !onUpdate(change)) return
+                lastSequence = row.sequence
             }
         }
     }
@@ -107,6 +136,6 @@ class InstanceStreamService(
     private data class StatsKey(
         val namespace: String,
         val name: String,
-        val version: String?,
+        val version: String,
     )
 }

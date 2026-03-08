@@ -2,22 +2,24 @@
 package com.lemline.runner.gateway.outbox
 
 import com.lemline.runner.common.config.DatabaseConfig
-import com.lemline.runner.common.test.H2TestDatabaseConfig
+import com.lemline.runner.common.test.MySQLTestDatabaseConfig
+import com.lemline.runner.common.test.RequiresDocker
 import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.DisplayName
 
-@DisplayName("GatewayCommandOutboxRepository [H2]")
-class GatewayCommandOutboxRepositoryH2Test : GatewayCommandOutboxRepositoryTestBase() {
+@RequiresDocker
+@DisplayName("GatewayCommandOutboxRepository [MySQL]")
+class GatewayCommandRepositoryMySQLTest : GatewayCommandRepositoryTestBase() {
 
     override fun getDatabaseConfig(): DatabaseConfig = testDb
-    override fun getRepository(): GatewayCommandOutboxRepository = repository
+    override fun getRepository(): GatewayCommandRepository = repository
 
     companion object {
-        private val testDb = H2TestDatabaseConfig()
+        private val testDb = MySQLTestDatabaseConfig()
 
-        private val repository: GatewayCommandOutboxRepository by lazy {
-            GatewayCommandOutboxRepository().apply {
+        private val repository: GatewayCommandRepository by lazy {
+            GatewayCommandRepository().apply {
                 databaseConfig = testDb
             }
         }
@@ -25,6 +27,7 @@ class GatewayCommandOutboxRepositoryH2Test : GatewayCommandOutboxRepositoryTestB
         @BeforeAll
         @JvmStatic
         fun setup() {
+            testDb.start()
             testDb.migrate()
         }
 

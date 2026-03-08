@@ -1,6 +1,6 @@
 # lemline-runner-gateway
 
-gRPC ingress gateway for starting workflows and streaming workflow analytics.
+gRPC ingress gateway for workflow definitions, instances, and instance-event streaming.
 
 ## How this module is started
 
@@ -18,7 +18,7 @@ Gateway startup requires:
 1. Runner database config (`lemline.database.*`) for gateway outbox persistence
 2. Runner messaging config (`lemline.messaging.*`) to publish workflow start commands
 3. Gateway config (`lemline.gateway.*`) for gRPC/TLS/security
-4. Analytics config (`lemline.analytics.*`) for watch replay/tail
+4. Analytics config (`lemline.analytics.*`) for list/watch snapshot reads
 
 Example `.lemline.yaml` (authentication disabled):
 
@@ -160,9 +160,17 @@ TLS validation rules:
 
 Authorization requirements:
 
-1. `StartWorkflow` requires scope `lemline.start`
-2. `WatchWorkflow` requires scope `lemline.watch`
-3. Namespace access is checked against the namespaces claim (`*` allows all)
+1. `StartInstance` requires scope `lemline.start`
+2. Streaming RPCs (`WatchDefinitionStats`, `WatchInstances`, `WatchInstanceEvents`) require scope `lemline.watch`
+3. Non-streaming read RPCs do not require a scope, but namespace access is still enforced
+4. Namespace access is checked against the namespaces claim (`*` allows all)
+
+Public RPC surface:
+
+1. Catalog and definitions: `ListDefinitions`, `GetDefinition`
+2. Definition execution stats: `ListDefinitionStats`, `WatchDefinitionStats`
+3. Instance lifecycle: `StartInstance`, `GetInstance`, `ListInstances`, `WatchInstances`
+4. Instance timeline: `ListInstanceEvents`, `WatchInstanceEvents`
 
 Accepted claim formats for scopes/namespaces:
 

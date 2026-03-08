@@ -19,7 +19,7 @@ import org.junit.jupiter.api.Test
 
 /**
  * Integration test validating the transactional atomicity between
- * schedule insert and outbox insert, as used by WorkflowStartService.
+ * schedule insert and outbox insert, as used by InstanceStartService.
  */
 @DisplayName("Gateway Command Outbox Integration")
 class GatewayCommandOutboxIntegrationTest {
@@ -27,8 +27,8 @@ class GatewayCommandOutboxIntegrationTest {
     companion object {
         private val testDb = H2TestDatabaseConfig()
 
-        private val outboxRepository: GatewayCommandOutboxRepository by lazy {
-            GatewayCommandOutboxRepository().apply { databaseConfig = testDb }
+        private val outboxRepository: GatewayCommandRepository by lazy {
+            GatewayCommandRepository().apply { databaseConfig = testDb }
         }
 
         private val scheduleRepository: ScheduleRepository by lazy {
@@ -60,7 +60,7 @@ class GatewayCommandOutboxIntegrationTest {
             workflowInfo = randomWorkflowInfo(),
             workflowState = randomResumeFromTaskCommand(),
         )
-        val outboxEntry = GatewayCommandOutboxModel(
+        val outboxEntry = GatewayCommandModel(
             id = IDV7.random(),
             instanceMessage = msg,
             outboxScheduledFor = Clock.System.now(),
@@ -91,7 +91,7 @@ class GatewayCommandOutboxIntegrationTest {
             scheduleZone = null,
         )
 
-        val outboxEntry = GatewayCommandOutboxModel(
+        val outboxEntry = GatewayCommandModel(
             id = IDV7.random(),
             instanceMessage = InstanceMessage(
                 workflowInfo = randomWorkflowInfo(),
@@ -131,7 +131,7 @@ class GatewayCommandOutboxIntegrationTest {
             scheduleZone = null,
         )
 
-        val outboxEntry = GatewayCommandOutboxModel(
+        val outboxEntry = GatewayCommandModel(
             id = IDV7.random(),
             instanceMessage = InstanceMessage(
                 workflowInfo = randomWorkflowInfo(),
@@ -152,7 +152,7 @@ class GatewayCommandOutboxIntegrationTest {
 
     @Test
     fun `outbox entry is found by outbox processor query after insert`() = runTest {
-        val outboxEntry = GatewayCommandOutboxModel(
+        val outboxEntry = GatewayCommandModel(
             id = IDV7.random(),
             instanceMessage = InstanceMessage(
                 workflowInfo = randomWorkflowInfo(),
