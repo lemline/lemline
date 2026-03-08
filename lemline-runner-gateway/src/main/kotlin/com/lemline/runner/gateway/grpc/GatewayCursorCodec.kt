@@ -2,9 +2,9 @@
 package com.lemline.runner.gateway.grpc
 
 import com.lemline.common.json.LemlineJson
-import com.lemline.runner.gateway.definitions.DefinitionPageBoundary
-import com.lemline.runner.gateway.definitionstats.DefinitionStatsPageBoundary
-import com.lemline.runner.gateway.instances.InstancePageBoundary
+import com.lemline.runner.gateway.resources.definitions.DefinitionPageBoundary
+import com.lemline.runner.gateway.resources.definitionstats.DefinitionStatsPageBoundary
+import com.lemline.runner.gateway.resources.instances.InstancePageBoundary
 import java.nio.charset.StandardCharsets
 import java.time.Instant
 import java.util.UUID
@@ -174,22 +174,22 @@ data class InstanceEventCursor(
     }
 }
 
-internal fun DefinitionPageCursor.toBoundary(): DefinitionPageBoundary =
-    DefinitionPageBoundary(
+internal fun DefinitionPageCursor.toBoundary(): com.lemline.runner.gateway.resources.definitions.DefinitionPageBoundary =
+    _root_ide_package_.com.lemline.runner.gateway.resources.definitions.DefinitionPageBoundary(
         namespace = lastNamespace,
         name = lastName,
         version = lastVersion,
     )
 
-internal fun DefinitionStatsPageCursor.toBoundary(): DefinitionStatsPageBoundary =
-    DefinitionStatsPageBoundary(
+internal fun DefinitionStatsPageCursor.toBoundary(): com.lemline.runner.gateway.resources.definitionstats.DefinitionStatsPageBoundary =
+    _root_ide_package_.com.lemline.runner.gateway.resources.definitionstats.DefinitionStatsPageBoundary(
         namespace = lastNamespace,
         name = lastName,
         version = lastVersion,
     )
 
-internal fun InstancePageCursor.toBoundary(): InstancePageBoundary =
-    InstancePageBoundary(
+internal fun InstancePageCursor.toBoundary(): com.lemline.runner.gateway.resources.instances.InstancePageBoundary =
+    _root_ide_package_.com.lemline.runner.gateway.resources.instances.InstancePageBoundary(
         createdAt = Instant.parse(lastCreatedAt),
         instanceId = UUID.fromString(lastInstanceId),
     )

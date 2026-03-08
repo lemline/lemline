@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-package com.lemline.runner.gateway.definitionstats
+package com.lemline.runner.gateway.resources.definitionstats
 
 import com.lemline.gateway.v1.DefinitionStats
 import com.lemline.gateway.v1.DefinitionStatsChange
@@ -17,11 +17,10 @@ import com.lemline.runner.gateway.grpc.GatewayCursorCodec
 import com.lemline.runner.gateway.grpc.allowedNamespacesForRead
 import com.lemline.runner.gateway.grpc.normalizeAllowedNamespaces
 import com.lemline.runner.gateway.grpc.optionalString
-import com.lemline.runner.gateway.grpc.parseCursorInstant
 import com.lemline.runner.gateway.grpc.requiredInstant
 import com.lemline.runner.gateway.grpc.toBoundary
 import com.lemline.runner.gateway.grpc.validateTimeRange
-import com.lemline.runner.gateway.instances.InstanceQueryService
+import com.lemline.runner.gateway.resources.instances.InstanceQueryService
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
 

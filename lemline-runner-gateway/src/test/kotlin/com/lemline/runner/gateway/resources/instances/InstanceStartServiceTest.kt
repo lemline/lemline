@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-package com.lemline.runner.gateway.instances
+package com.lemline.runner.gateway.resources.instances
 
 import com.google.protobuf.NullValue
 import com.google.protobuf.Struct
@@ -35,8 +35,10 @@ import io.mockk.just
 import io.mockk.mockk
 import io.mockk.runs
 import io.mockk.slot
+import io.serverlessworkflow.api.types.Workflow
 import java.sql.Connection
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -224,7 +226,7 @@ class InstanceStartServiceTest {
 
     private fun existingOutbox(
         workflowId: WorkflowId,
-        workflowInput: kotlinx.serialization.json.JsonElement,
+        workflowInput: JsonElement,
         version: WorkflowVersion,
     ): GatewayCommandModel =
         GatewayCommandModel(
@@ -240,7 +242,7 @@ class InstanceStartServiceTest {
             outboxScheduledFor = null,
         )
 
-    private fun workflow(version: String): io.serverlessworkflow.api.types.Workflow =
+    private fun workflow(version: String): Workflow =
         WorkflowCache.parseYaml(
             """
             document:

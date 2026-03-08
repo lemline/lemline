@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-package com.lemline.runner.gateway.definitionstats
+package com.lemline.runner.gateway.resources.definitionstats
 
 import java.time.Instant
 

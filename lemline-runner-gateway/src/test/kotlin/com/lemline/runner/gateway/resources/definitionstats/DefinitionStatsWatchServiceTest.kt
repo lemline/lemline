@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
-package com.lemline.runner.gateway.definitionstats
+package com.lemline.runner.gateway.resources.definitionstats
 
-import com.lemline.runner.gateway.instances.InstanceQueryService
+import com.lemline.runner.gateway.resources.instances.InstanceQueryService
 import com.lemline.runner.gateway.support.testLemlineConfiguration
 import io.kotest.matchers.collections.shouldContainExactly
 import io.mockk.coEvery

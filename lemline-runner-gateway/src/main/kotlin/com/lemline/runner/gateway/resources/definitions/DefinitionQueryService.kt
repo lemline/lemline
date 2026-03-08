@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-package com.lemline.runner.gateway.definitions
+package com.lemline.runner.gateway.resources.definitions
 
 import com.lemline.runner.common.config.DatabaseConfig
 import com.lemline.runner.definitions.DEFINITION_TABLE
@@ -168,19 +168,20 @@ class DefinitionQueryService {
         }
     }
 
-    private suspend fun countDefinitions(filter: DefinitionListFilter, snapshotAt: Instant): Long = withContext(Dispatchers.IO) {
-        val query = buildCountDefinitionsQuery(filter, snapshotAt)
-        databaseConfig.withConnection { conn ->
-            conn.prepareStatement(query.sql).use { stmt ->
-                query.params.forEachIndexed { index, value ->
-                    stmt.setGatewayObject(index + 1, value)
-                }
-                stmt.executeQuery().use { rs ->
-                    if (rs.next()) rs.getLong("total_count") else 0L
+    private suspend fun countDefinitions(filter: DefinitionListFilter, snapshotAt: Instant): Long =
+        withContext(Dispatchers.IO) {
+            val query = buildCountDefinitionsQuery(filter, snapshotAt)
+            databaseConfig.withConnection { conn ->
+                conn.prepareStatement(query.sql).use { stmt ->
+                    query.params.forEachIndexed { index, value ->
+                        stmt.setGatewayObject(index + 1, value)
+                    }
+                    stmt.executeQuery().use { rs ->
+                        if (rs.next()) rs.getLong("total_count") else 0L
+                    }
                 }
             }
         }
-    }
 
     private fun buildListDefinitionsQuery(
         filter: DefinitionListFilter,

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-package com.lemline.runner.gateway.instances
+package com.lemline.runner.gateway.resources.instances
 
 import com.lemline.gateway.v1.GetInstanceRequest
 import com.lemline.gateway.v1.GetInstanceResponse

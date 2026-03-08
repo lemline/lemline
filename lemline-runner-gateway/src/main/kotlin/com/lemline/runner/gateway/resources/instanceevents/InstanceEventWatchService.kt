@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-package com.lemline.runner.gateway.instanceevents
+package com.lemline.runner.gateway.resources.instanceevents
 
 import com.lemline.runner.config.LemlineConfiguration
 import com.lemline.runner.config.gatewayWatchBatchSize

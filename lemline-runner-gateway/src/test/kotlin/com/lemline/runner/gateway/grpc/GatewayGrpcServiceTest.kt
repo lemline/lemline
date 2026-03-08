@@ -7,10 +7,10 @@ import com.lemline.gateway.v1.WatchInstanceEventsRequest
 import com.lemline.gateway.v1.WatchInstanceEventsResponse
 import com.lemline.runner.gateway.auth.GatewayAuthContext
 import com.lemline.runner.gateway.auth.GatewayPrincipal
-import com.lemline.runner.gateway.definitions.DefinitionRpcHandler
-import com.lemline.runner.gateway.definitionstats.DefinitionStatsRpcHandler
-import com.lemline.runner.gateway.instanceevents.InstanceEventRpcHandler
-import com.lemline.runner.gateway.instances.InstanceRpcHandler
+import com.lemline.runner.gateway.resources.definitions.DefinitionRpcHandler
+import com.lemline.runner.gateway.resources.definitionstats.DefinitionStatsRpcHandler
+import com.lemline.runner.gateway.resources.instanceevents.InstanceEventRpcHandler
+import com.lemline.runner.gateway.resources.instances.InstanceRpcHandler
 import com.lemline.runner.gateway.support.testLemlineConfiguration
 import io.grpc.Status
 import io.grpc.stub.StreamObserver

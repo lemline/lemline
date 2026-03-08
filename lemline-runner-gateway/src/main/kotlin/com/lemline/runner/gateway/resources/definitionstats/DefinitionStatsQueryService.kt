@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-package com.lemline.runner.gateway.definitionstats
+package com.lemline.runner.gateway.resources.definitionstats
 
 import com.lemline.core.lifecycleevents.LifecycleEventType
 import com.lemline.runner.common.config.ANALYTICS_LIFECYCLE_EVENTS_TABLE
@@ -97,19 +97,20 @@ class DefinitionStatsQueryService(
         }
     }
 
-    private suspend fun countStats(filter: DefinitionStatsFilter, snapshotSequence: Long): Long = withContext(Dispatchers.IO) {
-        val query = buildStatsCountQuery(filter, snapshotSequence)
-        analyticsDataSourceProvider.require().connection.use { conn ->
-            conn.prepareStatement(query.sql).use { stmt ->
-                query.params.forEachIndexed { index, value ->
-                    stmt.setGatewayObject(index + 1, value)
-                }
-                stmt.executeQuery().use { rs ->
-                    if (rs.next()) rs.getLong("total_count") else 0L
+    private suspend fun countStats(filter: DefinitionStatsFilter, snapshotSequence: Long): Long =
+        withContext(Dispatchers.IO) {
+            val query = buildStatsCountQuery(filter, snapshotSequence)
+            analyticsDataSourceProvider.require().connection.use { conn ->
+                conn.prepareStatement(query.sql).use { stmt ->
+                    query.params.forEachIndexed { index, value ->
+                        stmt.setGatewayObject(index + 1, value)
+                    }
+                    stmt.executeQuery().use { rs ->
+                        if (rs.next()) rs.getLong("total_count") else 0L
+                    }
                 }
             }
         }
-    }
 
     private fun buildStatsListQuery(
         filter: DefinitionStatsFilter,

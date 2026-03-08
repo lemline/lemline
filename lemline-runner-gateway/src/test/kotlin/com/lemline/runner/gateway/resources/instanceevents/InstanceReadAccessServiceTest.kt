@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: BUSL-1.1
-package com.lemline.runner.gateway.instanceevents
+package com.lemline.runner.gateway.resources.instanceevents
 
 import com.lemline.runner.gateway.auth.GatewayAuthorizer
 import com.lemline.runner.gateway.auth.GatewayPrincipal
 import com.lemline.runner.gateway.errors.GatewayNotFoundException
 import com.lemline.runner.gateway.errors.GatewayPermissionDeniedException
-import com.lemline.runner.gateway.instances.InstanceLookupRow
-import com.lemline.runner.gateway.instances.InstanceQueryService
-import com.lemline.runner.gateway.instances.InstanceStatus
-import com.lemline.runner.gateway.instances.InstanceSummaryRow
+import com.lemline.runner.gateway.resources.instances.InstanceLookupRow
+import com.lemline.runner.gateway.resources.instances.InstanceQueryService
+import com.lemline.runner.gateway.resources.instances.InstanceStatus
+import com.lemline.runner.gateway.resources.instances.InstanceSummaryRow
 import io.kotest.assertions.throwables.shouldThrow
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -18,7 +18,7 @@ import io.mockk.mockk
 import io.mockk.runs
 import io.mockk.verify
 import java.time.Instant
-import java.util.UUID
+import java.util.*
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
@@ -63,7 +63,11 @@ class InstanceReadAccessServiceTest {
     fun `authorizeRead falls back to first event namespace when lookup misses`() = runTest {
         coEvery { instanceQueryService.latestLifecycleSequence() } returns 20L
         coEvery { instanceQueryService.findInstance(instanceId, 20L) } returns null
-        coEvery { instanceEventQueryService.firstEvent(instanceId) } returns eventRow(1L, "WORKFLOW_CREATED", namespace = "team-a")
+        coEvery { instanceEventQueryService.firstEvent(instanceId) } returns eventRow(
+            1L,
+            "WORKFLOW_CREATED",
+            namespace = "team-a"
+        )
 
         service.authorizeRead(principal, instanceId)
 
@@ -86,7 +90,11 @@ class InstanceReadAccessServiceTest {
     fun `authorizeRead raises permission denied when the first event has no namespace`() = runTest {
         coEvery { instanceQueryService.latestLifecycleSequence() } returns 20L
         coEvery { instanceQueryService.findInstance(instanceId, 20L) } returns null
-        coEvery { instanceEventQueryService.firstEvent(instanceId) } returns eventRow(1L, "WORKFLOW_CREATED", namespace = "")
+        coEvery { instanceEventQueryService.firstEvent(instanceId) } returns eventRow(
+            1L,
+            "WORKFLOW_CREATED",
+            namespace = ""
+        )
 
         shouldThrow<GatewayPermissionDeniedException> {
             service.authorizeRead(principal, instanceId)

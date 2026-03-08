@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-package com.lemline.runner.gateway.instanceevents
+package com.lemline.runner.gateway.resources.instanceevents
 
 import com.lemline.gateway.v1.InstanceEvent
 import com.lemline.gateway.v1.ListInstanceEventsRequest

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-package com.lemline.runner.gateway.instances
+package com.lemline.runner.gateway.resources.instances
 
 import com.fasterxml.jackson.databind.JsonNode
 import com.lemline.common.json.LemlineJson
@@ -163,64 +163,69 @@ class InstanceQueryService(
         if (filter.version != null && row.version != filter.version) return false
         if (filter.status != null && row.status != filter.status) return false
         if (filter.instanceId != null && row.instanceId != filter.instanceId) return false
-        if (filter.instanceIdPrefix != null && !row.instanceId.toString().startsWith(filter.instanceIdPrefix)) return false
+        if (filter.instanceIdPrefix != null && !row.instanceId.toString()
+                .startsWith(filter.instanceIdPrefix)
+        ) return false
         if (filter.createdFrom != null && row.createdAt < filter.createdFrom) return false
         if (filter.createdTo != null && row.createdAt >= filter.createdTo) return false
         if (filter.allowedNamespaces != null && row.namespace !in filter.allowedNamespaces) return false
         return true
     }
 
-    private suspend fun executeInstanceLookupQuery(query: SqlQuery): List<InstanceLookupRow> = withContext(Dispatchers.IO) {
-        analyticsDataSourceProvider.require().connection.use { conn ->
-            conn.prepareStatement(query.sql).use { stmt ->
-                query.params.forEachIndexed { index, value ->
-                    stmt.setGatewayObject(index + 1, value)
-                }
-                stmt.executeQuery().use { rs ->
-                    buildList {
-                        while (rs.next()) {
-                            val startedAt = rs.getInstantOrNull("started_at")
-                            val completedAt = rs.getInstantOrNull("completed_at")
-                            val faultedAt = rs.getInstantOrNull("faulted_at")
-                            val summary = InstanceSummaryRow(
-                                instanceId = rs.getObject("lemline_workflow_id", UUID::class.java),
-                                namespace = rs.getString("lemline_workflow_namespace") ?: "",
-                                name = rs.getString("lemline_workflow_name") ?: "",
-                                version = rs.getString("lemline_workflow_version") ?: "",
-                                status = InstanceStatus.fromRaw(rs.getString("status")),
-                                createdAt = rs.getInstantOrNull("instance_created_at") ?: Instant.EPOCH,
-                                startedAt = startedAt,
-                                completedAt = completedAt,
-                                faultedAt = faultedAt,
-                                durationMs = calculateDurationMs(startedAt, completedAt, faultedAt),
-                                error = parseErrorSummary(rs.getString("faulted_payload_json")),
-                            )
-                            add(
-                                InstanceLookupRow(
-                                    instance = summary,
-                                    latestEventSequence = rs.getLong("latest_event_sequence").takeIf { !rs.wasNull() },
+    private suspend fun executeInstanceLookupQuery(query: SqlQuery): List<InstanceLookupRow> =
+        withContext(Dispatchers.IO) {
+            analyticsDataSourceProvider.require().connection.use { conn ->
+                conn.prepareStatement(query.sql).use { stmt ->
+                    query.params.forEachIndexed { index, value ->
+                        stmt.setGatewayObject(index + 1, value)
+                    }
+                    stmt.executeQuery().use { rs ->
+                        buildList {
+                            while (rs.next()) {
+                                val startedAt = rs.getInstantOrNull("started_at")
+                                val completedAt = rs.getInstantOrNull("completed_at")
+                                val faultedAt = rs.getInstantOrNull("faulted_at")
+                                val summary = InstanceSummaryRow(
+                                    instanceId = rs.getObject("lemline_workflow_id", UUID::class.java),
+                                    namespace = rs.getString("lemline_workflow_namespace") ?: "",
+                                    name = rs.getString("lemline_workflow_name") ?: "",
+                                    version = rs.getString("lemline_workflow_version") ?: "",
+                                    status = InstanceStatus.fromRaw(rs.getString("status")),
+                                    createdAt = rs.getInstantOrNull("instance_created_at") ?: Instant.EPOCH,
+                                    startedAt = startedAt,
+                                    completedAt = completedAt,
+                                    faultedAt = faultedAt,
+                                    durationMs = calculateDurationMs(startedAt, completedAt, faultedAt),
+                                    error = parseErrorSummary(rs.getString("faulted_payload_json")),
                                 )
-                            )
+                                add(
+                                    InstanceLookupRow(
+                                        instance = summary,
+                                        latestEventSequence = rs.getLong("latest_event_sequence")
+                                            .takeIf { !rs.wasNull() },
+                                    )
+                                )
+                            }
                         }
                     }
                 }
             }
         }
-    }
 
-    private suspend fun countInstances(filter: InstanceListFilter, snapshotSequence: Long): Long = withContext(Dispatchers.IO) {
-        val query = buildInstanceCountQuery(filter, snapshotSequence)
-        analyticsDataSourceProvider.require().connection.use { conn ->
-            conn.prepareStatement(query.sql).use { stmt ->
-                query.params.forEachIndexed { index, value ->
-                    stmt.setGatewayObject(index + 1, value)
-                }
-                stmt.executeQuery().use { rs ->
-                    if (rs.next()) rs.getLong("total_count") else 0L
+    private suspend fun countInstances(filter: InstanceListFilter, snapshotSequence: Long): Long =
+        withContext(Dispatchers.IO) {
+            val query = buildInstanceCountQuery(filter, snapshotSequence)
+            analyticsDataSourceProvider.require().connection.use { conn ->
+                conn.prepareStatement(query.sql).use { stmt ->
+                    query.params.forEachIndexed { index, value ->
+                        stmt.setGatewayObject(index + 1, value)
+                    }
+                    stmt.executeQuery().use { rs ->
+                        if (rs.next()) rs.getLong("total_count") else 0L
+                    }
                 }
             }
         }
-    }
 
     private fun buildInstanceListQuery(
         filter: InstanceListFilter,

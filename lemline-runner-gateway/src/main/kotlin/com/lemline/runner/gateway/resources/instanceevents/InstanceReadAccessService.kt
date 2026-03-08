@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: BUSL-1.1
-package com.lemline.runner.gateway.instanceevents
+package com.lemline.runner.gateway.resources.instanceevents
 
 import com.lemline.runner.gateway.auth.GatewayAuthorizer
 import com.lemline.runner.gateway.auth.GatewayPrincipal
 import com.lemline.runner.gateway.errors.GatewayNotFoundException
 import com.lemline.runner.gateway.errors.GatewayPermissionDeniedException
-import com.lemline.runner.gateway.instances.InstanceQueryService
+import com.lemline.runner.gateway.resources.instances.InstanceQueryService
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
-import java.util.UUID
+import java.util.*
 
 @ApplicationScoped
 class InstanceReadAccessService {

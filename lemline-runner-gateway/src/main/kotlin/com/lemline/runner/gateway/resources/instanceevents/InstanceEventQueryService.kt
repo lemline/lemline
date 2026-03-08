@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-package com.lemline.runner.gateway.instanceevents
+package com.lemline.runner.gateway.resources.instanceevents
 
 import com.lemline.runner.common.config.ANALYTICS_LIFECYCLE_EVENTS_TABLE
 import com.lemline.runner.common.config.AnalyticsType
@@ -91,27 +91,28 @@ class InstanceEventQueryService(
         )
     }
 
-    suspend fun latestEventSequence(instanceId: UUID, snapshotSequence: Long? = null): Long? = withContext(Dispatchers.IO) {
-        val snapshotWhere = if (snapshotSequence == null) "" else "AND id <= ?"
-        val sql = """
+    suspend fun latestEventSequence(instanceId: UUID, snapshotSequence: Long? = null): Long? =
+        withContext(Dispatchers.IO) {
+            val snapshotWhere = if (snapshotSequence == null) "" else "AND id <= ?"
+            val sql = """
             SELECT MAX(id) AS max_id
             FROM $analyticsQualifiedTable
             WHERE lemline_workflow_id = ?
             $snapshotWhere
         """.trimIndent()
 
-        analyticsDataSourceProvider.require().connection.use { conn ->
-            conn.prepareStatement(sql).use { stmt ->
-                stmt.setObject(1, instanceId)
-                if (snapshotSequence != null) {
-                    stmt.setLong(2, snapshotSequence)
-                }
-                stmt.executeQuery().use { rs ->
-                    if (rs.next()) rs.getLong("max_id").takeIf { !rs.wasNull() } else null
+            analyticsDataSourceProvider.require().connection.use { conn ->
+                conn.prepareStatement(sql).use { stmt ->
+                    stmt.setObject(1, instanceId)
+                    if (snapshotSequence != null) {
+                        stmt.setLong(2, snapshotSequence)
+                    }
+                    stmt.executeQuery().use { rs ->
+                        if (rs.next()) rs.getLong("max_id").takeIf { !rs.wasNull() } else null
+                    }
                 }
             }
         }
-    }
 
     suspend fun firstEvent(instanceId: UUID): InstanceEventRow? =
         listEvents(InstanceEventFilter(instanceId = instanceId, pageSize = 1)).events.firstOrNull()
