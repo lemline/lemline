@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-package com.lemline.runner.gateway.dashboard
+package com.lemline.runner.gateway.persistence
 
 import com.lemline.runner.common.config.AnalyticsType
 import java.sql.PreparedStatement
@@ -10,7 +10,7 @@ import java.time.LocalDateTime
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
 
-internal object DashboardSqlSupport {
+internal object GatewayJdbcSupport {
     private val identifierRegex = Regex("^[A-Za-z_][A-Za-z0-9_]*$")
 
     fun validateIdentifier(kind: String, value: String): String {
@@ -52,7 +52,7 @@ internal fun ResultSet.getInstantOrNull(column: String): Instant? {
     }
 }
 
-internal fun PreparedStatement.setDashboardObject(index: Int, value: Any) {
+internal fun PreparedStatement.setGatewayObject(index: Int, value: Any) {
     when (value) {
         is Instant -> setTimestamp(index, Timestamp.from(value))
         else -> setObject(index, value)

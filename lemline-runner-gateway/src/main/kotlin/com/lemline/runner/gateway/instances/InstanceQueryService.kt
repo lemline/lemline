@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-package com.lemline.runner.gateway.dashboard
+package com.lemline.runner.gateway.instances
 
 import com.fasterxml.jackson.databind.JsonNode
 import com.lemline.common.json.LemlineJson
@@ -10,6 +10,12 @@ import com.lemline.runner.config.LemlineConfiguration
 import com.lemline.runner.config.analyticsSchemaResolved
 import com.lemline.runner.config.analyticsTypeResolved
 import com.lemline.runner.gateway.analytics.AnalyticsDataSourceProvider
+import com.lemline.runner.gateway.persistence.GatewayJdbcSupport
+import com.lemline.runner.gateway.persistence.SqlQuery
+import com.lemline.runner.gateway.persistence.getInstantOrNull
+import com.lemline.runner.gateway.persistence.normalizePageSize
+import com.lemline.runner.gateway.persistence.placeholders
+import com.lemline.runner.gateway.persistence.setGatewayObject
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
 import java.time.Instant
@@ -27,7 +33,7 @@ class InstanceQueryService(
 
     private val analyticsType = AnalyticsType.fromConfigValue(config.analyticsTypeResolved)
     private val analyticsQualifiedTable =
-        DashboardSqlSupport.qualifiedAnalyticsTable(
+        GatewayJdbcSupport.qualifiedAnalyticsTable(
             analyticsType = analyticsType,
             schema = config.analyticsSchemaResolved,
             table = ANALYTICS_LIFECYCLE_EVENTS_TABLE
@@ -37,7 +43,7 @@ class InstanceQueryService(
         AnalyticsType.H2 -> "payload"
     }
 
-    suspend fun latestSequence(): Long = withContext(Dispatchers.IO) {
+    suspend fun latestLifecycleSequence(): Long = withContext(Dispatchers.IO) {
         val sql = "SELECT COALESCE(MAX(id), 0) AS max_id FROM $analyticsQualifiedTable"
         analyticsDataSourceProvider.require().connection.use { conn ->
             conn.prepareStatement(sql).use { stmt ->
@@ -86,31 +92,6 @@ class InstanceQueryService(
         executeInstanceLookupQuery(query).firstOrNull()
     }
 
-    suspend fun latestInstanceEventSequence(
-        instanceId: UUID,
-        snapshotSequence: Long? = null,
-    ): Long? = withContext(Dispatchers.IO) {
-        val snapshotWhere = if (snapshotSequence == null) "" else "AND id <= ?"
-        val sql = """
-            SELECT MAX(id) AS max_id
-            FROM $analyticsQualifiedTable
-            WHERE lemline_workflow_id = ?
-            $snapshotWhere
-        """.trimIndent()
-
-        analyticsDataSourceProvider.require().connection.use { conn ->
-            conn.prepareStatement(sql).use { stmt ->
-                stmt.setObject(1, instanceId)
-                if (snapshotSequence != null) {
-                    stmt.setLong(2, snapshotSequence)
-                }
-                stmt.executeQuery().use { rs ->
-                    if (rs.next()) rs.getLong("max_id").takeIf { !rs.wasNull() } else null
-                }
-            }
-        }
-    }
-
     suspend fun listChangedInstanceSequencesAfter(
         afterSequenceExclusive: Long,
         limit: Int,
@@ -157,7 +138,7 @@ class InstanceQueryService(
         analyticsDataSourceProvider.require().connection.use { conn ->
             conn.prepareStatement(sql).use { stmt ->
                 params.forEachIndexed { index, value ->
-                    stmt.setDashboardObject(index + 1, value)
+                    stmt.setGatewayObject(index + 1, value)
                 }
                 stmt.setInt(params.size + 1, normalizedLimit)
                 stmt.executeQuery().use { rs ->
@@ -174,62 +155,6 @@ class InstanceQueryService(
                 }
             }
         }
-    }
-
-    suspend fun listInstanceEvents(filter: InstanceEventFilter): InstanceEventListResult = withContext(Dispatchers.IO) {
-        val normalizedPageSize = normalizePageSize(filter.pageSize)
-        val afterWhere = if (filter.afterSequenceExclusive == null) "" else "AND id > ?"
-        val sql = """
-            SELECT
-              id,
-              lemline_workflow_id,
-              lemline_workflow_namespace,
-              type,
-              event_time,
-              $payloadTextProjection AS payload_json
-            FROM $analyticsQualifiedTable
-            WHERE lemline_workflow_id = ?
-            $afterWhere
-            ORDER BY id ASC
-            LIMIT ?
-        """.trimIndent()
-
-        val rows = analyticsDataSourceProvider.require().connection.use { conn ->
-            conn.prepareStatement(sql).use { stmt ->
-                stmt.setObject(1, filter.instanceId)
-                var nextIndex = 2
-                filter.afterSequenceExclusive?.let {
-                    stmt.setLong(nextIndex++, it)
-                }
-                stmt.setInt(nextIndex, normalizedPageSize + 1)
-                stmt.executeQuery().use { rs ->
-                    buildList {
-                        while (rs.next()) {
-                            add(
-                                InstanceEventRow(
-                                    cursor = rs.getLong("id"),
-                                    instanceId = rs.getObject("lemline_workflow_id", UUID::class.java),
-                                    eventType = rs.getString("type"),
-                                    eventTime = rs.getInstantOrNull("event_time"),
-                                    cloudEventJson = rs.getString("payload_json") ?: "{}",
-                                    namespace = rs.getString("lemline_workflow_namespace"),
-                                )
-                            )
-                        }
-                    }
-                }
-            }
-        }
-
-        val hasMore = rows.size > normalizedPageSize
-        val pageRows = if (hasMore) rows.take(normalizedPageSize) else rows
-        val latestCursor = latestInstanceEventSequence(filter.instanceId)
-
-        InstanceEventListResult(
-            events = pageRows,
-            nextCursor = pageRows.lastOrNull()?.cursor?.takeIf { hasMore },
-            latestCursor = latestCursor,
-        )
     }
 
     fun matchesFilter(row: InstanceSummaryRow, filter: InstanceListFilter): Boolean {
@@ -249,7 +174,7 @@ class InstanceQueryService(
         analyticsDataSourceProvider.require().connection.use { conn ->
             conn.prepareStatement(query.sql).use { stmt ->
                 query.params.forEachIndexed { index, value ->
-                    stmt.setDashboardObject(index + 1, value)
+                    stmt.setGatewayObject(index + 1, value)
                 }
                 stmt.executeQuery().use { rs ->
                     buildList {
@@ -288,7 +213,7 @@ class InstanceQueryService(
         analyticsDataSourceProvider.require().connection.use { conn ->
             conn.prepareStatement(query.sql).use { stmt ->
                 query.params.forEachIndexed { index, value ->
-                    stmt.setDashboardObject(index + 1, value)
+                    stmt.setGatewayObject(index + 1, value)
                 }
                 stmt.executeQuery().use { rs ->
                     if (rs.next()) rs.getLong("total_count") else 0L
@@ -540,17 +465,6 @@ class InstanceQueryService(
     }
 
     private fun uuidToVarchar(column: String): String = "CAST($column AS VARCHAR)"
-
-    private fun placeholders(size: Int): String =
-        List(size) { "?" }.joinToString(", ")
-
-    private fun normalizePageSize(rawPageSize: Int): Int =
-        rawPageSize.takeIf { it > 0 }?.coerceAtMost(200) ?: 50
-
-    private data class SqlQuery(
-        val sql: String,
-        val params: List<Any>,
-    )
 
     private data class InstanceQueryParts(
         val cteSql: String,

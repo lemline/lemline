@@ -9,12 +9,13 @@ gRPC ingress gateway for starting workflows and streaming workflow lifecycle ana
 
 | File | Description |
 |------|-------------|
-| `grpc/WorkflowGatewayGrpcService.kt` | gRPC service implementation (`startWorkflow`, `watchWorkflow`) |
-| `start/WorkflowStartService.kt` | Start workflow flow + idempotency/conflict semantics |
-| `watch/WorkflowWatchService.kt` | Long-poll watch loop that streams analytics events |
+| `grpc/WorkflowGatewayGrpcService.kt` | Thin gRPC transport shell delegating to feature-specific handlers |
+| `instances/InstanceStartService.kt` | Start-instance flow + idempotency/conflict semantics |
+| `instances/InstanceWatchService.kt` | Long-poll watch loop for instance list changes |
+| `instanceevents/InstanceEventWatchService.kt` | Long-poll watch loop for per-instance event streams |
 | `auth/GatewayAuthInterceptor.kt` | JWT Bearer auth interceptor for gRPC requests |
 | `auth/GatewayAuthorizer.kt` | Scope + namespace authorization checks |
-| `outbox/GatewayCommandOutboxRepository.kt` | Gateway outbox repository and workflow-id lookups |
+| `outbox/GatewayCommandRepository.kt` | Gateway outbox repository and workflow-id lookups |
 | `outbox/GatewayCommandOutbox.kt` | Outbox processor for start command dispatch |
 | `analytics/WorkflowAnalyticsEventSourceSelector.kt` | Analytics backend selection (PostgreSQL/ClickHouse) |
 | `analytics/PostgresqlWorkflowAnalyticsEventSource.kt` | Analytics event source backed by PostgreSQL |

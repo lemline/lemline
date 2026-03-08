@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-package com.lemline.runner.gateway.start
+package com.lemline.runner.gateway.instances
 
 import com.google.protobuf.NullValue
 import com.google.protobuf.Struct
@@ -52,7 +52,7 @@ class InstanceStartServiceTest {
         definitions = this@InstanceStartServiceTest.definitions
     }
     private val scheduleRepository = mockk<ScheduleRepository>()
-    private val gatewayOutboxRepository = mockk<GatewayCommandRepository>()
+    private val gatewayCommandRepository = mockk<GatewayCommandRepository>()
     private val lifecycleHook = mockk<LifecycleEventHook>(relaxed = true)
     private val authorizer = mockk<GatewayAuthorizer>()
 
@@ -70,7 +70,7 @@ class InstanceStartServiceTest {
         this.starter = this@InstanceStartServiceTest.starter
         this.databaseConfig = this@InstanceStartServiceTest.databaseConfig
         this.scheduleRepository = this@InstanceStartServiceTest.scheduleRepository
-        this.gatewayOutboxRepository = this@InstanceStartServiceTest.gatewayOutboxRepository
+        this.gatewayCommandRepository = this@InstanceStartServiceTest.gatewayCommandRepository
         this.lifecycleHook = this@InstanceStartServiceTest.lifecycleHook
         this.authorizer = this@InstanceStartServiceTest.authorizer
     }
@@ -93,7 +93,7 @@ class InstanceStartServiceTest {
     fun `generates instance id when request omits one`() = runTest {
         val inserted = slot<GatewayCommandModel>()
         coEvery { definitions.get(WorkflowNamespace("team-a"), WorkflowName("orders"), null) } returns workflow("1.0.0")
-        coEvery { gatewayOutboxRepository.insert(capture(inserted), any<Connection>()) } returns 1
+        coEvery { gatewayCommandRepository.insert(capture(inserted), any<Connection>()) } returns 1
 
         val result = service.start(
             StartInstanceRequest.newBuilder()
@@ -112,7 +112,7 @@ class InstanceStartServiceTest {
     @Test
     fun `omitted version lets starter resolve latest version`() = runTest {
         coEvery { definitions.get(WorkflowNamespace("team-a"), WorkflowName("orders"), null) } returns workflow("2.3.4")
-        coEvery { gatewayOutboxRepository.insert(any<GatewayCommandModel>(), any<Connection>()) } returns 1
+        coEvery { gatewayCommandRepository.insert(any<GatewayCommandModel>(), any<Connection>()) } returns 1
 
         val result = service.start(
             StartInstanceRequest.newBuilder()
@@ -130,7 +130,7 @@ class InstanceStartServiceTest {
     fun `missing input defaults to empty object`() = runTest {
         val inserted = slot<GatewayCommandModel>()
         coEvery { definitions.get(WorkflowNamespace("team-a"), WorkflowName("orders"), null) } returns workflow("1.0.0")
-        coEvery { gatewayOutboxRepository.insert(capture(inserted), any<Connection>()) } returns 1
+        coEvery { gatewayCommandRepository.insert(capture(inserted), any<Connection>()) } returns 1
 
         service.start(
             StartInstanceRequest.newBuilder()
@@ -147,7 +147,7 @@ class InstanceStartServiceTest {
     fun `protobuf value input is converted to json`() = runTest {
         val inserted = slot<GatewayCommandModel>()
         coEvery { definitions.get(WorkflowNamespace("team-a"), WorkflowName("orders"), null) } returns workflow("1.0.0")
-        coEvery { gatewayOutboxRepository.insert(capture(inserted), any<Connection>()) } returns 1
+        coEvery { gatewayCommandRepository.insert(capture(inserted), any<Connection>()) } returns 1
 
         service.start(
             StartInstanceRequest.newBuilder()
@@ -186,8 +186,8 @@ class InstanceStartServiceTest {
         val workflowInput = buildJsonObject {}
 
         coEvery { definitions.get(WorkflowNamespace("team-a"), WorkflowName("orders"), null) } returns workflow("9.9.9")
-        coEvery { gatewayOutboxRepository.insert(any<GatewayCommandModel>(), any<Connection>()) } returns 0
-        coEvery { gatewayOutboxRepository.findByWorkflowId(workflowId) } returns existingOutbox(
+        coEvery { gatewayCommandRepository.insert(any<GatewayCommandModel>(), any<Connection>()) } returns 0
+        coEvery { gatewayCommandRepository.findByWorkflowId(workflowId) } returns existingOutbox(
             workflowId = workflowId,
             workflowInput = workflowInput,
             version = WorkflowVersion("9.9.9"),
@@ -210,8 +210,8 @@ class InstanceStartServiceTest {
         val workflowInput = buildJsonObject {}
 
         coEvery { definitions.get(WorkflowNamespace("team-a"), WorkflowName("orders"), null) } returns workflow("2.0.0")
-        coEvery { gatewayOutboxRepository.insert(any<GatewayCommandModel>(), any<Connection>()) } returns 0
-        coEvery { gatewayOutboxRepository.findByWorkflowId(workflowId) } returns existingOutbox(
+        coEvery { gatewayCommandRepository.insert(any<GatewayCommandModel>(), any<Connection>()) } returns 0
+        coEvery { gatewayCommandRepository.findByWorkflowId(workflowId) } returns existingOutbox(
             workflowId = workflowId,
             workflowInput = workflowInput,
             version = WorkflowVersion("1.0.0"),

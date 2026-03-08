@@ -15,7 +15,7 @@ import jakarta.inject.Inject
  * Outbox processor for gateway workflow start commands.
  *
  * Reliably delivers workflow start commands that were inserted atomically
- * alongside schedule inserts during [com.lemline.runner.gateway.start.InstanceStartService.start].
+ * alongside schedule inserts during [com.lemline.runner.gateway.instances.InstanceStartService.start].
  * The outbox pattern ensures commands are eventually delivered even if the process
  * crashes after the database transaction commits.
  */

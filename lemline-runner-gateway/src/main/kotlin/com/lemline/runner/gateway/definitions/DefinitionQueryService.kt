@@ -1,8 +1,13 @@
 // SPDX-License-Identifier: BUSL-1.1
-package com.lemline.runner.gateway.dashboard
+package com.lemline.runner.gateway.definitions
 
 import com.lemline.runner.common.config.DatabaseConfig
 import com.lemline.runner.definitions.DEFINITION_TABLE
+import com.lemline.runner.gateway.persistence.SqlQuery
+import com.lemline.runner.gateway.persistence.getInstantOrNull
+import com.lemline.runner.gateway.persistence.normalizePageSize
+import com.lemline.runner.gateway.persistence.placeholders
+import com.lemline.runner.gateway.persistence.setGatewayObject
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
 import java.time.Instant
@@ -30,7 +35,7 @@ class DefinitionQueryService {
         val rows = databaseConfig.withConnection { conn ->
             conn.prepareStatement(query.sql).use { stmt ->
                 query.params.forEachIndexed { index, value ->
-                    stmt.setDashboardObject(index + 1, value)
+                    stmt.setGatewayObject(index + 1, value)
                 }
                 stmt.executeQuery().use { rs ->
                     buildList {
@@ -168,7 +173,7 @@ class DefinitionQueryService {
         databaseConfig.withConnection { conn ->
             conn.prepareStatement(query.sql).use { stmt ->
                 query.params.forEachIndexed { index, value ->
-                    stmt.setDashboardObject(index + 1, value)
+                    stmt.setGatewayObject(index + 1, value)
                 }
                 stmt.executeQuery().use { rs ->
                     if (rs.next()) rs.getLong("total_count") else 0L
@@ -288,17 +293,6 @@ class DefinitionQueryService {
 
         return SqlQuery(cteSql, params)
     }
-
-    private fun placeholders(size: Int): String =
-        List(size) { "?" }.joinToString(", ")
-
-    private fun normalizePageSize(rawPageSize: Int): Int =
-        rawPageSize.takeIf { it > 0 }?.coerceAtMost(200) ?: 50
-
-    private data class SqlQuery(
-        val sql: String,
-        val params: List<Any>,
-    )
 
     private data class SelectedDefinition(
         val namespace: String,

@@ -2,7 +2,12 @@
 package com.lemline.runner.gateway.grpc
 
 import com.lemline.common.json.LemlineJson
+import com.lemline.runner.gateway.definitions.DefinitionPageBoundary
+import com.lemline.runner.gateway.definitionstats.DefinitionStatsPageBoundary
+import com.lemline.runner.gateway.instances.InstancePageBoundary
 import java.nio.charset.StandardCharsets
+import java.time.Instant
+import java.util.UUID
 import kotlinx.serialization.Serializable
 
 object GatewayCursorCodec {
@@ -168,3 +173,23 @@ data class InstanceEventCursor(
         const val KIND = "instance_event_v1"
     }
 }
+
+internal fun DefinitionPageCursor.toBoundary(): DefinitionPageBoundary =
+    DefinitionPageBoundary(
+        namespace = lastNamespace,
+        name = lastName,
+        version = lastVersion,
+    )
+
+internal fun DefinitionStatsPageCursor.toBoundary(): DefinitionStatsPageBoundary =
+    DefinitionStatsPageBoundary(
+        namespace = lastNamespace,
+        name = lastName,
+        version = lastVersion,
+    )
+
+internal fun InstancePageCursor.toBoundary(): InstancePageBoundary =
+    InstancePageBoundary(
+        createdAt = Instant.parse(lastCreatedAt),
+        instanceId = UUID.fromString(lastInstanceId),
+    )

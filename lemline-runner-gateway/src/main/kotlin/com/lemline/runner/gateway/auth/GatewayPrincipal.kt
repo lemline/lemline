@@ -11,7 +11,7 @@ data class GatewayPrincipal(
     fun canAccessNamespace(namespace: String): Boolean = namespaces.contains("*") || namespaces.contains(namespace)
 
     companion object {
-        val dashboardAnonymous: GatewayPrincipal = GatewayPrincipal(
+        val anonymous: GatewayPrincipal = GatewayPrincipal(
             subject = null,
             scopes = setOf("*"),
             namespaces = setOf("*")

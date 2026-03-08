@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-package com.lemline.runner.gateway.config
+package com.lemline.runner.gateway.support
 
 import com.lemline.runner.common.config.ANALYTICS_TYPE_POSTGRESQL
 import com.lemline.runner.config.LemlineConfiguration

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-package com.lemline.runner.gateway.start
+package com.lemline.runner.gateway.instances
 
 import com.google.protobuf.Value
 import com.lemline.common.values.IDV7
@@ -56,7 +56,7 @@ class InstanceStartService {
     lateinit var scheduleRepository: ScheduleRepository
 
     @Inject
-    lateinit var gatewayOutboxRepository: GatewayCommandRepository
+    lateinit var gatewayCommandRepository: GatewayCommandRepository
 
     @Inject
     lateinit var lifecycleHook: LifecycleEventHook
@@ -102,11 +102,11 @@ class InstanceStartService {
                     outboxScheduledFor = Clock.System.now(),
                 )
                 insertOrDetectConflict(
-                    inserted = gatewayOutboxRepository.insert(outboxEntry, conn),
+                    inserted = gatewayCommandRepository.insert(outboxEntry, conn),
                     instanceId = instanceId,
                     workflowInfo = resolvedWorkflowInfo,
                     workflowInput = workflowInput,
-                    loadExisting = { gatewayOutboxRepository.findByWorkflowId(instanceId) },
+                    loadExisting = { gatewayCommandRepository.findByWorkflowId(instanceId) },
                 )
             }
 

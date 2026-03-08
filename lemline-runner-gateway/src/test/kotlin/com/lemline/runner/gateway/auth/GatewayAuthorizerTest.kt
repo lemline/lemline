@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.gateway.auth
 
-import com.lemline.runner.gateway.config.testLemlineConfiguration
+import com.lemline.runner.gateway.support.testLemlineConfiguration
 import com.lemline.runner.gateway.errors.GatewayPermissionDeniedException
 import kotlin.test.Test
 import kotlin.test.assertFailsWith
 
-class GatewayAuthorizerDashboardTest {
+class GatewayAuthorizerTest {
 
     @Test
     fun `security disabled allows all scope and namespace checks`() {

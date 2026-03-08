@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-package com.lemline.runner.gateway.dashboard
+package com.lemline.runner.gateway.definitionstats
 
 import com.lemline.core.lifecycleevents.LifecycleEventType
 import com.lemline.runner.common.config.ANALYTICS_LIFECYCLE_EVENTS_TABLE
@@ -8,13 +8,18 @@ import com.lemline.runner.config.LemlineConfiguration
 import com.lemline.runner.config.analyticsSchemaResolved
 import com.lemline.runner.config.analyticsTypeResolved
 import com.lemline.runner.gateway.analytics.AnalyticsDataSourceProvider
+import com.lemline.runner.gateway.persistence.GatewayJdbcSupport
+import com.lemline.runner.gateway.persistence.SqlQuery
+import com.lemline.runner.gateway.persistence.normalizePageSize
+import com.lemline.runner.gateway.persistence.placeholders
+import com.lemline.runner.gateway.persistence.setGatewayObject
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 @ApplicationScoped
-class StatsQueryService(
+class DefinitionStatsQueryService(
     config: LemlineConfiguration,
 ) {
 
@@ -22,7 +27,7 @@ class StatsQueryService(
     lateinit var analyticsDataSourceProvider: AnalyticsDataSourceProvider
 
     private val analyticsQualifiedTable =
-        DashboardSqlSupport.qualifiedAnalyticsTable(
+        GatewayJdbcSupport.qualifiedAnalyticsTable(
             analyticsType = AnalyticsType.fromConfigValue(config.analyticsTypeResolved),
             schema = config.analyticsSchemaResolved,
             table = ANALYTICS_LIFECYCLE_EVENTS_TABLE
@@ -31,7 +36,7 @@ class StatsQueryService(
     suspend fun listDefinitionStats(
         filter: DefinitionStatsFilter,
         snapshotSequence: Long,
-        page: DefinitionPageBoundary? = null,
+        page: DefinitionStatsPageBoundary? = null,
     ): DefinitionStatsListResult = withContext(Dispatchers.IO) {
         if (filter.allowedNamespaces?.isEmpty() == true) {
             return@withContext DefinitionStatsListResult(emptyList(), null, 0L, snapshotSequence)
@@ -45,7 +50,7 @@ class StatsQueryService(
         val pageRows = if (hasMore) rows.take(normalizedPageSize) else rows
         val nextPage = pageRows.lastOrNull()
             ?.takeIf { hasMore }
-            ?.let { DefinitionPageBoundary(it.namespace, it.name, it.version) }
+            ?.let { DefinitionStatsPageBoundary(it.namespace, it.name, it.version) }
 
         DefinitionStatsListResult(
             stats = pageRows,
@@ -69,7 +74,7 @@ class StatsQueryService(
         analyticsDataSourceProvider.require().connection.use { conn ->
             conn.prepareStatement(query.sql).use { stmt ->
                 query.params.forEachIndexed { index, value ->
-                    stmt.setDashboardObject(index + 1, value)
+                    stmt.setGatewayObject(index + 1, value)
                 }
                 stmt.executeQuery().use { rs ->
                     buildList {
@@ -97,7 +102,7 @@ class StatsQueryService(
         analyticsDataSourceProvider.require().connection.use { conn ->
             conn.prepareStatement(query.sql).use { stmt ->
                 query.params.forEachIndexed { index, value ->
-                    stmt.setDashboardObject(index + 1, value)
+                    stmt.setGatewayObject(index + 1, value)
                 }
                 stmt.executeQuery().use { rs ->
                     if (rs.next()) rs.getLong("total_count") else 0L
@@ -109,7 +114,7 @@ class StatsQueryService(
     private fun buildStatsListQuery(
         filter: DefinitionStatsFilter,
         snapshotSequence: Long,
-        page: DefinitionPageBoundary?,
+        page: DefinitionStatsPageBoundary?,
         limit: Int,
     ): SqlQuery {
         val queryParts = buildStatsQueryParts(filter, snapshotSequence)
@@ -289,14 +294,4 @@ class StatsQueryService(
         )
     }
 
-    private fun placeholders(size: Int): String =
-        List(size) { "?" }.joinToString(", ")
-
-    private fun normalizePageSize(rawPageSize: Int): Int =
-        rawPageSize.takeIf { it > 0 }?.coerceAtMost(200) ?: 50
-
-    private data class SqlQuery(
-        val sql: String,
-        val params: List<Any>,
-    )
 }
