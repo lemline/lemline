@@ -11,7 +11,7 @@ import com.lemline.runner.gateway.auth.GatewayPrincipal
 import com.lemline.runner.gateway.errors.GatewayBadRequestException
 import com.lemline.runner.gateway.resources.instances.InstanceStatus
 import java.time.Instant
-import java.util.*
+import java.util.UUID
 
 internal fun allowedNamespacesForRead(
     config: LemlineConfiguration,

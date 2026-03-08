@@ -174,22 +174,22 @@ data class InstanceEventCursor(
     }
 }
 
-internal fun DefinitionPageCursor.toBoundary(): com.lemline.runner.gateway.resources.definitions.DefinitionPageBoundary =
-    _root_ide_package_.com.lemline.runner.gateway.resources.definitions.DefinitionPageBoundary(
+internal fun DefinitionPageCursor.toBoundary(): DefinitionPageBoundary =
+    DefinitionPageBoundary(
         namespace = lastNamespace,
         name = lastName,
         version = lastVersion,
     )
 
-internal fun DefinitionStatsPageCursor.toBoundary(): com.lemline.runner.gateway.resources.definitionstats.DefinitionStatsPageBoundary =
-    _root_ide_package_.com.lemline.runner.gateway.resources.definitionstats.DefinitionStatsPageBoundary(
+internal fun DefinitionStatsPageCursor.toBoundary(): DefinitionStatsPageBoundary =
+    DefinitionStatsPageBoundary(
         namespace = lastNamespace,
         name = lastName,
         version = lastVersion,
     )
 
-internal fun InstancePageCursor.toBoundary(): com.lemline.runner.gateway.resources.instances.InstancePageBoundary =
-    _root_ide_package_.com.lemline.runner.gateway.resources.instances.InstancePageBoundary(
+internal fun InstancePageCursor.toBoundary(): InstancePageBoundary =
+    InstancePageBoundary(
         createdAt = Instant.parse(lastCreatedAt),
         instanceId = UUID.fromString(lastInstanceId),
     )

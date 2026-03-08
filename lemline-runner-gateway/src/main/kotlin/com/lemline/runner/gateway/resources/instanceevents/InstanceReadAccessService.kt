@@ -8,7 +8,7 @@ import com.lemline.runner.gateway.errors.GatewayPermissionDeniedException
 import com.lemline.runner.gateway.resources.instances.InstanceQueryService
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
-import java.util.*
+import java.util.UUID
 
 @ApplicationScoped
 class InstanceReadAccessService {
