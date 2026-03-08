@@ -4,9 +4,9 @@ import { matchPath, useLocation, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { useNamespaces } from "../../hooks/use-namespaces";
 import { useDefinitions } from "../../hooks/use-definitions";
-import { useInstanceTimeline } from "../../hooks/use-instance-timeline";
+import { useWorkflowScopeFromWatch } from "../../hooks/use-watch-workflow-projection";
 import { gatewayClient } from "../../lib/grpc-client";
-import { ListInstancesRequest } from "../../gen/proto/lemline/gateway/v1/workflow_gateway_pb";
+import { ListInstancesRequest } from "../../gen/proto/lemline/gateway/v1/gateway_pb";
 import { shortId } from "../../lib/utils";
 import { Input } from "../ui/input";
 import { Select } from "../ui/select";
@@ -29,11 +29,11 @@ export function CascadingSelects() {
   const [highlightedSuggestion, setHighlightedSuggestion] = useState(-1);
   const debouncedWorkflowIdQuery = useDebouncedValue(workflowIdQuery.trim(), 300);
 
-  const instanceTimeline = useInstanceTimeline(workflowIdParam, true);
+  const workflowScope = useWorkflowScopeFromWatch(workflowIdParam);
 
-  const resolvedNamespace = isInstanceRoute ? (instanceTimeline.data?.namespace ?? namespace) : namespace;
-  const resolvedName = isInstanceRoute ? (instanceTimeline.data?.name ?? name) : name;
-  const resolvedVersion = isInstanceRoute ? (instanceTimeline.data?.version ?? version) : version;
+  const resolvedNamespace = isInstanceRoute ? (workflowScope?.namespace ?? namespace) : namespace;
+  const resolvedName = isInstanceRoute ? (workflowScope?.name ?? name) : name;
+  const resolvedVersion = isInstanceRoute ? (workflowScope?.version ?? version) : version;
 
   const { data: names = [] } = useDefinitions({
     namespace: resolvedNamespace,
@@ -54,7 +54,7 @@ export function CascadingSelects() {
     queryFn: async () => {
       const response = await gatewayClient.listInstances(
         new ListInstancesRequest({
-          workflowIdPrefix: debouncedWorkflowIdQuery,
+          instanceIdPrefix: debouncedWorkflowIdQuery,
           pageSize: 10,
         }),
       );
@@ -149,7 +149,7 @@ export function CascadingSelects() {
     if (event.key !== "Enter") return;
     event.preventDefault();
     if (highlightedSuggestion >= 0 && highlightedSuggestion < workflowSuggestions.length) {
-      navigateToWorkflowId(workflowSuggestions[highlightedSuggestion].workflowId);
+      navigateToWorkflowId(workflowSuggestions[highlightedSuggestion].instanceId);
       return;
     }
 
@@ -202,11 +202,11 @@ export function CascadingSelects() {
               )}
               {workflowSuggestions.map((instance, index) => (
                 <button
-                  key={instance.workflowId}
+                  key={instance.instanceId}
                   type="button"
                   onMouseDown={(event) => event.preventDefault()}
                   onMouseEnter={() => setHighlightedSuggestion(index)}
-                  onClick={() => navigateToWorkflowId(instance.workflowId)}
+                  onClick={() => navigateToWorkflowId(instance.instanceId)}
                   className={`flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm ${
                     index === highlightedSuggestion
                       ? "bg-slate-100 dark:bg-slate-800"
@@ -214,7 +214,7 @@ export function CascadingSelects() {
                   }`}
                 >
                   <div className="min-w-0">
-                    <p className="font-medium text-slate-800 dark:text-slate-100">{shortId(instance.workflowId, 10, 6)}</p>
+                    <p className="font-medium text-slate-800 dark:text-slate-100">{shortId(instance.instanceId, 10, 6)}</p>
                     <p className="truncate text-xs text-slate-500">
                       {instance.name} · v{instance.version}
                     </p>
@@ -280,7 +280,7 @@ function useDebouncedValue(value: string, delayMs: number): string {
   return debouncedValue;
 }
 
-export interface ScopeFromPathname {
+interface ScopeFromPathname {
   namespace?: string;
   name?: string;
   version?: string;
@@ -288,7 +288,7 @@ export interface ScopeFromPathname {
   isInstanceRoute: boolean;
 }
 
-export function resolveScopeFromPathname(pathname: string): ScopeFromPathname {
+function resolveScopeFromPathname(pathname: string): ScopeFromPathname {
   const versionScope =
     matchPath("/ns/:namespace/name/:name/version/:version", pathname) ??
     matchPath("/ns/:namespace/name/:name/v/:version", pathname);

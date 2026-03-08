@@ -13,7 +13,7 @@
     "preview": "vite preview",
     "proto:sync": "node scripts/proto-sync.mjs",
     "proto:check": "node scripts/proto-check.mjs",
-    "proto:generate": "npm run proto:sync && buf generate --path proto/lemline/gateway/v1/workflow_gateway.proto"
+    "proto:generate": "npm run proto:sync && buf generate --path proto/lemline/gateway/v1/gateway.proto"
   },
   "dependencies": {
     "@bufbuild/protobuf": "^1.10.0",

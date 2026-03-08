@@ -1,10 +1,8 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo } from "react";
 import { Copy } from "lucide-react";
 import { toast } from "sonner";
 import { useParams } from "react-router-dom";
-import { WatchWorkflowRequest } from "../gen/proto/lemline/gateway/v1/workflow_gateway_pb";
-import { useInstanceTimeline } from "../hooks/use-instance-timeline";
-import { gatewayClient } from "../lib/grpc-client";
+import { useWatchWorkflowProjection } from "../hooks/use-watch-workflow-projection";
 import { Card } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { StatusBadge } from "../components/instances/status-badge";
@@ -18,15 +16,11 @@ import { formatDuration, shortId } from "../lib/utils";
 import { buildPageTitle, useDocumentMeta, type FaviconTone } from "../hooks/use-document-meta";
 import { useViewportWidth } from "../hooks/use-viewport-width";
 
-const MAX_STREAM_RETRIES = 5;
-
 export function InstanceDetailPage() {
   const { workflowId } = useParams();
-  const timeline = useInstanceTimeline(workflowId, true);
+  const timeline = useWatchWorkflowProjection(workflowId);
   const timelineStatus = timeline.data?.status;
-  const refetchTimeline = timeline.refetch;
-  const refreshTimerRef = useRef<number | null>(null);
-  const [liveConnected, setLiveConnected] = useState(false);
+  const liveConnected = timeline.liveConnected;
   const viewportWidth = useViewportWidth();
   const showGantt = viewportWidth >= 1024;
   const pageTitle = useMemo(() => {
@@ -79,85 +73,7 @@ export function InstanceDetailPage() {
     }
   }, [timeline.data?.events]);
 
-  useEffect(() => {
-    if (!workflowId || timelineStatus !== "RUNNING") {
-      setLiveConnected(false);
-      if (refreshTimerRef.current != null) {
-        window.clearTimeout(refreshTimerRef.current);
-        refreshTimerRef.current = null;
-      }
-      return;
-    }
-
-    const controller = new AbortController();
-    let disposed = false;
-    let retries = 0;
-    let needsReconnectToast = false;
-
-    const scheduleRefresh = () => {
-      if (refreshTimerRef.current != null) return;
-      refreshTimerRef.current = window.setTimeout(() => {
-        refreshTimerRef.current = null;
-        void refetchTimeline();
-      }, 250);
-    };
-
-    const watch = async () => {
-      while (!disposed && !controller.signal.aborted) {
-        try {
-          const request = new WatchWorkflowRequest({ workflowId });
-          setLiveConnected(true);
-
-          for await (const event of gatewayClient.watchWorkflow(request, { signal: controller.signal })) {
-            void event;
-            if (needsReconnectToast) {
-              toast.success("Reconnected — live updates resumed", { duration: 3000 });
-              needsReconnectToast = false;
-            }
-            retries = 0;
-            setLiveConnected(true);
-            scheduleRefresh();
-          }
-
-          if (controller.signal.aborted || disposed) {
-            return;
-          }
-
-          throw new Error("Workflow stream disconnected");
-        } catch {
-          if (controller.signal.aborted || disposed) {
-            return;
-          }
-
-          retries += 1;
-          needsReconnectToast = true;
-          setLiveConnected(false);
-
-          if (retries > MAX_STREAM_RETRIES) {
-            toast.error("Live updates unavailable. Reload page.", { duration: Infinity });
-            return;
-          }
-
-          toast.error("Connection error — retrying...");
-          await delay(backoffDelayMs(retries));
-        }
-      }
-    };
-
-    void watch();
-
-    return () => {
-      disposed = true;
-      controller.abort();
-      setLiveConnected(false);
-      if (refreshTimerRef.current != null) {
-        window.clearTimeout(refreshTimerRef.current);
-        refreshTimerRef.current = null;
-      }
-    };
-  }, [workflowId, timelineStatus, refetchTimeline]);
-
-  if (timeline.isLoading) {
+  if (timeline.isLoading && !timeline.data) {
     return (
       <div className="space-y-4">
         <HeaderSkeleton />
@@ -167,11 +83,13 @@ export function InstanceDetailPage() {
     );
   }
 
-  if (timeline.isError || !timeline.data) {
+  const timelineData = timeline.data;
+
+  if ((timeline.isError && !timelineData) || !timelineData) {
     return (
       <Card>
         <p className="text-sm text-red-600 dark:text-red-300">Could not load timeline.</p>
-        <Button className="mt-3" variant="outline" onClick={() => timeline.refetch()}>
+        <Button className="mt-3" variant="outline" onClick={() => timeline.reconnect()}>
           Retry
         </Button>
       </Card>
@@ -183,16 +101,16 @@ export function InstanceDetailPage() {
       <Card>
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex flex-wrap items-center gap-3">
-            <StatusBadge status={timeline.data.status} />
+            <StatusBadge status={timelineData.status} />
             <p className="text-sm text-slate-500">Duration: {formatDuration(durationMs ?? undefined)}</p>
-            <p className="text-sm text-slate-500">{timeline.data.workflowId}</p>
+            <p className="text-sm text-slate-500">{timelineData.workflowId}</p>
             <button
               type="button"
               className="text-slate-500 hover:text-slate-900 dark:hover:text-slate-100"
               aria-label="Copy workflow ID"
               onClick={async () => {
                 try {
-                  await navigator.clipboard.writeText(timeline.data.workflowId);
+                  await navigator.clipboard.writeText(timelineData.workflowId);
                   toast.success("Copied to clipboard", { duration: 2000 });
                 } catch {
                   toast.error("Unable to copy workflow ID");
@@ -210,8 +128,8 @@ export function InstanceDetailPage() {
         <ErrorPanel title={error.title} type={error.type} status={error.status} payloadJson={error.payloadJson} />
       )}
 
-      {showGantt && <GanttChart events={timeline.data.events} />}
-      <EventLog events={timeline.data.events} />
+      {showGantt && <GanttChart events={timelineData.events} />}
+      <EventLog events={timelineData.events} />
     </div>
   );
 }
@@ -236,12 +154,4 @@ function lastMatching<T>(items: T[], predicate: (item: T) => boolean): T | undef
     if (predicate(items[index])) return items[index];
   }
   return undefined;
-}
-
-function backoffDelayMs(retryAttempt: number): number {
-  return Math.min(1000 * 2 ** Math.max(0, retryAttempt - 1), 30_000);
-}
-
-function delay(ms: number) {
-  return new Promise((resolve) => window.setTimeout(resolve, ms));
 }

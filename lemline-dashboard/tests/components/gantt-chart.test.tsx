@@ -65,6 +65,152 @@ function buildEvents(): TimelineEventLike[] {
   ];
 }
 
+function buildStructuredSortEvents(): TimelineEventLike[] {
+  return [
+    {
+      sequence: 1,
+      eventType: "io.serverlessworkflow.workflow.created.v1",
+      eventTime: "2025-01-01T10:00:00.000Z",
+      category: "WORKFLOW",
+      payloadJson: "{}",
+    },
+    {
+      sequence: 2,
+      eventType: "io.serverlessworkflow.workflow.started.v1",
+      eventTime: "2025-01-01T10:00:01.000Z",
+      category: "WORKFLOW",
+      payloadJson: "{}",
+    },
+    {
+      sequence: 3,
+      eventType: "io.serverlessworkflow.task.created.v1",
+      eventTime: "2025-01-01T10:00:02.000Z",
+      category: "TASK",
+      taskPointer: "/do/10/alphaTask",
+      taskName: "Alpha Task",
+      payloadJson: "{}",
+    },
+    {
+      sequence: 4,
+      eventType: "io.serverlessworkflow.task.completed.v1",
+      eventTime: "2025-01-01T10:00:03.000Z",
+      category: "TASK",
+      taskPointer: "/do/10/alphaTask",
+      taskName: "Alpha Task",
+      payloadJson: "{}",
+    },
+    {
+      sequence: 5,
+      eventType: "io.serverlessworkflow.task.created.v1",
+      eventTime: "2025-01-01T10:00:04.000Z",
+      category: "TASK",
+      taskPointer: "/do/2/zuluTask",
+      taskName: "Zulu Task",
+      payloadJson: "{}",
+    },
+    {
+      sequence: 6,
+      eventType: "io.serverlessworkflow.task.completed.v1",
+      eventTime: "2025-01-01T10:00:05.000Z",
+      category: "TASK",
+      taskPointer: "/do/2/zuluTask",
+      taskName: "Zulu Task",
+      payloadJson: "{}",
+    },
+    {
+      sequence: 7,
+      eventType: "io.serverlessworkflow.task.created.v1",
+      eventTime: "2025-01-01T10:00:06.000Z",
+      category: "TASK",
+      taskPointer: "/do/2/zuluTask/try/do/1/nestedTask",
+      taskName: "Nested Task",
+      payloadJson: "{}",
+    },
+    {
+      sequence: 8,
+      eventType: "io.serverlessworkflow.task.completed.v1",
+      eventTime: "2025-01-01T10:00:07.000Z",
+      category: "TASK",
+      taskPointer: "/do/2/zuluTask/try/do/1/nestedTask",
+      taskName: "Nested Task",
+      payloadJson: "{}",
+    },
+    {
+      sequence: 9,
+      eventType: "io.serverlessworkflow.workflow.completed.v1",
+      eventTime: "2025-01-01T10:00:08.000Z",
+      category: "WORKFLOW",
+      payloadJson: "{}",
+    },
+  ];
+}
+
+function buildPointerFallbackEvents(): TimelineEventLike[] {
+  return [
+    {
+      sequence: 1,
+      eventType: "io.serverlessworkflow.workflow.created.v1",
+      eventTime: "2025-01-01T11:00:00.000Z",
+      category: "WORKFLOW",
+      payloadJson: "{}",
+    },
+    {
+      sequence: 2,
+      eventType: "io.serverlessworkflow.workflow.started.v1",
+      eventTime: "2025-01-01T11:00:01.000Z",
+      category: "WORKFLOW",
+      payloadJson: "{}",
+    },
+    {
+      sequence: 3,
+      eventType: "io.serverlessworkflow.task.created.v1",
+      eventTime: "2025-01-01T11:00:02.000Z",
+      category: "TASK",
+      taskName: "Zulu Without Pointer",
+      payloadJson: "{}",
+    },
+    {
+      sequence: 4,
+      eventType: "io.serverlessworkflow.task.completed.v1",
+      eventTime: "2025-01-01T11:00:03.000Z",
+      category: "TASK",
+      taskName: "Zulu Without Pointer",
+      payloadJson: "{}",
+    },
+    {
+      sequence: 5,
+      eventType: "io.serverlessworkflow.task.created.v1",
+      eventTime: "2025-01-01T11:00:04.000Z",
+      category: "TASK",
+      taskName: "Alpha Without Pointer",
+      payloadJson: "{}",
+    },
+    {
+      sequence: 6,
+      eventType: "io.serverlessworkflow.task.completed.v1",
+      eventTime: "2025-01-01T11:00:05.000Z",
+      category: "TASK",
+      taskName: "Alpha Without Pointer",
+      payloadJson: "{}",
+    },
+    {
+      sequence: 7,
+      eventType: "io.serverlessworkflow.workflow.completed.v1",
+      eventTime: "2025-01-01T11:00:06.000Z",
+      category: "WORKFLOW",
+      payloadJson: "{}",
+    },
+  ];
+}
+
+function ganttRowLabels(container: HTMLElement, labels: string[]): string[] {
+  const expectedLabels = new Set(labels);
+
+  return Array.from(container.querySelectorAll("svg text"))
+    .map((node) => node.textContent?.trim() ?? "")
+    .filter((label) => expectedLabels.has(label));
+}
+
 describe("GanttChart", () => {
   it("supports zoom controls via buttons and keyboard reset", () => {
     render(<GanttChart events={buildEvents()} />);
@@ -95,5 +241,26 @@ describe("GanttChart", () => {
 
     fireEvent.keyDown(taskBar, { key: "Escape" });
     expect(screen.queryByRole("region", { name: "Selected timeline details" })).not.toBeInTheDocument();
+  });
+
+  it("sorts task rows by structured task pointer order instead of label order", () => {
+    const { container } = render(<GanttChart events={buildStructuredSortEvents()} />);
+
+    expect(ganttRowLabels(container, ["Workflow", "Zulu Task", "Nested Task", "Alpha Task"])).toEqual([
+      "Workflow",
+      "Zulu Task",
+      "Nested Task",
+      "Alpha Task",
+    ]);
+  });
+
+  it("falls back to first event sequence when rows do not have a structured pointer", () => {
+    const { container } = render(<GanttChart events={buildPointerFallbackEvents()} />);
+
+    expect(ganttRowLabels(container, ["Workflow", "Zulu Without Pointer", "Alpha Without Pointer"])).toEqual([
+      "Workflow",
+      "Zulu Without Pointer",
+      "Alpha Without Pointer",
+    ]);
   });
 });

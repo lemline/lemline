@@ -685,7 +685,20 @@ function buildTaskRows(events: NormalizedTimelineEvent[], nowMs: number): Timeli
     });
   }
 
-  return rows.sort((left, right) => left.label.localeCompare(right.label));
+  return rows.sort(compareTaskRows);
+}
+
+function compareTaskRows(left: TimelineRow, right: TimelineRow): number {
+  const pointerComparison = compareStructuredPointers(taskRowPointer(left), taskRowPointer(right));
+  if (pointerComparison !== 0) return pointerComparison;
+
+  const sequenceComparison = compareOptionalBigInts(firstRowSequence(left), firstRowSequence(right));
+  if (sequenceComparison !== 0) return sequenceComparison;
+
+  const labelComparison = left.label.localeCompare(right.label);
+  if (labelComparison !== 0) return labelComparison;
+
+  return (taskRowPointer(left) ?? "").localeCompare(taskRowPointer(right) ?? "");
 }
 
 function buildTaskAttempts(pointer: string, events: NormalizedTimelineEvent[], nowMs: number): TimelineAttempt[] {
@@ -979,6 +992,93 @@ function clampPan(pan: number, baseSpan: number, zoom: number): number {
   return clamp(pan, -maxPan, maxPan);
 }
 
+function taskRowPointer(row: TimelineRow): string | undefined {
+  const pointer = row.attempts[0]?.pointer?.trim();
+  return pointer && pointer.length > 0 ? pointer : undefined;
+}
+
+function firstRowSequence(row: TimelineRow): bigint | undefined {
+  return row.attempts[0]?.events[0]?.sequenceBigInt;
+}
+
+function compareStructuredPointers(left?: string, right?: string): number {
+  const leftSegments = parseStructuredPointer(left);
+  const rightSegments = parseStructuredPointer(right);
+  if (!leftSegments || !rightSegments) return 0;
+
+  const length = Math.min(leftSegments.length, rightSegments.length);
+  for (let index = 0; index < length; index += 1) {
+    const segmentComparison = comparePointerSegments(leftSegments[index], rightSegments[index]);
+    if (segmentComparison !== 0) return segmentComparison;
+  }
+
+  if (leftSegments.length === rightSegments.length) return 0;
+  return leftSegments.length < rightSegments.length ? -1 : 1;
+}
+
+function parseStructuredPointer(pointer?: string): PointerSegment[] | null {
+  const normalized = pointer?.trim();
+  if (!normalized || !normalized.startsWith("/")) return null;
+  if (normalized === "/") return [];
+
+  return normalized
+    .split("/")
+    .slice(1)
+    .map((segment) => decodePointerSegment(segment))
+    .map((segment) => {
+      const index = parsePointerIndex(segment);
+      if (index !== undefined) {
+        return {
+          kind: "index",
+          value: index,
+        };
+      }
+
+      return {
+        kind: "text",
+        value: segment,
+      };
+    });
+}
+
+function decodePointerSegment(segment: string): string {
+  return segment.replace(/~1/g, "/").replace(/~0/g, "~");
+}
+
+function parsePointerIndex(segment: string): bigint | undefined {
+  if (!/^(0|[1-9]\d*)$/.test(segment)) return undefined;
+
+  try {
+    return BigInt(segment);
+  } catch {
+    return undefined;
+  }
+}
+
+function comparePointerSegments(left: PointerSegment, right: PointerSegment): number {
+  if (left.kind === "index" && right.kind === "index") {
+    if (left.value === right.value) return 0;
+    return left.value < right.value ? -1 : 1;
+  }
+
+  if (left.kind === "text" && right.kind === "text") {
+    return left.value.localeCompare(right.value);
+  }
+
+  return left.kind === "index" ? -1 : 1;
+}
+
+function compareOptionalBigInts(left?: bigint, right?: bigint): number {
+  if (left != null && right != null) {
+    if (left === right) return 0;
+    return left < right ? -1 : 1;
+  }
+
+  if (left != null) return -1;
+  if (right != null) return 1;
+  return 0;
+}
+
 function clipString(value: string, maxLength: number): string {
   if (value.length <= maxLength) return value;
   return `${value.slice(0, maxLength - 3)}...`;
@@ -991,6 +1091,16 @@ function toBigInt(value: bigint | number | string): bigint {
   if (Number.isNaN(parsed)) return 0n;
   return BigInt(parsed);
 }
+
+type PointerSegment =
+  | {
+      kind: "index";
+      value: bigint;
+    }
+  | {
+      kind: "text";
+      value: string;
+    };
 
 type LegendPattern = "queued" | "running" | "completed" | "faulted" | "retried";
 

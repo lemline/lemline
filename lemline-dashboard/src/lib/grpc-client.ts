@@ -1,6 +1,6 @@
 import { Code, ConnectError, createPromiseClient, type Interceptor } from "@connectrpc/connect";
 import { createGrpcWebTransport } from "@connectrpc/connect-web";
-import { WorkflowGateway } from "../gen/proto/lemline/gateway/v1/workflow_gateway_connect";
+import { GatewayService } from "../gen/proto/lemline/gateway/v1/gateway_connect";
 import { getRuntimeConfig } from "./runtime-config";
 
 const runtime = getRuntimeConfig();
@@ -80,4 +80,4 @@ const transport = createGrpcWebTransport({
   interceptors: [grpcErrorLoggingInterceptor],
 });
 
-export const gatewayClient = createPromiseClient(WorkflowGateway, transport);
+export const gatewayClient = createPromiseClient(GatewayService, transport);
