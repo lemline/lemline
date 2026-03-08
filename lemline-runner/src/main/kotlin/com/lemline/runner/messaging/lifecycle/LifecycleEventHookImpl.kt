@@ -61,8 +61,8 @@ class LifecycleEventHookImpl(
         workflowInfo: WorkflowInfo,
         nodeStack: NodeStack,
         error: InternalException.Error,
-        failedAt: Instant,
-    ) = delegate.onWorkflowFaulted(workflowInfo, nodeStack, error, failedAt)
+        faultedAt: Instant,
+    ) = delegate.onWorkflowFaulted(workflowInfo, nodeStack, error, faultedAt)
 
     override suspend fun onTaskCreated(
         workflowInfo: WorkflowInfo,
@@ -93,8 +93,8 @@ class LifecycleEventHookImpl(
         nodeStack: NodeStack,
         nodePosition: NodePosition,
         error: InternalException.Error,
-        failedAt: Instant,
-    ) = delegate.onTaskFaulted(workflowInfo, nodeStack, nodePosition, error, failedAt)
+        faultedAt: Instant,
+    ) = delegate.onTaskFaulted(workflowInfo, nodeStack, nodePosition, error, faultedAt)
 
     override suspend fun onTaskRetried(
         workflowInfo: WorkflowInfo,

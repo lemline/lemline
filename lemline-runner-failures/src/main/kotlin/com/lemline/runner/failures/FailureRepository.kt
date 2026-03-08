@@ -103,7 +103,7 @@ class FailureRepository : CrudRepository<FailureModel>(),
 
     override fun createModel(rs: ResultSet) = FailureModel(
         id = getIDV7(rs, ID_COLUMN)!!,
-        instanceMessage = rs.getInstanceMessage<WorkflowEvent.WorkflowFailed>(idHelper),
+        instanceMessage = rs.getInstanceMessage<WorkflowEvent.WorkflowFaulted>(idHelper),
         payload = rs.getString(PAYLOAD_COLUMN),
         errorReason = rs.getString(ERROR_REASON_COLUMN),
         errorClass = rs.getString(ERROR_CLASS_COLUMN),

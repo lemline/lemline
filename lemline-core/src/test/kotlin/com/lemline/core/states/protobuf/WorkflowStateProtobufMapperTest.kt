@@ -77,7 +77,7 @@ class WorkflowStateProtobufMapperTest {
                 rawInput = JsonPrimitive("raw-input"),
                 flowDirective = null
             ),
-            WorkflowEvent.WorkflowFailed(
+            WorkflowEvent.WorkflowFaulted(
                 nodeStack = nodeStack(),
                 rawInput = null,
                 rawOutput = null,
@@ -89,7 +89,7 @@ class WorkflowStateProtobufMapperTest {
                     title = null,
                     details = null
                 ),
-                failedAt = now
+                faultedAt = now
             )
         )
 
@@ -125,8 +125,8 @@ class WorkflowStateProtobufMapperTest {
             rawOutput = JsonPrimitive("raw-output")
         )
 
-    private fun commandResumeWithFailedTask(): WorkflowCommand.ResumeWithFailedTask =
-        WorkflowCommand.ResumeWithFailedTask(
+    private fun commandResumeWithFailedTask(): WorkflowCommand.ResumeWithFaultedTask =
+        WorkflowCommand.ResumeWithFaultedTask(
             nodeStack = nodeStack(),
             error = sampleError()
         )
@@ -138,14 +138,14 @@ class WorkflowStateProtobufMapperTest {
             nodeStack = nodeStack()
         )
 
-    private fun eventWorkflowFailed(): WorkflowEvent.WorkflowFailed =
-        WorkflowEvent.WorkflowFailed(
+    private fun eventWorkflowFailed(): WorkflowEvent.WorkflowFaulted =
+        WorkflowEvent.WorkflowFaulted(
             nodeStack = nodeStack(),
             rawInput = JsonPrimitive("in"),
             rawOutput = JsonPrimitive("out"),
             flowDirective = FlowDirectiveEnum.End,
             error = sampleError(),
-            failedAt = now
+            faultedAt = now
         )
 
     private fun eventForkBranchCompleted(): WorkflowEvent.ForkBranchCompleted =
@@ -156,12 +156,12 @@ class WorkflowStateProtobufMapperTest {
             completedAt = now
         )
 
-    private fun eventForkBranchFailed(): WorkflowEvent.ForkBranchFailed =
-        WorkflowEvent.ForkBranchFailed(
+    private fun eventForkBranchFailed(): WorkflowEvent.ForkBranchFaulted =
+        WorkflowEvent.ForkBranchFaulted(
             nodeStack = nodeStack(),
             branchPosition = NodePosition("/do/0/fork/1/branch"),
             error = sampleError(),
-            failedAt = now
+            faultedAt = now
         )
 
     private fun eventForEachCompleted(): WorkflowEvent.ForEachCompleted =

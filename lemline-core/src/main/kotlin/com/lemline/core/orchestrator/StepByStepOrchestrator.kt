@@ -20,7 +20,7 @@ import com.lemline.core.states.WorkflowCommand
 import com.lemline.core.states.WorkflowEvent
 import com.lemline.core.states.WorkflowEvent.ActivityStarted
 import com.lemline.core.states.WorkflowEvent.ForEachCompleted
-import com.lemline.core.states.WorkflowEvent.ForkBranchFailed
+import com.lemline.core.states.WorkflowEvent.ForkBranchFaulted
 import com.lemline.core.states.WorkflowEvent.ForkStarted
 import com.lemline.core.states.WorkflowEvent.ListenStarted
 import com.lemline.core.states.WorkflowEvent.Outcome
@@ -29,7 +29,7 @@ import com.lemline.core.states.WorkflowEvent.TaskRetryScheduled
 import com.lemline.core.states.WorkflowEvent.TaskScheduled
 import com.lemline.core.states.WorkflowEvent.WaitStarted
 import com.lemline.core.states.WorkflowEvent.WorkflowCompleted
-import com.lemline.core.states.WorkflowEvent.WorkflowFailed
+import com.lemline.core.states.WorkflowEvent.WorkflowFaulted
 import com.lemline.core.tasks.toJava
 import com.lemline.core.tasks.toKotlin
 import com.lemline.core.workflows.getNode
@@ -116,7 +116,7 @@ object StepByStepOrchestrator {
                 lifecycleHook = lifecycleHook,
             )
 
-            is WorkflowCommand.ResumeWithFailedTask -> resumeFromFailedTask(
+            is WorkflowCommand.ResumeWithFaultedTask -> resumeFromFaultedTask(
                 nodeStack = command.nodeStack,
                 node = node,
                 error = command.error,
@@ -141,7 +141,7 @@ object StepByStepOrchestrator {
      *
      * Event mapping:
      * - [WorkflowCompleted] → workflow.completed
-     * - [WorkflowFailed] → workflow.faulted
+     * - [WorkflowFaulted] → workflow.faulted
      * - [TaskScheduled] → task.created (only when scheduling a child, not returning to parent)
      */
     private suspend fun emitLifecycleEventsForEvent(
@@ -159,12 +159,12 @@ object StepByStepOrchestrator {
                 )
             }
 
-            is WorkflowFailed -> {
+            is WorkflowFaulted -> {
                 lifecycleHook.onWorkflowFaulted(
                     workflowInfo = workflowInfo,
                     nodeStack = workflowEvent.nodeStack,
                     error = workflowEvent.error,
-                    failedAt = workflowEvent.failedAt,
+                    faultedAt = workflowEvent.faultedAt,
                 )
             }
 
@@ -239,16 +239,16 @@ object StepByStepOrchestrator {
         }
     } catch (e: Exception) {
         // Uncaught failure within a fork branch
-        hasForkBranchFailed(nodeStack, node, e)
+        hasForkBranchFaulted(nodeStack, node, e)
         // Uncaught failure
-            ?: WorkflowFailed(
+            ?: WorkflowFaulted(
                 nodeStack = nodeStack,
                 nodePosition = node.position,
                 rawInput = rawInput,
                 rawOutput = rawOutput,
                 flowDirective = flowDirective?.toKotlin(),
                 exception = e,
-                failedAt = Clock.System.now(),
+                faultedAt = Clock.System.now(),
             )
     }
 
@@ -301,12 +301,12 @@ object StepByStepOrchestrator {
     }
 
     /**
-     * Resumes the workflow execution from an asynchronously failed task,
-     * (hopefully catching the error, if not returns a ForkBranchFailed or TaskFailed event on the same node)
+     * Resumes the workflow execution from an asynchronously faulted task,
+     * (hopefully catching the error, if not returns a ForkBranchFaulted or TaskFaulted event on the same node)
      *
      * The task.faulted event is emitted in [tryCatch] where the error is caught.
      */
-    internal suspend fun resumeFromFailedTask(
+    internal suspend fun resumeFromFaultedTask(
         nodeStack: NodeStack,
         node: Node<*>,
         error: InternalException.Error,
@@ -314,16 +314,16 @@ object StepByStepOrchestrator {
         lifecycleHook: LifecycleEventHook,
     ): WorkflowEvent {
         return try {
-            // Resume the failed task (hopefully, the error can be handled)
+            // Resume the faulted task (hopefully, the error can be handled)
             // task.faulted is emitted in tryCatch when the exception is caught
             tryCatch(node, nodeStack, workflowInfo, lifecycleHook) {
                 throw InternalException(error)
             }
         } catch (e: Exception) {
             // Uncaught failure within a fork branch
-            hasForkBranchFailed(nodeStack, node, e)?.let { return it }
+            hasForkBranchFaulted(nodeStack, node, e)?.let { return it }
             // Uncaught failure
-            WorkflowFailed(
+            WorkflowFaulted(
                 nodeStack = nodeStack,
                 nodePosition = node.position,
                 rawInput = null,
@@ -350,13 +350,13 @@ object StepByStepOrchestrator {
     ): WorkflowEvent = try {
         block()
     } catch (e: InternalException) {
-        // Emit task.faulted - the task failed with an error
+        // Emit task.faulted - the task faulted with an error
         lifecycleHook.onTaskFaulted(
             workflowInfo = workflowInfo,
             nodeStack = nodeStack,
             nodePosition = NodePosition(e.error.position),
             error = e.error,
-            failedAt = Clock.System.now(),
+            faultedAt = Clock.System.now(),
         )
         processTaskFaulted(e, current, nodeStack, workflowInfo, lifecycleHook)
     }
@@ -532,11 +532,11 @@ object StepByStepOrchestrator {
     /**
      * Handles the failure of a branch execution stemming from a Fork task in a workflow (if any)
      */
-    private fun hasForkBranchFailed(
+    private fun hasForkBranchFaulted(
         nodeStack: NodeStack,
         failingNode: Node<*>,
         exception: Exception
-    ): ForkBranchFailed? {
+    ): ForkBranchFaulted? {
         // Find the nearest Fork task up the current node
         var current: Node<*> = failingNode
 
@@ -545,11 +545,11 @@ object StepByStepOrchestrator {
 
             if (forkNode.task is ForkTask) {
                 // Pop all states up to and including the fork node
-                return ForkBranchFailed(
+                return ForkBranchFaulted(
                     nodeStack = nodeStack.popUntil(forkNode.position).incrementTopCounter(),
                     branchPosition = current.position,
                     error = InternalException.Error.from(exception, failingNode.position),
-                    failedAt = Clock.System.now(),
+                    faultedAt = Clock.System.now(),
                 )
             }
             current = current.parent

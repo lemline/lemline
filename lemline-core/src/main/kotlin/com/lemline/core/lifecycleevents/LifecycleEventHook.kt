@@ -88,13 +88,13 @@ interface LifecycleEventHook {
      * @param workflowInfo The workflow definition info (namespace, name, version)
      * @param nodeStack The node stack at failure point
      * @param error The error that caused the failure
-     * @param failedAt When the failure occurred
+     * @param faultedAt When the failure occurred
      */
     suspend fun onWorkflowFaulted(
         workflowInfo: WorkflowInfo,
         nodeStack: NodeStack,
         error: InternalException.Error,
-        failedAt: Instant,
+        faultedAt: Instant,
     )
 
     // ==========================================
@@ -166,14 +166,14 @@ interface LifecycleEventHook {
      * @param nodeStack The node stack at failure point
      * @param nodePosition The task's position in the workflow tree
      * @param error The error that caused the failure
-     * @param failedAt When the failure occurred
+     * @param faultedAt When the failure occurred
      */
     suspend fun onTaskFaulted(
         workflowInfo: WorkflowInfo,
         nodeStack: NodeStack,
         nodePosition: NodePosition,
         error: InternalException.Error,
-        failedAt: Instant,
+        faultedAt: Instant,
     )
 
     /**
@@ -222,7 +222,7 @@ interface LifecycleEventHook {
                 workflowInfo: WorkflowInfo,
                 nodeStack: NodeStack,
                 error: InternalException.Error,
-                failedAt: Instant
+                faultedAt: Instant
             ) = Unit
 
             override suspend fun onTaskCreated(
@@ -254,7 +254,7 @@ interface LifecycleEventHook {
                 nodeStack: NodeStack,
                 nodePosition: NodePosition,
                 error: InternalException.Error,
-                failedAt: Instant
+                faultedAt: Instant
             ) = Unit
 
             override suspend fun onTaskRetried(

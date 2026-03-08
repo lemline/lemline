@@ -13,7 +13,7 @@ message WorkflowCommandProto {
     oneof command {
         ResumeFromTaskProto resume_from_task = 1;
         ResumeWithCompletedTaskProto resume_with_completed_task = 2;
-        ResumeWithFailedTaskProto resume_with_failed_task = 3;
+        ResumeWithFaultedTaskProto resume_with_faulted_task = 3;
     }
 }
 
@@ -29,7 +29,7 @@ message ResumeWithCompletedTaskProto {
     google.protobuf.Value output_json = 2;
 }
 
-message ResumeWithFailedTaskProto {
+message ResumeWithFaultedTaskProto {
     NodeStackProto node_stack = 1;
     InternalErrorProto error = 2;
 }

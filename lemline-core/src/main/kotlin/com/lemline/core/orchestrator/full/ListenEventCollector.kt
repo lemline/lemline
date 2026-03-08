@@ -290,7 +290,7 @@ internal object ListenEventCollector {
                 outcome.nodeStack to outcome.output
             }
 
-            is WorkflowEvent.WorkflowFailed -> {
+            is WorkflowEvent.WorkflowFaulted -> {
                 logger.debug { "Foreach iteration $iterationIndex failed with error: ${outcome.error}" }
                 throw InternalException(outcome.error)
             }

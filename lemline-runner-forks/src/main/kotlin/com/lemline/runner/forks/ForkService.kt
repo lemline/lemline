@@ -222,7 +222,7 @@ class ForkService {
      *    - compete=false: Fail fork immediately on first branch failure
      * 4. If fork should fail, resuming parent workflow with error
      */
-    suspend fun handleBranchFailed(instance: InstanceMessage<WorkflowEvent.ForkBranchFailed>) {
+    suspend fun handleBranchFaulted(instance: InstanceMessage<WorkflowEvent.ForkBranchFaulted>) {
         val forkBranchFailed = instance.workflowState
         val forkPosition = forkBranchFailed.nodePosition
         val branchError = forkBranchFailed.error
@@ -284,7 +284,7 @@ class ForkService {
 
                     val resumeMessage = InstanceMessage(
                         workflowInfo = instance.workflowInfo,
-                        workflowState = WorkflowCommand.ResumeWithFailedTask(
+                        workflowState = WorkflowCommand.ResumeWithFaultedTask(
                             nodeStack = instance.workflowState.nodeStack,
                             error = error,
                         ),

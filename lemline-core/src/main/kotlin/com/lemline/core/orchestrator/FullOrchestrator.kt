@@ -254,7 +254,7 @@ object FullOrchestrator {
             event.resumeCompleted(output)
         } catch (e: Exception) {
             logger.error(e) { "Activity failed: ${event::class.simpleName}" }
-            event.resumeFailed(InternalException.Error.from(e, event.nodePosition))
+            event.resumeFaulted(InternalException.Error.from(e, event.nodePosition))
         }
     }
 
@@ -314,7 +314,7 @@ object FullOrchestrator {
 
     private fun listenFailed(nodeStack: NodeStack, position: NodePosition, e: Exception): WorkflowCommand {
         logger.debug(e) { "Listen failed" }
-        return WorkflowCommand.ResumeWithFailedTask(
+        return WorkflowCommand.ResumeWithFaultedTask(
             nodeStack = nodeStack.popUntil(position).incrementTopCounter(),
             error = InternalException.Error.from(e, position)
         )
@@ -352,7 +352,7 @@ object FullOrchestrator {
                 logger.debug { "Child workflow completed" }
                 when (result) {
                     is WorkflowEvent.WorkflowCompleted -> event.resumeAsCompleted(result.output)
-                    is WorkflowEvent.WorkflowFailed -> event.resumeAsFailed(result.error)
+                    is WorkflowEvent.WorkflowFaulted -> event.resumeAsFaulted(result.error)
                     else -> throw IllegalStateException("Child workflow returned unexpected outcome: $result")
                 }
             }
@@ -413,7 +413,7 @@ object FullOrchestrator {
             WorkflowCommand.ResumeWithCompletedTask(nodeStack = event.nodeStack, rawOutput = output)
         } catch (e: InternalException) {
             logger.error { "Fork failed: error=$e" }
-            WorkflowCommand.ResumeWithFailedTask(
+            WorkflowCommand.ResumeWithFaultedTask(
                 nodeStack = event.nodeStack,
                 error = InternalException.Error.from(e, forkNode.position)
             )

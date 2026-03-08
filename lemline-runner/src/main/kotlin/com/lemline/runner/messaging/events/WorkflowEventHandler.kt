@@ -157,14 +157,14 @@ internal class WorkflowEventHandler(
             is WorkflowEvent.ForkBranchCompleted ->
                 forkService.handleBranchCompleted(current as InstanceMessage<WorkflowEvent.ForkBranchCompleted>)
 
-            is WorkflowEvent.ForkBranchFailed ->
-                forkService.handleBranchFailed(current as InstanceMessage<WorkflowEvent.ForkBranchFailed>)
+            is WorkflowEvent.ForkBranchFaulted ->
+                forkService.handleBranchFaulted(current as InstanceMessage<WorkflowEvent.ForkBranchFaulted>)
 
             is WorkflowEvent.WorkflowCompleted ->
                 handleWorkflowCompleted(current as InstanceMessage<WorkflowEvent.WorkflowCompleted>)
 
-            is WorkflowEvent.WorkflowFailed ->
-                handleWorkflowFailed(current as InstanceMessage<WorkflowEvent.WorkflowFailed>)
+            is WorkflowEvent.WorkflowFaulted ->
+                handleWorkflowFaulted(current as InstanceMessage<WorkflowEvent.WorkflowFaulted>)
 
             is WorkflowEvent.ForEachCompleted ->
                 listenerEventService.handleForEachCompleted(current as InstanceMessage<WorkflowEvent.ForEachCompleted>)
@@ -186,7 +186,7 @@ internal class WorkflowEventHandler(
      * 1. Persisting failure to database
      * 2. Resuming parent workflow if this is a child workflow
      */
-    private suspend fun handleWorkflowFailed(instance: InstanceMessage<WorkflowEvent.WorkflowFailed>) {
+    private suspend fun handleWorkflowFaulted(instance: InstanceMessage<WorkflowEvent.WorkflowFaulted>) {
         val failureId = instance.workflowState.nodeStack.deriveIdempotentId("-failure")
         databaseConfig.withTransaction { conn ->
             val exception = InternalException(instance.workflowState.error)

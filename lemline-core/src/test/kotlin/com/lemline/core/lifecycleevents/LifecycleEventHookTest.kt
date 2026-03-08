@@ -91,7 +91,7 @@ class LifecycleEventHookTest : FunSpec() {
             workflowInfo: WorkflowInfo,
             nodeStack: NodeStack,
             error: InternalException.Error,
-            failedAt: Instant,
+            faultedAt: Instant,
         ) {
             val workflowId = nodeStack.rootState.workflowId
             _events.add("workflow.faulted:$workflowId")
@@ -132,7 +132,7 @@ class LifecycleEventHookTest : FunSpec() {
             nodeStack: NodeStack,
             nodePosition: NodePosition,
             error: InternalException.Error,
-            failedAt: Instant,
+            faultedAt: Instant,
         ) {
             _events.add("task.faulted:${nodePosition.taskId()}")
         }

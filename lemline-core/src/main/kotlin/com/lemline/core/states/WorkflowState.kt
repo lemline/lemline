@@ -81,9 +81,9 @@ sealed class WorkflowCommand : WorkflowState() {
     }
 
     /**
-     * Command to resume execution with a task failed asynchronously.
+     * Command to resume execution with a task faulted asynchronously.
      */
-    data class ResumeWithFailedTask(
+    data class ResumeWithFaultedTask(
         override val nodeStack: NodeStack,
         val error: InternalException.Error,
     ) : WorkflowCommand() {
@@ -117,8 +117,8 @@ sealed class WorkflowEvent : WorkflowState() {
             is WorkflowCompleted -> output
             is ForkBranchCompleted -> branchOutput
             is ForEachCompleted -> output
-            is WorkflowFailed -> throw exception
-            is ForkBranchFailed -> throw exception
+            is WorkflowFaulted -> throw exception
+            is ForkBranchFaulted -> throw exception
         }
     }
 
@@ -144,13 +144,13 @@ sealed class WorkflowEvent : WorkflowState() {
      * If rawInput is not null, this error comes from the [com.lemline.core.orchestrator.StepByStepOrchestrator.resumeFromTask] method
      * If rawOutput is not null, this error comes from the [com.lemline.core.orchestrator.StepByStepOrchestrator.resumeFromCompletedTask] method
      */
-    data class WorkflowFailed(
+    data class WorkflowFaulted(
         override val nodeStack: NodeStack,
         val rawInput: JsonElement?,
         val rawOutput: JsonElement?,
         val flowDirective: FlowDirective?,
         val error: InternalException.Error,
-        val failedAt: Instant,
+        val faultedAt: Instant,
     ) : Outcome() {
 
         override val nodePosition = nodeStack.currentPosition
@@ -164,14 +164,14 @@ sealed class WorkflowEvent : WorkflowState() {
             rawOutput: JsonElement?,
             flowDirective: FlowDirective?,
             exception: Exception,
-            failedAt: Instant = Clock.System.now(),
+            faultedAt: Instant = Clock.System.now(),
         ) : this(
             nodeStack = nodeStack,
             rawInput = rawInput,
             rawOutput = rawOutput,
             flowDirective = flowDirective,
             error = InternalException.Error.from(exception, nodePosition),
-            failedAt = failedAt
+            faultedAt = faultedAt
         )
 
         override fun toString() = "${this::class.simpleName}(" +
@@ -207,11 +207,11 @@ sealed class WorkflowEvent : WorkflowState() {
     /**
      * Event emitted when a fork branch execution fails.
      */
-    data class ForkBranchFailed(
+    data class ForkBranchFaulted(
         override val nodeStack: NodeStack,
         val branchPosition: NodePosition,
         val error: InternalException.Error,
-        val failedAt: Instant
+        val faultedAt: Instant
     ) : Outcome() {
 
         val exception: InternalException by lazy { InternalException(error) }
@@ -249,7 +249,7 @@ sealed class WorkflowEvent : WorkflowState() {
             rawOutput = output,
         )
 
-        fun resumeFailed(error: InternalException.Error) = WorkflowCommand.ResumeWithFailedTask(
+        fun resumeFaulted(error: InternalException.Error) = WorkflowCommand.ResumeWithFaultedTask(
             nodeStack = nodeStack,
             error = error,
         )
@@ -361,7 +361,7 @@ sealed class WorkflowEvent : WorkflowState() {
             rawOutput = rawOutput,
         )
 
-        fun resumeAsFailed(error: InternalException.Error) = WorkflowCommand.ResumeWithFailedTask(
+        fun resumeAsFaulted(error: InternalException.Error) = WorkflowCommand.ResumeWithFaultedTask(
             nodeStack = nodeStack,
             error = error,
         )
@@ -428,7 +428,7 @@ sealed class WorkflowEvent : WorkflowState() {
             rawOutput = events,
         )
 
-        fun resumeFailed(error: InternalException.Error) = WorkflowCommand.ResumeWithFailedTask(
+        fun resumeFaulted(error: InternalException.Error) = WorkflowCommand.ResumeWithFaultedTask(
             nodeStack = nodeStack,
             error = error,
         )

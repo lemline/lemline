@@ -147,13 +147,13 @@ internal class WorkflowCommandHandler(
 
         return InstanceMessage(
             workflowInfo = workflowInfo,
-            workflowState = WorkflowEvent.WorkflowFailed(
+            workflowState = WorkflowEvent.WorkflowFaulted(
                 nodeStack = workflowState.nodeStack,
                 rawInput = null,
                 rawOutput = null,
                 flowDirective = null,
                 error = error,
-                failedAt = Clock.System.now()
+                faultedAt = Clock.System.now()
             ),
         )
     }
@@ -392,7 +392,7 @@ internal class WorkflowCommandHandler(
                 null  // Terminal
             }
 
-            is WorkflowEvent.WorkflowFailed -> {
+            is WorkflowEvent.WorkflowFaulted -> {
                 // Notify test callback (before sending to database)
                 onEventProducedTest(this, event)
 
@@ -407,7 +407,7 @@ internal class WorkflowCommandHandler(
                 null  // Terminal
             }
 
-            is WorkflowEvent.ForkBranchFailed -> {
+            is WorkflowEvent.ForkBranchFaulted -> {
                 // Send to database for branch failure tracking
                 sendToEventChannel(this, event)
                 null  // Terminal
@@ -451,7 +451,7 @@ internal class WorkflowCommandHandler(
             event.resumeCompleted(output)
         } catch (e: Exception) {
             logger.error(e) { "Activity failed: ${event::class.simpleName}" }
-            event.resumeFailed(InternalException.Error.from(e, event.nodePosition))
+            event.resumeFaulted(InternalException.Error.from(e, event.nodePosition))
         }
     }
 

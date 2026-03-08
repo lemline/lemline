@@ -70,7 +70,7 @@ fun randomResumeWithCompletedTaskCommand() = WorkflowCommand.ResumeWithCompleted
     rawOutput = JsonElement.random(),
 )
 
-fun randomWorkflowFailedEvent() = WorkflowEvent.WorkflowFailed(
+fun randomWorkflowFailedEvent() = WorkflowEvent.WorkflowFaulted(
     nodeStack = NodeStack.random(),
     rawInput = JsonElement.random(),
     rawOutput = JsonElement.random(),
@@ -82,7 +82,7 @@ fun randomWorkflowFailedEvent() = WorkflowEvent.WorkflowFailed(
         title = "Test error",
         details = "Test error details"
     ),
-    failedAt = Clock.System.now()
+    faultedAt = Clock.System.now()
 )
 
 fun randomRunWorkflowStartedEvent() = WorkflowEvent.RunWorkflowStarted(
