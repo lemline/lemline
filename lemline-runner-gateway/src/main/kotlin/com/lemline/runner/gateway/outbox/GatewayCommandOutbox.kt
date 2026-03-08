@@ -31,7 +31,7 @@ class GatewayCommandOutbox : AbstractOutbox<GatewayCommandModel>() {
     override lateinit var commandEmitter: CommandEmitter
 
     @Inject
-    lateinit var gatewayOutboxConfig: GatewayOutboxConfig
+    lateinit var gatewayCommandConfig: GatewayCommandConfig
 
     @Inject
     override lateinit var databaseConfig: DatabaseConfig
@@ -45,9 +45,9 @@ class GatewayCommandOutbox : AbstractOutbox<GatewayCommandModel>() {
     override val crudRepository: WithCrudRepository<GatewayCommandModel>
         get() = gatewayCommandRepository
 
-    override val enabled by lazy { gatewayOutboxConfig.enabled }
+    override val enabled by lazy { gatewayCommandConfig.enabled }
 
-    override val outboxConfig: OutboxConfig by lazy { gatewayOutboxConfig.outbox }
+    override val outboxConfig: OutboxConfig by lazy { gatewayCommandConfig.outbox }
 
     override suspend fun process(entity: GatewayCommandModel) {
         commandEmitter.send(entity.instanceMessage, entity.id)

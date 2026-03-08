@@ -9,7 +9,7 @@ gRPC ingress gateway for starting workflows and streaming workflow lifecycle ana
 
 | File | Description |
 |------|-------------|
-| `grpc/WorkflowGatewayGrpcService.kt` | Thin gRPC transport shell delegating to feature-specific handlers |
+| `grpc/GatewayGrpcService.kt` | Thin gRPC transport shell delegating to feature-specific handlers |
 | `instances/InstanceStartService.kt` | Start-instance flow + idempotency/conflict semantics |
 | `instances/InstanceWatchService.kt` | Long-poll watch loop for instance list changes |
 | `instanceevents/InstanceEventWatchService.kt` | Long-poll watch loop for per-instance event streams |
@@ -21,7 +21,7 @@ gRPC ingress gateway for starting workflows and streaming workflow lifecycle ana
 | `analytics/PostgresqlWorkflowAnalyticsEventSource.kt` | Analytics event source backed by PostgreSQL |
 | `../lemline-runner/src/main/kotlin/com/lemline/runner/config/LemlineConfigSource.kt` | Global config source mapping `lemline.*` into Quarkus properties (including gateway keys) |
 | `config/GatewayStartupValidator.kt` | Required config checks + analytics source validation |
-| `src/main/proto/lemline/gateway/v1/workflow_gateway.proto` | Public gateway gRPC contract |
+| `src/main/proto/lemline/gateway/v1/gateway.proto` | Public gateway gRPC contract |
 | `src/main/resources/db/migration/{postgresql,mysql,h2}/` | Gateway outbox migrations (all supported DBs) |
 
 ## For AI Agents

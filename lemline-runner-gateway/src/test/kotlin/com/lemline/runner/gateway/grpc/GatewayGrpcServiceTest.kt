@@ -7,8 +7,8 @@ import com.lemline.gateway.v1.WatchInstanceEventsRequest
 import com.lemline.gateway.v1.WatchInstanceEventsResponse
 import com.lemline.runner.gateway.auth.GatewayAuthContext
 import com.lemline.runner.gateway.auth.GatewayPrincipal
-import com.lemline.runner.gateway.definitionstats.DefinitionStatsRpcHandler
 import com.lemline.runner.gateway.definitions.DefinitionRpcHandler
+import com.lemline.runner.gateway.definitionstats.DefinitionStatsRpcHandler
 import com.lemline.runner.gateway.instanceevents.InstanceEventRpcHandler
 import com.lemline.runner.gateway.instances.InstanceRpcHandler
 import com.lemline.runner.gateway.support.testLemlineConfiguration
@@ -25,8 +25,8 @@ import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
 
-@DisplayName("WorkflowGatewayGrpcService")
-class WorkflowGatewayGrpcServiceTest {
+@DisplayName("GatewayGrpcService")
+class GatewayGrpcServiceTest {
 
     @Test
     fun `missing principal returns unauthenticated`() {
@@ -128,7 +128,7 @@ class WorkflowGatewayGrpcServiceTest {
         definitionStatsRpcHandler: DefinitionStatsRpcHandler = mockk(relaxed = true),
         instanceRpcHandler: InstanceRpcHandler = mockk(relaxed = true),
         instanceEventRpcHandler: InstanceEventRpcHandler = mockk(relaxed = true),
-    ) = WorkflowGatewayGrpcService(config).apply {
+    ) = GatewayGrpcService(config).apply {
         this.definitionRpcHandler = definitionRpcHandler
         this.definitionStatsRpcHandler = definitionStatsRpcHandler
         this.instanceRpcHandler = instanceRpcHandler

@@ -21,7 +21,7 @@ import com.lemline.gateway.v1.WatchInstanceEventsRequest
 import com.lemline.gateway.v1.WatchInstanceEventsResponse
 import com.lemline.gateway.v1.WatchInstancesRequest
 import com.lemline.gateway.v1.WatchInstancesResponse
-import com.lemline.gateway.v1.WorkflowGatewayServiceGrpc
+import com.lemline.gateway.v1.GatewayServiceGrpc
 import com.lemline.runner.config.LemlineConfiguration
 import com.lemline.runner.config.gatewayAuthenticationEnabled
 import com.lemline.runner.gateway.auth.GatewayAuthContext
@@ -46,9 +46,9 @@ import kotlinx.coroutines.launch
 
 @GrpcService
 @Singleton
-class WorkflowGatewayGrpcService(
+class GatewayGrpcService(
     private val config: LemlineConfiguration,
-) : WorkflowGatewayServiceGrpc.WorkflowGatewayServiceImplBase() {
+) : GatewayServiceGrpc.GatewayServiceImplBase() {
 
     @Inject
     lateinit var definitionRpcHandler: DefinitionRpcHandler

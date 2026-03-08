@@ -7,4 +7,4 @@ import com.lemline.runner.common.config.OutboxAndCleanupConfig
  * Configuration interface for the Gateway command outbox feature.
  * Implementations are provided by the main runner module.
  */
-interface GatewayOutboxConfig : OutboxAndCleanupConfig
+interface GatewayCommandConfig : OutboxAndCleanupConfig

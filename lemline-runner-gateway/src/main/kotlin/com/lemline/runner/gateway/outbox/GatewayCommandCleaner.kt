@@ -20,7 +20,7 @@ class GatewayCommandCleaner : AbstractCleaner<GatewayCommandModel>() {
     override val runWhenScheduledDisabled: Boolean get() = true
 
     @Inject
-    lateinit var gatewayOutboxConfig: GatewayOutboxConfig
+    lateinit var gatewayCommandConfig: GatewayCommandConfig
 
     @Inject
     override lateinit var databaseConfig: DatabaseConfig
@@ -34,9 +34,9 @@ class GatewayCommandCleaner : AbstractCleaner<GatewayCommandModel>() {
     override val crudRepository: WithCrudRepository<GatewayCommandModel>
         get() = gatewayCommandRepository
 
-    override val enabled by lazy { gatewayOutboxConfig.enabled }
+    override val enabled by lazy { gatewayCommandConfig.enabled }
 
-    override val cleanerConfig: CleanupConfig by lazy { gatewayOutboxConfig.cleanup }
+    override val cleanerConfig: CleanupConfig by lazy { gatewayCommandConfig.cleanup }
 
     override val jobName: String get() = "Gateway command outbox cleaner"
 }
