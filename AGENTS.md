@@ -120,16 +120,16 @@ Known deviations:
   - `lemline-core/src/main/kotlin/com/lemline/core/orchestrator/StepByStepOrchestrator.kt`
   - `lemline-core/src/main/kotlin/com/lemline/core/orchestrator/FullOrchestrator.kt`
 - Processor contract:
-  - `lemline-core/src/main/kotlin/com/lemline/core/processors/NodeProcessor.kt`
+  - `lemline-core/src/main/kotlin/com/lemline/core/processors/AbstractProcessor.kt`
 - Runner command/event handling:
   - `lemline-runner/src/main/kotlin/com/lemline/runner/messaging/commands/WorkflowCommandHandler.kt`
   - `lemline-runner/src/main/kotlin/com/lemline/runner/messaging/events/WorkflowEventHandler.kt`
 - Common outbox base:
   - `lemline-runner-common/src/main/kotlin/com/lemline/runner/common/outbox/AbstractOutbox.kt`
 - Gateway ingress + streaming:
-  - `lemline-runner-gateway/src/main/kotlin/com/lemline/runner/gateway/grpc/WorkflowGatewayGrpcService.kt`
-  - `lemline-runner-gateway/src/main/kotlin/com/lemline/runner/gateway/start/WorkflowStartService.kt`
-  - `lemline-runner-gateway/src/main/kotlin/com/lemline/runner/gateway/watch/WorkflowWatchService.kt`
+  - `lemline-runner-gateway/src/main/kotlin/com/lemline/runner/gateway/grpc/GatewayGrpcService.kt`
+  - `lemline-runner-gateway/src/main/kotlin/com/lemline/runner/gateway/resources/instances/InstanceStartService.kt`
+  - `lemline-runner-gateway/src/main/kotlin/com/lemline/runner/gateway/resources/instances/InstanceWatchService.kt`
 - Analytics ingestion:
   - `lemline-runner-analytics/src/main/kotlin/com/lemline/runner/analytics/LifecycleAnalyticsSubscriber.kt`
   - `lemline-runner-analytics/src/main/kotlin/com/lemline/runner/analytics/LifecycleAnalyticsRepository.kt`
