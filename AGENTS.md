@@ -21,6 +21,7 @@ Lemline is an event-driven workflow orchestration runtime implementing Serverles
 
 Use these docs as primary context before broad refactors:
 
+- Product vision and scope guardrails: [`VISION.md`](VISION.md) — consult when deciding product scope, prioritization, or naming; do not load by default.
 - System architecture: [`docs/orchestrator-architecture.md`](docs/orchestrator-architecture.md), [`docs/runner-architecture.md`](docs/runner-architecture.md)
 - Messaging architecture ADR: [`docs/adr/0003-messaging-architecture.md`](docs/adr/0003-messaging-architecture.md)
 - Workflow execution model ADR: [`docs/adr/0002-workflow-execution-model.md`](docs/adr/0002-workflow-execution-model.md)
