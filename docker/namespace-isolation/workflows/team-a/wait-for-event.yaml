@@ -1,0 +1,15 @@
+document:
+  dsl: '1.0.0'
+  namespace: team-a
+  name: wait-for-event
+  version: '0.1.0'
+do:
+  - waitForOrder:
+      listen:
+        to:
+          one:
+            with:
+              type: com.acme.order.placed
+  - done:
+      set:
+        received: true

@@ -25,6 +25,7 @@ An Architectural Decision Record (ADR) is a document that captures an important 
 | [ADR-0013](0013-subscriptions.md) | Subscriptions | Accepted |
 | [ADR-0014](0014-grpc-gateway.md) | Public Secured gRPC Gateway for Lemline | Proposed |
 | [ADR-0015](0015-broker-message-encryption.md) | Broker Message Encryption | Proposed |
+| [ADR-0016](0016-namespace-isolation.md) | Namespace Isolation | Accepted |
 
 ## Creating a New ADR
 

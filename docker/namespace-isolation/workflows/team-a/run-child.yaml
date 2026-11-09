@@ -1,0 +1,16 @@
+document:
+  dsl: '1.0.0'
+  namespace: team-a
+  name: run-child
+  version: '0.1.0'
+do:
+  # Cross-namespace Run: the child's start command is routed to team-b's destination
+  # and executed by runner-b; the resume comes back to team-a's destination.
+  - callTeamB:
+      run:
+        workflow:
+          namespace: team-b
+          name: child
+          version: '0.1.0'
+          input:
+            from: team-a

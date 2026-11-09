@@ -1,0 +1,9 @@
+document:
+  dsl: '1.0.0'
+  namespace: team-a
+  name: hello
+  version: '0.1.0'
+do:
+  - greet:
+      set:
+        message: Hello from team-a!

@@ -1,0 +1,118 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: lemline
+    # No host port binding: inspect with `docker compose exec postgres psql -U postgres -d lemline`
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  runner-image:
+    image: lemline-runner-nsdemo:local
+    pull_policy: never
+    build:
+      context: ../..
+      dockerfile: lemline-runner/Dockerfile
+    command: ["--version"]
+    restart: "no"
+
+  seed-definitions:
+    image: lemline-runner-nsdemo:local
+    pull_policy: never
+    depends_on:
+      postgres:
+        condition: service_healthy
+      runner-image:
+        condition: service_completed_successfully
+    entrypoint: ["/bin/sh", "-lc"]
+    command:
+      - |
+        for _ in 1 2 3 4 5; do
+          java -jar /app/quarkus-app/quarkus-run.jar --config=/config/lemline.yaml definition post -d /workflows -r -F && exit 0
+          echo "seed-definitions failed, retrying in 5s..."
+          sleep 5
+        done
+        exit 1
+    volumes:
+      - ./config/runner-a.yaml:/config/lemline.yaml:ro
+      - ./workflows:/workflows:ro
+
+  # Pool A: follows namespace team-a only — consumes lemline-team-a-{commands,events,cloudevents}
+  runner-a:
+    image: lemline-runner-nsdemo:local
+    pull_policy: never
+    depends_on:
+      postgres:
+        condition: service_healthy
+      runner-image:
+        condition: service_completed_successfully
+      seed-definitions:
+        condition: service_completed_successfully
+    command: ["--config=/config/lemline.yaml", "listen", "--metrics-port", "9445"]
+    volumes:
+      - ./config/runner-a.yaml:/config/lemline.yaml:ro
+    ports:
+      - "9445:9445"
+    healthcheck:
+      test: ["CMD", "bash", "-c", "echo > /dev/tcp/localhost/9445"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 15s
+
+  # Pool B: follows namespace team-b only — consumes lemline-team-b-{commands,events,cloudevents}
+  runner-b:
+    image: lemline-runner-nsdemo:local
+    pull_policy: never
+    depends_on:
+      postgres:
+        condition: service_healthy
+      runner-image:
+        condition: service_completed_successfully
+      seed-definitions:
+        condition: service_completed_successfully
+    command: ["--config=/config/lemline.yaml", "listen", "--metrics-port", "9446"]
+    volumes:
+      - ./config/runner-b.yaml:/config/lemline.yaml:ro
+    ports:
+      - "9446:9446"
+    healthcheck:
+      test: ["CMD", "bash", "-c", "echo > /dev/tcp/localhost/9446"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 15s
+
+  # Unpinned gateway: serves every namespace (its emissions are routed by convention);
+  # also runs the analytics sink so start-time inactive-namespace WARNs and the read
+  # model work. No TLS/auth: this is a local demo.
+  gateway:
+    image: lemline-runner-nsdemo:local
+    pull_policy: never
+    depends_on:
+      runner-a:
+        condition: service_healthy
+      runner-b:
+        condition: service_healthy
+    command: ["--config=/config/lemline.yaml", "gateway", "start", "--grpc-port", "9443", "--metrics-port", "9444"]
+    volumes:
+      - ./config/gateway.yaml:/config/lemline.yaml:ro
+    ports:
+      - "9443:9443"
+      - "9444:9444"
+    healthcheck:
+      test: ["CMD", "bash", "-c", "echo > /dev/tcp/localhost/9444"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 15s
+
+volumes:
+  postgres_data:

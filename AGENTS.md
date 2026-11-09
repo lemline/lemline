@@ -28,10 +28,12 @@ Use these docs as primary context before broad refactors:
 - Database strategy ADR: [`docs/adr/0004-database-storage-strategy.md`](docs/adr/0004-database-storage-strategy.md)
 - Error handling ADR: [`docs/adr/0005-error-handling-approach.md`](docs/adr/0005-error-handling-approach.md)
 - Config strategy ADR: [`docs/adr/0007-config-strategy.md`](docs/adr/0007-config-strategy.md)
+- Namespace isolation ADR: [`docs/adr/0016-namespace-isolation.md`](docs/adr/0016-namespace-isolation.md)
 - Protobuf messaging rules: [`docs/protobuf-messaging.md`](docs/protobuf-messaging.md)
 - Logging strategy: [`docs/logging-strategy.md`](docs/logging-strategy.md)
 - CLI strategy: [`docs/cli-strategy.md`](docs/cli-strategy.md)
 - Listen behavior reference: [`docs/listen-task.md`](docs/listen-task.md)
+- Namespace isolation ops guide: [`docs/namespace-isolation.md`](docs/namespace-isolation.md)
 - ADR index: [`docs/adr/README.md`](docs/adr/README.md)
 
 ## Repository Layout
