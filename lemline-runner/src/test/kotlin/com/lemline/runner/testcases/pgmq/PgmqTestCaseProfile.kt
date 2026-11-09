@@ -12,6 +12,7 @@ import com.lemline.runner.common.config.LEMLINE_MESSAGING_EVENTS_PRODUCER_ENABLE
 import com.lemline.runner.common.config.LEMLINE_MESSAGING_LIFECYCLE_EVENTS_CONSUMER_ENABLED
 import com.lemline.runner.common.config.LEMLINE_MESSAGING_LIFECYCLE_EVENTS_PRODUCER_ENABLED
 import com.lemline.runner.common.config.LEMLINE_MESSAGING_TYPE
+import com.lemline.runner.common.config.LEMLINE_NAMESPACES
 import com.lemline.runner.common.config.LEMLINE_ORCHESTRATOR_MODE
 import com.lemline.runner.common.config.LEMLINE_OUTBOX_ENABLED
 import com.lemline.runner.common.config.LEMLINE_OUTBOX_LISTENER_OUTBOX_EVERY
@@ -28,15 +29,19 @@ import com.lemline.runner.tests.resources.PgmqTestResource
 import io.quarkus.test.junit.QuarkusTestProfile
 
 /**
- * Test profile for PGMQ messaging with loopback configuration.
+ * Test profile for PGMQ messaging with per-namespace destinations.
  *
- * Uses the SAME queue for commands-in and commands-out (and events-in/out)
- * to create a natural message loop for end-to-end workflow testing.
+ * The runner follows every namespace used by the testcase workflow fixtures
+ * (`default`, `examples`, `samples`, `test`), so LemlineConfigSource generates
+ * consumption of each `lemline-<namespace>-<type>` queue (auto-created).
+ * Emissions route to the emitting workflow's namespace queue, so loopback
+ * (in = out per namespace) is inherent — no raw mp.messaging destination
+ * overrides are needed.
  *
  * This profile configures:
  * - PostgreSQL database for persistence (shared with PGMQ messaging)
- * - PGMQ channels with loopback queues (same queue name for in/out)
- * - Lifecycle events with loopback for test verification
+ * - PGMQ channels with per-namespace queues (natural loopback)
+ * - Lifecycle events with loopback for test verification (single shared queue)
  * - Outbox schedulers enabled with fast polling for Wait/Fork/Retry tests
  */
 class PgmqTestCaseProfile : QuarkusTestProfile {
@@ -60,21 +65,15 @@ class PgmqTestCaseProfile : QuarkusTestProfile {
             // Orchestrator mode: ALL generates more messages for thorough end-to-end testing
             LEMLINE_ORCHESTRATOR_MODE to "all",
 
-            // Use SAME queue for in/out to create loopback
-            "mp.messaging.incoming.commands-in.queue" to "lemline-commands",
-            "mp.messaging.incoming.events-in.queue" to "lemline-events",
-            "mp.messaging.outgoing.commands-out.queue" to "lemline-commands",
-            "mp.messaging.outgoing.events-out.queue" to "lemline-events",
+            // Follow every namespace used by the testcase workflow fixtures so the
+            // generated per-namespace queues cover all of them (natural loopback)
+            LEMLINE_NAMESPACES to "default,examples,samples,test",
 
             // Lifecycle events loopback - same queue for producer and test listener
             "mp.messaging.outgoing.lifecycleevents-out.connector" to "smallrye-pgmq",
             "mp.messaging.outgoing.lifecycleevents-out.queue" to "lemline-lifecycle",
             "mp.messaging.incoming.lifecycleevents-in.connector" to "smallrye-pgmq",
             "mp.messaging.incoming.lifecycleevents-in.queue" to "lemline-lifecycle",
-
-            // CloudEvents loopback - same queue for in/out
-            "mp.messaging.incoming.cloudevents-in.queue" to "lemline-cloudevents",
-            "mp.messaging.outgoing.cloudevents-out.queue" to "lemline-cloudevents",
 
             // PGMQ-specific settings for commands
             "mp.messaging.incoming.commands-in.visibility-timeout" to "30",

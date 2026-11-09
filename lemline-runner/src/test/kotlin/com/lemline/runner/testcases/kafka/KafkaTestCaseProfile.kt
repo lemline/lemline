@@ -14,6 +14,7 @@ import com.lemline.runner.common.config.LEMLINE_MESSAGING_EVENTS_PRODUCER_ENABLE
 import com.lemline.runner.common.config.LEMLINE_MESSAGING_LIFECYCLE_EVENTS_CONSUMER_ENABLED
 import com.lemline.runner.common.config.LEMLINE_MESSAGING_LIFECYCLE_EVENTS_PRODUCER_ENABLED
 import com.lemline.runner.common.config.LEMLINE_MESSAGING_TYPE
+import com.lemline.runner.common.config.LEMLINE_NAMESPACES
 import com.lemline.runner.common.config.LEMLINE_ORCHESTRATOR_MODE
 import com.lemline.runner.common.config.LEMLINE_OUTBOX_ENABLED
 import com.lemline.runner.common.config.LEMLINE_OUTBOX_LISTENER_OUTBOX_EVERY
@@ -30,15 +31,18 @@ import com.lemline.runner.tests.resources.KafkaTestResource
 import io.quarkus.test.junit.QuarkusTestProfile
 
 /**
- * Test profile for Kafka messaging with loopback configuration.
+ * Test profile for Kafka messaging with per-namespace destinations.
  *
- * Uses the SAME topic for commands-in and commands-out (and events-in/out)
- * to create a natural message loop for end-to-end workflow testing.
+ * The runner follows every namespace used by the testcase workflow fixtures
+ * (`default`, `examples`, `samples`, `test`), so LemlineConfigSource generates
+ * consumption of each `lemline-<namespace>-<type>` topic. Emissions route to the
+ * emitting workflow's namespace topic, so loopback (in = out per namespace) is
+ * inherent — no raw mp.messaging destination overrides are needed.
  *
  * This profile configures:
  * - H2 (in-memory) database for persistence
- * - Kafka channels with loopback topics
- * - Lifecycle events with loopback for test verification
+ * - Kafka channels with per-namespace topics (natural loopback)
+ * - Lifecycle events with loopback for test verification (single shared topic)
  * - Outbox schedulers enabled with fast polling for Wait/Fork/Retry tests
  */
 class KafkaTestCaseProfile : QuarkusTestProfile {
@@ -63,23 +67,16 @@ class KafkaTestCaseProfile : QuarkusTestProfile {
             // Orchestrator mode: ALL generates more messages for thorough end-to-end testing
             LEMLINE_ORCHESTRATOR_MODE to "all",
 
-            // Use SAME topic for in/out to create loopback
-            "mp.messaging.incoming.commands-in.topic" to "lemline-commands",
-            "mp.messaging.incoming.events-in.topic" to "lemline-events",
-            "mp.messaging.outgoing.commands-out.topic" to "lemline-commands",
-            "mp.messaging.outgoing.events-out.topic" to "lemline-events",
+            // Follow every namespace used by the testcase workflow fixtures so the
+            // generated per-namespace topics cover all of them (natural loopback,
+            // consumers start from earliest by default)
+            LEMLINE_NAMESPACES to "default,examples,samples,test",
 
             // Lifecycle events loopback - same topic for producer and test listener
             "mp.messaging.incoming.lifecycleevents-in.topic" to "lemline-lifecycle",
             "mp.messaging.incoming.lifecycleevents-in.auto.offset.reset" to "earliest",
             "mp.messaging.outgoing.lifecycleevents-out.topic" to "lemline-lifecycle",
             "mp.messaging.outgoing.lifecycleevents-out.auto.offset.reset" to "earliest",
-
-            // CloudEvents loopback - same topic for in/out
-            "mp.messaging.incoming.cloudevents-in.topic" to "lemline-cloudevents",
-            "mp.messaging.incoming.cloudevents-in.auto.offset.reset" to "earliest",
-            "mp.messaging.outgoing.cloudevents-out.topic" to "lemline-cloudevents",
-            "mp.messaging.outgoing.cloudevents-out.auto.offset.reset" to "earliest",
 
             "smallrye.messaging.kafka.topic.creation.enable" to "true",
 

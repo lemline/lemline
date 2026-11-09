@@ -25,6 +25,7 @@ import com.lemline.gateway.v1.GatewayServiceGrpc
 import com.lemline.runner.config.LemlineConfiguration
 import com.lemline.runner.config.gatewayAuthenticationEnabled
 import com.lemline.runner.gateway.auth.GatewayAuthContext
+import com.lemline.runner.gateway.auth.GatewayAuthorizer
 import com.lemline.runner.gateway.auth.GatewayPrincipal
 import com.lemline.runner.gateway.resources.definitions.DefinitionRpcHandler
 import com.lemline.runner.gateway.resources.definitionstats.DefinitionStatsRpcHandler
@@ -48,6 +49,7 @@ import kotlinx.coroutines.launch
 @Singleton
 class GatewayGrpcService(
     private val config: LemlineConfiguration,
+    private val authorizer: GatewayAuthorizer,
 ) : GatewayServiceGrpc.GatewayServiceImplBase() {
 
     @Inject
@@ -216,7 +218,8 @@ class GatewayGrpcService(
 
     private fun resolvePrincipalOrNull(): GatewayPrincipal? =
         GatewayAuthContext.getOrNull()
-            ?: if (!config.gatewayAuthenticationEnabled) GatewayPrincipal.anonymous else null
+            // Authorizer-provided: a pinned gateway constrains unauthenticated callers too
+            ?: if (!config.gatewayAuthenticationEnabled) authorizer.unauthenticatedPrincipal() else null
 
     @Suppress("unused")
     fun onShutdown(@Observes event: ShutdownEvent) {

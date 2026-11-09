@@ -33,4 +33,6 @@ data class PgmqOutgoingMetadata(
     val delaySeconds: Int = 0,
     /** Custom message ID (optional, will be generated if not provided) */
     val messageId: String? = null,
+    /** Target queue override (per-namespace destination); null = the channel's configured queue */
+    val queue: String? = null,
 )

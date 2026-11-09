@@ -14,6 +14,7 @@ import org.eclipse.microprofile.config.Config
  * - username: Database username (default: postgres)
  * - password: Database password (default: postgres)
  * - queue: PGMQ queue name (required)
+ * - queues: Comma-separated list of PGMQ queue names (incoming only, overrides queue when present)
  * - visibility-timeout: Message visibility timeout in seconds (default: 30)
  * - poll-interval: Polling interval in milliseconds (default: 100)
  * - batch-size: Number of messages to fetch per poll (default: 10)
@@ -33,6 +34,7 @@ class PgmqConnectorConfig(
         const val USERNAME = "username"
         const val PASSWORD = "password"
         const val QUEUE = "queue"
+        const val QUEUES = "queues"
         const val VISIBILITY_TIMEOUT = "visibility-timeout"
         const val POLL_INTERVAL = "poll-interval"
         const val BATCH_SIZE = "batch-size"
@@ -53,6 +55,9 @@ class PgmqConnectorConfig(
         const val DEFAULT_MAX_POOL_SIZE = 5
         const val DEFAULT_AUTO_CREATE_QUEUE = true
         const val DEFAULT_MAX_RETRIES = 3
+
+        /** Suffix used to derive per-source dead-letter queues in multi-queue mode. */
+        const val DLQ_SUFFIX = ".dlq"
     }
 
     private fun getProperty(key: String): String? {
@@ -84,6 +89,40 @@ class PgmqConnectorConfig(
 
     val queue: String
         get() = getProperty(QUEUE) ?: channelName
+
+    /**
+     * True when the channel is configured with the multi-queue `queues` attribute.
+     *
+     * In multi-queue mode the channel polls every listed queue and dead-letters
+     * per source queue (see [deadLetterQueueFor]).
+     */
+    val usesQueues: Boolean
+        get() = getProperty(QUEUES)?.isNotBlank() == true
+
+    /**
+     * The list of queues this channel operates on.
+     *
+     * When the `queues` attribute is present, it wins over `queue` and is parsed
+     * as a comma-separated list. Otherwise, the single [queue] is returned.
+     */
+    val queues: List<String>
+        get() = getProperty(QUEUES)
+            ?.split(',')
+            ?.map { it.trim() }
+            ?.filter { it.isNotEmpty() }
+            ?.takeIf { it.isNotEmpty() }
+            ?: listOf(queue)
+
+    /**
+     * Resolves the dead-letter queue for a message read from [sourceQueue].
+     *
+     * - Multi-queue mode (`queues` attribute): derived as `<source-queue>.dlq`.
+     * - Single-queue mode: the explicit `dead-letter-queue` attribute (may be null).
+     */
+    fun deadLetterQueueFor(sourceQueue: String): String? = when {
+        usesQueues -> "$sourceQueue$DLQ_SUFFIX"
+        else -> deadLetterQueue
+    }
 
     val visibilityTimeout: Int
         get() = getProperty(VISIBILITY_TIMEOUT)?.toIntOrNull() ?: DEFAULT_VISIBILITY_TIMEOUT

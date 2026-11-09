@@ -4,6 +4,7 @@ package com.lemline.runner
 import com.lemline.runner.cli.MainCommand
 import com.lemline.runner.cli.config.ConfigCreateCommand
 import com.lemline.runner.cli.config.ConfigPathHolder
+import com.lemline.runner.cli.failures.FailuresReplayCommand
 import com.lemline.runner.cli.gateway.GatewayStartCommand
 import com.lemline.runner.cli.instances.InstanceStartCommand
 import com.lemline.runner.cli.listen.ListenCommand
@@ -121,6 +122,9 @@ class LemlineApplication : QuarkusApplication {
                     // the instance start command, if any
                     val instanceStart = parseResults.command<InstanceStartCommand>()
 
+                    // the failures replay command, if any
+                    val failuresReplay = parseResults.command<FailuresReplayCommand>()
+
                     if (listen == null && gatewayStart == null) {
                         disableMetricsEndpoint()
                         disableMessaging()
@@ -135,6 +139,12 @@ class LemlineApplication : QuarkusApplication {
 
                     if (instanceStart != null) {
                         System.setProperty(LEMLINE_MESSAGING_COMMANDS_PRODUCER_ENABLED, "true")
+                    }
+
+                    if (failuresReplay != null) {
+                        // replayed payloads may be commands or events; enable both producers
+                        System.setProperty(LEMLINE_MESSAGING_COMMANDS_PRODUCER_ENABLED, "true")
+                        System.setProperty(LEMLINE_MESSAGING_EVENTS_PRODUCER_ENABLED, "true")
                     }
 
                     if (gatewayStart != null) {

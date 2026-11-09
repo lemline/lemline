@@ -6,7 +6,7 @@ import com.lemline.runner.messaging.commands.COMMANDS_IN_CHANNEL
 import com.lemline.runner.messaging.commands.COMMANDS_OUT_CHANNEL
 import com.lemline.runner.messaging.events.EVENTS_IN_CHANNEL
 import com.lemline.runner.messaging.events.EVENTS_OUT_CHANNEL
-import com.lemline.runner.tests.profiles.InMemoryProfile
+import com.lemline.runner.tests.profiles.InMemoryConsumerProfile
 import io.quarkus.test.junit.QuarkusTest
 import io.quarkus.test.junit.TestProfile
 import io.smallrye.reactive.messaging.memory.InMemoryConnector
@@ -20,9 +20,14 @@ import org.junit.jupiter.api.Tag
 
 /**
  * Runs the WorkflowConsumerTest suite against an in-memory broker.
+ *
+ * Uses [InMemoryConsumerProfile]: the shared in-memory configuration plus the
+ * TestNamespaceScope alternative, so the foreign-namespace guard accepts the base
+ * suite's `test` workflows (the in-memory connector binds by channel, so no
+ * per-namespace consumption config is involved).
  */
 @QuarkusTest
-@TestProfile(InMemoryProfile::class)
+@TestProfile(InMemoryConsumerProfile::class)
 @Tag("integration")
 internal class WorkflowConsumerInMemoryTest : WorkflowConsumerTest() {
 

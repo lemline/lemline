@@ -85,8 +85,10 @@ class MessagingStartupValidator(
 
         try {
             AdminClient.create(props).use { client ->
-                // Try to list topics to verify connectivity
-                client.listTopics().names().get(5, TimeUnit.SECONDS)
+                // Try to list topics to verify connectivity.
+                // 30s: a startup-only check — generous enough not to flake on loaded hosts
+                // (e.g. test machines running several suites), still fail-fast at boot.
+                client.listTopics().names().get(30, TimeUnit.SECONDS)
             }
             logger.info { "Kafka broker connectivity verified at $brokers." }
         } catch (e: Exception) {

@@ -15,10 +15,17 @@ import io.quarkus.test.junit.QuarkusTestProfile.TestResourceEntry
  * - Kafka channels for messaging
  *
  * Configuration approach:
- * - Business config (topic names, enabled flags) uses lemline.* properties
+ * - Business config (followed namespaces, enabled flags) uses lemline.* properties
  *   → LemlineConfigSource transforms these to mp.messaging.* properties
  * - Test-only infrastructure tweaks (auto-create topics) use mp.messaging.* directly
  *   → These bypass LemlineConfigSource intentionally (not production config)
+ *
+ * Destination model (per-namespace destinations `<prefix>-<namespace>-<type>`):
+ * - The runner follows namespace `test-in` only → it consumes
+ *   `lemline-test-in-commands` / `lemline-test-in-events`.
+ * - The base suite's workflows use namespace `test`, so the runner's emissions are
+ *   routed to `lemline-test-commands` / `lemline-test-events`, which the runner does
+ *   NOT consume — the test observes them with a raw Kafka consumer.
  */
 class KafkaProfile : QuarkusTestProfile {
 
@@ -38,19 +45,16 @@ class KafkaProfile : QuarkusTestProfile {
             // Messaging type
             com.lemline.runner.common.config.LEMLINE_MESSAGING_TYPE to MessagingType.KAFKA.configValue,
 
+            // Followed namespaces: consumption topics are derived from this list
+            // (`lemline-test-in-commands` / `lemline-test-in-events`), while emissions
+            // are routed per message by the workflow's namespace (`test`).
+            com.lemline.runner.common.config.LEMLINE_NAMESPACES to "test-in",
+
             // Channel enabled flags
             com.lemline.runner.common.config.LEMLINE_MESSAGING_COMMANDS_CONSUMER_ENABLED to "true",
             com.lemline.runner.common.config.LEMLINE_MESSAGING_COMMANDS_PRODUCER_ENABLED to "true",
             com.lemline.runner.common.config.LEMLINE_MESSAGING_EVENTS_CONSUMER_ENABLED to "true",
             com.lemline.runner.common.config.LEMLINE_MESSAGING_EVENTS_PRODUCER_ENABLED to "true",
-
-            // Topic names for test isolation (transformed by LemlineConfigSource)
-            // Note: Consumer and producer use different topics for testing
-            // (production would typically use the same topic)
-            com.lemline.runner.common.config.LEMLINE_MESSAGING_KAFKA_COMMANDS_TOPIC to "lemline-commands-in",
-            com.lemline.runner.common.config.LEMLINE_MESSAGING_KAFKA_COMMANDS_PRODUCER_TOPIC_OUT to "lemline-commands-out",
-            com.lemline.runner.common.config.LEMLINE_MESSAGING_KAFKA_EVENTS_TOPIC to "lemline-events-in",
-            com.lemline.runner.common.config.LEMLINE_MESSAGING_KAFKA_EVENTS_PRODUCER_TOPIC_OUT to "lemline-events-out",
 
             // =============================================================
             // Test-only infrastructure tweaks (bypass LemlineConfigSource)
@@ -60,6 +64,12 @@ class KafkaProfile : QuarkusTestProfile {
             "kafka.allow.auto.create.topics" to "true",
         )
     }
+
+    /**
+     * Widens the foreign-namespace guard scope to accept the base suite's `test` workflows
+     * while consumption stays on `test-in` — see [TestNamespaceScope].
+     */
+    override fun getEnabledAlternatives(): Set<Class<*>> = setOf(TestNamespaceScope::class.java)
 
     /**
      * Defines which test resources are active for this profile (optional).

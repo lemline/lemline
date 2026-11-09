@@ -133,4 +133,20 @@ class FailureRepository : CrudRepository<FailureModel>(),
     private val findByWorkflowIdSql by lazy {
         "SELECT * FROM $tableName WHERE $WORKFLOW_ID_COLUMN = ? ORDER BY $ID_COLUMN"
     }
+
+    /**
+     * Find all failures with a given error reason (e.g. `foreign_namespace`).
+     * Used by `lemline failures replay` to re-emit parked payloads.
+     */
+    suspend fun findByReason(reason: String, connection: Connection? = null): List<FailureModel> =
+        databaseConfig.withConnection(connection) { conn ->
+            conn.prepareStatement(findByReasonSql).use { stmt ->
+                stmt.setString(1, reason)
+                stmt.executeQuery().use { it.toModels() }
+            }
+        }
+
+    private val findByReasonSql by lazy {
+        "SELECT * FROM $tableName WHERE $ERROR_REASON_COLUMN = ? ORDER BY $ID_COLUMN"
+    }
 }

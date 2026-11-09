@@ -14,6 +14,7 @@ import com.lemline.runner.common.config.LEMLINE_MESSAGING_EVENTS_PRODUCER_ENABLE
 import com.lemline.runner.common.config.LEMLINE_MESSAGING_LIFECYCLE_EVENTS_CONSUMER_ENABLED
 import com.lemline.runner.common.config.LEMLINE_MESSAGING_LIFECYCLE_EVENTS_PRODUCER_ENABLED
 import com.lemline.runner.common.config.LEMLINE_MESSAGING_TYPE
+import com.lemline.runner.common.config.LEMLINE_NAMESPACES
 import com.lemline.runner.common.config.LEMLINE_ORCHESTRATOR_MODE
 import com.lemline.runner.common.config.LEMLINE_OUTBOX_ENABLED
 import com.lemline.runner.common.config.LEMLINE_OUTBOX_LISTENER_OUTBOX_EVERY
@@ -30,15 +31,19 @@ import com.lemline.runner.tests.resources.RabbitMQTestResource
 import io.quarkus.test.junit.QuarkusTestProfile
 
 /**
- * Test profile for RabbitMQ messaging with loopback configuration.
+ * Test profile for RabbitMQ messaging with per-namespace destinations.
  *
- * Uses a shared exchange to create a loopback where messages produced to
- * commands-out are routed back to commands-in (and similarly for events).
+ * The runner follows every namespace used by the testcase workflow fixtures
+ * (`default`, `examples`, `samples`, `test`): producers publish to the channel
+ * exchange `lemline-<type>` with routing key = namespace, and
+ * RabbitTopologyBootstrap binds the pool queue `lemline-<type>.<sorted-ns>` to
+ * the per-namespace exchanges — loopback (in = out per namespace) is inherent,
+ * no raw mp.messaging destination overrides are needed.
  *
  * This profile configures:
  * - H2 (in-memory) database for persistence
- * - RabbitMQ channels with loopback via shared exchanges
- * - Lifecycle events with loopback for test verification
+ * - RabbitMQ channels with per-namespace topology (natural loopback)
+ * - Lifecycle events with loopback for test verification (single shared exchange)
  * - Outbox schedulers enabled with fast polling for Wait/Fork/Retry tests
  */
 class RabbitMQTestCaseProfile : QuarkusTestProfile {
@@ -63,20 +68,10 @@ class RabbitMQTestCaseProfile : QuarkusTestProfile {
             // Orchestrator mode: ALL generates more messages for thorough end-to-end testing
             LEMLINE_ORCHESTRATOR_MODE to "all",
 
-            // Loopback configuration using shared exchanges
-            // Commands: input queue binds to the same exchange that output publishes to
-            "mp.messaging.incoming.commands-in.queue.name" to "lemline-commands",
-            "mp.messaging.incoming.commands-in.exchange.name" to "lemline-commands-exchange",
-            "mp.messaging.incoming.commands-in.exchange.type" to "fanout",
-            "mp.messaging.outgoing.commands-out.exchange.name" to "lemline-commands-exchange",
-            "mp.messaging.outgoing.commands-out.exchange.type" to "fanout",
-
-            // Events: input queue binds to the same exchange that output publishes to
-            "mp.messaging.incoming.events-in.queue.name" to "lemline-events",
-            "mp.messaging.incoming.events-in.exchange.name" to "lemline-events-exchange",
-            "mp.messaging.incoming.events-in.exchange.type" to "fanout",
-            "mp.messaging.outgoing.events-out.exchange.name" to "lemline-events-exchange",
-            "mp.messaging.outgoing.events-out.exchange.type" to "fanout",
+            // Follow every namespace used by the testcase workflow fixtures so
+            // RabbitTopologyBootstrap binds the pool queues to all of them
+            // (natural loopback)
+            LEMLINE_NAMESPACES to "default,examples,samples,test",
 
             // Lifecycle events loopback - same exchange for producer and analytics consumer
             "mp.messaging.outgoing.lifecycleevents-out.exchange.name" to "lemline-lifecycle-exchange",
@@ -85,12 +80,6 @@ class RabbitMQTestCaseProfile : QuarkusTestProfile {
             "mp.messaging.incoming.lifecycleevents-in.queue.name" to "lemline-lifecycle-test",
             "mp.messaging.incoming.lifecycleevents-in.exchange.name" to "lemline-lifecycle-exchange",
             "mp.messaging.incoming.lifecycleevents-in.exchange.type" to "fanout",
-
-            // CloudEvents loopback - same exchange for in/out
-            "mp.messaging.incoming.cloudevents-in.exchange.name" to "lemline-cloudevents-exchange",
-            "mp.messaging.incoming.cloudevents-in.exchange.type" to "fanout",
-            "mp.messaging.outgoing.cloudevents-out.exchange.name" to "lemline-cloudevents-exchange",
-            "mp.messaging.outgoing.cloudevents-out.exchange.type" to "fanout",
 
             // Enable outbox schedulers for Wait/Fork/Retry tests
             LEMLINE_OUTBOX_ENABLED to "true",

@@ -4,6 +4,8 @@ package com.lemline.runner.analytics
 import com.lemline.common.logger.Logger
 import com.lemline.common.logger.logger
 import com.lemline.common.values.IDV7
+import com.lemline.common.values.WorkflowInfo
+import com.lemline.runner.common.namespaces.NamespaceScope
 import com.lemline.runner.common.messaging.MessageHandler
 import com.lemline.runner.listeners.CloudEventService
 import io.cloudevents.CloudEvent
@@ -14,6 +16,7 @@ import org.eclipse.microprofile.reactive.messaging.Message
 internal class LifecycleAnalyticsHandler(
     override val metrics: LifecycleAnalyticsSubscriberMetrics,
     private val lifecycleAnalyticsService: LifecycleAnalyticsService,
+    override val namespaceScope: NamespaceScope,
 ) : MessageHandler<CloudEvent> {
 
     override val logger: Logger = logger()
@@ -47,7 +50,7 @@ internal class LifecycleAnalyticsHandler(
     }
 
     // Never called since handle() returns null.
-    override suspend fun emit(payload: String, idempotentKey: IDV7) {
+    override suspend fun emit(payload: String, idempotentKey: IDV7, workflowInfo: WorkflowInfo?) {
         throw UnsupportedOperationException("Lifecycle analytics handler does not emit messages")
     }
 

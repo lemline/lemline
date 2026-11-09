@@ -3,6 +3,7 @@ package com.lemline.runner.messaging.events
 
 import com.lemline.common.logger.logger
 import com.lemline.common.values.IDV7
+import com.lemline.common.values.WorkflowInfo
 import com.lemline.core.errors.InternalException
 import com.lemline.core.states.WorkflowEvent
 import com.lemline.runner.common.config.DatabaseConfig
@@ -11,6 +12,8 @@ import com.lemline.runner.common.messaging.InstanceMessage
 import com.lemline.runner.common.messaging.toLogString
 import com.lemline.runner.definitions.Definitions
 import com.lemline.runner.failures.FailureModel
+import com.lemline.runner.common.namespaces.NamespaceScope
+import com.lemline.runner.failures.FailureReasons
 import com.lemline.runner.failures.FailureReasons.DESERIALIZATION_FAILURE
 import com.lemline.runner.failures.FailureReasons.getFailureReason
 import com.lemline.runner.failures.FailureRepository
@@ -56,6 +59,7 @@ internal class WorkflowEventHandler(
     private val listenerService: ListenerService,
     private val listenerEventService: ListenerEventService,
     private val scheduleService: ScheduleService,
+    override val namespaceScope: NamespaceScope,
 ) : WithHealthCheckMessageHandler<InstanceMessage<WorkflowEvent>> {
 
     override var logger = logger()
@@ -90,6 +94,23 @@ internal class WorkflowEventHandler(
         }
     }
 
+    /**
+     * Preserves the payload of a foreign-namespace message — it is the only copy of that
+     * instance's state; `lemline failures replay` can re-emit it once bindings are fixed.
+     */
+    override suspend fun onForeignNamespace(message: Message<String>, workflowInfo: WorkflowInfo) {
+        failureRepository.insert(
+            FailureModel.from(
+                payload = message.payload,
+                reason = FailureReasons.FOREIGN_NAMESPACE,
+                exception = IllegalStateException(
+                    "Namespace '${workflowInfo.namespace}' is not followed by this runner " +
+                        "(follows: ${namespaceScope.followed})"
+                )
+            )
+        )
+    }
+
     // ========================================
     // Serialization
     // ========================================
@@ -112,7 +133,7 @@ internal class WorkflowEventHandler(
      * WorkflowEventHandler does not reemit via the standard pipeline.
      * Message emissions are handled directly in handlers with explicit idempotent keys.
      */
-    override suspend fun emit(payload: String, idempotentKey: IDV7) {
+    override suspend fun emit(payload: String, idempotentKey: IDV7, workflowInfo: WorkflowInfo?) {
         error("WorkflowEventHandler should not emit - it doesn't chain to other messages")
     }
 

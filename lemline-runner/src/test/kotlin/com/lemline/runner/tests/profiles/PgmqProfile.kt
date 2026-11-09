@@ -17,10 +17,17 @@ import io.quarkus.test.junit.QuarkusTestProfile.TestResourceEntry
  * Flyway automatically runs all migrations including the PGMQ schema (V800, V801, V802).
  *
  * Configuration approach:
- * - Business config (queue names, enabled flags) uses lemline.* properties
+ * - Business config (followed namespaces, enabled flags) uses lemline.* properties
  *   → LemlineConfigSource transforms these to mp.messaging.* properties
- * - Test-only infrastructure tweaks (auto-create-queue) use mp.messaging.* directly
- *   → These bypass LemlineConfigSource intentionally (not production config)
+ * - Test-only infrastructure tweaks (lifecycle events test listener) use
+ *   mp.messaging.* directly → these bypass LemlineConfigSource intentionally
+ *
+ * Destination model (per-namespace destinations `<prefix>-<namespace>-<type>`):
+ * - The runner follows namespace `test-in` only → it consumes the pgmq queues
+ *   `lemline-test-in-commands` / `lemline-test-in-events` (auto-created).
+ * - The base suite's workflows use namespace `test`, so the runner's emissions are
+ *   routed to the pgmq queues `lemline-test-commands` / `lemline-test-events`,
+ *   which the runner does NOT consume — the test reads them directly.
  */
 class PgmqProfile : QuarkusTestProfile {
 
@@ -39,6 +46,11 @@ class PgmqProfile : QuarkusTestProfile {
             // Messaging type
             com.lemline.runner.common.config.LEMLINE_MESSAGING_TYPE to MessagingType.PGMQ.configValue,
 
+            // Followed namespaces: consumption queues are derived from this list
+            // (`lemline-test-in-commands` / `lemline-test-in-events`), while emissions
+            // are routed per message by the workflow's namespace (`test`).
+            com.lemline.runner.common.config.LEMLINE_NAMESPACES to "test-in",
+
             // Channel enabled flags
             com.lemline.runner.common.config.LEMLINE_MESSAGING_COMMANDS_CONSUMER_ENABLED to "true",
             com.lemline.runner.common.config.LEMLINE_MESSAGING_COMMANDS_PRODUCER_ENABLED to "true",
@@ -48,15 +60,7 @@ class PgmqProfile : QuarkusTestProfile {
             com.lemline.runner.common.config.LEMLINE_MESSAGING_CLOUDEVENTS_PRODUCER_ENABLED to "true",
             com.lemline.runner.common.config.LEMLINE_MESSAGING_LIFECYCLE_EVENTS_PRODUCER_ENABLED to "true",
 
-            // Queue names for test isolation (transformed by LemlineConfigSource)
-            // Note: Consumer and producer use different queues for testing
-            // (production would typically use the same queue)
-            com.lemline.runner.common.config.LEMLINE_MESSAGING_PGMQ_COMMANDS_QUEUE to "lemline-commands-in",
-            com.lemline.runner.common.config.LEMLINE_MESSAGING_PGMQ_COMMANDS_PRODUCER_QUEUE_OUT to "lemline-commands-out",
-            com.lemline.runner.common.config.LEMLINE_MESSAGING_PGMQ_EVENTS_QUEUE to "lemline-events-in",
-            com.lemline.runner.common.config.LEMLINE_MESSAGING_PGMQ_EVENTS_PRODUCER_QUEUE_OUT to "lemline-events-out",
-            com.lemline.runner.common.config.LEMLINE_MESSAGING_PGMQ_CLOUDEVENTS_QUEUE to "lemline-cloudevents-in",
-            com.lemline.runner.common.config.LEMLINE_MESSAGING_PGMQ_CLOUDEVENTS_PRODUCER_QUEUE_OUT to "lemline-cloudevents-out",
+            // Lifecycle events use a central shared queue (not per-namespace)
             com.lemline.runner.common.config.LEMLINE_MESSAGING_PGMQ_LIFECYCLE_EVENTS_QUEUE to "lemline-lifecycleevents",
 
             // =============================================================
@@ -70,17 +74,14 @@ class PgmqProfile : QuarkusTestProfile {
             "mp.messaging.incoming.lifecycleevents-in.poll-interval" to "100",
             "mp.messaging.incoming.lifecycleevents-in.batch-size" to "10",
             "mp.messaging.incoming.lifecycleevents-in.auto-create-queue" to "true",
-
-            // Auto-create queues for testing (production uses pre-created queues)
-            "mp.messaging.incoming.commands-in.auto-create-queue" to "true",
-            "mp.messaging.outgoing.commands-out.auto-create-queue" to "true",
-            "mp.messaging.incoming.events-in.auto-create-queue" to "true",
-            "mp.messaging.outgoing.events-out.auto-create-queue" to "true",
-            "mp.messaging.incoming.cloudevents-in.auto-create-queue" to "true",
-            "mp.messaging.outgoing.cloudevents-out.auto-create-queue" to "true",
-            "mp.messaging.outgoing.lifecycleevents-out.auto-create-queue" to "true",
         )
     }
+
+    /**
+     * Widens the foreign-namespace guard scope to accept the base suite's `test` workflows
+     * while consumption stays on `test-in` — see [TestNamespaceScope].
+     */
+    override fun getEnabledAlternatives(): Set<Class<*>> = setOf(TestNamespaceScope::class.java)
 
     /**
      * Defines which test resources are active for this profile.

@@ -7,6 +7,7 @@ import com.lemline.common.values.WorkflowNamespace
 import com.lemline.common.values.WorkflowVersion
 import com.lemline.core.states.WorkflowEvent
 import com.lemline.runner.common.config.DatabaseConfig
+import com.lemline.runner.common.namespaces.NamespaceScope
 import com.lemline.runner.common.repositories.helpers.ColumnBindings
 import com.lemline.runner.common.repositories.helpers.ColumnBindingsBuilder
 import com.lemline.runner.common.repositories.ops.CREATED_AT_COLUMN
@@ -75,12 +76,15 @@ class ListenerRepository : CrudRepository<ListenerModel>(),
     @Inject
     override lateinit var databaseConfig: DatabaseConfig
 
+    @Inject
+    var namespaceScope: NamespaceScope = NamespaceScope.UNSCOPED
+
     override val tableName = LISTENER_TABLE
 
     // Composed operations - initialized lazily to ensure databaseConfig is injected
     val idRepository by lazy { IdRepository(tableName, idHelper, ::createModel, databaseConfig) }
-    val outboxRepository by lazy { OutboxRepository(tableName, ::createModel, databaseConfig) }
-    val cleanerRepository by lazy { CleanerRepository(tableName, ::createModel, databaseConfig) }
+    val outboxRepository by lazy { OutboxRepository(tableName, ::createModel, databaseConfig, namespaceScope.configured) }
+    val cleanerRepository by lazy { CleanerRepository(tableName, ::createModel, databaseConfig, namespaceScope.configured) }
 
     // Delegate WithIdRepository methods
     override suspend fun findById(id: IDV7, connection: Connection?) =
@@ -201,8 +205,10 @@ class ListenerRepository : CrudRepository<ListenerModel>(),
     suspend fun findTimedOut(limit: Int, connection: Connection? = null): List<ListenerModel> =
         databaseConfig.withConnection(connection) { conn ->
             conn.prepareStatement(findTimedOutSql).use { stmt ->
-                stmt.setTimestamp(1, nowTimestamp())
-                stmt.setInt(2, limit)
+                var idx = 1
+                stmt.setTimestamp(idx++, nowTimestamp())
+                namespaceScope.configured?.forEach { stmt.setString(idx++, it) }
+                stmt.setInt(idx, limit)
                 stmt.executeQuery().use { it.toModels() }
             }
         }
@@ -214,6 +220,7 @@ class ListenerRepository : CrudRepository<ListenerModel>(),
           AND $OUTBOX_FAILED_AT_COLUMN IS NULL
           AND $TIMEOUT_AT_COLUMN IS NOT NULL
           AND $TIMEOUT_AT_COLUMN <= ?
+          ${com.lemline.runner.common.repositories.ops.namespacePredicate(namespaceScope.configured)}
         ORDER BY $TIMEOUT_AT_COLUMN ASC
         LIMIT ?
         FOR UPDATE SKIP LOCKED

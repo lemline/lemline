@@ -41,6 +41,8 @@ abstract class MessageSubscriberMetrics(val registry: MeterRegistry) {
     protected val METRIC_NACK_COMPLETED_TOTAL = "$METRIC_PREFIX.nack.completed.total"
     protected val METRIC_NACK_FAILED_TOTAL = "$METRIC_PREFIX.nack.failed.total"
 
+    protected val METRIC_FOREIGN_NAMESPACE_TOTAL = "$METRIC_PREFIX.foreign_namespace.total"
+
     /** Tracks the number of messages currently being processed */
     private val activeMessages = AtomicInteger(0)
 
@@ -118,6 +120,16 @@ abstract class MessageSubscriberMetrics(val registry: MeterRegistry) {
             TAG_WORKFLOW_NAME, (workflowInfo?.name ?: UNKNOWN_NAME).toString(),
             TAG_WORKFLOW_VERSION, (workflowInfo?.version ?: UNKNOWN_VERSION).toString()
         ).increment()
+
+    /**
+     * Increments the counter for messages delivered on this channel whose namespace is not
+     * followed by this runner — a broker binding/config anomaly, never a nominal-path event.
+     * Cardinality is bounded by the namespaces actually seen on misrouted messages.
+     */
+    fun foreignNamespace(workflowInfo: WorkflowInfo?) = registry.counter(
+        METRIC_FOREIGN_NAMESPACE_TOTAL,
+        TAG_WORKFLOW_NAMESPACE, workflowInfo?.namespace?.toString() ?: "",
+    ).increment()
 
     /**
      * Increments the counter for successfully acknowledged messages.
@@ -229,5 +241,6 @@ abstract class MessageSubscriberMetrics(val registry: MeterRegistry) {
         private const val TAG_REASON = "reason"
         private const val TAG_WORKFLOW_NAME = "workflow_name"
         private const val TAG_WORKFLOW_VERSION = "workflow_version"
+        private const val TAG_WORKFLOW_NAMESPACE = "workflow_namespace"
     }
 }

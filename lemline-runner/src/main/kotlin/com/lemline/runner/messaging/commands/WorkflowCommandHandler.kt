@@ -3,6 +3,7 @@ package com.lemline.runner.messaging.commands
 
 import com.lemline.common.logger.logger
 import com.lemline.common.values.IDV7
+import com.lemline.common.values.WorkflowInfo
 import com.lemline.core.activities.ActivityExecutor
 import com.lemline.core.cloudevents.CloudEventFactory
 import com.lemline.core.errors.InternalException
@@ -19,6 +20,8 @@ import com.lemline.runner.common.messaging.toLogString
 import com.lemline.runner.config.LemlineConfiguration
 import com.lemline.runner.definitions.DefinitionRepository
 import com.lemline.runner.failures.FailureModel
+import com.lemline.runner.common.namespaces.NamespaceScope
+import com.lemline.runner.failures.FailureReasons
 import com.lemline.runner.failures.FailureReasons.DEFINITION_MISSING
 import com.lemline.runner.failures.FailureReasons.DESERIALIZATION_FAILURE
 import com.lemline.runner.failures.FailureReasons.SERIALIZATION_FAILURE
@@ -54,6 +57,7 @@ internal class WorkflowCommandHandler(
     private val functionResolver: FunctionResolver,
     private val lifecycleHook: LifecycleEventHook,
     private val cloudEventsEmitter: Instance<CloudEventsEmitter>,
+    override val namespaceScope: NamespaceScope,
 ) : WithHealthCheckMessageHandler<InstanceMessage<WorkflowCommand>> {
     override var logger = logger()
 
@@ -98,6 +102,24 @@ internal class WorkflowCommandHandler(
             reason = DESERIALIZATION_FAILURE
         )
         failureRepository.insert(failure)
+    }
+
+    /**
+     * Preserves the payload of a foreign-namespace message — it is the only copy of that
+     * instance's state; `lemline failures replay` can re-emit it once bindings are fixed.
+     */
+    override suspend fun onForeignNamespace(message: Message<String>, workflowInfo: WorkflowInfo) {
+        failureRepository.insert(
+            FailureModel.from(
+                id = IDV7.random(),
+                payload = message.payload,
+                exception = IllegalStateException(
+                    "Namespace '${workflowInfo.namespace}' is not followed by this runner " +
+                        "(follows: ${namespaceScope.followed})"
+                ),
+                reason = FailureReasons.FOREIGN_NAMESPACE
+            )
+        )
     }
 
     // ========================================
@@ -169,8 +191,8 @@ internal class WorkflowCommandHandler(
      * @param payload The serialized message payload
      * @param idempotentKey Optional deterministic ID for message deduplication
      */
-    override suspend fun emit(payload: String, idempotentKey: IDV7) {
-        commandEmitter.sendPayload(payload, idempotentKey)
+    override suspend fun emit(payload: String, idempotentKey: IDV7, workflowInfo: WorkflowInfo?) {
+        commandEmitter.sendPayload(payload, idempotentKey, workflowInfo?.namespace)
     }
 
     /**

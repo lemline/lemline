@@ -4,6 +4,7 @@ package com.lemline.runner.listeners
 import com.fasterxml.jackson.databind.node.ObjectNode
 import com.lemline.common.json.LemlineJson
 import com.lemline.common.logger.logger
+import com.lemline.common.values.WorkflowNamespace
 import com.lemline.core.expressions.JQExpression
 import com.lemline.core.states.ForeachState
 import com.lemline.core.states.WorkflowEvent
@@ -54,12 +55,22 @@ class ListenerEventService {
      *
      * Completion detection happens asynchronously in `ListenerCompletionOutbox.batchMarkReady()`.
      *
+     * ## Arrival-namespace scoping
+     *
+     * The event arrived on one namespace's broker destination (`<prefix>-<namespace>-cloudevents`).
+     * Matching is scoped to that namespace: listen tasks of other namespaces — even ones this
+     * runner also follows — are filtered out before any query key is built. Since every
+     * listener-matching query binds `workflow_namespace` from [ListenerQueryKey.workflowInfo],
+     * this constrains all downstream SQL (inserts, until-event closing, until-expression lookups)
+     * to the arrival namespace.
+     *
      * @param event The incoming CloudEvent
+     * @param arrivalNamespace The namespace of the destination the event arrived on
      * @return Number of events inserted (approximate affected count)
      */
-    suspend fun handleCloudEvent(event: CloudEvent): Int {
+    suspend fun handleCloudEvent(event: CloudEvent, arrivalNamespace: WorkflowNamespace): Int {
 
-        logger.debug { "Processing CloudEvent: $event" }
+        logger.debug { "Processing CloudEvent (arrival namespace '$arrivalNamespace'): $event" }
 
         // ═══════════════════════════════════════════════════════════════════════════════
         // STEP 1: Match event against workflow definitions (in-memory, no database)
@@ -75,9 +86,13 @@ class ListenerEventService {
             }
         }
 
-        // No database requests are done here, we just inspect the workflow definition
+        // No database requests are done here, we just inspect the workflow definition.
+        // Matching is restricted to the arrival namespace: an event consumed from namespace A's
+        // destination must never wake listeners of namespace B, even when both are followed.
         val matchingListenTasks = definitionListenService.findMatchingListenTasks(event, eventDataProvider)
+            .filter { it.workflowInfo.namespace == arrivalNamespace }
         val matchingUntilEvent = definitionListenService.findMatchingUntilEvents(event)
+            .filter { it.workflowInfo.namespace == arrivalNamespace }
 
         if (matchingListenTasks.isEmpty() && matchingUntilEvent.isEmpty()) return 0
 

@@ -75,6 +75,7 @@ class InstanceStartServiceTest {
         this.gatewayCommandRepository = this@InstanceStartServiceTest.gatewayCommandRepository
         this.lifecycleHook = this@InstanceStartServiceTest.lifecycleHook
         this.authorizer = this@InstanceStartServiceTest.authorizer
+        this.namespaceActivityMonitor = mockk(relaxed = true)
     }
 
     private val principal = GatewayPrincipal(

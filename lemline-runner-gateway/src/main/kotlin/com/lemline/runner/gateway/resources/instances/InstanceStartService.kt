@@ -64,6 +64,9 @@ class InstanceStartService {
     @Inject
     lateinit var authorizer: GatewayAuthorizer
 
+    @Inject
+    lateinit var namespaceActivityMonitor: NamespaceActivityMonitor
+
     suspend fun start(request: StartInstanceRequest, principal: GatewayPrincipal): InstanceStartResult {
         val instanceId = parseInstanceId(request)
         val workflowNamespace = parseWorkflowNamespace(request.namespace)
@@ -124,6 +127,8 @@ class InstanceStartService {
 
         val outcome = existingResult ?: run {
             preparedWorkflow.onWorkflowCreated(lifecycleHook)
+            // Loud first-contact signal: WARN + counter when the namespace shows no runner activity
+            namespaceActivityMonitor.onInstanceAccepted(resolvedWorkflowInfo.namespace.toString())
             StartInstanceOutcome.ACCEPTED_NEW
         }
 

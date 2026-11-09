@@ -128,7 +128,15 @@ class GatewayGrpcServiceTest {
         definitionStatsRpcHandler: DefinitionStatsRpcHandler = mockk(relaxed = true),
         instanceRpcHandler: InstanceRpcHandler = mockk(relaxed = true),
         instanceEventRpcHandler: InstanceEventRpcHandler = mockk(relaxed = true),
-    ) = GatewayGrpcService(config).apply {
+    ) = GatewayGrpcService(
+        config,
+        com.lemline.runner.gateway.auth.GatewayAuthorizer(
+            config,
+            object : com.lemline.runner.common.namespaces.NamespaceScope {
+                override val configured: Set<String>? = null
+            },
+        ),
+    ).apply {
         this.definitionRpcHandler = definitionRpcHandler
         this.definitionStatsRpcHandler = definitionStatsRpcHandler
         this.instanceRpcHandler = instanceRpcHandler

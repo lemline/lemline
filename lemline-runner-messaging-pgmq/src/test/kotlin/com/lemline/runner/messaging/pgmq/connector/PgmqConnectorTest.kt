@@ -58,6 +58,7 @@ class PgmqConnectorTest : FunSpec({
             val metadata = PgmqOutgoingMetadata()
             metadata.delaySeconds shouldBe 0
             metadata.messageId shouldBe null
+            metadata.queue shouldBe null
         }
 
         test("should store custom delay and message ID") {
@@ -68,6 +69,12 @@ class PgmqConnectorTest : FunSpec({
 
             metadata.delaySeconds shouldBe 60
             metadata.messageId shouldBe "custom-id-123"
+        }
+
+        test("should store target queue override") {
+            val metadata = PgmqOutgoingMetadata(queue = "lemline-acme-commands")
+
+            metadata.queue shouldBe "lemline-acme-commands"
         }
     }
 

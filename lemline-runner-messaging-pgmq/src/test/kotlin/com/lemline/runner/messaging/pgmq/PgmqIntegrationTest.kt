@@ -100,6 +100,12 @@ class PgmqIntegrationTest : FunSpec({
         } returns Optional.of(queueName)
         every {
             config.getOptionalValue(
+                "mp.messaging.incoming.$queueName.queues",
+                String::class.java
+            )
+        } returns Optional.empty()
+        every {
+            config.getOptionalValue(
                 "mp.messaging.incoming.$queueName.visibility-timeout",
                 String::class.java
             )
@@ -140,10 +146,10 @@ class PgmqIntegrationTest : FunSpec({
                 String::class.java
             )
         } returns Optional.of("3")
-        // Fallback to outgoing (returns empty)
+        // Fallback to outgoing and global pgmq.* defaults (returns empty)
         every {
             config.getOptionalValue(
-                match { it.startsWith("mp.messaging.outgoing.") },
+                match { it.startsWith("mp.messaging.outgoing.") || it.startsWith("pgmq.") },
                 String::class.java
             )
         } returns Optional.empty()

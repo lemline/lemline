@@ -7,6 +7,7 @@ import java.sql.SQLException
 
 object FailureReasons {
     const val OUTBOX_FAILURE = "outbox_failure"
+    const val FOREIGN_NAMESPACE = "foreign_namespace"
     const val DESERIALIZATION_FAILURE = "deserialization_failure"
     const val SERIALIZATION_FAILURE = "serialization_failure"
     const val DEFINITION_MISSING = "definition_missing"

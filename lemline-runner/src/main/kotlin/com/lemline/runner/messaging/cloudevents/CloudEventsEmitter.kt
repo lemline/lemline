@@ -2,8 +2,13 @@
 package com.lemline.runner.messaging.cloudevents
 
 import com.lemline.common.logger.logger
+import com.lemline.common.values.IDV7
+import com.lemline.runner.common.namespaces.DestinationType
+import com.lemline.runner.common.namespaces.destinationFor
 import com.lemline.runner.config.LemlineConfiguration
 import com.lemline.runner.listeners.CloudEventService
+import com.lemline.runner.messaging.MessageMetaData
+import com.lemline.runner.messaging.MetaData
 import io.cloudevents.CloudEvent
 import io.cloudevents.core.builder.CloudEventBuilder
 import io.quarkus.runtime.Startup
@@ -30,9 +35,12 @@ internal const val CLOUDEVENTS_OUT_CHANNEL = "cloudevents-out"
 @Startup
 @ApplicationScoped
 internal class CloudEventsEmitter(
-    config: LemlineConfiguration
+    config: LemlineConfiguration,
+    private val messageMetaData: MessageMetaData,
 ) {
     private val enabled: Boolean = config.messaging().cloudevents().getOrNull()?.producer()?.enabled() ?: false
+
+    private val destinationPrefix = config.messaging().prefix()
 
     private val logger = logger()
 
@@ -87,7 +95,17 @@ internal class CloudEventsEmitter(
         logger.debug { "Emitting CloudEvent: id=${enrichedEvent.id}, source=${enrichedEvent.source}, type=${enrichedEvent.type}" }
 
         try {
-            emitter.sendMessage(Message.of(payload)).awaitSuspending()
+            // Emit tasks publish to the emitting workflow's namespace destination
+            // (<prefix>-<namespace>-cloudevents); cross-namespace targeting is out of scope.
+            val metaData = MetaData(
+                messageId = IDV7.random(),
+                destination = workflowNamespace?.let {
+                    destinationFor(destinationPrefix, it, DestinationType.CLOUDEVENTS)
+                },
+                namespace = workflowNamespace,
+            )
+            val message = with(messageMetaData) { Message.of(payload).withMetaData(metaData) }
+            emitter.sendMessage(message).awaitSuspending()
             logger.debug { "CloudEvent sent successfully: id=${enrichedEvent.id}" }
         } catch (e: Exception) {
             // Fire-and-forget: log error but don't fail the workflow

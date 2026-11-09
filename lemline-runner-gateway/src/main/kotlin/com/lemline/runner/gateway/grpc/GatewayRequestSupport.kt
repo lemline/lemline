@@ -24,7 +24,8 @@ internal fun allowedNamespacesForRead(
         return setOf(it)
     }
 
-    if (!config.gatewayAuthenticationEnabled) return null
+    // The principal already carries the effective namespaces: the JWT claim intersected with the
+    // gateway pin, or the pin itself when authentication is disabled ("*" only when unrestricted).
     if (principal.namespaces.contains("*")) return null
     return principal.namespaces
 }

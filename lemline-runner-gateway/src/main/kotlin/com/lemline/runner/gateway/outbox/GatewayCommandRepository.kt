@@ -5,6 +5,7 @@ import com.lemline.common.values.IDV7
 import com.lemline.common.values.WorkflowId
 import com.lemline.core.states.WorkflowCommand
 import com.lemline.runner.common.config.DatabaseConfig
+import com.lemline.runner.common.namespaces.NamespaceScope
 import com.lemline.runner.common.repositories.helpers.ColumnBindings
 import com.lemline.runner.common.repositories.helpers.ColumnBindingsBuilder
 import com.lemline.runner.common.repositories.ops.CleanerRepository
@@ -42,13 +43,18 @@ class GatewayCommandRepository : CrudRepository<GatewayCommandModel>(),
     @Inject
     override lateinit var databaseConfig: DatabaseConfig
 
+    @Inject
+    var namespaceScope: NamespaceScope = NamespaceScope.UNSCOPED
+
     override val tableName = GATEWAY_COMMAND_OUTBOX_TABLE
 
-    // Composed operations - initialized lazily to ensure databaseConfig is injected
+    // Composed operations - initialized lazily to ensure databaseConfig is injected.
+    // Gateway pin semantics: `configured` (not `followed`) — an unpinned gateway relays
+    // outbox rows of every namespace its callers started.
     val idRepository by lazy { IdRepository(tableName, idHelper, ::createModel, databaseConfig) }
     val instanceRepository by lazy { InstanceRepository(tableName, idHelper, ::createModel, databaseConfig) }
-    val outboxRepository by lazy { OutboxRepository(tableName, ::createModel, databaseConfig) }
-    val cleanerRepository by lazy { CleanerRepository(tableName, ::createModel, databaseConfig) }
+    val outboxRepository by lazy { OutboxRepository(tableName, ::createModel, databaseConfig, namespaceScope.configured) }
+    val cleanerRepository by lazy { CleanerRepository(tableName, ::createModel, databaseConfig, namespaceScope.configured) }
 
     // Delegate WithIdRepository methods
     override suspend fun findById(id: IDV7, connection: Connection?) =

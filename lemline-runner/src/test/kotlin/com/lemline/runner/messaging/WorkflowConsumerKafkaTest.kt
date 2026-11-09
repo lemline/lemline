@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.messaging
 
+import com.lemline.runner.common.namespaces.DestinationType
+import com.lemline.runner.common.namespaces.destinationFor
 import com.lemline.runner.common.test.RequiresDocker
 import com.lemline.runner.messaging.base.WorkflowConsumerTest
 import com.lemline.runner.messaging.commands.COMMANDS_IN_CHANNEL
-import com.lemline.runner.messaging.commands.COMMANDS_OUT_CHANNEL
 import com.lemline.runner.messaging.events.EVENTS_IN_CHANNEL
-import com.lemline.runner.messaging.events.EVENTS_OUT_CHANNEL
 import com.lemline.runner.tests.profiles.KafkaProfile
 import io.quarkus.test.junit.QuarkusTest
 import io.quarkus.test.junit.TestProfile
@@ -27,6 +27,16 @@ import org.junit.jupiter.api.TestInstance
 
 /**
  * Runs the WorkflowConsumerTest suite against a Kafka broker.
+ *
+ * Destination model:
+ * - The runner follows namespace `test-in` (see [KafkaProfile]) → the test SENDS raw
+ *   commands to the runner's consumption topic (`lemline-test-in-commands`), read from
+ *   `mp.messaging.incoming.*.topics` (single followed namespace → single topic).
+ * - Emissions are routed per message by the workflow's namespace (`test`) → the test
+ *   OBSERVES `lemline-test-commands` / `lemline-test-events` with raw Kafka consumers.
+ *   The runner does not consume these topics. Observed topics are computed via
+ *   [destinationFor] because the static `mp.messaging.outgoing.*.topic` property is
+ *   only a default-namespace fallback, not what emissions actually use.
  */
 @QuarkusTest
 @TestProfile(KafkaProfile::class)
@@ -37,13 +47,16 @@ internal class WorkflowConsumerKafkaTest : WorkflowConsumerTest() {
 
     private lateinit var bootstrapServers: String
     private lateinit var commandsTopicIn: String
-    private lateinit var commandsTopicOut: String
     private lateinit var eventsTopicIn: String
-    private lateinit var eventsTopicOut: String
+
+    /** Topic where the runner emits commands for workflows of namespace `test`. */
+    private val commandsTopicObserved = destinationFor("lemline", "test", DestinationType.COMMANDS)
+
+    /** Topic where the runner emits events for workflows of namespace `test`. */
+    private val eventsTopicObserved = destinationFor("lemline", "test", DestinationType.EVENTS)
 
     private lateinit var commandsProducer: KafkaProducer<String, String>
     private lateinit var commandsConsumer: KafkaConsumer<String, String>
-    private lateinit var eventsProducer: KafkaProducer<String, String>
     private lateinit var eventsConsumer: KafkaConsumer<String, String>
 
     @BeforeAll
@@ -51,16 +64,18 @@ internal class WorkflowConsumerKafkaTest : WorkflowConsumerTest() {
         val config = ConfigProvider.getConfig()
 
         bootstrapServers = config.getValue("kafka.bootstrap.servers", String::class.java)
-        commandsTopicIn = config.getValue("mp.messaging.incoming.$COMMANDS_IN_CHANNEL.topic", String::class.java)
-        commandsTopicOut = config.getValue("mp.messaging.outgoing.$COMMANDS_OUT_CHANNEL.topic", String::class.java)
-        eventsTopicIn = config.getValue("mp.messaging.incoming.$EVENTS_IN_CHANNEL.topic", String::class.java)
-        eventsTopicOut = config.getValue("mp.messaging.outgoing.$EVENTS_OUT_CHANNEL.topic", String::class.java)
 
-        require(commandsTopicIn != commandsTopicOut) {
-            "For *testing*, topics In ($commandsTopicIn) and Out ($commandsTopicOut) must be different"
+        // The runner consumes one topic per followed namespace; profile follows a single one
+        commandsTopicIn = config.getValue("mp.messaging.incoming.$COMMANDS_IN_CHANNEL.topics", String::class.java)
+            .split(",").single().trim()
+        eventsTopicIn = config.getValue("mp.messaging.incoming.$EVENTS_IN_CHANNEL.topics", String::class.java)
+            .split(",").single().trim()
+
+        require(commandsTopicIn != commandsTopicObserved) {
+            "For *testing*, topics In ($commandsTopicIn) and Observed ($commandsTopicObserved) must be different"
         }
-        require(eventsTopicIn != eventsTopicOut) {
-            "For *testing*, topics In ($eventsTopicIn) and Out ($eventsTopicOut) must be different"
+        require(eventsTopicIn != eventsTopicObserved) {
+            "For *testing*, topics In ($eventsTopicIn) and Observed ($eventsTopicObserved) must be different"
         }
 
         // Setup Kafka producer
@@ -70,7 +85,6 @@ internal class WorkflowConsumerKafkaTest : WorkflowConsumerTest() {
             ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG to StringSerializer::class.java.name,
         )
         commandsProducer = KafkaProducer(producerProps)
-        eventsProducer = KafkaProducer(producerProps)
 
         // Set up Kafka consumer with unique group IDs per test run to avoid offset issues
         val baseConsumerProps = mapOf(
@@ -82,15 +96,17 @@ internal class WorkflowConsumerKafkaTest : WorkflowConsumerTest() {
             ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG to "false",
         )
 
-        // Use unique group IDs to avoid offset conflicts
+        // Use unique group IDs to avoid offset conflicts.
+        // Observed topics may not exist until the first emission: broker auto-create is
+        // enabled on the test container, and subscribing triggers their creation.
         val uniqueSuffix = System.currentTimeMillis()
         commandsConsumer =
             KafkaConsumer(baseConsumerProps + (ConsumerConfig.GROUP_ID_CONFIG to "test-commands-$uniqueSuffix"))
-        commandsConsumer.subscribe(listOf(commandsTopicOut))
+        commandsConsumer.subscribe(listOf(commandsTopicObserved))
 
         eventsConsumer =
             KafkaConsumer(baseConsumerProps + (ConsumerConfig.GROUP_ID_CONFIG to "test-events-$uniqueSuffix"))
-        eventsConsumer.subscribe(listOf(eventsTopicOut))
+        eventsConsumer.subscribe(listOf(eventsTopicObserved))
 
         // Initial poll to trigger partition assignment
         commandsConsumer.poll(Duration.ofMillis(100))
@@ -101,7 +117,6 @@ internal class WorkflowConsumerKafkaTest : WorkflowConsumerTest() {
     fun closeClients() {
         if (::commandsProducer.isInitialized) commandsProducer.close()
         if (::commandsConsumer.isInitialized) commandsConsumer.close()
-        if (::eventsProducer.isInitialized) eventsProducer.close()
         if (::eventsConsumer.isInitialized) eventsConsumer.close()
     }
 

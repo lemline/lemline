@@ -22,6 +22,13 @@ object LemlineConfigConstants {
     const val RABBITMQ_CONNECTOR = "smallrye-rabbitmq"
     const val PGMQ_CONNECTOR = "smallrye-pgmq"
 
+    // Per-namespace destination naming convention: <prefix>-<namespace>-<type>
+    const val MESSAGING_PREFIX_DEFAULT = "lemline"
+
+    // Custom Kafka failure strategy routing each failed record to <source-topic>.dlq
+    const val KAFKA_NAMESPACE_DLQ_STRATEGY = "lemline-namespace-dlq"
+    const val KAFKA_COOPERATIVE_ASSIGNOR = "org.apache.kafka.clients.consumer.CooperativeStickyAssignor"
+
     const val WORKFLOW_COMMANDS_TOPIC_DEFAULT = "lemline-commands"
     const val WORKFLOW_EVENTS_TOPIC_DEFAULT = "lemline-events"
     const val CLOUDEVENTS_TOPIC_DEFAULT = "lemline-cloudevents"
