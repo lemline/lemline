@@ -58,8 +58,8 @@ sealed class WorkflowCommand : WorkflowState() {
             ")"
 
 
-        fun duplicate(workflowId: WorkflowId): ResumeFromTask {
-            return copy(nodeStack = nodeStack.duplicate(workflowId = workflowId))
+        fun duplicate(workflowId: WorkflowId, startedAt: Instant): ResumeFromTask {
+            return copy(nodeStack = nodeStack.duplicate(workflowId = workflowId, startedAt = startedAt))
         }
     }
 

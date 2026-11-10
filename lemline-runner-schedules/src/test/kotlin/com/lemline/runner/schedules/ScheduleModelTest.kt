@@ -8,7 +8,10 @@ import com.lemline.core.random.randomWorkflowInfo
 import com.lemline.runner.common.messaging.InstanceMessage
 import kotlin.test.assertEquals
 import kotlin.test.assertFails
+import kotlin.test.assertNotEquals
 import kotlin.test.assertNotNull
+import kotlin.test.assertTrue
+import kotlin.time.Clock
 import kotlin.time.Instant
 import org.junit.jupiter.api.Test
 
@@ -41,6 +44,21 @@ class ScheduleModelTest {
         // The next execution should be exactly one minute after the outboxScheduledFor time
         val expected = Instant.parse("2023-01-01T00:01:00Z")
         assertEquals(expected, model.outboxDelayedUntil)
+    }
+
+    @Test
+    fun `each execution gets a new workflow id and its own start time`() {
+        val model = createModel(scheduleCron = "* * * * *", outboxScheduledFor = Instant.parse("2023-01-01T00:00:00Z"))
+        val registeredStartedAt = model.instanceMessage.workflowState.nodeStack.rootState.startedAt
+        val executionId = WorkflowId.random()
+        val beforeTick = Clock.System.now()
+
+        model.prepareNextScheduled(executionId)
+
+        val rootState = model.instanceMessage.workflowState.nodeStack.rootState
+        assertEquals(executionId, rootState.workflowId)
+        assertTrue(rootState.startedAt >= beforeTick, "start time ${rootState.startedAt} predates the tick")
+        assertNotEquals(registeredStartedAt, rootState.startedAt)
     }
 
     @Test

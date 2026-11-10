@@ -2,6 +2,7 @@
 package com.lemline.runner.schedules
 
 import com.lemline.common.values.WorkflowId
+import com.lemline.core.lifecycleevents.LifecycleEventHook
 import com.lemline.runner.common.config.DatabaseConfig
 import com.lemline.runner.common.config.OutboxConfig
 import com.lemline.runner.common.messaging.CommandEmitter
@@ -40,6 +41,9 @@ class ScheduleOutbox : AbstractOutbox<ScheduleModel>() {
     @Inject
     lateinit var scheduleRepository: ScheduleRepository
 
+    @Inject
+    lateinit var lifecycleHook: LifecycleEventHook
+
     override val outboxRepository: WithOutboxRepository<ScheduleModel> get() = scheduleRepository
 
     override val crudRepository: WithCrudRepository<ScheduleModel> get() = scheduleRepository
@@ -70,5 +74,8 @@ class ScheduleOutbox : AbstractOutbox<ScheduleModel>() {
 
         // Start a new instance of the workflow (instanceMessage already contains WorkflowCommand)
         commandEmitter.send(entity.instanceMessage, messageId)
+
+        // Announce the instance like any other start: readers list instances by this event.
+        lifecycleHook.onWorkflowCreated(entity.instanceMessage.workflowInfo, entity.instanceMessage.workflowState.nodeStack)
     }
 }
