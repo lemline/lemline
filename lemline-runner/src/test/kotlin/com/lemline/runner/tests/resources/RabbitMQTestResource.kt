@@ -5,22 +5,16 @@ import com.lemline.runner.common.config.LEMLINE_MESSAGING_RABBITMQ_HOSTNAME
 import com.lemline.runner.common.config.LEMLINE_MESSAGING_RABBITMQ_PASSWORD
 import com.lemline.runner.common.config.LEMLINE_MESSAGING_RABBITMQ_PORT
 import com.lemline.runner.common.config.LEMLINE_MESSAGING_RABBITMQ_USERNAME
-import com.lemline.runner.common.test.DockerAvailability
-import io.quarkus.test.common.QuarkusTestResourceLifecycleManager
 import org.testcontainers.containers.Network
 import org.testcontainers.containers.RabbitMQContainer
 import org.testcontainers.containers.wait.strategy.Wait
 import org.testcontainers.utility.DockerImageName
 
-class RabbitMQTestResource : QuarkusTestResourceLifecycleManager {
+class RabbitMQTestResource : TestcontainersResource() {
     private lateinit var rabbitmq: RabbitMQContainer
     private lateinit var network: Network
 
-    override fun start(): Map<String, String> {
-        if (!DockerAvailability.isAvailable) {
-            return emptyMap()
-        }
-
+    override fun startContainers(): Map<String, String> {
         // Create a network for RabbitMQ
         network = Network.newNetwork()
 

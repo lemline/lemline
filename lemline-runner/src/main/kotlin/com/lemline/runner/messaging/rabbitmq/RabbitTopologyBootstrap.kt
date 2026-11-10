@@ -17,20 +17,16 @@ import com.rabbitmq.client.Channel
 import com.rabbitmq.client.Connection
 import com.rabbitmq.client.ConnectionFactory
 import io.quarkus.runtime.StartupEvent
-import jakarta.annotation.PreDestroy
+import jakarta.annotation.Priority
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.enterprise.event.Observes
+import jakarta.enterprise.inject.spi.ObserverMethod
 import java.io.IOException
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 
 /**
  * Declares the broker-side wiring of the RabbitMQ per-namespace destination model at startup.
@@ -50,11 +46,11 @@ import kotlinx.coroutines.launch
  * 3. (consumer side only) a queue binding from the namespace exchange to the pool queue with
  *    routing key `#`: `lemline-acme-commands --#--> lemline-commands.acme.team`.
  *
- * Steps 1 and 2 run synchronously in the startup observer so producers have a complete route
- * even before any consumer pool starts. Step 3 races the incoming connector, which declares the
- * pool queue asynchronously: it is retried in a background coroutine (passive queue declare every
- * [QUEUE_BIND_RETRY_DELAY] for up to [QUEUE_BIND_TIMEOUT]) and logs an explicit WARN if the queue
- * never appears. The AMQP connection is closed as soon as all bindings are done.
+ * All three steps complete before startup returns. The incoming connector declares pool queues
+ * asynchronously, so startup waits for them before binding. Messages published to an exchange
+ * without a bound queue are silently discarded, even when publishing succeeds.
+ * Missing queues fail startup after [QUEUE_BIND_TIMEOUT] rather than leaving a running worker
+ * with an incomplete route. The connector retains ownership of queue arguments (including DLQs).
  *
  * No-op unless `lemline.messaging.type` is `rabbitmq`.
  */
@@ -63,9 +59,6 @@ class RabbitTopologyBootstrap(
     private val config: LemlineConfiguration,
 ) {
     private val logger = logger()
-
-    /** Scope of the queue-binding retry loop; cancelled on shutdown. */
-    private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
     /** Per-channel-family topology to declare on the broker. */
     internal data class ChannelTopology(
@@ -81,7 +74,7 @@ class RabbitTopologyBootstrap(
     )
 
     @Suppress("unused")
-    fun onStart(@Observes event: StartupEvent) {
+    fun onStart(@Observes @Priority(ObserverMethod.DEFAULT_PRIORITY + 1) event: StartupEvent) {
         if (MessagingType.fromConfigValue(config.messaging().type()) != MessagingType.RABBITMQ) return
 
         val plans = channelTopologies()
@@ -91,29 +84,18 @@ class RabbitTopologyBootstrap(
         }
 
         val connection = newConnection()
-        var handedOffToBindingLoop = false
         try {
-            // 1 + 2: exchanges and exchange-to-exchange bindings, synchronously (fast, idempotent)
             connection.createChannel().use { channel ->
                 plans.forEach { declareNamespaceExchanges(channel, it) }
             }
 
-            // 3: pool queue bindings — the queue is declared asynchronously by the incoming
-            // connector, so retry in the background instead of blocking the startup thread
-            val consumerPlans = plans.filter { it.consumerEnabled }
-            if (consumerPlans.isNotEmpty()) {
-                handedOffToBindingLoop = true
-                scope.launch { bindPoolQueues(connection, consumerPlans) }
-            }
+            // Our @Startup subscribers subscribe at DEFAULT_PRIORITY. RabbitMQ declares their
+            // queues only on subscription, so wait after those observers, before startup returns.
+            // Block only the startup thread; connector queue declarations run asynchronously.
+            runBlocking { bindPoolQueues(connection, plans.filter { it.consumerEnabled }) }
         } finally {
-            // The binding loop owns (and closes) the connection once launched
-            if (!handedOffToBindingLoop) closeQuietly(connection)
+            closeQuietly(connection)
         }
-    }
-
-    @PreDestroy
-    fun shutdown() {
-        scope.cancel()
     }
 
     /**
@@ -198,40 +180,26 @@ class RabbitTopologyBootstrap(
     /**
      * Binds each pool queue to the namespace exchanges of its channel family with routing key `#`.
      *
-     * The pool queue is declared asynchronously by the incoming connector, so its existence is
-     * polled (passive declare) every [QUEUE_BIND_RETRY_DELAY] for up to [QUEUE_BIND_TIMEOUT];
-     * an explicit WARN is logged for any queue that never appears. Closes [connection] when done.
+     * The connector owns queue declaration. Poll until every queue exists, then bind it before
+     * allowing startup to complete. A missing queue is a startup error, not a recoverable warning.
      */
     private suspend fun bindPoolQueues(connection: Connection, plans: List<ChannelTopology>) {
-        try {
-            val pending = plans.toMutableList()
-            val deadline = System.nanoTime() + QUEUE_BIND_TIMEOUT.inWholeNanoseconds
-            while (true) {
-                val iterator = pending.iterator()
-                while (iterator.hasNext()) {
-                    val topology = iterator.next()
-                    if (queueExists(connection, topology.poolQueue)) {
-                        bindPoolQueue(connection, topology)
-                        iterator.remove()
-                    }
-                }
-                if (pending.isEmpty() || System.nanoTime() >= deadline) break
-                delay(QUEUE_BIND_RETRY_DELAY)
-            }
-            pending.forEach { topology ->
-                logger.warn {
-                    "RabbitMQ namespace topology: pool queue '${topology.poolQueue}' " +
-                        "(${topology.type.suffix} channel) did not appear within $QUEUE_BIND_TIMEOUT — " +
-                        "it was NOT bound to ${topology.namespaceExchanges.values} and the consumer " +
-                        "will not receive any message until the binding is created"
+        val pending = plans.toMutableList()
+        val deadline = System.nanoTime() + QUEUE_BIND_TIMEOUT.inWholeNanoseconds
+        while (pending.isNotEmpty()) {
+            val iterator = pending.iterator()
+            while (iterator.hasNext()) {
+                val topology = iterator.next()
+                if (queueExists(connection, topology.poolQueue)) {
+                    bindPoolQueue(connection, topology)
+                    iterator.remove()
                 }
             }
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            logger.error(e) { "RabbitMQ namespace topology: pool queue binding failed" }
-        } finally {
-            closeQuietly(connection)
+            check(pending.isEmpty() || System.nanoTime() < deadline) {
+                "RabbitMQ namespace topology: pool queues ${pending.map { it.poolQueue }} " +
+                    "did not appear within $QUEUE_BIND_TIMEOUT; namespace routes are incomplete"
+            }
+            if (pending.isNotEmpty()) delay(QUEUE_BIND_RETRY_DELAY)
         }
     }
 

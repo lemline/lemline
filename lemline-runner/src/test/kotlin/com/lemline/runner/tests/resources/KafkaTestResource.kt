@@ -1,21 +1,15 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.tests.resources
 
-import com.lemline.runner.common.test.DockerAvailability
-import io.quarkus.test.common.QuarkusTestResourceLifecycleManager
 import org.apache.kafka.clients.admin.AdminClient
 import org.apache.kafka.clients.admin.AdminClientConfig
 import org.apache.kafka.clients.admin.NewTopic
 import org.testcontainers.kafka.KafkaContainer
 
-class KafkaTestResource : QuarkusTestResourceLifecycleManager {
+class KafkaTestResource : TestcontainersResource() {
     private lateinit var kafka: KafkaContainer
 
-    override fun start(): Map<String, String> {
-        if (!DockerAvailability.isAvailable) {
-            return emptyMap()
-        }
-
+    override fun startContainers(): Map<String, String> {
         // Create Kafka container using Apache Kafka native image (KRaft mode)
         kafka = KafkaContainer("apache/kafka:3.7.0")
 

@@ -34,8 +34,8 @@ import org.junit.jupiter.api.TestInstance
  * 2. the exchange-to-exchange binding works end to end: a message published to the channel
  *    exchange `lemline-commands` with routing key `test-in` reaches a probe queue bound to
  *    `lemline-test-in-commands`;
- * 3. the pool queue `lemline-commands.test-in` (declared asynchronously by the incoming
- *    connector) got bound: a published message is delivered to the running consumer — observed
+ * 3. the pool queue `lemline-commands.test-in` is bound before startup returns: a published
+ *    message is delivered to the running consumer — observed
  *    through the failures storage, where the handler persists undeserializable payloads.
  */
 @QuarkusTest
@@ -118,22 +118,17 @@ internal class RabbitTopologyBootstrapTest {
             assertEquals(probePayload, String(received.body))
         }
 
-        // 3 — namespace exchange --#--> pool queue (retried by the bootstrap until the incoming
-        // connector has declared the queue). A message published to the channel exchange must end
-        // up in the running consumer: an undeserializable payload is persisted to the failures
-        // storage, which proves the full route channel exchange -> namespace exchange -> pool
-        // queue -> consumer. Publishing is repeated because messages published before the queue
-        // binding exists are silently dropped by the broker.
+        // Publish exactly once: retrying publication would hide messages lost before binding.
         await("pool queue '$poolQueue'") { queueExists(poolQueue) }
         val garbage = "garbage-${UUID.randomUUID()}"
         connection.createChannel().use { channel ->
+            channel.basicPublish(
+                channelExchange,
+                namespace,
+                MessageProperties.PERSISTENT_TEXT_PLAIN,
+                garbage.toByteArray()
+            )
             await("garbage payload delivered to the consumer through the pool queue", timeout = 90.seconds) {
-                channel.basicPublish(
-                    channelExchange,
-                    namespace,
-                    MessageProperties.PERSISTENT_TEXT_PLAIN,
-                    garbage.toByteArray()
-                )
                 runBlocking { failureRepository.listAll() }.any { it.payload == garbage }
             }
         }
