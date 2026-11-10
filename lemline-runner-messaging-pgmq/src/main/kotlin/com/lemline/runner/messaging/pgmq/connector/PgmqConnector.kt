@@ -4,6 +4,7 @@ package com.lemline.runner.messaging.pgmq.connector
 import com.lemline.common.logger.logger
 import com.lemline.runner.messaging.pgmq.PgmqClient
 import com.lemline.runner.messaging.pgmq.PgmqMessage
+import com.lemline.runner.messaging.pgmq.UnreadableMessage
 import com.lemline.runner.messaging.pgmq.config.PgmqConnectorConfig
 import io.quarkus.runtime.ShutdownEvent
 import io.quarkus.runtime.Startup
@@ -214,6 +215,9 @@ class PgmqConnector : InboundConnector, OutboundConnector {
     ) = flow {
         val queues = config.queues
         val maxPollSeconds = (config.pollInterval.toMillis() / 1000).toInt().coerceAtLeast(1)
+        val onUnreadable: suspend (UnreadableMessage) -> Unit = { unreadable ->
+            quarantineUnreadable(channelName, client, config, unreadable)
+        }
 
         while (incomingRunning[channelName]?.get() == true) {
             try {
@@ -224,16 +228,25 @@ class PgmqConnector : InboundConnector, OutboundConnector {
                         batchSize = config.batchSize,
                         maxPollSeconds = maxPollSeconds,
                         pollIntervalMs = 100,
-                        queue = queue
+                        queue = queue,
+                        onUnreadable = onUnreadable
                     )
                     messages.forEach { emit(queue to it) }
                 } else {
                     // Multiple queues: read each queue once per cycle to stay fair,
-                    // then wait for the poll interval if no queue had messages
+                    // then wait for the poll interval if no queue had messages.
+                    // A failure reading one queue must not starve the others: it is
+                    // isolated per queue (only the read is guarded, never `emit`).
                     var received = 0
                     for (queue in queues) {
                         if (incomingRunning[channelName]?.get() != true) break
-                        val messages = client.read(batchSize = config.batchSize, queue = queue)
+                        val messages = try {
+                            client.read(batchSize = config.batchSize, queue = queue, onUnreadable = onUnreadable)
+                        } catch (t: Throwable) {
+                            if (isStopping(channelName, t)) throw t
+                            logger.error(t) { "Error polling PGMQ queue $queue (other queues keep being polled)" }
+                            continue
+                        }
                         received += messages.size
                         messages.forEach { emit(queue to it) }
                     }
@@ -242,15 +255,7 @@ class PgmqConnector : InboundConnector, OutboundConnector {
                     }
                 }
             } catch (t: Throwable) {
-                val isCancellation = t is kotlinx.coroutines.CancellationException ||
-                    t.cause is kotlinx.coroutines.CancellationException ||
-                    t.message?.contains("cancelled", ignoreCase = true) == true
-
-                val isShuttingDown = isShutdown.get() ||
-                    incomingRunning[channelName]?.get() != true ||
-                    isCancellation
-
-                if (!isShuttingDown) {
+                if (!isStopping(channelName, t)) {
                     logger.error(t) { "Error polling PGMQ queue(s) $queues" }
                     delay(1000)
                 } else {
@@ -259,6 +264,77 @@ class PgmqConnector : InboundConnector, OutboundConnector {
                 }
             }
         }
+    }
+
+    private fun isStopping(channelName: String, t: Throwable): Boolean {
+        val isCancellation = t is kotlinx.coroutines.CancellationException ||
+            t.cause is kotlinx.coroutines.CancellationException ||
+            t.message?.contains("cancelled", ignoreCase = true) == true
+
+        return isShutdown.get() || incomingRunning[channelName]?.get() != true || isCancellation
+    }
+
+    /**
+     * Removes a message that cannot be decoded from its source queue, so it can never
+     * block the polling of that queue.
+     *
+     * Failures here are only logged: the message stays invisible until its visibility
+     * timeout and is quarantined again on the next read, without affecting other messages.
+     */
+    private suspend fun quarantineUnreadable(
+        channelName: String,
+        client: PgmqClient,
+        config: PgmqConnectorConfig,
+        unreadable: UnreadableMessage,
+    ) {
+        try {
+            deadLetter(
+                channelName = channelName,
+                client = client,
+                config = config,
+                sourceQueue = unreadable.queue,
+                msgId = unreadable.msgId,
+                payload = unreadable.rawPayload ?: "",
+                error = "Unreadable message: ${unreadable.error.message ?: unreadable.error::class.simpleName}",
+            )
+        } catch (t: Throwable) {
+            if (t is kotlinx.coroutines.CancellationException) throw t
+            logger.error(t) { "Failed to quarantine unreadable message ${unreadable.msgId} from queue ${unreadable.queue}" }
+        }
+    }
+
+    /**
+     * Moves a message out of its source queue: to its dead-letter queue when one is
+     * configured (derived per source queue in multi-queue mode), otherwise to the PGMQ
+     * archive table (`pgmq.a_<queue>`), where it stays recoverable.
+     */
+    private suspend fun deadLetter(
+        channelName: String,
+        client: PgmqClient,
+        config: PgmqConnectorConfig,
+        sourceQueue: String,
+        msgId: Long,
+        payload: String,
+        error: String,
+    ) {
+        val dlq = config.deadLetterQueueFor(sourceQueue)
+        if (dlq == null) {
+            client.archive(msgId, queue = sourceQueue)
+            logger.error { "Message $msgId from queue $sourceQueue archived (no dead-letter queue configured): $error" }
+            return
+        }
+        if (config.usesQueues) {
+            // Derived per-source DLQs are created lazily on first use
+            ensureDeadLetterQueue(channelName, client, dlq)
+        }
+        client.moveToDeadLetterQueue(
+            msgId = msgId,
+            message = payload,
+            error = error,
+            sourceQueue = sourceQueue,
+            deadLetterQueue = dlq
+        )
+        logger.warn { "Message $msgId from queue $sourceQueue moved to DLQ $dlq: $error" }
     }
 
     private fun createMessage(
@@ -300,19 +376,21 @@ class PgmqConnector : InboundConnector, OutboundConnector {
         return if (message.readCt >= config.maxRetries) {
             val errorMessage = reason?.message ?: "Unknown error"
             scope.future {
-                val dlq = config.deadLetterQueueFor(sourceQueue)
-                if (dlq != null && config.usesQueues) {
-                    // Derived per-source DLQs are created lazily on first use
-                    ensureDeadLetterQueue(channelName, client, dlq)
+                if (config.deadLetterQueueFor(sourceQueue) == null) {
+                    // No DLQ: keep the message in the queue so it is retried after the
+                    // visibility timeout (transient failures must not drop messages)
+                    logger.warn { "Message ${message.msgId} from queue $sourceQueue exceeded max retries, no DLQ configured" }
+                } else {
+                    deadLetter(
+                        channelName = channelName,
+                        client = client,
+                        config = config,
+                        sourceQueue = sourceQueue,
+                        msgId = message.msgId,
+                        payload = message.message,
+                        error = errorMessage,
+                    )
                 }
-                client.moveToDeadLetterQueue(
-                    msgId = message.msgId,
-                    message = message.message,
-                    error = errorMessage,
-                    sourceQueue = sourceQueue,
-                    deadLetterQueue = dlq
-                )
-                logger.warn { "Message ${message.msgId} from queue $sourceQueue exceeded max retries, moved to DLQ" }
             }.thenApply { null as Void? }
         } else {
             logger.debug { "Nacked message ${message.msgId}, will be redelivered (attempt ${message.readCt}/${config.maxRetries})" }

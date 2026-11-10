@@ -282,4 +282,54 @@ class PgmqIntegrationTest : FunSpec({
 
         client.close()
     }
+
+    /** Runs raw SQL the way an external producer would (bypassing the connector). */
+    fun sql(statement: String) {
+        DriverManager.getConnection(postgres.jdbcUrl, postgres.username, postgres.password).use { conn ->
+            conn.createStatement().execute(statement)
+        }
+    }
+
+    test("should read jsonb object payloads and headers sent by external producers") {
+        val config = createConfig("object_payload_queue")
+        val client = PgmqClient(config)
+        client.initialize()
+
+        // External producers naturally send jsonb objects, not jsonb strings
+        sql("""SELECT pgmq.send('object_payload_queue', '{"kind":"object"}'::jsonb, '{"h":"v"}'::jsonb)""")
+        val regularId = client.send("""{"kind":"string"}""")
+
+        val messages = client.read(10)
+        messages shouldHaveSize 2
+        messages[0].message shouldBe """{"kind":"object"}"""
+        messages[0].headers shouldBe """{"h":"v"}"""
+        messages[1].msgId shouldBe regularId
+        messages[1].message shouldBe """{"kind":"string"}"""
+
+        client.close()
+    }
+
+    test("should isolate unreadable rows without failing the read") {
+        val config = createConfig("unreadable_row_queue")
+        val client = PgmqClient(config)
+        client.initialize()
+
+        sql("SELECT pgmq.send('unreadable_row_queue', NULL::jsonb)")
+        val validId = client.send("""{"valid":true}""")
+
+        val unreadable = mutableListOf<UnreadableMessage>()
+        val messages = client.read(10, onUnreadable = { unreadable += it })
+
+        messages shouldHaveSize 1
+        messages[0].msgId shouldBe validId
+        unreadable shouldHaveSize 1
+        unreadable[0].queue shouldBe "unreadable_row_queue"
+        unreadable[0].error.message shouldBe "message payload is null"
+
+        // Without a handler, unreadable rows are skipped (logged), never thrown
+        sql("SELECT pgmq.send('unreadable_row_queue', NULL::jsonb)")
+        client.read(10) shouldHaveSize 0
+
+        client.close()
+    }
 })

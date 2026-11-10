@@ -40,3 +40,18 @@ data class DlqMessage(
     val error: String,
     val timestamp: String,
 )
+
+/**
+ * A row read from a queue that could not be decoded into a [PgmqMessage].
+ *
+ * @property msgId The message ID in [queue]
+ * @property queue The queue the row was read from
+ * @property rawPayload Best-effort text of the stored payload (null if unavailable)
+ * @property error Why decoding failed
+ */
+data class UnreadableMessage(
+    val msgId: Long,
+    val queue: String,
+    val rawPayload: String?,
+    val error: Throwable,
+)

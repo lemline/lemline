@@ -5,6 +5,9 @@ import com.lemline.common.logger.logger
 import com.lemline.runner.messaging.pgmq.config.PgmqConnectorConfig
 import io.smallrye.mutiny.Uni
 import io.smallrye.mutiny.coroutines.awaitSuspending
+import io.vertx.core.json.Json
+import io.vertx.core.json.JsonArray
+import io.vertx.core.json.JsonObject
 import io.vertx.mutiny.pgclient.PgBuilder
 import io.vertx.mutiny.sqlclient.Pool
 import io.vertx.mutiny.sqlclient.Row
@@ -319,15 +322,21 @@ class PgmqClient(
      *
      * @param batchSize Maximum number of messages to read
      * @param queue Queue to read from (defaults to the channel's configured queue)
+     * @param onUnreadable Called for each row that cannot be decoded; such rows are left
+     *   out of the result instead of failing the whole read
      * @return List of PGMQ messages
      */
-    suspend fun read(batchSize: Int = config.batchSize, queue: String = config.queue): List<PgmqMessage> {
+    suspend fun read(
+        batchSize: Int = config.batchSize,
+        queue: String = config.queue,
+        onUnreadable: (suspend (UnreadableMessage) -> Unit)? = null,
+    ): List<PgmqMessage> {
         val result = pool.preparedQuery(READ_MESSAGES)
             .execute(Tuple.of(queue, config.visibilityTimeout, batchSize))
             .awaitSuspending()
 
         // Sort by msgId to ensure FIFO order (UPDATE...RETURNING doesn't guarantee order)
-        return result.map { row -> row.toPgmqMessage() }.sortedBy { it.msgId }
+        return mapReadRows(result, queue, onUnreadable).sortedBy { it.msgId }
     }
 
     /**
@@ -341,6 +350,8 @@ class PgmqClient(
      * @param maxPollSeconds Maximum time to wait for messages (default: 5 seconds)
      * @param pollIntervalMs Interval between poll attempts in milliseconds (default: 100ms)
      * @param queue Queue to read from (defaults to the channel's configured queue)
+     * @param onUnreadable Called for each row that cannot be decoded; such rows are left
+     *   out of the result instead of failing the whole read
      * @return List of PGMQ messages
      */
     suspend fun readWithPoll(
@@ -348,6 +359,7 @@ class PgmqClient(
         maxPollSeconds: Int = 5,
         pollIntervalMs: Int = 100,
         queue: String = config.queue,
+        onUnreadable: (suspend (UnreadableMessage) -> Unit)? = null,
     ): List<PgmqMessage> {
         val result = pool.preparedQuery(READ_WITH_POLL)
             .execute(
@@ -362,7 +374,7 @@ class PgmqClient(
             .awaitSuspending()
 
         // Sort by msgId to ensure FIFO order (UPDATE...RETURNING doesn't guarantee order)
-        return result.map { row -> row.toPgmqMessage() }.sortedBy { it.msgId }
+        return mapReadRows(result, queue, onUnreadable).sortedBy { it.msgId }
     }
 
     /**
@@ -427,15 +439,16 @@ class PgmqClient(
      * Archives a message (moves it to the archive table).
      *
      * @param msgId The message ID to archive
+     * @param queue Queue holding the message (defaults to the channel's configured queue)
      * @return true if the message was archived, false if not found
      */
-    suspend fun archive(msgId: Long): Boolean {
+    suspend fun archive(msgId: Long, queue: String = config.queue): Boolean {
         return pool.preparedQuery(ARCHIVE_MESSAGE)
-            .execute(Tuple.of(config.queue, msgId))
+            .execute(Tuple.of(queue, msgId))
             .awaitSuspending()
             .iterator().next().getBoolean(0)
             .also { archived ->
-                if (archived) logger.debug { "Archived message $msgId from queue ${config.queue}" }
+                if (archived) logger.debug { "Archived message $msgId from queue $queue" }
             }
     }
 
@@ -560,14 +573,65 @@ class PgmqClient(
         pools.remove(poolKey)?.close()
     }
 
+    /**
+     * Maps rows read from [queue], isolating rows that cannot be decoded.
+     *
+     * A row that fails to map never aborts the batch: it is reported to [onUnreadable]
+     * (or only logged when no handler is given, in which case it becomes visible again
+     * after the visibility timeout) and the remaining rows are still returned.
+     */
+    private suspend fun mapReadRows(
+        rows: Iterable<Row>,
+        queue: String,
+        onUnreadable: (suspend (UnreadableMessage) -> Unit)?,
+    ): List<PgmqMessage> {
+        val messages = mutableListOf<PgmqMessage>()
+        for (row in rows) {
+            try {
+                messages += row.toPgmqMessage()
+            } catch (e: Exception) {
+                val unreadable = UnreadableMessage(
+                    msgId = row.getLong("msg_id"),
+                    queue = queue,
+                    rawPayload = runCatching { row.getValue("message")?.toString() }.getOrNull(),
+                    error = e,
+                )
+                if (onUnreadable != null) {
+                    onUnreadable(unreadable)
+                } else {
+                    logger.error(e) { "Unreadable message ${unreadable.msgId} in queue $queue (skipped)" }
+                }
+            }
+        }
+        return messages
+    }
+
     private fun Row.toPgmqMessage(): PgmqMessage = PgmqMessage(
         msgId = getLong("msg_id"),
         readCt = getInteger("read_ct"),
         enqueuedAt = getLocalDateTime("enqueued_at").toInstantUtc(),
         vt = getLocalDateTime("vt").toInstantUtc(),
-        message = getString("message") ?: getJsonObject("message")?.encode() ?: "",
-        headers = getString("headers") ?: getJsonObject("headers")?.encode()
+        message = jsonbToText(getValue("message"))
+            ?: throw IllegalArgumentException("message payload is null"),
+        headers = runCatching { jsonbToText(getValue("headers")) }.getOrNull()
     )
+
+    /**
+     * Converts a decoded jsonb value to its text form.
+     *
+     * The connector stores payloads as jsonb *strings*, but external producers commonly
+     * send jsonb *objects* (`pgmq.send(q, '{...}'::jsonb)`). Both are accepted: strings are
+     * returned as-is, any other JSON value is re-encoded to its JSON text.
+     * Returns null for SQL NULL and JSON null.
+     */
+    private fun jsonbToText(value: Any?): String? = when (value) {
+        null -> null
+        io.vertx.sqlclient.Tuple.JSON_NULL -> null
+        is String -> value
+        is JsonObject -> value.encode()
+        is JsonArray -> value.encode()
+        else -> Json.encode(value)
+    }
 
     private fun LocalDateTime?.toInstantUtc(): Instant =
         this?.toInstant(ZoneOffset.UTC) ?: Instant.now()

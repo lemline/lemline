@@ -277,4 +277,165 @@ class PgmqMultiQueueIntegrationTest : FunSpec({
             connector.destroy()
         }
     }
+
+    /** Runs raw SQL the way an external producer would (bypassing the connector). */
+    fun sql(statement: String) {
+        DriverManager.getConnection(postgres.jdbcUrl, postgres.username, postgres.password).use { conn ->
+            conn.createStatement().execute(statement)
+        }
+    }
+
+    /** Polls a count query until it reaches [expected] or the timeout expires; returns the last count. */
+    suspend fun awaitCount(query: String, expected: Int, timeoutMs: Long = 15_000): Int {
+        val deadline = System.currentTimeMillis() + timeoutMs
+        var count = -1
+        while (System.currentTimeMillis() < deadline) {
+            count = DriverManager.getConnection(postgres.jdbcUrl, postgres.username, postgres.password).use { conn ->
+                conn.createStatement().executeQuery(query).use { rs -> rs.next(); rs.getInt(1) }
+            }
+            if (count == expected) return count
+            delay(200)
+        }
+        return count
+    }
+
+    fun payloads(subscriber: CollectingSubscriber) = subscriber.received.map { it.payload as String }
+
+    test("jsonb object payloads should be delivered and unreadable messages dead-lettered without blocking the queue") {
+        val channel = "poison-single-channel"
+        val connector = createConnector(
+            channelProps(
+                "incoming", channel,
+                mapOf(
+                    "queue" to "poison_single_q",
+                    "dead-letter-queue" to "poison_single_dlq",
+                    "poll-interval" to "100",
+                )
+            )
+        )
+        val helper = helperClient("poison-single-helper")
+
+        try {
+            helper.ensureQueue("poison_single_q")
+            helper.ensureQueue("poison_single_dlq")
+            // Unreadable (null payload) first, then an external jsonb object, then a regular message
+            sql("SELECT pgmq.send('poison_single_q', NULL::jsonb)")
+            sql("""SELECT pgmq.send('poison_single_q', '{"kind":"object"}'::jsonb)""")
+            helper.send("""{"kind":"string"}""", queue = "poison_single_q")
+
+            val subscriber = CollectingSubscriber(expected = 2)
+            connector.getPublisher(channelConfig(channel)).subscribe(subscriber)
+
+            subscriber.latch.await(20, TimeUnit.SECONDS) shouldBe true
+            payloads(subscriber) shouldContainExactlyInAnyOrder listOf("""{"kind":"object"}""", """{"kind":"string"}""")
+
+            val dlqMessage = awaitMessage(helper, "poison_single_dlq")
+            dlqMessage.shouldNotBeNull()
+            val dlqPayload = Json.decodeFromString<DlqMessage>(dlqMessage.message)
+            dlqPayload.originalQueue shouldBe "poison_single_q"
+            dlqPayload.error shouldContain "Unreadable message"
+
+            // Nothing left in the source queue once the valid messages are acked
+            awaitCount("SELECT count(*) FROM pgmq.q_poison_single_q", expected = 0) shouldBe 0
+
+            subscriber.cancel()
+        } finally {
+            helper.close()
+            connector.destroy()
+        }
+    }
+
+    test("unreadable message without dead-letter queue should be archived instead of looping") {
+        val channel = "poison-archive-channel"
+        val connector = createConnector(
+            channelProps("incoming", channel, mapOf("queue" to "poison_archive_q", "poll-interval" to "100"))
+        )
+        val helper = helperClient("poison-archive-helper")
+
+        try {
+            helper.ensureQueue("poison_archive_q")
+            sql("SELECT pgmq.send('poison_archive_q', NULL::jsonb)")
+            helper.send("""{"after":"poison"}""", queue = "poison_archive_q")
+
+            val subscriber = CollectingSubscriber(expected = 1)
+            connector.getPublisher(channelConfig(channel)).subscribe(subscriber)
+
+            subscriber.latch.await(20, TimeUnit.SECONDS) shouldBe true
+            payloads(subscriber) shouldBe listOf("""{"after":"poison"}""")
+
+            // The unreadable message is kept, recoverable, in the PGMQ archive table
+            awaitCount("SELECT count(*) FROM pgmq.a_poison_archive_q WHERE message IS NULL", expected = 1) shouldBe 1
+
+            subscriber.cancel()
+        } finally {
+            helper.close()
+            connector.destroy()
+        }
+    }
+
+    test("unreadable message in multi-queue mode should go to the derived DLQ while sibling queues keep flowing") {
+        val channel = "poison-multi-channel"
+        val connector = createConnector(
+            channelProps(
+                "incoming", channel,
+                mapOf("queues" to "poison_mq_a,poison_mq_b", "poll-interval" to "100")
+            )
+        )
+        val helper = helperClient("poison-multi-helper")
+
+        try {
+            helper.ensureQueue("poison_mq_a")
+            helper.ensureQueue("poison_mq_b")
+            sql("SELECT pgmq.send('poison_mq_a', NULL::jsonb)")
+            helper.send("""{"from":"a"}""", queue = "poison_mq_a")
+            helper.send("""{"from":"b"}""", queue = "poison_mq_b")
+
+            val subscriber = CollectingSubscriber(expected = 2)
+            connector.getPublisher(channelConfig(channel)).subscribe(subscriber)
+
+            subscriber.latch.await(20, TimeUnit.SECONDS) shouldBe true
+            payloads(subscriber) shouldContainExactlyInAnyOrder listOf("""{"from":"a"}""", """{"from":"b"}""")
+
+            val dlqMessage = awaitMessage(helper, "poison_mq_a.dlq")
+            dlqMessage.shouldNotBeNull()
+            Json.decodeFromString<DlqMessage>(dlqMessage.message).originalQueue shouldBe "poison_mq_a"
+
+            subscriber.cancel()
+        } finally {
+            helper.close()
+            connector.destroy()
+        }
+    }
+
+    test("a failing queue in multi-queue mode should not starve the queues listed after it") {
+        val channel = "isolation-multi-channel"
+        val connector = createConnector(
+            channelProps(
+                "incoming", channel,
+                mapOf(
+                    // missing_q is never created: reading it fails on every cycle
+                    "queues" to "isolation_missing_q,isolation_ok_q",
+                    "auto-create-queue" to "false",
+                    "poll-interval" to "100",
+                )
+            )
+        )
+        val helper = helperClient("isolation-helper")
+
+        try {
+            helper.ensureQueue("isolation_ok_q")
+            helper.send("""{"from":"ok"}""", queue = "isolation_ok_q")
+
+            val subscriber = CollectingSubscriber(expected = 1)
+            connector.getPublisher(channelConfig(channel)).subscribe(subscriber)
+
+            subscriber.latch.await(20, TimeUnit.SECONDS) shouldBe true
+            payloads(subscriber) shouldBe listOf("""{"from":"ok"}""")
+
+            subscriber.cancel()
+        } finally {
+            helper.close()
+            connector.destroy()
+        }
+    }
 })
