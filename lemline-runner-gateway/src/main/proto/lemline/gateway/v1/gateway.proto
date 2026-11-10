@@ -148,7 +148,8 @@ message DefinitionStats {
     // Number of faulted instances in the requested time window.
     int64 faulted_count = 6;
 
-    // Number of instances that were still running at time_to.
+    // Number of instances that were still running at time_to, or at the latest
+    // lifecycle event when time_to is omitted.
     int64 running_count_at_time_to = 7;
 }
 
@@ -366,7 +367,9 @@ message ListDefinitionStatsRequest {
     // Required inclusive lower bound for the aggregation window.
     google.protobuf.Timestamp time_from = 4;
 
-    // Required exclusive upper bound for the aggregation window.
+    // Optional exclusive upper bound for the aggregation window.
+    // Omit it for an open window: counters then follow the latest lifecycle
+    // events, so a watch keeps counting instances started after it began.
     google.protobuf.Timestamp time_to = 5;
 
     // Maximum number of rows to return. Zero lets the server choose a default.
@@ -410,7 +413,9 @@ message WatchDefinitionStatsRequest {
     // Required inclusive lower bound for the aggregation window.
     google.protobuf.Timestamp time_from = 4;
 
-    // Required exclusive upper bound for the aggregation window.
+    // Optional exclusive upper bound for the aggregation window.
+    // Omit it for an open window: counters then follow the latest lifecycle
+    // events, so a watch keeps counting instances started after it began.
     google.protobuf.Timestamp time_to = 5;
 
     // Opaque cursor previously returned by a definition-stats list or watch

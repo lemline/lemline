@@ -47,13 +47,9 @@ export function OverviewContent({ level, namespace, name, version }: OverviewCon
   const [bufferedNewInstances, setBufferedNewInstances] = useState<InstanceSummary[]>([]);
 
   const timeWindow = useMemo(() => toTimeWindow(timeRange), [timeRange]);
-  const statsTimeWindow = useMemo(() => {
-    const now = new Date().toISOString();
-    return {
-      from: timeWindow.from ?? UNIX_EPOCH_ISO,
-      to: timeWindow.to ?? now,
-    };
-  }, [timeWindow.from, timeWindow.to]);
+  // The stats API requires a lower bound, so "all" starts at the epoch. No upper bound is sent:
+  // the counters keep following new instances, like the live instance table.
+  const statsTimeFrom = timeWindow.from ?? UNIX_EPOCH_ISO;
 
   const statsKey = useMemo(
     () =>
@@ -61,10 +57,9 @@ export function OverviewContent({ level, namespace, name, version }: OverviewCon
         namespace,
         name,
         version,
-        timeFrom: statsTimeWindow.from,
-        timeTo: statsTimeWindow.to,
+        timeFrom: statsTimeFrom,
       }),
-    [name, namespace, statsTimeWindow.from, statsTimeWindow.to, version],
+    [name, namespace, statsTimeFrom, version],
   );
 
   const instanceFilters = useMemo(
@@ -74,10 +69,9 @@ export function OverviewContent({ level, namespace, name, version }: OverviewCon
       version,
       status: status === "all" ? undefined : status,
       timeFrom: timeWindow.from,
-      timeTo: timeWindow.to,
       pageSize: 50,
     }),
-    [name, namespace, status, timeWindow.from, timeWindow.to, version],
+    [name, namespace, status, timeWindow.from, version],
   );
 
   const instancesKey = useMemo(() => instancesQueryKey(instanceFilters), [instanceFilters]);
@@ -86,8 +80,7 @@ export function OverviewContent({ level, namespace, name, version }: OverviewCon
     namespace,
     name,
     version,
-    timeFrom: statsTimeWindow.from,
-    timeTo: statsTimeWindow.to,
+    timeFrom: statsTimeFrom,
   });
   const stats = useMemo(() => statsQuery.data?.stats ?? [], [statsQuery.data?.stats]);
   const hasStatsSnapshot = Boolean(statsQuery.data);
@@ -121,8 +114,7 @@ export function OverviewContent({ level, namespace, name, version }: OverviewCon
             namespace,
             name,
             version,
-            timeFrom: timestampFromIsoString(statsTimeWindow.from),
-            timeTo: timestampFromIsoString(statsTimeWindow.to),
+            timeFrom: timestampFromIsoString(statsTimeFrom),
             afterCursor,
           });
 
@@ -171,7 +163,7 @@ export function OverviewContent({ level, namespace, name, version }: OverviewCon
       disposed = true;
       controller.abort();
     };
-  }, [hasStatsSnapshot, name, namespace, queryClient, statsKey, statsQuery.status, statsTimeWindow.from, statsTimeWindow.to, statsWatchCursor, version]);
+  }, [hasStatsSnapshot, name, namespace, queryClient, statsKey, statsQuery.status, statsTimeFrom, statsWatchCursor, version]);
 
   useEffect(() => {
     if (instances.status !== "success" || !hasInstanceSnapshot) return;
@@ -211,7 +203,6 @@ export function OverviewContent({ level, namespace, name, version }: OverviewCon
             version,
             status: toProtoInstanceStatus(status),
             createdFrom: timestampFromIsoString(timeWindow.from),
-            createdTo: timestampFromIsoString(timeWindow.to),
             afterCursor,
           });
 
@@ -281,7 +272,7 @@ export function OverviewContent({ level, namespace, name, version }: OverviewCon
       }
       pendingInsertionsRef.current = [];
     };
-  }, [hasInstanceSnapshot, instances.status, instancesKey, instancesWatchCursor, name, namespace, queryClient, status, timeWindow.from, timeWindow.to, version]);
+  }, [hasInstanceSnapshot, instances.status, instancesKey, instancesWatchCursor, name, namespace, queryClient, status, timeWindow.from, version]);
 
   const totals = useMemo(() => {
     return stats.reduce(

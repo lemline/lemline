@@ -16,6 +16,7 @@ import com.lemline.runner.gateway.grpc.DefinitionStatsWatchCursor
 import com.lemline.runner.gateway.grpc.GatewayCursorCodec
 import com.lemline.runner.gateway.grpc.allowedNamespacesForRead
 import com.lemline.runner.gateway.grpc.normalizeAllowedNamespaces
+import com.lemline.runner.gateway.grpc.optionalInstant
 import com.lemline.runner.gateway.grpc.optionalString
 import com.lemline.runner.gateway.grpc.requiredInstant
 import com.lemline.runner.gateway.grpc.toBoundary
@@ -67,7 +68,7 @@ class DefinitionStatsRpcHandler(
                 version = filter.version,
                 allowedNamespaces = normalizeAllowedNamespaces(filter.allowedNamespaces),
                 timeFrom = filter.timeFrom.toString(),
-                timeTo = filter.timeTo.toString(),
+                timeTo = filter.timeTo?.toString(),
                 sequence = result.watchSequence,
             )
         )
@@ -86,7 +87,7 @@ class DefinitionStatsRpcHandler(
                         version = filter.version,
                         allowedNamespaces = normalizeAllowedNamespaces(filter.allowedNamespaces),
                         timeFrom = filter.timeFrom.toString(),
-                        timeTo = filter.timeTo.toString(),
+                        timeTo = filter.timeTo?.toString(),
                         snapshotSequence = result.watchSequence,
                         lastNamespace = it.namespace,
                         lastName = it.name,
@@ -122,7 +123,7 @@ class DefinitionStatsRpcHandler(
                     version = filter.version,
                     allowedNamespaces = normalizeAllowedNamespaces(filter.allowedNamespaces),
                     timeFrom = filter.timeFrom.toString(),
-                    timeTo = filter.timeTo.toString(),
+                    timeTo = filter.timeTo?.toString(),
                     sequence = change.cursor,
                 )
             )
@@ -142,8 +143,8 @@ class DefinitionStatsRpcHandler(
     ): DefinitionStatsFilter {
         val namespace = optionalString(request.hasNamespace(), request.namespace)
         val timeFrom = requiredInstant(request.hasTimeFrom(), request.timeFrom, "time_from")
-        val timeTo = requiredInstant(request.hasTimeTo(), request.timeTo, "time_to")
-        validateTimeRange(timeFrom, timeTo)
+        val timeTo = optionalInstant(request.hasTimeTo(), request.timeTo)
+        timeTo?.let { validateTimeRange(timeFrom, it) }
 
         return DefinitionStatsFilter(
             namespace = namespace,
@@ -162,8 +163,8 @@ class DefinitionStatsRpcHandler(
     ): DefinitionStatsFilter {
         val namespace = optionalString(request.hasNamespace(), request.namespace)
         val timeFrom = requiredInstant(request.hasTimeFrom(), request.timeFrom, "time_from")
-        val timeTo = requiredInstant(request.hasTimeTo(), request.timeTo, "time_to")
-        validateTimeRange(timeFrom, timeTo)
+        val timeTo = optionalInstant(request.hasTimeTo(), request.timeTo)
+        timeTo?.let { validateTimeRange(timeFrom, it) }
 
         return DefinitionStatsFilter(
             namespace = namespace,
@@ -186,7 +187,7 @@ class DefinitionStatsRpcHandler(
             "page_cursor does not match authorized namespaces"
         }
         require(cursor.timeFrom == filter.timeFrom.toString()) { "page_cursor does not match time_from filter" }
-        require(cursor.timeTo == filter.timeTo.toString()) { "page_cursor does not match time_to filter" }
+        require(cursor.timeTo == filter.timeTo?.toString()) { "page_cursor does not match time_to filter" }
     }
 
     private fun requireDefinitionStatsWatchCursorMatches(
@@ -200,7 +201,7 @@ class DefinitionStatsRpcHandler(
             "after_cursor does not match authorized namespaces"
         }
         require(cursor.timeFrom == filter.timeFrom.toString()) { "after_cursor does not match time_from filter" }
-        require(cursor.timeTo == filter.timeTo.toString()) { "after_cursor does not match time_to filter" }
+        require(cursor.timeTo == filter.timeTo?.toString()) { "after_cursor does not match time_to filter" }
     }
 
     private fun toProtoDefinitionStats(row: DefinitionStatsRow): DefinitionStats =

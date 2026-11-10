@@ -7,7 +7,7 @@ export interface DefinitionStatsFilter {
   name?: string;
   version?: string;
   timeFrom: string;
-  timeTo: string;
+  timeTo?: string;
 }
 
 export function definitionStatsQueryKey(filter: DefinitionStatsFilter) {

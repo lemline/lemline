@@ -211,16 +211,16 @@ class DefinitionStatsQueryService(
             whereParams.addAll(namespaces.sorted())
         }
 
-        selectParams += filter.timeTo
-        selectParams += filter.timeTo
-        selectParams += filter.timeTo
+        // Without time_to the window is open and only the snapshot sequence bounds it.
+        val timeTo = filter.timeTo
+        fun beforeTimeTo(column: String) = if (timeTo == null) "" else " AND $column < ?"
 
-        groupedParams += filter.timeFrom
-        groupedParams += filter.timeTo
-        groupedParams += filter.timeFrom
-        groupedParams += filter.timeTo
-        groupedParams += filter.timeFrom
-        groupedParams += filter.timeTo
+        if (timeTo != null) repeat(3) { selectParams += timeTo }
+
+        repeat(3) {
+            groupedParams += filter.timeFrom
+            if (timeTo != null) groupedParams += timeTo
+        }
 
         val sql = """
             WITH per_instance AS (
@@ -230,15 +230,15 @@ class DefinitionStatsQueryService(
                 MAX(lemline_workflow_name) AS lemline_workflow_name,
                 MAX(lemline_workflow_version) AS lemline_workflow_version,
                 MIN(CASE
-                      WHEN type = '${LifecycleEventType.WORKFLOW_STARTED.type}' AND event_time < ?
+                      WHEN type = '${LifecycleEventType.WORKFLOW_STARTED.type}'${beforeTimeTo("event_time")}
                       THEN event_time
                     END) AS started_at,
                 MAX(CASE
-                      WHEN type = '${LifecycleEventType.WORKFLOW_COMPLETED.type}' AND event_time < ?
+                      WHEN type = '${LifecycleEventType.WORKFLOW_COMPLETED.type}'${beforeTimeTo("event_time")}
                       THEN event_time
                     END) AS completed_at,
                 MAX(CASE
-                      WHEN type = '${LifecycleEventType.WORKFLOW_FAULTED.type}' AND event_time < ?
+                      WHEN type = '${LifecycleEventType.WORKFLOW_FAULTED.type}'${beforeTimeTo("event_time")}
                       THEN event_time
                     END) AS faulted_at
               FROM $analyticsQualifiedTable
@@ -271,15 +271,15 @@ class DefinitionStatsQueryService(
                 lemline_workflow_namespace,
                 lemline_workflow_name,
                 lemline_workflow_version,
-                SUM(CASE WHEN started_at >= ? AND started_at < ? THEN 1 ELSE 0 END) AS started_count,
+                SUM(CASE WHEN started_at >= ?${beforeTimeTo("started_at")} THEN 1 ELSE 0 END) AS started_count,
                 SUM(CASE
                       WHEN status_at_time_to = 'COMPLETED'
-                       AND completed_at >= ? AND completed_at < ?
+                       AND completed_at >= ?${beforeTimeTo("completed_at")}
                       THEN 1 ELSE 0
                     END) AS completed_count,
                 SUM(CASE
                       WHEN status_at_time_to = 'FAULTED'
-                       AND faulted_at >= ? AND faulted_at < ?
+                       AND faulted_at >= ?${beforeTimeTo("faulted_at")}
                       THEN 1 ELSE 0
                     END) AS faulted_count,
                 SUM(CASE WHEN status_at_time_to = 'RUNNING' THEN 1 ELSE 0 END) AS running_count_at_time_to

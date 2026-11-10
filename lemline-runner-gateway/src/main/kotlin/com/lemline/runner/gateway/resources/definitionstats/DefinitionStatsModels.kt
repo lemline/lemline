@@ -9,7 +9,8 @@ data class DefinitionStatsFilter(
     val version: String? = null,
     val allowedNamespaces: Set<String>? = null,
     val timeFrom: Instant,
-    val timeTo: Instant,
+    // Null leaves the window open: counters follow the latest lifecycle events.
+    val timeTo: Instant? = null,
     val pageSize: Int = 50,
 )
 

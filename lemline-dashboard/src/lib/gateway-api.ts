@@ -25,7 +25,7 @@ interface FetchDefinitionStatsOptions {
   name?: string;
   version?: string;
   timeFrom: string;
-  timeTo: string;
+  timeTo?: string;
 }
 
 export async function fetchAllDefinitions(

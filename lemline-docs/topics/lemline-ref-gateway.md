@@ -47,8 +47,8 @@ Service: `lemline.gateway.v1.GatewayService`
 |---|---|---|---|
 | `ListDefinitions` | `ListDefinitionsRequest` | `ListDefinitionsResponse` | Returns a finite catalog snapshot ordered by `namespace ASC`, `name ASC`, `version DESC`. `latest_only` defaults to `true` when omitted. |
 | `GetDefinition` | `GetDefinitionRequest` | `GetDefinitionResponse` | Returns one full definition. If `version` is omitted, the latest version for `namespace/name` is returned. |
-| `ListDefinitionStats` | `ListDefinitionStatsRequest` | `ListDefinitionStatsResponse` | Returns finite definition-level counters for a required time window. Includes `watch_cursor` for snapshot-then-tail flows. |
-| `WatchDefinitionStats` | `WatchDefinitionStatsRequest` | `stream WatchDefinitionStatsResponse` | Delta stream of `UPSERT` and `REMOVED` changes for definition stats. If `after_cursor` is omitted, the stream starts from "now" and emits only future changes. |
+| `ListDefinitionStats` | `ListDefinitionStatsRequest` | `ListDefinitionStatsResponse` | Returns finite definition-level counters for a time window. `time_from` is required; omit `time_to` for an open window that follows the latest lifecycle events. Includes `watch_cursor` for snapshot-then-tail flows. |
+| `WatchDefinitionStats` | `WatchDefinitionStatsRequest` | `stream WatchDefinitionStatsResponse` | Delta stream of `UPSERT` and `REMOVED` changes for definition stats. If `after_cursor` is omitted, the stream starts from "now" and emits only future changes. With `time_to` omitted, counters keep moving as new instances start and finish. A client resuming from a change in the middle of one update may receive that update's changes again; each change carries the row's full state. |
 | `StartInstance` | `StartInstanceRequest` | `StartInstanceResponse` | Starts a workflow instance asynchronously. If `instance_id` is omitted, the server generates a UUIDv7 identifier. If `version` is omitted, the latest definition version is started. |
 | `GetInstance` | `GetInstanceRequest` | `GetInstanceResponse` | Returns the current instance summary and, when known, a `latest_event_cursor` that can be used to tail events without replaying older ones. |
 | `ListInstances` | `ListInstancesRequest` | `ListInstancesResponse` | Returns a finite instance snapshot ordered by `created_at DESC`, `instance_id DESC`. Includes `watch_cursor` for snapshot-then-tail flows. |
@@ -82,7 +82,7 @@ Service: `lemline.gateway.v1.GatewayService`
 ### Resource Shapes
 
 - `WorkflowDefinition` returns the stored definition `source`, the resolved `version`, and `available_versions` ordered newest first.
-- `DefinitionStats` returns `started_count`, `completed_count`, `faulted_count`, and `running_count_at_time_to` for one `namespace/name/version`.
+- `DefinitionStats` returns `started_count`, `completed_count`, `faulted_count`, and `running_count_at_time_to` (running at `time_to`, or at the latest lifecycle event when `time_to` is omitted) for one `namespace/name/version`.
 - `InstanceSummary` returns the resolved definition identity, lifecycle status, timestamps, optional `duration`, and optional structured `error`.
 - `InstanceEvent` returns an opaque per-instance `cursor`, normalized `event_type`, optional `event_time`, and canonical `cloud_event_json`.
 

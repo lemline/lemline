@@ -98,7 +98,7 @@ data class DefinitionStatsPageCursor(
     val version: String? = null,
     val allowedNamespaces: List<String>? = null,
     val timeFrom: String,
-    val timeTo: String,
+    val timeTo: String? = null,
     val snapshotSequence: Long,
     val lastNamespace: String,
     val lastName: String,
@@ -117,7 +117,7 @@ data class DefinitionStatsWatchCursor(
     val version: String? = null,
     val allowedNamespaces: List<String>? = null,
     val timeFrom: String,
-    val timeTo: String,
+    val timeTo: String? = null,
     val sequence: Long,
 ) {
     companion object {

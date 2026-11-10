@@ -65,6 +65,9 @@ class H2TestDatabaseConfig(
         HikariDataSource(config)
     }
 
+    /** The pooled datasource, for code under test that takes a [javax.sql.DataSource]. */
+    val jdbcDataSource: javax.sql.DataSource get() = dataSource
+
     private val flyway: Flyway by lazy {
         Flyway.configure()
             .dataSource(dataSource)

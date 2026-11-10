@@ -386,7 +386,8 @@ export class DefinitionStats extends Message<DefinitionStats> {
   faultedCount = protoInt64.zero;
 
   /**
-   * Number of instances that were still running at time_to.
+   * Number of instances that were still running at time_to, or at the latest
+   * lifecycle event when time_to is omitted.
    *
    * @generated from field: int64 running_count_at_time_to = 7;
    */
@@ -1052,7 +1053,9 @@ export class ListDefinitionStatsRequest extends Message<ListDefinitionStatsReque
   timeFrom?: Timestamp;
 
   /**
-   * Required exclusive upper bound for the aggregation window.
+   * Optional exclusive upper bound for the aggregation window.
+   * Omit it for an open window: counters then follow the latest lifecycle
+   * events, so a watch keeps counting instances started after it began.
    *
    * @generated from field: google.protobuf.Timestamp time_to = 5;
    */
@@ -1211,7 +1214,9 @@ export class WatchDefinitionStatsRequest extends Message<WatchDefinitionStatsReq
   timeFrom?: Timestamp;
 
   /**
-   * Required exclusive upper bound for the aggregation window.
+   * Optional exclusive upper bound for the aggregation window.
+   * Omit it for an open window: counters then follow the latest lifecycle
+   * events, so a watch keeps counting instances started after it began.
    *
    * @generated from field: google.protobuf.Timestamp time_to = 5;
    */
