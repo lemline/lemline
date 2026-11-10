@@ -67,7 +67,14 @@ class DefinitionStatsWatchService(
             }.sortedWith(
                 compareBy<DefinitionStatsChangeRow>({ it.stats.namespace }, { it.stats.name }, { it.stats.version })
                     .thenBy { it.changeType.name }
-            )
+            ).let { sorted ->
+                // Only the last change of a poll advances the cursor: a client resuming from an
+                // earlier change replays the whole diff from `lastSequence` instead of skipping
+                // the rest of it. Rows carry full state, so redelivered changes are idempotent.
+                sorted.mapIndexed { index, change ->
+                    if (index == sorted.lastIndex) change else change.copy(cursor = lastSequence)
+                }
+            }
 
             for (update in updates) {
                 if (!onUpdate(update)) return
