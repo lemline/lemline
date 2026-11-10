@@ -138,7 +138,7 @@ class LemlineApplication : QuarkusApplication {
                     }
 
                     if (instanceStart != null) {
-                        System.setProperty(LEMLINE_MESSAGING_COMMANDS_PRODUCER_ENABLED, "true")
+                        enableInstanceStart()
                     }
 
                     if (failuresReplay != null) {
@@ -332,6 +332,16 @@ private fun disableDatabase() {
 
 private fun disableScheduled() {
     System.setProperty(LEMLINE_SCHEDULED_ENABLED, "false")
+}
+
+/**
+ * `instance start` publishes the first command and the `workflow.created` lifecycle event.
+ * Without the lifecycle producer, the event is silently dropped and the instance never shows up
+ * in the gateway instance list (which requires `workflow.created`).
+ */
+private fun enableInstanceStart() {
+    System.setProperty(LEMLINE_MESSAGING_COMMANDS_PRODUCER_ENABLED, "true")
+    System.setProperty(LEMLINE_MESSAGING_LIFECYCLE_EVENTS_PRODUCER_ENABLED, "true")
 }
 
 private fun enableGateway() {
