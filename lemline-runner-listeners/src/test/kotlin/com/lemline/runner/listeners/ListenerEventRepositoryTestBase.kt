@@ -19,6 +19,7 @@ import com.lemline.core.states.TaskState
 import com.lemline.core.states.WorkflowEvent
 import com.lemline.runner.common.config.DatabaseConfig
 import com.lemline.runner.common.messaging.InstanceMessage
+import com.lemline.runner.common.namespaces.NamespaceScope
 import com.lemline.runner.definitions.DefinitionModel
 import com.lemline.runner.definitions.DefinitionRepository
 import io.kotest.matchers.nulls.shouldNotBeNull
@@ -738,6 +739,31 @@ abstract class ListenerEventRepositoryTestBase {
         val outputs = getEventRepository().findCompletedOutputsByListeners(listOf(listener.id))
 
         outputs[listener.id] shouldBe null
+    }
+
+    // ========== namespace scoping ==========
+
+    @Test
+    fun `a scoped runner claims only listener events of the namespaces it follows`() = runTest {
+        val listener = createListener(hasForeach = true, strategy = ListenStrategy.ONE, filtersCount = 1)
+        getListenerRepository().insert(listener)
+        getEventRepository().batchInsertForOneAny(listOf(createQueryKey(listener)), "scoped-1", """{"l":"1"}""")
+        // Marked ready by a runner following the listener's namespace.
+        getEventRepository().markReadyForForeach(limit = 10) shouldBe 1
+
+        val otherNamespaceRunner = scopedEventRepository("other-namespace")
+        val sameNamespaceRunner = scopedEventRepository(testNamespace.toString())
+
+        otherNamespaceRunner.findEntitiesToProcess(maxAttempts = 10, limit = 10, connection = null) shouldBe emptyList()
+        sameNamespaceRunner.findEntitiesToProcess(maxAttempts = 10, limit = 10, connection = null)
+            .map { it.eventId } shouldBe listOf("scoped-1")
+    }
+
+    private fun scopedEventRepository(namespace: String) = ListenerEventRepository().apply {
+        databaseConfig = getDatabaseConfig()
+        namespaceScope = object : NamespaceScope {
+            override val configured: Set<String> = setOf(namespace)
+        }
     }
 
     // ========== markReadyForForeach tests ==========

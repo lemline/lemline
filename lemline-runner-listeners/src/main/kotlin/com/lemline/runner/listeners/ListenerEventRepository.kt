@@ -65,10 +65,19 @@ class ListenerEventRepository : CrudRepository<ListenerEventModel>(),
     var namespaceScope: NamespaceScope = NamespaceScope.UNSCOPED
 
     // Composed operations - initialized lazily to ensure databaseConfig is injected
-    // Uses specialized ListenerEventOutboxRepository for FIFO-aware processing.
-    // NOT namespace-scoped: lemline_listener_events has no workflow_namespace column — scoping
-    // happens through the lemline_listeners join in buildEligibleListenersSubquery.
-    private val outboxRepository by lazy { OutboxRepository(tableName, ::createModel, databaseConfig) }
+    // lemline_listener_events has no workflow_namespace column, so both readiness
+    // (buildEligibleListenersSubquery) and claims are scoped through the owning listener: a scoped
+    // runner never claims an event that another namespace's runner marked ready.
+    private val outboxRepository by lazy {
+        OutboxRepository(
+            tableName,
+            ::createModel,
+            databaseConfig,
+            namespaceScope.configured,
+            namespaceColumn = "(SELECT l.$WORKFLOW_NAMESPACE_COLUMN FROM $LISTENER_TABLE l " +
+                "WHERE l.$ID_COLUMN = $tableName.$LISTENER_ID_COLUMN)",
+        )
+    }
 
     // Delegate WithOutboxRepository methods
     override suspend fun findEntitiesToProcess(maxAttempts: Int, limit: Int, connection: Connection?) =

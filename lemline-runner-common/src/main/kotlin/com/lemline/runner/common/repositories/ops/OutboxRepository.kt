@@ -15,9 +15,10 @@ import kotlin.time.toJavaInstant
 /**
  * `AND workflow_namespace IN (?, …)` when scoped, empty when not. The predicate stays in the
  * WHERE clause — the LIMIT / FOR UPDATE SKIP LOCKED ordering differs per dialect and is untouched.
+ * [namespaceColumn] is the SQL expression holding a row's namespace, for tables that do not carry it.
  */
-fun namespacePredicate(namespaces: Set<String>?): String =
-    namespaces?.let { ns -> "AND $WORKFLOW_NAMESPACE_COLUMN IN (${ns.joinToString(", ") { "?" }})" } ?: ""
+fun namespacePredicate(namespaces: Set<String>?, namespaceColumn: String = WORKFLOW_NAMESPACE_COLUMN): String =
+    namespaces?.let { ns -> "AND $namespaceColumn IN (${ns.joinToString(", ") { "?" }})" } ?: ""
 
 const val OUTBOX_COMPLETED_AT_COLUMN = "outbox_completed_at"
 const val OUTBOX_SCHEDULED_FOR_COLUMN = "outbox_scheduled_for"
@@ -39,12 +40,15 @@ const val OUTBOX_ERROR_STACKTRACE_COLUMN = "outbox_error_stacktrace"
  * @param namespaces When non-null, only rows of these namespaces are claimed — a runner never
  *                   locks or relays another namespace's rows in a shared database. Null = unscoped
  *                   (e.g. an unpinned gateway outbox).
+ * @param namespaceColumn SQL expression giving a row's namespace; defaults to the table's own
+ *                   `workflow_namespace` column.
  */
 open class OutboxRepository<T : WithOutbox>(
     private val tableName: String,
     private val createModel: (ResultSet) -> T,
     private val databaseConfig: DatabaseConfig,
     private val namespaces: Set<String>? = null,
+    private val namespaceColumn: String = WORKFLOW_NAMESPACE_COLUMN,
 ) : WithOutboxRepository<T> {
 
     companion object;
@@ -88,7 +92,7 @@ open class OutboxRepository<T : WithOutbox>(
               AND $OUTBOX_DELAYED_UNTIL_COLUMN IS NOT NULL
               AND $OUTBOX_DELAYED_UNTIL_COLUMN <= ?
               AND $OUTBOX_ATTEMPT_COUNT_COLUMN < ?
-              ${namespacePredicate(namespaces)}
+              ${namespacePredicate(namespaces, namespaceColumn)}
             ORDER BY $OUTBOX_DELAYED_UNTIL_COLUMN ASC
             LIMIT ?
             FOR UPDATE SKIP LOCKED
