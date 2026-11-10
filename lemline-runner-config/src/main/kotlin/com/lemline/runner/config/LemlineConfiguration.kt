@@ -19,6 +19,7 @@ import com.lemline.runner.config.LemlineConfigConstants.KAFKA_LIFECYCLE_EVENTS_G
 import com.lemline.runner.config.LemlineConfigConstants.KAFKA_OFFSET_RESET_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.KAFKA_WORKFLOWS_GROUP_ID_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.LIFECYCLE_EVENTS_TOPIC_DEFAULT
+import com.lemline.runner.config.LemlineConfigConstants.MESSAGING_PREFIX_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.METRICS_PATH_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.METRICS_PORT_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.MYSQL_DATABASE_DEFAULT
@@ -73,6 +74,14 @@ import java.util.*
 @ConfigMapping(prefix = "lemline")
 interface LemlineConfiguration {
     fun config(): Optional<String>
+
+    /**
+     * Namespaces this process is scoped to (consumption, execution, persistence).
+     * Absent: runners fall back to the single "default" namespace; the gateway serves all namespaces.
+     * Validated at startup by NamespaceScopeValidator.
+     */
+    fun namespaces(): Optional<List<String>>
+
     fun database(): DatabaseConfig
     fun analytics(): Optional<AnalyticsConfig>
     fun messaging(): MessagingConfig
@@ -308,6 +317,14 @@ interface LemlineConfiguration {
         @Pattern(regexp = "in-memory|kafka|rabbitmq|pgmq")
         fun type(): String
 
+        /**
+         * Prefix of the per-namespace destination naming convention `<prefix>-<namespace>-<type>`
+         * (e.g. `lemline-acme-commands`).
+         */
+        @WithDefault(MESSAGING_PREFIX_DEFAULT)
+        @Pattern(regexp = "[a-z0-9]([a-z0-9-]*[a-z0-9])?")
+        fun prefix(): String
+
         fun commands(): Optional<ChannelConfig>
 
         fun events(): Optional<ChannelConfig>
@@ -389,10 +406,9 @@ interface LemlineConfiguration {
     }
 
     interface KafkaCloudEventsConfig {
-        @WithDefault(CLOUDEVENTS_TOPIC_DEFAULT)
-        fun topic(): String
+        // Topic names (incl. producer side) are derived from the per-namespace convention
+        // <prefix>-<namespace>-cloudevents; there is nothing broker-specific to configure per producer.
         fun consumer(): KafkaCloudEventsConsumerConfig
-        fun producer(): KafkaProducerConfig
     }
 
     /**
@@ -407,17 +423,13 @@ interface LemlineConfiguration {
     }
 
     interface KafkaWorkflowCommandsConfig {
-        @WithDefault(WORKFLOW_COMMANDS_TOPIC_DEFAULT)
-        fun topic(): String
+        // Topic names are derived from the per-namespace convention <prefix>-<namespace>-commands.
         fun consumer(): KafkaWorkflowCommandsConsumerConfig
-        fun producer(): KafkaProducerConfig
     }
 
     interface KafkaWorkflowEventsConfig {
-        @WithDefault(WORKFLOW_EVENTS_TOPIC_DEFAULT)
-        fun topic(): String
+        // Topic names are derived from the per-namespace convention <prefix>-<namespace>-events.
         fun consumer(): KafkaWorkflowEventsConsumerConfig
-        fun producer(): KafkaProducerConfig
     }
 
     interface KafkaWorkflowCommandsConsumerConfig {
@@ -430,10 +442,6 @@ interface LemlineConfiguration {
         @Pattern(regexp = "latest|earliest")
         @WithDefault(KAFKA_OFFSET_RESET_DEFAULT)
         fun offsetReset(): String
-
-        fun topicDlq(): Optional<String>
-
-        fun topicOut(): Optional<String>
     }
 
     interface KafkaWorkflowEventsConsumerConfig {
@@ -446,10 +454,6 @@ interface LemlineConfiguration {
         @Pattern(regexp = "latest|earliest")
         @WithDefault(KAFKA_OFFSET_RESET_DEFAULT)
         fun offsetReset(): String
-
-        fun topicDlq(): Optional<String>
-
-        fun topicOut(): Optional<String>
     }
 
     interface KafkaCloudEventsConsumerConfig {
@@ -462,10 +466,6 @@ interface LemlineConfiguration {
         @Pattern(regexp = "latest|earliest")
         @WithDefault(KAFKA_OFFSET_RESET_DEFAULT)
         fun offsetReset(): String
-
-        fun topicDlq(): Optional<String>
-
-        fun topicOut(): Optional<String>
     }
 
     interface KafkaLifecycleEventsConsumerConfig {
@@ -484,6 +484,7 @@ interface LemlineConfiguration {
         fun topicOut(): Optional<String>
     }
 
+    /** Kafka producer overrides — lifecycle events only (the shared central destination). */
     interface KafkaProducerConfig {
         fun topicOut(): Optional<String>
     }
@@ -511,9 +512,8 @@ interface LemlineConfiguration {
         @WithDefault(RABBITMQ_VHOST_DEFAULT)
         fun virtualHost(): Optional<String>
 
-        @WithDefault(WORKFLOW_COMMANDS_TOPIC_DEFAULT)
-        fun queue(): String
-        fun producer(): RabbitProducerConfig
+        /** Override of the deterministic per-pool queue name (derived from the sorted namespace set). */
+        fun queue(): Optional<String>
         fun consumer(): RabbitConsumerConfig
     }
 
@@ -521,17 +521,15 @@ interface LemlineConfiguration {
         @WithDefault(RABBITMQ_VHOST_DEFAULT)
         fun virtualHost(): Optional<String>
 
-        @WithDefault(WORKFLOW_EVENTS_TOPIC_DEFAULT)
-        fun queue(): String
-        fun producer(): RabbitProducerConfig
+        /** Override of the deterministic per-pool queue name (derived from the sorted namespace set). */
+        fun queue(): Optional<String>
         fun consumer(): RabbitConsumerConfig
     }
 
     interface RabbitCloudEventsConfig {
-        @WithDefault(CLOUDEVENTS_TOPIC_DEFAULT)
-        fun queue(): String
+        /** Override of the deterministic per-pool queue name (derived from the sorted namespace set). */
+        fun queue(): Optional<String>
         fun consumer(): RabbitConsumerConfig
-        fun producer(): RabbitProducerConfig
     }
 
     interface RabbitLifecycleEventsConfig {
@@ -547,6 +545,7 @@ interface LemlineConfiguration {
         fun queueDlq(): Optional<String>
     }
 
+    /** RabbitMQ producer overrides — lifecycle events only (the shared central destination). */
     interface RabbitProducerConfig {
         fun queueOut(): Optional<String>
         fun exchangeName(): Optional<String>
@@ -580,25 +579,18 @@ interface LemlineConfiguration {
 
     /**
      * PGMQ channel configuration.
+     * Queue names (incl. producer side and per-source DLQs) are derived from the per-namespace
+     * convention <prefix>-<namespace>-<type>.
      */
     interface PgmqWorkflowCommandsConfig {
-        @WithDefault(WORKFLOW_COMMANDS_TOPIC_DEFAULT)
-        fun queue(): String
-        fun producer(): PgmqProducerConfig
         fun consumer(): PgmqConsumerConfig
     }
 
     interface PgmqWorkflowEventsConfig {
-        @WithDefault(WORKFLOW_EVENTS_TOPIC_DEFAULT)
-        fun queue(): String
-        fun producer(): PgmqProducerConfig
         fun consumer(): PgmqConsumerConfig
     }
 
     interface PgmqCloudEventsConfig {
-        @WithDefault(CLOUDEVENTS_TOPIC_DEFAULT)
-        fun queue(): String
-        fun producer(): PgmqProducerConfig
         fun consumer(): PgmqConsumerConfig
     }
 
@@ -606,13 +598,35 @@ interface LemlineConfiguration {
         @WithDefault(LIFECYCLE_EVENTS_TOPIC_DEFAULT)
         fun queue(): String
         fun producer(): PgmqProducerConfig
-        fun consumer(): PgmqConsumerConfig
+        fun consumer(): PgmqLifecycleConsumerConfig
     }
 
     /**
      * PGMQ consumer configuration.
      */
     interface PgmqConsumerConfig {
+        @WithDefault(CONSUMER_CONCURRENCY_DEFAULT)
+        fun concurrency(): Int
+
+        @WithDefault(PGMQ_VISIBILITY_TIMEOUT_DEFAULT)
+        fun visibilityTimeout(): Int
+
+        @WithDefault(PGMQ_POLL_INTERVAL_DEFAULT)
+        fun pollInterval(): Long
+
+        @WithDefault(PGMQ_BATCH_SIZE_DEFAULT)
+        fun batchSize(): Int
+
+        @WithDefault(PGMQ_MAX_RETRIES_DEFAULT)
+        fun maxRetries(): Int
+    }
+
+    /**
+     * Lifecycle-events consumer: same tuning as [PgmqConsumerConfig] plus an explicit DLQ override
+     * (shared central destination). Fields are declared flat — the config-keys generator parses
+     * the source and does not follow interface inheritance.
+     */
+    interface PgmqLifecycleConsumerConfig {
         @WithDefault(CONSUMER_CONCURRENCY_DEFAULT)
         fun concurrency(): Int
 

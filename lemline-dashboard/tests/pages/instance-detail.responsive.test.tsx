@@ -4,14 +4,14 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { InstanceDetailPage } from "../../src/pages/instance-detail";
 
 const mockUseViewportWidth = vi.fn();
-const mockUseInstanceTimeline = vi.fn();
+const mockUseWatchWorkflowProjection = vi.fn();
 
 vi.mock("../../src/hooks/use-viewport-width", () => ({
   useViewportWidth: () => mockUseViewportWidth(),
 }));
 
-vi.mock("../../src/hooks/use-instance-timeline", () => ({
-  useInstanceTimeline: (...args: unknown[]) => mockUseInstanceTimeline(...args),
+vi.mock("../../src/hooks/use-watch-workflow-projection", () => ({
+  useWatchWorkflowProjection: (...args: unknown[]) => mockUseWatchWorkflowProjection(...args),
 }));
 
 vi.mock("../../src/components/timeline/gantt-chart", () => ({
@@ -35,7 +35,7 @@ function renderPage() {
 describe("InstanceDetailPage responsive timeline rendering", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockUseInstanceTimeline.mockReturnValue({
+    mockUseWatchWorkflowProjection.mockReturnValue({
       data: {
         workflowId: "01956f7a-4444-7444-8444-444444444444",
         namespace: "orders",
@@ -61,7 +61,8 @@ describe("InstanceDetailPage responsive timeline rendering", () => {
       },
       isLoading: false,
       isError: false,
-      refetch: vi.fn(),
+      reconnect: vi.fn(),
+      liveConnected: true,
     });
   });
 

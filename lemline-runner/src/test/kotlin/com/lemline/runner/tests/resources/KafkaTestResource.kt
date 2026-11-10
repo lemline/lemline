@@ -1,21 +1,15 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.tests.resources
 
-import com.lemline.runner.common.test.DockerAvailability
-import io.quarkus.test.common.QuarkusTestResourceLifecycleManager
 import org.apache.kafka.clients.admin.AdminClient
 import org.apache.kafka.clients.admin.AdminClientConfig
 import org.apache.kafka.clients.admin.NewTopic
 import org.testcontainers.kafka.KafkaContainer
 
-class KafkaTestResource : QuarkusTestResourceLifecycleManager {
+class KafkaTestResource : TestcontainersResource() {
     private lateinit var kafka: KafkaContainer
 
-    override fun start(): Map<String, String> {
-        if (!DockerAvailability.isAvailable) {
-            return emptyMap()
-        }
-
+    override fun startContainers(): Map<String, String> {
         // Create Kafka container using Apache Kafka native image (KRaft mode)
         kafka = KafkaContainer("apache/kafka:3.7.0")
 
@@ -46,14 +40,17 @@ class KafkaTestResource : QuarkusTestResourceLifecycleManager {
         val adminProps = mapOf(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG to bootstrapServers)
         AdminClient.create(adminProps).use { admin ->
             val topics = listOf(
-                // Topics for WorkflowConsumerKafkaTest (separate in/out for testing)
-                NewTopic("lemline-commands-in", 1, 1.toShort()),
-                NewTopic("lemline-commands-out", 1, 1.toShort()),
-                NewTopic("lemline-events-in", 1, 1.toShort()),
-                NewTopic("lemline-events-out", 1, 1.toShort()),
-                // DLQ topics
-                NewTopic("lemline-commands-in.dlq", 1, 1.toShort()),
-                NewTopic("lemline-events-in.dlq", 1, 1.toShort()),
+                // Per-namespace destinations (<prefix>-<namespace>-<type>) used by the suites:
+                // "test-in" is consumed by the runner, "test"/"default" carry observed emissions
+                NewTopic("lemline-test-in-commands", 1, 1.toShort()),
+                NewTopic("lemline-test-in-events", 1, 1.toShort()),
+                NewTopic("lemline-test-commands", 1, 1.toShort()),
+                NewTopic("lemline-test-events", 1, 1.toShort()),
+                NewTopic("lemline-default-commands", 1, 1.toShort()),
+                NewTopic("lemline-default-events", 1, 1.toShort()),
+                // DLQ topics of the consumed destinations
+                NewTopic("lemline-test-in-commands.dlq", 1, 1.toShort()),
+                NewTopic("lemline-test-in-events.dlq", 1, 1.toShort()),
             )
             admin.createTopics(topics).all().get()
         }

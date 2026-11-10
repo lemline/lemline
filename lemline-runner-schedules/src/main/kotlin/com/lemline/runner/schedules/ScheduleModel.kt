@@ -107,9 +107,13 @@ data class ScheduleModel(
             null
         }
 
-        // set a new id for the next workflow instance
+        // Each execution is a new workflow instance: a new id, and its own start time rather than
+        // the one inherited from when the schedule was registered.
         instanceMessage = instanceMessage.copy(
-            workflowState = instanceMessage.workflowState.duplicate(workflowId = newWorkflowId)
+            workflowState = instanceMessage.workflowState.duplicate(
+                workflowId = newWorkflowId,
+                startedAt = Clock.System.now(),
+            )
         )
 
     }

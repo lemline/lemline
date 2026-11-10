@@ -3,6 +3,7 @@ package com.lemline.runner.messaging.commands
 
 import com.lemline.core.states.WorkflowCommand
 import com.lemline.runner.common.messaging.InstanceMessage
+import com.lemline.runner.common.namespaces.DestinationType
 import com.lemline.runner.config.LemlineConfiguration
 import com.lemline.runner.messaging.MessageEmitter
 import io.quarkus.runtime.Startup
@@ -20,6 +21,8 @@ class WorkflowCommandEmitter(
     override val metrics: WorkflowCommandSubscriberMetrics
 ) : MessageEmitter<InstanceMessage<out WorkflowCommand>>() {
     override val enabled: Boolean = config.messaging().commands().getOrNull()?.producer()?.enabled() ?: false
+
+    override val destinationType = DestinationType.COMMANDS
 
     @Channel(COMMANDS_OUT_CHANNEL)
     override lateinit var emitter: MutinyEmitter<String>

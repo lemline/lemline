@@ -4,7 +4,7 @@ package com.lemline.runner.failures
 import com.lemline.common.random.nullableRandom
 import com.lemline.common.random.random
 import com.lemline.common.values.IDV7
-import com.lemline.core.random.randomWorkflowFailedEvent
+import com.lemline.core.random.randomWorkflowFaultedEvent
 import com.lemline.core.random.randomWorkflowInfo
 import com.lemline.runner.common.messaging.InstanceMessage
 import kotlin.random.Random
@@ -14,7 +14,7 @@ fun FailureModel.Companion.random() = FailureModel(
     instanceMessage = when (Random.nextBoolean()) {
         true -> InstanceMessage(
             workflowInfo = randomWorkflowInfo(),
-            workflowState = randomWorkflowFailedEvent(),
+            workflowState = randomWorkflowFaultedEvent(),
         )
 
         false -> null

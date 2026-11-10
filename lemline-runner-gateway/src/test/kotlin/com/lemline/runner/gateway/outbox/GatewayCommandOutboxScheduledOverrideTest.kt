@@ -16,9 +16,9 @@ class GatewayCommandOutboxScheduledOverrideTest {
 
     @Test
     fun `gateway command outbox cleaner can run when global scheduling is disabled`() {
-        val getter = GatewayCommandOutboxCleaner::class.java.getDeclaredMethod("getRunWhenScheduledDisabled")
+        val getter = GatewayCommandCleaner::class.java.getDeclaredMethod("getRunWhenScheduledDisabled")
         getter.isAccessible = true
 
-        assertTrue(getter.invoke(GatewayCommandOutboxCleaner()) as Boolean)
+        assertTrue(getter.invoke(GatewayCommandCleaner()) as Boolean)
     }
 }

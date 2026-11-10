@@ -6,12 +6,6 @@ import io.serverlessworkflow.api.types.ListenTaskConfiguration.ListenAndReadAs
 import io.serverlessworkflow.api.types.RunTaskConfiguration.ProcessReturnType
 import kotlin.time.Instant
 import kotlinx.serialization.Contextual
-import kotlinx.serialization.KSerializer
-import kotlinx.serialization.descriptors.PrimitiveKind
-import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
-import kotlinx.serialization.descriptors.SerialDescriptor
-import kotlinx.serialization.encoding.Decoder
-import kotlinx.serialization.encoding.Encoder
 import kotlinx.serialization.json.JsonElement
 
 /**
@@ -103,23 +97,6 @@ enum class ListenStrategy {
 
     /** Wait for one event per filter */
     ALL
-}
-
-/**
- * Custom serializer for [ListenAndReadAs] Java enum.
- * Serializes to/from the string value ("data", "envelope", "raw").
- */
-internal object ListenAndReadAsSerializer : KSerializer<ListenAndReadAs> {
-    override val descriptor: SerialDescriptor =
-        PrimitiveSerialDescriptor("ListenAndReadAs", PrimitiveKind.STRING)
-
-    override fun serialize(encoder: Encoder, value: ListenAndReadAs) {
-        encoder.encodeString(value.value())
-    }
-
-    override fun deserialize(decoder: Decoder): ListenAndReadAs {
-        return ListenAndReadAs.fromValue(decoder.decodeString())
-    }
 }
 
 /**

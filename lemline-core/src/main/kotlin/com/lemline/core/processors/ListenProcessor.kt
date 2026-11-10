@@ -62,7 +62,7 @@ import kotlinx.serialization.json.buildJsonObject
  */
 class ListenProcessor(
     node: Node<ListenTask>,
-) : NodeProcessor<ListenTask, ListenState>(node) {
+) : AbstractProcessor<ListenTask, ListenState>(node) {
 
     override val isAsync = true
 

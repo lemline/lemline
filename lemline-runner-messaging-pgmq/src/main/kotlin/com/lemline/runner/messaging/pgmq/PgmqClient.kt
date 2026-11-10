@@ -5,6 +5,9 @@ import com.lemline.common.logger.logger
 import com.lemline.runner.messaging.pgmq.config.PgmqConnectorConfig
 import io.smallrye.mutiny.Uni
 import io.smallrye.mutiny.coroutines.awaitSuspending
+import io.vertx.core.json.Json
+import io.vertx.core.json.JsonArray
+import io.vertx.core.json.JsonObject
 import io.vertx.mutiny.pgclient.PgBuilder
 import io.vertx.mutiny.sqlclient.Pool
 import io.vertx.mutiny.sqlclient.Row
@@ -126,15 +129,33 @@ class PgmqClient(
      */
     suspend fun initialize() {
 
-        // Create queue if auto-create is enabled
+        // Create queue(s) if auto-create is enabled
         if (config.autoCreateQueue) {
-            logger.info { "Initializing PGMQ for queue: ${config.queue}" }
-            createQueue(config.queue)
-            config.deadLetterQueue?.let { dlq ->
-                logger.info { "Initializing PGMQ for queue: $dlq" }
-                createQueue(dlq)
+            config.queues.forEach { queue ->
+                logger.info { "Initializing PGMQ for queue: $queue" }
+                createQueue(queue)
+            }
+            // In multi-queue mode DLQs are derived per source queue and created lazily
+            // on first dead-letter; the explicit DLQ only applies in single-queue mode.
+            if (!config.usesQueues) {
+                config.deadLetterQueue?.let { dlq ->
+                    logger.info { "Initializing PGMQ for queue: $dlq" }
+                    createQueue(dlq)
+                }
             }
         }
+    }
+
+    /**
+     * Ensures a queue exists, creating it idempotently if needed.
+     *
+     * Used for per-message queue overrides (outgoing) and derived dead-letter
+     * queues (incoming multi-queue mode). Relies on pgmq.create() being idempotent.
+     *
+     * @param queueName Name of the queue to ensure
+     */
+    suspend fun ensureQueue(queueName: String) {
+        createQueue(queueName)
     }
 
     /**
@@ -225,37 +246,43 @@ class PgmqClient(
      * @param message The message payload as a JSON string
      * @param delaySeconds Optional delay before the message becomes visible
      * @param headers Optional message headers as a JSON string
+     * @param queue Target queue (defaults to the channel's configured queue)
      * @return The message ID
      */
-    suspend fun send(message: String, delaySeconds: Int = 0, headers: String? = null): Long {
+    suspend fun send(
+        message: String,
+        delaySeconds: Int = 0,
+        headers: String? = null,
+        queue: String = config.queue,
+    ): Long {
         val result = when {
             headers != null && delaySeconds > 0 -> {
                 pool.preparedQuery(SEND_MESSAGE_WITH_HEADERS_AND_DELAY)
-                    .execute(Tuple.of(config.queue, message, headers, delaySeconds))
+                    .execute(Tuple.of(queue, message, headers, delaySeconds))
                     .awaitSuspending()
             }
 
             headers != null -> {
                 pool.preparedQuery(SEND_MESSAGE_WITH_HEADERS)
-                    .execute(Tuple.of(config.queue, message, headers))
+                    .execute(Tuple.of(queue, message, headers))
                     .awaitSuspending()
             }
 
             delaySeconds > 0 -> {
                 pool.preparedQuery(SEND_MESSAGE_WITH_DELAY)
-                    .execute(Tuple.of(config.queue, message, delaySeconds))
+                    .execute(Tuple.of(queue, message, delaySeconds))
                     .awaitSuspending()
             }
 
             else -> {
                 pool.preparedQuery(SEND_MESSAGE)
-                    .execute(Tuple.of(config.queue, message))
+                    .execute(Tuple.of(queue, message))
                     .awaitSuspending()
             }
         }
 
         val msgId = result.iterator().next().getLong(0)
-        logger.debug { "Sent message $msgId to queue ${config.queue}" }
+        logger.debug { "Sent message $msgId to queue $queue" }
         return msgId
     }
 
@@ -294,15 +321,22 @@ class PgmqClient(
      * Messages are marked as invisible for the visibility timeout period.
      *
      * @param batchSize Maximum number of messages to read
+     * @param queue Queue to read from (defaults to the channel's configured queue)
+     * @param onUnreadable Called for each row that cannot be decoded; such rows are left
+     *   out of the result instead of failing the whole read
      * @return List of PGMQ messages
      */
-    suspend fun read(batchSize: Int = config.batchSize): List<PgmqMessage> {
+    suspend fun read(
+        batchSize: Int = config.batchSize,
+        queue: String = config.queue,
+        onUnreadable: (suspend (UnreadableMessage) -> Unit)? = null,
+    ): List<PgmqMessage> {
         val result = pool.preparedQuery(READ_MESSAGES)
-            .execute(Tuple.of(config.queue, config.visibilityTimeout, batchSize))
+            .execute(Tuple.of(queue, config.visibilityTimeout, batchSize))
             .awaitSuspending()
 
         // Sort by msgId to ensure FIFO order (UPDATE...RETURNING doesn't guarantee order)
-        return result.map { row -> row.toPgmqMessage() }.sortedBy { it.msgId }
+        return mapReadRows(result, queue, onUnreadable).sortedBy { it.msgId }
     }
 
     /**
@@ -315,17 +349,22 @@ class PgmqClient(
      * @param batchSize Maximum number of messages to read
      * @param maxPollSeconds Maximum time to wait for messages (default: 5 seconds)
      * @param pollIntervalMs Interval between poll attempts in milliseconds (default: 100ms)
+     * @param queue Queue to read from (defaults to the channel's configured queue)
+     * @param onUnreadable Called for each row that cannot be decoded; such rows are left
+     *   out of the result instead of failing the whole read
      * @return List of PGMQ messages
      */
     suspend fun readWithPoll(
         batchSize: Int = config.batchSize,
         maxPollSeconds: Int = 5,
         pollIntervalMs: Int = 100,
+        queue: String = config.queue,
+        onUnreadable: (suspend (UnreadableMessage) -> Unit)? = null,
     ): List<PgmqMessage> {
         val result = pool.preparedQuery(READ_WITH_POLL)
             .execute(
                 Tuple.of(
-                    config.queue,
+                    queue,
                     config.visibilityTimeout,
                     batchSize,
                     maxPollSeconds,
@@ -335,7 +374,7 @@ class PgmqClient(
             .awaitSuspending()
 
         // Sort by msgId to ensure FIFO order (UPDATE...RETURNING doesn't guarantee order)
-        return result.map { row -> row.toPgmqMessage() }.sortedBy { it.msgId }
+        return mapReadRows(result, queue, onUnreadable).sortedBy { it.msgId }
     }
 
     /**
@@ -356,15 +395,16 @@ class PgmqClient(
      * Deletes a message from the queue (acknowledges it).
      *
      * @param msgId The message ID to delete
+     * @param queue Queue to delete from (defaults to the channel's configured queue)
      * @return true if the message was deleted, false if not found
      */
-    suspend fun delete(msgId: Long): Boolean {
+    suspend fun delete(msgId: Long, queue: String = config.queue): Boolean {
         return pool.preparedQuery(DELETE_MESSAGE)
-            .execute(Tuple.of(config.queue, msgId))
+            .execute(Tuple.of(queue, msgId))
             .awaitSuspending()
             .iterator().next().getBoolean(0)
             .also { deleted ->
-                if (deleted) logger.debug { "Deleted message $msgId from queue ${config.queue}" }
+                if (deleted) logger.debug { "Deleted message $msgId from queue $queue" }
             }
     }
 
@@ -399,15 +439,16 @@ class PgmqClient(
      * Archives a message (moves it to the archive table).
      *
      * @param msgId The message ID to archive
+     * @param queue Queue holding the message (defaults to the channel's configured queue)
      * @return true if the message was archived, false if not found
      */
-    suspend fun archive(msgId: Long): Boolean {
+    suspend fun archive(msgId: Long, queue: String = config.queue): Boolean {
         return pool.preparedQuery(ARCHIVE_MESSAGE)
-            .execute(Tuple.of(config.queue, msgId))
+            .execute(Tuple.of(queue, msgId))
             .awaitSuspending()
             .iterator().next().getBoolean(0)
             .also { archived ->
-                if (archived) logger.debug { "Archived message $msgId from queue ${config.queue}" }
+                if (archived) logger.debug { "Archived message $msgId from queue $queue" }
             }
     }
 
@@ -463,14 +504,26 @@ class PgmqClient(
 
     /**
      * Moves a message to the dead-letter queue.
+     *
+     * @param msgId The message ID in the source queue
+     * @param message The original message payload
+     * @param error The error that caused the dead-lettering
+     * @param sourceQueue Queue the message was read from (defaults to the channel's configured queue)
+     * @param deadLetterQueue Target DLQ (defaults to the channel's `dead-letter-queue` attribute)
      */
-    suspend fun moveToDeadLetterQueue(msgId: Long, message: String, error: String) {
-        val dlq = config.deadLetterQueue ?: return
+    suspend fun moveToDeadLetterQueue(
+        msgId: Long,
+        message: String,
+        error: String,
+        sourceQueue: String = config.queue,
+        deadLetterQueue: String? = config.deadLetterQueue,
+    ) {
+        val dlq = deadLetterQueue ?: return
 
         // Create a DLQ message with error info
         val dlqMessage = buildJsonObject {
             put("originalMessageId", msgId)
-            put("originalQueue", config.queue)
+            put("originalQueue", sourceQueue)
             put("payload", message)
             put("error", error)
             put("timestamp", Instant.now().toString())
@@ -481,7 +534,7 @@ class PgmqClient(
             .execute(Tuple.of(dlq, dlqMessage))
             .awaitSuspending()
 
-        delete(msgId)
+        delete(msgId, sourceQueue)
         logger.warn { "Moved message $msgId to DLQ: $dlq" }
     }
 
@@ -520,14 +573,65 @@ class PgmqClient(
         pools.remove(poolKey)?.close()
     }
 
+    /**
+     * Maps rows read from [queue], isolating rows that cannot be decoded.
+     *
+     * A row that fails to map never aborts the batch: it is reported to [onUnreadable]
+     * (or only logged when no handler is given, in which case it becomes visible again
+     * after the visibility timeout) and the remaining rows are still returned.
+     */
+    private suspend fun mapReadRows(
+        rows: Iterable<Row>,
+        queue: String,
+        onUnreadable: (suspend (UnreadableMessage) -> Unit)?,
+    ): List<PgmqMessage> {
+        val messages = mutableListOf<PgmqMessage>()
+        for (row in rows) {
+            try {
+                messages += row.toPgmqMessage()
+            } catch (e: Exception) {
+                val unreadable = UnreadableMessage(
+                    msgId = row.getLong("msg_id"),
+                    queue = queue,
+                    rawPayload = runCatching { row.getValue("message")?.toString() }.getOrNull(),
+                    error = e,
+                )
+                if (onUnreadable != null) {
+                    onUnreadable(unreadable)
+                } else {
+                    logger.error(e) { "Unreadable message ${unreadable.msgId} in queue $queue (skipped)" }
+                }
+            }
+        }
+        return messages
+    }
+
     private fun Row.toPgmqMessage(): PgmqMessage = PgmqMessage(
         msgId = getLong("msg_id"),
         readCt = getInteger("read_ct"),
         enqueuedAt = getLocalDateTime("enqueued_at").toInstantUtc(),
         vt = getLocalDateTime("vt").toInstantUtc(),
-        message = getString("message") ?: getJsonObject("message")?.encode() ?: "",
-        headers = getString("headers") ?: getJsonObject("headers")?.encode()
+        message = jsonbToText(getValue("message"))
+            ?: throw IllegalArgumentException("message payload is null"),
+        headers = runCatching { jsonbToText(getValue("headers")) }.getOrNull()
     )
+
+    /**
+     * Converts a decoded jsonb value to its text form.
+     *
+     * The connector stores payloads as jsonb *strings*, but external producers commonly
+     * send jsonb *objects* (`pgmq.send(q, '{...}'::jsonb)`). Both are accepted: strings are
+     * returned as-is, any other JSON value is re-encoded to its JSON text.
+     * Returns null for SQL NULL and JSON null.
+     */
+    private fun jsonbToText(value: Any?): String? = when (value) {
+        null -> null
+        io.vertx.sqlclient.Tuple.JSON_NULL -> null
+        is String -> value
+        is JsonObject -> value.encode()
+        is JsonArray -> value.encode()
+        else -> Json.encode(value)
+    }
 
     private fun LocalDateTime?.toInstantUtc(): Instant =
         this?.toInstant(ZoneOffset.UTC) ?: Instant.now()

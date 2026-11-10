@@ -54,7 +54,7 @@ import kotlinx.serialization.json.JsonPrimitive
  */
 class RunShellProcessor(
     node: Node<RunTask>,
-) : NodeProcessor<RunTask, RunState>(node) {
+) : AbstractProcessor<RunTask, RunState>(node) {
 
     override val isAsync = true
 

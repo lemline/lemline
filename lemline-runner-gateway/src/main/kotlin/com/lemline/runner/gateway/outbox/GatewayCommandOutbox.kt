@@ -15,13 +15,13 @@ import jakarta.inject.Inject
  * Outbox processor for gateway workflow start commands.
  *
  * Reliably delivers workflow start commands that were inserted atomically
- * alongside schedule inserts during [com.lemline.runner.gateway.start.WorkflowStartService.start].
+ * alongside schedule inserts during [com.lemline.runner.gateway.instances.InstanceStartService.start].
  * The outbox pattern ensures commands are eventually delivered even if the process
  * crashes after the database transaction commits.
  */
 @Startup
 @ApplicationScoped
-class GatewayCommandOutbox : AbstractOutbox<GatewayCommandOutboxModel>() {
+class GatewayCommandOutbox : AbstractOutbox<GatewayCommandModel>() {
 
     override val jobName: String get() = "Gateway command outbox"
 
@@ -31,25 +31,25 @@ class GatewayCommandOutbox : AbstractOutbox<GatewayCommandOutboxModel>() {
     override lateinit var commandEmitter: CommandEmitter
 
     @Inject
-    lateinit var gatewayOutboxConfig: GatewayOutboxConfig
+    lateinit var gatewayCommandConfig: GatewayCommandConfig
 
     @Inject
     override lateinit var databaseConfig: DatabaseConfig
 
     @Inject
-    lateinit var gatewayCommandOutboxRepository: GatewayCommandOutboxRepository
+    lateinit var gatewayCommandRepository: GatewayCommandRepository
 
-    override val outboxRepository: WithOutboxRepository<GatewayCommandOutboxModel>
-        get() = gatewayCommandOutboxRepository
+    override val outboxRepository: WithOutboxRepository<GatewayCommandModel>
+        get() = gatewayCommandRepository
 
-    override val crudRepository: WithCrudRepository<GatewayCommandOutboxModel>
-        get() = gatewayCommandOutboxRepository
+    override val crudRepository: WithCrudRepository<GatewayCommandModel>
+        get() = gatewayCommandRepository
 
-    override val enabled by lazy { gatewayOutboxConfig.enabled }
+    override val enabled by lazy { gatewayCommandConfig.enabled }
 
-    override val outboxConfig: OutboxConfig by lazy { gatewayOutboxConfig.outbox }
+    override val outboxConfig: OutboxConfig by lazy { gatewayCommandConfig.outbox }
 
-    override suspend fun process(entity: GatewayCommandOutboxModel) {
+    override suspend fun process(entity: GatewayCommandModel) {
         commandEmitter.send(entity.instanceMessage, entity.id)
     }
 }

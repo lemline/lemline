@@ -41,7 +41,7 @@ import kotlinx.serialization.json.JsonElement
  */
 class DoProcessor(
     node: Node<DoTask>
-) : NodeProcessor<DoTask, DoState>(node) {
+) : AbstractProcessor<DoTask, DoState>(node) {
 
     override fun stateWhenEnteringFromParent(transformedInput: JsonElement, scope: Scope): DoState = DoState(
         startedAt = Clock.System.now(),
@@ -61,15 +61,15 @@ class DoProcessor(
         state: DoState,
         dataset: JsonElement,
         scope: Scope,
-    ): NavigationInfo {
+    ): NextInfo {
         // state.index already points to the next child to execute
         return when (state.index >= node.doBlock.size) {
-            true -> NavigationInfo(
+            true -> NextInfo(
                 nextNode = node.parent,
                 nextDirective = getFlowDirective()
             )
 
-            false -> NavigationInfo(
+            false -> NextInfo(
                 nextNode = getChildByIndex(state.index),
                 nextDirective = null
             )

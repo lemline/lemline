@@ -54,7 +54,7 @@ import kotlinx.serialization.json.JsonElement
  */
 class RunWorkflowProcessor(
     node: Node<RunTask>,
-) : NodeProcessor<RunTask, RunState>(node) {
+) : AbstractProcessor<RunTask, RunState>(node) {
     override val isAsync = true
     override fun stateWhenEnteringFromParent(transformedInput: JsonElement, scope: Scope) = RunState()
 

@@ -22,10 +22,10 @@ import kotlin.time.Duration.Companion.seconds
  *
  * ## Processing Flow
  *
- * 1. **Find Timed Out**: Query listeners where `timeout_at < NOW()` and not yet completed/failed
+ * 1. **Find Timed Out**: Query listeners where `timeout_at < NOW()` and not yet completed/faulted
  * 2. **Create Error**: Build a timeout error with type, status 408, and details
- * 3. **Emit Command**: Send `ResumeWithFailedTask` command to continue the workflow with error
- * 4. **Mark Failed**: Update listener status to failed in database
+ * 3. **Emit Command**: Send `ResumeWithFaultedTask` command to continue the workflow with error
+ * 4. **Mark Faulted**: Update listener status to faulted in database
  *
  * This processor runs on a scheduled interval and processes timed-out listeners in batches.
  */
@@ -113,7 +113,7 @@ class ListenerScheduledTimeout : AbstractScheduledTask() {
         )
 
         // Create and emit the failure command
-        val resumeCommand = listenStarted.resumeFailed(error)
+        val resumeCommand = listenStarted.resumeFaulted(error)
         val resumeMessage = InstanceMessage(
             workflowInfo = listener.instanceMessage.workflowInfo,
             workflowState = resumeCommand
@@ -123,7 +123,7 @@ class ListenerScheduledTimeout : AbstractScheduledTask() {
 
         commandEmitter.send(resumeMessage, idempotentKey)
 
-        // Mark listener as failed
+        // Mark listener as faulted
         listenerRepository.markFailed(
             id = listener.id,
             errorClass = "ListenerTimeoutException",

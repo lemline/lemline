@@ -1,12 +1,12 @@
 import { useQuery } from "@tanstack/react-query";
-import { gatewayClient } from "../lib/grpc-client";
-import { GetDefinitionStatsRequest } from "../gen/proto/lemline/gateway/v1/workflow_gateway_pb";
+import { fetchDefinitionStatsSnapshot } from "../lib/gateway-api";
+import type { DefinitionStatsSnapshot } from "../lib/gateway-api";
 
 export interface DefinitionStatsFilter {
   namespace?: string;
   name?: string;
   version?: string;
-  timeFrom?: string;
+  timeFrom: string;
   timeTo?: string;
 }
 
@@ -22,19 +22,8 @@ export function definitionStatsQueryKey(filter: DefinitionStatsFilter) {
 }
 
 export function useDefinitionStats(filter: DefinitionStatsFilter) {
-  return useQuery({
+  return useQuery<DefinitionStatsSnapshot>({
     queryKey: definitionStatsQueryKey(filter),
-    queryFn: async () => {
-      const response = await gatewayClient.getDefinitionStats(
-        new GetDefinitionStatsRequest({
-          namespace: filter.namespace,
-          name: filter.name,
-          version: filter.version,
-          timeFrom: filter.timeFrom,
-          timeTo: filter.timeTo,
-        }),
-      );
-      return response.stats;
-    },
+    queryFn: () => fetchDefinitionStatsSnapshot(filter),
   });
 }

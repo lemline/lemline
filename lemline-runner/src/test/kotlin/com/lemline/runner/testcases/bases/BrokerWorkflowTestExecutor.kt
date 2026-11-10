@@ -85,11 +85,14 @@ internal class BrokerWorkflowTestExecutor : AbstractWorkflowTestExecutor() {
         commandEmitter.send(message)
     }
 
-    override suspend fun sendCloudEventPayload(payload: String) {
+    override suspend fun sendCloudEventPayload(payload: String, namespace: String) {
         if (cloudEventsEmitterInstance.isUnsatisfied) {
             logger.warn { "CloudEvents emitter not available - CloudEvents will not be sent" }
             return
         }
+        // No per-message metadata: the message lands on the channel's fallback destination
+        // (the `default` namespace destination / routing key), which matches the namespace
+        // the listen testcases run in.
         cloudEventsEmitterInstance.get().sendMessage(Message.of(payload)).awaitSuspending()
     }
 

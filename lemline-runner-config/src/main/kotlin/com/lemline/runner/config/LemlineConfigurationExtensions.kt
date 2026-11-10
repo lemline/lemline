@@ -4,6 +4,14 @@ package com.lemline.runner.config
 import com.lemline.runner.common.config.ANALYTICS_TYPE_DEFAULT
 import kotlin.jvm.optionals.getOrNull
 
+/**
+ * `lemline.namespaces` as declared, with surrounding whitespace trimmed from each entry
+ * (`acme-prod, acme-staging` is the documented form). `null` when the property is absent.
+ * Entries are not filtered: blank entries are left for [NamespaceScopeValidation] to reject.
+ */
+val LemlineConfiguration.declaredNamespaces: List<String>?
+    get() = namespaces().getOrNull()?.map(String::trim)
+
 val LemlineConfiguration.gatewayEnabled: Boolean
     get() = gateway().getOrNull()?.enabled() ?: LemlineConfigConstants.GATEWAY_ENABLED_DEFAULT.toBoolean()
 

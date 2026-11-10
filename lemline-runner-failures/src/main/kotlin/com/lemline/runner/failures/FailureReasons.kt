@@ -9,6 +9,7 @@ import com.lemline.runner.common.messaging.FailureReasons as CommonFailureReason
  */
 object FailureReasons {
     const val OUTBOX_FAILURE = CommonFailureReasons.OUTBOX_FAILURE
+    const val FOREIGN_NAMESPACE = CommonFailureReasons.FOREIGN_NAMESPACE
     const val DESERIALIZATION_FAILURE = CommonFailureReasons.DESERIALIZATION_FAILURE
     const val SERIALIZATION_FAILURE = CommonFailureReasons.SERIALIZATION_FAILURE
     const val DEFINITION_MISSING = CommonFailureReasons.DEFINITION_MISSING

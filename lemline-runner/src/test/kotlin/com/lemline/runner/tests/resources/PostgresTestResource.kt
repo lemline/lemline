@@ -7,19 +7,13 @@ import com.lemline.runner.common.config.LEMLINE_DATABASE_POSTGRES_PASSWORD
 import com.lemline.runner.common.config.LEMLINE_DATABASE_POSTGRES_PORT
 import com.lemline.runner.common.config.LEMLINE_DATABASE_POSTGRES_USERNAME
 import com.lemline.runner.common.config.LEMLINE_DATABASE_TYPE
-import com.lemline.runner.common.test.DockerAvailability
-import io.quarkus.test.common.QuarkusTestResourceLifecycleManager
 import org.testcontainers.containers.PostgreSQLContainer
 import org.testcontainers.utility.DockerImageName
 
-class PostgresTestResource : QuarkusTestResourceLifecycleManager {
+class PostgresTestResource : TestcontainersResource() {
     private lateinit var postgres: PostgreSQLContainer<*>
 
-    override fun start(): Map<String, String> {
-        if (!DockerAvailability.isAvailable) {
-            return emptyMap()
-        }
-
+    override fun startContainers(): Map<String, String> {
         postgres = PostgreSQLContainer(DockerImageName.parse("postgres:14-alpine"))
             .withDatabaseName("lemline_test")
             .withUsername("test")

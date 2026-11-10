@@ -26,7 +26,9 @@ const val CLEANUP_AFTER_COLUMN = "cleanup_after"
 class CleanerRepository<T : WithCleanup>(
     private val tableName: String,
     private val createModel: (ResultSet) -> T,
-    private val databaseConfig: DatabaseConfig
+    private val databaseConfig: DatabaseConfig,
+    /** When non-null, only rows of these namespaces are locked/deleted (see OutboxRepository). */
+    private val namespaces: Set<String>? = null,
 ) : WithCleanerRepository<T> {
 
     /**
@@ -47,8 +49,10 @@ class CleanerRepository<T : WithCleanup>(
         connection: Connection?
     ): List<T> = databaseConfig.withConnection(connection) { conn ->
         conn.prepareStatement(findEntitiesToDeleteSql).use { stmt ->
-            stmt.setTimestamp(1, Timestamp.from(cutoffDate.toJavaInstant()))
-            stmt.setInt(2, batchSize)
+            var idx = 1
+            stmt.setTimestamp(idx++, Timestamp.from(cutoffDate.toJavaInstant()))
+            namespaces?.forEach { stmt.setString(idx++, it) }
+            stmt.setInt(idx, batchSize)
             stmt.executeQuery().use { rs -> rs.toModels() }
         }
     }
@@ -58,6 +62,7 @@ class CleanerRepository<T : WithCleanup>(
             SELECT * FROM $tableName
             WHERE $CLEANUP_AFTER_COLUMN IS NOT NULL
               AND $CLEANUP_AFTER_COLUMN < ?
+              ${namespacePredicate(namespaces)}
             ORDER BY $CLEANUP_AFTER_COLUMN ASC
             LIMIT ?
             FOR UPDATE SKIP LOCKED

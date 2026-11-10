@@ -117,8 +117,7 @@ object WorkflowCache {
     }
 
     @JvmStatic
-    fun parseYamlAndPut(definition: String): Workflow = WorkflowReader
-        .validation()
+    fun parseYamlAndPut(definition: String): Workflow = WorkflowDefinitionReader
         .read(definition, WorkflowFormat.YAML)
         .also { workflow -> cacheWorkflow(workflow) }
 
@@ -133,8 +132,7 @@ object WorkflowCache {
      * and puts it into the cache.
      */
     @JvmStatic
-    fun parseJsonAndPut(definition: String): Workflow = WorkflowReader
-        .validation()
+    fun parseJsonAndPut(definition: String): Workflow = WorkflowDefinitionReader
         .read(definition, WorkflowFormat.JSON)
         .also { workflow -> cacheWorkflow(workflow) }
 

@@ -178,7 +178,7 @@ class ParentService {
         commandEmitter.send(
             InstanceMessage(
                 workflowInfo = parent.instanceMessage.workflowInfo,
-                workflowState = state.resumeAsFailed(childError),
+                workflowState = state.resumeAsFaulted(childError),
             ),
             resumeMessageId
         )

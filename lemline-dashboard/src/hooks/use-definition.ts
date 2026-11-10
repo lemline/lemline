@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { gatewayClient } from "../lib/grpc-client";
-import { GetDefinitionRequest } from "../gen/proto/lemline/gateway/v1/workflow_gateway_pb";
+import { GetDefinitionRequest } from "../gen/proto/lemline/gateway/v1/gateway_pb";
 
 export function useDefinition(namespace?: string, name?: string, version?: string) {
   return useQuery({
@@ -14,7 +14,7 @@ export function useDefinition(namespace?: string, name?: string, version?: strin
           version,
         }),
       );
-      return response;
+      return response.definition;
     },
   });
 }

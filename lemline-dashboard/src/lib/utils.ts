@@ -1,5 +1,7 @@
+import { Duration } from "@bufbuild/protobuf";
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
+import { durationToMilliseconds } from "./proto";
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -18,8 +20,8 @@ export function asNumber(value: bigint | number | string | undefined): number {
   return Number.isNaN(parsed) ? 0 : parsed;
 }
 
-export function formatDuration(durationMs?: bigint | number | string): string {
-  const ms = asNumber(durationMs);
+export function formatDuration(durationMs?: Duration | bigint | number | string): string {
+  const ms = durationToMilliseconds(durationMs) ?? 0;
   if (!ms || ms < 0) return "-";
   const seconds = Math.floor(ms / 1000);
   if (seconds < 60) return `${seconds}s`;

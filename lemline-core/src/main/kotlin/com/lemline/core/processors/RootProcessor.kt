@@ -40,7 +40,7 @@ import kotlinx.serialization.json.JsonElement
  */
 class RootProcessor(
     node: Node<RootTask>
-) : NodeProcessor<RootTask, RootState>(node) {
+) : AbstractProcessor<RootTask, RootState>(node) {
 
     // the RootProcessor should not create the root state
     override fun stateWhenEnteringFromParent(
@@ -55,7 +55,7 @@ class RootProcessor(
         state: RootState,
         dataset: JsonElement,
         scope: Scope,
-    ): NavigationInfo = NavigationInfo(
+    ): NextInfo = NextInfo(
         nextNode = null,
         nextDirective = null
     )

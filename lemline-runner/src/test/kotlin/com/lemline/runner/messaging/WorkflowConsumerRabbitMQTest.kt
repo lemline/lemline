@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.messaging
 
+import com.lemline.runner.common.namespaces.DestinationType
+import com.lemline.runner.common.namespaces.destinationFor
 import com.lemline.runner.common.test.RequiresDocker
 import com.lemline.runner.messaging.base.WorkflowConsumerTest
 import com.lemline.runner.messaging.commands.COMMANDS_IN_CHANNEL
@@ -27,6 +29,17 @@ import org.junit.jupiter.api.TestInstance
 
 /**
  * Runs the WorkflowConsumerTest suite against a RabbitMQ broker.
+ *
+ * Destination model:
+ * - The runner follows namespace `test-in` (see [RabbitMQProfile]) → it consumes the
+ *   deterministic pool queues (`lemline-commands.test-in` / `lemline-events.test-in`),
+ *   read from `mp.messaging.incoming.*.queue.name`. The test SENDS raw commands
+ *   directly to that queue via the default exchange (routing key = queue name), which
+ *   requires no bindings.
+ * - Emissions are published to the channel topic exchanges (`lemline-commands` /
+ *   `lemline-events`) with per-message routing key = the workflow's namespace (`test`).
+ *   The test OBSERVES them by binding its own observation queues to those exchanges
+ *   with routing key `test` — the runner does not consume these emissions.
  */
 @QuarkusTest
 @TestProfile(RabbitMQProfile::class)
@@ -35,10 +48,19 @@ import org.junit.jupiter.api.TestInstance
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 internal class WorkflowConsumerRabbitMQTest : WorkflowConsumerTest() {
 
-    private lateinit var instanceQueueIn: String
-    private lateinit var instanceQueueOut: String
-    private lateinit var databaseQueueIn: String
-    private lateinit var databaseQueueOut: String
+    /** Routing key carried by every runner emission: the workflow's namespace. */
+    private val emissionRoutingKey = "test"
+
+    private lateinit var commandsQueueIn: String
+    private lateinit var eventsQueueIn: String
+    private lateinit var commandsExchange: String
+    private lateinit var eventsExchange: String
+
+    /** Queue where this test observes the runner's command emissions. */
+    private val commandsQueueObserved = destinationFor("lemline", "test", DestinationType.COMMANDS)
+
+    /** Queue where this test observes the runner's event emissions. */
+    private val eventsQueueObserved = destinationFor("lemline", "test", DestinationType.EVENTS)
 
     private lateinit var connection: Connection
     private lateinit var commandsChannel: Channel
@@ -55,17 +77,22 @@ internal class WorkflowConsumerRabbitMQTest : WorkflowConsumerTest() {
         val rabbitmqUsername = config.getValue("rabbitmq-username", String::class.java)
         val rabbitmqPassword = config.getValue("rabbitmq-password", String::class.java)
 
-        instanceQueueIn = config.getValue("mp.messaging.incoming.$COMMANDS_IN_CHANNEL.queue.name", String::class.java)
-        instanceQueueOut = config.getValue("mp.messaging.outgoing.$COMMANDS_OUT_CHANNEL.queue.name", String::class.java)
-        databaseQueueIn = config.getValue("mp.messaging.incoming.$EVENTS_IN_CHANNEL.queue.name", String::class.java)
-        databaseQueueOut = config.getValue("mp.messaging.outgoing.$EVENTS_OUT_CHANNEL.queue.name", String::class.java)
+        // Pool queues the runner consumes (derived from the followed namespaces)
+        commandsQueueIn = config.getValue("mp.messaging.incoming.$COMMANDS_IN_CHANNEL.queue.name", String::class.java)
+        eventsQueueIn = config.getValue("mp.messaging.incoming.$EVENTS_IN_CHANNEL.queue.name", String::class.java)
 
-        // In testing, queues In and Out must be different
-        require(instanceQueueIn != instanceQueueOut) {
-            "For RabbitMQ *testing*, queues In ($instanceQueueIn) and Out ($instanceQueueOut) must be different"
+        // Channel topic exchanges the producers publish to (static, per channel)
+        commandsExchange =
+            config.getValue("mp.messaging.outgoing.$COMMANDS_OUT_CHANNEL.exchange.name", String::class.java)
+        eventsExchange =
+            config.getValue("mp.messaging.outgoing.$EVENTS_OUT_CHANNEL.exchange.name", String::class.java)
+
+        // In testing, the consumed queues and the observed queues must be different
+        require(commandsQueueIn != commandsQueueObserved) {
+            "For RabbitMQ *testing*, queues In ($commandsQueueIn) and Observed ($commandsQueueObserved) must be different"
         }
-        require(databaseQueueIn != databaseQueueOut) {
-            "For RabbitMQ *testing*, queues In ($databaseQueueIn) and Out ($databaseQueueOut) must be different"
+        require(eventsQueueIn != eventsQueueObserved) {
+            "For RabbitMQ *testing*, queues In ($eventsQueueIn) and Observed ($eventsQueueObserved) must be different"
         }
 
         // Setup RabbitMQ connection
@@ -79,7 +106,7 @@ internal class WorkflowConsumerRabbitMQTest : WorkflowConsumerTest() {
         commandsChannel = connection.createChannel()
         eventsChannel = connection.createChannel()
 
-        // Declare the incoming queue with DLQ settings matching LemlineConfigSource
+        // Declare the incoming pool queues with DLQ settings matching LemlineConfigSource
         val commandsDlx =
             config.getValue("mp.messaging.incoming.$COMMANDS_IN_CHANNEL.dead-letter-exchange", String::class.java)
         val commandsDlq =
@@ -88,7 +115,7 @@ internal class WorkflowConsumerRabbitMQTest : WorkflowConsumerTest() {
             "x-dead-letter-exchange" to commandsDlx,
             "x-dead-letter-routing-key" to commandsDlq
         )
-        commandsChannel.queueDeclare(instanceQueueIn, true, false, false, commandsArgs)
+        commandsChannel.queueDeclare(commandsQueueIn, true, false, false, commandsArgs)
 
         val eventsDlx =
             config.getValue("mp.messaging.incoming.$EVENTS_IN_CHANNEL.dead-letter-exchange", String::class.java)
@@ -98,32 +125,34 @@ internal class WorkflowConsumerRabbitMQTest : WorkflowConsumerTest() {
             "x-dead-letter-exchange" to eventsDlx,
             "x-dead-letter-routing-key" to eventsDlq
         )
-        eventsChannel.queueDeclare(databaseQueueIn, true, false, false, eventsArgs)
+        eventsChannel.queueDeclare(eventsQueueIn, true, false, false, eventsArgs)
 
-        // Explicitly declare the exchange that SmallRye will default to
-        commandsChannel.exchangeDeclare(COMMANDS_OUT_CHANNEL, "topic", true)
-        eventsChannel.exchangeDeclare(EVENTS_OUT_CHANNEL, "topic", true)
+        // Declare the channel topic exchanges the producers publish to.
+        // The producer channels declare them at startup (topic, durable); declaring them
+        // here too (idempotent, same args) avoids ordering races with app startup.
+        commandsChannel.exchangeDeclare(commandsExchange, "topic", true)
+        eventsChannel.exchangeDeclare(eventsExchange, "topic", true)
 
-        // Declare the outgoing queue (where this test consumes)
-        commandsChannel.queueDeclare(instanceQueueOut, true, false, false, null)
-        eventsChannel.queueDeclare(databaseQueueOut, true, false, false, null)
+        // Declare the observation queues (where this test consumes)
+        commandsChannel.queueDeclare(commandsQueueObserved, true, false, false, null)
+        eventsChannel.queueDeclare(eventsQueueObserved, true, false, false, null)
 
-        // Bind the outgoing queue to the exchange with an EMPTY routing key,
-        // matching the default behavior observed in the logs.
-        commandsChannel.queueBind(instanceQueueOut, COMMANDS_OUT_CHANNEL, "") // routingKey = ""
-        eventsChannel.queueBind(databaseQueueOut, EVENTS_OUT_CHANNEL, "") // routingKey = ""
+        // Bind the observation queues to the channel exchanges with the emission
+        // routing key (= the workflow namespace `test`)
+        commandsChannel.queueBind(commandsQueueObserved, commandsExchange, emissionRoutingKey)
+        eventsChannel.queueBind(eventsQueueObserved, eventsExchange, emissionRoutingKey)
 
         // Setup consumer callbacks
-        val instanceCallback = DeliverCallback { _, delivery ->
-            println("Received message on output queue: ${String(delivery.body)}")
+        val commandsCallback = DeliverCallback { _, delivery ->
+            println("Received message on observed commands queue: ${String(delivery.body)}")
             commandsDeliveries.offer(delivery)
         }
-        commandsChannel.basicConsume(instanceQueueOut, true, instanceCallback) { }
-        val databaseCallback = DeliverCallback { _, delivery ->
-            println("Received message on output queue: ${String(delivery.body)}")
+        commandsChannel.basicConsume(commandsQueueObserved, true, commandsCallback) { }
+        val eventsCallback = DeliverCallback { _, delivery ->
+            println("Received message on observed events queue: ${String(delivery.body)}")
             eventsDeliveries.offer(delivery)
         }
-        eventsChannel.basicConsume(databaseQueueOut, true, databaseCallback) { }
+        eventsChannel.basicConsume(eventsQueueObserved, true, eventsCallback) { }
     }
 
     @AfterAll
@@ -135,10 +164,10 @@ internal class WorkflowConsumerRabbitMQTest : WorkflowConsumerTest() {
 
     override fun setupMessaging() {
         // Purge queues to ensure clean state between tests
-        commandsChannel.queuePurge(instanceQueueIn)
-        commandsChannel.queuePurge(instanceQueueOut)
-        eventsChannel.queuePurge(databaseQueueIn)
-        eventsChannel.queuePurge(databaseQueueOut)
+        commandsChannel.queuePurge(commandsQueueIn)
+        commandsChannel.queuePurge(commandsQueueObserved)
+        eventsChannel.queuePurge(eventsQueueIn)
+        eventsChannel.queuePurge(eventsQueueObserved)
 
         // Clear in-memory delivery queues
         commandsDeliveries.clear()
@@ -150,9 +179,11 @@ internal class WorkflowConsumerRabbitMQTest : WorkflowConsumerTest() {
     }
 
     override fun sendCommand(message: String) {
+        // Publish directly to the runner's pool queue via the default exchange
+        // (routing key = queue name) — requires no bindings
         commandsChannel.basicPublish(
             "",
-            instanceQueueIn,
+            commandsQueueIn,
             MessageProperties.PERSISTENT_TEXT_PLAIN,
             message.toByteArray()
         )

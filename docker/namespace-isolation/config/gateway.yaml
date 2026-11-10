@@ -1,0 +1,50 @@
+lemline:
+  # No `namespaces` here: an unpinned gateway serves all namespaces.
+  # To pin it to one team, uncomment:
+  # namespaces: team-a
+
+  database:
+    type: postgresql
+    migrate-at-start: true
+    baseline-on-migrate: false
+    postgresql:
+      host: postgres
+      port: 5432
+      database: lemline
+      username: postgres
+      password: postgres
+
+  messaging:
+    type: pgmq
+    pgmq:
+      host: postgres
+      port: 5432
+      database: lemline
+      username: postgres
+      password: postgres
+    # The gateway hosts the analytics sink (shared lifecycle destination)
+    lifecycleevents:
+      consumer:
+        enabled: true
+        concurrency: 64
+
+  gateway:
+    grpc:
+      host: 0.0.0.0
+      port: 9443
+    authentication:
+      enabled: false
+    watch:
+      poll-interval-ms: 250
+      batch-size: 256
+
+  analytics:
+    type: postgresql
+    migrate-at-start: true
+    baseline-on-migrate: true
+    postgresql:
+      host: postgres
+      port: 5432
+      database: lemline
+      username: postgres
+      password: postgres

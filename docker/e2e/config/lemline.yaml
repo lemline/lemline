@@ -1,4 +1,7 @@
 lemline:
+  # Namespaces of the seeded example workflows: without them, their instances stay pending.
+  namespaces: default, examples, samples, test
+
   database:
     type: postgresql
     migrate-at-start: true

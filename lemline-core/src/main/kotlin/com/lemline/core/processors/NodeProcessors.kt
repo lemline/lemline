@@ -39,7 +39,7 @@ object NodeProcessors {
      * @throws IllegalArgumentException if the task type is unknown
      */
     @Suppress("UNCHECKED_CAST")
-    fun <T : TaskBase> createProcessor(node: Node<T>): NodeProcessor<T, NodeState> = when (node.task) {
+    fun <T : TaskBase> createProcessor(node: Node<T>): AbstractProcessor<T, NodeState> = when (node.task) {
         is RootTask -> RootProcessor(node as Node<RootTask>)
         is DoTask -> DoProcessor(node as Node<DoTask>)
         is ForTask -> ForProcessor(node as Node<ForTask>)
@@ -56,12 +56,12 @@ object NodeProcessors {
         is ListenTask -> ListenProcessor(node as Node<ListenTask>)
         is RunTask -> createRunProcessor(node as Node<RunTask>)
         else -> throw IllegalArgumentException("Unknown task type: ${node.task::class.simpleName}")
-    } as NodeProcessor<T, NodeState>
+    } as AbstractProcessor<T, NodeState>
 
     /**
      * Creates the appropriate processor for a RunTask based on its run type.
      */
-    private fun createRunProcessor(node: Node<RunTask>): NodeProcessor<*, *> = when (node.task.run.get()) {
+    private fun createRunProcessor(node: Node<RunTask>): AbstractProcessor<*, *> = when (node.task.run.get()) {
         is RunShell -> RunShellProcessor(node)
         is RunScript -> RunScriptProcessor(node)
         is RunWorkflow -> RunWorkflowProcessor(node)

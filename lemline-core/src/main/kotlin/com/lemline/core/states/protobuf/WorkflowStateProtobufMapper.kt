@@ -37,7 +37,7 @@ import com.lemline.messages.internal.v1.FlowDirectiveEnumProto
 import com.lemline.messages.internal.v1.FlowDirectiveProto
 import com.lemline.messages.internal.v1.ForEachCompletedProto
 import com.lemline.messages.internal.v1.ForkBranchCompletedProto
-import com.lemline.messages.internal.v1.ForkBranchFailedProto
+import com.lemline.messages.internal.v1.ForkBranchFaultedProto
 import com.lemline.messages.internal.v1.ForkStartedProto
 import com.lemline.messages.internal.v1.HttpAuthenticationProto
 import com.lemline.messages.internal.v1.HttpOutputProto
@@ -50,7 +50,7 @@ import com.lemline.messages.internal.v1.OAuth2AuthProto
 import com.lemline.messages.internal.v1.ProcessReturnTypeProto
 import com.lemline.messages.internal.v1.ResumeFromTaskProto
 import com.lemline.messages.internal.v1.ResumeWithCompletedTaskProto
-import com.lemline.messages.internal.v1.ResumeWithFailedTaskProto
+import com.lemline.messages.internal.v1.ResumeWithFaultedTaskProto
 import com.lemline.messages.internal.v1.RunScriptConfigProto
 import com.lemline.messages.internal.v1.RunScriptStartedProto
 import com.lemline.messages.internal.v1.RunShellConfigProto
@@ -66,7 +66,7 @@ import com.lemline.messages.internal.v1.WaitStartedProto
 import com.lemline.messages.internal.v1.WorkflowCommandProto
 import com.lemline.messages.internal.v1.WorkflowCompletedProto
 import com.lemline.messages.internal.v1.WorkflowEventProto
-import com.lemline.messages.internal.v1.WorkflowFailedProto
+import com.lemline.messages.internal.v1.WorkflowFaultedProto
 import com.lemline.messages.internal.v1.WorkflowStateProto
 import io.serverlessworkflow.api.types.HTTPArguments.HTTPOutput
 import io.serverlessworkflow.api.types.ListenTaskConfiguration.ListenAndReadAs
@@ -92,21 +92,21 @@ object WorkflowStateProtobufMapper {
         when (command) {
             is WorkflowCommand.ResumeFromTask -> WorkflowCommandProto(resume_from_task = command.toProto())
             is WorkflowCommand.ResumeWithCompletedTask -> WorkflowCommandProto(resume_with_completed_task = command.toProto())
-            is WorkflowCommand.ResumeWithFailedTask -> WorkflowCommandProto(resume_with_failed_task = command.toProto())
+            is WorkflowCommand.ResumeWithFaultedTask -> WorkflowCommandProto(resume_with_faulted_task = command.toProto())
         }
 
     fun fromCommandProto(command: WorkflowCommandProto): WorkflowCommand {
         command.resume_from_task?.let { return it.toDomain() }
         command.resume_with_completed_task?.let { return it.toDomain() }
-        command.resume_with_failed_task?.let { return it.toDomain() }
+        command.resume_with_faulted_task?.let { return it.toDomain() }
         error("WorkflowCommandMessage has no command set")
     }
 
     fun toEventProto(event: WorkflowEvent): WorkflowEventProto = when (event) {
         is WorkflowEvent.WorkflowCompleted -> WorkflowEventProto(workflow_completed = event.toProto())
-        is WorkflowEvent.WorkflowFailed -> WorkflowEventProto(workflow_failed = event.toProto())
+        is WorkflowEvent.WorkflowFaulted -> WorkflowEventProto(workflow_faulted = event.toProto())
         is WorkflowEvent.ForkBranchCompleted -> WorkflowEventProto(fork_branch_completed = event.toProto())
-        is WorkflowEvent.ForkBranchFailed -> WorkflowEventProto(fork_branch_failed = event.toProto())
+        is WorkflowEvent.ForkBranchFaulted -> WorkflowEventProto(fork_branch_faulted = event.toProto())
         is WorkflowEvent.ForEachCompleted -> WorkflowEventProto(for_each_completed = event.toProto())
         is WorkflowEvent.TaskScheduled -> WorkflowEventProto(task_scheduled = event.toProto())
         is WorkflowEvent.WaitStarted -> WorkflowEventProto(wait_started = event.toProto())
@@ -122,9 +122,9 @@ object WorkflowStateProtobufMapper {
 
     fun fromEventProto(event: WorkflowEventProto): WorkflowEvent {
         event.workflow_completed?.let { return it.toDomain() }
-        event.workflow_failed?.let { return it.toDomain() }
+        event.workflow_faulted?.let { return it.toDomain() }
         event.fork_branch_completed?.let { return it.toDomain() }
-        event.fork_branch_failed?.let { return it.toDomain() }
+        event.fork_branch_faulted?.let { return it.toDomain() }
         event.for_each_completed?.let { return it.toDomain() }
         event.task_scheduled?.let { return it.toDomain() }
         event.wait_started?.let { return it.toDomain() }
@@ -165,15 +165,15 @@ object WorkflowStateProtobufMapper {
         rawOutput = output_json.toKotlinJsonElement()
     )
 
-    private fun WorkflowCommand.ResumeWithFailedTask.toProto() = ResumeWithFailedTaskProto(
+    private fun WorkflowCommand.ResumeWithFaultedTask.toProto() = ResumeWithFaultedTaskProto(
         node_stack = NodeStackProtobufMapper.toProto(nodeStack),
         error = error.toProto()
     )
 
-    private fun ResumeWithFailedTaskProto.toDomain() = WorkflowCommand.ResumeWithFailedTask(
+    private fun ResumeWithFaultedTaskProto.toDomain() = WorkflowCommand.ResumeWithFaultedTask(
         nodeStack = node_stack?.let(NodeStackProtobufMapper::fromProto)
-            ?: error("ResumeWithFailedTaskCommand.node_stack is required"),
-        error = error?.toDomain() ?: error("ResumeWithFailedTaskCommand.error is required")
+            ?: error("ResumeWithFaultedTaskCommand.node_stack is required"),
+        error = error?.toDomain() ?: error("ResumeWithFaultedTaskCommand.error is required")
     )
 
     private fun WorkflowEvent.WorkflowCompleted.toProto() = WorkflowCompletedProto(
@@ -189,23 +189,23 @@ object WorkflowStateProtobufMapper {
             ?: error("WorkflowCompletedEvent.node_stack is required"),
     )
 
-    private fun WorkflowEvent.WorkflowFailed.toProto() = WorkflowFailedProto(
+    private fun WorkflowEvent.WorkflowFaulted.toProto() = WorkflowFaultedProto(
         node_stack = NodeStackProtobufMapper.toProto(nodeStack),
         input_json = rawInput?.toProtoJsonValue(),
         output_json = rawOutput?.toProtoJsonValue(),
         flow_directive = flowDirective?.toProto(),
         error = error.toProto(),
-        failed_at = failedAt.toProtoInstant()
+        faulted_at = faultedAt.toProtoInstant()
     )
 
-    private fun WorkflowFailedProto.toDomain() = WorkflowEvent.WorkflowFailed(
+    private fun WorkflowFaultedProto.toDomain() = WorkflowEvent.WorkflowFaulted(
         nodeStack = node_stack?.let(NodeStackProtobufMapper::fromProto)
-            ?: error("WorkflowFailedEvent.node_stack is required"),
+            ?: error("WorkflowFaultedEvent.node_stack is required"),
         rawInput = input_json?.toKotlinJsonElement(),
         rawOutput = output_json?.toKotlinJsonElement(),
         flowDirective = flow_directive?.toDomain(),
-        error = error?.toDomain() ?: error("WorkflowFailedEvent.error is required"),
-        failedAt = failed_at.toKotlinInstantOrEpoch(),
+        error = error?.toDomain() ?: error("WorkflowFaultedEvent.error is required"),
+        faultedAt = faulted_at.toKotlinInstantOrEpoch(),
     )
 
     private fun WorkflowEvent.ForkBranchCompleted.toProto() = ForkBranchCompletedProto(
@@ -223,19 +223,19 @@ object WorkflowStateProtobufMapper {
         completedAt = completed_at.toKotlinInstantOrEpoch(),
     )
 
-    private fun WorkflowEvent.ForkBranchFailed.toProto() = ForkBranchFailedProto(
+    private fun WorkflowEvent.ForkBranchFaulted.toProto() = ForkBranchFaultedProto(
         node_stack = NodeStackProtobufMapper.toProto(nodeStack),
         branch_position = branchPosition.toString(),
         error = error.toProto(),
-        failed_at = failedAt.toProtoInstant()
+        faulted_at = faultedAt.toProtoInstant()
     )
 
-    private fun ForkBranchFailedProto.toDomain() = WorkflowEvent.ForkBranchFailed(
+    private fun ForkBranchFaultedProto.toDomain() = WorkflowEvent.ForkBranchFaulted(
         nodeStack = node_stack?.let(NodeStackProtobufMapper::fromProto)
-            ?: error("ForkBranchFailedEvent.node_stack is required"),
+            ?: error("ForkBranchFaultedEvent.node_stack is required"),
         branchPosition = NodePosition(branch_position),
-        error = error?.toDomain() ?: error("ForkBranchFailedEvent.error is required"),
-        failedAt = failed_at.toKotlinInstantOrEpoch(),
+        error = error?.toDomain() ?: error("ForkBranchFaultedEvent.error is required"),
+        faultedAt = faulted_at.toKotlinInstantOrEpoch(),
     )
 
     private fun WorkflowEvent.ForEachCompleted.toProto() = ForEachCompletedProto(

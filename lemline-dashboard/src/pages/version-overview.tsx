@@ -33,7 +33,7 @@ export function VersionOverviewPage() {
       ) : definition.data ? (
         <Suspense fallback={<p className="text-sm text-slate-500">Loading definition...</p>}>
           <DefinitionViewer
-            definition={definition.data.definition}
+            definition={definition.data.source}
             namespace={namespace}
             name={name}
             version={version}

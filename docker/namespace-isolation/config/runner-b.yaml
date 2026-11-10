@@ -1,0 +1,42 @@
+lemline:
+  # This runner only consumes, executes and persists workflows of namespace team-b
+  namespaces: team-b
+
+  database:
+    type: postgresql
+    migrate-at-start: true
+    baseline-on-migrate: false
+    postgresql:
+      host: postgres
+      port: 5432
+      database: lemline
+      username: postgres
+      password: postgres
+
+  messaging:
+    type: pgmq
+    pgmq:
+      host: postgres
+      port: 5432
+      database: lemline
+      username: postgres
+      password: postgres
+    cloudevents:
+      consumer:
+        enabled: true
+      producer:
+        enabled: true
+    lifecycleevents:
+      producer:
+        enabled: true
+
+  analytics:
+    type: postgresql
+    migrate-at-start: true
+    baseline-on-migrate: true
+    postgresql:
+      host: postgres
+      port: 5432
+      database: lemline
+      username: postgres
+      password: postgres

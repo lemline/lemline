@@ -2,6 +2,7 @@
 package com.lemline.runner.testcases.bases
 
 import com.lemline.common.logger.logger
+import com.lemline.common.values.IDV7
 import com.lemline.common.values.WorkflowId
 import com.lemline.core.lifecycleevents.LifecycleEventHook
 import com.lemline.core.states.WorkflowCommand
@@ -13,6 +14,7 @@ import com.lemline.runner.common.messaging.LIFECYCLEEVENTS_OUT_CHANNEL
 import com.lemline.runner.config.DatabaseManager
 import com.lemline.runner.definitions.DefinitionRepository
 import com.lemline.runner.listeners.ListenerRepository
+import com.lemline.runner.messaging.MetaData
 import com.lemline.runner.messaging.cloudevents.CLOUDEVENTS_IN_CHANNEL
 import com.lemline.runner.messaging.commands.COMMANDS_IN_CHANNEL
 import com.lemline.runner.messaging.commands.COMMANDS_OUT_CHANNEL
@@ -25,6 +27,8 @@ import jakarta.enterprise.inject.Any
 import jakarta.inject.Inject
 import jakarta.inject.Singleton
 import kotlinx.coroutines.delay
+import org.eclipse.microprofile.reactive.messaging.Message
+import org.eclipse.microprofile.reactive.messaging.Metadata
 
 /**
  * Workflow test executor using in-memory channels with manual message routing.
@@ -79,7 +83,7 @@ internal class InMemoryWorkflowTestExecutor : AbstractWorkflowTestExecutor() {
     private val eventsOut get() = connector.sink<String>(EVENTS_OUT_CHANNEL)
     private val lifecycleEventsIn get() = connector.source<String>(LIFECYCLEEVENTS_IN_CHANNEL)
     private val lifecycleEventsOut get() = connector.sink<String>(LIFECYCLEEVENTS_OUT_CHANNEL)
-    private val cloudEventsIn get() = connector.source<String>(CLOUDEVENTS_IN_CHANNEL)
+    private val cloudEventsIn get() = connector.source<Message<String>>(CLOUDEVENTS_IN_CHANNEL)
 
     override suspend fun sendInitialCommand(message: InstanceMessage<out WorkflowCommand>) {
         commandsOut.clear()
@@ -88,8 +92,21 @@ internal class InMemoryWorkflowTestExecutor : AbstractWorkflowTestExecutor() {
         commandsIn.send(message.toTransportPayload())
     }
 
-    override suspend fun sendCloudEventPayload(payload: String) {
-        cloudEventsIn.send(payload)
+    /**
+     * Spacing between CloudEvent sends. The broker test resources set the system property
+     * JVM-wide (RabbitMQ: 50ms, PGMQ: 500ms); standalone in-memory runs need an explicit
+     * default, otherwise back-to-back sends race in the concurrent cloudevents subscriber
+     * and event accumulation order becomes non-deterministic.
+     */
+    override val cloudEventSendIntervalMs: Long? by lazy {
+        System.getProperty("test.workflow.cloudevent-send-interval-ms")?.toLongOrNull() ?: 50L
+    }
+
+    override suspend fun sendCloudEventPayload(payload: String, namespace: String) {
+        // The in-memory arrival-namespace resolver needs MetaData.namespace when the runner
+        // follows several namespaces (InMemoryConnector sends a Message argument as-is)
+        val metaData = MetaData(messageId = IDV7.random(), namespace = namespace)
+        cloudEventsIn.send(Message.of(payload, Metadata.of(metaData)))
     }
 
     override suspend fun awaitCompletion(workflowId: WorkflowId, timeoutSeconds: Long): WorkflowTestResult {

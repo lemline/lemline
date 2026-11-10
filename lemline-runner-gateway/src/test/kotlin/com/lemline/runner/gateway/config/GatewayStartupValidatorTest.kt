@@ -4,6 +4,7 @@ package com.lemline.runner.gateway.config
 import com.lemline.runner.common.config.LEMLINE_GATEWAY_AUTHENTICATION_ENABLED
 import com.lemline.runner.common.config.LEMLINE_GATEWAY_TLS_ENABLED
 import com.lemline.runner.gateway.analytics.WorkflowAnalyticsEventSource
+import com.lemline.runner.gateway.support.testLemlineConfiguration
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk

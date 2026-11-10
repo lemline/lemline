@@ -4,7 +4,6 @@ package com.lemline.runner.messaging.cloudevents
 import com.lemline.runner.common.messaging.MessageSubscriber
 import com.lemline.runner.config.LemlineConfigConstants.CONSUMER_CONCURRENCY_DEFAULT
 import com.lemline.runner.config.LemlineConfiguration
-import io.cloudevents.CloudEvent
 import io.quarkus.runtime.Startup
 import jakarta.enterprise.context.ApplicationScoped
 import kotlin.jvm.optionals.getOrNull
@@ -33,7 +32,7 @@ internal class CloudEventSubscriber(
     @param:Channel(CLOUDEVENTS_IN_CHANNEL) override val publisher: Publisher<Message<String>>,
     override val handler: CloudEventHandler,
     override val metrics: CloudEventSubscriberMetrics,
-) : MessageSubscriber<CloudEvent>() {
+) : MessageSubscriber<ReceivedCloudEvent>() {
     private val consumerConfig = config.messaging().cloudevents().getOrNull()?.consumer()
 
     override val maxConcurrency: Long = consumerConfig?.concurrency() ?: CONSUMER_CONCURRENCY_DEFAULT.toLong()

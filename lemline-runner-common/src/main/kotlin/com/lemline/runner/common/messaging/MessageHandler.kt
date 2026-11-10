@@ -9,6 +9,7 @@ import com.lemline.common.values.WorkflowId
 import com.lemline.common.values.WorkflowInfo
 import com.lemline.common.values.WorkflowName
 import com.lemline.common.values.WorkflowVersion
+import com.lemline.runner.common.namespaces.NamespaceScope
 import io.quarkus.smallrye.reactivemessaging.ackSuspending
 import io.quarkus.smallrye.reactivemessaging.nackSuspending
 import org.eclipse.microprofile.reactive.messaging.Message
@@ -32,8 +33,10 @@ interface MessageHandler<T> {
      * @param payload The serialized message payload
      * @param idempotentKey Optional deterministic ID for message deduplication.
      *                      If null, a random ID will be generated.
+     * @param workflowInfo Identity of the emitted message — its namespace routes the payload
+     *                     to the per-namespace destination.
      */
-    suspend fun emit(payload: String, idempotentKey: IDV7)
+    suspend fun emit(payload: String, idempotentKey: IDV7, workflowInfo: WorkflowInfo?)
 
     /**
      * Derives an idempotent key for the given message.
@@ -47,6 +50,17 @@ interface MessageHandler<T> {
     val logger: Logger
 
     val metrics: MessageSubscriberMetrics
+
+    /** Namespaces this runner follows — messages outside them are never processed. */
+    val namespaceScope: NamespaceScope
+
+    /**
+     * Compensation hook for a message whose namespace is not followed by this runner
+     * (broker binding/config anomaly). Runs before the message is ACKed; override to persist
+     * the payload (e.g. as a FailureModel) so the message stays recoverable. Never re-emit:
+     * that would write another namespace's workflow state to this runner's channels.
+     */
+    suspend fun onForeignNamespace(message: Message<String>, workflowInfo: WorkflowInfo) {}
 
     val onCompleteTest: (Message<String>, T?) -> Unit
 
@@ -85,6 +99,20 @@ interface MessageHandler<T> {
 
         // --- Processing  ---
         message.tryWithCompensation(msg.workflowId, msg.workflowInfo) {
+            // Foreign-namespace guard: a message of a namespace this runner does not follow is a
+            // routing anomaly — counted, logged, persisted (compensation), ACKed. Never processed.
+            msg.workflowInfo?.let { info ->
+                if (!namespaceScope.owns(info.namespace)) {
+                    logger.warn {
+                        "Foreign namespace '${info.namespace}' received on this channel — this runner follows " +
+                            "${namespaceScope.followed}. Check broker bindings; payload preserved in failures."
+                    }
+                    metrics.foreignNamespace(info)
+                    throw CompensationException(FailureReasons.FOREIGN_NAMESPACE) {
+                        onForeignNamespace(message, info)
+                    }
+                }
+            }
             val next: T? = metrics.recordProcessingDuration(msg.workflowInfo) {
                 handle(msg)
             }
@@ -95,7 +123,7 @@ interface MessageHandler<T> {
             }
             // Derive idempotent key and emit with it
             nextPayload?.let { payload ->
-                emit(payload, deriveIdempotentKey(next))
+                emit(payload, deriveIdempotentKey(next), next.workflowInfo)
             }
 
             onCompleteTest(message, next)

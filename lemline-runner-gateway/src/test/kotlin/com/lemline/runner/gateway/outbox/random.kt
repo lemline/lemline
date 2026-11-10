@@ -10,7 +10,7 @@ import com.lemline.runner.common.messaging.InstanceMessage
 import com.lemline.runner.common.models.WithOutbox
 import kotlin.time.Instant
 
-fun randomGatewayCommandOutboxModel() = GatewayCommandOutboxModel(
+fun randomGatewayCommandOutboxModel() = GatewayCommandModel(
     id = IDV7.random(),
     instanceMessage = InstanceMessage(
         workflowInfo = randomWorkflowInfo(),

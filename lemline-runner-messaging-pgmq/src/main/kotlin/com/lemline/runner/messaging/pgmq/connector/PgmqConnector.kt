@@ -4,6 +4,7 @@ package com.lemline.runner.messaging.pgmq.connector
 import com.lemline.common.logger.logger
 import com.lemline.runner.messaging.pgmq.PgmqClient
 import com.lemline.runner.messaging.pgmq.PgmqMessage
+import com.lemline.runner.messaging.pgmq.UnreadableMessage
 import com.lemline.runner.messaging.pgmq.config.PgmqConnectorConfig
 import io.quarkus.runtime.ShutdownEvent
 import io.quarkus.runtime.Startup
@@ -53,9 +54,17 @@ import org.eclipse.microprofile.reactive.messaging.spi.Connector
  * - username: Database username
  * - password: Database password
  * - queue: PGMQ queue name
+ * - queues: Comma-separated list of PGMQ queue names (incoming only; overrides `queue` when present)
  * - visibility-timeout: Seconds before unacknowledged message becomes visible again (incoming only)
  * - poll-interval: Polling interval in milliseconds (incoming only)
  * - batch-size: Messages to fetch per poll (incoming only)
+ *
+ * Outgoing messages may carry a [PgmqOutgoingMetadata.queue] override to target a queue
+ * other than the channel's configured one (used for per-namespace destinations).
+ *
+ * When the incoming `queues` attribute is used, messages exceeding `max-retries` are
+ * dead-lettered to a per-source queue derived as `<source-queue>.dlq` (created lazily);
+ * the explicit `dead-letter-queue` attribute only applies in single-queue mode.
  *
  * @see PgmqConnectorConfig for all configuration options
  */
@@ -85,6 +94,9 @@ class PgmqConnector : InboundConnector, OutboundConnector {
     // Incoming channel state
     private val incomingClients = ConcurrentHashMap<String, PgmqClient>()
     private val incomingRunning = ConcurrentHashMap<String, AtomicBoolean>()
+
+    // Dead-letter queues already ensured to exist, keyed by "channel:dlq" (multi-queue mode)
+    private val ensuredDeadLetterQueues = ConcurrentHashMap.newKeySet<String>()
 
     @PostConstruct
     fun init() {
@@ -165,7 +177,7 @@ class PgmqConnector : InboundConnector, OutboundConnector {
         val channelName = cfg.getValue("channel-name", String::class.java)
         val connectorConfig = PgmqConnectorConfig(config, channelName)
 
-        logger.info { "Creating PGMQ incoming channel: $channelName for queue: ${connectorConfig.queue}" }
+        logger.info { "Creating PGMQ incoming channel: $channelName for queue(s): ${connectorConfig.queues}" }
 
         val client = PgmqClient(connectorConfig)
         incomingClients[channelName] = client
@@ -174,12 +186,14 @@ class PgmqConnector : InboundConnector, OutboundConnector {
         // Create polling flow using Kotlin coroutines, convert to Publisher only at the end
         val reactivePublisher = createPollingFlow(channelName, client, connectorConfig)
             .onStart { client.initialize() }
-            .map { pgmqMessage -> createMessage(channelName, client, connectorConfig, pgmqMessage) }
+            .map { (queue, pgmqMessage) -> createMessage(channelName, client, connectorConfig, queue, pgmqMessage) }
             .catch { t ->
                 logger.error(t) { "Failed in PGMQ incoming channel: $channelName" }
                 delay(connectorConfig.pollInterval.toMillis())
                 createPollingFlow(channelName, client, connectorConfig)
-                    .map { pgmqMessage -> createMessage(channelName, client, connectorConfig, pgmqMessage) }
+                    .map { (queue, pgmqMessage) ->
+                        createMessage(channelName, client, connectorConfig, queue, pgmqMessage)
+                    }
                     .collect { emit(it) }
             }
             .asPublisher(scope.coroutineContext)
@@ -187,45 +201,147 @@ class PgmqConnector : InboundConnector, OutboundConnector {
         return AdaptersToFlow.publisher(reactivePublisher)
     }
 
+    /**
+     * Polls the channel's queue(s) and emits each message paired with its source queue.
+     *
+     * - Single queue: uses PGMQ long polling (database-side wait loop).
+     * - Multiple queues (`queues` attribute): reads each queue sequentially per cycle
+     *   (fair round-robin) and sleeps for `poll-interval` when all queues are empty.
+     */
     private fun createPollingFlow(
         channelName: String,
         client: PgmqClient,
         config: PgmqConnectorConfig
     ) = flow {
+        val queues = config.queues
         val maxPollSeconds = (config.pollInterval.toMillis() / 1000).toInt().coerceAtLeast(1)
+        val onUnreadable: suspend (UnreadableMessage) -> Unit = { unreadable ->
+            quarantineUnreadable(channelName, client, config, unreadable)
+        }
 
         while (incomingRunning[channelName]?.get() == true) {
             try {
-                val messages = client.readWithPoll(
-                    batchSize = config.batchSize,
-                    maxPollSeconds = maxPollSeconds,
-                    pollIntervalMs = 100
-                )
-                messages.forEach { emit(it) }
+                if (queues.size == 1) {
+                    // Single queue: long polling is more efficient (server-side wait)
+                    val queue = queues.first()
+                    val messages = client.readWithPoll(
+                        batchSize = config.batchSize,
+                        maxPollSeconds = maxPollSeconds,
+                        pollIntervalMs = 100,
+                        queue = queue,
+                        onUnreadable = onUnreadable
+                    )
+                    messages.forEach { emit(queue to it) }
+                } else {
+                    // Multiple queues: read each queue once per cycle to stay fair,
+                    // then wait for the poll interval if no queue had messages.
+                    // A failure reading one queue must not starve the others: it is
+                    // isolated per queue (only the read is guarded, never `emit`).
+                    var received = 0
+                    for (queue in queues) {
+                        if (incomingRunning[channelName]?.get() != true) break
+                        val messages = try {
+                            client.read(batchSize = config.batchSize, queue = queue, onUnreadable = onUnreadable)
+                        } catch (t: Throwable) {
+                            if (isStopping(channelName, t)) throw t
+                            logger.error(t) { "Error polling PGMQ queue $queue (other queues keep being polled)" }
+                            continue
+                        }
+                        received += messages.size
+                        messages.forEach { emit(queue to it) }
+                    }
+                    if (received == 0) {
+                        delay(config.pollInterval.toMillis())
+                    }
+                }
             } catch (t: Throwable) {
-                val isCancellation = t is kotlinx.coroutines.CancellationException ||
-                    t.cause is kotlinx.coroutines.CancellationException ||
-                    t.message?.contains("cancelled", ignoreCase = true) == true
-
-                val isShuttingDown = isShutdown.get() ||
-                    incomingRunning[channelName]?.get() != true ||
-                    isCancellation
-
-                if (!isShuttingDown) {
-                    logger.error(t) { "Error polling PGMQ queue ${config.queue}" }
+                if (!isStopping(channelName, t)) {
+                    logger.error(t) { "Error polling PGMQ queue(s) $queues" }
                     delay(1000)
                 } else {
-                    logger.debug { "PGMQ polling stopped for queue ${config.queue} (shutdown)" }
+                    logger.debug { "PGMQ polling stopped for queue(s) $queues (shutdown)" }
                     break
                 }
             }
         }
     }
 
+    private fun isStopping(channelName: String, t: Throwable): Boolean {
+        val isCancellation = t is kotlinx.coroutines.CancellationException ||
+            t.cause is kotlinx.coroutines.CancellationException ||
+            t.message?.contains("cancelled", ignoreCase = true) == true
+
+        return isShutdown.get() || incomingRunning[channelName]?.get() != true || isCancellation
+    }
+
+    /**
+     * Removes a message that cannot be decoded from its source queue, so it can never
+     * block the polling of that queue.
+     *
+     * Failures here are only logged: the message stays invisible until its visibility
+     * timeout and is quarantined again on the next read, without affecting other messages.
+     */
+    private suspend fun quarantineUnreadable(
+        channelName: String,
+        client: PgmqClient,
+        config: PgmqConnectorConfig,
+        unreadable: UnreadableMessage,
+    ) {
+        try {
+            deadLetter(
+                channelName = channelName,
+                client = client,
+                config = config,
+                sourceQueue = unreadable.queue,
+                msgId = unreadable.msgId,
+                payload = unreadable.rawPayload ?: "",
+                error = "Unreadable message: ${unreadable.error.message ?: unreadable.error::class.simpleName}",
+            )
+        } catch (t: Throwable) {
+            if (t is kotlinx.coroutines.CancellationException) throw t
+            logger.error(t) { "Failed to quarantine unreadable message ${unreadable.msgId} from queue ${unreadable.queue}" }
+        }
+    }
+
+    /**
+     * Moves a message out of its source queue: to its dead-letter queue when one is
+     * configured (derived per source queue in multi-queue mode), otherwise to the PGMQ
+     * archive table (`pgmq.a_<queue>`), where it stays recoverable.
+     */
+    private suspend fun deadLetter(
+        channelName: String,
+        client: PgmqClient,
+        config: PgmqConnectorConfig,
+        sourceQueue: String,
+        msgId: Long,
+        payload: String,
+        error: String,
+    ) {
+        val dlq = config.deadLetterQueueFor(sourceQueue)
+        if (dlq == null) {
+            client.archive(msgId, queue = sourceQueue)
+            logger.error { "Message $msgId from queue $sourceQueue archived (no dead-letter queue configured): $error" }
+            return
+        }
+        if (config.usesQueues) {
+            // Derived per-source DLQs are created lazily on first use
+            ensureDeadLetterQueue(channelName, client, dlq)
+        }
+        client.moveToDeadLetterQueue(
+            msgId = msgId,
+            message = payload,
+            error = error,
+            sourceQueue = sourceQueue,
+            deadLetterQueue = dlq
+        )
+        logger.warn { "Message $msgId from queue $sourceQueue moved to DLQ $dlq: $error" }
+    }
+
     private fun createMessage(
         channelName: String,
         client: PgmqClient,
         config: PgmqConnectorConfig,
+        sourceQueue: String,
         pgmqMessage: PgmqMessage
     ): Message<String> {
         val metadata = PgmqIncomingMetadata(
@@ -233,33 +349,48 @@ class PgmqConnector : InboundConnector, OutboundConnector {
             readCount = pgmqMessage.readCt,
             enqueuedAt = pgmqMessage.enqueuedAt,
             visibilityTimeout = pgmqMessage.vt,
-            queue = config.queue,
+            queue = sourceQueue,
             headers = pgmqMessage.headers
         )
 
         return Message.of(pgmqMessage.message, org.eclipse.microprofile.reactive.messaging.Metadata.of(metadata))
             .withAck {
                 scope.future {
-                    client.delete(pgmqMessage.msgId)
-                    logger.debug { "Acknowledged message ${pgmqMessage.msgId} from queue ${config.queue}" }
+                    client.delete(pgmqMessage.msgId, queue = sourceQueue)
+                    logger.debug { "Acknowledged message ${pgmqMessage.msgId} from queue $sourceQueue" }
                 }.thenApply { null as Void? }
             }
             .withNack { reason ->
-                handleNack(client, config, pgmqMessage, reason)
+                handleNack(channelName, client, config, sourceQueue, pgmqMessage, reason)
             }
     }
 
     private fun handleNack(
+        channelName: String,
         client: PgmqClient,
         config: PgmqConnectorConfig,
+        sourceQueue: String,
         message: PgmqMessage,
         reason: Throwable?
     ): CompletionStage<Void> {
         return if (message.readCt >= config.maxRetries) {
             val errorMessage = reason?.message ?: "Unknown error"
             scope.future {
-                client.moveToDeadLetterQueue(message.msgId, message.message, errorMessage)
-                logger.warn { "Message ${message.msgId} exceeded max retries, moved to DLQ" }
+                if (config.deadLetterQueueFor(sourceQueue) == null) {
+                    // No DLQ: keep the message in the queue so it is retried after the
+                    // visibility timeout (transient failures must not drop messages)
+                    logger.warn { "Message ${message.msgId} from queue $sourceQueue exceeded max retries, no DLQ configured" }
+                } else {
+                    deadLetter(
+                        channelName = channelName,
+                        client = client,
+                        config = config,
+                        sourceQueue = sourceQueue,
+                        msgId = message.msgId,
+                        payload = message.message,
+                        error = errorMessage,
+                    )
+                }
             }.thenApply { null as Void? }
         } else {
             logger.debug { "Nacked message ${message.msgId}, will be redelivered (attempt ${message.readCt}/${config.maxRetries})" }
@@ -267,9 +398,23 @@ class PgmqConnector : InboundConnector, OutboundConnector {
         }
     }
 
+    /**
+     * Ensures a derived dead-letter queue exists, creating it idempotently on first use.
+     *
+     * The result is cached per channel; a benign race only causes an extra idempotent
+     * pgmq.create() call.
+     */
+    private suspend fun ensureDeadLetterQueue(channelName: String, client: PgmqClient, dlq: String) {
+        val key = "$channelName:$dlq"
+        if (key in ensuredDeadLetterQueues) return
+        client.ensureQueue(dlq)
+        ensuredDeadLetterQueues.add(key)
+    }
+
     private fun stopIncoming(channelName: String) {
         incomingRunning[channelName]?.set(false)
         incomingClients.remove(channelName)?.close()
+        ensuredDeadLetterQueues.removeIf { it.startsWith("$channelName:") }
         logger.info { "Stopped PGMQ incoming channel: $channelName" }
     }
 
@@ -281,6 +426,11 @@ class PgmqConnector : InboundConnector, OutboundConnector {
 
     /**
      * Subscriber that sends messages to PGMQ.
+     *
+     * Messages carrying a [PgmqOutgoingMetadata.queue] override are sent to that queue
+     * instead of the channel's configured one. Override queues are created lazily and
+     * idempotently on first use (when `auto-create-queue` is enabled, mirroring how the
+     * channel's own queue is created at initialization).
      */
     private class PgmqSubscriber(
         private val channelName: String,
@@ -293,6 +443,9 @@ class PgmqConnector : InboundConnector, OutboundConnector {
         private val running = AtomicBoolean(true)
         private var subscription: Flow.Subscription? = null
         private val pending = AtomicInteger(0)
+
+        // Override queues already ensured to exist (lazy, thread-safe)
+        private val ensuredQueues = ConcurrentHashMap.newKeySet<String>()
 
         val pendingCount: Int get() = pending.get()
 
@@ -320,13 +473,17 @@ class PgmqConnector : InboundConnector, OutboundConnector {
             val headersJson = pgmqMetadata?.messageId?.let { messageId ->
                 """{"messageId":"$messageId"}"""
             }
+            // Per-message queue override (per-namespace destination)
+            val overrideQueue = pgmqMetadata?.queue?.takeIf { it != config.queue }
+            val queue = overrideQueue ?: config.queue
 
             pending.incrementAndGet()
 
             scope.launch {
                 try {
-                    val msgId = client.send(payload, delaySeconds, headersJson)
-                    logger.debug { "Sent message $msgId to queue ${config.queue}" }
+                    overrideQueue?.let { ensureQueue(it) }
+                    val msgId = client.send(payload, delaySeconds, headersJson, queue = queue)
+                    logger.debug { "Sent message $msgId to queue $queue" }
                     message.ack().whenComplete { _, error ->
                         if (error != null) {
                             logger.error(error) { "Failed to ack message after send" }
@@ -340,11 +497,24 @@ class PgmqConnector : InboundConnector, OutboundConnector {
                         logger.debug { "Duplicate message detected (idempotent send), treating as success" }
                         message.ack().whenComplete { _, _ -> messageDone() }
                     } else {
-                        logger.error(error) { "Failed to send message to queue ${config.queue}" }
+                        logger.error(error) { "Failed to send message to queue $queue" }
                         message.nack(error).whenComplete { _, _ -> messageDone() }
                     }
                 }
             }
+        }
+
+        /**
+         * Ensures an override queue exists before the first send to it.
+         *
+         * Creation is gated on `auto-create-queue`, mirroring how the channel's own
+         * queue is created at initialization. The result is cached; a benign race
+         * only causes an extra idempotent pgmq.create() call.
+         */
+        private suspend fun ensureQueue(queue: String) {
+            if (!config.autoCreateQueue || queue in ensuredQueues) return
+            client.ensureQueue(queue)
+            ensuredQueues.add(queue)
         }
 
         private fun messageDone() {

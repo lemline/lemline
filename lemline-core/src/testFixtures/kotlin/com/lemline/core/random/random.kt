@@ -191,7 +191,7 @@ fun randomResumeWithCompletedTaskCommand() = WorkflowCommand.ResumeWithCompleted
 fun randomWorkflowEvent(): WorkflowEvent {
     return when (Random.nextInt(9)) {
         0 -> randomWorkflowCompletedEvent()
-        1 -> randomWorkflowFailedEvent()
+        1 -> randomWorkflowFaultedEvent()
         2 -> randomTaskScheduledEvent()
         3 -> randomWaitStartedEvent()
         4 -> randomTaskRetryScheduledEvent()
@@ -223,7 +223,7 @@ fun randomWorkflowCompletedEvent() = WorkflowEvent.WorkflowCompleted(
     nodeStack = NodeStack.random()
 )
 
-fun randomWorkflowFailedEvent() = WorkflowEvent.WorkflowFailed(
+fun randomWorkflowFaultedEvent() = WorkflowEvent.WorkflowFaulted(
     nodeStack = NodeStack.random(),
     rawInput = when (Random.nextBoolean()) {
         true -> JsonElement.random()
@@ -238,7 +238,7 @@ fun randomWorkflowFailedEvent() = WorkflowEvent.WorkflowFailed(
         false -> null
     },
     error = InternalException.Error.random(),
-    failedAt = Instant.random()
+    faultedAt = Instant.random()
 )
 
 fun randomTaskScheduledEvent() = WorkflowEvent.TaskScheduled(

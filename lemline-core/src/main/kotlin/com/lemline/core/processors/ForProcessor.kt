@@ -53,7 +53,7 @@ import kotlinx.serialization.json.JsonElement
  */
 class ForProcessor(
     node: Node<ForTask>
-) : NodeProcessor<ForTask, ForState>(node) {
+) : AbstractProcessor<ForTask, ForState>(node) {
 
     override fun stateWhenEnteringFromParent(transformedInput: JsonElement, scope: Scope) = ForState(
         startedAt = Clock.System.now(),
@@ -83,16 +83,16 @@ class ForProcessor(
         state: ForState,
         dataset: JsonElement,
         scope: Scope,
-    ): NavigationInfo {
+    ): NextInfo {
         // state already reflects the current iteration to execute
         // Check if we should continue looping (while condition and collection bounds)
         return when (shouldContinue(state, dataset, scope)) {
-            false -> NavigationInfo(
+            false -> NextInfo(
                 nextNode = node.parent,
                 nextDirective = getFlowDirective()
             )
 
-            true -> NavigationInfo(
+            true -> NextInfo(
                 nextNode = node.forBlock,
                 nextDirective = null
             )

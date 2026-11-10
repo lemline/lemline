@@ -167,7 +167,7 @@ This separation maintains clean boundaries between execution modes and avoids un
    - Add documentation clarifying that error tracking is NOT stored here
    - No schema changes needed (keeps state minimal)
 
-2. **Add ForkBranchFailed Event** (`lemline-core/src/main/kotlin/com/lemline/core/states/WorkflowState.kt`):
+2. **Add ForkBranchFaulted Event** (`lemline-core/src/main/kotlin/com/lemline/core/states/WorkflowState.kt`):
    - Create new `ForkBranchFailed` event type (parallel to `ForkBranchCompleted`)
    - Carries branch name, error, and failedAt timestamp
 

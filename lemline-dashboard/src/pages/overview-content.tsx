@@ -1,20 +1,25 @@
 import { useQueryClient } from "@tanstack/react-query";
-import type { InfiniteData } from "@tanstack/react-query";
+import type { InfiniteData, QueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
 import {
   DefinitionStats,
+  DefinitionStatsChangeType,
+  InstanceChangeType,
+  InstanceStatus,
+  InstanceSummary,
   ListInstancesResponse,
   WatchDefinitionStatsRequest,
   WatchInstancesRequest,
-  WorkflowInstance,
-} from "../gen/proto/lemline/gateway/v1/workflow_gateway_pb";
+} from "../gen/proto/lemline/gateway/v1/gateway_pb";
 import { useDefinitionStats, definitionStatsQueryKey } from "../hooks/use-definition-stats";
 import { useInstances, instancesQueryKey } from "../hooks/use-instances";
 import { gatewayClient } from "../lib/grpc-client";
 import { toTimeWindow } from "../lib/time-range";
 import type { TimeRangePreset } from "../lib/time-range";
+import { timestampFromIsoString, timestampToMilliseconds, UNIX_EPOCH_ISO } from "../lib/proto";
+import type { DefinitionStatsSnapshot } from "../lib/gateway-api";
 import { asNumber } from "../lib/utils";
 import { DefinitionTable, type BreakdownRow } from "../components/definitions/definition-table";
 import { StatsCards } from "../components/definitions/stats-cards";
@@ -39,19 +44,22 @@ export function OverviewContent({ level, namespace, name, version }: OverviewCon
   const queryClient = useQueryClient();
   const [timeRange, setTimeRange] = useState<TimeRangePreset>("24h");
   const [status, setStatus] = useState<string>("all");
-  const [bufferedNewInstances, setBufferedNewInstances] = useState<WorkflowInstance[]>([]);
+  const [bufferedNewInstances, setBufferedNewInstances] = useState<InstanceSummary[]>([]);
 
   const timeWindow = useMemo(() => toTimeWindow(timeRange), [timeRange]);
+  // The stats API requires a lower bound, so "all" starts at the epoch. No upper bound is sent:
+  // the counters keep following new instances, like the live instance table.
+  const statsTimeFrom = timeWindow.from ?? UNIX_EPOCH_ISO;
+
   const statsKey = useMemo(
     () =>
       definitionStatsQueryKey({
         namespace,
         name,
         version,
-        timeFrom: timeWindow.from,
-        timeTo: timeWindow.to,
+        timeFrom: statsTimeFrom,
       }),
-    [name, namespace, timeWindow.from, timeWindow.to, version],
+    [name, namespace, statsTimeFrom, version],
   );
 
   const instanceFilters = useMemo(
@@ -61,39 +69,43 @@ export function OverviewContent({ level, namespace, name, version }: OverviewCon
       version,
       status: status === "all" ? undefined : status,
       timeFrom: timeWindow.from,
-      timeTo: timeWindow.to,
       pageSize: 50,
     }),
-    [name, namespace, status, timeWindow.from, timeWindow.to, version],
+    [name, namespace, status, timeWindow.from, version],
   );
 
   const instancesKey = useMemo(() => instancesQueryKey(instanceFilters), [instanceFilters]);
 
-  const { data: stats = [], isLoading: statsLoading } = useDefinitionStats({
+  const statsQuery = useDefinitionStats({
     namespace,
     name,
     version,
-    timeFrom: timeWindow.from,
-    timeTo: timeWindow.to,
+    timeFrom: statsTimeFrom,
   });
+  const stats = useMemo(() => statsQuery.data?.stats ?? [], [statsQuery.data?.stats]);
+  const hasStatsSnapshot = Boolean(statsQuery.data);
+  const statsWatchCursor = statsQuery.data?.watchCursor;
 
   const instances = useInstances(instanceFilters);
+  const hasInstanceSnapshot = Boolean(instances.data?.pages[0]);
+  const instancesWatchCursor = instances.watchCursor;
 
-  const newestSequenceRef = useRef<bigint | undefined>(undefined);
-  const pendingInsertionsRef = useRef<WorkflowInstance[]>([]);
+  const pendingInsertionsRef = useRef<InstanceSummary[]>([]);
   const insertionTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
     setBufferedNewInstances([]);
     pendingInsertionsRef.current = [];
-    newestSequenceRef.current = undefined;
   }, [instancesKey]);
 
   useEffect(() => {
+    if (statsQuery.status !== "success" || !hasStatsSnapshot) return;
+
     const controller = new AbortController();
     let disposed = false;
     let retries = 0;
     let needsReconnectToast = false;
+    let afterCursor = statsWatchCursor;
 
     const watch = async () => {
       while (!disposed && !controller.signal.aborted) {
@@ -102,8 +114,8 @@ export function OverviewContent({ level, namespace, name, version }: OverviewCon
             namespace,
             name,
             version,
-            timeFrom: timeWindow.from,
-            timeTo: timeWindow.to,
+            timeFrom: timestampFromIsoString(statsTimeFrom),
+            afterCursor,
           });
 
           for await (const update of gatewayClient.watchDefinitionStats(request, {
@@ -114,25 +126,11 @@ export function OverviewContent({ level, namespace, name, version }: OverviewCon
               needsReconnectToast = false;
             }
             retries = 0;
+            afterCursor = update.cursor || afterCursor;
 
-            const statsUpdate = update.stats;
-            if (!statsUpdate) continue;
-
-            queryClient.setQueryData<DefinitionStats[]>(statsKey, (previous = []) => {
-              const next = previous.map((row) => new DefinitionStats(row));
-              const key = `${statsUpdate.namespace}/${statsUpdate.name}/${statsUpdate.version ?? "*"}`;
-              const index = next.findIndex(
-                (row) => `${row.namespace}/${row.name}/${row.version ?? "*"}` === key,
-              );
-
-              if (index >= 0) {
-                next[index] = new DefinitionStats(statsUpdate);
-              } else {
-                next.push(new DefinitionStats(statsUpdate));
-              }
-
-              return next;
-            });
+            queryClient.setQueryData<DefinitionStatsSnapshot>(statsKey, (previous) =>
+              applyDefinitionStatsChange(previous, update),
+            );
           }
 
           if (controller.signal.aborted || disposed) {
@@ -165,19 +163,22 @@ export function OverviewContent({ level, namespace, name, version }: OverviewCon
       disposed = true;
       controller.abort();
     };
-  }, [name, namespace, queryClient, statsKey, timeWindow.from, timeWindow.to, version]);
+  }, [hasStatsSnapshot, name, namespace, queryClient, statsKey, statsQuery.status, statsTimeFrom, statsWatchCursor, version]);
 
   useEffect(() => {
+    if (instances.status !== "success" || !hasInstanceSnapshot) return;
+
     const controller = new AbortController();
     let disposed = false;
     let retries = 0;
     let needsReconnectToast = false;
+    let afterCursor = instancesWatchCursor;
 
     const flushPendingInsertions = () => {
       insertionTimerRef.current = null;
       if (pendingInsertionsRef.current.length === 0) return;
 
-      const uniqueRows = uniqueByWorkflowId(pendingInsertionsRef.current);
+      const uniqueRows = uniqueByInstanceId(pendingInsertionsRef.current);
       pendingInsertionsRef.current = [];
 
       if (isWindowAtTop()) {
@@ -185,7 +186,7 @@ export function OverviewContent({ level, namespace, name, version }: OverviewCon
         return;
       }
 
-      setBufferedNewInstances((previous) => uniqueByWorkflowId([...uniqueRows, ...previous]));
+      setBufferedNewInstances((previous) => uniqueByInstanceId([...uniqueRows, ...previous]));
     };
 
     const scheduleFlush = () => {
@@ -200,7 +201,9 @@ export function OverviewContent({ level, namespace, name, version }: OverviewCon
             namespace,
             name,
             version,
-            afterSequence: newestSequenceRef.current,
+            status: toProtoInstanceStatus(status),
+            createdFrom: timestampFromIsoString(timeWindow.from),
+            afterCursor,
           });
 
           for await (const update of gatewayClient.watchInstances(request, {
@@ -211,16 +214,27 @@ export function OverviewContent({ level, namespace, name, version }: OverviewCon
               needsReconnectToast = false;
             }
             retries = 0;
+            afterCursor = update.cursor || afterCursor;
 
-            newestSequenceRef.current = toBigInt(update.sequence) ?? newestSequenceRef.current;
+            const change = update.change;
+            const changedInstance = change?.instance;
+            if (!changedInstance) continue;
 
-            const updated = update.instance;
-            if (!updated) continue;
+            if (change?.changeType === InstanceChangeType.REMOVED) {
+              removeInstance(queryClient, instancesKey, changedInstance.instanceId);
+              pendingInsertionsRef.current = pendingInsertionsRef.current.filter(
+                (row) => row.instanceId !== changedInstance.instanceId,
+              );
+              setBufferedNewInstances((previous) =>
+                previous.filter((row) => row.instanceId !== changedInstance.instanceId),
+              );
+              continue;
+            }
 
-            const existed = upsertExistingInstance(queryClient, instancesKey, updated);
+            const existed = upsertExistingInstance(queryClient, instancesKey, changedInstance);
             if (existed) continue;
 
-            pendingInsertionsRef.current.push(new WorkflowInstance(updated));
+            pendingInsertionsRef.current.push(new InstanceSummary(changedInstance));
             scheduleFlush();
           }
 
@@ -258,15 +272,15 @@ export function OverviewContent({ level, namespace, name, version }: OverviewCon
       }
       pendingInsertionsRef.current = [];
     };
-  }, [instancesKey, name, namespace, queryClient, version]);
+  }, [hasInstanceSnapshot, instances.status, instancesKey, instancesWatchCursor, name, namespace, queryClient, status, timeWindow.from, version]);
 
   const totals = useMemo(() => {
     return stats.reduce(
       (acc, stat) => {
-        acc.started += asNumber(stat.started);
-        acc.completed += asNumber(stat.completed);
-        acc.faulted += asNumber(stat.faulted);
-        acc.running += asNumber(stat.running);
+        acc.started += asNumber(stat.startedCount);
+        acc.completed += asNumber(stat.completedCount);
+        acc.faulted += asNumber(stat.faultedCount);
+        acc.running += asNumber(stat.runningCountAtTimeTo);
         return acc;
       },
       { started: 0, completed: 0, faulted: 0, running: 0 },
@@ -357,13 +371,13 @@ export function OverviewContent({ level, namespace, name, version }: OverviewCon
 
         <InstanceTable
           rows={instances.instances.map((instance) => ({
-            workflowId: instance.workflowId,
+            workflowId: instance.instanceId,
             namespace: instance.namespace,
             name: instance.name,
             version: instance.version,
             status: instance.status,
             startedAt: instance.startedAt,
-            durationMs: instance.durationMs,
+            durationMs: instance.duration,
             error: instance.error,
           }))}
           showNamespace={level === "root"}
@@ -375,7 +389,7 @@ export function OverviewContent({ level, namespace, name, version }: OverviewCon
           totalCount={instances.totalCount}
         />
 
-        {(statsLoading || instances.isLoading) && (
+        {(statsQuery.isLoading || instances.isLoading) && (
           <p className="text-sm text-slate-500">Loading scope data...</p>
         )}
       </div>
@@ -392,7 +406,7 @@ function buildBreakdownRows(stats: DefinitionStats[], level: OverviewLevel): Bre
         ? stat.namespace
         : level === "namespace"
           ? stat.name
-          : stat.version ?? "unknown";
+          : stat.version || "unknown";
 
     const existing = map.get(key);
     if (!existing) {
@@ -400,18 +414,18 @@ function buildBreakdownRows(stats: DefinitionStats[], level: OverviewLevel): Bre
         key,
         label: key,
         latestVersion: level === "namespace" ? stat.version : undefined,
-        started: stat.started,
-        completed: stat.completed,
-        faulted: stat.faulted,
-        running: stat.running,
+        started: stat.startedCount,
+        completed: stat.completedCount,
+        faulted: stat.faultedCount,
+        running: stat.runningCountAtTimeTo,
       });
       continue;
     }
 
-    existing.started = BigInt(asNumber(existing.started) + asNumber(stat.started));
-    existing.completed = BigInt(asNumber(existing.completed) + asNumber(stat.completed));
-    existing.faulted = BigInt(asNumber(existing.faulted) + asNumber(stat.faulted));
-    existing.running = BigInt(asNumber(existing.running) + asNumber(stat.running));
+    existing.started = BigInt(asNumber(existing.started) + asNumber(stat.startedCount));
+    existing.completed = BigInt(asNumber(existing.completed) + asNumber(stat.completedCount));
+    existing.faulted = BigInt(asNumber(existing.faulted) + asNumber(stat.faultedCount));
+    existing.running = BigInt(asNumber(existing.running) + asNumber(stat.runningCountAtTimeTo));
     if (level === "namespace") {
       existing.latestVersion = pickLatestVersion(existing.latestVersion, stat.version);
     }
@@ -437,10 +451,39 @@ function isWindowAtTop(): boolean {
   return typeof window !== "undefined" && window.scrollY <= 80;
 }
 
+function applyDefinitionStatsChange(
+  previous: DefinitionStatsSnapshot | undefined,
+  update: { cursor: string; change?: { changeType: DefinitionStatsChangeType; stats?: DefinitionStats } },
+): DefinitionStatsSnapshot {
+  const nextStats = (previous?.stats ?? []).map((row) => new DefinitionStats(row));
+  const changedStats = update.change?.stats;
+
+  if (changedStats) {
+    const index = nextStats.findIndex((row) => matchesDefinitionStatsKey(row, changedStats));
+    if (update.change?.changeType === DefinitionStatsChangeType.REMOVED) {
+      if (index >= 0) nextStats.splice(index, 1);
+    } else if (index >= 0) {
+      nextStats[index] = new DefinitionStats(changedStats);
+    } else {
+      nextStats.push(new DefinitionStats(changedStats));
+    }
+  }
+
+  return {
+    stats: nextStats,
+    totalCount: previous?.totalCount,
+    watchCursor: previous?.watchCursor,
+  };
+}
+
+function matchesDefinitionStatsKey(left: DefinitionStats, right: DefinitionStats): boolean {
+  return left.namespace === right.namespace && left.name === right.name && left.version === right.version;
+}
+
 function upsertExistingInstance(
-  queryClient: ReturnType<typeof useQueryClient>,
+  queryClient: QueryClient,
   key: readonly unknown[],
-  instance: WorkflowInstance,
+  instance: InstanceSummary,
 ): boolean {
   let found = false;
 
@@ -450,9 +493,9 @@ function upsertExistingInstance(
     const pages = previous.pages.map((page) => new ListInstancesResponse(page));
 
     for (const page of pages) {
-      const index = page.instances.findIndex((row) => row.workflowId === instance.workflowId);
+      const index = page.instances.findIndex((row) => row.instanceId === instance.instanceId);
       if (index >= 0) {
-        page.instances[index] = new WorkflowInstance(instance);
+        page.instances[index] = new InstanceSummary(instance);
         found = true;
       }
     }
@@ -467,26 +510,22 @@ function upsertExistingInstance(
   return found;
 }
 
-function prependInstances(
-  queryClient: ReturnType<typeof useQueryClient>,
-  key: readonly unknown[],
-  rows: WorkflowInstance[],
-) {
-  const orderedRows = uniqueByWorkflowId(rows)
-    .sort((left, right) => right.workflowId.localeCompare(left.workflowId))
-    .map((row) => new WorkflowInstance(row));
-
+function removeInstance(queryClient: QueryClient, key: readonly unknown[], instanceId: string) {
   queryClient.setQueryData<InfiniteData<ListInstancesResponse>>(key, (previous) => {
-    if (!previous || previous.pages.length === 0 || orderedRows.length === 0) return previous;
+    if (!previous) return previous;
 
-    const pages = previous.pages.map((page) => new ListInstancesResponse(page));
-    const firstPage = pages[0];
+    let changed = false;
+    const pages = previous.pages.map((page) => {
+      const clone = new ListInstancesResponse(page);
+      const nextInstances = clone.instances.filter((row) => row.instanceId !== instanceId);
+      if (nextInstances.length !== clone.instances.length) {
+        changed = true;
+        clone.instances = nextInstances;
+      }
+      return clone;
+    });
 
-    const existing = new Set(firstPage.instances.map((instance) => instance.workflowId));
-    const inserts = orderedRows.filter((row) => !existing.has(row.workflowId));
-    if (inserts.length === 0) return previous;
-
-    firstPage.instances = [...inserts, ...firstPage.instances];
+    if (!changed) return previous;
     return {
       ...previous,
       pages,
@@ -494,12 +533,65 @@ function prependInstances(
   });
 }
 
-function uniqueByWorkflowId(rows: WorkflowInstance[]): WorkflowInstance[] {
-  const map = new Map<string, WorkflowInstance>();
+function prependInstances(
+  queryClient: QueryClient,
+  key: readonly unknown[],
+  rows: InstanceSummary[],
+) {
+  const orderedRows = uniqueByInstanceId(rows)
+    .sort(compareInstancesDesc)
+    .map((row) => new InstanceSummary(row));
+
+  queryClient.setQueryData<InfiniteData<ListInstancesResponse>>(key, (previous) => {
+    if (!previous || previous.pages.length === 0 || orderedRows.length === 0) return previous;
+
+    const pages = previous.pages.map((page) => new ListInstancesResponse(page));
+    const firstPage = pages[0];
+
+    const combined = [...orderedRows, ...firstPage.instances].sort(compareInstancesDesc);
+    const deduplicated = uniqueByInstanceId(combined);
+    const existingIds = firstPage.instances.map((instance) => instance.instanceId).join(",");
+    const nextIds = deduplicated.map((instance) => instance.instanceId).join(",");
+    if (existingIds === nextIds) return previous;
+
+    firstPage.instances = deduplicated;
+    return {
+      ...previous,
+      pages,
+    };
+  });
+}
+
+function uniqueByInstanceId(rows: InstanceSummary[]): InstanceSummary[] {
+  const map = new Map<string, InstanceSummary>();
   for (const row of rows) {
-    map.set(row.workflowId, new WorkflowInstance(row));
+    map.set(row.instanceId, new InstanceSummary(row));
   }
   return Array.from(map.values());
+}
+
+function compareInstancesDesc(left: InstanceSummary, right: InstanceSummary): number {
+  const leftCreatedAt = timestampToMilliseconds(left.createdAt) ?? 0;
+  const rightCreatedAt = timestampToMilliseconds(right.createdAt) ?? 0;
+  if (leftCreatedAt !== rightCreatedAt) {
+    return rightCreatedAt - leftCreatedAt;
+  }
+  return right.instanceId.localeCompare(left.instanceId);
+}
+
+function toProtoInstanceStatus(value: string): InstanceStatus | undefined {
+  switch (value) {
+    case "PENDING":
+      return InstanceStatus.PENDING;
+    case "RUNNING":
+      return InstanceStatus.RUNNING;
+    case "COMPLETED":
+      return InstanceStatus.COMPLETED;
+    case "FAULTED":
+      return InstanceStatus.FAULTED;
+    default:
+      return undefined;
+  }
 }
 
 function backoffDelayMs(retryAttempt: number): number {
@@ -508,15 +600,4 @@ function backoffDelayMs(retryAttempt: number): number {
 
 function delay(ms: number) {
   return new Promise((resolve) => window.setTimeout(resolve, ms));
-}
-
-function toBigInt(value: bigint | number | string | undefined): bigint | undefined {
-  if (typeof value === "bigint") return value;
-  if (typeof value === "number") return BigInt(value);
-  if (typeof value === "string") {
-    const parsed = Number(value);
-    if (Number.isNaN(parsed)) return undefined;
-    return BigInt(parsed);
-  }
-  return undefined;
 }

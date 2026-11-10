@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.gateway.outbox
 
-import com.lemline.runner.common.config.DatabaseConfig
 import com.lemline.runner.common.test.H2TestDatabaseConfig
 import com.lemline.runner.common.test.outbox.OutboxProcessorTest
 import org.junit.jupiter.api.AfterAll
@@ -9,14 +8,14 @@ import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.DisplayName
 
 @DisplayName("GatewayCommandOutbox Processor [H2]")
-class GatewayCommandOutboxProcessorTest : OutboxProcessorTest<GatewayCommandOutboxModel>(
+class GatewayCommandOutboxProcessorTest : OutboxProcessorTest<GatewayCommandModel>(
     outboxRepository = { repository },
     crudRepository = { repository },
     idRepository = { repository },
     databaseConfig = { testDb },
-    modelClass = GatewayCommandOutboxModel::class,
+    modelClass = GatewayCommandModel::class,
     createTestModel = { _ ->
-        GatewayCommandOutboxModel(
+        GatewayCommandModel(
             id = com.lemline.common.values.IDV7.random(),
             instanceMessage = com.lemline.runner.common.messaging.InstanceMessage(
                 workflowInfo = com.lemline.core.random.randomWorkflowInfo(),
@@ -29,8 +28,8 @@ class GatewayCommandOutboxProcessorTest : OutboxProcessorTest<GatewayCommandOutb
     companion object {
         private val testDb = H2TestDatabaseConfig()
 
-        private val repository: GatewayCommandOutboxRepository by lazy {
-            GatewayCommandOutboxRepository().apply {
+        private val repository: GatewayCommandRepository by lazy {
+            GatewayCommandRepository().apply {
                 databaseConfig = testDb
             }
         }

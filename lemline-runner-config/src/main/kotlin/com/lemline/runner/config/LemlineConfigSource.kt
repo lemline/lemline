@@ -4,6 +4,11 @@ package com.lemline.runner.config
 import com.lemline.common.logger.logger
 import com.lemline.runner.common.config.AnalyticsType
 import com.lemline.runner.common.config.DatabaseType
+import com.lemline.runner.common.config.LEMLINE_MESSAGING_PREFIX
+import com.lemline.runner.common.config.LEMLINE_NAMESPACES
+import com.lemline.runner.common.namespaces.DestinationType
+import com.lemline.runner.common.namespaces.NamespaceScope
+import com.lemline.runner.common.namespaces.destinationFor
 import com.lemline.runner.common.config.LEMLINE_ANALYTICS_BASELINE_ON_MIGRATE
 import com.lemline.runner.common.config.LEMLINE_ANALYTICS_POSTGRES
 import com.lemline.runner.common.config.LEMLINE_ANALYTICS_POSTGRES_DATABASE
@@ -55,21 +60,12 @@ import com.lemline.runner.common.config.LEMLINE_MESSAGING_KAFKA_BROKERS
 import com.lemline.runner.common.config.LEMLINE_MESSAGING_KAFKA_CLOUDEVENTS_CONSUMER_CONCURRENCY
 import com.lemline.runner.common.config.LEMLINE_MESSAGING_KAFKA_CLOUDEVENTS_CONSUMER_GROUP_ID
 import com.lemline.runner.common.config.LEMLINE_MESSAGING_KAFKA_CLOUDEVENTS_CONSUMER_OFFSET_RESET
-import com.lemline.runner.common.config.LEMLINE_MESSAGING_KAFKA_CLOUDEVENTS_CONSUMER_TOPIC_DLQ
-import com.lemline.runner.common.config.LEMLINE_MESSAGING_KAFKA_CLOUDEVENTS_PRODUCER_TOPIC_OUT
-import com.lemline.runner.common.config.LEMLINE_MESSAGING_KAFKA_CLOUDEVENTS_TOPIC
 import com.lemline.runner.common.config.LEMLINE_MESSAGING_KAFKA_COMMANDS_CONSUMER_CONCURRENCY
 import com.lemline.runner.common.config.LEMLINE_MESSAGING_KAFKA_COMMANDS_CONSUMER_GROUP_ID
 import com.lemline.runner.common.config.LEMLINE_MESSAGING_KAFKA_COMMANDS_CONSUMER_OFFSET_RESET
-import com.lemline.runner.common.config.LEMLINE_MESSAGING_KAFKA_COMMANDS_CONSUMER_TOPIC_OUT
-import com.lemline.runner.common.config.LEMLINE_MESSAGING_KAFKA_COMMANDS_PRODUCER_TOPIC_OUT
-import com.lemline.runner.common.config.LEMLINE_MESSAGING_KAFKA_COMMANDS_TOPIC
 import com.lemline.runner.common.config.LEMLINE_MESSAGING_KAFKA_EVENTS_CONSUMER_CONCURRENCY
 import com.lemline.runner.common.config.LEMLINE_MESSAGING_KAFKA_EVENTS_CONSUMER_GROUP_ID
 import com.lemline.runner.common.config.LEMLINE_MESSAGING_KAFKA_EVENTS_CONSUMER_OFFSET_RESET
-import com.lemline.runner.common.config.LEMLINE_MESSAGING_KAFKA_EVENTS_CONSUMER_TOPIC_OUT
-import com.lemline.runner.common.config.LEMLINE_MESSAGING_KAFKA_EVENTS_PRODUCER_TOPIC_OUT
-import com.lemline.runner.common.config.LEMLINE_MESSAGING_KAFKA_EVENTS_TOPIC
 import com.lemline.runner.common.config.LEMLINE_MESSAGING_KAFKA_LIFECYCLE_EVENTS_CONSUMER_CONCURRENCY
 import com.lemline.runner.common.config.LEMLINE_MESSAGING_KAFKA_LIFECYCLE_EVENTS_CONSUMER_GROUP_ID
 import com.lemline.runner.common.config.LEMLINE_MESSAGING_KAFKA_LIFECYCLE_EVENTS_CONSUMER_OFFSET_RESET
@@ -88,27 +84,18 @@ import com.lemline.runner.common.config.LEMLINE_MESSAGING_PGMQ_CLOUDEVENTS_CONSU
 import com.lemline.runner.common.config.LEMLINE_MESSAGING_PGMQ_CLOUDEVENTS_CONSUMER_CONCURRENCY
 import com.lemline.runner.common.config.LEMLINE_MESSAGING_PGMQ_CLOUDEVENTS_CONSUMER_MAX_RETRIES
 import com.lemline.runner.common.config.LEMLINE_MESSAGING_PGMQ_CLOUDEVENTS_CONSUMER_POLL_INTERVAL
-import com.lemline.runner.common.config.LEMLINE_MESSAGING_PGMQ_CLOUDEVENTS_CONSUMER_QUEUE_DLQ
 import com.lemline.runner.common.config.LEMLINE_MESSAGING_PGMQ_CLOUDEVENTS_CONSUMER_VISIBILITY_TIMEOUT
-import com.lemline.runner.common.config.LEMLINE_MESSAGING_PGMQ_CLOUDEVENTS_PRODUCER_QUEUE_OUT
-import com.lemline.runner.common.config.LEMLINE_MESSAGING_PGMQ_CLOUDEVENTS_QUEUE
 import com.lemline.runner.common.config.LEMLINE_MESSAGING_PGMQ_COMMANDS_CONSUMER_BATCH_SIZE
 import com.lemline.runner.common.config.LEMLINE_MESSAGING_PGMQ_COMMANDS_CONSUMER_CONCURRENCY
 import com.lemline.runner.common.config.LEMLINE_MESSAGING_PGMQ_COMMANDS_CONSUMER_MAX_RETRIES
 import com.lemline.runner.common.config.LEMLINE_MESSAGING_PGMQ_COMMANDS_CONSUMER_POLL_INTERVAL
-import com.lemline.runner.common.config.LEMLINE_MESSAGING_PGMQ_COMMANDS_CONSUMER_QUEUE_DLQ
 import com.lemline.runner.common.config.LEMLINE_MESSAGING_PGMQ_COMMANDS_CONSUMER_VISIBILITY_TIMEOUT
-import com.lemline.runner.common.config.LEMLINE_MESSAGING_PGMQ_COMMANDS_PRODUCER_QUEUE_OUT
-import com.lemline.runner.common.config.LEMLINE_MESSAGING_PGMQ_COMMANDS_QUEUE
 import com.lemline.runner.common.config.LEMLINE_MESSAGING_PGMQ_DATABASE
 import com.lemline.runner.common.config.LEMLINE_MESSAGING_PGMQ_EVENTS_CONSUMER_BATCH_SIZE
 import com.lemline.runner.common.config.LEMLINE_MESSAGING_PGMQ_EVENTS_CONSUMER_CONCURRENCY
 import com.lemline.runner.common.config.LEMLINE_MESSAGING_PGMQ_EVENTS_CONSUMER_MAX_RETRIES
 import com.lemline.runner.common.config.LEMLINE_MESSAGING_PGMQ_EVENTS_CONSUMER_POLL_INTERVAL
-import com.lemline.runner.common.config.LEMLINE_MESSAGING_PGMQ_EVENTS_CONSUMER_QUEUE_DLQ
 import com.lemline.runner.common.config.LEMLINE_MESSAGING_PGMQ_EVENTS_CONSUMER_VISIBILITY_TIMEOUT
-import com.lemline.runner.common.config.LEMLINE_MESSAGING_PGMQ_EVENTS_PRODUCER_QUEUE_OUT
-import com.lemline.runner.common.config.LEMLINE_MESSAGING_PGMQ_EVENTS_QUEUE
 import com.lemline.runner.common.config.LEMLINE_MESSAGING_PGMQ_HOST
 import com.lemline.runner.common.config.LEMLINE_MESSAGING_PGMQ_LIFECYCLE_EVENTS_CONSUMER_BATCH_SIZE
 import com.lemline.runner.common.config.LEMLINE_MESSAGING_PGMQ_LIFECYCLE_EVENTS_CONSUMER_CONCURRENCY
@@ -124,18 +111,12 @@ import com.lemline.runner.common.config.LEMLINE_MESSAGING_PGMQ_USERNAME
 import com.lemline.runner.common.config.LEMLINE_MESSAGING_RABBITMQ
 import com.lemline.runner.common.config.LEMLINE_MESSAGING_RABBITMQ_CLOUDEVENTS_CONSUMER_CONCURRENCY
 import com.lemline.runner.common.config.LEMLINE_MESSAGING_RABBITMQ_CLOUDEVENTS_CONSUMER_QUEUE_DLQ
-import com.lemline.runner.common.config.LEMLINE_MESSAGING_RABBITMQ_CLOUDEVENTS_PRODUCER_EXCHANGE_NAME
-import com.lemline.runner.common.config.LEMLINE_MESSAGING_RABBITMQ_CLOUDEVENTS_PRODUCER_QUEUE_OUT
 import com.lemline.runner.common.config.LEMLINE_MESSAGING_RABBITMQ_CLOUDEVENTS_QUEUE
 import com.lemline.runner.common.config.LEMLINE_MESSAGING_RABBITMQ_COMMANDS_CONSUMER_CONCURRENCY
 import com.lemline.runner.common.config.LEMLINE_MESSAGING_RABBITMQ_COMMANDS_CONSUMER_QUEUE_DLQ
-import com.lemline.runner.common.config.LEMLINE_MESSAGING_RABBITMQ_COMMANDS_PRODUCER_EXCHANGE_NAME
-import com.lemline.runner.common.config.LEMLINE_MESSAGING_RABBITMQ_COMMANDS_PRODUCER_QUEUE_OUT
 import com.lemline.runner.common.config.LEMLINE_MESSAGING_RABBITMQ_COMMANDS_QUEUE
 import com.lemline.runner.common.config.LEMLINE_MESSAGING_RABBITMQ_EVENTS_CONSUMER_CONCURRENCY
 import com.lemline.runner.common.config.LEMLINE_MESSAGING_RABBITMQ_EVENTS_CONSUMER_QUEUE_DLQ
-import com.lemline.runner.common.config.LEMLINE_MESSAGING_RABBITMQ_EVENTS_PRODUCER_EXCHANGE_NAME
-import com.lemline.runner.common.config.LEMLINE_MESSAGING_RABBITMQ_EVENTS_PRODUCER_QUEUE_OUT
 import com.lemline.runner.common.config.LEMLINE_MESSAGING_RABBITMQ_EVENTS_QUEUE
 import com.lemline.runner.common.config.LEMLINE_MESSAGING_RABBITMQ_HOSTNAME
 import com.lemline.runner.common.config.LEMLINE_MESSAGING_RABBITMQ_LIFECYCLE_EVENTS_CONSUMER_CONCURRENCY
@@ -173,6 +154,9 @@ import com.lemline.runner.config.LemlineConfigConstants.H2_PASSWORD_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.H2_USERNAME_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.IN_MEMORY_CONNECTOR
 import com.lemline.runner.config.LemlineConfigConstants.KAFKA_BROKERS_DEFAULT
+import com.lemline.runner.config.LemlineConfigConstants.KAFKA_COOPERATIVE_ASSIGNOR
+import com.lemline.runner.config.LemlineConfigConstants.KAFKA_NAMESPACE_DLQ_STRATEGY
+import com.lemline.runner.config.LemlineConfigConstants.MESSAGING_PREFIX_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.KAFKA_CLOUDEVENTS_GROUP_ID_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.KAFKA_CONNECTOR
 import com.lemline.runner.config.LemlineConfigConstants.KAFKA_DATABASE_GROUP_ID_DEFAULT
@@ -225,6 +209,7 @@ enum class TopicType(
     val consumerConcurrency: String,
     val consumerGroupDefault: String,
 ) {
+
     // Note: 'type' values must match LemlineConfiguration.KafkaConfig interface method names
     // (commands, events) for config validation to pass
     COMMANDS(
@@ -247,6 +232,13 @@ enum class TopicType(
         LEMLINE_MESSAGING_EVENTS_CONSUMER_CONCURRENCY,
         KAFKA_DATABASE_GROUP_ID_DEFAULT
     );
+
+    // Per-namespace destination family of this channel (<prefix>-<namespace>-<type>)
+    val destinationType: DestinationType
+        get() = when (this) {
+            COMMANDS -> DestinationType.COMMANDS
+            EVENTS -> DestinationType.EVENTS
+        }
 }
 
 class LemlineConfigSource : PropertiesConfigSource(
@@ -498,6 +490,18 @@ class LemlineConfigSource : PropertiesConfigSource(
             return generated
         }
 
+        /**
+         * Namespaces this process follows (`lemline.namespaces`), falling back to the default namespace.
+         * Comma-separated form; validated at startup by NamespaceScopeValidator.
+         */
+        private fun namespacesOf(props: Map<String, String>): List<String> =
+            props[LEMLINE_NAMESPACES]?.split(",")?.map { it.trim() }?.filter { it.isNotEmpty() }
+                ?.takeIf { it.isNotEmpty() }
+                ?: listOf(NamespaceScope.DEFAULT_NAMESPACE)
+
+        private fun prefixOf(props: Map<String, String>): String =
+            props[LEMLINE_MESSAGING_PREFIX] ?: MESSAGING_PREFIX_DEFAULT
+
         private fun generateMessagingProperties(props: Map<String, String>): Map<String, String> {
             val generated = mutableMapOf<String, String>()
             val useKafka = props.keys.any { it.startsWith("$LEMLINE_MESSAGING_KAFKA.") }
@@ -578,19 +582,15 @@ class LemlineConfigSource : PropertiesConfigSource(
             props: Map<String, String>,
             topicType: TopicType
         ) {
-            val topic = when (topicType) {
-                TopicType.COMMANDS -> props[LEMLINE_MESSAGING_KAFKA_COMMANDS_TOPIC]
-                TopicType.EVENTS -> props[LEMLINE_MESSAGING_KAFKA_EVENTS_TOPIC]
-            } ?: topicType.defaultTopicName
+            val prefix = prefixOf(props)
+            val destinationType = topicType.destinationType
 
             if (props[topicType.consumerEnabled].toBoolean()) {
                 val incoming = "mp.messaging.incoming.${topicType.incomingChannel}"
-                val topicDLQ = when (topicType) {
-                    TopicType.COMMANDS -> props[LEMLINE_MESSAGING_KAFKA_COMMANDS_CONSUMER_TOPIC_OUT]
-                    TopicType.EVENTS -> props[LEMLINE_MESSAGING_KAFKA_EVENTS_CONSUMER_TOPIC_OUT]
-                } ?: "$topic.dlq"
+                // One topic per followed namespace (<prefix>-<namespace>-<type>)
+                val topics = namespacesOf(props).joinToString(",") { destinationFor(prefix, it, destinationType) }
                 set("$incoming.connector", KAFKA_CONNECTOR)
-                set("$incoming.topic", topic)
+                set("$incoming.topics", topics)
                 set(
                     "$incoming.group.id",
                     when (topicType) {
@@ -606,8 +606,12 @@ class LemlineConfigSource : PropertiesConfigSource(
                     } ?: KAFKA_OFFSET_RESET_DEFAULT
                 )
                 set("$incoming.value.deserializer", KAFKA_STRING_DESERIALIZER)
-                set("$incoming.failure-strategy", "dead-letter-queue")
-                set("$incoming.dead-letter-queue.topic", topicDLQ)
+                // Each failed record is dead-lettered to <its-source-topic>.dlq (custom strategy):
+                // a single static DLQ topic would mix namespaces
+                set("$incoming.failure-strategy", KAFKA_NAMESPACE_DLQ_STRATEGY)
+                // The consumer group is shared across pools: the cooperative assignor keeps a
+                // membership change in one pool from pausing consumption in the others
+                set("$incoming.partition.assignment.strategy", KAFKA_COOPERATIVE_ASSIGNOR)
                 // set the consumer concurrency
                 set(
                     topicType.consumerConcurrency,
@@ -621,13 +625,9 @@ class LemlineConfigSource : PropertiesConfigSource(
             if (props[topicType.producerEnabled].toBoolean()) {
                 val outgoing = "mp.messaging.outgoing.${topicType.outgoingChannel}"
                 set("$outgoing.connector", KAFKA_CONNECTOR)
-                set(
-                    "$outgoing.topic",
-                    when (topicType) {
-                        TopicType.COMMANDS -> props[LEMLINE_MESSAGING_KAFKA_COMMANDS_PRODUCER_TOPIC_OUT]
-                        TopicType.EVENTS -> props[LEMLINE_MESSAGING_KAFKA_EVENTS_PRODUCER_TOPIC_OUT]
-                    } ?: topic
-                )
+                // Fallback only: every emission carries its per-message topic
+                // (OutgoingKafkaRecordMetadata) derived from the message's namespace
+                set("$outgoing.topic", destinationFor(prefix, NamespaceScope.DEFAULT_NAMESPACE, destinationType))
                 set("$outgoing.value.serializer", KAFKA_STRING_SERIALIZER)
                 set("$outgoing.acks", "all")
             }
@@ -639,14 +639,16 @@ class LemlineConfigSource : PropertiesConfigSource(
          * - Producer: Emits CloudEvents from emit tasks
          */
         private fun MutableMap<String, String>.configureKafkaCloudEventsTopic(props: Map<String, String>) {
-            val topic = props[LEMLINE_MESSAGING_KAFKA_CLOUDEVENTS_TOPIC] ?: CLOUDEVENTS_TOPIC_DEFAULT
+            val prefix = prefixOf(props)
 
             // Consumer configuration for listen tasks
             if (props[LEMLINE_MESSAGING_CLOUDEVENTS_CONSUMER_ENABLED].toBoolean()) {
                 val incoming = "mp.messaging.incoming.$CLOUDEVENTS_IN_CHANNEL"
-                val topicDLQ = props[LEMLINE_MESSAGING_KAFKA_CLOUDEVENTS_CONSUMER_TOPIC_DLQ] ?: "$topic.dlq"
+                // One topic per followed namespace (<prefix>-<namespace>-cloudevents)
+                val topics = namespacesOf(props)
+                    .joinToString(",") { destinationFor(prefix, it, DestinationType.CLOUDEVENTS) }
                 set("$incoming.connector", KAFKA_CONNECTOR)
-                set("$incoming.topic", topic)
+                set("$incoming.topics", topics)
                 set(
                     "$incoming.group.id",
                     props[LEMLINE_MESSAGING_KAFKA_CLOUDEVENTS_CONSUMER_GROUP_ID] ?: KAFKA_CLOUDEVENTS_GROUP_ID_DEFAULT
@@ -656,8 +658,8 @@ class LemlineConfigSource : PropertiesConfigSource(
                     props[LEMLINE_MESSAGING_KAFKA_CLOUDEVENTS_CONSUMER_OFFSET_RESET] ?: KAFKA_OFFSET_RESET_DEFAULT
                 )
                 set("$incoming.value.deserializer", KAFKA_STRING_DESERIALIZER)
-                set("$incoming.failure-strategy", "dead-letter-queue")
-                set("$incoming.dead-letter-queue.topic", topicDLQ)
+                set("$incoming.failure-strategy", KAFKA_NAMESPACE_DLQ_STRATEGY)
+                set("$incoming.partition.assignment.strategy", KAFKA_COOPERATIVE_ASSIGNOR)
                 set(
                     LEMLINE_MESSAGING_CLOUDEVENTS_CONSUMER_CONCURRENCY,
                     props[LEMLINE_MESSAGING_KAFKA_CLOUDEVENTS_CONSUMER_CONCURRENCY] ?: CONSUMER_CONCURRENCY_DEFAULT
@@ -668,7 +670,12 @@ class LemlineConfigSource : PropertiesConfigSource(
             if (props[LEMLINE_MESSAGING_CLOUDEVENTS_PRODUCER_ENABLED].toBoolean()) {
                 val outgoing = "mp.messaging.outgoing.$CLOUDEVENTS_OUT_CHANNEL"
                 set("$outgoing.connector", KAFKA_CONNECTOR)
-                set("$outgoing.topic", props[LEMLINE_MESSAGING_KAFKA_CLOUDEVENTS_PRODUCER_TOPIC_OUT] ?: topic)
+                // Fallback only: Emit tasks publish with a per-message topic derived from
+                // the emitting workflow's namespace
+                set(
+                    "$outgoing.topic",
+                    destinationFor(prefix, NamespaceScope.DEFAULT_NAMESPACE, DestinationType.CLOUDEVENTS)
+                )
                 set("$outgoing.value.serializer", KAFKA_STRING_SERIALIZER)
                 set("$outgoing.acks", "all")
             }
@@ -734,23 +741,36 @@ class LemlineConfigSource : PropertiesConfigSource(
             configureRabbitLifecycleEventsQueue(props)
         }
 
+        /**
+         * RabbitMQ per-namespace topology:
+         * - producers publish to the channel exchange `<prefix>-<type>` (topic) with
+         *   routing key = the message's namespace (per-message OutgoingRabbitMQMetadata);
+         * - RabbitTopologyBootstrap (lemline-runner) declares one exchange per namespace
+         *   `<prefix>-<namespace>-<type>` fed by an exchange-to-exchange binding, and binds
+         *   the pool queue to the exchanges of the followed namespaces;
+         * - the pool queue name is deterministic from the sorted namespace set, overridable
+         *   via `lemline.messaging.rabbitmq.<channel>.queue`.
+         */
         private fun MutableMap<String, String>.configureRabbitQueue(
             props: Map<String, String>,
             topicType: TopicType
         ) {
-            val queue = when (topicType) {
+            val prefix = prefixOf(props)
+            val destinationType = topicType.destinationType
+            val channelExchange = "$prefix-${destinationType.suffix}"
+            val poolQueue = when (topicType) {
                 TopicType.COMMANDS -> props[LEMLINE_MESSAGING_RABBITMQ_COMMANDS_QUEUE]
                 TopicType.EVENTS -> props[LEMLINE_MESSAGING_RABBITMQ_EVENTS_QUEUE]
-            } ?: topicType.defaultTopicName
+            } ?: poolQueueName(channelExchange, namespacesOf(props))
 
             if (props[topicType.consumerEnabled].toBoolean()) {
                 val incoming = "mp.messaging.incoming.${topicType.incomingChannel}"
                 val queueDLQ = when (topicType) {
                     TopicType.COMMANDS -> props[LEMLINE_MESSAGING_RABBITMQ_COMMANDS_CONSUMER_QUEUE_DLQ]
                     TopicType.EVENTS -> props[LEMLINE_MESSAGING_RABBITMQ_EVENTS_CONSUMER_QUEUE_DLQ]
-                } ?: "$queue.dlq"
+                } ?: "$poolQueue.dlq"
                 set("$incoming.connector", RABBITMQ_CONNECTOR)
-                set("$incoming.queue.name", queue)
+                set("$incoming.queue.name", poolQueue)
                 set("$incoming.queue.durable", "true")
                 set("$incoming.auto-ack", "false")
                 set("$incoming.deserializer", RABBITMQ_STRING_SERIALIZER)
@@ -773,21 +793,20 @@ class LemlineConfigSource : PropertiesConfigSource(
             if (props[topicType.producerEnabled].toBoolean()) {
                 val outgoing = "mp.messaging.outgoing.${topicType.outgoingChannel}"
                 set("$outgoing.connector", RABBITMQ_CONNECTOR)
-                set(
-                    "$outgoing.queue.name",
-                    when (topicType) {
-                        TopicType.COMMANDS -> props[LEMLINE_MESSAGING_RABBITMQ_COMMANDS_PRODUCER_QUEUE_OUT]
-                        TopicType.EVENTS -> props[LEMLINE_MESSAGING_RABBITMQ_EVENTS_PRODUCER_QUEUE_OUT]
-                    } ?: queue
-                )
+                set("$outgoing.exchange.name", channelExchange)
+                set("$outgoing.exchange.declare", "true")
+                set("$outgoing.exchange.type", "topic")
+                set("$outgoing.exchange.durable", "true")
+                // Fallback only: every emission carries its per-message routing key (= namespace)
+                set("$outgoing.default-routing-key", NamespaceScope.DEFAULT_NAMESPACE)
                 set("$outgoing.serializer", RABBITMQ_STRING_SERIALIZER)
                 set("$outgoing.delivery-mode", "persistent")
-                when (topicType) {
-                    TopicType.COMMANDS -> props[LEMLINE_MESSAGING_RABBITMQ_COMMANDS_PRODUCER_EXCHANGE_NAME]
-                    TopicType.EVENTS -> props[LEMLINE_MESSAGING_RABBITMQ_EVENTS_PRODUCER_EXCHANGE_NAME]
-                }?.let { set("$outgoing.exchange.name", it) }
             }
         }
+
+        /** Deterministic pool queue name: `<channel-exchange>.<sorted-namespaces-dot-joined>`. */
+        private fun poolQueueName(channelExchange: String, namespaces: List<String>): String =
+            "$channelExchange.${namespaces.sorted().joinToString(".")}"
 
         /**
          * Configures the CloudEvents RabbitMQ queue.
@@ -795,15 +814,18 @@ class LemlineConfigSource : PropertiesConfigSource(
          * - Producer: Emits CloudEvents from emit tasks
          */
         private fun MutableMap<String, String>.configureRabbitCloudEventsQueue(props: Map<String, String>) {
-            val queue = props[LEMLINE_MESSAGING_RABBITMQ_CLOUDEVENTS_QUEUE] ?: CLOUDEVENTS_TOPIC_DEFAULT
+            val prefix = prefixOf(props)
+            val channelExchange = "$prefix-${DestinationType.CLOUDEVENTS.suffix}"
+            val poolQueue = props[LEMLINE_MESSAGING_RABBITMQ_CLOUDEVENTS_QUEUE]
+                ?: poolQueueName(channelExchange, namespacesOf(props))
 
             // Consumer configuration for listen tasks
             if (props[LEMLINE_MESSAGING_CLOUDEVENTS_CONSUMER_ENABLED].toBoolean()) {
                 val incoming = "mp.messaging.incoming.$CLOUDEVENTS_IN_CHANNEL"
                 val queueDLQ = props[LEMLINE_MESSAGING_RABBITMQ_CLOUDEVENTS_CONSUMER_QUEUE_DLQ]
-                    ?: "$queue.dlq"
+                    ?: "$poolQueue.dlq"
                 set("$incoming.connector", RABBITMQ_CONNECTOR)
-                set("$incoming.queue.name", queue)
+                set("$incoming.queue.name", poolQueue)
                 set("$incoming.queue.durable", "true")
                 set("$incoming.auto-ack", "false")
                 set("$incoming.deserializer", RABBITMQ_STRING_SERIALIZER)
@@ -824,12 +846,13 @@ class LemlineConfigSource : PropertiesConfigSource(
             if (props[LEMLINE_MESSAGING_CLOUDEVENTS_PRODUCER_ENABLED].toBoolean()) {
                 val outgoing = "mp.messaging.outgoing.$CLOUDEVENTS_OUT_CHANNEL"
                 set("$outgoing.connector", RABBITMQ_CONNECTOR)
-                set("$outgoing.queue.name", props[LEMLINE_MESSAGING_RABBITMQ_CLOUDEVENTS_PRODUCER_QUEUE_OUT] ?: queue)
+                set("$outgoing.exchange.name", channelExchange)
+                set("$outgoing.exchange.declare", "true")
+                set("$outgoing.exchange.type", "topic")
+                set("$outgoing.exchange.durable", "true")
+                set("$outgoing.default-routing-key", NamespaceScope.DEFAULT_NAMESPACE)
                 set("$outgoing.serializer", RABBITMQ_STRING_SERIALIZER)
                 set("$outgoing.delivery-mode", "persistent")
-                props[LEMLINE_MESSAGING_RABBITMQ_CLOUDEVENTS_PRODUCER_EXCHANGE_NAME]?.let {
-                    set("$outgoing.exchange.name", it)
-                }
             }
         }
 
@@ -917,20 +940,17 @@ class LemlineConfigSource : PropertiesConfigSource(
             username: String,
             password: String
         ) {
-            val queue = when (topicType) {
-                TopicType.COMMANDS -> props[LEMLINE_MESSAGING_PGMQ_COMMANDS_QUEUE]
-                TopicType.EVENTS -> props[LEMLINE_MESSAGING_PGMQ_EVENTS_QUEUE]
-            } ?: topicType.defaultTopicName
+            val prefix = prefixOf(props)
+            val destinationType = topicType.destinationType
 
             if (props[topicType.consumerEnabled].toBoolean()) {
-                val queueDLQ = when (topicType) {
-                    TopicType.COMMANDS -> props[LEMLINE_MESSAGING_PGMQ_COMMANDS_CONSUMER_QUEUE_DLQ]
-                    TopicType.EVENTS -> props[LEMLINE_MESSAGING_PGMQ_EVENTS_CONSUMER_QUEUE_DLQ]
-                } ?: "$queue.dlq"
                 val incoming = "mp.messaging.incoming.${topicType.incomingChannel}"
+                // One queue per followed namespace (<prefix>-<namespace>-<type>);
+                // each message is dead-lettered to <its-source-queue>.dlq by the connector
+                val queues = namespacesOf(props).joinToString(",") { destinationFor(prefix, it, destinationType) }
 
                 set("$incoming.connector", PGMQ_CONNECTOR)
-                set("$incoming.queue", queue)
+                set("$incoming.queues", queues)
                 set("$incoming.host", host)
                 set("$incoming.port", port)
                 set("$incoming.database", database)
@@ -964,8 +984,7 @@ class LemlineConfigSource : PropertiesConfigSource(
                         TopicType.EVENTS -> props[LEMLINE_MESSAGING_PGMQ_EVENTS_CONSUMER_MAX_RETRIES]
                     } ?: PGMQ_MAX_RETRIES_DEFAULT
                 )
-                set("$incoming.dead-letter-queue", queueDLQ)
-                set("$incoming.auto-create-queue", "false")
+                set("$incoming.auto-create-queue", "true")
                 // Set consumer concurrency
                 set(
                     topicType.consumerConcurrency,
@@ -980,19 +999,15 @@ class LemlineConfigSource : PropertiesConfigSource(
                 val outgoing = "mp.messaging.outgoing.${topicType.outgoingChannel}"
 
                 set("$outgoing.connector", PGMQ_CONNECTOR)
-                set(
-                    "$outgoing.queue",
-                    when (topicType) {
-                        TopicType.COMMANDS -> props[LEMLINE_MESSAGING_PGMQ_COMMANDS_PRODUCER_QUEUE_OUT]
-                        TopicType.EVENTS -> props[LEMLINE_MESSAGING_PGMQ_EVENTS_PRODUCER_QUEUE_OUT]
-                    } ?: queue
-                )
+                // Fallback only: every emission carries its per-message queue
+                // (PgmqOutgoingMetadata) derived from the message's namespace
+                set("$outgoing.queue", destinationFor(prefix, NamespaceScope.DEFAULT_NAMESPACE, destinationType))
                 set("$outgoing.host", host)
                 set("$outgoing.port", port)
                 set("$outgoing.database", database)
                 set("$outgoing.username", username)
                 set("$outgoing.password", password)
-                set("$outgoing.auto-create-queue", "false")
+                set("$outgoing.auto-create-queue", "true")
             }
         }
 
@@ -1007,15 +1022,17 @@ class LemlineConfigSource : PropertiesConfigSource(
             username: String,
             password: String
         ) {
-            val queue = props[LEMLINE_MESSAGING_PGMQ_CLOUDEVENTS_QUEUE] ?: CLOUDEVENTS_TOPIC_DEFAULT
+            val prefix = prefixOf(props)
 
             // Consumer configuration for listen tasks
             if (props[LEMLINE_MESSAGING_CLOUDEVENTS_CONSUMER_ENABLED].toBoolean()) {
                 val incoming = "mp.messaging.incoming.$CLOUDEVENTS_IN_CHANNEL"
-                val queueDLQ = props[LEMLINE_MESSAGING_PGMQ_CLOUDEVENTS_CONSUMER_QUEUE_DLQ] ?: "$queue.dlq"
+                // One queue per followed namespace; per-source-queue DLQ derived by the connector
+                val queues = namespacesOf(props)
+                    .joinToString(",") { destinationFor(prefix, it, DestinationType.CLOUDEVENTS) }
 
                 set("$incoming.connector", PGMQ_CONNECTOR)
-                set("$incoming.queue", queue)
+                set("$incoming.queues", queues)
                 set("$incoming.host", host)
                 set("$incoming.port", port)
                 set("$incoming.database", database)
@@ -1038,8 +1055,7 @@ class LemlineConfigSource : PropertiesConfigSource(
                     "$incoming.max-retries",
                     props[LEMLINE_MESSAGING_PGMQ_CLOUDEVENTS_CONSUMER_MAX_RETRIES] ?: PGMQ_MAX_RETRIES_DEFAULT
                 )
-                set("$incoming.dead-letter-queue", queueDLQ)
-                set("$incoming.auto-create-queue", "false")
+                set("$incoming.auto-create-queue", "true")
                 set(
                     LEMLINE_MESSAGING_CLOUDEVENTS_CONSUMER_CONCURRENCY,
                     props[LEMLINE_MESSAGING_PGMQ_CLOUDEVENTS_CONSUMER_CONCURRENCY] ?: CONSUMER_CONCURRENCY_DEFAULT
@@ -1051,13 +1067,18 @@ class LemlineConfigSource : PropertiesConfigSource(
                 val outgoing = "mp.messaging.outgoing.$CLOUDEVENTS_OUT_CHANNEL"
 
                 set("$outgoing.connector", PGMQ_CONNECTOR)
-                set("$outgoing.queue", props[LEMLINE_MESSAGING_PGMQ_CLOUDEVENTS_PRODUCER_QUEUE_OUT] ?: queue)
+                // Fallback only: Emit tasks publish with a per-message queue derived from
+                // the emitting workflow's namespace
+                set(
+                    "$outgoing.queue",
+                    destinationFor(prefix, NamespaceScope.DEFAULT_NAMESPACE, DestinationType.CLOUDEVENTS)
+                )
                 set("$outgoing.host", host)
                 set("$outgoing.port", port)
                 set("$outgoing.database", database)
                 set("$outgoing.username", username)
                 set("$outgoing.password", password)
-                set("$outgoing.auto-create-queue", "false")
+                set("$outgoing.auto-create-queue", "true")
             }
         }
 

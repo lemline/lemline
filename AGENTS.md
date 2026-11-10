@@ -21,16 +21,19 @@ Lemline is an event-driven workflow orchestration runtime implementing Serverles
 
 Use these docs as primary context before broad refactors:
 
+- Product vision and scope guardrails: [`VISION.md`](VISION.md) — consult when deciding product scope, prioritization, or naming; do not load by default.
 - System architecture: [`docs/orchestrator-architecture.md`](docs/orchestrator-architecture.md), [`docs/runner-architecture.md`](docs/runner-architecture.md)
 - Messaging architecture ADR: [`docs/adr/0003-messaging-architecture.md`](docs/adr/0003-messaging-architecture.md)
 - Workflow execution model ADR: [`docs/adr/0002-workflow-execution-model.md`](docs/adr/0002-workflow-execution-model.md)
 - Database strategy ADR: [`docs/adr/0004-database-storage-strategy.md`](docs/adr/0004-database-storage-strategy.md)
 - Error handling ADR: [`docs/adr/0005-error-handling-approach.md`](docs/adr/0005-error-handling-approach.md)
 - Config strategy ADR: [`docs/adr/0007-config-strategy.md`](docs/adr/0007-config-strategy.md)
+- Namespace isolation ADR: [`docs/adr/0016-namespace-isolation.md`](docs/adr/0016-namespace-isolation.md)
 - Protobuf messaging rules: [`docs/protobuf-messaging.md`](docs/protobuf-messaging.md)
 - Logging strategy: [`docs/logging-strategy.md`](docs/logging-strategy.md)
 - CLI strategy: [`docs/cli-strategy.md`](docs/cli-strategy.md)
 - Listen behavior reference: [`docs/listen-task.md`](docs/listen-task.md)
+- Namespace isolation ops guide: [`docs/namespace-isolation.md`](docs/namespace-isolation.md)
 - ADR index: [`docs/adr/README.md`](docs/adr/README.md)
 
 ## Repository Layout
@@ -120,16 +123,16 @@ Known deviations:
   - `lemline-core/src/main/kotlin/com/lemline/core/orchestrator/StepByStepOrchestrator.kt`
   - `lemline-core/src/main/kotlin/com/lemline/core/orchestrator/FullOrchestrator.kt`
 - Processor contract:
-  - `lemline-core/src/main/kotlin/com/lemline/core/processors/NodeProcessor.kt`
+  - `lemline-core/src/main/kotlin/com/lemline/core/processors/AbstractProcessor.kt`
 - Runner command/event handling:
   - `lemline-runner/src/main/kotlin/com/lemline/runner/messaging/commands/WorkflowCommandHandler.kt`
   - `lemline-runner/src/main/kotlin/com/lemline/runner/messaging/events/WorkflowEventHandler.kt`
 - Common outbox base:
   - `lemline-runner-common/src/main/kotlin/com/lemline/runner/common/outbox/AbstractOutbox.kt`
 - Gateway ingress + streaming:
-  - `lemline-runner-gateway/src/main/kotlin/com/lemline/runner/gateway/grpc/WorkflowGatewayGrpcService.kt`
-  - `lemline-runner-gateway/src/main/kotlin/com/lemline/runner/gateway/start/WorkflowStartService.kt`
-  - `lemline-runner-gateway/src/main/kotlin/com/lemline/runner/gateway/watch/WorkflowWatchService.kt`
+  - `lemline-runner-gateway/src/main/kotlin/com/lemline/runner/gateway/grpc/GatewayGrpcService.kt`
+  - `lemline-runner-gateway/src/main/kotlin/com/lemline/runner/gateway/resources/instances/InstanceStartService.kt`
+  - `lemline-runner-gateway/src/main/kotlin/com/lemline/runner/gateway/resources/instances/InstanceWatchService.kt`
 - Analytics ingestion:
   - `lemline-runner-analytics/src/main/kotlin/com/lemline/runner/analytics/LifecycleAnalyticsSubscriber.kt`
   - `lemline-runner-analytics/src/main/kotlin/com/lemline/runner/analytics/LifecycleAnalyticsRepository.kt`

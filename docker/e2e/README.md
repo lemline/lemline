@@ -136,14 +136,19 @@ docker compose -f docker/e2e/docker-compose.yml logs seed-definitions
 
 ## Start a sample instance
 
-Start an instance:
+Start an instance (a 30-second wait, so it shows as running in the dashboard before completing):
 
 ```bash
 docker compose -f docker/e2e/docker-compose.yml exec worker \
   java -jar /app/quarkus-app/quarkus-run.jar \
   --config=/config/lemline.yaml \
-  instance start e2e hello 1.0.0 --input '{"from":"docker-e2e"}'
+  instance start test wait-duration-inline 0.1.0 --input '{"from":"docker-e2e"}'
 ```
+
+You can also start instances from the dashboard with **Start Workflow**.
+
+The worker follows the namespaces of the seeded examples (`lemline.namespaces` in
+`config/lemline.yaml`). An instance started in any other namespace stays pending.
 
 ## Logs
 

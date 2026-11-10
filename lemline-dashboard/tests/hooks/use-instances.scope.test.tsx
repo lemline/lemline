@@ -3,7 +3,7 @@ import { renderHook, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { useInstances, type InstanceFilters } from "../../src/hooks/use-instances";
-import type { ListInstancesRequest } from "../../src/gen/proto/lemline/gateway/v1/workflow_gateway_pb";
+import type { ListInstancesRequest } from "../../src/gen/proto/lemline/gateway/v1/gateway_pb";
 
 const mockListInstances = vi.fn();
 

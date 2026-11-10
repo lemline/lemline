@@ -6,19 +6,13 @@ import com.lemline.runner.common.config.LEMLINE_DATABASE_MYSQL_HOST
 import com.lemline.runner.common.config.LEMLINE_DATABASE_MYSQL_PASSWORD
 import com.lemline.runner.common.config.LEMLINE_DATABASE_MYSQL_PORT
 import com.lemline.runner.common.config.LEMLINE_DATABASE_MYSQL_USERNAME
-import com.lemline.runner.common.test.DockerAvailability
-import io.quarkus.test.common.QuarkusTestResourceLifecycleManager
 import org.testcontainers.containers.MySQLContainer
 import org.testcontainers.utility.DockerImageName
 
-class MySQLTestResource : QuarkusTestResourceLifecycleManager {
+class MySQLTestResource : TestcontainersResource() {
     private lateinit var mysql: MySQLContainer<*>
 
-    override fun start(): Map<String, String> {
-        if (!DockerAvailability.isAvailable) {
-            return emptyMap()
-        }
-
+    override fun startContainers(): Map<String, String> {
         mysql = MySQLContainer(DockerImageName.parse("mysql:8.0"))
             .withDatabaseName("swruntime_test")
             .withUsername("test")

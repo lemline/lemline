@@ -326,6 +326,84 @@ class PgmqConfigurationTest : FunSpec({
         }
     }
 
+    context("Multi-queue configuration (queues attribute)") {
+        fun configWith(props: Map<String, String>, channel: String = "ch"): PgmqConnectorConfig {
+            val config = mockk<Config>()
+            every { config.getOptionalValue(any(), String::class.java) } answers {
+                Optional.ofNullable(props[firstArg<String>()])
+            }
+            return PgmqConnectorConfig(config, channel)
+        }
+
+        test("should default to single queue list when queues is absent") {
+            val connectorConfig = configWith(mapOf("mp.messaging.incoming.ch.queue" to "my-queue"))
+
+            connectorConfig.usesQueues shouldBe false
+            connectorConfig.queues shouldBe listOf("my-queue")
+        }
+
+        test("should parse comma-separated queues with whitespace") {
+            val connectorConfig = configWith(
+                mapOf("mp.messaging.incoming.ch.queues" to " lemline-acme-commands , lemline-globex-commands ,")
+            )
+
+            connectorConfig.usesQueues shouldBe true
+            connectorConfig.queues shouldBe listOf("lemline-acme-commands", "lemline-globex-commands")
+        }
+
+        test("queues should win over queue when both are present") {
+            val connectorConfig = configWith(
+                mapOf(
+                    "mp.messaging.incoming.ch.queue" to "single-queue",
+                    "mp.messaging.incoming.ch.queues" to "q-a,q-b",
+                )
+            )
+
+            connectorConfig.queues shouldBe listOf("q-a", "q-b")
+        }
+
+        test("blank queues attribute should fall back to single queue") {
+            val connectorConfig = configWith(
+                mapOf(
+                    "mp.messaging.incoming.ch.queue" to "single-queue",
+                    "mp.messaging.incoming.ch.queues" to "  ",
+                )
+            )
+
+            connectorConfig.usesQueues shouldBe false
+            connectorConfig.queues shouldBe listOf("single-queue")
+        }
+
+        test("should derive per-source DLQ in multi-queue mode") {
+            val connectorConfig = configWith(
+                mapOf(
+                    "mp.messaging.incoming.ch.queues" to "q-a,q-b",
+                    "mp.messaging.incoming.ch.dead-letter-queue" to "shared-dlq",
+                )
+            )
+
+            connectorConfig.deadLetterQueueFor("q-a") shouldBe "q-a.dlq"
+            connectorConfig.deadLetterQueueFor("q-b") shouldBe "q-b.dlq"
+        }
+
+        test("should use explicit dead-letter-queue in single-queue mode") {
+            val connectorConfig = configWith(
+                mapOf(
+                    "mp.messaging.incoming.ch.queue" to "my-queue",
+                    "mp.messaging.incoming.ch.dead-letter-queue" to "my-dlq",
+                )
+            )
+
+            connectorConfig.deadLetterQueueFor("my-queue") shouldBe "my-dlq"
+        }
+
+        test("should return null DLQ in single-queue mode without dead-letter-queue") {
+            val connectorConfig = configWith(mapOf("mp.messaging.incoming.ch.queue" to "my-queue"))
+
+            connectorConfig.deadLetterQueueFor("my-queue") shouldBe null
+        }
+    }
+
     context("Edge cases") {
         test("should handle channel name with special characters") {
             val config = mockk<Config>()

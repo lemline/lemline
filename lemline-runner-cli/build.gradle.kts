@@ -12,6 +12,7 @@ dependencies {
     implementation(project(":lemline-runner-common"))
     implementation(project(":lemline-runner-config"))
     implementation(project(":lemline-runner-definitions"))
+    implementation(project(":lemline-runner-failures"))
     implementation(project(":lemline-runner-schedules"))
     implementation(project(":lemline-runner-listeners"))
     implementation(project(":lemline-runner-gateway"))

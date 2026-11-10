@@ -1,6 +1,8 @@
 document:
   dsl: '1.0.0'
-  namespace: tutorial
+  # "default" is the namespace a zero-config runner follows — a workflow in another
+  # namespace stays pending until a runner is configured to follow it (lemline.namespaces)
+  namespace: default
   name: hello-workflow
   version: '0.1.0'
 do:

@@ -50,7 +50,7 @@ Security behavior:
 
 ## Protobuf Sync
 
-`workflow_gateway.proto` is canonical in `lemline-runner-gateway`. The dashboard keeps a synced copy in `lemline-dashboard/proto`.
+`gateway.proto` is canonical in `lemline-runner-gateway`. The dashboard keeps a synced copy in `lemline-dashboard/proto`.
 
 ```bash
 # Copy canonical proto from gateway into dashboard

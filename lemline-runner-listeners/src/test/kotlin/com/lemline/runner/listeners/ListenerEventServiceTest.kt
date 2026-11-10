@@ -50,6 +50,8 @@ import org.junit.jupiter.api.Test
 @DisplayName("ListenerEventService")
 class ListenerEventServiceTest {
 
+    private val testNamespace = WorkflowNamespace("test-namespace")
+
     private val mockedListenerRepository = mockk<ListenerRepository>()
     private val mockedListenerEventRepository = mockk<ListenerEventRepository>()
     private val mockedDefinitionListenService = mockk<DefinitionListenService>()
@@ -164,10 +166,11 @@ class ListenerEventServiceTest {
     private fun createMatchingListenTask(
         strategy: ListenerStrategy = ListenerStrategy.ONE,
         filterIndex: Int = 0,
-        correlationValuesJson: String? = null
+        correlationValuesJson: String? = null,
+        namespace: String = "test-namespace"
     ): MatchingListenTask {
         val workflowInfo = WorkflowInfo(
-            WorkflowNamespace("test-namespace"),
+            WorkflowNamespace(namespace),
             WorkflowName("test-workflow"),
             WorkflowVersion("1.0.0")
         )
@@ -196,9 +199,9 @@ class ListenerEventServiceTest {
         )
     }
 
-    private fun createMatchingUntilEvent(): MatchingListenTaskUntilEvent {
+    private fun createMatchingUntilEvent(namespace: String = "test-namespace"): MatchingListenTaskUntilEvent {
         val workflowInfo = WorkflowInfo(
-            WorkflowNamespace("test-namespace"),
+            WorkflowNamespace(namespace),
             WorkflowName("test-workflow"),
             WorkflowVersion("1.0.0")
         )
@@ -233,7 +236,7 @@ class ListenerEventServiceTest {
             } returns emptyList()
 
             // When
-            val result = service.handleCloudEvent(event)
+            val result = service.handleCloudEvent(event, testNamespace)
 
             // Then
             result shouldBe 0
@@ -260,10 +263,97 @@ class ListenerEventServiceTest {
             } returns emptyList()
 
             // When
-            val result = service.handleCloudEvent(event)
+            val result = service.handleCloudEvent(event, testNamespace)
 
             // Then
             result shouldBe 0
+        }
+    }
+
+    // ============================================================================
+    // handleCloudEvent - Arrival Namespace Scoping
+    // ============================================================================
+
+    @Nested
+    @DisplayName("When scoping matching to the arrival namespace")
+    inner class ArrivalNamespaceScopingTests {
+
+        @Test
+        fun `should not match an identical listen task from another namespace`() = runTest {
+            // Given: the only matching listen task belongs to namespace-b,
+            // but the event arrived on namespace-a's destination
+            val event = buildCloudEvent()
+            val taskInB = createMatchingListenTask(strategy = ListenerStrategy.ONE, namespace = "namespace-b")
+
+            every {
+                mockedDefinitionListenService.findMatchingListenTasks(event, any())
+            } returns listOf(taskInB)
+            every {
+                mockedDefinitionListenService.findMatchingUntilEvents(event)
+            } returns emptyList()
+
+            // When
+            val result = service.handleCloudEvent(event, WorkflowNamespace("namespace-a"))
+
+            // Then: nothing is inserted, no listener query is ever issued
+            result shouldBe 0
+            coVerify(exactly = 0) { mockedListenerEventRepository.batchInsertForOneAny(any(), any(), any(), any()) }
+            coVerify(exactly = 0) {
+                mockedListenerEventRepository.batchInsertForAllAnyUntil(any(), any(), any(), any())
+            }
+        }
+
+        @Test
+        fun `should only build query keys for the arrival namespace`() = runTest {
+            // Given: identical listen tasks in namespace-a and namespace-b,
+            // the event arrived on namespace-a's destination
+            val event = buildCloudEvent()
+            val taskInA = createMatchingListenTask(strategy = ListenerStrategy.ONE, namespace = "namespace-a")
+            val taskInB = createMatchingListenTask(strategy = ListenerStrategy.ONE, namespace = "namespace-b")
+
+            every {
+                mockedDefinitionListenService.findMatchingListenTasks(event, any())
+            } returns listOf(taskInA, taskInB)
+            every {
+                mockedDefinitionListenService.findMatchingUntilEvents(event)
+            } returns emptyList()
+
+            val capturedKeys = slot<List<ListenerQueryKey>>()
+            coEvery {
+                mockedListenerEventRepository.batchInsertForOneAny(capture(capturedKeys), any(), any(), any())
+            } returns 1
+
+            // When
+            val result = service.handleCloudEvent(event, WorkflowNamespace("namespace-a"))
+
+            // Then: only namespace-a keys reach the matching query
+            result shouldBe 1
+            capturedKeys.captured.size shouldBe 1
+            capturedKeys.captured.all {
+                it.workflowInfo.namespace == WorkflowNamespace("namespace-a")
+            } shouldBe true
+        }
+
+        @Test
+        fun `should not close until-event listeners of another namespace`() = runTest {
+            // Given: a termination event matching a listener definition of namespace-b only,
+            // arriving on namespace-a's destination
+            val event = buildCloudEvent()
+            val untilEventInB = createMatchingUntilEvent(namespace = "namespace-b")
+
+            every {
+                mockedDefinitionListenService.findMatchingListenTasks(event, any())
+            } returns emptyList()
+            every {
+                mockedDefinitionListenService.findMatchingUntilEvents(event)
+            } returns listOf(untilEventInB)
+
+            // When
+            val result = service.handleCloudEvent(event, WorkflowNamespace("namespace-a"))
+
+            // Then
+            result shouldBe 0
+            coVerify(exactly = 0) { mockedListenerRepository.markListenerCompletedByUntilEvent(any(), any()) }
         }
     }
 
@@ -292,7 +382,7 @@ class ListenerEventServiceTest {
             } returns 1
 
             // When
-            val result = service.handleCloudEvent(event)
+            val result = service.handleCloudEvent(event, testNamespace)
 
             // Then
             result shouldBe 1
@@ -323,7 +413,7 @@ class ListenerEventServiceTest {
             } returns 1
 
             // When
-            val result = service.handleCloudEvent(event)
+            val result = service.handleCloudEvent(event, testNamespace)
 
             // Then
             result shouldBe 1
@@ -357,7 +447,7 @@ class ListenerEventServiceTest {
             } returns 2
 
             // When
-            val result = service.handleCloudEvent(event)
+            val result = service.handleCloudEvent(event, testNamespace)
 
             // Then
             result shouldBe 2
@@ -393,7 +483,7 @@ class ListenerEventServiceTest {
             } returns 1
 
             // When
-            service.handleCloudEvent(event)
+            service.handleCloudEvent(event, testNamespace)
 
             // Then
             Json.parseToJsonElement(capturedEventJson.captured)
@@ -421,7 +511,7 @@ class ListenerEventServiceTest {
             } returns 1
 
             // When
-            service.handleCloudEvent(event)
+            service.handleCloudEvent(event, testNamespace)
 
             // Then
             coVerify {
@@ -451,7 +541,7 @@ class ListenerEventServiceTest {
             } returns 1
 
             // When
-            service.handleCloudEvent(event)
+            service.handleCloudEvent(event, testNamespace)
 
             // Then
             coVerify(exactly = 0) {
@@ -490,7 +580,7 @@ class ListenerEventServiceTest {
             } returns 1
 
             // When
-            val result = service.handleCloudEvent(event)
+            val result = service.handleCloudEvent(event, testNamespace)
 
             // Then
             result shouldBe 1
@@ -525,7 +615,7 @@ class ListenerEventServiceTest {
             } returns 3
 
             // When
-            val result = service.handleCloudEvent(event)
+            val result = service.handleCloudEvent(event, testNamespace)
 
             // Then
             result shouldBe 3
@@ -556,7 +646,7 @@ class ListenerEventServiceTest {
             } returns 1
 
             // When
-            service.handleCloudEvent(event)
+            service.handleCloudEvent(event, testNamespace)
 
             // Then
             coVerify(exactly = 0) { mockedListenerEventRepository.batchInsertForOneAny(any(), any(), any(), any()) }
@@ -591,7 +681,7 @@ class ListenerEventServiceTest {
             } returns emptyList()
 
             // When
-            val result = service.handleCloudEvent(event)
+            val result = service.handleCloudEvent(event, testNamespace)
 
             // Then
             result shouldBe 1
@@ -625,7 +715,7 @@ class ListenerEventServiceTest {
             } returns emptyList()
 
             // When
-            service.handleCloudEvent(event)
+            service.handleCloudEvent(event, testNamespace)
 
             // Then
             coVerify {
@@ -664,7 +754,7 @@ class ListenerEventServiceTest {
             } returns 1
 
             // When
-            val result = service.handleCloudEvent(event)
+            val result = service.handleCloudEvent(event, testNamespace)
 
             // Then
             result shouldBe 2 // 1 for insert + 1 for marking completed
@@ -701,7 +791,7 @@ class ListenerEventServiceTest {
             } returns listOf(listener to accumulatedEvents)
 
             // When
-            val result = service.handleCloudEvent(event)
+            val result = service.handleCloudEvent(event, testNamespace)
 
             // Then
             result shouldBe 1 // Only insert, no completion
@@ -735,7 +825,7 @@ class ListenerEventServiceTest {
             } returns listOf(listener to accumulatedEvents)
 
             // When
-            val result = service.handleCloudEvent(event)
+            val result = service.handleCloudEvent(event, testNamespace)
 
             // Then
             result shouldBe 1 // Only insert
@@ -770,7 +860,7 @@ class ListenerEventServiceTest {
             } returns 1
 
             // When
-            val result = service.handleCloudEvent(event)
+            val result = service.handleCloudEvent(event, testNamespace)
 
             // Then
             result shouldBe 1
@@ -801,7 +891,7 @@ class ListenerEventServiceTest {
             } returns 3
 
             // When
-            val result = service.handleCloudEvent(terminationEvent)
+            val result = service.handleCloudEvent(terminationEvent, testNamespace)
 
             // Then
             result shouldBe 3
@@ -834,7 +924,7 @@ class ListenerEventServiceTest {
             } returns 2
 
             // When
-            val result = service.handleCloudEvent(event)
+            val result = service.handleCloudEvent(event, testNamespace)
 
             // Then
             result shouldBe 3 // 1 insert + 2 terminations
@@ -857,7 +947,7 @@ class ListenerEventServiceTest {
             } returns 0
 
             // When
-            val result = service.handleCloudEvent(terminationEvent)
+            val result = service.handleCloudEvent(terminationEvent, testNamespace)
 
             // Then
             result shouldBe 0
@@ -893,7 +983,7 @@ class ListenerEventServiceTest {
             } returns 1
 
             // When
-            val result = service.handleCloudEvent(event)
+            val result = service.handleCloudEvent(event, testNamespace)
 
             // Then
             result shouldBe 2
@@ -929,7 +1019,7 @@ class ListenerEventServiceTest {
             } returns emptyList() // No expression evaluation needed
 
             // When
-            val result = service.handleCloudEvent(event)
+            val result = service.handleCloudEvent(event, testNamespace)
 
             // Then
             result shouldBe 2
@@ -977,7 +1067,7 @@ class ListenerEventServiceTest {
             } returns 1
 
             // When
-            val result = service.handleCloudEvent(event)
+            val result = service.handleCloudEvent(event, testNamespace)
 
             // Then
             result shouldBe 6 // 2 + 3 + 1 (termination)
@@ -1014,7 +1104,7 @@ class ListenerEventServiceTest {
             } returns 1
 
             // When
-            service.handleCloudEvent(event)
+            service.handleCloudEvent(event, testNamespace)
 
             // Then
             capturedKeys.captured.size shouldBe 1
@@ -1043,7 +1133,7 @@ class ListenerEventServiceTest {
             } returns 1
 
             // When
-            service.handleCloudEvent(event)
+            service.handleCloudEvent(event, testNamespace)
 
             // Then
             capturedKeys.captured.size shouldBe 1
@@ -1251,7 +1341,7 @@ class ListenerEventServiceTest {
             } returns listOf(listener to accumulatedEvents)
 
             // When - Should not throw exception
-            val result = service.handleCloudEvent(event)
+            val result = service.handleCloudEvent(event, testNamespace)
 
             // Then
             result shouldBe 1 // Only the insert, no completion due to failed expression
@@ -1284,7 +1374,7 @@ class ListenerEventServiceTest {
             } returns 1
 
             // When
-            val result = service.handleCloudEvent(event)
+            val result = service.handleCloudEvent(event, testNamespace)
 
             // Then
             result shouldBe 1
@@ -1308,7 +1398,7 @@ class ListenerEventServiceTest {
             } returns 1
 
             // When
-            val result = service.handleCloudEvent(event)
+            val result = service.handleCloudEvent(event, testNamespace)
 
             // Then
             result shouldBe 1
@@ -1331,7 +1421,7 @@ class ListenerEventServiceTest {
             } returns 0 // No listeners matched the query
 
             // When
-            val result = service.handleCloudEvent(event)
+            val result = service.handleCloudEvent(event, testNamespace)
 
             // Then
             result shouldBe 0
@@ -1376,7 +1466,7 @@ class ListenerEventServiceTest {
             } returns 2 // Only 2 should complete
 
             // When
-            val result = service.handleCloudEvent(event)
+            val result = service.handleCloudEvent(event, testNamespace)
 
             // Then
             result shouldBe 3 // 1 insert + 2 completions

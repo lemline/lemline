@@ -168,6 +168,8 @@ dependencies {
     // QuarkusTestProfile for InMemoryProfile
     testFixturesImplementation(enforcedPlatform(libs.quarkus.bom))
     testFixturesImplementation("io.quarkus:quarkus-junit5")
+    // The augmentation loader discovers this test-only hook from the fixtures dependency.
+    testFixturesCompileOnly("io.quarkus:quarkus-core-deployment")
     testFixturesImplementation(libs.serverlessworkflow.api)
     testFixturesImplementation(project(":lemline-runner-common"))
     testFixturesImplementation(project(":lemline-runner-config"))

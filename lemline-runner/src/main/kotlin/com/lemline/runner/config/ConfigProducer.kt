@@ -3,15 +3,18 @@ package com.lemline.runner.config
 
 import com.lemline.common.values.IDV7
 import com.lemline.core.states.WorkflowCommand
+import com.lemline.core.states.WorkflowEvent
 import com.lemline.runner.common.config.CleanupConfig
 import com.lemline.runner.common.config.OutboxConfig
 import com.lemline.runner.common.messaging.CommandEmitter
+import com.lemline.runner.common.messaging.EventEmitter
 import com.lemline.runner.common.messaging.InstanceMessage
 import com.lemline.runner.definitions.DefinitionConfig
 import com.lemline.runner.forks.ForkFeatureConfig
-import com.lemline.runner.gateway.outbox.GatewayOutboxConfig
+import com.lemline.runner.gateway.outbox.GatewayCommandConfig
 import com.lemline.runner.listeners.ListenerConfig
 import com.lemline.runner.messaging.commands.WorkflowCommandEmitter
+import com.lemline.runner.messaging.events.WorkflowEventEmitter
 import com.lemline.runner.parents.ParentFeatureConfig
 import com.lemline.runner.retries.RetryConfig
 import com.lemline.runner.schedules.ScheduleConfig
@@ -30,7 +33,7 @@ import kotlin.time.Duration.Companion.seconds
 /**
  * CDI producer for feature configuration beans and infrastructure interfaces.
  * Converts [LemlineConfiguration] to feature-specific configuration interfaces
- * and provides [CommandEmitter] for use by feature modules.
+ * and provides [CommandEmitter] and [EventEmitter] for use by feature modules and the CLI.
  */
 @ApplicationScoped
 class ConfigProducer {
@@ -41,11 +44,22 @@ class ConfigProducer {
     @Inject
     internal lateinit var workflowCommandEmitter: WorkflowCommandEmitter
 
+    @Inject
+    internal lateinit var workflowEventEmitter: WorkflowEventEmitter
+
     @Produces
     @ApplicationScoped
     fun commandEmitter(): CommandEmitter = object : CommandEmitter {
         override suspend fun send(message: InstanceMessage<out WorkflowCommand>, idempotentKey: IDV7?) {
             workflowCommandEmitter.send(message, idempotentKey)
+        }
+    }
+
+    @Produces
+    @ApplicationScoped
+    fun eventEmitter(): EventEmitter = object : EventEmitter {
+        override suspend fun send(message: InstanceMessage<WorkflowEvent>, idempotentKey: IDV7?) {
+            workflowEventEmitter.send(message, idempotentKey)
         }
     }
 
@@ -103,7 +117,7 @@ class ConfigProducer {
 
     @Produces
     @ApplicationScoped
-    fun gatewayOutboxConfig(): GatewayOutboxConfig = object : GatewayOutboxConfig {
+    fun gatewayOutboxConfig(): GatewayCommandConfig = object : GatewayCommandConfig {
         private val source = config.outbox().gateway().getOrNull()
         override val enabled: Boolean get() = config.gatewayEnabled && (source?.enabled() ?: true)
         override val outbox: OutboxConfig

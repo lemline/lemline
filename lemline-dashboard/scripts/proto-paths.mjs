@@ -6,10 +6,10 @@ const dashboardDir = resolve(scriptDir, "..");
 
 export const gatewayProtoPath = resolve(
   dashboardDir,
-  "../lemline-runner-gateway/src/main/proto/lemline/gateway/v1/workflow_gateway.proto",
+  "../lemline-runner-gateway/src/main/proto/lemline/gateway/v1/gateway.proto",
 );
 
 export const dashboardProtoPath = resolve(
   dashboardDir,
-  "proto/lemline/gateway/v1/workflow_gateway.proto",
+  "proto/lemline/gateway/v1/gateway.proto",
 );

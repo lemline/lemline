@@ -2,7 +2,7 @@
 package com.lemline.runner.failures
 
 import com.lemline.common.values.IDV7
-import com.lemline.core.random.randomWorkflowFailedEvent
+import com.lemline.core.random.randomWorkflowFaultedEvent
 import com.lemline.core.random.randomWorkflowInfo
 import com.lemline.runner.common.config.DatabaseConfig
 import com.lemline.runner.common.messaging.InstanceMessage
@@ -53,7 +53,7 @@ abstract class FailureRepositoryTestBase {
             id = IDV7.random(),
             instance = InstanceMessage(
                 workflowInfo = randomWorkflowInfo(),
-                workflowState = randomWorkflowFailedEvent(),
+                workflowState = randomWorkflowFaultedEvent(),
             ),
             exception = ex,
         )
@@ -89,11 +89,11 @@ abstract class FailureRepositoryTestBase {
     fun `should find failures by workflow id`() = runTest {
         val instance1 = InstanceMessage(
             workflowInfo = randomWorkflowInfo(),
-            workflowState = randomWorkflowFailedEvent(),
+            workflowState = randomWorkflowFaultedEvent(),
         )
         val instance2 = InstanceMessage(
             workflowInfo = randomWorkflowInfo(),
-            workflowState = randomWorkflowFailedEvent(),
+            workflowState = randomWorkflowFaultedEvent(),
         )
 
         val f1 = FailureModel.from(IDV7.random(), instance1, RuntimeException("e1")).copy(payload = "m1")
@@ -113,7 +113,7 @@ abstract class FailureRepositoryTestBase {
     fun `count and deleteAll should work`() = runTest {
         val instance = InstanceMessage(
             workflowInfo = randomWorkflowInfo(),
-            workflowState = randomWorkflowFailedEvent(),
+            workflowState = randomWorkflowFaultedEvent(),
         )
         val failures = List(3) { idx ->
             FailureModel.from(IDV7.random(), instance, RuntimeException("err-$idx")).copy(payload = "m$idx")
@@ -132,7 +132,7 @@ abstract class FailureRepositoryTestBase {
             IDV7.random(),
             InstanceMessage(
                 workflowInfo = randomWorkflowInfo(),
-                workflowState = randomWorkflowFailedEvent(),
+                workflowState = randomWorkflowFaultedEvent(),
             ),
             RuntimeException("boom")
         )
@@ -150,7 +150,7 @@ abstract class FailureRepositoryTestBase {
             IDV7.random(),
             InstanceMessage(
                 workflowInfo = randomWorkflowInfo(),
-                workflowState = randomWorkflowFailedEvent(),
+                workflowState = randomWorkflowFaultedEvent(),
             ),
             RuntimeException("boom")
         )

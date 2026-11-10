@@ -11,7 +11,7 @@ import kotlinx.serialization.json.JsonElement
 
 class ForeachProcessor(
     node: Node<ForeachTask>
-) : NodeProcessor<ForeachTask, ForeachState>(node) {
+) : AbstractProcessor<ForeachTask, ForeachState>(node) {
 
     override fun stateWhenEnteringFromParent(transformedInput: JsonElement, scope: Scope): ForeachState =
         ForeachState(
@@ -29,7 +29,7 @@ class ForeachProcessor(
         state: ForeachState,
         dataset: JsonElement,
         scope: Scope,
-    ): NavigationInfo = NavigationInfo(
+    ): NextInfo = NextInfo(
         nextNode = node.foreachDoBlock,
         nextDirective = null
     )

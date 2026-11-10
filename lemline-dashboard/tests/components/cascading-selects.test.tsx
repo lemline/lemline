@@ -7,7 +7,7 @@ import { CascadingSelects } from "../../src/components/layout/cascading-selects"
 
 const mockUseNamespaces = vi.fn();
 const mockUseDefinitions = vi.fn();
-const mockUseInstanceTimeline = vi.fn();
+const mockUseWorkflowScopeFromWatch = vi.fn();
 const mockListInstances = vi.fn();
 
 vi.mock("../../src/hooks/use-namespaces", () => ({
@@ -18,8 +18,8 @@ vi.mock("../../src/hooks/use-definitions", () => ({
   useDefinitions: (options: unknown) => mockUseDefinitions(options),
 }));
 
-vi.mock("../../src/hooks/use-instance-timeline", () => ({
-  useInstanceTimeline: () => mockUseInstanceTimeline(),
+vi.mock("../../src/hooks/use-watch-workflow-projection", () => ({
+  useWorkflowScopeFromWatch: () => mockUseWorkflowScopeFromWatch(),
 }));
 
 vi.mock("../../src/lib/grpc-client", () => ({
@@ -91,7 +91,7 @@ describe("CascadingSelects", () => {
       };
     });
 
-    mockUseInstanceTimeline.mockReturnValue({ data: undefined });
+    mockUseWorkflowScopeFromWatch.mockReturnValue(undefined);
     mockListInstances.mockResolvedValue({ instances: [] });
   });
 

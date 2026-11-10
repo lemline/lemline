@@ -3,10 +3,12 @@ package com.lemline.runner.listeners
 
 import com.lemline.common.values.IDV7
 import com.lemline.runner.common.config.DatabaseConfig
+import com.lemline.runner.common.namespaces.NamespaceScope
 import com.lemline.runner.common.config.DatabaseType
 import com.lemline.runner.common.repositories.helpers.ColumnBindings
 import com.lemline.runner.common.repositories.helpers.ColumnBindingsBuilder
 import com.lemline.runner.common.repositories.ops.CREATED_AT_COLUMN
+import com.lemline.runner.common.repositories.ops.WORKFLOW_NAMESPACE_COLUMN
 import com.lemline.runner.common.repositories.ops.CrudRepository
 import com.lemline.runner.common.repositories.ops.ID_COLUMN
 import com.lemline.runner.common.repositories.ops.OUTBOX_DELAYED_UNTIL_COLUMN
@@ -59,9 +61,23 @@ class ListenerEventRepository : CrudRepository<ListenerEventModel>(),
     @Inject
     override lateinit var databaseConfig: DatabaseConfig
 
+    @Inject
+    var namespaceScope: NamespaceScope = NamespaceScope.UNSCOPED
+
     // Composed operations - initialized lazily to ensure databaseConfig is injected
-    // Uses specialized ListenerEventOutboxRepository for FIFO-aware processing
-    private val outboxRepository by lazy { OutboxRepository(tableName, ::createModel, databaseConfig) }
+    // lemline_listener_events has no workflow_namespace column, so both readiness
+    // (buildEligibleListenersSubquery) and claims are scoped through the owning listener: a scoped
+    // runner never claims an event that another namespace's runner marked ready.
+    private val outboxRepository by lazy {
+        OutboxRepository(
+            tableName,
+            ::createModel,
+            databaseConfig,
+            namespaceScope.configured,
+            namespaceColumn = "(SELECT l.$WORKFLOW_NAMESPACE_COLUMN FROM $LISTENER_TABLE l " +
+                "WHERE l.$ID_COLUMN = $tableName.$LISTENER_ID_COLUMN)",
+        )
+    }
 
     // Delegate WithOutboxRepository methods
     override suspend fun findEntitiesToProcess(maxAttempts: Int, limit: Int, connection: Connection?) =
@@ -678,10 +694,16 @@ class ListenerEventRepository : CrudRepository<ListenerEventModel>(),
             DatabaseType.POSTGRESQL -> "FOR UPDATE SKIP LOCKED\n        LIMIT $limit"
             else -> "LIMIT $limit\n        FOR UPDATE SKIP LOCKED"
         }
+        // Namespace scope inlined (config-bounded values validated at startup): a scoped runner only
+        // advances listener events of the namespaces it follows in a shared database.
+        val namespaceFilter = namespaceScope.configured
+            ?.joinToString(", ") { "'$it'" }
+            ?.let { "l.$WORKFLOW_NAMESPACE_COLUMN IN ($it)\n            AND " }
+            ?: ""
         return """
             SELECT l.$ID_COLUMN AS listener_id
             FROM $LISTENER_TABLE l
-            WHERE EXISTS (
+            WHERE ${namespaceFilter}EXISTS (
                 SELECT 1 FROM $tableName p
                 WHERE p.$LISTENER_ID_COLUMN = l.$ID_COLUMN AND p.$pendingEventCondition
             )

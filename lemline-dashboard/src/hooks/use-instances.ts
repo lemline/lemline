@@ -1,12 +1,13 @@
 import { useInfiniteQuery } from "@tanstack/react-query";
+import { InstanceStatus, ListInstancesRequest } from "../gen/proto/lemline/gateway/v1/gateway_pb";
 import { gatewayClient } from "../lib/grpc-client";
-import { ListInstancesRequest } from "../gen/proto/lemline/gateway/v1/workflow_gateway_pb";
+import { timestampFromIsoString } from "../lib/proto";
 
 export interface InstanceFilters {
   namespace?: string;
   name?: string;
   version?: string;
-  status?: string;
+  status?: string | InstanceStatus;
   timeFrom?: string;
   timeTo?: string;
   workflowId?: string;
@@ -41,24 +42,45 @@ export function useInstances(filters: InstanceFilters) {
           namespace: filters.namespace,
           name: filters.name,
           version: filters.version,
-          status: filters.status,
-          timeFrom: filters.timeFrom,
-          timeTo: filters.timeTo,
-          workflowId: filters.workflowId,
-          workflowIdPrefix: filters.workflowIdPrefix,
+          status: toProtoInstanceStatus(filters.status),
+          createdFrom: timestampFromIsoString(filters.timeFrom),
+          createdTo: timestampFromIsoString(filters.timeTo),
+          instanceIdPrefix: filters.workflowId ?? filters.workflowIdPrefix,
           pageSize: filters.pageSize ?? 50,
           pageCursor: pageParam,
         }),
       );
       return response;
     },
-    getNextPageParam: (lastPage) => lastPage.nextCursor || undefined,
+    getNextPageParam: (lastPage) => lastPage.nextPageCursor || undefined,
   });
 
   return {
     ...query,
     instances: query.data?.pages.flatMap((page) => page.instances) ?? [],
     totalCount: query.data?.pages[0]?.totalCount,
-    nextCursor: query.data?.pages[query.data.pages.length - 1]?.nextCursor,
+    nextCursor: query.data?.pages[query.data.pages.length - 1]?.nextPageCursor,
+    watchCursor: query.data?.pages[0]?.watchCursor,
   };
+}
+
+function toProtoInstanceStatus(
+  value: InstanceFilters["status"],
+): InstanceStatus | undefined {
+  if (typeof value === "number") {
+    return value === InstanceStatus.UNSPECIFIED ? undefined : value;
+  }
+
+  switch (value?.toUpperCase()) {
+    case "PENDING":
+      return InstanceStatus.PENDING;
+    case "RUNNING":
+      return InstanceStatus.RUNNING;
+    case "COMPLETED":
+      return InstanceStatus.COMPLETED;
+    case "FAULTED":
+      return InstanceStatus.FAULTED;
+    default:
+      return undefined;
+  }
 }

@@ -11,8 +11,6 @@ import com.lemline.runner.common.config.LEMLINE_MESSAGING_PGMQ_HOST
 import com.lemline.runner.common.config.LEMLINE_MESSAGING_PGMQ_PASSWORD
 import com.lemline.runner.common.config.LEMLINE_MESSAGING_PGMQ_PORT
 import com.lemline.runner.common.config.LEMLINE_MESSAGING_PGMQ_USERNAME
-import com.lemline.runner.common.test.DockerAvailability
-import io.quarkus.test.common.QuarkusTestResourceLifecycleManager
 import org.testcontainers.containers.PostgreSQLContainer
 import org.testcontainers.containers.wait.strategy.Wait
 import org.testcontainers.utility.DockerImageName
@@ -28,14 +26,10 @@ import org.testcontainers.utility.DockerImageName
  * This approach lets Flyway automatically initialize the PGMQ schema as part of normal
  * database migration, just like it would in production.
  */
-class PgmqTestResource : QuarkusTestResourceLifecycleManager {
+class PgmqTestResource : TestcontainersResource() {
     private lateinit var postgres: PostgreSQLContainer<*>
 
-    override fun start(): Map<String, String> {
-        if (!DockerAvailability.isAvailable) {
-            return emptyMap()
-        }
-
+    override fun startContainers(): Map<String, String> {
         // Use standard PostgreSQL - we use SQL-only PGMQ installation (no extension required)
         postgres = PostgreSQLContainer(DockerImageName.parse("postgres:16-alpine"))
 

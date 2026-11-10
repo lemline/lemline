@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.lifecycleevents
 
-import com.lemline.common.values.NodePosition
 import com.lemline.common.ids.IdGenerator
 import com.lemline.common.values.IDV7
+import com.lemline.common.values.NodePosition
 import com.lemline.common.values.WorkflowId
 import com.lemline.common.values.WorkflowInfo
 import com.lemline.core.errors.InternalException
@@ -125,11 +125,11 @@ class CloudEventLifecycleHook(
         workflowInfo: WorkflowInfo,
         nodeStack: NodeStack,
         error: InternalException.Error,
-        failedAt: Instant,
+        faultedAt: Instant,
     ) {
         val data = LifecycleEventData.WorkflowFaultedData(
             name = workflowInfo.qualifiedName,
-            faultedAt = failedAt,
+            faultedAt = faultedAt,
             error = error.toErrorInfo(),
         )
 
@@ -139,7 +139,7 @@ class CloudEventLifecycleHook(
             workflowId = nodeStack.workflowId,
             nodeStack = nodeStack,
             data = data,
-            timestamp = failedAt,
+            timestamp = faultedAt,
             idSuffix = "workflow-faulted",
         )
 
@@ -235,12 +235,12 @@ class CloudEventLifecycleHook(
         nodeStack: NodeStack,
         nodePosition: NodePosition,
         error: InternalException.Error,
-        failedAt: Instant,
+        faultedAt: Instant,
     ) {
         val data = LifecycleEventData.TaskFaultedData(
             workflow = workflowInfo.qualifiedName,
             task = nodePosition.toJsonPointer(),
-            faultedAt = failedAt,
+            faultedAt = faultedAt,
             error = error.toErrorInfo(),
         )
 
@@ -250,7 +250,7 @@ class CloudEventLifecycleHook(
             workflowId = nodeStack.workflowId,
             nodeStack = nodeStack,
             data = data,
-            timestamp = failedAt,
+            timestamp = faultedAt,
             idSuffix = "task-faulted-${nodePosition.toIdSuffix()}",
         )
 

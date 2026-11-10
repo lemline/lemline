@@ -2,10 +2,11 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { uuidv7 } from "uuidv7";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
-import { StartWorkflowRequest } from "../../gen/proto/lemline/gateway/v1/workflow_gateway_pb";
+import { StartInstanceRequest } from "../../gen/proto/lemline/gateway/v1/gateway_pb";
 import { gatewayClient } from "../../lib/grpc-client";
 import { useNamespaces } from "../../hooks/use-namespaces";
 import { useDefinitions } from "../../hooks/use-definitions";
+import { valueFromJsonText } from "../../lib/proto";
 import { Input } from "../ui/input";
 import { Select } from "../ui/select";
 import { Button } from "../ui/button";
@@ -85,24 +86,24 @@ export function StartForm({ initialNamespace, initialName, initialVersion }: Sta
     setLoading(true);
 
     try {
-      JSON.parse(inputJson);
+      const input = valueFromJsonText(inputJson);
       const workflowIdToStart = workflowId.trim() || uuidv7();
       if (workflowIdToStart !== workflowId) {
         setWorkflowId(workflowIdToStart);
       }
 
-      const response = await gatewayClient.startWorkflow(
-        new StartWorkflowRequest({
-          workflowId: workflowIdToStart,
+      const response = await gatewayClient.startInstance(
+        new StartInstanceRequest({
+          instanceId: workflowIdToStart,
           namespace,
           name,
           version,
-          inputJson,
+          input,
           zoneId,
         }),
       );
 
-      const instancePath = `/id/${response.workflowId}`;
+      const instancePath = `/id/${response.instanceId}`;
       toast.success("Workflow started", {
         description: "Redirecting to instance details...",
         duration: 5000,

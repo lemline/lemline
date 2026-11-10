@@ -2,9 +2,8 @@ import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { Search } from "lucide-react";
-import { gatewayClient } from "../../lib/grpc-client";
 import { useNamespaces } from "../../hooks/use-namespaces";
-import { ListDefinitionsRequest } from "../../gen/proto/lemline/gateway/v1/workflow_gateway_pb";
+import { fetchAllDefinitions } from "../../lib/gateway-api";
 import { Input } from "../ui/input";
 import { Button } from "../ui/button";
 
@@ -40,23 +39,11 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
   const [recentNavigations, setRecentNavigations] = useState<RecentNavigation[]>(() => loadRecentNavigations());
 
   const definitionsQuery = useQuery({
-    queryKey: ["command-palette-definitions", namespaces],
-    enabled: open && namespaces.length > 0,
+    queryKey: ["command-palette-definitions"],
+    enabled: open,
     staleTime: 5 * 60_000,
-    queryFn: async () => {
-      const responses = await Promise.all(
-        namespaces.map((namespace) =>
-          gatewayClient.listDefinitions(
-            new ListDefinitionsRequest({
-              namespace,
-              latestOnly: true,
-            }),
-          ),
-        ),
-      );
-
-      return responses
-        .flatMap((response) => response.definitions)
+    queryFn: async () =>
+      (await fetchAllDefinitions({ latestOnly: true }))
         .map((definition) => ({
           namespace: definition.namespace,
           name: definition.name,
@@ -66,8 +53,7 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
           `${left.name}/${left.namespace}/${left.version}`.localeCompare(
             `${right.name}/${right.namespace}/${right.version}`,
           ),
-        );
-    },
+        ),
   });
 
   useEffect(() => {

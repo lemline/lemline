@@ -1,3 +1,4 @@
+import { Duration, Timestamp } from "@bufbuild/protobuf";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowDown, ArrowUp, ArrowUpDown, Check, Copy } from "lucide-react";
 import { toast } from "sonner";
@@ -5,15 +6,17 @@ import { Button } from "../ui/button";
 import { Card } from "../ui/card";
 import { StatusBadge } from "./status-badge";
 import { asNumber, cn, formatDuration, shortId } from "../../lib/utils";
+import { durationToMilliseconds, timestampToIsoString } from "../../lib/proto";
+import { InstanceStatus } from "../../gen/proto/lemline/gateway/v1/gateway_pb";
 
 interface InstanceRow {
   workflowId: string;
   namespace: string;
   name: string;
   version: string;
-  status: string;
-  startedAt?: string;
-  durationMs?: bigint | number | string;
+  status: InstanceStatus | string;
+  startedAt?: Timestamp | string;
+  durationMs?: Duration | bigint | number | string;
   error?: {
     title: string;
   };
@@ -173,7 +176,7 @@ export function InstanceTable({
                 {row.error?.title ?? "-"}
               </td>
               <td className="w-[210px] px-4 py-2 tabular-nums">
-                {row.startedAt ? new Date(row.startedAt).toLocaleString() : "-"}
+                {formatStartedAt(row.startedAt)}
               </td>
               <td className="w-[120px] px-4 py-2 tabular-nums">{formatDuration(row.durationMs)}</td>
             </tr>
@@ -231,15 +234,17 @@ function SortButton({ label, isActive, direction, onClick }: SortButtonProps) {
   );
 }
 
-function toTimestamp(value: string | undefined): number | null {
-  if (!value) return null;
-  const timestamp = Date.parse(value);
+function toTimestamp(value: Timestamp | string | undefined): number | null {
+  const isoValue =
+    typeof value === "string" ? value : value instanceof Timestamp ? timestampToIsoString(value) : undefined;
+  if (!isoValue) return null;
+  const timestamp = Date.parse(isoValue);
   return Number.isNaN(timestamp) ? null : timestamp;
 }
 
-function toDuration(value: bigint | number | string | undefined): number | null {
+function toDuration(value: Duration | bigint | number | string | undefined): number | null {
   if (value === undefined) return null;
-  return asNumber(value);
+  return durationToMilliseconds(value) ?? null;
 }
 
 function compareNullableNumbers(left: number | null, right: number | null): number {
@@ -247,4 +252,10 @@ function compareNullableNumbers(left: number | null, right: number | null): numb
   if (left === null) return 1;
   if (right === null) return -1;
   return left - right;
+}
+
+function formatStartedAt(value: Timestamp | string | undefined): string {
+  const isoValue =
+    typeof value === "string" ? value : value instanceof Timestamp ? timestampToIsoString(value) : undefined;
+  return isoValue ? new Date(isoValue).toLocaleString() : "-";
 }

@@ -4,6 +4,7 @@ package com.lemline.runner.retries
 import com.lemline.common.values.IDV7
 import com.lemline.core.states.WorkflowEvent
 import com.lemline.runner.common.config.DatabaseConfig
+import com.lemline.runner.common.namespaces.NamespaceScope
 import com.lemline.runner.common.repositories.helpers.ColumnBindings
 import com.lemline.runner.common.repositories.helpers.ColumnBindingsBuilder
 import com.lemline.runner.common.repositories.ops.CleanerRepository
@@ -46,12 +47,15 @@ class RetryRepository : CrudRepository<RetryModel>(),
     @Inject
     override lateinit var databaseConfig: DatabaseConfig
 
+    @Inject
+    var namespaceScope: NamespaceScope = NamespaceScope.UNSCOPED
+
     override val tableName = RETRY_TABLE
 
     // Composed operations - initialized lazily to ensure databaseConfig is injected
     val idRepository by lazy { IdRepository(tableName, idHelper, ::createModel, databaseConfig) }
-    val outboxRepository by lazy { OutboxRepository(tableName, ::createModel, databaseConfig) }
-    val cleanerRepository by lazy { CleanerRepository(tableName, ::createModel, databaseConfig) }
+    val outboxRepository by lazy { OutboxRepository(tableName, ::createModel, databaseConfig, namespaceScope.configured) }
+    val cleanerRepository by lazy { CleanerRepository(tableName, ::createModel, databaseConfig, namespaceScope.configured) }
 
     // Delegate WithIdRepository methods
     override suspend fun findById(id: IDV7, connection: Connection?) =

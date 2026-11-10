@@ -6,6 +6,7 @@ import com.lemline.common.values.NodePosition
 import com.lemline.common.values.WorkflowId
 import com.lemline.core.processors.scope.Scope
 import com.lemline.core.processors.scope.merge
+import kotlin.time.Instant
 import kotlinx.serialization.json.buildJsonObject
 import org.jetbrains.annotations.TestOnly
 
@@ -88,7 +89,9 @@ class NodeStack internal constructor(
         frames.dropLast(1) + frames.last().decrement()
     )
 
-    fun duplicate(workflowId: WorkflowId): NodeStack = withRootState(rootState.copy(workflowId = workflowId))
+    /** A new instance of the same workflow: its own id and its own start time. */
+    fun duplicate(workflowId: WorkflowId, startedAt: Instant): NodeStack =
+        withRootState(rootState.copy(workflowId = workflowId, startedAt = startedAt))
 
     /** Creates a new TaskStack with updated context in the root state.*/
     fun withContext(newContext: Scope): NodeStack = withRootState(rootState.withContext(newContext))

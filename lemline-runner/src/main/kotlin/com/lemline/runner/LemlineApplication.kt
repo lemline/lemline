@@ -4,6 +4,7 @@ package com.lemline.runner
 import com.lemline.runner.cli.MainCommand
 import com.lemline.runner.cli.config.ConfigCreateCommand
 import com.lemline.runner.cli.config.ConfigPathHolder
+import com.lemline.runner.cli.failures.FailuresReplayCommand
 import com.lemline.runner.cli.gateway.GatewayStartCommand
 import com.lemline.runner.cli.instances.InstanceStartCommand
 import com.lemline.runner.cli.listen.ListenCommand
@@ -121,6 +122,9 @@ class LemlineApplication : QuarkusApplication {
                     // the instance start command, if any
                     val instanceStart = parseResults.command<InstanceStartCommand>()
 
+                    // the failures replay command, if any
+                    val failuresReplay = parseResults.command<FailuresReplayCommand>()
+
                     if (listen == null && gatewayStart == null) {
                         disableMetricsEndpoint()
                         disableMessaging()
@@ -134,7 +138,13 @@ class LemlineApplication : QuarkusApplication {
                     }
 
                     if (instanceStart != null) {
+                        enableInstanceStart()
+                    }
+
+                    if (failuresReplay != null) {
+                        // replayed payloads may be commands or events; enable both producers
                         System.setProperty(LEMLINE_MESSAGING_COMMANDS_PRODUCER_ENABLED, "true")
+                        System.setProperty(LEMLINE_MESSAGING_EVENTS_PRODUCER_ENABLED, "true")
                     }
 
                     if (gatewayStart != null) {
@@ -322,6 +332,16 @@ private fun disableDatabase() {
 
 private fun disableScheduled() {
     System.setProperty(LEMLINE_SCHEDULED_ENABLED, "false")
+}
+
+/**
+ * `instance start` publishes the first command and the `workflow.created` lifecycle event.
+ * Without the lifecycle producer, the event is silently dropped and the instance never shows up
+ * in the gateway instance list (which requires `workflow.created`).
+ */
+private fun enableInstanceStart() {
+    System.setProperty(LEMLINE_MESSAGING_COMMANDS_PRODUCER_ENABLED, "true")
+    System.setProperty(LEMLINE_MESSAGING_LIFECYCLE_EVENTS_PRODUCER_ENABLED, "true")
 }
 
 private fun enableGateway() {

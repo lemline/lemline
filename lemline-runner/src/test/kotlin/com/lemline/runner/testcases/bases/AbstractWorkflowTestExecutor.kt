@@ -102,8 +102,10 @@ internal abstract class AbstractWorkflowTestExecutor : WorkflowTestExecutor {
      * Implementations may use in-memory channels or broker emitters.
      *
      * @param payload The serialized CloudEvent JSON string
+     * @param namespace The namespace of the listening workflow under test; implementations
+     *        that need an arrival namespace (in-memory) attach it as message metadata
      */
-    protected abstract suspend fun sendCloudEventPayload(payload: String)
+    protected abstract suspend fun sendCloudEventPayload(payload: String, namespace: String)
 
     /**
      * Hook called after listener registration is confirmed, before sending CloudEvents.
@@ -143,7 +145,7 @@ internal abstract class AbstractWorkflowTestExecutor : WorkflowTestExecutor {
             prepareAndStartWorkflow(workflowId, namespace, uniqueName, version, input)
 
             if (cloudEvents.isNotEmpty()) {
-                executeWithCloudEvents(workflowId, cloudEvents)
+                executeWithCloudEvents(workflowId, cloudEvents, namespace)
             } else {
                 awaitCompletion(workflowId, timeoutSeconds = defaultTimeoutSeconds)
             }
@@ -192,7 +194,8 @@ internal abstract class AbstractWorkflowTestExecutor : WorkflowTestExecutor {
      */
     private suspend fun executeWithCloudEvents(
         workflowId: WorkflowId,
-        cloudEvents: List<CloudEvent>
+        cloudEvents: List<CloudEvent>,
+        namespace: String
     ): WorkflowTestResult {
         val listenerFound = waitForListenerRegistration(workflowId)
         if (!listenerFound) {
@@ -203,7 +206,7 @@ internal abstract class AbstractWorkflowTestExecutor : WorkflowTestExecutor {
         }
 
         onListenerRegistered()
-        sendCloudEvents(cloudEvents)
+        sendCloudEvents(cloudEvents, namespace)
         onCloudEventsSent()
 
         return awaitCompletion(workflowId, timeoutSeconds = listenTimeoutSeconds)
@@ -235,12 +238,13 @@ internal abstract class AbstractWorkflowTestExecutor : WorkflowTestExecutor {
      * Sends CloudEvents to the messaging infrastructure.
      *
      * @param events The CloudEvents to send
+     * @param namespace The namespace of the listening workflow under test
      */
-    protected suspend fun sendCloudEvents(events: List<CloudEvent>) {
+    protected suspend fun sendCloudEvents(events: List<CloudEvent>, namespace: String) {
         for ((index, event) in events.withIndex()) {
             val payload = String(cloudEventJsonFormat.serialize(event), Charsets.UTF_8)
             logger.debug { "Sending CloudEvent: type=${event.type}, id=${event.id}" }
-            sendCloudEventPayload(payload)
+            sendCloudEventPayload(payload, namespace)
 
             // Small delay between events to ensure ordering
             if (index < events.lastIndex) {

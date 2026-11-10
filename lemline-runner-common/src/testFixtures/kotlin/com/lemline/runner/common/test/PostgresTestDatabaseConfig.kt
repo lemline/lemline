@@ -78,6 +78,9 @@ class PostgresTestDatabaseConfig(
         return HikariDataSource(config)
     }
 
+    /** The pooled datasource, for code under test that takes a [javax.sql.DataSource]. Requires [start]. */
+    val jdbcDataSource: javax.sql.DataSource get() = requireDataSource()
+
     private val flyway: Flyway by lazy {
         Flyway.configure()
             .dataSource(requireDataSource())

@@ -27,9 +27,13 @@ class MessageMetaData(
 
     private val logger = logger()
 
-    fun Message<*>.addMetaData(metaData: MetaData) {
-        addMetaDataFunction(this, metaData)
-    }
+    /**
+     * Returns a copy of this message carrying [metaData] as broker-specific outgoing metadata.
+     * [Message.addMetadata] is immutable — callers MUST use the returned message.
+     */
+    @Suppress("UNCHECKED_CAST")
+    fun <P> Message<P>.withMetaData(metaData: MetaData): Message<P> =
+        addMetaDataFunction(this, metaData) as Message<P>
 
     val Message<*>.messageId get() = getMetaData().messageId
 
@@ -98,33 +102,31 @@ class MessageMetaData(
         }
     }
 
-    private fun Message<*>.addKafkaMetaData(metaData: MetaData) {
+    private fun Message<*>.addKafkaMetaData(metaData: MetaData): Message<*> {
         val headers = RecordHeaders()
             .add(MetaData.MESSAGE_ID, metaData.messageId.toBytes())
-        val md = OutgoingKafkaRecordMetadata.builder<String>()
+        val builder = OutgoingKafkaRecordMetadata.builder<String>()
             .withHeaders(headers)
-            .build()
-        this.addMetadata(md)
+        metaData.destination?.let { builder.withTopic(it) }
+        return this.addMetadata(builder.build())
     }
 
-    private fun Message<*>.addRabbitMQMeta(metaData: MetaData) {
-        val md = OutgoingRabbitMQMetadata.Builder()
+    private fun Message<*>.addRabbitMQMeta(metaData: MetaData): Message<*> {
+        val builder = OutgoingRabbitMQMetadata.Builder()
             .withMessageId(metaData.messageId.toString())
-            //.withHeader("Idempotency-Key", "abc-123")
-            .build()
-        this.addMetadata(md)
+        metaData.namespace?.let { builder.withRoutingKey(it) }
+        return this.addMetadata(builder.build())
     }
 
-    private fun Message<*>.addPgmqMeta(metaData: MetaData) {
+    private fun Message<*>.addPgmqMeta(metaData: MetaData): Message<*> {
         // Store messageId in PgmqOutgoingMetadata for the connector to extract
         // The connector will create the headers JSON with this messageId
         val md = PgmqOutgoingMetadata(
-            messageId = metaData.messageId.toString()
+            messageId = metaData.messageId.toString(),
+            queue = metaData.destination,
         )
-        this.addMetadata(md)
+        return this.addMetadata(md)
     }
 
-    private fun Message<*>.addInMemoryMeta(md: MetaData) {
-        this.addMetadata(md)
-    }
+    private fun Message<*>.addInMemoryMeta(md: MetaData): Message<*> = this.addMetadata(md)
 }
