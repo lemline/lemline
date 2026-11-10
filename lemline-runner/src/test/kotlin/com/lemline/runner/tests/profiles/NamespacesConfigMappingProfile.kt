@@ -14,7 +14,8 @@ import io.quarkus.test.junit.QuarkusTestProfile
 /**
  * Profile validating config mapping of `lemline.namespaces` and `lemline.messaging.prefix`.
  * The namespace set deliberately contains a dash-prefix pair (acme / acme-prod) to exercise
- * the startup WARN path without failing the boot.
+ * the startup WARN path without failing the boot, and is written with a space after the comma
+ * (the documented form) to check that the startup validator accepts it.
  */
 class NamespacesConfigMappingProfile : QuarkusTestProfile {
 
@@ -24,7 +25,8 @@ class NamespacesConfigMappingProfile : QuarkusTestProfile {
             LEMLINE_MESSAGING_TYPE to MessagingType.IN_MEMORY.configValue,
             LEMLINE_ANALYTICS_TYPE to ANALYTICS_TYPE_H2,
 
-            LEMLINE_NAMESPACES to "acme,acme-prod",
+            // Documented form, with a space after the comma: entries must be trimmed.
+            LEMLINE_NAMESPACES to "acme, acme-prod",
             LEMLINE_MESSAGING_PREFIX to "lem",
         )
 }

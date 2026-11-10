@@ -6,6 +6,7 @@ import com.lemline.runner.common.namespaces.DestinationType
 import com.lemline.runner.common.namespaces.NamespaceScope
 import com.lemline.runner.common.namespaces.destinationFor
 import com.lemline.runner.config.LemlineConfiguration
+import com.lemline.runner.config.declaredNamespaces
 import com.lemline.runner.tests.profiles.NamespacesConfigMappingProfile
 import io.quarkus.test.junit.QuarkusTest
 import io.quarkus.test.junit.TestProfile
@@ -27,7 +28,7 @@ class NamespacesConfigMappingTest {
 
     @Test
     fun `namespaces and prefix keys are accepted and mapped`() {
-        assertEquals(listOf("acme", "acme-prod"), config.namespaces().orElseThrow())
+        assertEquals(listOf("acme", "acme-prod"), config.declaredNamespaces)
         assertEquals("lem", config.messaging().prefix())
     }
 

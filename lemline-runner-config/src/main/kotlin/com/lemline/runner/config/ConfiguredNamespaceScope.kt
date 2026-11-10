@@ -3,7 +3,6 @@ package com.lemline.runner.config
 
 import com.lemline.runner.common.namespaces.NamespaceScope
 import jakarta.enterprise.context.ApplicationScoped
-import kotlin.jvm.optionals.getOrNull
 
 /**
  * [NamespaceScope] backed by the `lemline.namespaces` configuration property.
@@ -12,5 +11,5 @@ import kotlin.jvm.optionals.getOrNull
 @ApplicationScoped
 class ConfiguredNamespaceScope(config: LemlineConfiguration) : NamespaceScope {
 
-    override val configured: Set<String>? = config.namespaces().getOrNull()?.toSet()
+    override val configured: Set<String>? = config.declaredNamespaces?.toSet()
 }

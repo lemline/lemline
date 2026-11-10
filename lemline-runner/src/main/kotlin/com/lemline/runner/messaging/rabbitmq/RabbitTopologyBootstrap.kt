@@ -12,6 +12,7 @@ import com.lemline.runner.config.LemlineConfigConstants.RABBITMQ_PORT_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.RABBITMQ_USER_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.RABBITMQ_VHOST_DEFAULT
 import com.lemline.runner.config.LemlineConfiguration
+import com.lemline.runner.config.declaredNamespaces
 import com.rabbitmq.client.BuiltinExchangeType
 import com.rabbitmq.client.Channel
 import com.rabbitmq.client.Connection
@@ -154,10 +155,10 @@ class RabbitTopologyBootstrap(
 
     /** Namespaces this process follows (`lemline.namespaces`), falling back to the default namespace. */
     private fun followedNamespaces(): List<String> =
-        config.namespaces()
-            .map { list -> list.map(String::trim).filter(String::isNotEmpty) }
-            .filter { it.isNotEmpty() }
-            .orElse(listOf(NamespaceScope.DEFAULT_NAMESPACE))
+        config.declaredNamespaces
+            ?.filter(String::isNotEmpty)
+            ?.takeIf { it.isNotEmpty() }
+            ?: listOf(NamespaceScope.DEFAULT_NAMESPACE)
 
     /**
      * Declares the channel exchange (idempotent re-declaration with the exact arguments used by

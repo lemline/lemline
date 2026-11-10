@@ -7,7 +7,6 @@ import io.quarkus.runtime.StartupEvent
 import jakarta.annotation.Priority
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.enterprise.event.Observes
-import kotlin.jvm.optionals.getOrNull
 
 /**
  * Fail-fast validation of `lemline.namespaces`.
@@ -22,7 +21,7 @@ class NamespaceScopeValidator(private val config: LemlineConfiguration) {
 
     @Suppress("unused")
     fun onStart(@Observes @Priority(0) event: StartupEvent) {
-        val declared = config.namespaces().getOrNull()
+        val declared = config.declaredNamespaces
 
         // Always announce the scope: a workflow started in a namespace no runner follows stays
         // pending — this line is the first thing to check when diagnosing a stuck instance.
