@@ -154,6 +154,8 @@ data class ScheduleModel(
                 else -> error("Invalid schedule model")
             }?.atDatabasePrecision()
 
+            // The first row keeps the requested workflow ID until its first publication:
+            // the gateway start relies on its unique workflow_id to recognize a retried registration.
             return ScheduleModel(
                 id = IDV7.random(),
                 instanceMessage = InstanceMessage(
@@ -165,16 +167,7 @@ data class ScheduleModel(
                 scheduleCron = scheduleCron,
                 scheduleZone = zoneId?.id,
                 outboxScheduledFor = initialScheduledFor
-            ).also { model ->
-                if (initialScheduledFor != null) {
-                    model.instanceMessage = model.instanceMessage.copy(
-                        workflowState = model.instanceMessage.workflowState.duplicate(
-                            workflowId = model.executionId,
-                            startedAt = initialScheduledFor,
-                        )
-                    )
-                }
-            }
+            )
         }
     }
 }

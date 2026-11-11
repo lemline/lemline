@@ -76,6 +76,11 @@ schedule definition and input, so no separate schedule-definition table is requi
 can change during publication retries without changing the workflow or message ID.
 IDs are deterministic and timestamp-based derivation uses SQL microsecond precision.
 
+The first row of a chain keeps the workflow ID requested by the start call until its
+first publication, so a retried gateway start with the same instance ID is recognized as
+already registered (or rejected when its parameters differ). Publication then gives
+that occurrence, like every successor, its own execution ID.
+
 ### Fixed-rate schedules
 
 For `every` and `cron`, `ScheduleOutbox` publishes the current occurrence through the

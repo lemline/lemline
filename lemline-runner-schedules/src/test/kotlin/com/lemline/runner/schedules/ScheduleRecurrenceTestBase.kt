@@ -2,6 +2,7 @@
 package com.lemline.runner.schedules
 
 import com.lemline.common.values.IDV7
+import com.lemline.common.values.WorkflowId
 import com.lemline.core.lifecycleevents.LifecycleEventHook
 import com.lemline.core.orchestrator.StepByStepOrchestrator
 import com.lemline.core.random.randomWorkflowInfo
@@ -12,6 +13,10 @@ import com.lemline.runner.common.messaging.InstanceMessage
 import io.mockk.coEvery
 import io.mockk.mockk
 import io.mockk.spyk
+import io.serverlessworkflow.api.types.DurationInline
+import io.serverlessworkflow.api.types.Schedule
+import io.serverlessworkflow.api.types.TimeoutAfter
+import java.time.ZoneId
 import kotlin.test.assertEquals
 import kotlin.test.assertNotEquals
 import kotlin.test.assertNotNull
@@ -25,6 +30,8 @@ import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 
@@ -85,6 +92,38 @@ abstract class ScheduleRecurrenceTestBase {
         assertNull(rows.last().outboxCompletedAt)
         assertNull(rows.last().cleanupAfter)
         assertEquals(first.outboxScheduledFor, rows.first().outboxScheduledFor)
+    }
+
+    @Test
+    fun `a retried fixed-rate registration is detected until its first publication`() = runTest {
+        // The setter, unlike withDurationInline, also sets the one-of value that toDuration() reads.
+        val every = Schedule().withEvery(TimeoutAfter().apply { durationInline = DurationInline().withMinutes(1) })
+        val cron = Schedule().withCron("* * * * *")
+        for (schedule in listOf(every, cron)) {
+            val requested = WorkflowId(IDV7.random())
+            val info = randomWorkflowInfo()
+            val input = buildJsonObject { put("key", "value") }
+            val zone = ZoneId.of("Europe/Paris")
+            fun register() = ScheduleModel.from(requested, info.namespace, info.name, info.version, input, schedule, zone)
+
+            val first = register()
+            assertEquals(1, repository().insert(first))
+            // The gateway start reads a zero insert count as a retry and compares against the stored row.
+            assertEquals(0, repository().insert(register()))
+            val existing = assertNotNull(repository().findByWorkflowId(requested))
+            assertEquals(first.id, existing.id)
+            assertEquals(info, existing.workflowInfo)
+            assertEquals(input, existing.workflowState.nodeStack.rootState.workflowInput)
+            assertEquals(zone, existing.zone)
+
+            // Publication still gives the occurrence its own execution ID.
+            existing.outboxDelayedUntil = Clock.System.now() - 1.seconds
+            repository().update(existing)
+            tick(outbox())
+            assertEquals(first.executionId, sent.last().first.workflowId)
+            assertEquals(first.executionId, repository().findById(first.id)!!.workflowId)
+            assertNull(repository().findByWorkflowId(requested))
+        }
     }
 
     @Test
