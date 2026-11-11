@@ -2,14 +2,12 @@
 package com.lemline.runner.schedules
 
 import com.lemline.common.values.IDV7
-import com.lemline.common.values.WorkflowId
 import com.lemline.core.random.randomResumeFromTaskCommand
 import com.lemline.core.random.randomWorkflowInfo
 import com.lemline.runner.common.messaging.InstanceMessage
 import kotlin.test.assertEquals
 import kotlin.test.assertFails
 import kotlin.test.assertNotEquals
-import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 import kotlin.time.Clock
 import kotlin.time.Instant
@@ -40,20 +38,20 @@ class ScheduleModelTest {
     fun `should return next execution instant for valid cron`() {
         // cron for every minute
         val model = createModel(scheduleCron = "* * * * *", outboxScheduledFor = Instant.parse("2023-01-01T00:00:00Z"))
-        model.prepareNextScheduled(WorkflowId.random())
+        val next = model.nextScheduled()
         // The next execution should be exactly one minute after the outboxScheduledFor time
         val expected = Instant.parse("2023-01-01T00:01:00Z")
-        assertEquals(expected, model.outboxDelayedUntil)
+        assertEquals(expected, next!!.outboxScheduledFor)
     }
 
     @Test
     fun `each execution gets a new workflow id and its own start time`() {
         val model = createModel(scheduleCron = "* * * * *", outboxScheduledFor = Instant.parse("2023-01-01T00:00:00Z"))
         val registeredStartedAt = model.instanceMessage.workflowState.nodeStack.rootState.startedAt
-        val executionId = WorkflowId.random()
+        val executionId = model.executionId
         val beforeTick = Clock.System.now()
 
-        model.prepareNextScheduled(executionId)
+        model.prepareExecution()
 
         val rootState = model.instanceMessage.workflowState.nodeStack.rootState
         assertEquals(executionId, rootState.workflowId)
@@ -64,16 +62,22 @@ class ScheduleModelTest {
     @Test
     fun `should fail when badly defined`() {
         val model = createModel()
-        assertFails { model.prepareNextScheduled(WorkflowId.random()) }
+        assertFails { model.nextScheduled() }
     }
 
     @Test
-    fun `should calculate next execution when outboxScheduledFor is null`() {
-        val model = createModel(scheduleCron = "* * * * *", outboxScheduledFor = null)
-        model.prepareNextScheduled(WorkflowId.random())
-        // When outboxScheduledFor is null, it uses Clock.System.now() as the base time
-        // and calculates the next cron execution from that point
-        assertNotNull(model.outboxDelayedUntil)
+    fun `successor has fresh retry state and preserves the schedule identity`() {
+        val model = createModel(scheduleEvery = "PT1M", outboxScheduledFor = Instant.parse("2023-01-01T00:00:00Z"))
+        model.outboxAttemptCount = 3
+        model.outboxErrorMessage = "unavailable"
+        val next = model.nextScheduled()!!
+        assertEquals(model.scheduleId, next.scheduleId)
+        assertNotEquals(model.id, next.id)
+        assertNotEquals(model.executionId, next.executionId)
+        assertEquals(0, next.outboxAttemptCount)
+        assertEquals(null, next.outboxErrorMessage)
+        assertEquals(model.nextOccurrenceId, next.id)
+        assertEquals(Instant.parse("2023-01-01T00:00:00Z"), model.outboxScheduledFor)
     }
 
     @Test
@@ -83,10 +87,10 @@ class ScheduleModelTest {
             scheduleCron = "0 0 1 1 *", // At 00:00 on day-of-month 1 and on month 1
             outboxScheduledFor = Instant.parse("2023-01-01T01:00:00Z") // after the cron time
         )
-        model.prepareNextScheduled(WorkflowId.random())
+        val next = model.nextScheduled()
         // The next execution should be the next year
         val expected = Instant.parse("2024-01-01T00:00:00Z")
-        assertEquals(expected, model.outboxDelayedUntil)
+        assertEquals(expected, next!!.outboxScheduledFor)
     }
 
     @Test
@@ -96,10 +100,10 @@ class ScheduleModelTest {
             outboxScheduledFor = Instant.parse("2023-01-01T08:00:00Z"),
             scheduleZone = "America/New_York"
         )
-        model.prepareNextScheduled(WorkflowId.random())
+        val next = model.nextScheduled()
 
         // 9 AM in New York on Jan 1st is 14:00 UTC
         val expected = Instant.parse("2023-01-01T14:00:00Z")
-        assertEquals(expected, model.outboxDelayedUntil)
+        assertEquals(expected, next!!.outboxScheduledFor)
     }
 }
