@@ -37,7 +37,8 @@ class GatewayStartupValidator(
     lateinit var analyticsEventSource: WorkflowAnalyticsEventSource
 
     @Suppress("unused")
-    fun onStart(@Observes @Priority(0) event: StartupEvent) {
+    // AnalyticsMigration runs at priority 1; validate the read side after its tables exist.
+    fun onStart(@Observes @Priority(2) event: StartupEvent) {
         if (!config.gatewayEnabled) return
 
         if (config.gatewayAuthenticationEnabled && !config.gatewayTlsEnabled) {
