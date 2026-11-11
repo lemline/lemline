@@ -181,3 +181,33 @@ val next = ExecutionTime.forCron(cron)
 cron/every occurrences, stable publication retries, lifecycle publication failure,
 transaction rollback on successor insertion failure, and completion-based recurrence
 with duplicate completion handling. Container-backed tests require Docker.
+
+### Broker end-to-end coverage
+
+`BrokerScheduleExecutionTest` in `lemline-runner/testcases/bases` runs the same three scenarios with
+Kafka, RabbitMQ and PGMQ (nine tests). Concrete tests and profiles live alongside
+the existing execution tests in `testcases/kafka`, `testcases/rabbitmq`, and
+`testcases/pgmq`. It starts workflows through the production
+`InstanceStartService`; the normal gateway/schedule relays and command/event consumers
+execute them. Completion and output assertions read lifecycle events ingested by
+analytics after broker transport. Emitters and workflow completions are not mocked.
+The gRPC/HTTP gateway transport is outside this suite's scope.
+
+- `every`: the immediate run and at least two scheduled runs complete with distinct IDs.
+- `cron`: two occurrences complete at consecutive real minute boundaries, without an
+  immediate execution or artificially advancing persisted deadlines.
+- `after`: a real five-second wait keeps the initial workflow running; no successor
+  exists during that wait, and each subsequent run starts after the previous run's
+  completion plus the configured delay.
+
+Each test stops only its own recurrence chain during cleanup. The cron test can take
+up to 150 seconds per broker because the supported UNIX cron format has minute resolution.
+
+Run with Docker available:
+
+```bash
+./gradlew :lemline-runner:test --tests '*ScheduleExecutionTest' 2>&1 | tee /tmp/lemline-schedules-e2e.log
+```
+
+To target one broker, use `*KafkaScheduleExecutionTest`,
+`*RabbitMQScheduleExecutionTest`, or `*PgmqScheduleExecutionTest`.
