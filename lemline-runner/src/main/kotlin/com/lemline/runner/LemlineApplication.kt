@@ -196,7 +196,7 @@ class LemlineApplication : QuarkusApplication {
         private fun setJsonLogging(parseResults: List<ParseResult>) {
             val jsonMode = parseResults.any { it.hasMatchedOption("--json") }
             if (jsonMode) {
-                System.setProperty("quarkus.log.console.json", "true")
+                System.setProperty("quarkus.log.console.json.enabled", "true")
             }
         }
 

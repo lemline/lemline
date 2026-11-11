@@ -16,32 +16,34 @@ import kotlin.time.toJavaDuration
  * Uses Micrometer for metrics collection and reporting.
  */
 @Suppress("PropertyName")
-abstract class MessageSubscriberMetrics(val registry: MeterRegistry) {
+abstract class MessageSubscriberMetrics(
+    val registry: MeterRegistry,
+    private val metricPrefix: String,
+) {
 
     // Metric Names
-    protected abstract val METRIC_PREFIX: String
-    protected val METRIC_ACTIVE = "$METRIC_PREFIX.active"
-    protected val METRIC_RECEIVED_TOTAL = "$METRIC_PREFIX.received.total"
+    protected val METRIC_ACTIVE = "$metricPrefix.active"
+    protected val METRIC_RECEIVED_TOTAL = "$metricPrefix.received.total"
 
-    protected val METRIC_DESERIALIZATION_COMPLETED_TOTAL = "$METRIC_PREFIX.deserialization.completed.total"
-    protected val METRIC_DESERIALIZATION_FAILED_TOTAL = "$METRIC_PREFIX.deserialization.failed.total"
-    protected val METRIC_DESERIALIZATION_DURATION = "$METRIC_PREFIX.deserialization.duration"
+    protected val METRIC_DESERIALIZATION_COMPLETED_TOTAL = "$metricPrefix.deserialization.completed.total"
+    protected val METRIC_DESERIALIZATION_FAILED_TOTAL = "$metricPrefix.deserialization.failed.total"
+    protected val METRIC_DESERIALIZATION_DURATION = "$metricPrefix.deserialization.duration"
 
-    protected val METRIC_SERIALIZATION_COMPLETED_TOTAL = "$METRIC_PREFIX.serialization.completed.total"
-    protected val METRIC_SERIALIZATION_FAILED_TOTAL = "$METRIC_PREFIX.serialization.failed.total"
-    protected val METRIC_SERIALIZATION_DURATION = "$METRIC_PREFIX.serialization.duration"
+    protected val METRIC_SERIALIZATION_COMPLETED_TOTAL = "$metricPrefix.serialization.completed.total"
+    protected val METRIC_SERIALIZATION_FAILED_TOTAL = "$metricPrefix.serialization.failed.total"
+    protected val METRIC_SERIALIZATION_DURATION = "$metricPrefix.serialization.duration"
 
-    protected val METRIC_PROCESSING_COMPLETED_TOTAL = "$METRIC_PREFIX.processing.completed.total"
-    protected val METRIC_PROCESSING_FAILED_TOTAL = "$METRIC_PREFIX.processing.failed.total"
-    protected val METRIC_PROCESSING_DURATION = "$METRIC_PREFIX.processing.duration"
+    protected val METRIC_PROCESSING_COMPLETED_TOTAL = "$metricPrefix.processing.completed.total"
+    protected val METRIC_PROCESSING_FAILED_TOTAL = "$metricPrefix.processing.failed.total"
+    protected val METRIC_PROCESSING_DURATION = "$metricPrefix.processing.duration"
 
-    protected val METRIC_ACK_COMPLETED_TOTAL = "$METRIC_PREFIX.ack.completed.total"
-    protected val METRIC_ACK_FAILED_TOTAL = "$METRIC_PREFIX.ack.failed.total"
+    protected val METRIC_ACK_COMPLETED_TOTAL = "$metricPrefix.ack.completed.total"
+    protected val METRIC_ACK_FAILED_TOTAL = "$metricPrefix.ack.failed.total"
 
-    protected val METRIC_NACK_COMPLETED_TOTAL = "$METRIC_PREFIX.nack.completed.total"
-    protected val METRIC_NACK_FAILED_TOTAL = "$METRIC_PREFIX.nack.failed.total"
+    protected val METRIC_NACK_COMPLETED_TOTAL = "$metricPrefix.nack.completed.total"
+    protected val METRIC_NACK_FAILED_TOTAL = "$metricPrefix.nack.failed.total"
 
-    protected val METRIC_FOREIGN_NAMESPACE_TOTAL = "$METRIC_PREFIX.foreign_namespace.total"
+    protected val METRIC_FOREIGN_NAMESPACE_TOTAL = "$metricPrefix.foreign_namespace.total"
 
     /** Tracks the number of messages currently being processed */
     private val activeMessages = AtomicInteger(0)
