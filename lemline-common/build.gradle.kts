@@ -16,10 +16,11 @@ dependencies {
     implementation("org.jetbrains.kotlin:kotlin-stdlib-jdk8")
 
     // Serverless Workflow SDK
-    implementation("io.serverlessworkflow:serverlessworkflow-api:7.0.0.Final")
-    implementation("io.serverlessworkflow:serverlessworkflow-impl-core:7.0.0.Final")
+    implementation(libs.serverlessworkflow.api)
+    implementation(libs.serverlessworkflow.impl.core)
 
-    implementation("com.fasterxml.jackson.core:jackson-databind:2.18.3")
+    implementation(platform(libs.jackson.bom))
+    implementation("com.fasterxml.jackson.core:jackson-databind")
 
     // Add Kotlin Serialization
     implementation(libs.kotlinxSerializationJson)

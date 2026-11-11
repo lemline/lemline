@@ -1108,7 +1108,7 @@ function Legend({ color, label, pattern }: { color: string; label: string; patte
   return (
     <span className="inline-flex items-center gap-1.5">
       <span
-        className="relative h-2.5 w-2.5 rounded-sm"
+        className="relative h-2.5 w-2.5 rounded-xs"
         style={{ backgroundColor: color }}
       >
         <span className="absolute inset-0" style={{ backgroundImage: legendPatternStyle(pattern) }} />

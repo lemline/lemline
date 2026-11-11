@@ -50,7 +50,7 @@ export function DefinitionTable({
 
   const sortedRows = useMemo(() => {
     return [...rows].sort((left, right) => {
-      let comparison = 0;
+      let comparison: number;
       if (sortKey === "label") {
         comparison = left.label.localeCompare(right.label, undefined, {
           numeric: true,

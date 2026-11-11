@@ -1,4 +1,4 @@
-import { Duration, Timestamp } from "@bufbuild/protobuf";
+import type { Duration, Timestamp } from "@bufbuild/protobuf/wkt";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowDown, ArrowUp, ArrowUpDown, Check, Copy } from "lucide-react";
 import { toast } from "sonner";
@@ -61,7 +61,7 @@ export function InstanceTable({
 
   const sortedRows = useMemo(() => {
     return [...rows].sort((left, right) => {
-      let comparison = 0;
+      let comparison: number;
       if (sortKey === "startedAt") {
         comparison = compareNullableNumbers(toTimestamp(left.startedAt), toTimestamp(right.startedAt));
       } else {
@@ -236,7 +236,7 @@ function SortButton({ label, isActive, direction, onClick }: SortButtonProps) {
 
 function toTimestamp(value: Timestamp | string | undefined): number | null {
   const isoValue =
-    typeof value === "string" ? value : value instanceof Timestamp ? timestampToIsoString(value) : undefined;
+    typeof value === "string" ? value : value !== undefined ? timestampToIsoString(value) : undefined;
   if (!isoValue) return null;
   const timestamp = Date.parse(isoValue);
   return Number.isNaN(timestamp) ? null : timestamp;
@@ -256,6 +256,6 @@ function compareNullableNumbers(left: number | null, right: number | null): numb
 
 function formatStartedAt(value: Timestamp | string | undefined): string {
   const isoValue =
-    typeof value === "string" ? value : value instanceof Timestamp ? timestampToIsoString(value) : undefined;
+    typeof value === "string" ? value : value !== undefined ? timestampToIsoString(value) : undefined;
   return isoValue ? new Date(isoValue).toLocaleString() : "-";
 }

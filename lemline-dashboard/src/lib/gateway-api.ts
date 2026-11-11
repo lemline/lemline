@@ -1,7 +1,8 @@
+import { create } from "@bufbuild/protobuf";
 import type { DefinitionStats, DefinitionSummary } from "../gen/proto/lemline/gateway/v1/gateway_pb";
 import {
-  ListDefinitionsRequest,
-  ListDefinitionStatsRequest,
+  ListDefinitionStatsRequestSchema,
+  ListDefinitionsRequestSchema,
 } from "../gen/proto/lemline/gateway/v1/gateway_pb";
 import { gatewayClient } from "./grpc-client";
 import { timestampFromIsoString } from "./proto";
@@ -36,7 +37,7 @@ export async function fetchAllDefinitions(
 
   do {
     const response = await gatewayClient.listDefinitions(
-      new ListDefinitionsRequest({
+      create(ListDefinitionsRequestSchema, {
         namespace: options.namespace,
         name: options.name,
         latestOnly: options.latestOnly,
@@ -62,7 +63,7 @@ export async function fetchDefinitionStatsSnapshot(
 
   do {
     const response = await gatewayClient.listDefinitionStats(
-      new ListDefinitionStatsRequest({
+      create(ListDefinitionStatsRequestSchema, {
         namespace: options.namespace,
         name: options.name,
         version: options.version,

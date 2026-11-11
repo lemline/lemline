@@ -249,7 +249,7 @@ class CloudEventFactoryTest {
         }
 
         @Test
-        fun `should handle empty subject string`() {
+        fun `should omit empty optional subject`() {
             // Given
             val config = EmitConfig(
                 id = "test-id",
@@ -262,7 +262,7 @@ class CloudEventFactoryTest {
             val event = CloudEventFactory.build(config)
 
             // Then
-            assertEquals("", event.subject)
+            assertNull(event.subject)
         }
     }
 

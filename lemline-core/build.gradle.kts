@@ -36,7 +36,7 @@ dependencies {
     implementation(project(":lemline-messages-proto"))
 
     // Add kotlinx-coroutines-slf4j for MDC context support in coroutines
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-slf4j:1.7.3")
+    implementation(libs.kotlinxCoroutinesSlf4j)
 
     // Apply the kotlinx bundle of dependencies from the version catalog (`gradle/libs.versions.toml`).
     implementation(libs.bundles.kotlinxEcosystem)
@@ -60,14 +60,14 @@ dependencies {
     implementation("io.ktor:ktor-client-auth")
 
     // YAML support for Kotlin serialization
-    implementation("com.charleskorn.kaml:kaml:0.82.0")
+    implementation("com.charleskorn.kaml:kaml:0.104.0")
 
     // XML support for Kotlin serialization
-    implementation("io.github.pdvrieze.xmlutil:core-jvmcommon:0.91.1")
-    implementation("io.github.pdvrieze.xmlutil:serialization-jvm:0.91.1")
+    implementation("io.github.pdvrieze.xmlutil:core-jvmcommon:1.0.2.1")
+    implementation("io.github.pdvrieze.xmlutil:serialization-jvm:1.0.2.1")
 
     // Auth0 for JWT token generation and validation
-    implementation("com.auth0:java-jwt:4.4.0")
+    implementation("com.auth0:java-jwt:4.6.2")
 
     // CloudEvents SDK for building CloudEvents (serialization done in lemline-runner)
     implementation(libs.cloudevents.core)
@@ -77,19 +77,19 @@ dependencies {
     testImplementation(enforcedPlatform(libs.kotest.bom))
     testImplementation("io.kotest:kotest-runner-junit5")
     testImplementation("io.kotest:kotest-assertions-core")
-    testImplementation("io.kotest:kotest-framework-api")
+    testImplementation("io.kotest:kotest-framework-engine")
     testImplementation(libs.mockk)
     testImplementation("io.ktor:ktor-client-mock")
 
     // Logging for tests
-    testImplementation("io.github.oshai:kotlin-logging-jvm:7.0.7")
-    testImplementation("ch.qos.logback:logback-classic:1.5.18")
+    testImplementation("io.github.oshai:kotlin-logging-jvm:8.0.7")
+    testImplementation("ch.qos.logback:logback-classic:1.6.6")
 
     // Tests Fixtures
     testFixturesImplementation(enforcedPlatform(libs.kotest.bom))
     testFixturesImplementation("io.kotest:kotest-runner-junit5")
     testFixturesImplementation("io.kotest:kotest-assertions-core")
-    testFixturesImplementation("io.kotest:kotest-framework-api")
+    testFixturesImplementation("io.kotest:kotest-framework-engine")
     testFixturesImplementation(libs.bundles.kotlinxEcosystem)
     testFixturesImplementation(testFixtures(project(":lemline-common")))
     // Required for FullOrchestratorExecutor

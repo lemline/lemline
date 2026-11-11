@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.analytics
 
+import com.lemline.common.coroutines.ApplicationClassLoaderContext
+
 import com.lemline.runner.common.test.RequiresDocker
 import com.lemline.runner.common.messaging.LIFECYCLEEVENTS_IN_CHANNEL
 import com.lemline.runner.listeners.CloudEventService
@@ -76,7 +78,7 @@ internal class LifecycleAnalyticsInMemoryIntegrationTest {
     }
 
     @Test
-    fun `concurrent duplicate ingests remain single-row`() = runBlocking {
+    fun `concurrent duplicate ingests remain single-row`() = runBlocking(ApplicationClassLoaderContext()) {
         val event = buildEvent("evt-concurrent")
         val inserted = AtomicInteger(0)
         val duplicates = AtomicInteger(0)

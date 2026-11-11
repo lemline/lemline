@@ -3,27 +3,28 @@
 # https://docs.gradle.org/current/userguide/platforms.html#sub::toml-dependencies-format
 
 [versions]
-kotlin = "2.2.10"
+kotlin = "2.4.21"
 java = "17"
-kotlinxDatetime = "0.7.1"
-kotlinxSerializationJSON = "1.9.0"
-kotlinxCoroutines = "1.10.2"
+kotlinxDatetime = "0.8.0"
+kotlinxSerializationJSON = "1.12.0"
+kotlinxCoroutines = "1.11.0"
 # NOTE: Quarkus 3.27-3.30.1 had a regression ignoring ConfigSource ordinal for
 # mp.messaging.*.connector properties. Fixed in 3.30.6.
-quarkus = "3.30.6"
-smallryeReactiveMessagingInMemory = "4.27.0"
+quarkus = "3.40.1.2"
+smallryeReactiveMessagingInMemory = "4.37.1"
+# Keep the DSL contract until Lemline supports the newer SDK's workflow format.
 serverlessworkflow = "7.0.0.Final"
 uuidCreator = "6.1.1"
 javaSemver = "0.10.2"
-ktor = "3.2.3"
-jackson = "2.19.2"
-kotest = "5.9.1"
-mockk = "1.13.9"
-testcontainers = "1.21.3"
-spotless = "7.0.3"
-cloudevents = "4.0.1"
-smallryeReactiveMessagingApi = "4.31.0"
-wire = "5.5.0"
+ktor = "3.6.1"
+jackson = "2.23.0"
+kotest = "6.2.6"
+mockk = "1.14.12"
+testcontainers = "2.0.5"
+spotless = "8.11.0"
+cloudevents = "5.1.0"
+smallryeReactiveMessagingApi = "4.37.1"
+wire = "7.2.0"
 
 [libraries]
 spotlessPlugin = { module = "com.diffplug.spotless:spotless-plugin-gradle", version.ref = "spotless" }
@@ -31,6 +32,9 @@ kotlinGradlePlugin = { module = "org.jetbrains.kotlin:kotlin-gradle-plugin", ver
 kotlinxDatetime = { module = "org.jetbrains.kotlinx:kotlinx-datetime", version.ref = "kotlinxDatetime" }
 kotlinxSerializationJson = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlinxSerializationJSON" }
 kotlinxCoroutines = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "kotlinxCoroutines" }
+kotlinxCoroutinesTest = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version.ref = "kotlinxCoroutines" }
+kotlinxCoroutinesReactive = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-reactive", version.ref = "kotlinxCoroutines" }
+kotlinxCoroutinesSlf4j = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-slf4j", version.ref = "kotlinxCoroutines" }
 quarkus-bom = { group = "io.quarkus", name = "quarkus-bom", version.ref = "quarkus" }
 quarkus-amazon-services-bom = { group = "io.quarkus.platform", name = "quarkus-amazon-services-bom", version.ref = "quarkus" }
 smallrye-reactive-messaging-inmemory = { module = "io.smallrye.reactive:smallrye-reactive-messaging-in-memory", version.ref = "smallryeReactiveMessagingInMemory" }

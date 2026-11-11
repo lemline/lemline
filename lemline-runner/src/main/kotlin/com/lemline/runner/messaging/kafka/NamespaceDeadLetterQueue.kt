@@ -11,7 +11,6 @@ import io.smallrye.reactive.messaging.SubscriberDecorator
 import io.smallrye.reactive.messaging.kafka.DeserializationFailureHandler
 import io.smallrye.reactive.messaging.kafka.IncomingKafkaRecord
 import io.smallrye.reactive.messaging.kafka.KafkaCDIEvents
-import io.smallrye.reactive.messaging.kafka.KafkaConnector
 import io.smallrye.reactive.messaging.kafka.KafkaConnectorIncomingConfiguration
 import io.smallrye.reactive.messaging.kafka.KafkaConnectorOutgoingConfiguration
 import io.smallrye.reactive.messaging.kafka.KafkaConsumer
@@ -20,8 +19,10 @@ import io.smallrye.reactive.messaging.kafka.api.OutgoingKafkaRecordMetadata
 import io.smallrye.reactive.messaging.kafka.fault.KafkaDeadLetterQueue
 import io.smallrye.reactive.messaging.kafka.fault.KafkaFailureHandler
 import io.smallrye.reactive.messaging.kafka.impl.ConfigHelper
+import io.smallrye.reactive.messaging.kafka.impl.KafkaAdminClientRegistry
 import io.smallrye.reactive.messaging.kafka.impl.KafkaSink
-import io.smallrye.reactive.messaging.providers.impl.OverrideConnectorConfig
+import io.smallrye.reactive.messaging.providers.impl.Configs
+import io.smallrye.reactive.messaging.providers.impl.OverrideConfig
 import io.smallrye.reactive.messaging.providers.wiring.Wiring.wireOutgoingConnectorToUpstream
 import io.vertx.mutiny.core.Vertx
 import jakarta.enterprise.context.ApplicationScoped
@@ -44,7 +45,6 @@ import org.apache.kafka.clients.producer.ProducerRecord
 import org.apache.kafka.common.serialization.StringSerializer
 import org.eclipse.microprofile.reactive.messaging.Message
 import org.eclipse.microprofile.reactive.messaging.Metadata
-import org.eclipse.microprofile.reactive.messaging.spi.ConnectorFactory.INCOMING_PREFIX
 
 /**
  * Custom Kafka failure strategy that dead-letters each failed record to a topic derived from
@@ -180,6 +180,7 @@ class NamespaceDeadLetterQueue(
     @Identifier(STRATEGY)
     class Factory(
         private val kafkaCDIEvents: KafkaCDIEvents,
+        private val adminClientRegistry: KafkaAdminClientRegistry,
         @param:Any private val serializationFailureHandlers: Instance<SerializationFailureHandler<*>>,
         @param:Any private val configCustomizers: Instance<ClientCustomizer<MutableMap<String, kotlin.Any>>>,
         @param:Any private val producerInterceptors: Instance<ProducerInterceptor<*, *>>,
@@ -199,13 +200,10 @@ class NamespaceDeadLetterQueue(
             val valueDeserializer = consumer.configuration()[VALUE_DESERIALIZER_CLASS_CONFIG] as String?
             val consumerClientId = consumer.configuration()[CLIENT_ID_CONFIG] as String?
 
-            val connectorConfig = OverrideConnectorConfig(
-                INCOMING_PREFIX,
+            val connectorConfig = Configs.prefixOverride(
                 config.config(),
-                KafkaConnector.CONNECTOR_NAME,
-                config.channel,
                 KafkaDeadLetterQueue.CHANNEL_DLQ_SUFFIX,
-                mapOf<String, Function<OverrideConnectorConfig, kotlin.Any>>(
+                mapOf<String, Function<OverrideConfig, kotlin.Any>>(
                     KEY_SERIALIZER_CLASS_CONFIG to Function { mirrorSerializer(keyDeserializer) },
                     VALUE_SERIALIZER_CLASS_CONFIG to Function { mirrorSerializer(valueDeserializer) },
                     CLIENT_ID_CONFIG to Function {
@@ -226,6 +224,7 @@ class NamespaceDeadLetterQueue(
             val kafkaSink = KafkaSink(
                 producerConfig,
                 kafkaCDIEvents,
+                adminClientRegistry,
                 openTelemetryInstance,
                 configCustomizers,
                 serializationFailureHandlers,
@@ -236,6 +235,7 @@ class NamespaceDeadLetterQueue(
                 kafkaSink.sink,
                 subscriberDecorators,
                 "${producerConfig.channel}-${KafkaDeadLetterQueue.CHANNEL_DLQ_SUFFIX}",
+                connectorConfig,
             )
             return NamespaceDeadLetterQueue(config.channel, kafkaSink, processor)
         }

@@ -144,7 +144,7 @@ runtime.
 ### Native Image
 
 To produce a native image of the runner, you need to have GraalVM installed in your environment.
-We recommend using 24.1.2.r23-mandrel.
+Use GraalVM or Mandrel for JDK 25; the current Quarkus version requires GraalVM 25 or newer.
 
 The binary will be created in `lemline-runner/build/lemline-runner-$version-runner`.
 

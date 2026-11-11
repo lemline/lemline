@@ -1,17 +1,21 @@
+import { create, clone as cloneMessage } from "@bufbuild/protobuf";
 import { useQueryClient } from "@tanstack/react-query";
 import type { InfiniteData, QueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
 import {
-  DefinitionStats,
+  type DefinitionStats,
   DefinitionStatsChangeType,
   InstanceChangeType,
   InstanceStatus,
-  InstanceSummary,
-  ListInstancesResponse,
-  WatchDefinitionStatsRequest,
-  WatchInstancesRequest,
+  type InstanceSummary,
+  type ListInstancesResponse,
+  DefinitionStatsSchema,
+  InstanceSummarySchema,
+  ListInstancesResponseSchema,
+  WatchDefinitionStatsRequestSchema,
+  WatchInstancesRequestSchema,
 } from "../gen/proto/lemline/gateway/v1/gateway_pb";
 import { useDefinitionStats, definitionStatsQueryKey } from "../hooks/use-definition-stats";
 import { useInstances, instancesQueryKey } from "../hooks/use-instances";
@@ -93,8 +97,13 @@ export function OverviewContent({ level, namespace, name, version }: OverviewCon
   const pendingInsertionsRef = useRef<InstanceSummary[]>([]);
   const insertionTimerRef = useRef<number | null>(null);
 
-  useEffect(() => {
+  const [bufferedInstancesKey, setBufferedInstancesKey] = useState(instancesKey);
+  if (bufferedInstancesKey !== instancesKey) {
+    setBufferedInstancesKey(instancesKey);
     setBufferedNewInstances([]);
+  }
+
+  useEffect(() => {
     pendingInsertionsRef.current = [];
   }, [instancesKey]);
 
@@ -110,7 +119,7 @@ export function OverviewContent({ level, namespace, name, version }: OverviewCon
     const watch = async () => {
       while (!disposed && !controller.signal.aborted) {
         try {
-          const request = new WatchDefinitionStatsRequest({
+          const request = create(WatchDefinitionStatsRequestSchema, {
             namespace,
             name,
             version,
@@ -197,7 +206,7 @@ export function OverviewContent({ level, namespace, name, version }: OverviewCon
     const watch = async () => {
       while (!disposed && !controller.signal.aborted) {
         try {
-          const request = new WatchInstancesRequest({
+          const request = create(WatchInstancesRequestSchema, {
             namespace,
             name,
             version,
@@ -234,7 +243,7 @@ export function OverviewContent({ level, namespace, name, version }: OverviewCon
             const existed = upsertExistingInstance(queryClient, instancesKey, changedInstance);
             if (existed) continue;
 
-            pendingInsertionsRef.current.push(new InstanceSummary(changedInstance));
+            pendingInsertionsRef.current.push(cloneMessage(InstanceSummarySchema, changedInstance));
             scheduleFlush();
           }
 
@@ -455,7 +464,7 @@ function applyDefinitionStatsChange(
   previous: DefinitionStatsSnapshot | undefined,
   update: { cursor: string; change?: { changeType: DefinitionStatsChangeType; stats?: DefinitionStats } },
 ): DefinitionStatsSnapshot {
-  const nextStats = (previous?.stats ?? []).map((row) => new DefinitionStats(row));
+  const nextStats = (previous?.stats ?? []).map((row) => cloneMessage(DefinitionStatsSchema, row));
   const changedStats = update.change?.stats;
 
   if (changedStats) {
@@ -463,9 +472,9 @@ function applyDefinitionStatsChange(
     if (update.change?.changeType === DefinitionStatsChangeType.REMOVED) {
       if (index >= 0) nextStats.splice(index, 1);
     } else if (index >= 0) {
-      nextStats[index] = new DefinitionStats(changedStats);
+      nextStats[index] = cloneMessage(DefinitionStatsSchema, changedStats);
     } else {
-      nextStats.push(new DefinitionStats(changedStats));
+      nextStats.push(cloneMessage(DefinitionStatsSchema, changedStats));
     }
   }
 
@@ -490,12 +499,12 @@ function upsertExistingInstance(
   queryClient.setQueryData<InfiniteData<ListInstancesResponse>>(key, (previous) => {
     if (!previous) return previous;
 
-    const pages = previous.pages.map((page) => new ListInstancesResponse(page));
+    const pages = previous.pages.map((page) => cloneMessage(ListInstancesResponseSchema, page));
 
     for (const page of pages) {
       const index = page.instances.findIndex((row) => row.instanceId === instance.instanceId);
       if (index >= 0) {
-        page.instances[index] = new InstanceSummary(instance);
+        page.instances[index] = cloneMessage(InstanceSummarySchema, instance);
         found = true;
       }
     }
@@ -516,7 +525,7 @@ function removeInstance(queryClient: QueryClient, key: readonly unknown[], insta
 
     let changed = false;
     const pages = previous.pages.map((page) => {
-      const clone = new ListInstancesResponse(page);
+      const clone = cloneMessage(ListInstancesResponseSchema, page);
       const nextInstances = clone.instances.filter((row) => row.instanceId !== instanceId);
       if (nextInstances.length !== clone.instances.length) {
         changed = true;
@@ -540,12 +549,12 @@ function prependInstances(
 ) {
   const orderedRows = uniqueByInstanceId(rows)
     .sort(compareInstancesDesc)
-    .map((row) => new InstanceSummary(row));
+    .map((row) => cloneMessage(InstanceSummarySchema, row));
 
   queryClient.setQueryData<InfiniteData<ListInstancesResponse>>(key, (previous) => {
     if (!previous || previous.pages.length === 0 || orderedRows.length === 0) return previous;
 
-    const pages = previous.pages.map((page) => new ListInstancesResponse(page));
+    const pages = previous.pages.map((page) => cloneMessage(ListInstancesResponseSchema, page));
     const firstPage = pages[0];
 
     const combined = [...orderedRows, ...firstPage.instances].sort(compareInstancesDesc);
@@ -565,7 +574,7 @@ function prependInstances(
 function uniqueByInstanceId(rows: InstanceSummary[]): InstanceSummary[] {
   const map = new Map<string, InstanceSummary>();
   for (const row of rows) {
-    map.set(row.instanceId, new InstanceSummary(row));
+    map.set(row.instanceId, cloneMessage(InstanceSummarySchema, row));
   }
   return Array.from(map.values());
 }

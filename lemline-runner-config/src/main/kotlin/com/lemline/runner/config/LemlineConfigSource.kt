@@ -190,6 +190,7 @@ import com.lemline.runner.config.LemlineConfigConstants.RABBITMQ_USER_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.RABBITMQ_VHOST_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.WORKFLOW_COMMANDS_TOPIC_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.WORKFLOW_EVENTS_TOPIC_DEFAULT
+import io.smallrye.config.ConfigSourceContext
 import io.smallrye.config.PropertiesConfigSource
 
 internal const val COMMANDS_IN_CHANNEL = "commands-in"
@@ -241,8 +242,8 @@ enum class TopicType(
         }
 }
 
-class LemlineConfigSource : PropertiesConfigSource(
-    buildProperties(),
+class LemlineConfigSource(context: ConfigSourceContext? = null) : PropertiesConfigSource(
+    buildProperties(context),
     LemlineConfigConstants.CONFIG_SOURCE_NAME,
     LemlineConfigConstants.CONFIG_ORDINAL
 ) {
@@ -251,8 +252,17 @@ class LemlineConfigSource : PropertiesConfigSource(
         private const val ANALYTICS_H2_DATASOURCE_NAME = "analytics"
         private const val ANALYTICS_POSTGRES_DATASOURCE_NAME = "analytics-postgresql"
 
-        private fun buildProperties(): Map<String, String> {
+        private fun buildProperties(context: ConfigSourceContext?): Map<String, String> {
             val lemlineProps = mutableMapOf<String, String>()
+            val contextualProperties = context?.iterateNames()?.asSequence()
+                ?.filter { it.startsWith(LEMLINE_PREFIX) }
+                ?.map { context.getValue(it) }
+                // Mapping defaults and Quarkus runtime defaults (ordinal 0) are not explicit backend settings:
+                // they would suppress database inference and enable every optional backend.
+                ?.filter { it.value != null && it.configSourceOrdinal > 0 }
+                ?.toList().orEmpty()
+            contextualProperties.forEach { lemlineProps[it.name] = it.value }
+
 
             logger.info { "LemlineConfigSource.buildProperties() starting..." }
             logger.info { "ConfigPathHolder.configPath = ${ConfigPathHolder.configPath}" }
@@ -268,17 +278,16 @@ class LemlineConfigSource : PropertiesConfigSource(
 
             logger.info { "Lemline file properties:\n${lemlineProps.toPrint()}" }
 
-            // Log lemline-related system properties before reading
-            val lemlineSysProps = System.getProperties()
-                .filter { (k, _) -> k.toString().startsWith(LEMLINE_PREFIX) }
-                .map { (k, v) -> "$k=${v.toString().maskIfSensitive(k.toString())}" }
-            logger.info { "Lemline system properties: $lemlineSysProps" }
-
-            // Override with system properties, as they have higher priority,
-            // This includes properties defined in [LemlineApplication]
-            System.getProperties().forEach { (key, value) ->
-                if (key.toString().startsWith(LEMLINE_PREFIX)) {
-                    lemlineProps[key.toString()] = value.toString()
+            // File configuration overrides application defaults, while environment variables,
+            // system properties and Quarkus test-profile overrides retain their higher priority.
+            if (context != null) {
+                contextualProperties.filter { it.configSourceOrdinal > LemlineConfigConstants.CONFIG_ORDINAL }
+                    .forEach { lemlineProps[it.name] = it.value }
+            } else {
+                System.getProperties().forEach { (key, value) ->
+                    if (key.toString().startsWith(LEMLINE_PREFIX)) {
+                        lemlineProps[key.toString()] = value.toString()
+                    }
                 }
             }
 

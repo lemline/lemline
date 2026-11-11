@@ -23,6 +23,7 @@ import com.lemline.gateway.v1.WatchInstancesRequest
 import com.lemline.gateway.v1.WatchInstancesResponse
 import com.lemline.gateway.v1.GatewayServiceGrpc
 import com.lemline.runner.config.LemlineConfiguration
+import com.lemline.common.coroutines.ApplicationClassLoaderContext
 import com.lemline.runner.config.gatewayAuthenticationEnabled
 import com.lemline.runner.gateway.auth.GatewayAuthContext
 import com.lemline.runner.gateway.auth.GatewayAuthorizer
@@ -64,7 +65,7 @@ class GatewayGrpcService(
     @Inject
     lateinit var instanceEventRpcHandler: InstanceEventRpcHandler
 
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO + ApplicationClassLoaderContext())
 
     override fun listDefinitions(
         request: ListDefinitionsRequest,
