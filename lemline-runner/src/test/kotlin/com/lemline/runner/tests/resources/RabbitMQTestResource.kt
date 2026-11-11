@@ -47,6 +47,7 @@ class RabbitMQTestResource : TestcontainersResource() {
             "rabbitmq-port" to rabbitmq.getMappedPort(5672).toString(),
             "rabbitmq-username" to rabbitmq.adminUsername,
             "rabbitmq-password" to rabbitmq.adminPassword,
+            "test.rabbitmq.management-url" to "http://${rabbitmq.host}:${rabbitmq.getMappedPort(15672)}",
         )
 
         // Set as system properties so that [LemlineConfigSource] can see them.
@@ -65,6 +66,7 @@ class RabbitMQTestResource : TestcontainersResource() {
         System.clearProperty("rabbitmq-port")
         System.clearProperty("rabbitmq-username")
         System.clearProperty("rabbitmq-password")
+        System.clearProperty("test.rabbitmq.management-url")
 
         if (::rabbitmq.isInitialized) {
             rabbitmq.stop()
