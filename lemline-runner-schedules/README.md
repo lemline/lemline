@@ -30,29 +30,13 @@ schedule:
 
 ## Architecture
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                   lemline-runner-schedules                      │
-├─────────────────────────────────────────────────────────────────┤
-│  ScheduleService            ← Business logic for schedules     │
-│  └── scheduleAfterCompletion() ← Reschedule after workflow ends│
-│                                                                 │
-│  ScheduleModel              ← Schedule state entity             │
-│  ├── id                     ← Schedule identifier              │
-│  ├── instanceMessage        ← Workflow init command            │
-│  ├── scheduleAfter          ← ISO 8601 duration (e.g., PT1H)   │
-│  ├── scheduleEvery          ← ISO 8601 duration (e.g., PT5M)   │
-│  ├── scheduleCron           ← Unix cron expression             │
-│  ├── scheduleZone           ← IANA timezone                    │
-│  └── outbox fields          ← Processing state                 │
-│                                                                 │
-│  ScheduleOutbox             ← Trigger scheduled workflows      │
-│  └── process()              ← Emit workflow init command       │
-│                                                                 │
-│  ScheduleRepository         ← Database operations              │
-│  ScheduleCleaner            ← Cleanup expired schedules        │
-└─────────────────────────────────────────────────────────────────┘
-```
+| Component | Responsibility |
+|-----------|----------------|
+| `ScheduleService` | Create a successor when a workflow completes |
+| `ScheduleModel` | One occurrence, with a stable `scheduleId` for its recurrence chain |
+| `ScheduleOutbox` | Publish due occurrences and create fixed-rate successors |
+| `ScheduleRepository` | Persist occurrences and lock completion transitions |
+| `ScheduleCleaner` | Remove occurrences after handoff and retention |
 
 ## Key Concepts
 
@@ -68,7 +52,7 @@ schedule:
 | Type | Field | Description | Next Calculation |
 |------|-------|-------------|------------------|
 | **Cron** | `scheduleCron` | Unix cron expression | Next cron match |
-| **Every** | `scheduleEvery` | ISO 8601 duration | Now + duration |
+| **Every** | `scheduleEvery` | ISO 8601 duration | Previous deadline + duration |
 | **After** | `scheduleAfter` | ISO 8601 duration | Completion + duration |
 
 ## File Reference
@@ -84,58 +68,60 @@ schedule:
 
 ## How It Works
 
-### Cron/Every Schedule Flow
+Each row in `lemline_schedules` represents one occurrence. `schedule_id` identifies
+its recurrence chain; `id` identifies the occurrence. Each successor copies the
+schedule definition and input, so no separate schedule-definition table is required.
 
-```
-┌─────────────────┐   definition post   ┌─────────────────┐
-│ Workflow with   │ ─────────────────▶  │ Insert schedule │
-│ schedule config │                     │ with next time  │
-└─────────────────┘                     └────────┬────────┘
-                                                 │
-                          [wait until scheduled time]
-                                                 │
-                                                 ▼
-                                        ┌─────────────────┐
-                                        │ ScheduleOutbox  │
-                                        │ (polls for due) │
-                                        └────────┬────────┘
-                                                 │
-                                                 ▼
-                                        ┌─────────────────┐
-                                        │ Emit workflow   │
-                                        │ init command    │
-                                        └────────┬────────┘
-                                                 │
-                                                 ▼
-                                        ┌─────────────────┐
-                                        │ Calculate next  │
-                                        │ scheduled time  │
-                                        └─────────────────┘
-```
+`outbox_scheduled_for` is the immutable occurrence deadline. `outbox_delayed_until`
+can change during publication retries without changing the workflow or message ID.
+IDs are deterministic and timestamp-based derivation uses SQL microsecond precision.
 
-### After-Completion Schedule Flow
+The first row of a chain keeps the workflow ID requested by the start call until its
+first publication, so a retried gateway start with the same instance ID is recognized as
+already registered (or rejected when its parameters differ). Publication then gives
+that occurrence, like every successor, its own execution ID.
 
-```
-┌─────────────────┐   workflow completed   ┌─────────────────┐
-│    Workflow     │ ─────────────────────▶ │ ScheduleService │
-│   Completes     │                        │                 │
-└─────────────────┘                        └────────┬────────┘
-                                                    │
-                                                    ▼
-                                           ┌─────────────────┐
-                                           │ Update schedule │
-                                           │ delayed_until = │
-                                           │ now + after     │
-                                           └────────┬────────┘
-                                                    │
-                             [wait until delayed time]
-                                                    │
-                                                    ▼
-                                           ┌─────────────────┐
-                                           │ ScheduleOutbox  │
-                                           │ triggers next   │
-                                           └─────────────────┘
-```
+### Fixed-rate schedules
+
+For `every` and `cron`, `ScheduleOutbox` publishes the current occurrence through the
+commands channel. Once publication and its lifecycle hook succeed, it inserts the
+next occurrence using the same transaction as the current row's completion update.
+An insertion failure rolls back the batch; a broker publication may therefore be
+replayed with the same identifiers. This is at-least-once publication, not an atomic
+transaction spanning the broker and database.
+
+The next deadline is calculated from the current deadline. Missed occurrences are
+caught up in order; they are not skipped. Each occurrence has an independent retry
+budget. A permanently failed publication stops that chain for operator inspection.
+
+### Completion-based schedules
+
+For `after`, the first immediate workflow has a tracking row with no outbox deadline.
+After any occurrence is published, its row remains available until the corresponding
+workflow completion is handled through the events channel.
+
+`ScheduleService` locks the occurrence by workflow ID, inserts a deterministic
+successor, and sets the current occurrence's `cleanup_after` in one transaction.
+That marker also prevents duplicate completion events from creating another
+successor, including after the successor has itself been cleaned up. A completion
+received after the source row was cleaned up does not recreate the chain.
+
+Published `after` occurrences are not eligible for cleanup while their workflow is
+still running. Failed workflow handling is unchanged: only successful workflow
+completion schedules the next occurrence. Failed workflows can therefore leave a
+retained tracking row requiring operational intervention.
+
+### Retention and upgrades
+
+Fixed-rate occurrences become eligible for retention cleanup after successful
+publication and successor creation. Completion-based occurrences become eligible
+only after completion has created their successor. `AbstractOutbox` retains its
+standard rule: successful publication completes the current row.
+
+Migration V401 backfills `schedule_id` from existing row IDs on PostgreSQL, MySQL,
+and H2. It does not automatically reactivate rows already marked completed by the
+old implementation: those require review to avoid replaying previously executed
+workflows.
 
 ### Cron Parsing
 
@@ -168,23 +154,60 @@ val next = ExecutionTime.forCron(cron)
 
 | Column | Type | Description |
 |--------|------|-------------|
-| `id` | UUID | Schedule identifier |
-| `instance_message` | TEXT | Serialized workflow init command |
+| `id` | UUID | Occurrence identifier |
+| `schedule_id` | UUID | Stable recurrence-chain identifier |
+| `workflow_state` | TEXT | Workflow init command state encoded as ProtoJSON |
 | `schedule_after` | VARCHAR(255) | ISO 8601 duration (PT1H) |
 | `schedule_every` | VARCHAR(255) | ISO 8601 duration (PT5M) |
 | `schedule_cron` | VARCHAR(255) | Unix cron expression |
-| `schedule_zone` | VARCHAR(255) | IANA timezone (America/New_York) |
-| `outbox_scheduled_for` | TIMESTAMP | Next scheduled execution |
+| `schedule_zone` | VARCHAR(64) | IANA timezone (America/New_York) |
+| `outbox_scheduled_for` | TIMESTAMP | Immutable occurrence deadline |
 | `outbox_delayed_until` | TIMESTAMP | When to process |
 | `outbox_attempt_count` | INT | Processing attempts |
-| `outbox_completed_at` | TIMESTAMP | When schedule exhausted |
+| `outbox_completed_at` | TIMESTAMP | When occurrence publication succeeded |
 | `outbox_failed_at` | TIMESTAMP | When outbox gave up |
 | `cleanup_after` | TIMESTAMP | Eligible for deletion |
 
-### Schedule Lifecycle
+### Occurrence Lifecycle
 
-| Type | Completed When |
-|------|----------------|
-| **Cron** | No more future executions (e.g., specific date passed) |
-| **Every** | Never (runs forever until deleted) |
-| **After** | Never (runs forever until deleted) |
+| Type | Publication completed | Eligible for cleanup |
+|------|-----------------------|----------------------|
+| **Cron/Every** | Command and lifecycle hook succeed | Same transaction as successor creation, or when no next cron occurrence exists |
+| **After** | Command and lifecycle hook succeed | Workflow completion has created the successor |
+
+## Regression coverage
+
+`ScheduleRecurrenceTestBase` runs against H2, PostgreSQL and MySQL. It covers repeated
+cron/every occurrences, stable publication retries, lifecycle publication failure,
+transaction rollback on successor insertion failure, and completion-based recurrence
+with duplicate completion handling. Container-backed tests require Docker.
+
+### Broker end-to-end coverage
+
+`BrokerScheduleExecutionTest` in `lemline-runner/testcases/bases` runs the same three scenarios with
+Kafka, RabbitMQ and PGMQ (nine tests). Concrete tests and profiles live alongside
+the existing execution tests in `testcases/kafka`, `testcases/rabbitmq`, and
+`testcases/pgmq`. It starts workflows through the production
+`InstanceStartService`; the normal gateway/schedule relays and command/event consumers
+execute them. Completion and output assertions read lifecycle events ingested by
+analytics after broker transport. Emitters and workflow completions are not mocked.
+The gRPC/HTTP gateway transport is outside this suite's scope.
+
+- `every`: the immediate run and at least two scheduled runs complete with distinct IDs.
+- `cron`: two occurrences complete at consecutive real minute boundaries, without an
+  immediate execution or artificially advancing persisted deadlines.
+- `after`: a real five-second wait keeps the initial workflow running; no successor
+  exists during that wait, and each subsequent run starts after the previous run's
+  completion plus the configured delay.
+
+Each test stops only its own recurrence chain during cleanup. The cron test can take
+up to 150 seconds per broker because the supported UNIX cron format has minute resolution.
+
+Run with Docker available:
+
+```bash
+./gradlew :lemline-runner:test --tests '*ScheduleExecutionTest' 2>&1 | tee /tmp/lemline-schedules-e2e.log
+```
+
+To target one broker, use `*KafkaScheduleExecutionTest`,
+`*RabbitMQScheduleExecutionTest`, or `*PgmqScheduleExecutionTest`.

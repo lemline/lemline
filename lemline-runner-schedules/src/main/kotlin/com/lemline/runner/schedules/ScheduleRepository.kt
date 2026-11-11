@@ -57,6 +57,7 @@ class ScheduleRepository : CrudRepository<ScheduleModel>(),
     override val tableName = SCHEDULE_TABLE
 
     companion object {
+        internal const val SCHEDULE_ID_COLUMN = "schedule_id"
         internal const val SCHEDULE_AFTER_COLUMN = "schedule_after"
         internal const val SCHEDULE_CRON_COLUMN = "schedule_cron"
         internal const val SCHEDULE_EVERY_COLUMN = "schedule_every"
@@ -84,6 +85,13 @@ class ScheduleRepository : CrudRepository<ScheduleModel>(),
     override suspend fun findByWorkflowId(workflowId: WorkflowId, connection: Connection?): ScheduleModel? =
         instanceRepository.findByWorkflowId(workflowId, connection)
 
+    /** Serialize completion handling with publication and with duplicate completion events. */
+    suspend fun findByWorkflowIdForUpdate(workflowId: WorkflowId, connection: Connection): ScheduleModel? =
+        connection.prepareStatement("SELECT * FROM $tableName WHERE workflow_id = ? FOR UPDATE").use { stmt ->
+            setIDV7(stmt, 1, workflowId.value)
+            stmt.executeQuery().use { rs -> if (rs.next()) createModel(rs) else null }
+        }
+
     // Delegate WithCleanerRepository methods
     override suspend fun findEntitiesToDelete(cutoffDate: Instant, batchSize: Int, connection: Connection?) =
         cleanerRepository.findEntitiesToDelete(cutoffDate, batchSize, connection)
@@ -96,6 +104,9 @@ class ScheduleRepository : CrudRepository<ScheduleModel>(),
             outboxColumns()
 
             // Schedule-specific columns
+            column(SCHEDULE_ID_COLUMN) { stmt, entity, idx ->
+                setIDV7(stmt, idx, entity.scheduleId)
+            }
             column(SCHEDULE_AFTER_COLUMN) { stmt, entity, idx ->
                 stmt.setString(idx, entity.scheduleAfter)
             }
@@ -113,6 +124,7 @@ class ScheduleRepository : CrudRepository<ScheduleModel>(),
 
     override fun createModel(rs: ResultSet) = ScheduleModel(
         id = getIDV7(rs, ID_COLUMN)!!,
+        scheduleId = getIDV7(rs, SCHEDULE_ID_COLUMN)!!,
         instanceMessage = rs.getInstanceMessage<WorkflowCommand.ResumeFromTask>(idHelper)!!,
         outboxScheduledFor = rs.getInstant(OUTBOX_SCHEDULED_FOR_COLUMN),
         scheduleAfter = rs.getString(SCHEDULE_AFTER_COLUMN),

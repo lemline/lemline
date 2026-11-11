@@ -12,7 +12,7 @@ import jakarta.inject.Inject
 
 /**
  * Cleaner for schedule entities.
- * Deletes schedule records that have completed (no more executions) and exceeded their retention period.
+ * Deletes occurrences that have handed off to their successor and exceeded their retention period.
  */
 @Startup
 @ApplicationScoped

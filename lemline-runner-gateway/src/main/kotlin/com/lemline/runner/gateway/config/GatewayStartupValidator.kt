@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.gateway.config
 
+import com.lemline.common.coroutines.ApplicationClassLoaderContext
 import com.lemline.runner.common.config.LEMLINE_GATEWAY_AUTHENTICATION_ENABLED
 import com.lemline.runner.common.config.LEMLINE_GATEWAY_AUTHENTICATION_JWT_ISSUER
 import com.lemline.runner.common.config.LEMLINE_GATEWAY_AUTHENTICATION_JWT_JWKS_URL
@@ -36,7 +37,8 @@ class GatewayStartupValidator(
     lateinit var analyticsEventSource: WorkflowAnalyticsEventSource
 
     @Suppress("unused")
-    fun onStart(@Observes @Priority(0) event: StartupEvent) {
+    // AnalyticsMigration runs at priority 1; validate the read side after its tables exist.
+    fun onStart(@Observes @Priority(2) event: StartupEvent) {
         if (!config.gatewayEnabled) return
 
         if (config.gatewayAuthenticationEnabled && !config.gatewayTlsEnabled) {
@@ -62,7 +64,7 @@ class GatewayStartupValidator(
             requireConfigured(config.gatewayAuthenticationJwtJwksUrl, LEMLINE_GATEWAY_AUTHENTICATION_JWT_JWKS_URL)
         }
 
-        runBlocking {
+        runBlocking(ApplicationClassLoaderContext()) {
             analyticsEventSource.validate()
         }
     }

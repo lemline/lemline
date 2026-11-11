@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.schedules
 
-import com.lemline.common.values.WorkflowId
 import com.lemline.core.lifecycleevents.LifecycleEventHook
 import com.lemline.runner.common.config.DatabaseConfig
 import com.lemline.runner.common.config.OutboxConfig
@@ -12,6 +11,8 @@ import com.lemline.runner.common.repositories.with.WithOutboxRepository
 import io.quarkus.runtime.Startup
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
+import java.sql.Connection
+import kotlin.time.Duration
 
 /**
  * `ScheduleOutbox` specializes `AbstractOutbox` to implement the outbox pattern for scheduled workflow executions.
@@ -21,7 +22,7 @@ import jakarta.inject.Inject
  * - cron: Schedules workflow execution based on a cron expression.
  * - every: Executes the workflow at fixed intervals.
  * - after: Triggers the workflow after a previous workflow completes,
- *   managed via `WorkflowInstance.onWorkflowCompleted()` in StepByStepRunner.
+ *   managed by ScheduleService when WorkflowEventHandler receives completion.
  */
 @Startup
 @ApplicationScoped
@@ -54,28 +55,30 @@ class ScheduleOutbox : AbstractOutbox<ScheduleModel>() {
     override val outboxConfig: OutboxConfig by lazy { scheduleConfig.outbox }
 
     /**
-     * Process scheduled workflow by updating next execution time and sending command.
-     * No transformation needed - ScheduleOutboxModel already stores WorkflowCommand.
-     *
-     * Uses idempotent message ID derived from the schedule model's ID + scheduled time
-     * to ensure duplicate processing produces the same message ID and workflow ID.
+     * Insert successors on the same connection as the locked batch and its final update.
+     * An insertion failure must escape the per-entity retry handler and roll back the batch:
+     * otherwise a published occurrence could be committed without its successor.
      */
+    override suspend fun processBatch(
+        entities: List<ScheduleModel>,
+        maxAttempts: Int,
+        retryDelay: Duration,
+        conn: Connection
+    ): Int {
+        val processed = super.processBatch(entities, maxAttempts, retryDelay, conn)
+        for (entity in entities.filter { it.outboxCompletedAt != null }) {
+            if (entity.scheduleAfter == null) {
+                entity.nextScheduled()?.let { scheduleRepository.insert(it, conn) }
+                entity.cleanupAfter = entity.outboxCompletedAt
+            }
+            // Completion-based schedules must survive cleanup until their workflow finishes.
+        }
+        return processed
+    }
+
     override suspend fun process(entity: ScheduleModel) {
-        // Derive a deterministic workflow ID from schedule ID + scheduled time
-        // This ensures the same schedule entry always produces the same workflow ID
-        val scheduledTime = entity.outboxScheduledFor.toString()
-        val deterministicWorkflowId = WorkflowId(entity.id.derive("-wf-$scheduledTime"))
-
-        // Update the schedule model with the next instant to be processed
-        entity.prepareNextScheduled(deterministicWorkflowId)
-
-        // Derive message ID from schedule ID + scheduled time
-        val messageId = entity.id.derive("-msg-$scheduledTime")
-
-        // Start a new instance of the workflow (instanceMessage already contains WorkflowCommand)
-        commandEmitter.send(entity.instanceMessage, messageId)
-
-        // Announce the instance like any other start: readers list instances by this event.
+        entity.prepareExecution()
+        commandEmitter.send(entity.instanceMessage, entity.messageId)
         lifecycleHook.onWorkflowCreated(entity.instanceMessage.workflowInfo, entity.instanceMessage.workflowState.nodeStack)
     }
 }

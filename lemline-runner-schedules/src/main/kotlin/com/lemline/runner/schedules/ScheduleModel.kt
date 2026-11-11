@@ -37,7 +37,7 @@ data class ScheduleModel(
 
     override val outboxScheduledFor: Instant?,
 
-    /** ISO 8601 duration for one-time delayed execution (e.g., PT1H for 1 hour) */
+    /** ISO 8601 duration for completion-based recurring execution (e.g., PT1H for 1 hour) */
     val scheduleAfter: String?,
 
     /** ISO 8601 duration for recurring interval execution (e.g., PT5M for every 5 minutes) */
@@ -48,6 +48,9 @@ data class ScheduleModel(
 
     /** IANA timezone identifier for cron schedules (e.g., "America/New_York") */
     val scheduleZone: String?,
+
+    /** Stable identity shared by all occurrences of this schedule. */
+    val scheduleId: IDV7 = id,
 ) : WithInstanceMessage, WithId, WithOutbox, WithCleanup {
 
     override var outboxDelayedUntil: Instant? = outboxScheduledFor
@@ -66,7 +69,7 @@ data class ScheduleModel(
 
     override var cleanupAfter: Instant? = null
 
-    /** Parsed duration for one-time delayed execution, null if not applicable */
+    /** Parsed duration for completion-based recurring execution, null if not applicable */
     val after: Duration? by lazy { scheduleAfter?.let { Duration.parse(it) } }
 
     /** Parsed duration for recurring interval execution, null if not applicable */
@@ -78,54 +81,52 @@ data class ScheduleModel(
     /** Parsed timezone for cron-based scheduling, null if not specified */
     val zone: ZoneId? by lazy { scheduleZone?.let { ZoneId.of(it) } }
 
-    /**
-     * Updates the scheduled execution instant from the schedule properties.
-     *
-     * This is called by [ScheduleOutbox], before sending the related message
-     */
-    fun prepareNextScheduled(newWorkflowId: WorkflowId) {
-        // Reset the attempt counter and error tracking
-        outboxAttemptCount = 0
-        outboxFailedAt = null
+    /** One successor per occurrence, including when completion events are redelivered. */
+    val nextOccurrenceId: IDV7 get() = id.derive("-next")
 
-        // Calculate the next scheduled execution time
-        val currentTime = outboxScheduledFor ?: Clock.System.now()
-        val nextScheduled = when {
-            scheduleAfter != null -> null // One-time schedule after completion
-            scheduleCron != null -> cron!!.getNextCronExecutionInstant(currentTime, zone)
-            scheduleEvery != null -> currentTime + every!!
-            else -> error("Invalid schedule model: $this")
-        }
+    /** Keep the existing ID derivation so retries of previously persisted occurrences remain stable. */
+    val executionId: WorkflowId get() = WorkflowId(id.derive("-wf-${outboxScheduledFor?.atDatabasePrecision()}"))
+    val messageId: IDV7 get() = id.derive("-msg-${outboxScheduledFor?.atDatabasePrecision()}")
 
-        // Update both scheduled and delayed times
-        outboxDelayedUntil = nextScheduled
-
-        // Mark as completed if this is a cron schedule with no more executions
-        outboxCompletedAt = if (nextScheduled == null && scheduleCron != null) {
-            Clock.System.now()
-        } else {
-            null
-        }
-
-        // Each execution is a new workflow instance: a new id, and its own start time rather than
-        // the one inherited from when the schedule was registered.
+    /** Prepare this occurrence without advancing its deadline or resetting its retry state. */
+    fun prepareExecution() {
         instanceMessage = instanceMessage.copy(
             workflowState = instanceMessage.workflowState.duplicate(
-                workflowId = newWorkflowId,
-                startedAt = Clock.System.now(),
+                workflowId = executionId,
+                startedAt = if (outboxAttemptCount <= 1) Clock.System.now()
+                else instanceMessage.workflowState.nodeStack.rootState.startedAt,
             )
         )
-
     }
 
-    /**
-     * Updates the scheduled execution instant from the after property.
-     *
-     * This is called after the current workflow instance has completed
-     */
-    fun scheduleAfterCompletion() {
-        val nextTime = Clock.System.now() + after!!
-        outboxDelayedUntil = nextTime
+    /** Fixed-rate schedules advance from the occurrence deadline, including when catching up. */
+    fun nextScheduled(): ScheduleModel? {
+        if (scheduleAfter != null) return null
+        val currentTime = requireNotNull(outboxScheduledFor) { "Missing occurrence deadline" }
+        val nextTime = when {
+            scheduleCron != null -> cron!!.getNextCronExecutionInstant(currentTime, zone)
+            scheduleEvery != null -> currentTime + every!!.also { require(it > Duration.ZERO) }
+            else -> error("Invalid schedule model: $this")
+        }
+        return nextTime?.let(::nextOccurrence)
+    }
+
+    fun nextAfterCompletion(completedAt: Instant): ScheduleModel =
+        nextOccurrence(completedAt + requireNotNull(after))
+
+    private fun nextOccurrence(scheduledFor: Instant): ScheduleModel {
+        val nextId = nextOccurrenceId
+        // copy() creates fresh outbox/retry/cleanup fields while retaining the schedule definition.
+        return copy(id = nextId, outboxScheduledFor = scheduledFor.atDatabasePrecision()).let { next ->
+            next.copy(
+                instanceMessage = instanceMessage.copy(
+                    workflowState = instanceMessage.workflowState.duplicate(
+                        workflowId = next.executionId,
+                        startedAt = scheduledFor.atDatabasePrecision(),
+                    )
+                )
+            )
+        }
     }
 
     companion object Companion {
@@ -144,15 +145,17 @@ data class ScheduleModel(
             val scheduleAfter = schedule.after?.toDuration()?.toString()
             val scheduleCron = schedule.cron
 
-            val now = Clock.System.now()
+            val now = Clock.System.now().atDatabasePrecision()
 
             val initialScheduledFor = when {
                 scheduleAfter != null -> null
                 scheduleCron != null -> cronParser.parse(scheduleCron)!!.getNextCronExecutionInstant(now, zoneId)
                 scheduleEvery != null -> now + Duration.parse(scheduleEvery)
                 else -> error("Invalid schedule model")
-            }
+            }?.atDatabasePrecision()
 
+            // The first row keeps the requested workflow ID until its first publication:
+            // the gateway start relies on its unique workflow_id to recognize a retried registration.
             return ScheduleModel(
                 id = IDV7.random(),
                 instanceMessage = InstanceMessage(
@@ -173,3 +176,7 @@ internal fun Cron.getNextCronExecutionInstant(now: Instant, zoneId: ZoneId?): In
     .nextExecution(now.toJavaInstant().atZone(zoneId ?: ZoneId.of("UTC")))
     .map { it.toInstant().toKotlinInstant() }
     .orElse(null)
+
+/** SQL timestamp columns store microseconds; identity must survive a database round trip. */
+private fun Instant.atDatabasePrecision(): Instant =
+    Instant.fromEpochSeconds(epochSeconds, (nanosecondsOfSecond / 1_000 * 1_000).toLong())

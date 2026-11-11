@@ -12,6 +12,4 @@ import jakarta.inject.Singleton
 @Singleton
 internal class CloudEventSubscriberMetrics @Inject constructor(
     registry: MeterRegistry
-) : MessageSubscriberMetrics(registry) {
-    override val METRIC_PREFIX = com.lemline.runner.common.config.LEMLINE_MESSAGING_CLOUDEVENTS
-}
+) : MessageSubscriberMetrics(registry, com.lemline.runner.common.config.LEMLINE_MESSAGING_CLOUDEVENTS)
