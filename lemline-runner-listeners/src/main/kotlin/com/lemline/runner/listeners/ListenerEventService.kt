@@ -80,10 +80,7 @@ class ListenerEventService {
 
         // use a lazy provider to parse data only if needed, and only once
         val eventDataProvider: () -> JsonElement = {
-            when (eventData) {
-                null -> CloudEventService.parseData(event).also { eventData = it }
-                else -> eventData
-            }
+            eventData ?: CloudEventService.parseData(event).also { eventData = it }
         }
 
         // No database requests are done here, we just inspect the workflow definition.

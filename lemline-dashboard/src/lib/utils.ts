@@ -1,4 +1,4 @@
-import { Duration } from "@bufbuild/protobuf";
+import type { Duration } from "@bufbuild/protobuf/wkt";
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
 import { durationToMilliseconds } from "./proto";

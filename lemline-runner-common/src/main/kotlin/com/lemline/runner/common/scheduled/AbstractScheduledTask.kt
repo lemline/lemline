@@ -3,6 +3,7 @@ package com.lemline.runner.common.scheduled
 
 import com.lemline.common.logger.logger
 import com.lemline.runner.common.config.LEMLINE_SCHEDULED_ENABLED
+import com.lemline.common.coroutines.ApplicationClassLoaderContext
 import io.quarkus.runtime.ShutdownEvent
 import io.quarkus.runtime.StartupEvent
 import jakarta.annotation.Priority
@@ -75,7 +76,7 @@ abstract class AbstractScheduledTask {
     protected open val runWhenScheduledDisabled: Boolean = false
 
     /** Coroutine scope for async work */
-    protected val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+    protected val scope = CoroutineScope(Dispatchers.IO + ApplicationClassLoaderContext() + SupervisorJob())
 
     /** Whether this scheduled task is enabled */
     protected abstract val enabled: Boolean

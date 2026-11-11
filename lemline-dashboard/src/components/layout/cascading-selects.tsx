@@ -1,3 +1,4 @@
+import { create } from "@bufbuild/protobuf";
 import { useEffect, useMemo, useState } from "react";
 import { Plus } from "lucide-react";
 import { matchPath, useLocation, useNavigate } from "react-router-dom";
@@ -6,7 +7,7 @@ import { useNamespaces } from "../../hooks/use-namespaces";
 import { useDefinitions } from "../../hooks/use-definitions";
 import { useWorkflowScopeFromWatch } from "../../hooks/use-watch-workflow-projection";
 import { gatewayClient } from "../../lib/grpc-client";
-import { ListInstancesRequest } from "../../gen/proto/lemline/gateway/v1/gateway_pb";
+import { ListInstancesRequestSchema } from "../../gen/proto/lemline/gateway/v1/gateway_pb";
 import { shortId } from "../../lib/utils";
 import { Input } from "../ui/input";
 import { Select } from "../ui/select";
@@ -53,7 +54,7 @@ export function CascadingSelects() {
     enabled: workflowInputFocused && debouncedWorkflowIdQuery.length >= 4,
     queryFn: async () => {
       const response = await gatewayClient.listInstances(
-        new ListInstancesRequest({
+        create(ListInstancesRequestSchema, {
           instanceIdPrefix: debouncedWorkflowIdQuery,
           pageSize: 10,
         }),
@@ -169,7 +170,7 @@ export function CascadingSelects() {
   const disableNamespace = namespacesQuery.isLoading || namespacesQuery.isError;
 
   return (
-    <div className="space-y-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-950">
+    <div className="space-y-3 rounded-xl border border-slate-200 bg-white p-4 shadow-xs dark:border-slate-800 dark:bg-slate-950">
       <div className="grid gap-3 lg:grid-cols-[1.4fr_1fr_1fr_1fr_auto]">
         <div className="relative">
           <Input

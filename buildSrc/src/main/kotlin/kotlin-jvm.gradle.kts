@@ -11,6 +11,12 @@ plugins {
     kotlin("jvm")
 }
 
+dependencies {
+    // Kotest 6 no longer exposes the coroutine test utilities transitively.
+    val catalog = project.extensions.getByType<VersionCatalogsExtension>().named("libs")
+    testImplementation(catalog.findLibrary("kotlinxCoroutinesTest").get())
+}
+
 spotless {
     kotlin {
         target("src/**/*.kt")

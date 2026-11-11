@@ -1,12 +1,13 @@
+import { create } from "@bufbuild/protobuf";
 import { useQuery } from "@tanstack/react-query";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import {
-  GetInstanceRequest,
-  ListInstanceEventsRequest,
   type InstanceEvent,
   type InstanceSummary,
-  WatchInstanceEventsRequest,
+  GetInstanceRequestSchema,
+  ListInstanceEventsRequestSchema,
+  WatchInstanceEventsRequestSchema,
 } from "../gen/proto/lemline/gateway/v1/gateway_pb";
 import { gatewayClient } from "../lib/grpc-client";
 import { durationToMilliseconds, timestampToIsoString, timestampToMilliseconds } from "../lib/proto";
@@ -94,15 +95,18 @@ export function useWatchWorkflowProjection(workflowId: string | undefined): UseW
     setReconnectToken((value) => value + 1);
   }, []);
 
+  const [streamIdentity, setStreamIdentity] = useState({ workflowId, reconnectToken });
+  if (streamIdentity.workflowId !== workflowId || streamIdentity.reconnectToken !== reconnectToken) {
+    setStreamIdentity({ workflowId, reconnectToken });
+    setProjection(undefined);
+    setIsLoading(Boolean(workflowId));
+    setIsError(false);
+    setError(undefined);
+    setLiveConnected(false);
+  }
+
   useEffect(() => {
-    if (!workflowId) {
-      setProjection(undefined);
-      setIsLoading(false);
-      setIsError(false);
-      setError(undefined);
-      setLiveConnected(false);
-      return;
-    }
+    if (!workflowId) return;
 
     const eventsByCursor = new Map<string, WorkflowProjectionInputEvent>();
     let lastCursor: string | undefined;
@@ -113,12 +117,6 @@ export function useWatchWorkflowProjection(workflowId: string | undefined): UseW
     let disposed = false;
     let retries = 0;
     let needsReconnectToast = false;
-
-    setProjection(undefined);
-    setIsLoading(true);
-    setIsError(false);
-    setError(undefined);
-    setLiveConnected(false);
 
     const publishProjection = () => {
       setProjection(buildWorkflowProjection(workflowId, eventsByCursor.values(), lastCursor, seed));
@@ -135,7 +133,7 @@ export function useWatchWorkflowProjection(workflowId: string | undefined): UseW
 
     const loadSummaryAndHistory = async () => {
       const instanceResponse = await gatewayClient.getInstance(
-        new GetInstanceRequest({ instanceId: workflowId }),
+        create(GetInstanceRequestSchema, { instanceId: workflowId }),
         { signal: controller.signal },
       );
 
@@ -145,7 +143,7 @@ export function useWatchWorkflowProjection(workflowId: string | undefined): UseW
       let pageCursor: string | undefined;
       while (!disposed && !controller.signal.aborted) {
         const page = await gatewayClient.listInstanceEvents(
-          new ListInstanceEventsRequest({
+          create(ListInstanceEventsRequestSchema, {
             instanceId: workflowId,
             afterCursor: pageCursor,
             pageSize: EVENT_HISTORY_PAGE_SIZE,
@@ -165,7 +163,7 @@ export function useWatchWorkflowProjection(workflowId: string | undefined): UseW
     const watchTail = async () => {
       while (!disposed && !controller.signal.aborted) {
         try {
-          const request = new WatchInstanceEventsRequest({
+          const request = create(WatchInstanceEventsRequestSchema, {
             instanceId: workflowId,
             afterCursor: lastCursor,
           });
@@ -252,7 +250,7 @@ export function useWorkflowScopeFromWatch(workflowId: string | undefined): Workf
     staleTime: 30_000,
     queryFn: async () => {
       const response = await gatewayClient.getInstance(
-        new GetInstanceRequest({ instanceId: workflowId ?? "" }),
+        create(GetInstanceRequestSchema, { instanceId: workflowId ?? "" }),
       );
       return response.instance ? scopeFromSummary(response.instance) : undefined;
     },

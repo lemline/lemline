@@ -116,7 +116,7 @@ const queryClient = new QueryClient({
   }),
   mutationCache: new MutationCache({
     onError: (error, _variables, _context, mutation) => {
-      let mutationKey = "[]";
+      let mutationKey: string;
       try {
         mutationKey = JSON.stringify(mutation.options.mutationKey ?? []);
       } catch {

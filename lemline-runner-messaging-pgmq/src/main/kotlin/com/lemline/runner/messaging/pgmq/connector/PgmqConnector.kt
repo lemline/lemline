@@ -2,6 +2,7 @@
 package com.lemline.runner.messaging.pgmq.connector
 
 import com.lemline.common.logger.logger
+import com.lemline.common.coroutines.ApplicationClassLoaderContext
 import com.lemline.runner.messaging.pgmq.PgmqClient
 import com.lemline.runner.messaging.pgmq.PgmqMessage
 import com.lemline.runner.messaging.pgmq.UnreadableMessage
@@ -78,7 +79,7 @@ class PgmqConnector : InboundConnector, OutboundConnector {
         private const val SHUTDOWN_TIMEOUT_MS = 5000L
     }
 
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO + ApplicationClassLoaderContext())
     private val isShutdown = AtomicBoolean(false)
 
     @Inject

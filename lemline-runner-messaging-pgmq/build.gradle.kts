@@ -14,7 +14,7 @@ dependencies {
 
     // KotlinX ecosystem
     implementation(libs.bundles.kotlinxEcosystem)
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-reactive:1.10.2")
+    implementation(libs.kotlinxCoroutinesReactive)
 
     // Quarkus core (for CDI annotations)
     implementation(enforcedPlatform(libs.quarkus.bom))
@@ -46,7 +46,7 @@ dependencies {
     testImplementation(testFixtures(project(":lemline-runner-common")))
     testImplementation(platform(libs.testcontainers.bom))
     testImplementation("org.testcontainers:testcontainers")
-    testImplementation("org.testcontainers:postgresql")
+    testImplementation("org.testcontainers:testcontainers-postgresql")
 
     // Test Fixtures
     testFixturesImplementation(libs.bundles.kotlinxEcosystem)

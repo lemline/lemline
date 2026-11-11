@@ -2,6 +2,7 @@
 package com.lemline.runner.common.messaging
 
 import com.lemline.common.logger.logger
+import com.lemline.common.coroutines.ApplicationClassLoaderContext
 import io.quarkus.runtime.ShutdownEvent
 import jakarta.annotation.PostConstruct
 import jakarta.enterprise.event.Observes
@@ -56,7 +57,7 @@ abstract class MessageSubscriber<T> : Subscriber<Message<String>> {
     private val gracePeriod = 5000L
 
     private val scope: CoroutineScope =
-        CoroutineScope(Dispatchers.IO + SupervisorJob() + CoroutineExceptionHandler { _, e ->
+        CoroutineScope(Dispatchers.IO + ApplicationClassLoaderContext() + SupervisorJob() + CoroutineExceptionHandler { _, e ->
             if (!isShutdown.get() && (e is Exception)) {
                 logger.warn(e) { "Error processing message, will attempt to recover." }
                 reSubscribe()

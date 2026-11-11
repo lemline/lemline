@@ -15,7 +15,8 @@ object CloudEventFactory {
             withSource(URI.create(config.source))
             withType(config.type)
             config.time?.let { withTime(OffsetDateTime.parse(it)) }
-            config.subject?.let { withSubject(it) }
+            // CloudEvents 5 rejects empty optional subjects; represent them as absent.
+            config.subject?.takeIf { it.isNotEmpty() }?.let { withSubject(it) }
             config.dataschema?.let { withDataSchema(URI.create(it)) }
             config.datacontenttype?.let { withDataContentType(it) }
             config.data?.let { data ->

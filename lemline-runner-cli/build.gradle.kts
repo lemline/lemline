@@ -54,5 +54,5 @@ dependencies {
     testImplementation(project(":lemline-runner"))
 
     // MicroProfile Config for ConfigCommand tests
-    testImplementation("org.eclipse.microprofile.config:microprofile-config-api:3.1")
+    testImplementation("org.eclipse.microprofile.config:microprofile-config-api:3.1.3")
 }

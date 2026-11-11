@@ -100,7 +100,7 @@ dependencies {
     implementation("io.ktor:ktor-serialization-kotlinx-json")
 
     // Jackson for JSON serialization/deserialization
-    implementation(libs.jackson.bom)
+    implementation(platform(libs.jackson.bom))
     implementation("com.fasterxml.jackson.core:jackson-databind")
     implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-yaml")
     implementation("com.fasterxml.jackson.module:jackson-module-kotlin")
@@ -123,10 +123,10 @@ dependencies {
     }
     runtimeOnly("jakarta.jms:jakarta.jms-api:3.1.0")
 
-    runtimeOnly("net.java.dev.jna:jna-platform:5.17.0")
+    runtimeOnly("net.java.dev.jna:jna-platform:5.19.1")
 
     // Quarkus helpers
-    runtimeOnly("org.jboss:jboss-vfs:3.2.15.Final")
+    runtimeOnly("org.jboss:jboss-vfs:3.3.2.Final")
     runtimeOnly("org.osgi:org.osgi.framework:1.10.0")
 
     // AWS
@@ -149,15 +149,15 @@ dependencies {
     testImplementation("io.quarkus:quarkus-jdbc-h2")
     testImplementation("io.kotest:kotest-runner-junit5")
     testImplementation("io.kotest:kotest-assertions-core")
-    testImplementation("io.kotest:kotest-framework-api")
+    testImplementation("io.kotest:kotest-framework-engine")
     testImplementation(libs.mockk)
     testImplementation(platform(libs.testcontainers.bom))
     testImplementation("org.testcontainers:testcontainers")
-    testImplementation("org.testcontainers:junit-jupiter")
-    testImplementation("org.testcontainers:postgresql")
-    testImplementation("org.testcontainers:mysql")
-    testImplementation("org.testcontainers:kafka")
-    testImplementation("org.testcontainers:rabbitmq")
+    testImplementation("org.testcontainers:testcontainers-junit-jupiter")
+    testImplementation("org.testcontainers:testcontainers-postgresql")
+    testImplementation("org.testcontainers:testcontainers-mysql")
+    testImplementation("org.testcontainers:testcontainers-kafka")
+    testImplementation("org.testcontainers:testcontainers-rabbitmq")
 
     // Tests Fixtures
     testFixturesImplementation(kotlin("test"))

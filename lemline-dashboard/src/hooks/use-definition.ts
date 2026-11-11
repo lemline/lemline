@@ -1,6 +1,7 @@
+import { create } from "@bufbuild/protobuf";
 import { useQuery } from "@tanstack/react-query";
 import { gatewayClient } from "../lib/grpc-client";
-import { GetDefinitionRequest } from "../gen/proto/lemline/gateway/v1/gateway_pb";
+import { GetDefinitionRequestSchema } from "../gen/proto/lemline/gateway/v1/gateway_pb";
 
 export function useDefinition(namespace?: string, name?: string, version?: string) {
   return useQuery({
@@ -8,7 +9,7 @@ export function useDefinition(namespace?: string, name?: string, version?: strin
     enabled: Boolean(namespace && name),
     queryFn: async () => {
       const response = await gatewayClient.getDefinition(
-        new GetDefinitionRequest({
+        create(GetDefinitionRequestSchema, {
           namespace: namespace ?? "",
           name: name ?? "",
           version,

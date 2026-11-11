@@ -1,8 +1,9 @@
+import { create } from "@bufbuild/protobuf";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { uuidv7 } from "uuidv7";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
-import { StartInstanceRequest } from "../../gen/proto/lemline/gateway/v1/gateway_pb";
+import { StartInstanceRequestSchema } from "../../gen/proto/lemline/gateway/v1/gateway_pb";
 import { gatewayClient } from "../../lib/grpc-client";
 import { useNamespaces } from "../../hooks/use-namespaces";
 import { useDefinitions } from "../../hooks/use-definitions";
@@ -24,7 +25,7 @@ export function StartForm({ initialNamespace, initialName, initialVersion }: Sta
   const namespaces = namespacesQuery.data ?? [];
   const [namespace, setNamespace] = useState(initialNamespace ?? "");
   const [name, setName] = useState(initialName ?? "");
-  const [version, setVersion] = useState(initialVersion ?? "");
+  const [selectedVersion, setVersion] = useState(initialVersion ?? "");
   const [workflowId, setWorkflowId] = useState(uuidv7());
   const [zoneId, setZoneId] = useState("UTC");
   const [inputJson, setInputJson] = useState("{}");
@@ -67,10 +68,7 @@ export function StartForm({ initialNamespace, initialName, initialVersion }: Sta
     [definitionVersions],
   );
 
-  useEffect(() => {
-    if (version || versionOptions.length === 0) return;
-    setVersion(versionOptions[0].value);
-  }, [version, versionOptions]);
+  const version = selectedVersion || versionOptions[0]?.value || "";
 
   useEffect(() => {
     return () => {
@@ -93,7 +91,7 @@ export function StartForm({ initialNamespace, initialName, initialVersion }: Sta
       }
 
       const response = await gatewayClient.startInstance(
-        new StartInstanceRequest({
+        create(StartInstanceRequestSchema, {
           instanceId: workflowIdToStart,
           namespace,
           name,
@@ -183,7 +181,7 @@ export function StartForm({ initialNamespace, initialName, initialVersion }: Sta
         <div>
           <label className="mb-1 block text-sm font-medium">Input JSON</label>
           <textarea
-            className="min-h-40 w-full rounded-md border border-slate-300 bg-slate-50 p-3 font-mono text-sm outline-none focus:border-slate-500 dark:border-slate-700 dark:bg-slate-900"
+            className="min-h-40 w-full rounded-md border border-slate-300 bg-slate-50 p-3 font-mono text-sm outline-hidden focus:border-slate-500 dark:border-slate-700 dark:bg-slate-900"
             value={inputJson}
             onChange={(event) => setInputJson(event.target.value)}
           />

@@ -5,11 +5,11 @@ import com.lemline.common.info
 import com.lemline.common.logger
 import com.lemline.common.warn
 import com.lemline.runner.common.config.DatabaseType
+import io.quarkus.runtime.LaunchMode
 import io.quarkus.runtime.StartupEvent
 import jakarta.annotation.Priority
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.enterprise.event.Observes
-import org.eclipse.microprofile.config.inject.ConfigProperty
 
 /**
  * Ensures that Flyway database migrations are applied during application startup.
@@ -18,8 +18,6 @@ import org.eclipse.microprofile.config.inject.ConfigProperty
  */
 @ApplicationScoped
 class DatabaseMigration(
-    @param:ConfigProperty(name = "quarkus.profile")
-    private val profile: String,
     private val config: LemlineConfiguration,
     private val databaseManager: DatabaseManager,
 ) {
@@ -35,10 +33,10 @@ class DatabaseMigration(
         if (!databaseEnabled) return
 
         // Run migrations:
-        // - if the profile is "test" - as databases are recreated for each test
+        // - in test launch mode - profiles may have custom names, but databases are recreated
         // - if the database type is in-memory - as it is provided by the app
         // - if migrateAtStart is true - as it is requested by the user
-        if (profile == "test" || dbType == DatabaseType.H2 || migrateAtStart) {
+        if (LaunchMode.current() == LaunchMode.TEST || dbType == DatabaseType.H2 || migrateAtStart) {
             databaseManager.flyway.migrate()
             logger.info { "Flyway migrations applied successfully on ${databaseManager.dbType} database." }
         } else {

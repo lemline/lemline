@@ -1,5 +1,6 @@
+import { create } from "@bufbuild/protobuf";
 import { useInfiniteQuery } from "@tanstack/react-query";
-import { InstanceStatus, ListInstancesRequest } from "../gen/proto/lemline/gateway/v1/gateway_pb";
+import { InstanceStatus, ListInstancesRequestSchema } from "../gen/proto/lemline/gateway/v1/gateway_pb";
 import { gatewayClient } from "../lib/grpc-client";
 import { timestampFromIsoString } from "../lib/proto";
 
@@ -38,7 +39,7 @@ export function useInstances(filters: InstanceFilters) {
     initialPageParam: undefined as string | undefined,
     queryFn: async ({ pageParam }) => {
       const response = await gatewayClient.listInstances(
-        new ListInstancesRequest({
+        create(ListInstancesRequestSchema, {
           namespace: filters.namespace,
           name: filters.name,
           version: filters.version,

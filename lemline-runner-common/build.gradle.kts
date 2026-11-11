@@ -58,32 +58,32 @@ dependencies {
     testFixturesImplementation(project(":lemline-runner-common"))
 
     // H2 Database for in-memory testing
-    testFixturesImplementation("com.h2database:h2:2.3.232")
+    testFixturesImplementation("com.h2database:h2:2.5.252")
 
     // HikariCP for connection pooling
-    testFixturesImplementation("com.zaxxer:HikariCP:6.0.0")
+    testFixturesImplementation("com.zaxxer:HikariCP:7.1.0")
 
     // Flyway for migrations
-    testFixturesImplementation("org.flywaydb:flyway-core:11.4.0")
-    testFixturesImplementation("org.flywaydb:flyway-database-postgresql:11.4.0")
-    testFixturesImplementation("org.flywaydb:flyway-mysql:11.4.0")
+    testFixturesImplementation("org.flywaydb:flyway-core:13.12.1")
+    testFixturesImplementation("org.flywaydb:flyway-database-postgresql:13.12.1")
+    testFixturesImplementation("org.flywaydb:flyway-mysql:13.12.1")
 
     // Test Fixtures - Testing framework dependencies for base test classes
     testFixturesImplementation(enforcedPlatform(libs.kotest.bom))
     testFixturesImplementation("io.kotest:kotest-assertions-core")
     testFixturesImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test")
-    testFixturesImplementation("org.junit.jupiter:junit-jupiter-api:5.10.2")
+    testFixturesImplementation("org.junit.jupiter:junit-jupiter-api:6.1.3")
     testFixturesImplementation(libs.mockk)
 
     // Testcontainers for PostgreSQL and MySQL testing
     testFixturesImplementation(enforcedPlatform(libs.testcontainers.bom))
     testFixturesImplementation("org.testcontainers:testcontainers")
-    testFixturesImplementation("org.testcontainers:postgresql")
-    testFixturesImplementation("org.testcontainers:mysql")
+    testFixturesImplementation("org.testcontainers:testcontainers-postgresql")
+    testFixturesImplementation("org.testcontainers:testcontainers-mysql")
 
     // JDBC drivers for PostgreSQL and MySQL
-    testFixturesImplementation("org.postgresql:postgresql:42.7.2")
-    testFixturesImplementation("com.mysql:mysql-connector-j:8.4.0")
+    testFixturesImplementation("org.postgresql:postgresql:42.7.14")
+    testFixturesImplementation("com.mysql:mysql-connector-j:26.10.0")
 }
 
 abstract class GenerateLemlineConfigKeysTask : DefaultTask() {
