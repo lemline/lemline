@@ -9,6 +9,7 @@ import com.lemline.runner.common.namespaces.DestinationType
 import com.lemline.runner.common.namespaces.NamespaceScope
 import com.lemline.runner.listeners.CloudEventService
 import com.lemline.runner.listeners.ListenerEventService
+import com.lemline.runner.eventschedules.EventScheduleService
 import com.lemline.runner.messaging.ArrivalNamespaceResolver
 import io.cloudevents.CloudEvent
 import io.cloudevents.core.builder.CloudEventBuilder
@@ -41,6 +42,7 @@ class CloudEventHandlerTest {
     private val metrics = mockk<CloudEventSubscriberMetrics>(relaxed = true)
     private val resolver = mockk<ArrivalNamespaceResolver>()
     private val listenerService = mockk<ListenerEventService>()
+    private val scheduleService = mockk<EventScheduleService>(relaxed = true)
 
     private fun scopeOf(vararg namespaces: String): NamespaceScope = object : NamespaceScope {
         override val configured: Set<String> = namespaces.toSet()
@@ -49,6 +51,7 @@ class CloudEventHandlerTest {
     private fun handler(vararg followed: String): CloudEventHandler =
         CloudEventHandler(metrics, scopeOf(*followed), resolver).apply {
             listenerEventService = listenerService
+            eventScheduleService = scheduleService
         }
 
     private fun buildCloudEvent(): CloudEvent = CloudEventBuilder.v1()
@@ -79,6 +82,7 @@ class CloudEventHandlerTest {
 
         next.shouldBeNull()
         coVerify(exactly = 1) { listenerService.handleCloudEvent(event, WorkflowNamespace("team-a")) }
+        coVerify(exactly = 1) { scheduleService.handleCloudEvent(event, WorkflowNamespace("team-a")) }
     }
 
     @Test
@@ -94,5 +98,6 @@ class CloudEventHandlerTest {
         e.run()
         verify(exactly = 1) { metrics.foreignNamespace(null) }
         coVerify(exactly = 0) { listenerService.handleCloudEvent(any(), any()) }
+        coVerify(exactly = 0) { scheduleService.handleCloudEvent(any(), any()) }
     }
 }

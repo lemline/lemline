@@ -8,6 +8,7 @@ This module handles persistent storage of workflow definitions in the database:
 - **CRUD operations** for workflow definitions (namespace/name/version)
 - **Cache synchronization** with the in-memory `WorkflowCache`
 - **Listen task extraction** for CloudEvent-triggered workflows
+- **Event schedules** are handled by [lemline-runner-event-schedules](../lemline-runner-event-schedules/README.md)
 
 ## Serverless Workflow DSL Reference
 
