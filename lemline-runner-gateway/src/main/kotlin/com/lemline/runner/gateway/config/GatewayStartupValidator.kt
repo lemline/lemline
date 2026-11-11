@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.gateway.config
 
+import com.lemline.common.coroutines.ApplicationClassLoaderContext
 import com.lemline.runner.common.config.LEMLINE_GATEWAY_AUTHENTICATION_ENABLED
 import com.lemline.runner.common.config.LEMLINE_GATEWAY_AUTHENTICATION_JWT_ISSUER
 import com.lemline.runner.common.config.LEMLINE_GATEWAY_AUTHENTICATION_JWT_JWKS_URL
@@ -62,7 +63,7 @@ class GatewayStartupValidator(
             requireConfigured(config.gatewayAuthenticationJwtJwksUrl, LEMLINE_GATEWAY_AUTHENTICATION_JWT_JWKS_URL)
         }
 
-        runBlocking {
+        runBlocking(ApplicationClassLoaderContext()) {
             analyticsEventSource.validate()
         }
     }
