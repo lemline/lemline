@@ -16,10 +16,9 @@ import java.net.HttpURLConnection
 import java.net.URI
 import java.util.Base64
 import kotlin.test.assertEquals
-import kotlin.test.assertTrue
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
@@ -55,24 +54,32 @@ class RabbitConnectorShutdownTest {
     @Test
     fun `application shutdown closes broker connections before CDI destruction`() = runBlocking {
         try {
-            assertTrue(connections().isNotEmpty(), "Expected active RabbitMQ connections before shutdown")
+            // Connector startup and RabbitMQ management statistics are asynchronous.
+            // Observe all four incoming connections before exercising shutdown so an
+            // initially empty management response cannot make the test pass spuriously.
+            val incomingChannels = setOf("commands-in", "events-in", "cloudevents-in", "lifecycleevents-in")
+            awaitConnections("Expected all incoming RabbitMQ connections before shutdown") { connections ->
+                incomingChannels.all { channel -> connections.any { it.contains("$channel (Incoming)") } }
+            }
             // CDI and Vert.x remain available here. The ShutdownEvent must close native
             // connections now, rather than deferring them to CDI context destruction.
             shutdown.fire(ShutdownEvent())
-            var remaining = connections()
-            try {
-                withTimeout(10_000) {
-                    while (remaining.isNotEmpty()) {
-                        delay(100)
-                        remaining = connections()
-                    }
-                }
-            } finally {
-                assertTrue(remaining.isEmpty(), "RabbitMQ connections survived shutdown: $remaining")
-            }
+            awaitConnections("RabbitMQ connections survived shutdown") { it.isEmpty() }
         } finally {
             connector.terminate(null)
         }
+    }
+
+    private suspend fun awaitConnections(message: String, condition: (List<String>) -> Boolean) {
+        var observed = emptyList<String>()
+        val reached = withTimeoutOrNull(30_000) {
+            while (true) {
+                observed = connections()
+                if (condition(observed)) return@withTimeoutOrNull true
+                delay(100)
+            }
+        }
+        assertEquals(true, reached, "$message: $observed")
     }
 
     private fun connections(): List<String> {
