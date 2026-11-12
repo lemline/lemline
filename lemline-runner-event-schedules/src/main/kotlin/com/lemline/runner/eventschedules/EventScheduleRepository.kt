@@ -33,6 +33,8 @@ import com.lemline.runner.definitions.DefinitionModel
 import io.cloudevents.CloudEvent
 import java.security.MessageDigest
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import com.lemline.runner.listeners.CloudEventService
 
 const val EVENT_SCHEDULE_TABLE = "lemline_event_schedule_starts"
 
@@ -56,18 +58,16 @@ class EventScheduleRepository : CrudRepository<EventScheduleModel>(),
 
     override val tableName = EVENT_SCHEDULE_TABLE
 
-    /** Caller holds the definition row lock for the entire read/modify/write transaction. */
-    suspend fun loadState(definition: DefinitionModel, event: CloudEvent, conn: Connection): Pair<IDV7, EventScheduleState>? {
+    /** Prepare a definition's storage under its row lock; null means an already committed delivery. */
+    suspend fun loadState(definition: DefinitionModel, event: CloudEvent, conn: Connection): IDV7? {
         val hash = digest(definition.definition)
-        conn.prepareStatement(
-            """
+        conn.prepareStatement("""
             SELECT s.id, s.definition_hash, r.event_key,
                    CASE WHEN r.event_key IS NULL AND s.definition_hash = ? THEN s.collections END AS collections
             FROM lemline_event_schedule_state s
             LEFT JOIN lemline_event_schedule_receipts r ON r.state_id = s.id AND r.event_key = ?
             WHERE s.namespace = ? AND s.name = ? AND s.version = ?
-            """.trimIndent()
-        ).use { stmt ->
+        """.trimIndent()).use { stmt ->
             stmt.setString(1, hash)
             stmt.setString(2, eventKey(event))
             stmt.setString(3, definition.namespace.toString())
@@ -75,36 +75,135 @@ class EventScheduleRepository : CrudRepository<EventScheduleModel>(),
             stmt.setString(5, definition.version.toString())
             stmt.executeQuery().use { rs ->
                 if (rs.next()) {
-                    // Reject a replay before transferring or decoding the collection payload.
                     if (rs.getString("event_key") != null) return null
                     val id = getIDV7(rs, "id")!!
-                    if (rs.getString("definition_hash") == hash) {
-                        return id to Json.decodeFromString<EventScheduleState>(rs.getString("collections"))
+                    if (rs.getString("definition_hash") != hash) {
+                        conn.prepareStatement("DELETE FROM lemline_event_schedule_collections WHERE state_id = ?").use {
+                            setIDV7(it, 1, id)
+                            it.executeUpdate()
+                        }
+                        clearLegacyState(id, hash, conn)
+                    } else {
+                        rs.getString("collections")?.let { payload ->
+                            // One-time conversion, in the same transaction as processing the event.
+                            val legacy = Json.decodeFromString<LegacyEventScheduleState>(payload)
+                            legacy.groups.forEachIndexed { index, group ->
+                                val collection = EventScheduleCollection(
+                                    index = index.toLong(), correlations = group.correlations.toMutableMap(),
+                                    matched = group.matched.toMutableSet(), termination = group.termination.toMutableSet(),
+                                    eventCount = group.events.size.toLong(),
+                                )
+                                insertCollection(id, collection, conn)
+                                group.events.forEachIndexed { eventIndex, json ->
+                                    val stored = CloudEventService.deserialize(json)
+                                    insertEvent(collection.id, eventIndex.toLong(), stored.source.toString(), stored.id, json, conn)
+                                }
+                            }
+                            clearLegacyState(id, hash, conn)
+                        }
                     }
-                    // Do not combine events collected under different revisions of a forced update.
-                    conn.prepareStatement("UPDATE lemline_event_schedule_state SET definition_hash = ?, collections = ? WHERE id = ?").use {
-                        it.setString(1, hash)
-                        it.setString(2, Json.encodeToString(EventScheduleState()))
-                        setIDV7(it, 3, id)
-                        it.executeUpdate()
-                    }
-                    return id to EventScheduleState()
+                    return id
                 }
             }
         }
         val id = IDV7.random()
         conn.prepareStatement(
-            "INSERT INTO lemline_event_schedule_state (id, namespace, name, version, definition_hash, collections) VALUES (?, ?, ?, ?, ?, ?)"
+            "INSERT INTO lemline_event_schedule_state (id, namespace, name, version, definition_hash, collections) VALUES (?, ?, ?, ?, ?, NULL)"
         ).use {
             setIDV7(it, 1, id)
             it.setString(2, definition.namespace.toString())
             it.setString(3, definition.name.toString())
             it.setString(4, definition.version.toString())
             it.setString(5, hash)
-            it.setString(6, Json.encodeToString(EventScheduleState()))
             it.executeUpdate()
         }
-        return id to EventScheduleState()
+        return id
+    }
+
+    private fun clearLegacyState(id: IDV7, hash: String, conn: Connection) {
+        conn.prepareStatement("UPDATE lemline_event_schedule_state SET definition_hash = ?, collections = NULL WHERE id = ?").use {
+            it.setString(1, hash)
+            setIDV7(it, 2, id)
+            it.executeUpdate()
+        }
+    }
+
+    /** Candidate metadata only. Event envelopes are fetched only for evaluation or completion. */
+    suspend fun loadCollections(stateId: IDV7, conn: Connection): List<EventScheduleCollection> =
+        conn.prepareStatement("SELECT * FROM lemline_event_schedule_collections WHERE state_id = ? ORDER BY collection_index").use {
+            setIDV7(it, 1, stateId)
+            it.executeQuery().use { rs -> buildList {
+                while (rs.next()) add(EventScheduleCollection(
+                    id = getIDV7(rs, "id")!!, index = rs.getLong("collection_index"),
+                    correlations = Json.decodeFromString(rs.getString("correlations")),
+                    matched = Json.decodeFromString(rs.getString("matched_filters")),
+                    termination = Json.decodeFromString(rs.getString("until_filters")),
+                    eventCount = rs.getLong("event_count"),
+                ))
+            } }
+        }
+
+    suspend fun insertCollection(stateId: IDV7, group: EventScheduleCollection, conn: Connection) {
+        conn.prepareStatement("""
+            INSERT INTO lemline_event_schedule_collections
+                (id, state_id, collection_index, correlations, matched_filters, until_filters, event_count)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        """.trimIndent()).use {
+            setIDV7(it, 1, group.id)
+            setIDV7(it, 2, stateId)
+            it.setLong(3, group.index)
+            it.setString(4, Json.encodeToString(group.correlations))
+            it.setString(5, Json.encodeToString(group.matched))
+            it.setString(6, Json.encodeToString(group.termination))
+            it.setLong(7, group.eventCount)
+            it.executeUpdate()
+        }
+    }
+
+    suspend fun updateCollection(group: EventScheduleCollection, conn: Connection) {
+        conn.prepareStatement("""
+            UPDATE lemline_event_schedule_collections
+            SET correlations = ?, matched_filters = ?, until_filters = ?, event_count = ? WHERE id = ?
+        """.trimIndent()).use {
+            it.setString(1, Json.encodeToString(group.correlations))
+            it.setString(2, Json.encodeToString(group.matched))
+            it.setString(3, Json.encodeToString(group.termination))
+            it.setLong(4, group.eventCount)
+            setIDV7(it, 5, group.id)
+            it.executeUpdate()
+        }
+    }
+
+    suspend fun appendEvent(collectionId: IDV7, index: Long, event: CloudEvent, conn: Connection) =
+        insertEvent(collectionId, index, event.source.toString(), event.id, CloudEventService.serialize(event), conn)
+
+    private fun insertEvent(collectionId: IDV7, index: Long, source: String, eventId: String, json: String, conn: Connection) {
+        conn.prepareStatement("""
+            INSERT INTO lemline_event_schedule_events (collection_id, event_index, event_source, event_id, event)
+            VALUES (?, ?, ?, ?, ?)
+        """.trimIndent()).use {
+            setIDV7(it, 1, collectionId)
+            it.setLong(2, index)
+            it.setString(3, source)
+            it.setString(4, eventId)
+            it.setString(5, json)
+            it.executeUpdate()
+        }
+    }
+
+    suspend fun collectionInput(collectionId: IDV7, conn: Connection): JsonArray =
+        conn.prepareStatement("SELECT event FROM lemline_event_schedule_events WHERE collection_id = ? ORDER BY event_index").use {
+            setIDV7(it, 1, collectionId)
+            it.executeQuery().use { rs -> JsonArray(buildList {
+                while (rs.next()) add(CloudEventService.parseEnvelope(CloudEventService.deserialize(rs.getString("event"))))
+            }) }
+        }
+
+    suspend fun deleteCollection(collectionId: IDV7, conn: Connection) {
+        conn.prepareStatement("DELETE FROM lemline_event_schedule_collections WHERE id = ?").use {
+            setIDV7(it, 1, collectionId)
+            it.executeUpdate()
+        }
     }
 
     /** Called after loadState rejects duplicates, under the same definition lock. */
@@ -119,14 +218,6 @@ class EventScheduleRepository : CrudRepository<EventScheduleModel>(),
 
     private fun eventKey(event: CloudEvent): String =
         digest("${event.source.toString().length}:${event.source}${event.id}")
-
-    suspend fun saveState(stateId: IDV7, state: EventScheduleState, conn: Connection) {
-        conn.prepareStatement("UPDATE lemline_event_schedule_state SET collections = ? WHERE id = ?").use {
-            it.setString(1, Json.encodeToString(state))
-            setIDV7(it, 2, stateId)
-            it.executeUpdate()
-        }
-    }
 
     private fun digest(value: String): String =
         MessageDigest.getInstance("SHA-256").digest(value.toByteArray(Charsets.UTF_8)).joinToString("") { "%02x".format(it) }

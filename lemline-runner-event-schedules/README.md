@@ -79,8 +79,44 @@ Incomplete collections have no automatic expiry. Event receipts remain until the
 deleted, independently of completed-start cleanup, so delayed redelivery remains deduplicated.
 Plan storage for long-lived, high-volume definitions and collections whose conditions never complete.
 
-The collection lookup joins the receipt identity before returning the collection
-payload. Committed redeliveries therefore skip payload transfer, JSON decoding
-and matching, while the definition row lock preserves transactional ordering.
-New events still deserialize and rewrite the complete per-definition collection
-state; very large incomplete collections remain a storage and serialization cost.
+### Collection storage and upgrades
+
+The durable model mirrors listen subscriptions without sharing their tables:
+
+- `lemline_event_schedule_state`: definition identity and revision, owning the receipts.
+- `lemline_event_schedule_collections`: one pending collection per row, with its FIFO
+  position, correlations, matched filters, termination progress and event count.
+- `lemline_event_schedule_events`: ordered CloudEvent rows belonging to a collection.
+- `lemline_event_schedule_receipts`: definition-scoped source + id deduplication.
+- `lemline_event_schedule_starts`: durable commands for completed collections.
+
+The definition row lock still serializes processing. Receipt insertion, event appends,
+affected collection updates/deletes and start commands commit together. A failed
+transaction restores completed collections and their events as well as receipts.
+Completion deletes the collection and cascades to its events; receipt retention is
+unchanged. Definition deletion cascades to all pending collections, events and receipts.
+
+Matching loads collection metadata in FIFO order, without loading event envelopes.
+Only affected collections are updated. Envelopes are read for the affected collection
+when evaluating an arbitrary until expression or assembling a completed workflow input.
+A termination event may complete multiple collections in the same transaction.
+Committed redeliveries are rejected before collection metadata or envelopes are loaded.
+
+V906 adds the collection/event tables and makes the old `collections` payload nullable.
+For an existing definition, the first nonduplicate event converts its legacy payload
+under the definition lock, preserving collection order, correlation, event order and
+until progress. Conversion clears that payload only in the same successful transaction;
+a failed delivery rolls conversion back and can safely retry. New definitions never
+write a global collection JSON. A changed definition discards both legacy and normalized
+pending state before consuming new events, while retaining its delivery receipts.
+
+Stop/drain old consuming workers before running the new workers. Mixed old/new writers
+are not supported: older versions still interpret the global payload. The first conversion
+can be expensive for a large existing payload; subsequent processing never rewrites it.
+The legacy column remains only for this compatibility path and can be removed by a later
+migration after every retained definition has been converted.
+
+Tradeoffs: additional rows, indexes and SQL statements, and metadata matching still scales
+with the number of pending collections. Complete payloads are read only when semantics
+require them; expression evaluation and large completed inputs can still be expensive.
+Collection expiry and receipt retention remain unchanged and unbounded for active definitions.

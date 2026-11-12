@@ -32,7 +32,11 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
+import com.lemline.runner.common.repositories.helpers.IdV7Helper
+import com.lemline.runner.listeners.CloudEventService
+import java.security.MessageDigest
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -83,6 +87,210 @@ abstract class EventScheduleServiceTestBase {
     private suspend fun starts() = repository.listAll().filter { it.workflowInfo.namespace == namespace }
     private fun EventScheduleModel.input() = instanceMessage.workflowState.nodeStack.rootState.workflowInput as JsonArray
     private fun EventScheduleModel.eventIds() = input().map { it.jsonObject.getValue("id").jsonPrimitive.content }
+
+    private suspend fun stateId(): IDV7 = db.withConnection { conn ->
+        conn.prepareStatement("SELECT id FROM lemline_event_schedule_state WHERE namespace = ?").use {
+            it.setString(1, namespace.toString())
+            it.executeQuery().use { rs -> check(rs.next()); IdV7Helper(db.dbType).get(rs, "id")!! }
+        }
+    }
+
+    private suspend fun collections(): List<EventScheduleCollection> {
+        val id = stateId()
+        return db.withConnection { repository.loadCollections(id, it) }
+    }
+
+    private suspend fun collectionEventIds(group: EventScheduleCollection): List<String> = db.withConnection {
+        repository.collectionInput(group.id, it).map { input -> input.jsonObject.getValue("id").jsonPrimitive.content }
+    }
+
+    private suspend fun legacyPayload(): String? = db.withConnection { conn ->
+        conn.prepareStatement("SELECT collections FROM lemline_event_schedule_state WHERE namespace = ?").use {
+            it.setString(1, namespace.toString())
+            it.executeQuery().use { rs -> check(rs.next()); rs.getString(1) }
+        }
+    }
+
+    private suspend fun seedLegacy(definition: DefinitionModel, groups: List<LegacyEventScheduleGroup>, received: List<io.cloudevents.CloudEvent>): String {
+        val payload = Json.encodeToString(LegacyEventScheduleState(groups))
+        val hash = MessageDigest.getInstance("SHA-256").digest(definition.definition.toByteArray()).joinToString("") { "%02x".format(it) }
+        db.withTransaction { conn ->
+            val id = IDV7.random()
+            conn.prepareStatement("INSERT INTO lemline_event_schedule_state (id, namespace, name, version, definition_hash, collections) VALUES (?, ?, ?, ?, ?, ?)").use {
+                IdV7Helper(db.dbType).set(it, 1, id)
+                it.setString(2, namespace.toString())
+                it.setString(3, definition.name.toString())
+                it.setString(4, definition.version.toString())
+                it.setString(5, hash)
+                it.setString(6, payload)
+                it.executeUpdate()
+            }
+            for (event in received) repository.recordEvent(id, event, conn)
+        }
+        return payload
+    }
+
+    @Test
+    fun `partial delivery changes only its collection without reading event history`() = runTest {
+        define("all:\n  - with: { type: a }\n  - with: { type: b }\n  - with: { type: c }")
+        service().handleCloudEvent(event("a", "a1"), namespace) shouldBe 0
+        service().handleCloudEvent(event("a", "a2"), namespace) shouldBe 0
+        val before = collections()
+        before.size shouldBe 2
+        val repo = spyk(repository)
+        service(repo).handleCloudEvent(event("b", "b1"), namespace) shouldBe 0
+        before.forEach { group -> coVerify(exactly = 0) { repo.collectionInput(group.id, any()) } }
+        coVerify(exactly = 1) { repo.updateCollection(match { it.id == before.first().id }, any()) }
+        val after = collections()
+        after[1] shouldBe before[1]
+        after[0].eventCount shouldBe 2
+        collectionEventIds(after[0]) shouldBe listOf("a1", "b1")
+        collectionEventIds(after[1]) shouldBe listOf("a2")
+        legacyPayload() shouldBe null
+    }
+
+    @Test
+    fun `termination completes multiple collections and removes their event rows atomically`() = runTest {
+        define("""
+            any:
+              - with: { type: a }
+                correlate:
+                  key: { from: '${'$'}{ .key }' }
+            until:
+              one:
+                with: { type: stop }
+        """.trimIndent())
+        service().handleCloudEvent(event("a", "one", key = "one"), namespace) shouldBe 0
+        service().handleCloudEvent(event("a", "two", key = "two"), namespace) shouldBe 0
+        val previous = collections()
+        previous.size shouldBe 2
+        val stop = event("stop")
+        service().handleCloudEvent(stop, namespace) shouldBe 2
+        collections().size shouldBe 0
+        previous.forEach { collectionEventIds(it) shouldBe emptyList() }
+        service().handleCloudEvent(stop, namespace) shouldBe 0
+        starts().map { it.eventIds() }.toSet() shouldBe setOf(listOf("one"), listOf("two"))
+    }
+
+    @Test
+    fun `concurrent distinct events complete one collection`() = runTest {
+        define("all:\n  - with: { type: a }\n  - with: { type: b }")
+        listOf(event("a", "a"), event("b", "b")).map { value ->
+            async(Dispatchers.IO) { service().handleCloudEvent(value, namespace) }
+        }.awaitAll().sum() shouldBe 1
+        starts().single().eventIds().toSet() shouldBe setOf("a", "b")
+        collections().size shouldBe 0
+    }
+
+    @Test
+    fun `failed progress update rolls back event append and allows retry`() = runTest {
+        define("all:\n  - with: { type: a }\n  - with: { type: b }\n  - with: { type: c }")
+        service().handleCloudEvent(event("a", "a"), namespace) shouldBe 0
+        val before = collections()
+        val repo = spyk(repository)
+        coEvery { repo.updateCollection(any(), any()) } throws IllegalStateException("progress failure")
+        val b = event("b", "b")
+        shouldThrow<IllegalStateException> { service(repo).handleCloudEvent(b, namespace) }
+        collections() shouldBe before
+        collectionEventIds(before.single()) shouldBe listOf("a")
+        service().handleCloudEvent(b, namespace) shouldBe 0
+        service().handleCloudEvent(event("c", "c"), namespace) shouldBe 1
+        starts().single().eventIds() shouldBe listOf("a", "b", "c")
+    }
+
+    @Test
+    fun `failed start restores completed collection and its events`() = runTest {
+        define("all:\n  - with: { type: a }\n  - with: { type: b }")
+        service().handleCloudEvent(event("a", "a"), namespace) shouldBe 0
+        val before = collections()
+        val repo = spyk(repository)
+        coEvery { repo.insert(any<EventScheduleModel>(), any()) } throws IllegalStateException("start failure")
+        val b = event("b", "b")
+        shouldThrow<IllegalStateException> { service(repo).handleCloudEvent(b, namespace) }
+        collections() shouldBe before
+        collectionEventIds(before.single()) shouldBe listOf("a")
+        service().handleCloudEvent(b, namespace) shouldBe 1
+        starts().single().eventIds() shouldBe listOf("a", "b")
+    }
+
+    @Test
+    fun `legacy collections migrate in FIFO order and retain delivery receipts`() = runTest {
+        val definition = define("all:\n  - with: { type: a }\n  - with: { type: b }")
+        val a1 = event("a", "a1")
+        val a2 = event("a", "a2")
+        seedLegacy(definition, listOf(
+            LegacyEventScheduleGroup(events = listOf(CloudEventService.serialize(a1)), matched = setOf(0)),
+            LegacyEventScheduleGroup(events = listOf(CloudEventService.serialize(a2)), matched = setOf(0)),
+        ), listOf(a1, a2))
+        service().handleCloudEvent(event("b", "b1"), namespace) shouldBe 1
+        legacyPayload() shouldBe null
+        collectionEventIds(collections().single()) shouldBe listOf("a2")
+        service().handleCloudEvent(a1, namespace) shouldBe 0
+        service().handleCloudEvent(a2, namespace) shouldBe 0
+        collections().size shouldBe 1
+        service().handleCloudEvent(event("b", "b2"), namespace) shouldBe 1
+        starts().map { it.eventIds() }.toSet() shouldBe setOf(listOf("a1", "b1"), listOf("a2", "b2"))
+    }
+
+    @Test
+    fun `legacy conversion rollback preserves until progress and retries without duplicates`() = runTest {
+        val definition = define("any:\n  - with: { type: a }\nuntil:\n  all:\n    - with: { type: stop1 }\n    - with: { type: stop2 }")
+        val a = event("a", "a")
+        val stop1 = event("stop1")
+        val payload = seedLegacy(definition, listOf(LegacyEventScheduleGroup(
+            events = listOf(CloudEventService.serialize(a)), matched = setOf(0), termination = setOf(0)
+        )), listOf(a, stop1))
+        val repo = spyk(repository)
+        coEvery { repo.insert(any<EventScheduleModel>(), any()) } throws IllegalStateException("start failure")
+        val stop2 = event("stop2")
+        shouldThrow<IllegalStateException> { service(repo).handleCloudEvent(stop2, namespace) }
+        legacyPayload() shouldBe payload
+        collections().size shouldBe 0
+        starts().size shouldBe 0
+        service().handleCloudEvent(stop2, namespace) shouldBe 1
+        legacyPayload() shouldBe null
+        starts().single().eventIds() shouldBe listOf("a")
+        service().handleCloudEvent(stop2, namespace) shouldBe 0
+    }
+
+    @Test
+    fun `legacy migration preserves correlation values`() = runTest {
+        val definition = define("""
+            all:
+              - with: { type: a }
+                correlate:
+                  key: { from: '${'$'}{ .key }' }
+              - with: { type: b }
+                correlate:
+                  key: { from: '${'$'}{ .key }' }
+        """.trimIndent())
+        val a = event("a", "old", key = "legacy🚀")
+        seedLegacy(definition, listOf(LegacyEventScheduleGroup(
+            correlations = mapOf("key" to "legacy🚀"), events = listOf(CloudEventService.serialize(a)), matched = setOf(0)
+        )), listOf(a))
+        service().handleCloudEvent(event("b", "other", key = "other"), namespace) shouldBe 0
+        collections().first().correlations shouldBe mapOf("key" to "legacy🚀")
+        service().handleCloudEvent(event("b", "matching", key = "legacy🚀"), namespace) shouldBe 1
+        starts().single().eventIds() shouldBe listOf("old", "matching")
+    }
+
+    @Test
+    fun `definition deletion cascades to open collections events and receipts`() = runTest {
+        val definition = define("all:\n  - with: { type: a }\n  - with: { type: b }")
+        service().handleCloudEvent(event("a"), namespace) shouldBe 0
+        val id = stateId()
+        val previous = collections()
+        previous.size shouldBe 1
+        definitions.delete(definition) shouldBe 1
+        db.withConnection { conn ->
+            repository.loadCollections(id, conn).size shouldBe 0
+            repository.collectionInput(previous.single().id, conn).size shouldBe 0
+            conn.prepareStatement("SELECT COUNT(*) FROM lemline_event_schedule_receipts WHERE state_id = ?").use {
+                IdV7Helper(db.dbType).set(it, 1, id)
+                it.executeQuery().use { rs -> rs.next(); rs.getInt(1) shouldBe 0 }
+            }
+        }
+    }
 
     @Test
     fun `routing reads only matching candidates and rechecks stale positives`() = runTest {
