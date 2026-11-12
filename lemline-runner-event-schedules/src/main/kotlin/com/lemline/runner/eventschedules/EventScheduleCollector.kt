@@ -11,9 +11,23 @@ import kotlinx.serialization.json.JsonArray
 
 /** Mutates only affected collections; the caller owns the definition lock and transaction. */
 class EventScheduleCollector(private val repository: EventScheduleRepository) {
+    private fun queryKeys(strategy: CachedEventConsumption, event: CloudEvent, termination: Boolean = false): List<EventScheduleQueryKey> {
+        if (strategy.wildcard) return listOf(EventScheduleQueryKey(emptyMap()))
+        return strategy.filters.mapIndexedNotNull { index, filter ->
+            val correlations = mutableMapOf<String, String>()
+            if (!filter.matches(event, correlations)) null else EventScheduleQueryKey(
+                correlations,
+                availableFilter = index.takeIf { !termination && strategy.strategy == ListenStrategy.ALL },
+            )
+        }
+    }
+
     suspend fun consume(stateId: IDV7, strategy: CachedEventConsumption, event: CloudEvent, conn: Connection): EventScheduleConsumption {
-        val groups = repository.loadCollections(stateId, conn).toMutableList()
-        var nextIndex = (groups.maxOfOrNull { it.index } ?: -1L) + 1
+        val keys = queryKeys(strategy, event) + strategy.untilEvents?.let { queryKeys(it, event, termination = true) }.orEmpty()
+        if (keys.isEmpty()) return EventScheduleConsumption(false, emptyList())
+        val groups = repository.findCandidateCollections(stateId, keys.distinct(), conn).toMutableList()
+        // Candidate filtering can omit the newest collection; allocate against all rows under the lock.
+        var nextIndex = repository.nextCollectionIndex(stateId, conn)
         val dirty = mutableSetOf<IDV7>()
         val completed = mutableListOf<JsonArray>()
         var matchedEvent = false

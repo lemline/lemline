@@ -131,6 +131,112 @@ abstract class EventScheduleServiceTestBase {
     }
 
     @Test
+    fun `SQL preselection preserves partial correlations and unions main and until candidates`() = runTest {
+        define("one:\n  with: { type: a }")
+        service().handleCloudEvent(event(), namespace) shouldBe 1
+        val state = stateId()
+        val rows = listOf(
+            EventScheduleCollection(index = 0),
+            EventScheduleCollection(index = 1, correlations = mutableMapOf("tenant" to "x")),
+            EventScheduleCollection(index = 2, correlations = mutableMapOf("tenant" to "x", "order" to "1")),
+            EventScheduleCollection(index = 3, correlations = mutableMapOf("tenant" to "y")),
+            EventScheduleCollection(index = 4, correlations = mutableMapOf("tenant" to "x"), matched = mutableSetOf(1)),
+            EventScheduleCollection(index = 5, correlations = mutableMapOf("tenant" to "x"), matched = mutableSetOf(11)),
+        )
+        db.withTransaction { conn ->
+            rows.forEach { repository.insertCollection(state, it, conn) }
+            val main = EventScheduleQueryKey(mapOf("tenant" to "x", "order" to "1"), availableFilter = 1)
+            repository.findCandidateCollections(state, listOf(main), conn).map { it.index } shouldBe listOf(0L, 1L, 2L, 5L)
+            val until = EventScheduleQueryKey(mapOf("tenant" to "y"))
+            repository.findCandidateCollections(state, listOf(main, until), conn).map { it.index } shouldBe listOf(0L, 1L, 2L, 3L, 5L)
+            repository.findCandidateCollections(state, emptyList(), conn) shouldBe emptyList()
+            repository.findCandidateCollections(state, listOf(EventScheduleQueryKey(emptyMap())), conn).size shouldBe 6
+        }
+    }
+
+    @Test
+    fun `SQL correlation tokens preserve exact keys values and escaping`() = runTest {
+        define("one:\n  with: { type: a }")
+        service().handleCloudEvent(event(), namespace) shouldBe 1
+        val state = stateId()
+        val names = listOf("key", "Key", "kéy", "", "_%!", "quote\"", "slash\\", "🚀", "x\":\"y", "a,b}")
+        val values = names + listOf("x", "X", "x ", "é", "e\u0301", "line\nfeed", "{\"key\":\"wrong\"}")
+        db.withTransaction { conn ->
+            var position = 0L
+            for (name in names) {
+                val rows = values.map { value ->
+                    EventScheduleCollection(index = position++, correlations = mutableMapOf("other" to "v", name to value)).also {
+                        repository.insertCollection(state, it, conn)
+                    }
+                }
+                for ((index, value) in values.withIndex()) {
+                    val candidates = repository.findCandidateCollections(state, listOf(EventScheduleQueryKey(mapOf(name to value))), conn)
+                    candidates.filter { name in it.correlations }.map { it.id } shouldBe listOf(rows[index].id)
+                    // Other keys, even those differing only in case/accent, must remain eligible.
+                    candidates.count { name !in it.correlations } shouldBe (position - rows.size).toInt()
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `preselection keeps FIFO partial correlations and allocates after excluded collections`() = runTest {
+        define("""
+            all:
+              - with: { type: a }
+                correlate:
+                  tenant: { from: '${'$'}{ .key }' }
+              - with: { type: b }
+                correlate:
+                  order: { from: '${'$'}{ .key }' }
+              - with: { type: c }
+                correlate:
+                  tenant: { from: '${'$'}{ .key }' }
+        """.trimIndent())
+        service().handleCloudEvent(event("a", "a1", key = "x"), namespace) shouldBe 0
+        service().handleCloudEvent(event("a", "a2", key = "y"), namespace) shouldBe 0
+        val repo = spyk(repository)
+        service(repo).handleCloudEvent(event("b", "b1", key = "order"), namespace) shouldBe 0
+        val state = stateId()
+        coVerify(exactly = 0) { repo.loadCollections(state, any()) }
+        collections().first().correlations shouldBe mapOf("tenant" to "x", "order" to "order")
+        // The only selected x collection has its a slot filled. Allocate beyond the excluded y row.
+        service().handleCloudEvent(event("a", "a3", key = "x"), namespace) shouldBe 0
+        collections().map { it.index } shouldBe listOf(0L, 1L, 2L)
+        service().handleCloudEvent(event("c", "c1", key = "x"), namespace) shouldBe 1
+        starts().single().eventIds() shouldBe listOf("a1", "b1", "c1")
+        service().handleCloudEvent(event("c", "c1", key = "x"), namespace) shouldBe 0
+        collections().map { it.eventCount } shouldBe listOf(1L, 1L)
+    }
+
+    @Test
+    fun `correlated termination selects all compatible collections and preserves unrelated progress`() = runTest {
+        define("""
+            any:
+              - with: { type: a }
+                correlate:
+                  tenant: { from: '${'$'}{ .key }' }
+            until:
+              all:
+                - with: { type: stop1 }
+                  correlate:
+                    tenant: { from: '${'$'}{ .key }' }
+                - with: { type: stop2 }
+                  correlate:
+                    tenant: { from: '${'$'}{ .key }' }
+        """.trimIndent())
+        service().handleCloudEvent(event("a", "x", key = "x"), namespace) shouldBe 0
+        service().handleCloudEvent(event("a", "y", key = "y"), namespace) shouldBe 0
+        service().handleCloudEvent(event("stop1", "s1", key = "x"), namespace) shouldBe 0
+        collections().map { it.termination } shouldBe listOf(setOf(0), emptySet())
+        service().handleCloudEvent(event("stop1", "s1", key = "x"), namespace) shouldBe 0
+        service().handleCloudEvent(event("stop2", "s2", key = "x"), namespace) shouldBe 1
+        starts().single().eventIds() shouldBe listOf("x")
+        collections().single().correlations shouldBe mapOf("tenant" to "y")
+        collections().single().termination shouldBe emptySet()
+    }
+
+    @Test
     fun `partial delivery changes only its collection without reading event history`() = runTest {
         define("all:\n  - with: { type: a }\n  - with: { type: b }\n  - with: { type: c }")
         service().handleCloudEvent(event("a", "a1"), namespace) shouldBe 0

@@ -96,7 +96,22 @@ transaction restores completed collections and their events as well as receipts.
 Completion deletes the collection and cascades to its events; receipt retention is
 unchanged. Definition deletion cascades to all pending collections, events and receipts.
 
-Matching loads collection metadata in FIFO order, without loading event envelopes.
+Like listen routing, matching first derives query keys from cached filters and the incoming
+event, then selects compatible collection metadata in SQL, in FIFO order. A correlation
+key absent from a collection remains eligible; only established conflicting values exclude
+it. Main ALL filters also exclude collections whose matching slot is already filled.
+Main and termination candidates are unioned, and the shared matcher rechecks them under
+the definition lock. Termination may select multiple collections. No envelopes are loaded
+by this preselection.
+
+The portable SQL predicates inspect compact serialized correlation properties and filter
+indices; every writer, including legacy conversion, uses the same JSON serialization.
+Bound LIKE patterns escape JSON text and SQL wildcards independently, with binary matching
+on MySQL to avoid collation-dependent key comparisons. This reduces transferred metadata
+and application matching, but correlation predicates are not index seeks. The existing
+state/order index bounds the scan to one definition. Broad or uncorrelated matches may
+still return every pending collection. A separate indexed last-position lookup preserves
+FIFO allocation even when preselection excludes the newest collection.
 Only affected collections are updated. Envelopes are read for the affected collection
 when evaluating an arbitrary until expression or assembling a completed workflow input.
 A termination event may complete multiple collections in the same transaction.
@@ -116,7 +131,7 @@ can be expensive for a large existing payload; subsequent processing never rewri
 The legacy column remains only for this compatibility path and can be removed by a later
 migration after every retained definition has been converted.
 
-Tradeoffs: additional rows, indexes and SQL statements, and metadata matching still scales
-with the number of pending collections. Complete payloads are read only when semantics
+Tradeoffs: additional rows, indexes and SQL statements; SQL correlation filtering still
+scans pending metadata within a definition, while only candidates reach the worker. Complete payloads are read only when semantics
 require them; expression evaluation and large completed inputs can still be expensive.
 Collection expiry and receipt retention remain unchanged and unbounded for active definitions.

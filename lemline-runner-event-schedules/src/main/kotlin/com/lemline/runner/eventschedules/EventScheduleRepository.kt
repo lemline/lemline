@@ -3,6 +3,7 @@ package com.lemline.runner.eventschedules
 
 import com.lemline.common.values.IDV7
 import com.lemline.core.states.WorkflowCommand
+import com.lemline.runner.common.config.DatabaseType
 import com.lemline.runner.common.config.DatabaseConfig
 import com.lemline.runner.common.namespaces.NamespaceScope
 import com.lemline.runner.common.repositories.helpers.ColumnBindings
@@ -133,15 +134,63 @@ class EventScheduleRepository : CrudRepository<EventScheduleModel>(),
         conn.prepareStatement("SELECT * FROM lemline_event_schedule_collections WHERE state_id = ? ORDER BY collection_index").use {
             setIDV7(it, 1, stateId)
             it.executeQuery().use { rs -> buildList {
-                while (rs.next()) add(EventScheduleCollection(
-                    id = getIDV7(rs, "id")!!, index = rs.getLong("collection_index"),
-                    correlations = Json.decodeFromString(rs.getString("correlations")),
-                    matched = Json.decodeFromString(rs.getString("matched_filters")),
-                    termination = Json.decodeFromString(rs.getString("until_filters")),
-                    eventCount = rs.getLong("event_count"),
-                ))
+                while (rs.next()) add(readCollection(rs))
             } }
         }
+
+    /** SQL preselection only; the shared matcher remains authoritative under the definition lock. */
+    suspend fun findCandidateCollections(
+        stateId: IDV7, keys: List<EventScheduleQueryKey>, conn: Connection,
+    ): List<EventScheduleCollection> {
+        if (keys.isEmpty()) return emptyList()
+        val parameters = mutableListOf<String>()
+        // MySQL text collations may equate distinct correlation keys. Match serialized tokens exactly.
+        val correlations = if (databaseConfig.dbType == DatabaseType.MYSQL) "CAST(correlations AS BINARY)" else "correlations"
+        val conditions = keys.map { key ->
+            val parts = key.correlations.map { (name, value) ->
+                val property = Json.encodeToString(name) + ":"
+                val pair = property + Json.encodeToString(value)
+                parameters.addAll(listOf(
+                    likeLiteral("{" + property) + "%", "%" + likeLiteral("," + property) + "%",
+                    "%" + likeLiteral(pair + ",") + "%", "%" + likeLiteral(pair + "}"),
+                ))
+                "(($correlations NOT LIKE ? ESCAPE '!' AND $correlations NOT LIKE ? ESCAPE '!')" +
+                    " OR $correlations LIKE ? ESCAPE '!' OR $correlations LIKE ? ESCAPE '!')"
+            }.toMutableList()
+            key.availableFilter?.let { index ->
+                parameters.add("%,$index,%")
+                parts.add("REPLACE(REPLACE(matched_filters, '[', ','), ']', ',') NOT LIKE ?")
+            }
+            if (parts.isEmpty()) "1 = 1" else parts.joinToString(" AND ", "(", ")")
+        }
+        val sql = "SELECT * FROM lemline_event_schedule_collections WHERE state_id = ? AND (" +
+            conditions.joinToString(" OR ") + ") ORDER BY collection_index"
+        return conn.prepareStatement(sql).use { stmt ->
+            setIDV7(stmt, 1, stateId)
+            parameters.forEachIndexed { index, value -> stmt.setString(index + 2, value) }
+            stmt.executeQuery().use { rs -> buildList {
+                while (rs.next()) add(readCollection(rs))
+            } }
+        }
+    }
+
+    // All writers (including legacy conversion) use compact Json.encodeToString maps/sets.
+    // Escape SQL wildcards separately from JSON escaping; values are always bound parameters.
+    private fun likeLiteral(value: String): String = value.replace("!", "!!").replace("%", "!%").replace("_", "!_")
+
+    suspend fun nextCollectionIndex(stateId: IDV7, conn: Connection): Long =
+        conn.prepareStatement("SELECT collection_index FROM lemline_event_schedule_collections WHERE state_id = ? ORDER BY collection_index DESC LIMIT 1").use {
+            setIDV7(it, 1, stateId)
+            it.executeQuery().use { rs -> if (rs.next()) rs.getLong(1) + 1 else 0 }
+        }
+
+    private fun readCollection(rs: ResultSet) = EventScheduleCollection(
+        id = getIDV7(rs, "id")!!, index = rs.getLong("collection_index"),
+        correlations = Json.decodeFromString(rs.getString("correlations")),
+        matched = Json.decodeFromString(rs.getString("matched_filters")),
+        termination = Json.decodeFromString(rs.getString("until_filters")),
+        eventCount = rs.getLong("event_count"),
+    )
 
     suspend fun insertCollection(stateId: IDV7, group: EventScheduleCollection, conn: Connection) {
         conn.prepareStatement("""
