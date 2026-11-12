@@ -4,8 +4,8 @@ Durable event-triggered workflow starts for `schedule.on`.
 
 ## Event-triggered workflows
 
-Posting a definition with `schedule.on` activates its trigger. No manual start or cache warmup is
-required. Publish a CloudEvent to the definition namespace's CloudEvents destination:
+Posting a definition with `schedule.on` activates its trigger locally. Other workers discover it
+on the next definition-cache synchronization (default: 10 seconds). No manual start is required. Publish a CloudEvent to the definition namespace's CloudEvents destination:
 
 ```yaml
 document:
@@ -43,7 +43,8 @@ that the workflow starts automatically from matching CloudEvents.
 
 ### Durability and lifecycle
 
-`EventScheduleService` reads persisted definitions, then locks each definition while updating its
+`EventScheduleService` selects candidates from the definition cache using the same parsed filters
+and matcher as `listen`. It reads and locks only matching candidate definitions while updating their
 collections, recording the CloudEvent `source + id`, and inserting a start into
 `lemline_event_schedule_starts`. All three changes commit together. Multiple workers and broker
 redelivery cannot create another start for the same event and definition. The outbox uses the
@@ -53,16 +54,27 @@ input is logged and consumed without creating an instance; the collection rearms
 receipts remain deduplicated. Other failures roll back so broker retries can recover.
 
 Forced definition changes discard incomplete collections on the next event; deletion cascades
-to collection state and receipts. Already accepted starts remain durable. Trigger lookup uses
-the database so a deleted or changed trigger cannot linger in another worker's cache.
+to collection state and receipts. Already accepted starts remain durable. Each candidate is rechecked against its locked database definition, so stale positive matches
+cannot start a workflow using an obsolete trigger.
 
 The relay and start cleaner use the existing listener outbox/cleanup settings and namespace scope.
 Migrations are provided for PostgreSQL, MySQL, and H2.
 
 ### Operational tradeoffs
 
-Processing serializes per definition and reads definitions from the database on each event.
-This favors correctness during updates and concurrent delivery over maximum trigger throughput.
+The shared definition cache publishes workflow nodes, listen filters and schedule filters atomically.
+The first CloudEvent waits for the initial catalog load; a failed load fails processing for retry.
+Periodic reconciliation adds, updates and removes definitions, reusing unchanged parsed entries.
+If a local cache write overlaps a catalog query, synchronization discards that snapshot and retries.
+Local definition deletion invalidates after commit; caller-owned transactions rely on periodic
+reconciliation after the caller commits. Synthetic descendants are evicted when their parent changes or is deleted; unrelated synthetic
+workflows remain outside catalog ownership. Function node trees also check the supplied task identity.
+
+Processing serializes per candidate definition. Nonmatching events perform no schedule database reads.
+Catalog scans occur only at initialization and during periodic synchronization, not on each event.
+A new or changed trigger published by another process can miss events until the next successful sync;
+those events are not replayed automatically. The locked candidate recheck prevents stale positive
+matches, but cannot discover a newly matching filter absent from the cache.
 Incomplete collections have no automatic expiry. Event receipts remain until the definition is
 deleted, independently of completed-start cleanup, so delayed redelivery remains deduplicated.
 Plan storage for long-lived, high-volume definitions and collections whose conditions never complete.

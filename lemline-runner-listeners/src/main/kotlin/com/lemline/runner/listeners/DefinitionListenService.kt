@@ -9,6 +9,7 @@ import com.lemline.common.values.WorkflowNamespace
 import com.lemline.common.values.WorkflowVersion
 import com.lemline.core.cloudevents.CloudEventMatcher
 import com.lemline.core.processors.EventFilter
+import com.lemline.core.workflows.CachedEventSchedule
 import com.lemline.core.workflows.CachedListenTask
 import com.lemline.core.workflows.WorkflowCache
 import io.cloudevents.CloudEvent
@@ -148,13 +149,13 @@ class DefinitionListenService {
                 )
             } else {
                 listenTask.filters.mapIndexedNotNull { index, filter ->
-                    if (!CloudEventMatcher.matchesFilters(event, listOf(filter)) { eventData }) {
+                    if (!filter.matches(event) { eventData }) {
                         return@mapIndexedNotNull null
                     }
 
                     MatchingListenTask(
                         listenTask = listenTask,
-                        correlationValuesJson = extractCorrelationJson(filter, eventData),
+                        correlationValuesJson = extractCorrelationJson(filter.standard, eventData),
                         filterIndex = index
                     )
                 }
@@ -170,12 +171,23 @@ class DefinitionListenService {
 
         val matches = WorkflowCache.getAllListenTasks().mapNotNull { listenTask ->
             val terminationFilter = listenTask.untilEventFilter ?: return@mapNotNull null
-            if (!CloudEventMatcher.matchesFilters(event, listOf(terminationFilter))) return@mapNotNull null
+            if (!terminationFilter.matches(event)) return@mapNotNull null
             MatchingListenTaskUntilEvent(listenTask = listenTask)
         }
 
         logger.debug { "Found ${matches.size} matching listen tasks 'until' event $event" }
         return matches
+    }
+
+    /** Route definitions only; durable correlation and completion are checked under the definition lock. */
+    fun findMatchingEventSchedules(event: CloudEvent, namespace: WorkflowNamespace): List<CachedEventSchedule> {
+        val data by lazy { CloudEventService.parseData(event) }
+        return WorkflowCache.getEventSchedules(namespace).filter { candidate ->
+            val main = candidate.consumption
+            val until = main.untilEvents
+            main.wildcard || main.filters.any { it.matches(event) { data } } ||
+                (until != null && (until.wildcard || until.filters.any { it.matches(event) { data } }))
+        }
     }
 
     private fun extractCorrelationJson(filter: EventFilter, eventData: JsonElement): String? =

@@ -55,7 +55,9 @@ object FunctionCache {
         val functionRef: String
     )
 
-    private val nodesMapCache = ConcurrentHashMap<FunctionKey, Map<NodePosition, Node<*>>>()
+    private data class Entry(val task: Task, val nodes: Map<NodePosition, Node<*>>)
+
+    private val nodesMapCache = ConcurrentHashMap<FunctionKey, Entry>()
 
     /**
      * Gets or builds the node tree for a function.
@@ -71,9 +73,10 @@ object FunctionCache {
         parentWorkflowInfo: WorkflowInfo? = null
     ): Map<NodePosition, Node<*>> {
         val key = FunctionKey(parentWorkflowInfo, functionRef)
-        return nodesMapCache.getOrPut(key) {
-            buildFunctionNodesMap(task)
-        }
+        // A same-version definition replacement may provide a different function body.
+        return nodesMapCache.compute(key) { _, existing ->
+            existing?.takeIf { it.task === task } ?: Entry(task, buildFunctionNodesMap(task))
+        }!!.nodes
     }
 
     /**

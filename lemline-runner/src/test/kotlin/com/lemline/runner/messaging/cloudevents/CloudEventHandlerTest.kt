@@ -52,6 +52,7 @@ class CloudEventHandlerTest {
         CloudEventHandler(metrics, scopeOf(*followed), resolver).apply {
             listenerEventService = listenerService
             eventScheduleService = scheduleService
+            definitionCacheSync = mockk(relaxed = true)
         }
 
     private fun buildCloudEvent(): CloudEvent = CloudEventBuilder.v1()

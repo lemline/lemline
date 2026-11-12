@@ -6,6 +6,7 @@ import com.lemline.common.values.WorkflowName
 import com.lemline.common.values.WorkflowNamespace
 import com.lemline.common.values.WorkflowVersion
 import com.lemline.core.workflows.WorkflowCache
+import com.lemline.core.workflows.useFunctions
 import io.serverlessworkflow.api.types.Document
 import io.serverlessworkflow.api.types.Task
 import io.serverlessworkflow.api.types.TaskItem
@@ -75,7 +76,9 @@ object FunctionWorkflowBuilder {
         val functionVersion = parentWorkflowInfo?.version ?: FUNCTION_VERSION
 
         // Check cache
-        WorkflowCache.getWorkflow(functionNamespace, functionName, functionVersion)?.let { return it }
+        WorkflowCache.getWorkflow(functionNamespace, functionName, functionVersion)?.let {
+            if (it.`do`.single().task === task && it.useFunctions.orEmpty() == parentUseFunctions.orEmpty()) return it
+        }
 
         // Build synthetic workflow programmatically
         val workflow = Workflow().apply {
@@ -100,7 +103,7 @@ object FunctionWorkflowBuilder {
             )
         }
         // Cache and return
-        WorkflowCache.putWorkflow(workflow)
+        WorkflowCache.putWorkflow(workflow, parentWorkflowInfo)
 
         return workflow
     }

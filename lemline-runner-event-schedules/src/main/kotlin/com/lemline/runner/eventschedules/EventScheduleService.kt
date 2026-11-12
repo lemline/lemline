@@ -8,6 +8,7 @@ import com.lemline.common.logger.logger
 import com.lemline.core.orchestrator.StepByStepOrchestrator
 import com.lemline.core.schemas.SchemaValidator
 import com.lemline.core.workflows.WorkflowCache
+import com.lemline.runner.listeners.DefinitionListenService
 import com.lemline.runner.common.config.DatabaseConfig
 import com.lemline.runner.common.messaging.InstanceMessage
 import com.lemline.runner.definitions.DefinitionRepository
@@ -20,18 +21,19 @@ class EventScheduleService {
     private val logger = logger()
     @Inject lateinit var databaseConfig: DatabaseConfig
     @Inject lateinit var definitions: DefinitionRepository
+    @Inject lateinit var definitionListenService: DefinitionListenService
     @Inject lateinit var repository: EventScheduleRepository
 
     suspend fun handleCloudEvent(event: CloudEvent, namespace: WorkflowNamespace): Int {
         var started = 0
-        // Read persisted definitions, not the eventually consistent cache: registrations, updates,
-        // and deletions must take effect without waiting for another worker's cache refresh.
-        for (candidate in definitions.listAllInNamespace(namespace)) {
-            if (WorkflowCache.parseYaml(candidate.definition).schedule?.on == null) continue
+        for (candidate in definitionListenService.findMatchingEventSchedules(event, namespace)) {
             started += databaseConfig.withTransaction { conn ->
-                val definition = definitions.findForUpdate(candidate, conn) ?: return@withTransaction 0
-                val workflow = WorkflowCache.parseYaml(definition.definition)
-                val strategy = workflow.schedule?.on?.get() ?: return@withTransaction 0
+                val definition = definitions.findForUpdate(candidate.workflowInfo, conn) ?: run {
+                    WorkflowCache.removeEventSchedule(candidate)
+                    return@withTransaction 0
+                }
+                val workflow = WorkflowCache.refreshDefinition(candidate.workflowInfo, definition.definition)
+                val strategy = WorkflowCache.getEventConsumption(workflow) ?: return@withTransaction 0
                 val (stateId, state) = repository.loadState(definition, conn)
                 val consumed = state.consume(strategy, event)
                 // A matching event needs a receipt even if its termination slot was already filled:

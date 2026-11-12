@@ -14,6 +14,8 @@ import com.lemline.runner.common.namespaces.NamespaceScope
 import com.lemline.runner.definitions.DefinitionModel
 import com.lemline.runner.definitions.DefinitionRepository
 import com.lemline.runner.definitions.Definitions
+import com.lemline.runner.definitions.DefinitionCacheSync
+import com.lemline.runner.listeners.DefinitionListenService
 import com.lemline.runner.starters.Starter
 import io.cloudevents.core.builder.CloudEventBuilder
 import io.kotest.assertions.throwables.shouldThrow
@@ -45,10 +47,11 @@ abstract class EventScheduleServiceTestBase {
         databaseConfig = db
         namespaceScope = object : NamespaceScope { override val configured = setOf(namespace.toString()) }
     }
-    private fun service(repo: EventScheduleRepository = repository) = EventScheduleService().apply {
+    private fun service(repo: EventScheduleRepository = repository, definitionRepo: DefinitionRepository = definitions) = EventScheduleService().apply {
         databaseConfig = db
-        definitions = this@EventScheduleServiceTestBase.definitions
+        definitions = definitionRepo
         repository = repo
+        definitionListenService = DefinitionListenService()
     }
 
     @BeforeEach
@@ -65,16 +68,43 @@ abstract class EventScheduleServiceTestBase {
               on:
         """.trimIndent() + "\n" + on.prependIndent("    ") + "\ndo:\n  - result:\n      set:\n        received: \${ \$workflow.input }\n")
         definitions.insert(definition) shouldBe 1
+        WorkflowCache.parseYamlAndPut(definition.definition)
         return definition
     }
 
-    private fun event(type: String = "a", id: String = IDV7.random().toString(), source: String = "/test", key: String = "x") =
+    private suspend fun refresh() = DefinitionCacheSync().apply {
+        definitionRepository = definitions
+    }.ensureInitialized()
+
+    private fun event(type: String = "a", id: String = IDV7.random().toString(), source: String = "https://test.example", key: String = "x") =
         CloudEventBuilder.v1().withId(id).withSource(URI(source)).withType(type)
             .withData("application/json", "{\"key\":\"$key\"}".toByteArray()).build()
 
     private suspend fun starts() = repository.listAll().filter { it.workflowInfo.namespace == namespace }
     private fun EventScheduleModel.input() = instanceMessage.workflowState.nodeStack.rootState.workflowInput as JsonArray
     private fun EventScheduleModel.eventIds() = input().map { it.jsonObject.getValue("id").jsonPrimitive.content }
+
+    @Test
+    fun `routing reads only matching candidates and rechecks stale positives`() = runTest {
+        val original = define("one:\n  with:\n    type: a")
+        define("one:\n  with:\n    type: b", name = "other")
+        val reads = spyk(definitions)
+        val service = service(definitionRepo = reads)
+        service.handleCloudEvent(event("unrelated"), namespace) shouldBe 0
+        coVerify(exactly = 0) { reads.findForUpdate(any(), any()) }
+        service.handleCloudEvent(event("a"), namespace) shouldBe 1
+        coVerify(exactly = 1) { reads.findForUpdate(any(), any()) }
+        coVerify(exactly = 0) { reads.listAll(any()) }
+        coVerify(exactly = 0) { reads.listAllInNamespace(any(), any()) }
+
+        definitions.update(original.copy(definition = original.definition.replace("type: a", "type: c"))) shouldBe 1
+        // The old cached filter is only a candidate; the locked row rejects it and refreshes routing.
+        service.handleCloudEvent(event("a"), namespace) shouldBe 0
+        service.handleCloudEvent(event("c"), namespace) shouldBe 1
+        definitions.delete(original) shouldBe 1
+        service.handleCloudEvent(event("c"), namespace) shouldBe 0
+        WorkflowCache.getEventSchedules(namespace).map { it.workflowInfo.name.toString() } shouldBe listOf("other")
+    }
 
     @Test
     fun `one starts repeatedly with event envelopes and ignores redelivery`() = runTest {
@@ -96,6 +126,7 @@ abstract class EventScheduleServiceTestBase {
         definitions.insert(DefinitionModel.from(first.definition.replace("version: '1.0.0'", "version: '2.0.0'"))) shouldBe 1
         define("any: []", "second")
         define("any: []", ns = WorkflowNamespace("foreign-${IDV7.random()}"))
+        refresh()
         service().handleCloudEvent(event(), namespace) shouldBe 3
         starts().size shouldBe 3
     }
@@ -146,7 +177,7 @@ abstract class EventScheduleServiceTestBase {
 
     @Test
     fun `overlapping any filters create one start and nonmatching attributes are ignored`() = runTest {
-        define("any:\n  - with: { type: a, source: /test }\n  - with: { type: a, source: /test }")
+        define("any:\n  - with: { type: a, source: https://test.example }\n  - with: { type: a, source: https://test.example }")
         service().handleCloudEvent(event(source = "/foreign"), namespace) shouldBe 0
         service().handleCloudEvent(event(), namespace) shouldBe 1
         starts().single().input().size shouldBe 1
@@ -154,7 +185,7 @@ abstract class EventScheduleServiceTestBase {
 
     @Test
     fun `one event matching multiple all filters appears once in workflow input`() = runTest {
-        define("all:\n  - with: { type: a }\n  - with: { source: /test }")
+        define("all:\n  - with: { type: a }\n  - with: { source: https://test.example }")
         service().handleCloudEvent(event(), namespace) shouldBe 1
         starts().single().input().size shouldBe 1
     }
@@ -259,6 +290,7 @@ abstract class EventScheduleServiceTestBase {
         val original = define("all:\n  - with: { type: a }\n  - with: { type: b }")
         service().handleCloudEvent(event("a", "old"), namespace) shouldBe 0
         definitions.update(original.copy(definition = original.definition.replace("type: b", "type: c"))) shouldBe 1
+        refresh()
         service().handleCloudEvent(event("c", "new-c"), namespace) shouldBe 0
         service().handleCloudEvent(event("a", "new-a"), namespace) shouldBe 1
         starts().single().eventIds() shouldBe listOf("new-c", "new-a")
@@ -283,7 +315,9 @@ abstract class EventScheduleServiceTestBase {
 
     @Test
     fun `outbox claims only exact namespace matches`() = runTest {
-        define("any: []")
+        val definition = define("any: []")
+        WorkflowCache.getEventSchedules(namespace).size shouldBe 1
+        WorkflowCache.getEventSchedules(namespace).single().consumption.wildcard shouldBe true
         service().handleCloudEvent(event(), namespace) shouldBe 1
         val foreignRepository = EventScheduleRepository().apply {
             databaseConfig = db
