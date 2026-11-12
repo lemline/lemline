@@ -220,3 +220,33 @@ ListenerForeachOutbox  Check completion
 | `cloud_event` | TEXT | Full CloudEvent JSON |
 | `output` | TEXT | Foreach iteration output |
 | `outbox_*` | Various | Outbox pattern fields |
+
+## Complete event termination strategies
+
+Cached listen tasks and `schedule.on` share `CachedEventConsumption`: one/any/all filters,
+optional expression termination, and an optional event termination strategy. Listen routing
+checks every termination filter, including `until.any: []` (any incoming event).
+
+For `listen`, `until.all` progress is per listener instance and stored in `until_progress`.
+Workers lock the listener with `FOR UPDATE`, evaluate the persisted progress, and commit
+progress, main-event inserts, and closure in the same transaction. Failures roll back all
+three; retries and other workers resume from database state. Foreach context updates take
+the same listener lock. Termination events never bypass pending foreach processing.
+
+Behavior changes from the former first-filter-only implementation:
+
+- `until.any` accepts any of its filters, not just the first.
+- `until.all` waits for all filters, in either order, with correlated partial progress.
+- `until.any: []` terminates on the next event, even before any data is collected.
+- An event that completes termination is excluded from the main output, even when it
+  also matches the main filter. This aligns the durable runner with FullOrchestrator.
+- Termination filters now honor extensions and correlation against instance context.
+
+Expression termination and ordinary one/any/all collection retain their behavior.
+DSL 1.0 schema validation still rejects another `until` inside an event termination strategy.
+
+Migration V903 adds nullable listener progress on PostgreSQL, MySQL and H2. Existing
+single-filter termination messages remain readable and retain their protobuf encoding.
+New multi-filter/extension termination messages use an additive protobuf field; upgrade
+workers before publishing workflows that require this field. Old workers cannot process it.
+Already-running legacy listeners retain the single filter captured in their start message.

@@ -24,14 +24,18 @@ import com.lemline.core.states.WorkflowState
 import com.lemline.core.tasks.FlowDirective
 import com.lemline.core.tasks.FlowDirectiveEnum
 import com.lemline.core.tasks.FlowDirectiveGoto
+import com.lemline.core.workflows.CachedEventConsumption
+import com.lemline.core.workflows.CachedEventFilter
 import com.lemline.messages.internal.v1.BasicAuthProto
 import com.lemline.messages.internal.v1.BearerAuthProto
+import com.lemline.messages.internal.v1.CachedEventFilterProto
 import com.lemline.messages.internal.v1.CallHttpConfigProto
 import com.lemline.messages.internal.v1.CallHttpStartedProto
 import com.lemline.messages.internal.v1.CorrelationDefProto
 import com.lemline.messages.internal.v1.CorrelationMapProto
 import com.lemline.messages.internal.v1.EmitConfigProto
 import com.lemline.messages.internal.v1.EmitStartedProto
+import com.lemline.messages.internal.v1.EventConsumptionProto
 import com.lemline.messages.internal.v1.EventFilterProto
 import com.lemline.messages.internal.v1.FlowDirectiveEnumProto
 import com.lemline.messages.internal.v1.FlowDirectiveProto
@@ -573,13 +577,38 @@ object WorkflowStateProtobufMapper {
         expect = expect_,
     )
 
+    private fun CachedEventConsumption.toProto(): EventConsumptionProto = EventConsumptionProto(
+        strategy = strategy.toProto(),
+        filters = filters.map { filter -> CachedEventFilterProto(
+            standard = filter.standard.toProto(),
+            extensions = filter.extensions.mapValues { it.value.toProtoJsonValue() },
+        ) },
+        until_expression = untilExpression,
+        until_events = untilEvents?.toProto(),
+    )
+
+    private fun EventConsumptionProto.toDomain(): CachedEventConsumption = CachedEventConsumption(
+        strategy = strategy.toDomain(),
+        filters = filters.map { filter -> CachedEventFilter(
+            standard = requireNotNull(filter.standard).toDomain(),
+            extensions = filter.extensions.mapValues { it.value.toKotlinJsonElement() },
+        ) },
+        untilExpression = until_expression,
+        untilEvents = until_events?.toDomain(),
+    )
+
     private fun UntilCondition.toProto(): UntilConditionProto =
         when (this) {
             is UntilCondition.Expression -> UntilConditionProto(expression = expression)
-            is UntilCondition.Event -> UntilConditionProto(event_filter = filter.toProto())
+            is UntilCondition.Event -> if (
+                consumption.strategy == ListenStrategy.ONE && consumption.filters.size == 1 &&
+                consumption.filters.single().extensions.isEmpty()
+            ) UntilConditionProto(event_filter = consumption.filters.single().standard.toProto())
+            else UntilConditionProto(event_consumption = consumption.toProto())
         }
 
     private fun UntilConditionProto.toDomain(): UntilCondition {
+        event_consumption?.let { return UntilCondition.Event(it.toDomain()) }
         expression?.let { return UntilCondition.Expression(it) }
         event_filter?.let { return UntilCondition.Event(it.toDomain()) }
         error("Until condition not set")

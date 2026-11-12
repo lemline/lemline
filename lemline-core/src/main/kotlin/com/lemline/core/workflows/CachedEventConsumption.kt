@@ -13,21 +13,21 @@ import io.cloudevents.CloudEvent
 import io.serverlessworkflow.api.types.AllEventConsumptionStrategy
 import io.serverlessworkflow.api.types.AnyEventConsumptionStrategy
 import io.serverlessworkflow.api.types.EventConsumptionStrategy
+import io.serverlessworkflow.api.types.EventFilter as SdkEventFilter
 import io.serverlessworkflow.api.types.OneEventConsumptionStrategy
 import io.serverlessworkflow.impl.expressions.ExpressionUtils
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
-import io.serverlessworkflow.api.types.EventFilter as SdkEventFilter
 
 /** Parsed definition filter, shared by listen-task routing and schedule.on routing/collection. */
 data class CachedEventFilter(val standard: EventFilter, val extensions: Map<String, JsonElement>) {
     fun matches(event: CloudEvent, data: () -> JsonElement = { event.parseData() }): Boolean =
         matchesExtensions(event) && CloudEventMatcher.matchesFilters(event, listOf(standard), data)
 
-    fun matches(event: CloudEvent, correlations: MutableMap<String, String>): Boolean =
+    fun matches(event: CloudEvent, correlations: MutableMap<String, String>, context: JsonElement? = JsonObject(emptyMap())): Boolean =
         matchesExtensions(event) && CloudEventMatcher.matchesFilters(
-            event, listOf(standard), JsonObject(emptyMap()), correlations
+            event, listOf(standard), context, correlations
         )
 
     private fun matchesExtensions(event: CloudEvent): Boolean = extensions.all { (name, expected) ->
@@ -55,6 +55,12 @@ data class CachedEventConsumption(
     val untilEvents: CachedEventConsumption? = null,
 ) {
     val wildcard: Boolean get() = strategy == ListenStrategy.ANY && filters.isEmpty()
+
+    /** Definition-level preselection, including every nested termination filter. */
+    fun mayMatch(event: CloudEvent, data: () -> JsonElement = { event.parseData() }): Boolean =
+        wildcard || filters.any { it.matches(event, data) } || untilEvents?.mayMatch(event, data) == true
+
+    fun allFilters(): List<CachedEventFilter> = filters + untilEvents?.allFilters().orEmpty()
 
     companion object {
         fun from(strategy: Any): CachedEventConsumption = when (strategy) {

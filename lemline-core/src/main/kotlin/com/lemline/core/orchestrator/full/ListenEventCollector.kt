@@ -14,6 +14,8 @@ import com.lemline.core.states.ForeachState
 import com.lemline.core.states.NodeStack
 import com.lemline.core.states.WorkflowCommand
 import com.lemline.core.states.WorkflowEvent
+import com.lemline.core.workflows.CachedEventConsumption
+import com.lemline.core.workflows.EventConsumptionProgress
 import io.cloudevents.CloudEvent
 import io.serverlessworkflow.api.types.ListenTaskConfiguration.ListenAndReadAs
 import kotlinx.coroutines.CoroutineScope
@@ -113,7 +115,7 @@ internal object ListenEventCollector {
         )
 
         is UntilCondition.Event -> collectUntilTermination(
-            eventFlow, event.config.filters, until.filter,
+            eventFlow, event.config.filters, until.consumption,
             correlationContext, establishedCorrelations, processEvent
         )
     }
@@ -201,17 +203,18 @@ internal object ListenEventCollector {
     private suspend fun collectUntilTermination(
         eventFlow: Flow<CloudEvent>,
         filters: List<EventFilter>,
-        terminationFilter: EventFilter,
+        termination: CachedEventConsumption,
         correlationContext: JsonElement?,
         establishedCorrelations: MutableMap<String, String>,
         processEvent: suspend (CloudEvent, Int) -> JsonElement,
     ): List<JsonElement> {
         val outputs = mutableListOf<JsonElement>()
+        val progress = EventConsumptionProgress()
 
         val channel = eventFlow.toChannel()
         try {
             for (cloudEvent in channel) {
-                if (CloudEventMatcher.matchesFilters(cloudEvent, listOf(terminationFilter))) {
+                if (progress.consume(termination, cloudEvent, correlationContext)) {
                     logger.debug { "Termination event received: type=${cloudEvent.type}, returning ${outputs.size} accumulated events" }
                     break
                 }

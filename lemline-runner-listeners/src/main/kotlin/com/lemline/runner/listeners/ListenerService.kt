@@ -7,9 +7,9 @@ import com.lemline.common.logger.logger
 import com.lemline.common.values.IDV7
 import com.lemline.core.expressions.JQExpression
 import com.lemline.core.processors.ListenConfig
+import com.lemline.core.processors.UntilCondition
 import com.lemline.core.states.NodeStack
 import com.lemline.core.states.WorkflowEvent
-import com.lemline.core.workflows.CachedUntilCondition
 import com.lemline.core.workflows.WorkflowCache
 import com.lemline.runner.common.messaging.InstanceMessage
 import io.serverlessworkflow.impl.expressions.ExpressionUtils
@@ -77,10 +77,10 @@ class ListenerService {
         listener.hasForeach = listenTask?.hasForeach ?: false
 
         // Store until configuration for expression evaluation
-        listener.hasUntil = listenTask?.until != null
+        listener.hasUntil = config.until != null
 
         // Is until an expression?
-        listener.untilExpression = (listenTask?.until as? CachedUntilCondition.Expression)?.expression
+        listener.untilExpression = (config.until as? UntilCondition.Expression)?.expression
 
         // Insert listener into database
         val rowsInserted = listenerRepository.insert(listener)

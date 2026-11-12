@@ -60,6 +60,7 @@ data class ListenerModel(
     var filtersCount: Int? = null,
     var hasUntil: Boolean = false,
     var untilExpression: String? = null,
+    var untilProgress: String? = null,
     var hasForeach: Boolean = false,
     var correlationValues: String? = null,
     var closedAt: Instant? = null,

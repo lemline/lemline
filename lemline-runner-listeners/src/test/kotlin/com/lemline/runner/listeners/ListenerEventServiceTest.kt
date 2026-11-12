@@ -11,14 +11,16 @@ import com.lemline.common.values.WorkflowVersion
 import com.lemline.core.processors.EventFilter
 import com.lemline.core.processors.ListenConfig
 import com.lemline.core.processors.ListenStrategy
+import com.lemline.core.processors.UntilCondition
 import com.lemline.core.states.DoState
 import com.lemline.core.states.NodeStack
 import com.lemline.core.states.RootState
 import com.lemline.core.states.StackFrame
 import com.lemline.core.states.TaskState
 import com.lemline.core.states.WorkflowEvent
+import com.lemline.core.workflows.CachedEventConsumption
+import com.lemline.core.workflows.CachedEventFilter
 import com.lemline.core.workflows.CachedListenTask
-import com.lemline.core.workflows.CachedUntilCondition
 import com.lemline.runner.common.config.DatabaseConfig
 import com.lemline.runner.common.messaging.InstanceMessage
 import io.cloudevents.CloudEvent
@@ -67,9 +69,10 @@ class ListenerEventServiceTest {
     @BeforeEach
     fun setup() {
         clearAllMocks()
+        coEvery { mockedListenerRepository.update(any<ListenerModel>(), any()) } returns 1
         coEvery { mockedDatabaseConfig.withTransaction<Any?>(any(), any()) } coAnswers {
-            val block = secondArg<suspend (java.sql.Connection?) -> Any?>()
-            block(null)
+            val block = secondArg<suspend (java.sql.Connection) -> Any?>()
+            block(mockk(relaxed = true))
         }
     }
 
@@ -138,6 +141,7 @@ class ListenerEventServiceTest {
                 ListenerStrategy.ALL -> ListenStrategy.ALL
             },
             filters = listOf(EventFilter(type = "com.example.Event")),
+            until = if (strategy == ListenerStrategy.ANY_UNTIL_EVENT) UntilCondition.Event(EventFilter()) else null,
             readAs = ListenAndReadAs.DATA,
             timeoutAt = null
         )
@@ -183,11 +187,13 @@ class ListenerEventServiceTest {
             ListenerStrategy.ANY, ListenerStrategy.ANY_UNTIL_EXPR, ListenerStrategy.ANY_UNTIL_EVENT -> ListenStrategy.ANY
             ListenerStrategy.ALL -> ListenStrategy.ALL
         }
-        every { cachedListenTask.until } returns when (strategy) {
-            ListenerStrategy.ANY_UNTIL_EXPR -> CachedUntilCondition.Expression("length > 0")
-            ListenerStrategy.ANY_UNTIL_EVENT -> mockk<CachedUntilCondition.Event>()
-            else -> null
-        }
+        every { cachedListenTask.consumption } returns CachedEventConsumption(
+            strategy = cachedListenTask.strategy,
+            filters = emptyList(),
+            untilExpression = if (strategy == ListenerStrategy.ANY_UNTIL_EXPR) "length > 0" else null,
+            untilEvents = if (strategy == ListenerStrategy.ANY_UNTIL_EVENT)
+                CachedEventConsumption(ListenStrategy.ONE, listOf(CachedEventFilter(EventFilter(), emptyMap()))) else null,
+        )
         every { cachedListenTask.readAs } returns ListenAndReadAs.DATA
         every { cachedListenTask.hasForeach } returns false
         every { cachedListenTask.isFromFunction } returns false
@@ -353,7 +359,7 @@ class ListenerEventServiceTest {
 
             // Then
             result shouldBe 0
-            coVerify(exactly = 0) { mockedListenerRepository.markListenerCompletedByUntilEvent(any(), any()) }
+            coVerify(exactly = 0) { mockedListenerRepository.findUntilListenersForUpdate(any(), any()) }
         }
     }
 
@@ -391,7 +397,7 @@ class ListenerEventServiceTest {
                     keys = match { it.size == 1 && it[0].listenerStrategy == ListenerStrategy.ONE },
                     eventId = event.id,
                     eventJson = any(),
-                    connection = null
+                    connection = any()
                 )
             }
         }
@@ -422,7 +428,7 @@ class ListenerEventServiceTest {
                     keys = match { it.size == 1 && it[0].listenerStrategy == ListenerStrategy.ANY },
                     eventId = event.id,
                     eventJson = any(),
-                    connection = null
+                    connection = any()
                 )
             }
         }
@@ -456,7 +462,7 @@ class ListenerEventServiceTest {
                     keys = match { it.size == 2 },
                     eventId = event.id,
                     eventJson = any(),
-                    connection = null
+                    connection = any()
                 )
             }
         }
@@ -519,7 +525,7 @@ class ListenerEventServiceTest {
                     keys = match { it.distinct().size == it.size }, // Keys should be deduplicated
                     eventId = any(),
                     eventJson = any(),
-                    connection = null
+                    connection = any()
                 )
             }
         }
@@ -589,7 +595,7 @@ class ListenerEventServiceTest {
                     keys = match { it.size == 1 && it[0].listenerStrategy == ListenerStrategy.ALL },
                     eventId = event.id,
                     eventJson = any(),
-                    connection = null
+                    connection = any()
                 )
             }
         }
@@ -624,7 +630,7 @@ class ListenerEventServiceTest {
                     keys = match { it.size == 3 },
                     eventId = event.id,
                     eventJson = any(),
-                    connection = null
+                    connection = any()
                 )
             }
         }
@@ -690,7 +696,7 @@ class ListenerEventServiceTest {
                     keys = match { it.size == 1 && it[0].listenerStrategy == ListenerStrategy.ANY_UNTIL_EXPR },
                     eventId = event.id,
                     eventJson = any(),
-                    connection = null
+                    connection = any()
                 )
             }
         }
@@ -721,7 +727,7 @@ class ListenerEventServiceTest {
             coVerify {
                 mockedListenerRepository.findListenersByKeysWithEvents(
                     keys = match { it.any { key -> key.listenerStrategy == ListenerStrategy.ANY_UNTIL_EXPR } },
-                    connection = null
+                    connection = any()
                 )
             }
         }
@@ -761,7 +767,7 @@ class ListenerEventServiceTest {
             coVerify {
                 mockedListenerRepository.batchMarkListenersCompleted(
                     ids = listOf(listener.id),
-                    connection = null
+                    connection = any()
                 )
             }
         }
@@ -869,7 +875,7 @@ class ListenerEventServiceTest {
                     keys = match { it.size == 1 && it[0].listenerStrategy == ListenerStrategy.ANY_UNTIL_EVENT },
                     eventId = event.id,
                     eventJson = any(),
-                    connection = null
+                    connection = any()
                 )
             }
         }
@@ -887,8 +893,8 @@ class ListenerEventServiceTest {
                 mockedDefinitionListenService.findMatchingUntilEvents(terminationEvent)
             } returns listOf(matchingUntilEvent)
             coEvery {
-                mockedListenerRepository.markListenerCompletedByUntilEvent(any(), any())
-            } returns 3
+                mockedListenerRepository.findUntilListenersForUpdate(any(), any())
+            } returns List(3) { createListenerModel(strategy = ListenerStrategy.ANY_UNTIL_EVENT) }
 
             // When
             val result = service.handleCloudEvent(terminationEvent, testNamespace)
@@ -896,9 +902,9 @@ class ListenerEventServiceTest {
             // Then
             result shouldBe 3
             coVerify {
-                mockedListenerRepository.markListenerCompletedByUntilEvent(
+                mockedListenerRepository.findUntilListenersForUpdate(
                     keys = match { it.isNotEmpty() },
-                    connection = null
+                    connection = any()
                 )
             }
         }
@@ -920,8 +926,8 @@ class ListenerEventServiceTest {
                 mockedListenerEventRepository.batchInsertForAllAnyUntil(any(), any(), any(), any())
             } returns 1
             coEvery {
-                mockedListenerRepository.markListenerCompletedByUntilEvent(any(), any())
-            } returns 2
+                mockedListenerRepository.findUntilListenersForUpdate(any(), any())
+            } returns List(2) { createListenerModel(strategy = ListenerStrategy.ANY_UNTIL_EVENT) }
 
             // When
             val result = service.handleCloudEvent(event, testNamespace)
@@ -943,8 +949,8 @@ class ListenerEventServiceTest {
                 mockedDefinitionListenService.findMatchingUntilEvents(terminationEvent)
             } returns listOf(matchingUntilEvent)
             coEvery {
-                mockedListenerRepository.markListenerCompletedByUntilEvent(any(), any())
-            } returns 0
+                mockedListenerRepository.findUntilListenersForUpdate(any(), any())
+            } returns List(0) { createListenerModel(strategy = ListenerStrategy.ANY_UNTIL_EVENT) }
 
             // When
             val result = service.handleCloudEvent(terminationEvent, testNamespace)
@@ -1063,8 +1069,8 @@ class ListenerEventServiceTest {
                 mockedListenerRepository.findListenersByKeysWithEvents(any(), any())
             } returns emptyList()
             coEvery {
-                mockedListenerRepository.markListenerCompletedByUntilEvent(any(), any())
-            } returns 1
+                mockedListenerRepository.findUntilListenersForUpdate(any(), any())
+            } returns List(1) { createListenerModel(strategy = ListenerStrategy.ANY_UNTIL_EVENT) }
 
             // When
             val result = service.handleCloudEvent(event, testNamespace)
@@ -1473,7 +1479,7 @@ class ListenerEventServiceTest {
             coVerify {
                 mockedListenerRepository.batchMarkListenersCompleted(
                     ids = match { it.size == 2 && it.contains(listener1.id) && it.contains(listener2.id) },
-                    connection = null
+                    connection = any()
                 )
             }
         }

@@ -139,6 +139,7 @@ class ListenerRepository : CrudRepository<ListenerModel>(),
         const val FILTERS_COUNT_COLUMN = "filters_count"
         const val HAS_UNTIL_COLUMN = "has_until"
         const val UNTIL_EXPRESSION_COLUMN = "until_expression"
+        const val UNTIL_PROGRESS_COLUMN = "until_progress"
         const val HAS_FOREACH_COLUMN = "has_foreach"
         const val CLOSED_AT_COLUMN = "closed_at"
     }
@@ -168,6 +169,9 @@ class ListenerRepository : CrudRepository<ListenerModel>(),
             column(UNTIL_EXPRESSION_COLUMN) { stmt, entity, idx ->
                 stmt.setString(idx, entity.untilExpression)
             }
+            column(UNTIL_PROGRESS_COLUMN) { stmt, entity, idx ->
+                stmt.setString(idx, entity.untilProgress)
+            }
             column(HAS_FOREACH_COLUMN) { stmt, entity, idx ->
                 stmt.setBoolean(idx, entity.hasForeach)
             }
@@ -192,6 +196,7 @@ class ListenerRepository : CrudRepository<ListenerModel>(),
         filtersCount = rs.getInt(FILTERS_COUNT_COLUMN).takeIf { !rs.wasNull() }
         hasUntil = rs.getBoolean(HAS_UNTIL_COLUMN)
         untilExpression = rs.getString(UNTIL_EXPRESSION_COLUMN)
+        untilProgress = rs.getString(UNTIL_PROGRESS_COLUMN)
         hasForeach = rs.getBoolean(HAS_FOREACH_COLUMN)
         correlationValues = rs.getString(CORRELATION_VALUES_COLUMN)
         closedAt = rs.getInstant(CLOSED_AT_COLUMN)
@@ -350,6 +355,29 @@ class ListenerRepository : CrudRepository<ListenerModel>(),
                 stmt.executeUpdate()
             }
         }
+
+    /** Lock before replacing an instance message so foreach cannot overwrite newer until progress. */
+    suspend fun findByIdForUpdate(id: IDV7, connection: Connection): ListenerModel? =
+        connection.prepareStatement("SELECT * FROM $tableName WHERE $ID_COLUMN = ? FOR UPDATE").use { stmt ->
+            setIDV7(stmt, 1, id)
+            stmt.executeQuery().use { rs -> if (rs.next()) createModel(rs) else null }
+        }
+
+    /** Lock matching subscriptions while accumulating termination progress and closing them. */
+    suspend fun findUntilListenersForUpdate(keys: List<ListenerQueryKey>, connection: Connection): List<ListenerModel> {
+        if (keys.isEmpty()) return emptyList()
+        val sql = """
+            SELECT l.* FROM $tableName l
+            WHERE l.$CLOSED_AT_COLUMN IS NULL
+              AND (${ListenerQueryKey.buildWhereClause(keys, "l")})
+            ORDER BY l.$ID_COLUMN
+            FOR UPDATE
+        """.trimIndent()
+        return connection.prepareStatement(sql).use { stmt ->
+            ListenerQueryKey.bindAllParameters(keys, stmt, 1)
+            stmt.executeQuery().use { rs -> rs.toModels() }
+        }
+    }
 
     /**
      * Marks listeners as completed by termination event (ANY_UNTIL_EVENT strategy).

@@ -27,6 +27,8 @@ import com.lemline.core.states.WorkflowEvent
 import com.lemline.core.states.WorkflowState
 import com.lemline.core.tasks.FlowDirectiveEnum
 import com.lemline.core.tasks.FlowDirectiveGoto
+import com.lemline.core.workflows.CachedEventConsumption
+import com.lemline.core.workflows.CachedEventFilter
 import io.serverlessworkflow.api.types.ListenTaskConfiguration.ListenAndReadAs
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -37,6 +39,25 @@ import kotlinx.serialization.json.put
 import org.junit.jupiter.api.Test
 
 class WorkflowStateProtobufMapperTest {
+
+    @Test
+    fun `complete until strategy preserves extension values in protobuf`() {
+        val filter = CachedEventFilter(EventFilter(type = "stop"), mapOf("tenant" to JsonPrimitive("acme")))
+        val rule = CachedEventConsumption(ListenStrategy.ALL, listOf(filter, filter.copy(standard = EventFilter(type = "done"))))
+        val original = eventListenStarted().let { it.copy(config = it.config.copy(until = UntilCondition.Event(rule))) }
+        val encoded = WorkflowStateProtobufMapper.toProto(original)
+        val decoded = WorkflowStateProtobufMapper.fromProto(encoded)
+        assertEquals(original, decoded)
+    }
+
+    @Test
+    fun `legacy single termination filter remains wire compatible`() {
+        val original = eventListenStarted().let {
+            it.copy(config = it.config.copy(until = UntilCondition.Event(EventFilter(type = "stop"))))
+        }
+        val encoded = WorkflowStateProtobufMapper.toProto(original)
+        assertEquals(original, WorkflowStateProtobufMapper.fromProto(encoded))
+    }
 
     @Test
     fun `should round-trip all workflow state variants`() {

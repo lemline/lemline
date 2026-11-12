@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.processors
 
+import com.lemline.core.workflows.CachedEventConsumption
+import com.lemline.core.workflows.CachedEventFilter
 import io.serverlessworkflow.api.types.HTTPArguments.HTTPOutput
 import io.serverlessworkflow.api.types.ListenTaskConfiguration.ListenAndReadAs
 import io.serverlessworkflow.api.types.RunTaskConfiguration.ProcessReturnType
@@ -146,7 +148,11 @@ sealed class UntilCondition {
     data class Expression(val expression: String) : UntilCondition()
 
     /** Event filter - stop when this event arrives */
-    data class Event(val filter: EventFilter) : UntilCondition()
+    data class Event(val consumption: CachedEventConsumption) : UntilCondition() {
+        constructor(filter: EventFilter) : this(CachedEventConsumption(
+            ListenStrategy.ONE, listOf(CachedEventFilter(filter, emptyMap()))
+        ))
+    }
 }
 
 /**

@@ -18,38 +18,13 @@ import com.lemline.core.nodes.RootTask
 import com.lemline.core.processors.ListenStrategy
 import io.serverlessworkflow.api.WorkflowFormat
 import io.serverlessworkflow.api.WorkflowReader
-import io.serverlessworkflow.api.types.AllEventConsumptionStrategy
-import io.serverlessworkflow.api.types.AnyEventConsumptionStrategy
 import io.serverlessworkflow.api.types.CallFunction
-import io.serverlessworkflow.api.types.EventConsumptionStrategy
-import io.serverlessworkflow.api.types.EventFilter as SdkEventFilter
 import io.serverlessworkflow.api.types.ListenTask
 import io.serverlessworkflow.api.types.ListenTaskConfiguration
-import io.serverlessworkflow.api.types.OneEventConsumptionStrategy
 import io.serverlessworkflow.api.types.Task
-import io.serverlessworkflow.api.types.Until
 import io.serverlessworkflow.api.types.Workflow
-import io.serverlessworkflow.impl.expressions.ExpressionUtils
 import kotlinx.coroutines.runBlocking
 import org.jetbrains.annotations.TestOnly
-
-/**
- * Cached until condition for ANY + until accumulation mode.
- * Pre-parsed from workflow definition for efficient CloudEvent matching.
- */
-sealed class CachedUntilCondition {
-    /**
-     * Expression evaluated against accumulated events array.
-     * E.g., ". | length > 3" or ". | any(.temperature > 38)"
-     */
-    data class Expression(val expression: String) : CachedUntilCondition()
-
-    /**
-     * Termination event filter - stop accumulating when this event arrives.
-     * Stores the filter to match against incoming events.
-     */
-    data class Event(val filter: CachedEventFilter) : CachedUntilCondition()
-}
 
 /**
  * Cached information about a listen task in a workflow.
@@ -58,11 +33,8 @@ sealed class CachedUntilCondition {
 data class CachedListenTask(
     val workflowInfo: WorkflowInfo,
     val nodePosition: NodePosition,
-    val filters: List<CachedEventFilter>,
-    val strategy: ListenStrategy,
+    val consumption: CachedEventConsumption,
     val readAs: ListenTaskConfiguration.ListenAndReadAs,
-    /** Until condition for ANY + until accumulation mode (null for ONE, ANY without until, ALL) */
-    val until: CachedUntilCondition? = null,
     /** Whether this listen task has foreach enabled for sequential event processing */
     val hasForeach: Boolean = false,
     /**
@@ -72,11 +44,9 @@ data class CachedListenTask(
      */
     val isFromFunction: Boolean = false
 ) {
-    /**
-     * Returns the termination filter if this is an ANY + until(event) task.
-     */
-    val untilEventFilter: CachedEventFilter?
-        get() = (until as? CachedUntilCondition.Event)?.filter
+    val filters get() = consumption.filters
+    val strategy get() = consumption.strategy
+
 }
 
 @Suppress("unused")
@@ -393,33 +363,8 @@ object WorkflowCache {
         val listenTask = node.task as? ListenTask ?: return null
         val listenTo = listenTask.listen?.to?.get() ?: return null
 
-        val (strategy, sdkFilters, until) = when (listenTo) {
-            is OneEventConsumptionStrategy -> Triple(
-                ListenStrategy.ONE,
-                listOfNotNull(listenTo.one),
-                null
-            )
-
-            is AnyEventConsumptionStrategy -> Triple(
-                ListenStrategy.ANY,
-                listenTo.any ?: emptyList(),
-                parseUntilCondition(listenTo.until)
-            )
-
-            is AllEventConsumptionStrategy -> Triple(
-                ListenStrategy.ALL,
-                listenTo.all ?: emptyList(),
-                null
-            )
-
-            else -> return null
-        }
-
-        // Allow empty filters for ANY strategy (any: [] means "match any event")
-        // For ONE and ALL strategies, filters are required
-        if (sdkFilters.isEmpty() && strategy != ListenStrategy.ANY) {
-            return null
-        }
+        val consumption = CachedEventConsumption.from(listenTo)
+        if (consumption.filters.isEmpty() && consumption.strategy != ListenStrategy.ANY) return null
 
         val readAs = listenTask.listen?.read
             ?: ListenTaskConfiguration.ListenAndReadAs.DATA
@@ -427,10 +372,8 @@ object WorkflowCache {
         return CachedListenTask(
             workflowInfo = workflowInfo,
             nodePosition = position,
-            filters = sdkFilters.map(CachedEventFilter::from),
-            strategy = strategy,
+            consumption = consumption,
             readAs = readAs,
-            until = until,
             hasForeach = listenTask.foreach != null,
             isFromFunction = isFromFunction
         )
@@ -454,44 +397,6 @@ object WorkflowCache {
         return functionNodesMap.mapNotNull { (position, node) ->
             extractListenTaskFromNode(workflowInfo, position, node, isFromFunction = true)
         }
-    }
-
-    /**
-     * Parses the until condition from the workflow definition.
-     * Returns null if no until condition is specified.
-     */
-    private fun parseUntilCondition(until: Until?): CachedUntilCondition? {
-        if (until == null) return null
-
-        return when (val value = until.get()) {
-            is String -> {
-                // Expression condition evaluated against accumulated events
-                val expr = if (ExpressionUtils.isExpr(value)) {
-                    ExpressionUtils.trimExpr(value)
-                } else {
-                    value
-                }
-                CachedUntilCondition.Expression(expr)
-            }
-
-            is EventConsumptionStrategy -> {
-                // Event filter - stop when this event arrives
-                val filter = extractUntilEventFilter(value) ?: return null
-                CachedUntilCondition.Event(filter)
-            }
-
-            else -> null
-        }
-    }
-
-    private fun extractUntilEventFilter(strategy: EventConsumptionStrategy): CachedEventFilter? {
-        val sdkFilter: SdkEventFilter? = when (val strategyValue = strategy.get()) {
-            is OneEventConsumptionStrategy -> strategyValue.one
-            is AnyEventConsumptionStrategy -> strategyValue.any?.firstOrNull()
-            is AllEventConsumptionStrategy -> strategyValue.all?.firstOrNull()
-            else -> null
-        }
-        return sdkFilter?.let(CachedEventFilter::from)
     }
 
     @TestOnly

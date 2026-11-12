@@ -36,7 +36,7 @@ data class MatchingListenTask(
 
     /** Database-compatible strategy derived from core strategy + until condition. */
     val listenerStrategy: ListenerStrategy
-        get() = ListenerStrategy.from(listenTask.strategy, listenTask.until)
+        get() = ListenerStrategy.from(listenTask.consumption)
 
     /** Converts this definition match to a query key for listener lookup. */
     fun toQueryKey() = ListenerQueryKey(
@@ -170,8 +170,8 @@ class DefinitionListenService {
         logger.trace { "Finding matching 'until' for CloudEvent: $event" }
 
         val matches = WorkflowCache.getAllListenTasks().mapNotNull { listenTask ->
-            val terminationFilter = listenTask.untilEventFilter ?: return@mapNotNull null
-            if (!terminationFilter.matches(event)) return@mapNotNull null
+            val termination = listenTask.consumption.untilEvents ?: return@mapNotNull null
+            if (!termination.mayMatch(event)) return@mapNotNull null
             MatchingListenTaskUntilEvent(listenTask = listenTask)
         }
 
@@ -183,10 +183,7 @@ class DefinitionListenService {
     fun findMatchingEventSchedules(event: CloudEvent, namespace: WorkflowNamespace): List<CachedEventSchedule> {
         val data by lazy { CloudEventService.parseData(event) }
         return WorkflowCache.getEventSchedules(namespace).filter { candidate ->
-            val main = candidate.consumption
-            val until = main.untilEvents
-            main.wildcard || main.filters.any { it.matches(event) { data } } ||
-                (until != null && (until.wildcard || until.filters.any { it.matches(event) { data } }))
+            candidate.consumption.mayMatch(event) { data }
         }
     }
 

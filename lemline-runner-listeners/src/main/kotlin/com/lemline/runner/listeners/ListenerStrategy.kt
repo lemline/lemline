@@ -4,7 +4,7 @@ package com.lemline.runner.listeners
 import com.lemline.core.processors.ListenConfig
 import com.lemline.core.processors.ListenStrategy as CoreListenStrategy
 import com.lemline.core.processors.UntilCondition
-import com.lemline.core.workflows.CachedUntilCondition
+import com.lemline.core.workflows.CachedEventConsumption
 
 /**
  * Database representation of listen strategy.
@@ -50,15 +50,14 @@ enum class ListenerStrategy {
         /**
          * Converts from core ListenStrategy + cached until condition to database ListenerStrategy.
          */
-        fun from(strategy: CoreListenStrategy, until: CachedUntilCondition?): ListenerStrategy = when (strategy) {
+        fun from(consumption: CachedEventConsumption): ListenerStrategy = when (consumption.strategy) {
             CoreListenStrategy.ONE -> ONE
-            CoreListenStrategy.ANY -> when (until) {
-                is CachedUntilCondition.Expression -> ANY_UNTIL_EXPR
-                is CachedUntilCondition.Event -> ANY_UNTIL_EVENT
-                null -> ANY
-            }
-
             CoreListenStrategy.ALL -> ALL
+            CoreListenStrategy.ANY -> when {
+                consumption.untilExpression != null -> ANY_UNTIL_EXPR
+                consumption.untilEvents != null -> ANY_UNTIL_EVENT
+                else -> ANY
+            }
         }
     }
 }

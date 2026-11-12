@@ -43,7 +43,27 @@ import kotlinx.serialization.json.put
  */
 object ListenTestCases {
 
-    val cases = listOf(
+    private fun terminationCase(name: String, until: String, types: List<String>, expected: List<String>, foreach: Boolean = false) =
+        WorkflowTestCase(
+            name = name,
+            cloudEvents = types.map { buildCloudEvent(it, buildJsonObject { put("type", it) }) },
+            yaml = "do:\n  - collect:\n      listen:\n        to:\n          any: []\n          until:\n" +
+                until.prependIndent("            ") +
+                if (foreach) "\n      foreach:\n        item: item\n        do:\n          - identity:\n              set:\n                type: ${'$'}{ .type }" else "",
+            tags = setOf("listen", "until", "complete-strategy"),
+            validate = expectOutput(JsonArray(expected.map { buildJsonObject { put("type", it) } })),
+        )
+
+    private val terminationCases = listOf(
+        terminationCase("until any accepts its second filter", "any:\n  - with: { type: stop1 }\n  - with: { type: stop2 }", listOf("data", "stop2"), listOf("data")),
+        terminationCase("until all waits for both filters", "all:\n  - with: { type: stop1 }\n  - with: { type: stop2 }", listOf("stop1", "data", "stop2"), listOf("stop1", "data")),
+        terminationCase("until all accepts reverse order", "all:\n  - with: { type: stop1 }\n  - with: { type: stop2 }", listOf("stop2", "data", "stop1"), listOf("stop2", "data")),
+        terminationCase("until wildcard closes before collecting first event", "any: []", listOf("data"), emptyList()),
+        terminationCase("until one excludes overlapping main event", "one:\n  with: { type: stop }", listOf("data", "stop"), listOf("data")),
+        terminationCase("until all keeps foreach output before closing", "all:\n  - with: { type: stop1 }\n  - with: { type: stop2 }", listOf("stop1", "data", "stop2"), listOf("stop1", "data"), foreach = true),
+    )
+
+    val cases = terminationCases + listOf(
         // ─────────────────────────────────────────────────────────────────────────
         // Basic Listen Tests
         // ─────────────────────────────────────────────────────────────────────────
