@@ -143,8 +143,9 @@ object WorkflowCache {
         require(workflow.info == info) { "Stored workflow identity does not match $info" }
         val parsed = entry(workflow, definition)
         synchronized(this) {
-            // A locked read may overlap a newer local publication; never overwrite it.
-            if (current === snapshot) current = Snapshot(current.entries + (info to parsed))
+            // Never overwrite a concurrent publication of this identity, but do not let writes
+            // to other workflows drop the refresh: the command handler reads this entry next.
+            if (current.entries[info] === snapshot.entries[info]) current = Snapshot(current.entries + (info to parsed))
         }
         return workflow
     }
