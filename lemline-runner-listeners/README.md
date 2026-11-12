@@ -277,3 +277,24 @@ All consuming workers must run the new code for this guarantee to hold. Receipts
 are not reconstructed for deliveries committed before this upgrade, including
 termination-only events that were never collected. Drain and acknowledge in-flight
 deliveries before switching versions when an upgrade-time replay must be avoided.
+
+### Delivery query performance
+
+V905 replaces the receipt lookup index with `(delivery_token, listener_id)` so
+batch joins can start from a token without scanning receipt history. It also adds
+an index for open listeners. Receipt claims lock only listener IDs in stable order,
+then read and insert receipts in chunks of 500 while retaining the same transaction.
+A first delivery to 501 listeners uses five statements for this phase; replay uses
+three. Claims still serialize overlapping listeners and retain durable receipts.
+
+Event ordering looks up the last queue index only for affected listeners through
+`(listener_id, event_index)`, instead of grouping the entire event table. The new
+nullable `event_source` column avoids fetching and parsing envelopes merely to
+deduplicate completed outputs. New writes populate it; pre-V905 rows fall back to
+their stored envelope. There is no eager backfill or change to output identity.
+
+MySQL and H2 also have a descending last-entry index. MySQL explicitly selects
+this index for the correlated last-entry lookup; H2 uses a VALUES join for
+receipt batches because a leading IN-list can scan each listener's full history.
+These dialect-specific choices are verified with execution plans, at the cost of
+one additional queue index on those two engines.

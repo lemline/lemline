@@ -78,3 +78,9 @@ matches, but cannot discover a newly matching filter absent from the cache.
 Incomplete collections have no automatic expiry. Event receipts remain until the definition is
 deleted, independently of completed-start cleanup, so delayed redelivery remains deduplicated.
 Plan storage for long-lived, high-volume definitions and collections whose conditions never complete.
+
+The collection lookup joins the receipt identity before returning the collection
+payload. Committed redeliveries therefore skip payload transfer, JSON decoding
+and matching, while the definition row lock preserves transactional ordering.
+New events still deserialize and rewrite the complete per-definition collection
+state; very large incomplete collections remain a storage and serialization cost.

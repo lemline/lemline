@@ -57,16 +57,26 @@ class EventScheduleRepository : CrudRepository<EventScheduleModel>(),
     override val tableName = EVENT_SCHEDULE_TABLE
 
     /** Caller holds the definition row lock for the entire read/modify/write transaction. */
-    suspend fun loadState(definition: DefinitionModel, conn: Connection): Pair<IDV7, EventScheduleState> {
+    suspend fun loadState(definition: DefinitionModel, event: CloudEvent, conn: Connection): Pair<IDV7, EventScheduleState>? {
         val hash = digest(definition.definition)
         conn.prepareStatement(
-            "SELECT * FROM lemline_event_schedule_state WHERE namespace = ? AND name = ? AND version = ?"
+            """
+            SELECT s.id, s.definition_hash, r.event_key,
+                   CASE WHEN r.event_key IS NULL AND s.definition_hash = ? THEN s.collections END AS collections
+            FROM lemline_event_schedule_state s
+            LEFT JOIN lemline_event_schedule_receipts r ON r.state_id = s.id AND r.event_key = ?
+            WHERE s.namespace = ? AND s.name = ? AND s.version = ?
+            """.trimIndent()
         ).use { stmt ->
-            stmt.setString(1, definition.namespace.toString())
-            stmt.setString(2, definition.name.toString())
-            stmt.setString(3, definition.version.toString())
+            stmt.setString(1, hash)
+            stmt.setString(2, eventKey(event))
+            stmt.setString(3, definition.namespace.toString())
+            stmt.setString(4, definition.name.toString())
+            stmt.setString(5, definition.version.toString())
             stmt.executeQuery().use { rs ->
                 if (rs.next()) {
+                    // Reject a replay before transferring or decoding the collection payload.
+                    if (rs.getString("event_key") != null) return null
                     val id = getIDV7(rs, "id")!!
                     if (rs.getString("definition_hash") == hash) {
                         return id to Json.decodeFromString<EventScheduleState>(rs.getString("collections"))
@@ -97,21 +107,18 @@ class EventScheduleRepository : CrudRepository<EventScheduleModel>(),
         return id to EventScheduleState()
     }
 
-    suspend fun recordEvent(stateId: IDV7, event: CloudEvent, conn: Connection): Boolean {
-        // Length-prefixing avoids ambiguity; identity is CloudEvents source + id, not id alone.
-        val key = digest("${event.source.toString().length}:${event.source}${event.id}")
-        conn.prepareStatement("SELECT 1 FROM lemline_event_schedule_receipts WHERE state_id = ? AND event_key = ?").use {
-            setIDV7(it, 1, stateId)
-            it.setString(2, key)
-            it.executeQuery().use { rs -> if (rs.next()) return false }
-        }
+    /** Called after loadState rejects duplicates, under the same definition lock. */
+    suspend fun recordEvent(stateId: IDV7, event: CloudEvent, conn: Connection) {
+        val key = eventKey(event)
         conn.prepareStatement("INSERT INTO lemline_event_schedule_receipts (state_id, event_key) VALUES (?, ?)").use {
             setIDV7(it, 1, stateId)
             it.setString(2, key)
             it.executeUpdate()
         }
-        return true
     }
+
+    private fun eventKey(event: CloudEvent): String =
+        digest("${event.source.toString().length}:${event.source}${event.id}")
 
     suspend fun saveState(stateId: IDV7, state: EventScheduleState, conn: Connection) {
         conn.prepareStatement("UPDATE lemline_event_schedule_state SET collections = ? WHERE id = ?").use {

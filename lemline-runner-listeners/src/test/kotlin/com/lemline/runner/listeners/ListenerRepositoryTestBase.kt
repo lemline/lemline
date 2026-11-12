@@ -138,6 +138,58 @@ abstract class ListenerRepositoryTestBase {
             CloudEventBuilder.v1().withId(id).withSource(URI(source))
                 .withType(type).withData("application/json", "{}".toByteArray()).build()
 
+        @Test fun `receipt claims use bounded batches without loading workflow state`() = runTest {
+            val model = listener(rule(ListenStrategy.ONE, "stop"))
+            val copies = (1..500).map { model.copy(id = IDV7.random()) }
+            getDatabaseConfig().withTransaction { conn -> getRepository().insert(copies, conn) }
+            val keys = listOf(ListenerQueryKey(model.workflowInfo, model.nodePosition, null,
+                listenerStrategy = ListenerStrategy.ANY_UNTIL_EVENT))
+            val sql = mutableListOf<String>()
+            suspend fun claim(): String = getDatabaseConfig().withTransaction { conn ->
+                val counting = java.lang.reflect.Proxy.newProxyInstance(
+                    java.sql.Connection::class.java.classLoader, arrayOf(java.sql.Connection::class.java)
+                ) { _, method, args ->
+                    if (method.name == "prepareStatement") sql.add(args!![0] as String)
+                    try { method.invoke(conn, *(args ?: emptyArray())) }
+                    catch (e: java.lang.reflect.InvocationTargetException) { throw e.targetException }
+                } as java.sql.Connection
+                getRepository().claimDelivery(keys, "https://batch", "same", counting)
+            }
+            val first = claim()
+            // One ordered lock query, then one read and one multi-row insert per 500 IDs.
+            sql.size shouldBe 5
+            sql.first().contains("SELECT l.id") shouldBe true
+            getDatabaseConfig().withConnection { conn ->
+                conn.prepareStatement("SELECT COUNT(*) FROM lemline_listener_receipts WHERE delivery_token = ?").use {
+                    it.setString(1, first)
+                    it.executeQuery().use { rs -> rs.next(); rs.getInt(1) shouldBe 501 }
+                }
+            }
+            sql.clear()
+            val replay = claim()
+            sql.size shouldBe 3
+            getDatabaseConfig().withConnection { conn ->
+                conn.prepareStatement("SELECT COUNT(*) FROM lemline_listener_receipts WHERE delivery_token = ?").use {
+                    it.setString(1, replay)
+                    it.executeQuery().use { rs -> rs.next(); rs.getInt(1) shouldBe 0 }
+                }
+            }
+        }
+
+        @Test fun `completed output supports both legacy and stored source identities`() = runTest {
+            val model = listener(rule(ListenStrategy.ONE, "stop"))
+            val a = event("data", "same", "https://a")
+            val b = event("data", "same", "https://b")
+            service(model).handleCloudEvent(a, model.workflowInfo.namespace)
+            service(model).handleCloudEvent(b, model.workflowInfo.namespace)
+            getEventRepository().findCompletedOutputsByListeners(listOf(model.id))[model.id]!!.size shouldBe 2
+            getDatabaseConfig().withConnection { conn ->
+                // Simulate rows written before V905, including equal IDs from distinct sources.
+                conn.createStatement().use { it.executeUpdate("UPDATE lemline_listener_events SET event_source = NULL") }
+            }
+            getEventRepository().findCompletedOutputsByListeners(listOf(model.id))[model.id]!!.size shouldBe 2
+        }
+
         @Test fun `until all persists partial progress across service restart and excludes final event`() = runTest {
             val model = listener(rule(ListenStrategy.ALL, "stop1", "stop2"), foreach = true)
             val first = event("stop1")

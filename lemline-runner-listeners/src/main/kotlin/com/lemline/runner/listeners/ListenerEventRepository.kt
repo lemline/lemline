@@ -87,12 +87,16 @@ class ListenerEventRepository : CrudRepository<ListenerEventModel>(),
     companion object {
         const val LISTENER_ID_COLUMN = "listener_id"
         const val EVENT_ID_COLUMN = "event_id"
+        const val EVENT_SOURCE_COLUMN = "event_source"
         const val FILTER_INDEX_COLUMN = "filter_index"
         const val EVENT_COLUMN = "event"
         const val EVENT_INDEX_COLUMN = "event_index"
         const val FOREACH_COMPLETED_COLUMN = "foreach_completed"
         const val FOREACH_OUTPUT_COLUMN = "foreach_output"
     }
+
+    private fun eventSource(event: String): String =
+        Json.parseToJsonElement(event).jsonObject["source"]?.jsonPrimitive?.content.orEmpty()
 
     override val tableName = LISTENER_EVENTS_TABLE
 
@@ -112,6 +116,7 @@ class ListenerEventRepository : CrudRepository<ListenerEventModel>(),
 
             // Core columns
             column(EVENT_COLUMN) { stmt, entity, idx -> stmt.setString(idx, entity.event) }
+            column(EVENT_SOURCE_COLUMN) { stmt, entity, idx -> stmt.setString(idx, eventSource(entity.event)) }
             key(EVENT_INDEX_COLUMN) { stmt, entity, idx -> stmt.setInt(idx, entity.sortKey) }
             column(FOREACH_COMPLETED_COLUMN) { stmt, entity, idx ->
                 stmt.setBoolean(idx, entity.foreachCompleted)
@@ -181,7 +186,7 @@ class ListenerEventRepository : CrudRepository<ListenerEventModel>(),
             // For ONE/ANY, event_index is always 0 (only one event per listener ever)
             val columns = """
                 $LISTENER_ID_COLUMN, $FILTER_INDEX_COLUMN, $EVENT_INDEX_COLUMN, $EVENT_ID_COLUMN,
-                $EVENT_COLUMN, $FOREACH_COMPLETED_COLUMN, $FOREACH_OUTPUT_COLUMN, $OUTBOX_SCHEDULED_FOR_COLUMN
+                $EVENT_COLUMN, $EVENT_SOURCE_COLUMN, $FOREACH_COMPLETED_COLUMN, $FOREACH_OUTPUT_COLUMN, $OUTBOX_SCHEDULED_FOR_COLUMN
             """.trimIndent()
 
             val selectSql = """
@@ -191,6 +196,7 @@ class ListenerEventRepository : CrudRepository<ListenerEventModel>(),
                     0,                                                          /* event_index = 0 (only one event per listener) */
                     ?,                                                          /* event_id */
                     ?,                                                          /* event */
+                    ?,                                                          /* event_source */
                     NOT l.$HAS_FOREACH_COLUMN,                                  /* foreach_completed = TRUE if no foreach */
                     CASE WHEN NOT l.$HAS_FOREACH_COLUMN THEN ? END,             /* foreach_output = event if not has foreach */
                     CASE WHEN l.$HAS_FOREACH_COLUMN THEN CURRENT_TIMESTAMP END  /* outbox_scheduled_for = now if has foreach */
@@ -205,6 +211,7 @@ class ListenerEventRepository : CrudRepository<ListenerEventModel>(),
                 var paramIdx = 1
                 stmt.setString(paramIdx++, eventId)
                 stmt.setString(paramIdx++, eventJson)
+                stmt.setString(paramIdx++, eventSource(eventJson))
                 stmt.setString(paramIdx++, eventJson) // foreach_output = event for non-foreach
                 ListenerQueryKey.bindAllParameters(oneAnyKeys, stmt, paramIdx)
 
@@ -331,7 +338,7 @@ class ListenerEventRepository : CrudRepository<ListenerEventModel>(),
             // Note: created_at uses database default (CURRENT_TIMESTAMP)
             val columns = """
                 $LISTENER_ID_COLUMN, $FILTER_INDEX_COLUMN, $EVENT_INDEX_COLUMN, $EVENT_ID_COLUMN,
-                $EVENT_COLUMN, $FOREACH_COMPLETED_COLUMN, $FOREACH_OUTPUT_COLUMN, $OUTBOX_SCHEDULED_FOR_COLUMN
+                $EVENT_COLUMN, $EVENT_SOURCE_COLUMN, $FOREACH_COMPLETED_COLUMN, $FOREACH_OUTPUT_COLUMN, $OUTBOX_SCHEDULED_FOR_COLUMN
             """.trimIndent()
 
             val selectSql = buildInsertSelectWithSortKey(unionSql)
@@ -342,6 +349,7 @@ class ListenerEventRepository : CrudRepository<ListenerEventModel>(),
                 var paramIdx = 1
                 stmt.setString(paramIdx++, eventId)
                 stmt.setString(paramIdx++, eventJson)
+                stmt.setString(paramIdx++, eventSource(eventJson))
                 stmt.setString(paramIdx++, eventJson)
 
                 for ((filterIndex, queryKeys) in byFilterIndex) {
@@ -441,7 +449,7 @@ class ListenerEventRepository : CrudRepository<ListenerEventModel>(),
      * Builds the SELECT statement for insert with calculated event_index.
      * event_index = COALESCE(max existing event_index for listener, -1) + ROW_NUMBER within batch
      *
-     * Uses LEFT JOIN to get the current max event_index per listener, then adds
+     * Uses an indexed last-entry lookup for each affected listener, then adds
      * ROW_NUMBER() OVER (PARTITION BY listener_id) to assign sequential values
      * for multiple rows being inserted for the same listener in one batch.
      */
@@ -452,27 +460,32 @@ class ListenerEventRepository : CrudRepository<ListenerEventModel>(),
             else -> "m.$FILTER_INDEX_COLUMN NULLS LAST"
         }
 
+        // MySQL can prefer the per-filter index for a correlated lookup and sort
+        // every event in a long-lived listener. Pin the descending queue-order index.
+        val lastEntryIndex = if (databaseConfig.dbType == DatabaseType.MYSQL)
+            "FORCE INDEX (idx_listener_events_last)" else ""
+        val lastEntryOrder = if (databaseConfig.dbType != DatabaseType.POSTGRESQL)
+            "e.$LISTENER_ID_COLUMN, e.$EVENT_INDEX_COLUMN DESC" else "e.$EVENT_INDEX_COLUMN DESC"
+
         return """
             SELECT
                 m.$LISTENER_ID_COLUMN,                                      /* listener_id */
                 m.$FILTER_INDEX_COLUMN,                                     /* filter_index */
-                COALESCE(existing.max_event_index, -1) + ROW_NUMBER() OVER (
+                COALESCE((SELECT e.$EVENT_INDEX_COLUMN FROM $tableName e $lastEntryIndex
+                    WHERE e.$LISTENER_ID_COLUMN = m.$LISTENER_ID_COLUMN
+                    ORDER BY $lastEntryOrder LIMIT 1), -1) + ROW_NUMBER() OVER (
                     PARTITION BY m.$LISTENER_ID_COLUMN
                     ORDER BY $rowNumberOrderBy
                 ),                                                          /* event_index */
                 ?,                                                          /* event_id */
                 ?,                                                          /* event */
+                ?,                                                          /* event_source */
                 NOT m.$HAS_FOREACH_COLUMN,                                  /* foreach_completed = TRUE if no foreach */
                 CASE WHEN NOT m.$HAS_FOREACH_COLUMN THEN ? END,             /* foreach_output = event for non-foreach */
                 CASE WHEN m.$HAS_FOREACH_COLUMN THEN CURRENT_TIMESTAMP END  /* outbox_scheduled_for = NULL if not foreach */
             FROM (
                 $unionSql
             ) m
-            LEFT JOIN (
-                SELECT $LISTENER_ID_COLUMN, MAX($EVENT_INDEX_COLUMN) as max_event_index
-                FROM $tableName
-                GROUP BY $LISTENER_ID_COLUMN
-            ) existing ON existing.$LISTENER_ID_COLUMN = m.$LISTENER_ID_COLUMN
         """.trimIndent()
     }
 
@@ -589,7 +602,8 @@ class ListenerEventRepository : CrudRepository<ListenerEventModel>(),
             val placeholders = listenerIds.joinToString(",") { "?" }
 
             val sql = """
-                SELECT $LISTENER_ID_COLUMN, $EVENT_ID_COLUMN, $EVENT_COLUMN, $FOREACH_OUTPUT_COLUMN
+                SELECT $LISTENER_ID_COLUMN, $EVENT_ID_COLUMN, $EVENT_SOURCE_COLUMN, $FOREACH_OUTPUT_COLUMN,
+                       CASE WHEN $EVENT_SOURCE_COLUMN IS NULL THEN $EVENT_COLUMN END AS legacy_event
                 FROM $tableName
                 WHERE $LISTENER_ID_COLUMN IN ($placeholders)
                   AND $FOREACH_OUTPUT_COLUMN IS NOT NULL
@@ -606,7 +620,7 @@ class ListenerEventRepository : CrudRepository<ListenerEventModel>(),
                     val seenEvents = mutableSetOf<Triple<IDV7, String, String>>()
                     while (rs.next()) {
                         val listenerId = getIDV7(rs, LISTENER_ID_COLUMN)!!
-                        val source = Json.parseToJsonElement(rs.getString(EVENT_COLUMN)).jsonObject["source"]?.jsonPrimitive?.content.orEmpty()
+                        val source = rs.getString(EVENT_SOURCE_COLUMN) ?: eventSource(rs.getString("legacy_event"))
                         val output = rs.getString(FOREACH_OUTPUT_COLUMN)
                         val key = Triple(listenerId, source, rs.getString(EVENT_ID_COLUMN))
                         if (seenEvents.add(key)) result.getOrPut(listenerId) { mutableListOf() }.add(output)

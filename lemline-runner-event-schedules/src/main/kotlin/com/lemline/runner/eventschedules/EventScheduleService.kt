@@ -34,12 +34,12 @@ class EventScheduleService {
                 }
                 val workflow = WorkflowCache.refreshDefinition(candidate.workflowInfo, definition.definition)
                 val strategy = WorkflowCache.getEventConsumption(workflow) ?: return@withTransaction 0
-                val (stateId, state) = repository.loadState(definition, conn)
+                val (stateId, state) = repository.loadState(definition, event, conn) ?: return@withTransaction 0
                 val consumed = state.consume(strategy, event)
                 // A matching event needs a receipt even if its termination slot was already filled:
                 // otherwise a redelivery could contribute to the next collection after rearming.
                 if (!consumed.matched) return@withTransaction 0
-                if (!repository.recordEvent(stateId, event, conn)) return@withTransaction 0
+                repository.recordEvent(stateId, event, conn)
                 var accepted = 0
                 for (input in consumed.inputs) {
                     try {

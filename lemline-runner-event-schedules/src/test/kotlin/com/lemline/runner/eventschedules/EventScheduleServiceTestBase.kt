@@ -121,6 +121,21 @@ abstract class EventScheduleServiceTestBase {
     }
 
     @Test
+    fun `redelivery skips collection decoding even when stored payload cannot be parsed`() = runTest {
+        define("one:\n  with:\n    type: a")
+        val delivered = event()
+        service().handleCloudEvent(delivered, namespace) shouldBe 1
+        db.withConnection { conn ->
+            conn.prepareStatement("UPDATE lemline_event_schedule_state SET collections = 'not-json' WHERE namespace = ?").use {
+                it.setString(1, namespace.toString())
+                it.executeUpdate()
+            }
+        }
+        service().handleCloudEvent(delivered, namespace) shouldBe 0
+        starts().size shouldBe 1
+    }
+
+    @Test
     fun `event only starts definitions in arrival namespace and all versions are eligible`() = runTest {
         val first = define("any: []")
         definitions.insert(DefinitionModel.from(first.definition.replace("version: '1.0.0'", "version: '2.0.0'"))) shouldBe 1

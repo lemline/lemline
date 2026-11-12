@@ -7,6 +7,7 @@ import com.lemline.common.values.WorkflowNamespace
 import com.lemline.common.values.WorkflowVersion
 import com.lemline.core.states.WorkflowEvent
 import com.lemline.runner.common.config.DatabaseConfig
+import com.lemline.runner.common.config.DatabaseType
 import com.lemline.runner.common.namespaces.NamespaceScope
 import com.lemline.runner.common.repositories.helpers.ColumnBindings
 import com.lemline.runner.common.repositories.helpers.ColumnBindingsBuilder
@@ -371,30 +372,60 @@ class ListenerRepository : CrudRepository<ListenerModel>(),
         val key = java.security.MessageDigest.getInstance("SHA-256")
             .digest("${source.length}:$source$eventId".toByteArray(Charsets.UTF_8))
             .joinToString("") { "%02x".format(it) }
-        for (listener in findUntilListenersForUpdate(keys, connection)) {
-            val seen = connection.prepareStatement(
-                "SELECT event_source, event_id FROM lemline_listener_receipts WHERE listener_id = ? AND event_key = ?"
-            ).use { stmt ->
-                setIDV7(stmt, 1, listener.id)
-                stmt.setString(2, key)
-                stmt.executeQuery().use { rs ->
-                    if (!rs.next()) false else {
+        if (keys.isEmpty()) return token
+        // Lock only IDs, in a stable order. Claiming receipts does not need workflow state.
+        val ids = connection.prepareStatement("""
+            SELECT l.id FROM $tableName l
+            WHERE l.closed_at IS NULL AND (${ListenerQueryKey.buildWhereClause(keys, "l")})
+            ORDER BY l.id FOR UPDATE
+        """.trimIndent()).use { stmt ->
+            ListenerQueryKey.bindAllParameters(keys, stmt, 1)
+            stmt.executeQuery().use { rs -> buildList { while (rs.next()) add(getIDV7(rs, "id")!!) } }
+        }
+        // Bound parameter count and rows per statement without releasing the listener locks.
+        for (batch in ids.chunked(500)) {
+            // H2 scans the whole listener range for a leading IN-list, even with
+            // an equality on event_key. A VALUES join gives it individual PK lookups.
+            val h2 = databaseConfig.dbType == DatabaseType.H2
+            val lookupSql = if (h2) {
+                "SELECT r.listener_id, r.event_source, r.event_id FROM " +
+                    "(VALUES ${batch.joinToString(",") { "(CAST(? AS UUID))" }}) ids(listener_id) " +
+                    "JOIN lemline_listener_receipts r ON r.listener_id = ids.listener_id WHERE r.event_key = ?"
+            } else {
+                "SELECT listener_id, event_source, event_id FROM lemline_listener_receipts " +
+                    "WHERE event_key = ? AND listener_id IN (${batch.joinToString(",") { "?" }})"
+            }
+            val seen = connection.prepareStatement(lookupSql).use { stmt ->
+                if (h2) {
+                    batch.forEachIndexed { index, id -> setIDV7(stmt, index + 1, id) }
+                    stmt.setString(batch.size + 1, key)
+                } else {
+                    stmt.setString(1, key)
+                    batch.forEachIndexed { index, id -> setIDV7(stmt, index + 2, id) }
+                }
+                stmt.executeQuery().use { rs -> buildSet {
+                    while (rs.next()) {
                         check(rs.getString("event_source") == source && rs.getString("event_id") == eventId) {
                             "CloudEvent receipt hash collision"
                         }
-                        true
+                        add(getIDV7(rs, "listener_id")!!)
                     }
-                }
+                } }
             }
-            if (seen) continue
+            val fresh = batch.filterNot { it in seen }
+            if (fresh.isEmpty()) continue
             connection.prepareStatement(
-                "INSERT INTO lemline_listener_receipts (listener_id, event_key, event_source, event_id, delivery_token) VALUES (?, ?, ?, ?, ?)"
+                "INSERT INTO lemline_listener_receipts (listener_id, event_key, event_source, event_id, delivery_token) VALUES " +
+                    fresh.joinToString(",") { "(?, ?, ?, ?, ?)" }
             ).use { stmt ->
-                setIDV7(stmt, 1, listener.id)
-                stmt.setString(2, key)
-                stmt.setString(3, source)
-                stmt.setString(4, eventId)
-                stmt.setString(5, token)
+                var index = 1
+                for (id in fresh) {
+                    setIDV7(stmt, index++, id)
+                    stmt.setString(index++, key)
+                    stmt.setString(index++, source)
+                    stmt.setString(index++, eventId)
+                    stmt.setString(index++, token)
+                }
                 stmt.executeUpdate()
             }
         }
