@@ -250,3 +250,30 @@ single-filter termination messages remain readable and retain their protobuf enc
 New multi-filter/extension termination messages use an additive protobuf field; upgrade
 workers before publishing workflows that require this field. Old workers cannot process it.
 Already-running legacy listeners retain the single filter captured in their start message.
+
+### CloudEvent redelivery
+
+Migration V904 adds `lemline_listener_receipts`. Each listener claims a CloudEvent
+by its exact `source + id` before evaluating termination or collecting events.
+The listener row lock and the receipt, progress, collection and closure writes
+share one transaction. A rollback releases the claim; a redelivery after commit
+cannot advance the same listener, append another event, reevaluate its until
+expression or enqueue another foreach iteration. Other listeners can still
+consume the same CloudEvent.
+
+The receipt primary key uses the listener ID and SHA-256 of the length-prefixed
+source plus event ID to keep indexes bounded on all three databases. The complete
+source and ID are stored and checked; a hash collision fails the transaction
+instead of silently discarding an event. A delivery token restricts every batch
+query to the receipts newly claimed by that transaction.
+
+Receipts survive event cleanup and are removed by foreign-key cascade when their
+listener is deleted. This costs one receipt per delivered event per listener and
+serializes concurrent processing for a listener. Queue rows use their unique
+`listener_id + event_index` identity, while completed output deduplication uses
+`source + id` so different sources can reuse an ID.
+
+All consuming workers must run the new code for this guarantee to hold. Receipts
+are not reconstructed for deliveries committed before this upgrade, including
+termination-only events that were never collected. Drain and acknowledge in-flight
+deliveries before switching versions when an upgrade-time replay must be avoided.

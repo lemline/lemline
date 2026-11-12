@@ -24,6 +24,8 @@ import kotlin.random.Random
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.hours
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.async
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.BeforeEach
@@ -110,17 +112,19 @@ abstract class ListenerRepositoryTestBase {
         }
 
         private fun service(model: ListenerModel): ListenerEventService {
-            val until = (model.instanceMessage.workflowState.config.until as UntilCondition.Event).consumption
+            val condition = model.instanceMessage.workflowState.config.until
+            val until = (condition as? UntilCondition.Event)?.consumption
             val task = CachedListenTask(
                 workflowInfo = model.workflowInfo, nodePosition = model.nodePosition,
-                consumption = CachedEventConsumption(ListenStrategy.ANY, emptyList(), untilEvents = until),
+                consumption = CachedEventConsumption(ListenStrategy.ANY, emptyList(),
+                    untilExpression = (condition as? UntilCondition.Expression)?.expression, untilEvents = until),
                 readAs = ListenAndReadAs.DATA,
                 hasForeach = model.hasForeach,
             )
             val definitions = io.mockk.mockk<DefinitionListenService>()
             io.mockk.every { definitions.findMatchingListenTasks(any(), any()) } returns listOf(MatchingListenTask(task, null, 0))
             io.mockk.every { definitions.findMatchingUntilEvents(any()) } answers {
-                if (until.mayMatch(firstArg())) listOf(MatchingListenTaskUntilEvent(task)) else emptyList()
+                if (until?.mayMatch(firstArg()) == true) listOf(MatchingListenTaskUntilEvent(task)) else emptyList()
             }
             return ListenerEventService().apply {
                 listenerRepository = getRepository()
@@ -130,8 +134,8 @@ abstract class ListenerRepositoryTestBase {
             }
         }
 
-        private fun event(type: String, id: String = IDV7.random().toString()) =
-            CloudEventBuilder.v1().withId(id).withSource(URI("https://tests"))
+        private fun event(type: String, id: String = IDV7.random().toString(), source: String = "https://tests") =
+            CloudEventBuilder.v1().withId(id).withSource(URI(source))
                 .withType(type).withData("application/json", "{}".toByteArray()).build()
 
         @Test fun `until all persists partial progress across service restart and excludes final event`() = runTest {
@@ -145,13 +149,94 @@ abstract class ListenerRepositoryTestBase {
             service(model).handleCloudEvent(event("stop2"), model.workflowInfo.namespace)
             getRepository().findById(model.id)!!.closedAt shouldNotBe null
             val events = getEventRepository().listAll().filter { it.listenerId == model.id }
-            // Main-stream duplicate handling is unchanged; repeated termination filters
-            // must not complete ALL early. The closing stop2 event is never collected.
-            events.size shouldBe 3
+            // A committed delivery retried by a fresh service neither advances until
+            // nor inserts another main-stream/foreach entry.
+            events.size shouldBe 2
             events.none { CloudEventService.deserialize(it.event).type == "stop2" } shouldBe true
             events.all { !it.foreachCompleted } shouldBe true
             // Closing does not bypass pending foreach work.
             getRepository().findById(model.id)!!.outboxDelayedUntil shouldBe null
+        }
+
+        @Test fun `committed receipts distinguish sources and subscriptions and survive event cleanup`() = runTest {
+            val model = listener(rule(ListenStrategy.ALL, "stop1", "stop2"))
+            val first = event("data", "shared-id", "https://source-a")
+            val second = event("data", "shared-id", "https://source-b")
+            service(model).handleCloudEvent(first, model.workflowInfo.namespace)
+            service(model).handleCloudEvent(second, model.workflowInfo.namespace)
+            service(model).handleCloudEvent(first, model.workflowInfo.namespace)
+            service(model).handleCloudEvent(second, model.workflowInfo.namespace)
+            getEventRepository().listAll().count { it.listenerId == model.id } shouldBe 2
+            getEventRepository().findCompletedOutputsByListeners(listOf(model.id))[model.id]!!.size shouldBe 2
+
+            // A new subscription to the same definition must still receive this event.
+            val other = listener(rule(ListenStrategy.ALL, "stop1", "stop2"), template = model)
+            service(other).handleCloudEvent(first, other.workflowInfo.namespace)
+            getEventRepository().listAll().count { it.listenerId == model.id } shouldBe 2
+            getEventRepository().listAll().count { it.listenerId == other.id } shouldBe 1
+
+            // Collection cleanup must not erase the durable delivery history.
+            getEventRepository().listAll().filter { it.listenerId == model.id }.forEach {
+                getEventRepository().delete(it)
+            }
+            service(model).handleCloudEvent(first, model.workflowInfo.namespace)
+            getEventRepository().listAll().count { it.listenerId == model.id } shouldBe 0
+        }
+
+        @Test fun `concurrent redelivery after commit creates only one foreach entry`() = runTest {
+            val model = listener(rule(ListenStrategy.ONE, "stop"), foreach = true)
+            val delivered = event("data")
+            service(model).handleCloudEvent(delivered, model.workflowInfo.namespace)
+            coroutineScope {
+                listOf(async { service(model).handleCloudEvent(delivered, model.workflowInfo.namespace) },
+                    async { service(model).handleCloudEvent(delivered, model.workflowInfo.namespace) }).awaitAll()
+            }
+            val rows = getEventRepository().listAll().filter { it.listenerId == model.id }
+            rows.size shouldBe 1
+            rows.single().foreachCompleted shouldBe false
+            val closing = event("stop")
+            service(model).handleCloudEvent(closing, model.workflowInfo.namespace)
+            service(model).handleCloudEvent(closing, model.workflowInfo.namespace)
+            getEventRepository().listAll().count { it.listenerId == model.id } shouldBe 1
+            getRepository().findById(model.id)!!.closedAt shouldNotBe null
+        }
+
+        @Test fun `committed redelivery cannot prematurely satisfy an until expression`() = runTest {
+            val original = listener(rule(ListenStrategy.ONE, "stop"))
+            val config = original.instanceMessage.workflowState.config.copy(until = UntilCondition.Expression("length >= 2"))
+            val model = original.copy(
+                instanceMessage = original.instanceMessage.copy(workflowState = original.instanceMessage.workflowState.copy(config = config)),
+                listenerStrategy = ListenerStrategy.ANY_UNTIL_EXPR,
+                untilExpression = "length >= 2",
+            )
+            getRepository().update(model)
+            val first = event("data")
+            service(model).handleCloudEvent(first, model.workflowInfo.namespace)
+            service(model).handleCloudEvent(first, model.workflowInfo.namespace)
+            getRepository().findById(model.id)!!.closedAt shouldBe null
+            getEventRepository().listAll().count { it.listenerId == model.id } shouldBe 1
+            service(model).handleCloudEvent(event("data"), model.workflowInfo.namespace)
+            getRepository().findById(model.id)!!.closedAt shouldNotBe null
+        }
+
+        @Test fun `foreach queue distinguishes equal ids from different sources`() = runTest {
+            val model = listener(rule(ListenStrategy.ONE, "stop"), foreach = true)
+            service(model).handleCloudEvent(event("data", "same", "https://a"), model.workflowInfo.namespace)
+            service(model).handleCloudEvent(event("data", "same", "https://b"), model.workflowInfo.namespace)
+            getEventRepository().markReadyForForeach(100)
+            val rows = getEventRepository().listAll().filter { it.listenerId == model.id }.sortedBy { it.sortKey }
+            rows.size shouldBe 2
+            rows[0].outboxDelayedUntil shouldNotBe null
+            rows[1].outboxDelayedUntil shouldBe null
+            rows[0].outboxAttemptCount = 7
+            getEventRepository().update(rows[0]) shouldBe 1
+            getEventRepository().markForeachCompleted(model.id, rows[0].sortKey, "first") shouldBe 1
+            getEventRepository().markReadyForForeach(100)
+            val updated = getEventRepository().listAll().filter { it.listenerId == model.id }.sortedBy { it.sortKey }
+            updated[1].outboxAttemptCount shouldBe 0
+            updated[1].outboxDelayedUntil shouldNotBe null
+            getEventRepository().markForeachCompleted(model.id, rows[1].sortKey, "second") shouldBe 1
+            getEventRepository().findCompletedOutputsByListeners(listOf(model.id))[model.id] shouldBe listOf("first", "second")
         }
 
         @Test fun `until any accepts second filter and wildcard can terminate before first data`() = runTest {

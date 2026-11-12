@@ -363,6 +363,44 @@ class ListenerRepository : CrudRepository<ListenerModel>(),
             stmt.executeQuery().use { rs -> if (rs.next()) createModel(rs) else null }
         }
 
+    /** Claim each subscription once per CloudEvent, while holding its row lock until commit.
+     * Receipts outlive collected-event cleanup and are deleted with the listener.
+     */
+    suspend fun claimDelivery(keys: List<ListenerQueryKey>, source: String, eventId: String, connection: Connection): String {
+        val token = IDV7.random().toString()
+        val key = java.security.MessageDigest.getInstance("SHA-256")
+            .digest("${source.length}:$source$eventId".toByteArray(Charsets.UTF_8))
+            .joinToString("") { "%02x".format(it) }
+        for (listener in findUntilListenersForUpdate(keys, connection)) {
+            val seen = connection.prepareStatement(
+                "SELECT event_source, event_id FROM lemline_listener_receipts WHERE listener_id = ? AND event_key = ?"
+            ).use { stmt ->
+                setIDV7(stmt, 1, listener.id)
+                stmt.setString(2, key)
+                stmt.executeQuery().use { rs ->
+                    if (!rs.next()) false else {
+                        check(rs.getString("event_source") == source && rs.getString("event_id") == eventId) {
+                            "CloudEvent receipt hash collision"
+                        }
+                        true
+                    }
+                }
+            }
+            if (seen) continue
+            connection.prepareStatement(
+                "INSERT INTO lemline_listener_receipts (listener_id, event_key, event_source, event_id, delivery_token) VALUES (?, ?, ?, ?, ?)"
+            ).use { stmt ->
+                setIDV7(stmt, 1, listener.id)
+                stmt.setString(2, key)
+                stmt.setString(3, source)
+                stmt.setString(4, eventId)
+                stmt.setString(5, token)
+                stmt.executeUpdate()
+            }
+        }
+        return token
+    }
+
     /** Lock matching subscriptions while accumulating termination progress and closing them. */
     suspend fun findUntilListenersForUpdate(keys: List<ListenerQueryKey>, connection: Connection): List<ListenerModel> {
         if (keys.isEmpty()) return emptyList()
@@ -508,7 +546,9 @@ class ListenerRepository : CrudRepository<ListenerModel>(),
         }
         return try {
             val array = Json.parseToJsonElement(json).jsonArray
-            array.map { Json.encodeToString(it) }
+            // MySQL aggregates the TEXT event column as JSON strings; PostgreSQL/H2
+            // aggregate parsed objects. Both must yield the original event envelope.
+            array.map { if (it is kotlinx.serialization.json.JsonPrimitive && it.isString) it.content else Json.encodeToString(it) }
         } catch (_: Exception) {
             emptyList()
         }

@@ -69,6 +69,7 @@ class ListenerEventServiceTest {
     @BeforeEach
     fun setup() {
         clearAllMocks()
+        coEvery { mockedListenerRepository.claimDelivery(any(), any(), any(), any()) } returns "test-delivery"
         coEvery { mockedListenerRepository.update(any<ListenerModel>(), any()) } returns 1
         coEvery { mockedDatabaseConfig.withTransaction<Any?>(any(), any()) } coAnswers {
             val block = secondArg<suspend (java.sql.Connection) -> Any?>()

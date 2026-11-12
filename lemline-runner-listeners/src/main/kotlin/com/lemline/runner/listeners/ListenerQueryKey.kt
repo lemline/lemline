@@ -26,7 +26,9 @@ data class ListenerQueryKey(
      * True if this key is for a listen task from a function definition.
      * Function listen tasks use suffix matching on position (e.g., LIKE '%/_fn/do/0/waitForEvent').
      */
-    val isFromFunction: Boolean = false
+    val isFromFunction: Boolean = false,
+    /** Restrict processing to receipts claimed by this transaction. */
+    val deliveryToken: String? = null
 ) {
     /**
      * Builds SQL WHERE condition for this key.
@@ -53,7 +55,10 @@ data class ListenerQueryKey(
             " AND $prefix${ListenerRepository.STRATEGY_COLUMN} = ?"
         } else ""
 
-        return "($baseCondition$correlationCondition$strategyCondition)"
+        val receiptCondition = if (deliveryToken != null) {
+            " AND EXISTS (SELECT 1 FROM lemline_listener_receipts r WHERE r.listener_id = ${prefix}id AND r.delivery_token = ?)"
+        } else ""
+        return "($baseCondition$correlationCondition$strategyCondition$receiptCondition)"
     }
 
     /**
@@ -74,13 +79,17 @@ data class ListenerQueryKey(
         stmt.setString(idx++, positionValue)
         if (correlationValuesJson != null) stmt.setString(idx++, correlationValuesJson)
         if (listenerStrategy != null) stmt.setString(idx++, listenerStrategy.name)
+        if (deliveryToken != null) stmt.setString(idx++, deliveryToken)
 
         return idx
     }
 
     fun toSqlConditionWithoutCorrelation(tableAlias: String = ""): String {
         val prefix = if (tableAlias.isNotEmpty()) "$tableAlias." else ""
-        return "($prefix$WORKFLOW_NAMESPACE_COLUMN = ? AND $prefix$WORKFLOW_NAME_COLUMN = ? AND $prefix$WORKFLOW_VERSION_COLUMN = ? AND $prefix${WORKFLOW_POSITION_COLUMN} = ?)"
+        val receiptCondition = if (deliveryToken != null) {
+            " AND EXISTS (SELECT 1 FROM lemline_listener_receipts r WHERE r.listener_id = ${prefix}id AND r.delivery_token = ?)"
+        } else ""
+        return "($prefix$WORKFLOW_NAMESPACE_COLUMN = ? AND $prefix$WORKFLOW_NAME_COLUMN = ? AND $prefix$WORKFLOW_VERSION_COLUMN = ? AND $prefix${WORKFLOW_POSITION_COLUMN} = ?$receiptCondition)"
     }
 
     fun bindParametersWithoutCorrelation(stmt: PreparedStatement, startIndex: Int): Int {
@@ -89,6 +98,7 @@ data class ListenerQueryKey(
         stmt.setString(idx++, workflowInfo.name.toString())
         stmt.setString(idx++, workflowInfo.version.toString())
         stmt.setString(idx++, position.toString())
+        if (deliveryToken != null) stmt.setString(idx++, deliveryToken)
         return idx
     }
 

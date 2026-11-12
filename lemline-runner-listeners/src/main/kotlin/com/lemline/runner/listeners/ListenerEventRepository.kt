@@ -29,16 +29,17 @@ import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
 import java.sql.Connection
 import java.sql.ResultSet
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 
 const val LISTENER_EVENTS_TABLE = "lemline_listener_events"
 
 /**
  * Repository for managing listener events with FIFO-aware foreach processing.
  *
- * ## Composite Primary Key
- *
- * This table uses `(listener_id, event_id)` as the composite primary key.
- * The `event_id` is the CloudEvent's unique identifier, providing natural idempotency.
+ * Rows are identified by `(listener_id, event_index)`. Delivery idempotency is
+ * enforced by transactional source + id receipts in ListenerRepository.
  *
  * ## Simplified Architecture
  *
@@ -101,8 +102,8 @@ class ListenerEventRepository : CrudRepository<ListenerEventModel>(),
             cleanupColumns()
 
             key(LISTENER_ID_COLUMN) { stmt, entity, idx -> setIDV7(stmt, idx, entity.listenerId) }
-            key(EVENT_ID_COLUMN) { stmt, entity, idx -> stmt.setString(idx, entity.eventId) }
-            nullableKey(FILTER_INDEX_COLUMN) { stmt, entity, idx ->
+            column(EVENT_ID_COLUMN) { stmt, entity, idx -> stmt.setString(idx, entity.eventId) }
+            column(FILTER_INDEX_COLUMN) { stmt, entity, idx ->
                 when (val filterIndex = entity.filterIndex) {
                     null -> stmt.setNull(idx, java.sql.Types.INTEGER)
                     else -> stmt.setInt(idx, filterIndex)
@@ -111,7 +112,7 @@ class ListenerEventRepository : CrudRepository<ListenerEventModel>(),
 
             // Core columns
             column(EVENT_COLUMN) { stmt, entity, idx -> stmt.setString(idx, entity.event) }
-            column(EVENT_INDEX_COLUMN) { stmt, entity, idx -> stmt.setInt(idx, entity.sortKey) }
+            key(EVENT_INDEX_COLUMN) { stmt, entity, idx -> stmt.setInt(idx, entity.sortKey) }
             column(FOREACH_COMPLETED_COLUMN) { stmt, entity, idx ->
                 stmt.setBoolean(idx, entity.foreachCompleted)
             }
@@ -143,7 +144,7 @@ class ListenerEventRepository : CrudRepository<ListenerEventModel>(),
     /**
      * Batch inserts events for ONE/ANY strategy listeners using INSERT...SELECT.
      *
-     * Uses `(listener_id, event_id, filter_index)` as composite PK for natural idempotency.
+     * Delivery deduplication is handled by listener receipts before this method is called.
      * Filter index is set to 0 (default) for ONE/ANY strategies.
      * The UNIQUE constraint `(listener_id, filter_index)` ensures only one event per listener.
      *
@@ -260,7 +261,7 @@ class ListenerEventRepository : CrudRepository<ListenerEventModel>(),
     /**
      * Batch inserts events for accumulating strategies (ALL/ANY+until) using INSERT...SELECT.
      *
-     * Uses `(listener_id, event_id, filter_index)` as composite PK for natural idempotency.
+     * Delivery deduplication is handled by listener receipts before this method is called.
      *
      * FIFO ordering is enforced using per-listener event_index (0, 1, 2...). The foreach outbox
      * processor uses MIN(event_index) to pick the first unprocessed event per listener.
@@ -272,7 +273,7 @@ class ListenerEventRepository : CrudRepository<ListenerEventModel>(),
      * - For foreach listeners: foreach_output IS NOT NULL (set after foreach.do completes)
      * - For non-foreach listeners: has_foreach = FALSE (no processing needed)
      *
-     * Uses ON CONFLICT DO NOTHING / INSERT IGNORE for idempotency on composite PK.
+     * Uses ON CONFLICT DO NOTHING / INSERT IGNORE to preserve one event per ALL filter.
      *
      * @param keys Query keys for matching listeners (with filterIndex for ALL strategy)
      * @param eventId CloudEvent ID (unique identifier from CloudEvent spec)
@@ -588,7 +589,7 @@ class ListenerEventRepository : CrudRepository<ListenerEventModel>(),
             val placeholders = listenerIds.joinToString(",") { "?" }
 
             val sql = """
-                SELECT $LISTENER_ID_COLUMN, $EVENT_ID_COLUMN, $FOREACH_OUTPUT_COLUMN
+                SELECT $LISTENER_ID_COLUMN, $EVENT_ID_COLUMN, $EVENT_COLUMN, $FOREACH_OUTPUT_COLUMN
                 FROM $tableName
                 WHERE $LISTENER_ID_COLUMN IN ($placeholders)
                   AND $FOREACH_OUTPUT_COLUMN IS NOT NULL
@@ -602,12 +603,12 @@ class ListenerEventRepository : CrudRepository<ListenerEventModel>(),
 
                 stmt.executeQuery().use { rs ->
                     val result = mutableMapOf<IDV7, MutableList<String>>()
-                    val seenEvents = mutableSetOf<Pair<IDV7, String>>()
+                    val seenEvents = mutableSetOf<Triple<IDV7, String, String>>()
                     while (rs.next()) {
                         val listenerId = getIDV7(rs, LISTENER_ID_COLUMN)!!
-                        val eventId = rs.getString(EVENT_ID_COLUMN)
+                        val source = Json.parseToJsonElement(rs.getString(EVENT_COLUMN)).jsonObject["source"]?.jsonPrimitive?.content.orEmpty()
                         val output = rs.getString(FOREACH_OUTPUT_COLUMN)
-                        val key = listenerId to eventId
+                        val key = Triple(listenerId, source, rs.getString(EVENT_ID_COLUMN))
                         if (seenEvents.add(key)) result.getOrPut(listenerId) { mutableListOf() }.add(output)
                     }
                     result
@@ -675,12 +676,10 @@ class ListenerEventRepository : CrudRepository<ListenerEventModel>(),
     private val processingEventCondition =
         "$FOREACH_COMPLETED_COLUMN = FALSE AND $OUTBOX_DELAYED_UNTIL_COLUMN IS NOT NULL"
 
-    /** NULL-safe composite key match for (listener_id, event_id, filter_index) */
+    /** Match the unique queue entry, even when different sources share an event id. */
     private val compositeKeyMatch = """
         t.$LISTENER_ID_COLUMN = h.$LISTENER_ID_COLUMN
-        AND t.$EVENT_ID_COLUMN = h.$EVENT_ID_COLUMN
-        AND (t.$FILTER_INDEX_COLUMN = h.$FILTER_INDEX_COLUMN
-             OR (t.$FILTER_INDEX_COLUMN IS NULL AND h.$FILTER_INDEX_COLUMN IS NULL))
+        AND t.$EVENT_INDEX_COLUMN = h.$EVENT_INDEX_COLUMN
     """.trimIndent()
 
     /**
@@ -745,7 +744,7 @@ class ListenerEventRepository : CrudRepository<ListenerEventModel>(),
         ),
         heads AS (
             SELECT DISTINCT ON (e.$LISTENER_ID_COLUMN)
-                   e.$LISTENER_ID_COLUMN, e.$EVENT_ID_COLUMN, e.$FILTER_INDEX_COLUMN
+                   e.$LISTENER_ID_COLUMN, e.$EVENT_INDEX_COLUMN
             FROM $tableName e
             JOIN locked_listeners ll ON ll.listener_id = e.$LISTENER_ID_COLUMN
             WHERE e.$pendingEventCondition
@@ -763,7 +762,7 @@ class ListenerEventRepository : CrudRepository<ListenerEventModel>(),
         UPDATE $tableName t
         JOIN (
             SELECT * FROM (
-                SELECT e.$LISTENER_ID_COLUMN, e.$EVENT_ID_COLUMN, e.$FILTER_INDEX_COLUMN
+                SELECT e.$LISTENER_ID_COLUMN, e.$EVENT_INDEX_COLUMN
                 FROM $tableName e
                 JOIN (${buildEligibleListenersSubquery(limit)}) ll
                     ON ll.listener_id = e.$LISTENER_ID_COLUMN
@@ -791,9 +790,7 @@ class ListenerEventRepository : CrudRepository<ListenerEventModel>(),
             JOIN (${buildHeadPerListenerSubquery()}) m
                 ON m.$LISTENER_ID_COLUMN = e.$LISTENER_ID_COLUMN AND m.min_event_index = e.$EVENT_INDEX_COLUMN
             WHERE e.$LISTENER_ID_COLUMN = t.$LISTENER_ID_COLUMN
-              AND e.$EVENT_ID_COLUMN = t.$EVENT_ID_COLUMN
-              AND (e.$FILTER_INDEX_COLUMN = t.$FILTER_INDEX_COLUMN
-                   OR (e.$FILTER_INDEX_COLUMN IS NULL AND t.$FILTER_INDEX_COLUMN IS NULL))
+              AND e.$EVENT_INDEX_COLUMN = t.$EVENT_INDEX_COLUMN
               AND e.$pendingEventCondition
         )
     """.trimIndent()

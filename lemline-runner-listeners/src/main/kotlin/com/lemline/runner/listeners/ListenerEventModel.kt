@@ -11,12 +11,9 @@ import kotlin.time.Instant
  *
  * ## Composite Key
  *
- * This model uses a composite primary key `(listenerId, eventId, filterIndex)` where:
- * - `eventId` is the CloudEvent's unique identifier
- * - `filterIndex` identifies which filter the event matched
- *
- * This allows the same CloudEvent to satisfy multiple filters in an ALL strategy,
- * while providing natural idempotency for duplicate events.
+ * Queue entries are identified by `(listenerId, sortKey)`.
+ * One CloudEvent may satisfy multiple ALL filters. Delivery deduplication uses
+ * per-listener source + id receipts, independently of queue entry cleanup.
  *
  * ## Simplified Architecture
  *
