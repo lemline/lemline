@@ -9,6 +9,7 @@ import com.lemline.common.values.WorkflowNamespace
 import com.lemline.common.values.WorkflowVersion
 import com.lemline.core.cloudevents.CloudEventMatcher
 import com.lemline.core.processors.EventFilter
+import com.lemline.core.workflows.CachedEventSchedule
 import com.lemline.core.workflows.CachedListenTask
 import com.lemline.core.workflows.WorkflowCache
 import io.cloudevents.CloudEvent
@@ -35,7 +36,7 @@ data class MatchingListenTask(
 
     /** Database-compatible strategy derived from core strategy + until condition. */
     val listenerStrategy: ListenerStrategy
-        get() = ListenerStrategy.from(listenTask.strategy, listenTask.until)
+        get() = ListenerStrategy.from(listenTask.consumption)
 
     /** Converts this definition match to a query key for listener lookup. */
     fun toQueryKey() = ListenerQueryKey(
@@ -148,13 +149,13 @@ class DefinitionListenService {
                 )
             } else {
                 listenTask.filters.mapIndexedNotNull { index, filter ->
-                    if (!CloudEventMatcher.matchesFilters(event, listOf(filter)) { eventData }) {
+                    if (!filter.matches(event) { eventData }) {
                         return@mapIndexedNotNull null
                     }
 
                     MatchingListenTask(
                         listenTask = listenTask,
-                        correlationValuesJson = extractCorrelationJson(filter, eventData),
+                        correlationValuesJson = extractCorrelationJson(filter.standard, eventData),
                         filterIndex = index
                     )
                 }
@@ -169,13 +170,21 @@ class DefinitionListenService {
         logger.trace { "Finding matching 'until' for CloudEvent: $event" }
 
         val matches = WorkflowCache.getAllListenTasks().mapNotNull { listenTask ->
-            val terminationFilter = listenTask.untilEventFilter ?: return@mapNotNull null
-            if (!CloudEventMatcher.matchesFilters(event, listOf(terminationFilter))) return@mapNotNull null
+            val termination = listenTask.consumption.untilEvents ?: return@mapNotNull null
+            if (!termination.mayMatch(event)) return@mapNotNull null
             MatchingListenTaskUntilEvent(listenTask = listenTask)
         }
 
         logger.debug { "Found ${matches.size} matching listen tasks 'until' event $event" }
         return matches
+    }
+
+    /** Route definitions only; durable correlation and completion are checked under the definition lock. */
+    fun findMatchingEventSchedules(event: CloudEvent, namespace: WorkflowNamespace): List<CachedEventSchedule> {
+        val data by lazy { CloudEventService.parseData(event) }
+        return WorkflowCache.getEventSchedules(namespace).filter { candidate ->
+            candidate.consumption.mayMatch(event) { data }
+        }
     }
 
     private fun extractCorrelationJson(filter: EventFilter, eventData: JsonElement): String? =

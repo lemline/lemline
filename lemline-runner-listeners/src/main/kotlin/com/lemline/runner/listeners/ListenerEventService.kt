@@ -6,13 +6,18 @@ import com.lemline.common.json.LemlineJson
 import com.lemline.common.logger.logger
 import com.lemline.common.values.WorkflowNamespace
 import com.lemline.core.expressions.JQExpression
+import com.lemline.core.processors.UntilCondition
 import com.lemline.core.states.ForeachState
 import com.lemline.core.states.WorkflowEvent
+import com.lemline.core.workflows.EventConsumptionProgress
 import com.lemline.runner.common.config.DatabaseConfig
 import com.lemline.runner.common.messaging.InstanceMessage
 import io.cloudevents.CloudEvent
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
+import java.sql.Connection
+import kotlin.time.Clock
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
@@ -93,64 +98,25 @@ class ListenerEventService {
 
         if (matchingListenTasks.isEmpty() && matchingUntilEvent.isEmpty()) return 0
 
-        // ═══════════════════════════════════════════════════════════════════════════════
-        // STEP 2: Insert events using simplified 2-path architecture
-        // ═══════════════════════════════════════════════════════════════════════════════
-
-        var affectedCount = 0
-
-        // ─────────────────────────────────────────────────────────────────────────────
-        // Path 1: ONE/ANY (without until) - Complete on first event
-        // Uses batchInsertForOneAny() which:
-        // - Inserts single event with ON CONFLICT DO NOTHING
-        // - Sets outbox_delayed_until = NOW for foreach listeners
-        // ─────────────────────────────────────────────────────────────────────────────
-        val oneAnyTasks = matchingListenTasks.filter {
-            it.listenerStrategy == ListenerStrategy.ONE || it.listenerStrategy == ListenerStrategy.ANY
+        return databaseConfig.withTransaction { conn ->
+            val keys = (matchingListenTasks.map { it.toQueryKey() } + matchingUntilEvent.map { it.toQueryKey() }).distinct()
+            val deliveryToken = listenerRepository.claimDelivery(keys, event.source.toString(), event.id, conn)
+            // Progress, collection and closure commit together. A delivery retried after
+            // rollback cannot see termination progress without its main-stream events.
+            var affectedCount = if (matchingUntilEvent.isEmpty()) 0 else processUntilEvent(matchingUntilEvent, event, conn, deliveryToken)
+            val oneAnyTasks = matchingListenTasks.filter {
+                it.listenerStrategy == ListenerStrategy.ONE || it.listenerStrategy == ListenerStrategy.ANY
+            }
+            if (oneAnyTasks.isNotEmpty()) affectedCount += insertForOneAny(oneAnyTasks, event, conn, deliveryToken)
+            val accumulatingTasks = matchingListenTasks.filter {
+                it.listenerStrategy in listOf(ListenerStrategy.ALL, ListenerStrategy.ANY_UNTIL_EXPR, ListenerStrategy.ANY_UNTIL_EVENT)
+            }
+            if (accumulatingTasks.isNotEmpty()) affectedCount += insertForAllAnyUntil(accumulatingTasks, event, conn, deliveryToken)
+            val exprTasks = accumulatingTasks.filter { it.listenerStrategy == ListenerStrategy.ANY_UNTIL_EXPR }
+            if (exprTasks.isNotEmpty()) affectedCount += processUntilExpressions(exprTasks, conn, deliveryToken)
+            logger.debug { "CloudEvent processing complete: $affectedCount events/listeners affected" }
+            affectedCount
         }
-        if (oneAnyTasks.isNotEmpty()) {
-            affectedCount += insertForOneAny(oneAnyTasks, event)
-        }
-
-        // ─────────────────────────────────────────────────────────────────────────────
-        // Path 2: Accumulating (ALL or ANY+until) - Accumulate events
-        // Uses batchInsertForAccumulating() which:
-        // - Inserts events with sequence numbers for FIFO ordering
-        // - Triggers first event for foreach listeners
-        // ─────────────────────────────────────────────────────────────────────────────
-        val accumulatingTasks = matchingListenTasks.filter {
-            it.listenerStrategy in listOf(
-                ListenerStrategy.ALL,
-                ListenerStrategy.ANY_UNTIL_EXPR,
-                ListenerStrategy.ANY_UNTIL_EVENT
-            )
-        }
-        if (accumulatingTasks.isNotEmpty()) {
-            affectedCount += insertForAllAnyUntil(accumulatingTasks, event)
-        }
-
-        // ═══════════════════════════════════════════════════════════════════════════════
-        // STEP 3: Handle termination events and until expression evaluation
-        // ═══════════════════════════════════════════════════════════════════════════════
-
-        // ─────────────────────────────────────────────────────────────────────────────
-        // Termination events: Mark listeners as ready for completion
-        // ─────────────────────────────────────────────────────────────────────────────
-        if (matchingUntilEvent.isNotEmpty()) {
-            affectedCount += processUntilEvent(matchingUntilEvent)
-        }
-
-        // ─────────────────────────────────────────────────────────────────────────────
-        // Until expressions: Evaluate and mark ready if expression is true
-        // ─────────────────────────────────────────────────────────────────────────────
-        val exprTasks = accumulatingTasks.filter { it.listenerStrategy == ListenerStrategy.ANY_UNTIL_EXPR }
-        if (exprTasks.isNotEmpty()) {
-            affectedCount += processUntilExpressions(exprTasks)
-        }
-
-        logger.debug { "CloudEvent processing complete: $affectedCount events/listeners affected" }
-
-        return affectedCount
     }
 
     /**
@@ -171,15 +137,18 @@ class ListenerEventService {
     private suspend fun insertForOneAny(
         listenTasks: List<MatchingListenTask>,
         event: CloudEvent,
+        connection: Connection,
+        deliveryToken: String,
     ): Int {
         // Store complete CloudEvent - readAs transformation happens at completion time
         val eventJson = CloudEventService.serialize(event)
-        val queryKeys = listenTasks.map { it.toQueryKey() }.distinct()
+        val queryKeys = listenTasks.map { it.toQueryKey().copy(deliveryToken = deliveryToken) }.distinct()
 
         val inserted = listenerEventRepository.batchInsertForOneAny(
             keys = queryKeys,
             eventId = event.id,
-            eventJson = eventJson
+            eventJson = eventJson,
+            connection = connection,
         )
 
         if (inserted > 0) {
@@ -207,15 +176,18 @@ class ListenerEventService {
     private suspend fun insertForAllAnyUntil(
         definitions: List<MatchingListenTask>,
         event: CloudEvent,
+        connection: Connection,
+        deliveryToken: String,
     ): Int {
         // Store complete CloudEvent - readAs transformation happens at completion time
         val eventJson = CloudEventService.serialize(event)
-        val queryKeys = definitions.map { it.toQueryKey() }.distinct()
+        val queryKeys = definitions.map { it.toQueryKey().copy(deliveryToken = deliveryToken) }.distinct()
 
         val inserted = listenerEventRepository.batchInsertForAllAnyUntil(
             keys = queryKeys,
             eventId = event.id,
-            eventJson = eventJson
+            eventJson = eventJson,
+            connection = connection,
         )
 
         if (inserted > 0) {
@@ -228,24 +200,35 @@ class ListenerEventService {
     /**
      * Processes termination events for ANY + until(event) strategy.
      *
-     * Uses `batchMarkReadyByTermination()` which:
-     * - Sets `completed_at = NOW` for matching listeners (stops collecting events)
-     * - Listener completion is handled by `ListenerCompletionOutbox`
+     * Locks listener rows, updates durable termination progress, and closes completed
+     * subscriptions. Foreach completion and resumption remain owned by the outboxes.
      *
      * @param listenTasks Termination definition matches
      * @return Number of listeners marked completed
      */
     private suspend fun processUntilEvent(
-        listenTasks: List<MatchingListenTaskUntilEvent>
-    ): Int {
-        val queryKeys = listenTasks.map { it.toQueryKey() }.distinct()
-
-        val markedCompleted = listenerRepository.markListenerCompletedByUntilEvent(queryKeys)
-        if (markedCompleted > 0) {
-            logger.debug { "Marked $markedCompleted listeners as completed (termination event received)" }
+        listenTasks: List<MatchingListenTaskUntilEvent>,
+        event: CloudEvent,
+        connection: Connection,
+        deliveryToken: String,
+    ): Int = databaseConfig.withTransaction(connection) { conn ->
+        val keys = listenTasks.map { it.toQueryKey().copy(deliveryToken = deliveryToken) }.distinct()
+        val listeners = listenerRepository.findUntilListenersForUpdate(keys, conn)
+        var completed = 0
+        for (listener in listeners) {
+            val config = listener.instanceMessage.workflowState.config
+            val termination = (config.until as? UntilCondition.Event)?.consumption ?: continue
+            val progress = listener.untilProgress?.let { Json.decodeFromString<EventConsumptionProgress>(it) }
+                ?: EventConsumptionProgress()
+            val ready = progress.consume(termination, event, config.correlationContext)
+            listener.untilProgress = Json.encodeToString(progress)
+            if (ready) {
+                listener.closedAt = Clock.System.now()
+                completed++
+            }
+            listenerRepository.update(listener, conn)
         }
-
-        return markedCompleted
+        completed
     }
 
     /**
@@ -262,11 +245,13 @@ class ListenerEventService {
      * Uses transaction + FOR UPDATE to prevent race when concurrent CloudEvents trigger evaluation.
      */
     private suspend fun processUntilExpressions(
-        listenTasks: List<MatchingListenTask>
+        listenTasks: List<MatchingListenTask>,
+        connection: Connection,
+        deliveryToken: String,
     ): Int {
-        val queryKeys = listenTasks.map { it.toQueryKey() }
+        val queryKeys = listenTasks.map { it.toQueryKey().copy(deliveryToken = deliveryToken) }
 
-        return databaseConfig.withTransaction { conn ->
+        return databaseConfig.withTransaction(connection) { conn ->
             val listenersWithEvents = listenerRepository.findListenersByKeysWithEvents(queryKeys, conn)
             if (listenersWithEvents.isEmpty()) return@withTransaction 0
 
@@ -317,16 +302,13 @@ class ListenerEventService {
         val listenerId = forEachCompleted.nodeStack.pop().listenerId()
         logger.debug { "ListenForEachCompleted: listenPosition=$forEachPosition, listenerId=$listenerId, sortKey=${foreachState.index}" }
 
-        val listener = listenerRepository.findById(listenerId)
-
-        logger.debug { "ListenForEachCompleted: listener=$listener, closedAt = ${listener?.closedAt}" }
-
-        if (listener == null) {
-            logger.warn { "Listener not found for $listenerId - message=$message" }
-            return
-        }
-
         databaseConfig.withTransaction { conn ->
+            val listener = listenerRepository.findByIdForUpdate(listenerId, conn)
+            if (listener == null) {
+                logger.warn { "Listener not found for $listenerId - message=$message" }
+                return@withTransaction
+            }
+
             val outputJson = LemlineJson.encodeToString(forEachOutput)
 
             val updated = listenerEventRepository.markForeachCompleted(

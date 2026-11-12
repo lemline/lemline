@@ -55,10 +55,23 @@ message EventFilterProto {
     CorrelationMapProto correlations = 9;
 }
 
+message CachedEventFilterProto {
+    EventFilterProto standard = 1;
+    map<string, google.protobuf.Value> extensions = 2;
+}
+
+message EventConsumptionProto {
+    ListenStrategyProto strategy = 1;
+    repeated CachedEventFilterProto filters = 2;
+    optional string until_expression = 3;
+    EventConsumptionProto until_events = 4;
+}
+
 message UntilConditionProto {
     oneof value {
         string expression = 1;
         EventFilterProto event_filter = 2;
+        EventConsumptionProto event_consumption = 3;
     }
 }
 

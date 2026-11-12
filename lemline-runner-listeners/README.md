@@ -220,3 +220,81 @@ ListenerForeachOutbox  Check completion
 | `cloud_event` | TEXT | Full CloudEvent JSON |
 | `output` | TEXT | Foreach iteration output |
 | `outbox_*` | Various | Outbox pattern fields |
+
+## Complete event termination strategies
+
+Cached listen tasks and `schedule.on` share `CachedEventConsumption`: one/any/all filters,
+optional expression termination, and an optional event termination strategy. Listen routing
+checks every termination filter, including `until.any: []` (any incoming event).
+
+For `listen`, `until.all` progress is per listener instance and stored in `until_progress`.
+Workers lock the listener with `FOR UPDATE`, evaluate the persisted progress, and commit
+progress, main-event inserts, and closure in the same transaction. Failures roll back all
+three; retries and other workers resume from database state. Foreach context updates take
+the same listener lock. Termination events never bypass pending foreach processing.
+
+Behavior changes from the former first-filter-only implementation:
+
+- `until.any` accepts any of its filters, not just the first.
+- `until.all` waits for all filters, in either order, with correlated partial progress.
+- `until.any: []` terminates on the next event, even before any data is collected.
+- An event that completes termination is excluded from the main output, even when it
+  also matches the main filter. This aligns the durable runner with FullOrchestrator.
+- Termination filters now honor extensions and correlation against instance context.
+
+Expression termination and ordinary one/any/all collection retain their behavior.
+DSL 1.0 schema validation still rejects another `until` inside an event termination strategy.
+
+Migration V903 adds nullable listener progress on PostgreSQL, MySQL and H2. Existing
+single-filter termination messages remain readable and retain their protobuf encoding.
+New multi-filter/extension termination messages use an additive protobuf field; upgrade
+workers before publishing workflows that require this field. Old workers cannot process it.
+Already-running legacy listeners retain the single filter captured in their start message.
+
+### CloudEvent redelivery
+
+Migration V904 adds `lemline_listener_receipts`. Each listener claims a CloudEvent
+by its exact `source + id` before evaluating termination or collecting events.
+The listener row lock and the receipt, progress, collection and closure writes
+share one transaction. A rollback releases the claim; a redelivery after commit
+cannot advance the same listener, append another event, reevaluate its until
+expression or enqueue another foreach iteration. Other listeners can still
+consume the same CloudEvent.
+
+The receipt primary key uses the listener ID and SHA-256 of the length-prefixed
+source plus event ID to keep indexes bounded on all three databases. The complete
+source and ID are stored and checked; a hash collision fails the transaction
+instead of silently discarding an event. A delivery token restricts every batch
+query to the receipts newly claimed by that transaction.
+
+Receipts survive event cleanup and are removed by foreign-key cascade when their
+listener is deleted. This costs one receipt per delivered event per listener and
+serializes concurrent processing for a listener. Queue rows use their unique
+`listener_id + event_index` identity, while completed output deduplication uses
+`source + id` so different sources can reuse an ID.
+
+All consuming workers must run the new code for this guarantee to hold. Receipts
+are not reconstructed for deliveries committed before this upgrade, including
+termination-only events that were never collected. Drain and acknowledge in-flight
+deliveries before switching versions when an upgrade-time replay must be avoided.
+
+### Delivery query performance
+
+V905 replaces the receipt lookup index with `(delivery_token, listener_id)` so
+batch joins can start from a token without scanning receipt history. It also adds
+an index for open listeners. Receipt claims lock only listener IDs in stable order,
+then read and insert receipts in chunks of 500 while retaining the same transaction.
+A first delivery to 501 listeners uses five statements for this phase; replay uses
+three. Claims still serialize overlapping listeners and retain durable receipts.
+
+Event ordering looks up the last queue index only for affected listeners through
+`(listener_id, event_index)`, instead of grouping the entire event table. The new
+nullable `event_source` column avoids fetching and parsing envelopes merely to
+deduplicate completed outputs. New writes populate it; pre-V905 rows fall back to
+their stored envelope. There is no eager backfill or change to output identity.
+
+MySQL and H2 also have a descending last-entry index. MySQL explicitly selects
+this index for the correlated last-entry lookup; H2 uses a VALUES join for
+receipt batches because a leading IN-list can scan each listener's full history.
+These dialect-specific choices are verified with execution plans, at the cost of
+one additional queue index on those two engines.

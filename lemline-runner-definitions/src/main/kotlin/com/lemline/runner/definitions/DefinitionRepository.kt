@@ -96,6 +96,17 @@ class DefinitionRepository : CrudRepository<DefinitionModel>() {
         "SELECT * FROM $tableName WHERE $NAMESPACE_COLUMN = ? ORDER BY $NAME_COLUMN, $VERSION_COLUMN"
     }
 
+    /** Serialize event collection with definition updates and deletes across workers. */
+    suspend fun findForUpdate(model: com.lemline.common.values.WorkflowInfo, connection: Connection): DefinitionModel? =
+        connection.prepareStatement(
+            "SELECT * FROM $tableName WHERE namespace = ? AND name = ? AND version = ? FOR UPDATE"
+        ).use { stmt ->
+            stmt.setString(1, model.namespace.toString())
+            stmt.setString(2, model.name.toString())
+            stmt.setString(3, model.version.toString())
+            stmt.executeQuery().use { rs -> if (rs.next()) createModel(rs) else null }
+        }
+
     /**
      * Deletes all workflows belonging to the given namespace.
      */

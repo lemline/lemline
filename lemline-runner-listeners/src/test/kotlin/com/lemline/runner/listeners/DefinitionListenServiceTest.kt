@@ -45,6 +45,37 @@ class DefinitionListenServiceTest {
         return builder.build()
     }
 
+    @Test
+    fun `listen and schedule routing share extension matching`() {
+        val filter = "with: { type: order, tenant: acme }"
+        WorkflowCache.parseYamlAndPut("""
+            document:
+              dsl: '1.0.0'
+              namespace: default
+              name: shared-filters
+              version: '1.0.0'
+            schedule:
+              on:
+                one:
+                  $filter
+            do:
+              - waitForEvent:
+                  listen:
+                    to:
+                      one:
+                        $filter
+        """.trimIndent())
+        val namespace = com.lemline.common.values.WorkflowNamespace("default")
+        for ((tenant, expected) in listOf("acme" to 1, "other" to 0)) {
+            val event = CloudEventBuilder.from(buildCloudEvent("order")).withExtension("tenant", tenant).build()
+            service.findMatchingListenTasks(event).size shouldBe expected
+            service.findMatchingEventSchedules(event, namespace).size shouldBe expected
+        }
+        val missing = buildCloudEvent("order")
+        service.findMatchingListenTasks(missing).shouldBeEmpty()
+        service.findMatchingEventSchedules(missing, namespace).shouldBeEmpty()
+    }
+
     @Nested
     inner class FindMatchingUntilEventsTests {
 

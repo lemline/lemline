@@ -53,6 +53,10 @@ class Starter : WorkflowStarter<ScheduleModel> {
 
         val workflowVersion = WorkflowVersion(workflow.document.version)
 
+        if (workflow.schedule?.on != null) {
+            onError("Workflow $workflowNamespace/$workflowName:$workflowVersion uses schedule.on and starts automatically from matching CloudEvents; it cannot be started manually.")
+        }
+
         // Validate input against schema if any
         validateInput(workflowInput, workflow, onError)
 

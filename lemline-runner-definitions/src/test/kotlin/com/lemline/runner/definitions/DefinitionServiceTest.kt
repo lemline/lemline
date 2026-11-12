@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.definitions
 
+import com.lemline.core.workflows.WorkflowCache
+import com.lemline.common.values.info
 import com.lemline.common.values.WorkflowName
 import com.lemline.common.values.WorkflowNamespace
 import com.lemline.common.values.WorkflowVersion
@@ -64,6 +66,50 @@ class DefinitionServiceTest {
             val dbField = DefinitionService::class.java.getDeclaredField("databaseConfig")
             dbField.isAccessible = true
             dbField.set(this, mockedDatabaseConfig)
+        }
+    }
+
+    @Test
+    fun `post commit invalidation preserves concurrently recreated definitions for every delete scope`() = runTest {
+        val source = """
+            document:
+              dsl: '1.0.0'
+              namespace: recreate
+              name: trigger
+              version: '1.0.0'
+            schedule:
+              on:
+                one:
+                  with: { type: old }
+            do:
+              - result:
+                  set: { value: old }
+        """.trimIndent()
+        val model = DefinitionModel.from(source)
+        val connection = mockk<java.sql.Connection>()
+        coEvery { mockedRepository.findByNameAndVersion(any(), any(), any(), any()) } returns model
+        coEvery { mockedRepository.listByName(any(), any(), any()) } returns listOf(model)
+        coEvery { mockedRepository.listAllInNamespace(any(), any()) } returns listOf(model)
+        coEvery { mockedRepository.countAllInNamespace(any(), any()) } returns 1
+        coEvery { mockedListenService.removeListeners(any(), any(), any()) } returns 0
+        coEvery { mockedRepository.delete(model, any()) } returns 1
+        coEvery { mockedRepository.delete(listOf(model), any()) } returns 1
+        coEvery { mockedRepository.deleteAllInNamespace(any(), any()) } returns 1
+        coEvery { mockedDatabaseConfig.withTransaction<DefinitionService.DeleteResult>(any(), any()) } coAnswers {
+            val result = secondArg<suspend (java.sql.Connection) -> DefinitionService.DeleteResult>()(connection)
+            // A save publishes its new entry after deletion commits but before eviction runs.
+            WorkflowCache.parseYamlAndPut(source.replace("old", "new"))
+            result
+        }
+        for (scope in 0..2) {
+            val original = WorkflowCache.parseYamlAndPut(source)
+            when (scope) {
+                0 -> service.delete(model.namespace, model.name, model.version)
+                1 -> service.deleteAllVersions(model.namespace, model.name)
+                else -> service.deleteAllInNamespace(model.namespace)
+            }
+            WorkflowCache.getEventSchedules(original.info.namespace).single()
+                .consumption.filters.single().standard.type shouldBe "new"
         }
     }
 

@@ -7,6 +7,7 @@ import com.lemline.common.values.WorkflowNamespace
 import com.lemline.common.values.WorkflowVersion
 import com.lemline.core.states.WorkflowEvent
 import com.lemline.runner.common.config.DatabaseConfig
+import com.lemline.runner.common.config.DatabaseType
 import com.lemline.runner.common.namespaces.NamespaceScope
 import com.lemline.runner.common.repositories.helpers.ColumnBindings
 import com.lemline.runner.common.repositories.helpers.ColumnBindingsBuilder
@@ -139,6 +140,7 @@ class ListenerRepository : CrudRepository<ListenerModel>(),
         const val FILTERS_COUNT_COLUMN = "filters_count"
         const val HAS_UNTIL_COLUMN = "has_until"
         const val UNTIL_EXPRESSION_COLUMN = "until_expression"
+        const val UNTIL_PROGRESS_COLUMN = "until_progress"
         const val HAS_FOREACH_COLUMN = "has_foreach"
         const val CLOSED_AT_COLUMN = "closed_at"
     }
@@ -168,6 +170,9 @@ class ListenerRepository : CrudRepository<ListenerModel>(),
             column(UNTIL_EXPRESSION_COLUMN) { stmt, entity, idx ->
                 stmt.setString(idx, entity.untilExpression)
             }
+            column(UNTIL_PROGRESS_COLUMN) { stmt, entity, idx ->
+                stmt.setString(idx, entity.untilProgress)
+            }
             column(HAS_FOREACH_COLUMN) { stmt, entity, idx ->
                 stmt.setBoolean(idx, entity.hasForeach)
             }
@@ -192,6 +197,7 @@ class ListenerRepository : CrudRepository<ListenerModel>(),
         filtersCount = rs.getInt(FILTERS_COUNT_COLUMN).takeIf { !rs.wasNull() }
         hasUntil = rs.getBoolean(HAS_UNTIL_COLUMN)
         untilExpression = rs.getString(UNTIL_EXPRESSION_COLUMN)
+        untilProgress = rs.getString(UNTIL_PROGRESS_COLUMN)
         hasForeach = rs.getBoolean(HAS_FOREACH_COLUMN)
         correlationValues = rs.getString(CORRELATION_VALUES_COLUMN)
         closedAt = rs.getInstant(CLOSED_AT_COLUMN)
@@ -351,6 +357,97 @@ class ListenerRepository : CrudRepository<ListenerModel>(),
             }
         }
 
+    /** Lock before replacing an instance message so foreach cannot overwrite newer until progress. */
+    suspend fun findByIdForUpdate(id: IDV7, connection: Connection): ListenerModel? =
+        connection.prepareStatement("SELECT * FROM $tableName WHERE $ID_COLUMN = ? FOR UPDATE").use { stmt ->
+            setIDV7(stmt, 1, id)
+            stmt.executeQuery().use { rs -> if (rs.next()) createModel(rs) else null }
+        }
+
+    /** Claim each subscription once per CloudEvent, while holding its row lock until commit.
+     * Receipts outlive collected-event cleanup and are deleted with the listener.
+     */
+    suspend fun claimDelivery(keys: List<ListenerQueryKey>, source: String, eventId: String, connection: Connection): String {
+        val token = IDV7.random().toString()
+        val key = java.security.MessageDigest.getInstance("SHA-256")
+            .digest("${source.length}:$source$eventId".toByteArray(Charsets.UTF_8))
+            .joinToString("") { "%02x".format(it) }
+        if (keys.isEmpty()) return token
+        // Lock only IDs, in a stable order. Claiming receipts does not need workflow state.
+        val ids = connection.prepareStatement("""
+            SELECT l.id FROM $tableName l
+            WHERE l.closed_at IS NULL AND (${ListenerQueryKey.buildWhereClause(keys, "l")})
+            ORDER BY l.id FOR UPDATE
+        """.trimIndent()).use { stmt ->
+            ListenerQueryKey.bindAllParameters(keys, stmt, 1)
+            stmt.executeQuery().use { rs -> buildList { while (rs.next()) add(getIDV7(rs, "id")!!) } }
+        }
+        // Bound parameter count and rows per statement without releasing the listener locks.
+        for (batch in ids.chunked(500)) {
+            // H2 scans the whole listener range for a leading IN-list, even with
+            // an equality on event_key. A VALUES join gives it individual PK lookups.
+            val h2 = databaseConfig.dbType == DatabaseType.H2
+            val lookupSql = if (h2) {
+                "SELECT r.listener_id, r.event_source, r.event_id FROM " +
+                    "(VALUES ${batch.joinToString(",") { "(CAST(? AS UUID))" }}) ids(listener_id) " +
+                    "JOIN lemline_listener_receipts r ON r.listener_id = ids.listener_id WHERE r.event_key = ?"
+            } else {
+                "SELECT listener_id, event_source, event_id FROM lemline_listener_receipts " +
+                    "WHERE event_key = ? AND listener_id IN (${batch.joinToString(",") { "?" }})"
+            }
+            val seen = connection.prepareStatement(lookupSql).use { stmt ->
+                if (h2) {
+                    batch.forEachIndexed { index, id -> setIDV7(stmt, index + 1, id) }
+                    stmt.setString(batch.size + 1, key)
+                } else {
+                    stmt.setString(1, key)
+                    batch.forEachIndexed { index, id -> setIDV7(stmt, index + 2, id) }
+                }
+                stmt.executeQuery().use { rs -> buildSet {
+                    while (rs.next()) {
+                        check(rs.getString("event_source") == source && rs.getString("event_id") == eventId) {
+                            "CloudEvent receipt hash collision"
+                        }
+                        add(getIDV7(rs, "listener_id")!!)
+                    }
+                } }
+            }
+            val fresh = batch.filterNot { it in seen }
+            if (fresh.isEmpty()) continue
+            connection.prepareStatement(
+                "INSERT INTO lemline_listener_receipts (listener_id, event_key, event_source, event_id, delivery_token) VALUES " +
+                    fresh.joinToString(",") { "(?, ?, ?, ?, ?)" }
+            ).use { stmt ->
+                var index = 1
+                for (id in fresh) {
+                    setIDV7(stmt, index++, id)
+                    stmt.setString(index++, key)
+                    stmt.setString(index++, source)
+                    stmt.setString(index++, eventId)
+                    stmt.setString(index++, token)
+                }
+                stmt.executeUpdate()
+            }
+        }
+        return token
+    }
+
+    /** Lock matching subscriptions while accumulating termination progress and closing them. */
+    suspend fun findUntilListenersForUpdate(keys: List<ListenerQueryKey>, connection: Connection): List<ListenerModel> {
+        if (keys.isEmpty()) return emptyList()
+        val sql = """
+            SELECT l.* FROM $tableName l
+            WHERE l.$CLOSED_AT_COLUMN IS NULL
+              AND (${ListenerQueryKey.buildWhereClause(keys, "l")})
+            ORDER BY l.$ID_COLUMN
+            FOR UPDATE
+        """.trimIndent()
+        return connection.prepareStatement(sql).use { stmt ->
+            ListenerQueryKey.bindAllParameters(keys, stmt, 1)
+            stmt.executeQuery().use { rs -> rs.toModels() }
+        }
+    }
+
     /**
      * Marks listeners as completed by termination event (ANY_UNTIL_EVENT strategy).
      * Called when a termination event is received.
@@ -480,7 +577,9 @@ class ListenerRepository : CrudRepository<ListenerModel>(),
         }
         return try {
             val array = Json.parseToJsonElement(json).jsonArray
-            array.map { Json.encodeToString(it) }
+            // MySQL aggregates the TEXT event column as JSON strings; PostgreSQL/H2
+            // aggregate parsed objects. Both must yield the original event envelope.
+            array.map { if (it is kotlinx.serialization.json.JsonPrimitive && it.isString) it.content else Json.encodeToString(it) }
         } catch (_: Exception) {
             emptyList()
         }

@@ -11,6 +11,8 @@ import com.lemline.runner.common.namespaces.DestinationType
 import com.lemline.runner.common.namespaces.NamespaceScope
 import com.lemline.runner.listeners.CloudEventService
 import com.lemline.runner.listeners.ListenerEventService
+import com.lemline.runner.eventschedules.EventScheduleService
+import com.lemline.runner.definitions.DefinitionCacheSync
 import com.lemline.runner.messaging.ArrivalNamespaceResolver
 import com.lemline.runner.messaging.WithHealthCheckMessageHandler
 import jakarta.enterprise.context.ApplicationScoped
@@ -41,6 +43,12 @@ internal class CloudEventHandler(
     @Inject
     internal lateinit var listenerEventService: ListenerEventService
 
+    @Inject
+    internal lateinit var eventScheduleService: EventScheduleService
+
+    @Inject
+    internal lateinit var definitionCacheSync: DefinitionCacheSync
+
     // Test hooks
     override var onCompleteTest: (Message<String>, ReceivedCloudEvent?) -> Unit = { _, _ -> }
     override var onFailureTest: (Message<String>, Throwable?) -> Unit = { _, _ -> }
@@ -70,7 +78,9 @@ internal class CloudEventHandler(
                 // No compensation persistence — see above.
             }
         }
+        definitionCacheSync.ensureInitialized()
         listenerEventService.handleCloudEvent(current.event, current.arrivalNamespace)
+        eventScheduleService.handleCloudEvent(current.event, current.arrivalNamespace)
         // Return null to skip emit - CloudEvents don't produce outbound messages
         return null
     }

@@ -2,6 +2,7 @@
 package com.lemline.runner.definitions
 
 import com.lemline.common.logger.logger
+import com.lemline.common.values.WorkflowInfo
 import com.lemline.common.values.WorkflowName
 import com.lemline.common.values.WorkflowNamespace
 import com.lemline.common.values.WorkflowVersion
@@ -177,6 +178,7 @@ class DefinitionService {
         version: WorkflowVersion,
         connection: Connection? = null
     ): DeleteResult {
+        val snapshot = WorkflowCache.snapshot()
         logger.debug { "Deleting workflow definition: $namespace/$name:$version" }
 
         return databaseConfig.withTransaction(connection) { conn ->
@@ -187,9 +189,6 @@ class DefinitionService {
             // Remove active listeners for this workflow definition
             definitionListenService.removeListeners(namespace, name, version)
 
-            // Remove from definition cache
-            WorkflowCache.remove(namespace, name, version)
-
             // Delete the definition
             val deleted = definitionRepository.delete(model, conn) == 1
             if (deleted) {
@@ -197,6 +196,8 @@ class DefinitionService {
             } else {
                 DeleteResult.NotFound("Workflow '$name' version '$version' was deleted concurrently")
             }
+        }.also {
+            if (connection == null && it is DeleteResult.Deleted) WorkflowCache.removeIfUnchanged(WorkflowInfo(namespace, name, version), snapshot)
         }
     }
 
@@ -213,28 +214,33 @@ class DefinitionService {
         namespace: WorkflowNamespace,
         name: WorkflowName,
         connection: Connection? = null
-    ): DeleteResult = databaseConfig.withTransaction(connection) { conn ->
+    ): DeleteResult {
+        val snapshot = WorkflowCache.snapshot()
+        val removed = mutableListOf<DefinitionModel>()
+        return databaseConfig.withTransaction(connection) { conn ->
 
-        val definitions = definitionRepository.listByName(namespace, name, conn)
+            val definitions = definitionRepository.listByName(namespace, name, conn)
 
-        if (definitions.isEmpty()) {
-            return@withTransaction DeleteResult.NotFound("No workflows found with name '$name'")
+            if (definitions.isEmpty()) {
+                return@withTransaction DeleteResult.NotFound("No workflows found with name '$name'")
+            }
+
+            val versionsString = definitions.joinToString { it.version.toString() }
+
+            definitions.forEach { model ->
+                // Remove active listeners for each version
+                definitionListenService.removeListeners(namespace, name, model.version)
+            }
+
+            val deletedCount = definitionRepository.delete(definitions, conn)
+            removed.addAll(definitions)
+            DeleteResult.Deleted(
+                deletedCount,
+                "${definitions.size} versions ($versionsString) of workflow '$name'"
+            )
+        }.also {
+            if (connection == null) removed.forEach { WorkflowCache.removeIfUnchanged(WorkflowInfo(it.namespace, it.name, it.version), snapshot) }
         }
-
-        val versionsString = definitions.joinToString { it.version.toString() }
-
-        definitions.forEach { model ->
-            // Remove active listeners for each version
-            definitionListenService.removeListeners(namespace, name, model.version)
-            // Remove from cache
-            WorkflowCache.remove(namespace, name, model.version)
-        }
-
-        val deletedCount = definitionRepository.delete(definitions, conn)
-        DeleteResult.Deleted(
-            deletedCount,
-            "${definitions.size} versions ($versionsString) of workflow '$name'"
-        )
     }
 
     /**
@@ -248,23 +254,28 @@ class DefinitionService {
     suspend fun deleteAllInNamespace(
         namespace: WorkflowNamespace,
         connection: Connection? = null
-    ): DeleteResult = databaseConfig.withTransaction(connection) { conn ->
-        val count = definitionRepository.countAllInNamespace(namespace, conn)
-        if (count == 0L) {
-            return@withTransaction DeleteResult.NotFound("No workflows found in namespace '$namespace'")
+    ): DeleteResult {
+        val snapshot = WorkflowCache.snapshot()
+        val removed = mutableListOf<DefinitionModel>()
+        return databaseConfig.withTransaction(connection) { conn ->
+            val count = definitionRepository.countAllInNamespace(namespace, conn)
+            if (count == 0L) {
+                return@withTransaction DeleteResult.NotFound("No workflows found in namespace '$namespace'")
+            }
+
+            val definitions = definitionRepository.listAllInNamespace(namespace, conn)
+
+            definitions.forEach { model ->
+                // Remove active listeners for each definition
+                definitionListenService.removeListeners(namespace, model.name, model.version)
+            }
+
+            val deletedCount = definitionRepository.deleteAllInNamespace(namespace, conn)
+            removed.addAll(definitions)
+            DeleteResult.Deleted(deletedCount, "$deletedCount workflows")
+        }.also {
+            if (connection == null) removed.forEach { WorkflowCache.removeIfUnchanged(WorkflowInfo(it.namespace, it.name, it.version), snapshot) }
         }
-
-        val definitions = definitionRepository.listAllInNamespace(namespace, conn)
-
-        definitions.forEach { model ->
-            // Remove active listeners for each definition
-            definitionListenService.removeListeners(namespace, model.name, model.version)
-            // Remove from cache
-            WorkflowCache.remove(namespace, model.name, model.version)
-        }
-
-        val deletedCount = definitionRepository.deleteAllInNamespace(namespace, conn)
-        DeleteResult.Deleted(deletedCount, "$deletedCount workflows")
     }
 
     /**

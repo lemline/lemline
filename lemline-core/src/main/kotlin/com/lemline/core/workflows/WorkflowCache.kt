@@ -15,44 +15,16 @@ import com.lemline.common.values.version
 import com.lemline.core.functions.FunctionCache
 import com.lemline.core.nodes.Node
 import com.lemline.core.nodes.RootTask
-import com.lemline.core.processors.EventFilter
 import com.lemline.core.processors.ListenStrategy
-import com.lemline.core.utils.convertFilter
 import io.serverlessworkflow.api.WorkflowFormat
 import io.serverlessworkflow.api.WorkflowReader
-import io.serverlessworkflow.api.types.AllEventConsumptionStrategy
-import io.serverlessworkflow.api.types.AnyEventConsumptionStrategy
 import io.serverlessworkflow.api.types.CallFunction
-import io.serverlessworkflow.api.types.EventConsumptionStrategy
-import io.serverlessworkflow.api.types.EventFilter as SdkEventFilter
 import io.serverlessworkflow.api.types.ListenTask
 import io.serverlessworkflow.api.types.ListenTaskConfiguration
-import io.serverlessworkflow.api.types.OneEventConsumptionStrategy
 import io.serverlessworkflow.api.types.Task
-import io.serverlessworkflow.api.types.Until
 import io.serverlessworkflow.api.types.Workflow
-import io.serverlessworkflow.impl.expressions.ExpressionUtils
-import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.runBlocking
 import org.jetbrains.annotations.TestOnly
-
-/**
- * Cached until condition for ANY + until accumulation mode.
- * Pre-parsed from workflow definition for efficient CloudEvent matching.
- */
-sealed class CachedUntilCondition {
-    /**
-     * Expression evaluated against accumulated events array.
-     * E.g., ". | length > 3" or ". | any(.temperature > 38)"
-     */
-    data class Expression(val expression: String) : CachedUntilCondition()
-
-    /**
-     * Termination event filter - stop accumulating when this event arrives.
-     * Stores the filter to match against incoming events.
-     */
-    data class Event(val filter: EventFilter) : CachedUntilCondition()
-}
 
 /**
  * Cached information about a listen task in a workflow.
@@ -61,11 +33,8 @@ sealed class CachedUntilCondition {
 data class CachedListenTask(
     val workflowInfo: WorkflowInfo,
     val nodePosition: NodePosition,
-    val filters: List<EventFilter>,
-    val strategy: ListenStrategy,
+    val consumption: CachedEventConsumption,
     val readAs: ListenTaskConfiguration.ListenAndReadAs,
-    /** Until condition for ANY + until accumulation mode (null for ONE, ANY without until, ALL) */
-    val until: CachedUntilCondition? = null,
     /** Whether this listen task has foreach enabled for sequential event processing */
     val hasForeach: Boolean = false,
     /**
@@ -75,19 +44,29 @@ data class CachedListenTask(
      */
     val isFromFunction: Boolean = false
 ) {
-    /**
-     * Returns the termination filter if this is an ANY + until(event) task.
-     */
-    val untilEventFilter: EventFilter?
-        get() = (until as? CachedUntilCondition.Event)?.filter
+    val filters get() = consumption.filters
+    val strategy get() = consumption.strategy
+
 }
 
 @Suppress("unused")
 object WorkflowCache {
 
-    private val workflowCache = ConcurrentHashMap<WorkflowInfo, Workflow>()
-    private val nodesMapCache = ConcurrentHashMap<WorkflowInfo, Map<NodePosition, Node<*>>>()
-    private val listenTasksCache = ConcurrentHashMap<WorkflowInfo, List<CachedListenTask>>()
+    internal data class Entry(
+        val workflow: Workflow,
+        val nodes: Map<NodePosition, Node<*>>,
+        val listens: List<CachedListenTask>,
+        val schedule: CachedEventSchedule?,
+        val source: String?,
+    )
+
+    class Snapshot internal constructor(internal val entries: Map<WorkflowInfo, Entry>)
+
+    // Publish a workflow, its nodes and both kinds of event filters together. Writes are
+    // infrequent definition changes; event matching only reads the immutable snapshot.
+    @Volatile private var current = Snapshot(emptyMap())
+
+    fun snapshot(): Snapshot = current
 
     private val jsonMapper = LemlineJson.jacksonMapper
     private val yamlMapper = LemlineJson.yamlMapper
@@ -119,13 +98,13 @@ object WorkflowCache {
     @JvmStatic
     fun parseYamlAndPut(definition: String): Workflow = WorkflowDefinitionReader
         .read(definition, WorkflowFormat.YAML)
-        .also { workflow -> cacheWorkflow(workflow) }
+        .also { workflow -> cacheWorkflow(workflow, definition) }
 
     @JvmStatic
     fun parseYamlAndPutNoValidation(definition: String): Workflow = WorkflowReader
         .noValidation()
         .read(definition, WorkflowFormat.YAML)
-        .also { workflow -> cacheWorkflow(workflow) }
+        .also { workflow -> cacheWorkflow(workflow, definition) }
 
     /**
      * Parses the given workflow definition string in JSON format
@@ -134,25 +113,104 @@ object WorkflowCache {
     @JvmStatic
     fun parseJsonAndPut(definition: String): Workflow = WorkflowDefinitionReader
         .read(definition, WorkflowFormat.JSON)
-        .also { workflow -> cacheWorkflow(workflow) }
+        .also { workflow -> cacheWorkflow(workflow, definition) }
 
     /**
      * Caches a workflow along with its parsed node tree and listen tasks.
      * This is the internal implementation used by parse*AndPut methods.
      */
-    private fun cacheWorkflow(workflow: Workflow) {
-        workflowCache[workflow.info] = workflow
-        val (_, nodesMap) = WorkflowParser.parse(workflow)
-        nodesMapCache[workflow.info] = nodesMap
-        listenTasksCache[workflow.info] = extractListenTasks(workflow.info, nodesMap, workflow)
+    private fun entry(workflow: Workflow, source: String?): Entry {
+        val (_, nodes) = WorkflowParser.parse(workflow)
+        return Entry(
+            workflow, nodes, extractListenTasks(workflow.info, nodes, workflow),
+            workflow.schedule?.on?.get()?.let { CachedEventSchedule(workflow.info, CachedEventConsumption.from(it)) },
+            source,
+        )
     }
+
+    private fun cacheWorkflow(workflow: Workflow, source: String? = null) {
+        val entry = entry(workflow, source)
+        synchronized(this) {
+            current = Snapshot(current.entries + (workflow.info to entry))
+        }
+    }
+
+    /** Reuse parsed definitions when a locked database read confirms their source is unchanged. */
+    fun refreshDefinition(info: WorkflowInfo, definition: String): Workflow {
+        val snapshot = current
+        snapshot.entries[info]?.takeIf { it.source == definition }?.let { return it.workflow }
+        val workflow = WorkflowDefinitionReader.read(definition, WorkflowFormat.YAML)
+        require(workflow.info == info) { "Stored workflow identity does not match $info" }
+        val parsed = entry(workflow, definition)
+        synchronized(this) {
+            // Never overwrite a concurrent publication of this identity, but do not let writes
+            // to other workflows drop the refresh: the command handler reads this entry next.
+            if (current.entries[info] === snapshot.entries[info]) current = Snapshot(current.entries + (info to parsed))
+        }
+        return workflow
+    }
+
+    /**
+     * Reconcile a database snapshot only if no local cache write happened since the query began.
+     * This also detects remove/recreate races. A rejected refresh must be retried by the caller.
+     * Programmatically-built workflows (source == null) are outside database ownership.
+     */
+    fun reconcile(
+        snapshot: Snapshot,
+        definitions: Map<WorkflowInfo, String>,
+        onInvalid: (WorkflowInfo, Exception) -> Unit,
+    ): Boolean {
+        val entries = snapshot.entries.filterValues { it.source == null }.toMutableMap()
+        for ((info, source) in definitions) {
+            try {
+                entries[info] = snapshot.entries[info]?.takeIf { it.source == source } ?: run {
+                    val workflow = WorkflowDefinitionReader.read(source, WorkflowFormat.YAML)
+                    require(workflow.info == info) { "Stored workflow identity does not match $info" }
+                    entry(workflow, source)
+                }
+            } catch (e: Exception) {
+                entries.remove(info)
+                onInvalid(info, e)
+            }
+        }
+        return synchronized(this) {
+            if (current !== snapshot) false else {
+                current = Snapshot(entries.toMap())
+                true
+            }
+        }
+    }
+
+    /** Invalidate after commit without evicting a concurrent recreation of the same identity. */
+    @Synchronized
+    fun removeIfUnchanged(info: WorkflowInfo, snapshot: Snapshot) {
+        if (current.entries[info] === snapshot.entries[info]) {
+            current = Snapshot(current.entries - info)
+        }
+    }
+
+    /** A stale candidate must not evict a newer definition published while the DB read was in flight. */
+    @Synchronized
+    fun removeEventSchedule(candidate: CachedEventSchedule) {
+        if (current.entries[candidate.workflowInfo]?.schedule === candidate) {
+            current = Snapshot(current.entries - candidate.workflowInfo)
+        }
+    }
+
+    fun getEventConsumption(workflow: Workflow): CachedEventConsumption? {
+        val entry = current.entries[workflow.info]
+        return if (entry?.workflow === workflow) entry.schedule?.consumption
+        else workflow.schedule?.on?.get()?.let(CachedEventConsumption::from)
+    }
+
+    fun getEventSchedules(namespace: WorkflowNamespace): List<CachedEventSchedule> =
+        current.entries.values.mapNotNull { it.schedule }.filter { it.workflowInfo.namespace == namespace }
 
     /**
      * Caches a programmatically-built workflow.
      *
      * Use this method when you have a Workflow object built in code
-     * (e.g., synthetic workflows for function execution) rather than
-     * parsed from YAML/JSON.
+     * rather than parsed from YAML/JSON.
      *
      * @param workflow The workflow to cache
      */
@@ -179,7 +237,7 @@ object WorkflowCache {
     /**
      * Retrieves a workflow from the workflow cache using its WorkflowInfo.
      */
-    fun WorkflowInfo.getWorkflow(): Workflow? = workflowCache[this]
+    fun WorkflowInfo.getWorkflow(): Workflow? = current.entries[this]?.workflow
 
     /**
      * Retrieves a map of node positions to their corresponding nodes for a given workflow.
@@ -192,7 +250,7 @@ object WorkflowCache {
     @JvmStatic
     fun getNodesMap(
         workflow: Workflow
-    ): Map<NodePosition, Node<*>> = nodesMapCache[workflow.info]
+    ): Map<NodePosition, Node<*>> = current.entries[workflow.info]?.nodes
         ?: throw IllegalStateException("Workflow not found in cache for ${workflow.info}")
 
 
@@ -209,7 +267,7 @@ object WorkflowCache {
     fun getRootNode(
         workflow: Workflow
     ): Node<RootTask> {
-        val nodesMap = nodesMapCache[workflow.info]
+        val nodesMap = current.entries[workflow.info]?.nodes
             ?: throw IllegalStateException("Nodes map not found in cache for ${workflow.info}")
 
         val rootNode = nodesMap[NodePosition.root]
@@ -233,9 +291,7 @@ object WorkflowCache {
         version: WorkflowVersion
     ) {
         val key = WorkflowInfo(namespace, name, version)
-        workflowCache.remove(key)
-        nodesMapCache.remove(key)
-        listenTasksCache.remove(key)
+        synchronized(this) { current = Snapshot(current.entries - key) }
     }
 
     /**
@@ -247,7 +303,7 @@ object WorkflowCache {
      * @return A list of all cached workflows.
      */
     @JvmStatic
-    fun getAllWorkflows(): List<Workflow> = workflowCache.values.toList()
+    fun getAllWorkflows(): List<Workflow> = current.entries.values.map { it.workflow }
 
     /**
      * Returns all cached listen tasks across all workflows.
@@ -258,7 +314,7 @@ object WorkflowCache {
      * @return A list of all cached listen tasks.
      */
     @JvmStatic
-    fun getAllListenTasks(): List<CachedListenTask> = listenTasksCache.values.flatten()
+    fun getAllListenTasks(): List<CachedListenTask> = current.entries.values.flatMap { it.listens }
 
     /**
      * Returns cached listen tasks for a specific workflow.
@@ -268,7 +324,7 @@ object WorkflowCache {
      */
     @JvmStatic
     fun getListenTasks(workflowInfo: WorkflowInfo): List<CachedListenTask> =
-        listenTasksCache[workflowInfo] ?: emptyList()
+        current.entries[workflowInfo]?.listens ?: emptyList()
 
     /**
      * Extracts listen tasks from a workflow's nodes map and its function definitions.
@@ -308,33 +364,8 @@ object WorkflowCache {
         val listenTask = node.task as? ListenTask ?: return null
         val listenTo = listenTask.listen?.to?.get() ?: return null
 
-        val (strategy, sdkFilters, until) = when (listenTo) {
-            is OneEventConsumptionStrategy -> Triple(
-                ListenStrategy.ONE,
-                listOfNotNull(listenTo.one),
-                null
-            )
-
-            is AnyEventConsumptionStrategy -> Triple(
-                ListenStrategy.ANY,
-                listenTo.any ?: emptyList(),
-                parseUntilCondition(listenTo.until)
-            )
-
-            is AllEventConsumptionStrategy -> Triple(
-                ListenStrategy.ALL,
-                listenTo.all ?: emptyList(),
-                null
-            )
-
-            else -> return null
-        }
-
-        // Allow empty filters for ANY strategy (any: [] means "match any event")
-        // For ONE and ALL strategies, filters are required
-        if (sdkFilters.isEmpty() && strategy != ListenStrategy.ANY) {
-            return null
-        }
+        val consumption = CachedEventConsumption.from(listenTo)
+        if (consumption.filters.isEmpty() && consumption.strategy != ListenStrategy.ANY) return null
 
         val readAs = listenTask.listen?.read
             ?: ListenTaskConfiguration.ListenAndReadAs.DATA
@@ -342,10 +373,8 @@ object WorkflowCache {
         return CachedListenTask(
             workflowInfo = workflowInfo,
             nodePosition = position,
-            filters = sdkFilters.map { convertFilter(it) },
-            strategy = strategy,
+            consumption = consumption,
             readAs = readAs,
-            until = until,
             hasForeach = listenTask.foreach != null,
             isFromFunction = isFromFunction
         )
@@ -371,49 +400,9 @@ object WorkflowCache {
         }
     }
 
-    /**
-     * Parses the until condition from the workflow definition.
-     * Returns null if no until condition is specified.
-     */
-    private fun parseUntilCondition(until: Until?): CachedUntilCondition? {
-        if (until == null) return null
-
-        return when (val value = until.get()) {
-            is String -> {
-                // Expression condition evaluated against accumulated events
-                val expr = if (ExpressionUtils.isExpr(value)) {
-                    ExpressionUtils.trimExpr(value)
-                } else {
-                    value
-                }
-                CachedUntilCondition.Expression(expr)
-            }
-
-            is EventConsumptionStrategy -> {
-                // Event filter - stop when this event arrives
-                val filter = extractUntilEventFilter(value) ?: return null
-                CachedUntilCondition.Event(filter)
-            }
-
-            else -> null
-        }
-    }
-
-    private fun extractUntilEventFilter(strategy: EventConsumptionStrategy): EventFilter? {
-        val sdkFilter: SdkEventFilter? = when (val strategyValue = strategy.get()) {
-            is OneEventConsumptionStrategy -> strategyValue.one
-            is AnyEventConsumptionStrategy -> strategyValue.any?.firstOrNull()
-            is AllEventConsumptionStrategy -> strategyValue.all?.firstOrNull()
-            else -> null
-        }
-        return sdkFilter?.let { convertFilter(it) }
-    }
-
     @TestOnly
     fun clear() {
-        workflowCache.clear()
-        nodesMapCache.clear()
-        listenTasksCache.clear()
+        synchronized(this) { current = Snapshot(emptyMap()) }
     }
 }
 

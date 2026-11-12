@@ -28,6 +28,8 @@ internal object WorkflowDefinitionReader {
         val document = mapper.readValue(definition, JsonNode::class.java)
         val errors = schema.validate(document)
         require(errors.isEmpty()) { errors.joinToString("\n") }
-        return mapper.convertValue(document, Workflow::class.java)
+        // Avoid re-serializing the tree: the SDK mapper omits empty arrays, which would
+        // turn an explicit `any: []` wildcard into a different consumption strategy.
+        return mapper.treeToValue(document, Workflow::class.java)
     }
 }
