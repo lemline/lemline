@@ -88,7 +88,6 @@ object WorkflowCache {
         val listens: List<CachedListenTask>,
         val schedule: CachedEventSchedule?,
         val source: String?,
-        val derivedFrom: WorkflowInfo? = null,
     )
 
     class Snapshot internal constructor(internal val entries: Map<WorkflowInfo, Entry>)
@@ -159,10 +158,10 @@ object WorkflowCache {
         )
     }
 
-    private fun cacheWorkflow(workflow: Workflow, source: String? = null, derivedFrom: WorkflowInfo? = null) {
-        val entry = entry(workflow, source).copy(derivedFrom = derivedFrom)
+    private fun cacheWorkflow(workflow: Workflow, source: String? = null) {
+        val entry = entry(workflow, source)
         synchronized(this) {
-            current = Snapshot(withoutDerived(current.entries, setOf(workflow.info)) + (workflow.info to entry))
+            current = Snapshot(current.entries + (workflow.info to entry))
         }
     }
 
@@ -175,7 +174,7 @@ object WorkflowCache {
         val parsed = entry(workflow, definition)
         synchronized(this) {
             // A locked read may overlap a newer local publication; never overwrite it.
-            if (current === snapshot) current = Snapshot(withoutDerived(current.entries, setOf(info)) + (info to parsed))
+            if (current === snapshot) current = Snapshot(current.entries + (info to parsed))
         }
         return workflow
     }
@@ -183,7 +182,7 @@ object WorkflowCache {
     /**
      * Reconcile a database snapshot only if no local cache write happened since the query began.
      * This also detects remove/recreate races. A rejected refresh must be retried by the caller.
-     * Synthetic function workflows (source == null) are outside database ownership.
+     * Programmatically-built workflows (source == null) are outside database ownership.
      */
     fun reconcile(
         snapshot: Snapshot,
@@ -203,33 +202,19 @@ object WorkflowCache {
                 onInvalid(info, e)
             }
         }
-        val changed = snapshot.entries.keys.filterTo(mutableSetOf()) { info ->
-            snapshot.entries[info]?.source != null && snapshot.entries[info] !== entries[info]
-        }
-        val reconciled = withoutDerived(entries, changed)
         return synchronized(this) {
             if (current !== snapshot) false else {
-                current = Snapshot(reconciled)
+                current = Snapshot(entries.toMap())
                 true
             }
         }
-    }
-
-    /** Remove synthetic descendants together with their replaced/deleted parent. */
-    private fun withoutDerived(entries: Map<WorkflowInfo, Entry>, parents: Set<WorkflowInfo>): Map<WorkflowInfo, Entry> {
-        val removed = parents.toMutableSet()
-        do {
-            val added = entries.filter { (info, entry) -> info !in removed && entry.derivedFrom in removed }.keys
-            removed.addAll(added)
-        } while (added.isNotEmpty())
-        return entries.filter { (info, entry) -> entry.derivedFrom == null || info !in removed }
     }
 
     /** Invalidate after commit without evicting a concurrent recreation of the same identity. */
     @Synchronized
     fun removeIfUnchanged(info: WorkflowInfo, snapshot: Snapshot) {
         if (current.entries[info] === snapshot.entries[info]) {
-            current = Snapshot(withoutDerived(current.entries, setOf(info)) - info)
+            current = Snapshot(current.entries - info)
         }
     }
 
@@ -237,7 +222,7 @@ object WorkflowCache {
     @Synchronized
     fun removeEventSchedule(candidate: CachedEventSchedule) {
         if (current.entries[candidate.workflowInfo]?.schedule === candidate) {
-            current = Snapshot(withoutDerived(current.entries, setOf(candidate.workflowInfo)) - candidate.workflowInfo)
+            current = Snapshot(current.entries - candidate.workflowInfo)
         }
     }
 
@@ -254,14 +239,13 @@ object WorkflowCache {
      * Caches a programmatically-built workflow.
      *
      * Use this method when you have a Workflow object built in code
-     * (e.g., synthetic workflows for function execution) rather than
-     * parsed from YAML/JSON.
+     * rather than parsed from YAML/JSON.
      *
      * @param workflow The workflow to cache
      */
     @JvmStatic
-    fun putWorkflow(workflow: Workflow, derivedFrom: WorkflowInfo? = null) {
-        cacheWorkflow(workflow, derivedFrom = derivedFrom)
+    fun putWorkflow(workflow: Workflow) {
+        cacheWorkflow(workflow)
     }
 
     /**
@@ -336,7 +320,7 @@ object WorkflowCache {
         version: WorkflowVersion
     ) {
         val key = WorkflowInfo(namespace, name, version)
-        synchronized(this) { current = Snapshot(withoutDerived(current.entries, setOf(key)) - key) }
+        synchronized(this) { current = Snapshot(current.entries - key) }
     }
 
     /**

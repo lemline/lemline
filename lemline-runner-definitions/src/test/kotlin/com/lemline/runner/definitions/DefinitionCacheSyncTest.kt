@@ -2,8 +2,6 @@
 package com.lemline.runner.definitions
 
 import com.lemline.common.values.info
-import com.lemline.core.functions.FunctionWorkflowBuilder
-import com.lemline.core.workflows.useFunctions
 import com.lemline.core.workflows.WorkflowCache
 import com.lemline.core.workflows.WorkflowCache.getWorkflow
 import io.kotest.assertions.throwables.shouldThrow
@@ -75,7 +73,7 @@ class DefinitionCacheSyncTest {
         WorkflowCache.getAllWorkflows() shouldBe listOf(synthetic)
     }
 
-    @Test fun `definition refresh replaces function filters and invalidates synthetic descendants`() = runTest {
+    @Test fun `definition refresh replaces function filters and deletion removes routing`() = runTest {
         fun withFunction(type: String) = definition().let {
             it.copy(definition = it.definition + "\n" + """
                 use:
@@ -90,18 +88,14 @@ class DefinitionCacheSyncTest {
         coEvery { repository.listAll() } returns listOf(withFunction("old"))
         sync.ensureInitialized()
         val parent = WorkflowCache.getAllWorkflows().single()
-        val function = FunctionWorkflowBuilder.build(parent.useFunctions!!.getValue("awaitEvent"), "awaitEvent", parent.info)
         WorkflowCache.getListenTasks(parent.info).filter { it.isFromFunction }.single().filters.single().standard.type shouldBe "old"
         coEvery { repository.listAll() } returns listOf(withFunction("new"))
         sync.refresh()
-        function.info.getWorkflow() shouldBe null
-        val updated = parent.info.getWorkflow()!!
         WorkflowCache.getListenTasks(parent.info).filter { it.isFromFunction }.single().filters.single().standard.type shouldBe "new"
-        val rebuilt = FunctionWorkflowBuilder.build(updated.useFunctions!!.getValue("awaitEvent"), "awaitEvent", updated.info)
-        WorkflowCache.getListenTasks(rebuilt.info).single().filters.single().standard.type shouldBe "new"
         coEvery { repository.listAll() } returns emptyList()
         sync.refresh()
-        rebuilt.info.getWorkflow() shouldBe null
+        parent.info.getWorkflow() shouldBe null
+        WorkflowCache.getListenTasks(parent.info) shouldBe emptyList()
     }
 
     @Test fun `failed warmup retries and concurrent first events share one load`() = runTest {

@@ -67,8 +67,8 @@ The first CloudEvent waits for the initial catalog load; a failed load fails pro
 Periodic reconciliation adds, updates and removes definitions, reusing unchanged parsed entries.
 If a local cache write overlaps a catalog query, synchronization discards that snapshot and retries.
 Local definition deletion invalidates after commit; caller-owned transactions rely on periodic
-reconciliation after the caller commits. Synthetic descendants are evicted when their parent changes or is deleted; unrelated synthetic
-workflows remain outside catalog ownership. Function node trees also check the supplied task identity.
+reconciliation after the caller commits. Programmatically-built workflows remain outside catalog ownership. Function node trees check the
+supplied task identity, so updated definitions rebuild their function bodies and listen filters.
 
 Processing serializes per candidate definition. Nonmatching events perform no schedule database reads.
 Catalog scans occur only at initialization and during periodic synchronization, not on each event.
