@@ -866,6 +866,8 @@ object CallFunctionTestCases {
         WorkflowTestCase(
             name = "function containing listen with foreach processes events",
             yaml = $$"""
+                evaluate:
+                  mode: loose
                 use:
                   functions:
                     collectEvents:

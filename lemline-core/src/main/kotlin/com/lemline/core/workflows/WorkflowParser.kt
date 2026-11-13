@@ -10,6 +10,7 @@ import com.lemline.common.values.Token.FORK
 import com.lemline.common.values.Token.SUBSCRIPTION
 import com.lemline.common.values.Token.TRY
 import com.lemline.common.values.Token.WITH
+import com.lemline.core.expressions.EvaluationMode
 import com.lemline.core.nodes.ForeachTask
 import com.lemline.core.nodes.Node
 import com.lemline.core.nodes.RootTask
@@ -70,7 +71,12 @@ object WorkflowParser {
      */
     fun createRootNode(workflow: Workflow): Node<RootTask> = Node(
         position = NodePosition.root,
-        task = RootTask(workflow.document, workflow.`do`, workflow.use).also {
+        task = RootTask(
+            workflow.document,
+            workflow.`do`,
+            workflow.use,
+            (workflow as? EvaluatedWorkflow)?.evaluationMode ?: EvaluationMode.STRICT,
+        ).also {
             it.output = workflow.output
             it.input = workflow.input
         },

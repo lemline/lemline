@@ -45,6 +45,19 @@ class JQExpressionTest {
     }
 
     @Test
+    fun `loose mode evaluates bare expressions and preserves invalid strings`() {
+        val input = """{"value": 3}""".toJsonElement()
+        assertEquals(
+            JsonPrimitive(3),
+            JQExpression.eval(input, JsonPrimitive(".value"), emptyScope, false, EvaluationMode.LOOSE),
+        )
+        assertEquals(
+            JsonPrimitive("ordinary text"),
+            JQExpression.eval(input, JsonPrimitive("ordinary text"), emptyScope, false, EvaluationMode.LOOSE),
+        )
+    }
+
+    @Test
     fun `test eval processes ObjectNode correctly`() {
         val input = """{"key": "value"}""".toJsonElement()
         val filter = """{"field": ".key"}""".toJsonElement()

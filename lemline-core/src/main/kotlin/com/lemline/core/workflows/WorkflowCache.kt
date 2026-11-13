@@ -13,11 +13,11 @@ import com.lemline.common.values.name
 import com.lemline.common.values.namespace
 import com.lemline.common.values.version
 import com.lemline.core.functions.FunctionCache
+import com.lemline.core.expressions.EvaluationMode
 import com.lemline.core.nodes.Node
 import com.lemline.core.nodes.RootTask
 import com.lemline.core.processors.ListenStrategy
 import io.serverlessworkflow.api.WorkflowFormat
-import io.serverlessworkflow.api.WorkflowReader
 import io.serverlessworkflow.api.types.CallFunction
 import io.serverlessworkflow.api.types.ListenTask
 import io.serverlessworkflow.api.types.ListenTaskConfiguration
@@ -71,19 +71,12 @@ object WorkflowCache {
 
     fun snapshot(): Snapshot = current
 
-    private val jsonMapper = LemlineJson.jacksonMapper
-    private val yamlMapper = LemlineJson.yamlMapper
-
     /**
      * Parses the given workflow definition string in YAML format
      */
     @JvmStatic
     fun parseYaml(definition: String): Workflow {
-        // Parse the YAML string into a JSON node
-        val jsonNode = yamlMapper.readTree(definition)
-
-        // Project the JSON node to a Workflow object
-        return jsonMapper.treeToValue(jsonNode, Workflow::class.java)
+        return WorkflowDefinitionReader.read(definition, WorkflowFormat.YAML, validate = false)
     }
 
     /**
@@ -91,11 +84,7 @@ object WorkflowCache {
      */
     @JvmStatic
     fun parseJson(definition: String): Workflow {
-        // Parse the JSON string into a JsonNode
-        val jsonNode = jsonMapper.readTree(definition)
-
-        // Project the JSON node to a Workflow object
-        return jsonMapper.treeToValue(jsonNode, Workflow::class.java)
+        return WorkflowDefinitionReader.read(definition, WorkflowFormat.JSON, validate = false)
     }
 
     @JvmStatic
@@ -104,9 +93,8 @@ object WorkflowCache {
         .also { workflow -> cacheWorkflow(workflow, definition) }
 
     @JvmStatic
-    fun parseYamlAndPutNoValidation(definition: String): Workflow = WorkflowReader
-        .noValidation()
-        .read(definition, WorkflowFormat.YAML)
+    fun parseYamlAndPutNoValidation(definition: String): Workflow = WorkflowDefinitionReader
+        .read(definition, WorkflowFormat.YAML, validate = false)
         .also { workflow -> cacheWorkflow(workflow, definition) }
 
     /**
@@ -126,7 +114,9 @@ object WorkflowCache {
         val (_, nodes) = WorkflowParser.parse(workflow)
         return Entry(
             workflow, nodes, extractListenTasks(workflow.info, nodes, workflow),
-            workflow.schedule?.on?.get()?.let { CachedEventSchedule(workflow.info, CachedEventConsumption.from(it)) },
+            workflow.schedule?.on?.get()?.let {
+                CachedEventSchedule(workflow.info, CachedEventConsumption.from(it, (workflow as? EvaluatedWorkflow)?.evaluationMode ?: EvaluationMode.STRICT))
+            },
             source,
         )
     }
@@ -345,16 +335,17 @@ object WorkflowCache {
         workflow: Workflow
     ): List<CachedListenTask> {
         val listenTasks = mutableListOf<CachedListenTask>()
+        val mode = (workflow as? EvaluatedWorkflow)?.evaluationMode ?: EvaluationMode.STRICT
 
         // Extract from main workflow tree
         for ((position, node) in nodesMap) {
-            extractListenTaskFromNode(workflowInfo, position, node, isFromFunction = false)
+            extractListenTaskFromNode(workflowInfo, position, node, mode, isFromFunction = false)
                 ?.let { listenTasks.add(it) }
         }
 
         // Extract from functions in use.functions
         workflow.useFunctions?.forEach { (_, functionTask) ->
-            extractListenTasksFromFunction(workflowInfo, functionTask)
+            extractListenTasksFromFunction(workflowInfo, functionTask, mode)
                 .forEach { listenTasks.add(it) }
         }
 
@@ -368,12 +359,13 @@ object WorkflowCache {
         workflowInfo: WorkflowInfo,
         position: NodePosition,
         node: Node<*>,
+        mode: EvaluationMode,
         isFromFunction: Boolean
     ): CachedListenTask? {
         val listenTask = node.task as? ListenTask ?: return null
         val listenTo = listenTask.listen?.to?.get() ?: return null
 
-        val consumption = CachedEventConsumption.from(listenTo)
+        val consumption = CachedEventConsumption.from(listenTo, mode)
         if (consumption.filters.isEmpty() && consumption.strategy != ListenStrategy.ANY) return null
 
         val readAs = listenTask.listen?.read
@@ -395,7 +387,8 @@ object WorkflowCache {
      */
     private fun extractListenTasksFromFunction(
         workflowInfo: WorkflowInfo,
-        functionTask: Task
+        functionTask: Task,
+        mode: EvaluationMode,
     ): List<CachedListenTask> {
         // Build function nodes map using FunctionCache
         val functionNodesMap = FunctionCache.getOrBuild(
@@ -405,7 +398,7 @@ object WorkflowCache {
         )
 
         return functionNodesMap.mapNotNull { (position, node) ->
-            extractListenTaskFromNode(workflowInfo, position, node, isFromFunction = true)
+            extractListenTaskFromNode(workflowInfo, position, node, mode, isFromFunction = true)
         }
     }
 

@@ -281,6 +281,48 @@ object ForTaskTestCases {
                     put("taskNames", JsonArray(listOf(JsonPrimitive("capture"), JsonPrimitive("capture"))))
                 }
             )
+        ),
+
+        WorkflowTestCase(
+            name = "loose mode evaluates bare for and while expressions",
+            yaml = $$"""
+                evaluate:
+                  mode: loose
+                do:
+                  - loop:
+                      for:
+                        in: .items
+                      while: (.seen | length) < 2
+                      do:
+                        - collect:
+                            set:
+                              seen: .seen + [$item]
+            """.trimIndent(),
+            input = buildJsonObject {
+                put("items", buildJsonArray { add(JsonPrimitive(1)); add(JsonPrimitive(2)) })
+                put("seen", buildJsonArray { })
+            },
+            validate = expectOutput(buildJsonObject {
+                put("seen", buildJsonArray { add(JsonPrimitive(1)); add(JsonPrimitive(2)) })
+            })
+        ),
+
+        WorkflowTestCase(
+            name = "strict mode keeps bare for expression literal",
+            yaml = $$"""
+                evaluate:
+                  mode: strict
+                do:
+                  - loop:
+                      for:
+                        in: .items
+                      do:
+                        - collect:
+                            set:
+                              seen: ${ .seen + [$item] }
+            """.trimIndent(),
+            input = buildJsonObject { put("items", buildJsonArray { add(JsonPrimitive(1)) }) },
+            validate = expectErrorContaining("'.for.in' expression must be an array")
         )
     )
 }

@@ -2,6 +2,7 @@
 package com.lemline.core.workflows
 
 import com.fasterxml.jackson.databind.JsonNode
+import com.fasterxml.jackson.databind.node.ObjectNode
 import com.networknt.schema.InputFormat
 import com.networknt.schema.JsonSchemaFactory
 import com.networknt.schema.SchemaValidatorsConfig
@@ -23,13 +24,30 @@ internal object WorkflowDefinitionReader {
         }
     }
 
-    fun read(definition: String, format: WorkflowFormat): Workflow {
+    fun read(definition: String, format: WorkflowFormat, validate: Boolean = true): Workflow {
         val mapper = format.mapper()
-        val document = mapper.readValue(definition, JsonNode::class.java)
-        val errors = schema.validate(document)
-        require(errors.isEmpty()) { errors.joinToString("\n") }
+        val document = mapper.readValue(definition, JsonNode::class.java) as? ObjectNode
+            ?: throw IllegalArgumentException("Workflow definition must be an object")
+        val evaluate = document.remove("evaluate")
+        validateEvaluate(evaluate)
+        if (validate) {
+            val errors = schema.validate(document)
+            require(errors.isEmpty()) { errors.joinToString("\n") }
+        }
         // Avoid re-serializing the tree: the SDK mapper omits empty arrays, which would
         // turn an explicit `any: []` wildcard into a different consumption strategy.
-        return mapper.treeToValue(document, Workflow::class.java)
+        return mapper.treeToValue(document, EvaluatedWorkflow::class.java).apply { this.evaluate = evaluate }
+    }
+
+    private fun validateEvaluate(evaluate: JsonNode?) {
+        if (evaluate == null) return
+        require(evaluate.isObject) { "evaluate must be an object" }
+        require(evaluate.fieldNames().asSequence().all { it == "language" || it == "mode" }) {
+            "evaluate supports only language and mode"
+        }
+        evaluate.get("language")?.let { require(it.isTextual && it.textValue() == "jq") { "Unsupported evaluate.language: $it" } }
+        evaluate.get("mode")?.let {
+            require(it.isTextual && it.textValue() in setOf("strict", "loose")) { "Invalid evaluate.mode: $it" }
+        }
     }
 }

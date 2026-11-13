@@ -30,16 +30,26 @@ internal interface ExpressionEvaluator {
      * @param force If true, forces evaluation of the expression even if not surrounded by `${}`.
      * @return The result of the evaluation as a JsonElement.
      */
-    fun eval(data: JsonElement, expr: JsonElement, scope: JsonObject, force: Boolean): JsonElement = when (expr) {
+    fun eval(
+        data: JsonElement,
+        expr: JsonElement,
+        scope: JsonObject,
+        force: Boolean,
+        mode: EvaluationMode = EvaluationMode.STRICT,
+    ): JsonElement = when (expr) {
         is JsonNull -> data
 
-        is JsonPrimitive -> when (expr.isString && (force || ExpressionUtils.isExpr(expr.content))) {
-            true -> eval(data, expr.content, scope)
+        is JsonPrimitive -> when (expr.isString && (force || mode == EvaluationMode.LOOSE || ExpressionUtils.isExpr(expr.content))) {
+            true -> try {
+                eval(data, expr.content, scope)
+            } catch (e: Exception) {
+                if (mode == EvaluationMode.LOOSE) expr else throw e
+            }
             false -> expr
         }
 
-        is JsonObject -> JsonObject(expr.mapValues { (_, value) -> eval(data, value, scope, force) })
+        is JsonObject -> JsonObject(expr.mapValues { (_, value) -> eval(data, value, scope, force, mode) })
 
-        is JsonArray -> JsonArray(expr.map { value -> eval(data, value, scope, force) })
+        is JsonArray -> JsonArray(expr.map { value -> eval(data, value, scope, force, mode) })
     }
 }

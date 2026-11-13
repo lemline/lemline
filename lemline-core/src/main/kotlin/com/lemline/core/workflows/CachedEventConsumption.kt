@@ -6,6 +6,7 @@ import com.lemline.common.json.LemlineJson
 import com.lemline.common.values.WorkflowInfo
 import com.lemline.core.cloudevents.CloudEventMatcher
 import com.lemline.core.cloudevents.CloudEventParser.parseData
+import com.lemline.core.expressions.EvaluationMode
 import com.lemline.core.processors.EventFilter
 import com.lemline.core.processors.ListenStrategy
 import com.lemline.core.utils.convertFilter
@@ -63,7 +64,7 @@ data class CachedEventConsumption(
     fun allFilters(): List<CachedEventFilter> = filters + untilEvents?.allFilters().orEmpty()
 
     companion object {
-        fun from(strategy: Any): CachedEventConsumption = when (strategy) {
+        fun from(strategy: Any, mode: EvaluationMode = EvaluationMode.STRICT): CachedEventConsumption = when (strategy) {
             is OneEventConsumptionStrategy -> CachedEventConsumption(
                 ListenStrategy.ONE, listOf(CachedEventFilter.from(strategy.one))
             )
@@ -74,8 +75,13 @@ data class CachedEventConsumption(
                 val until = strategy.until?.get()
                 CachedEventConsumption(
                     ListenStrategy.ANY, strategy.any.map(CachedEventFilter::from),
-                    untilExpression = until as? String,
-                    untilEvents = (until as? EventConsumptionStrategy)?.get()?.let(::from),
+                    untilExpression = (until as? String)?.let { expression ->
+                        require(mode == EvaluationMode.LOOSE || ExpressionUtils.isExpr(expression)) {
+                            "listen.to.any.until expression must use \${ ... } in strict mode"
+                        }
+                        ExpressionUtils.trimExpr(expression)
+                    },
+                    untilEvents = (until as? EventConsumptionStrategy)?.get()?.let { from(it, mode) },
                 )
             }
             else -> error("Unknown event consumption strategy: ${strategy.javaClass.name}")
