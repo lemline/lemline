@@ -215,10 +215,14 @@ data class WorkflowDefinitionData(
  * @property type Error type URI
  * @property status HTTP-like status code
  * @property title Human-readable error title
+ * @property instance JSON Pointer to the task that raised the error
+ * @property detail Explanation of this occurrence of the error
  */
 @Serializable
 data class ErrorInfo(
     val type: String,
     val status: Int,
     val title: String,
+    val instance: String? = null,
+    val detail: String? = null,
 )
