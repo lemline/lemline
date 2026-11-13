@@ -878,7 +878,9 @@ class LemlineConfigSource(context: ConfigSourceContext? = null) : PropertiesConf
                 val queueDLQ = props[LEMLINE_MESSAGING_RABBITMQ_LIFECYCLE_EVENTS_CONSUMER_QUEUE_DLQ] ?: "$queue.dlq"
                 set("$incoming.connector", RABBITMQ_CONNECTOR)
                 set("$incoming.queue.name", queue)
-                set("$incoming.broadcast", "true")
+                // No broadcast: a Mutiny broadcast never cancels its upstream when the subscriber leaves,
+                // so the RabbitMQ consumer would stay live through shutdown and Vert.x would restart it
+                // once the connector closes the connection, after the event loop has stopped.
                 set("$incoming.queue.durable", "true")
                 set("$incoming.auto-ack", "false")
                 set("$incoming.deserializer", RABBITMQ_STRING_SERIALIZER)
