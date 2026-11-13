@@ -599,7 +599,11 @@ function buildTimelineModel(events: TimelineEventLike[]): TimelineModel {
   }
 
   const workflowRow = buildWorkflowRow(normalized, nowMs);
-  const taskRows = buildTaskRows(normalized, nowMs);
+  const workflowAttempt = workflowRow.attempts[0];
+  const taskEndMs = workflowAttempt.status === "completed" || workflowAttempt.status === "faulted"
+    ? workflowAttempt.endMs
+    : nowMs;
+  const taskRows = buildTaskRows(normalized, taskEndMs);
   const rows = [workflowRow, ...taskRows];
 
   const allTimes = rows.flatMap((row) => row.attempts.flatMap((attempt) => [attempt.startMs, attempt.endMs]));

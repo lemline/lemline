@@ -186,6 +186,18 @@ object StepByStepOrchestrator {
             }
 
             is WorkflowFaulted -> {
+                // The stack contains the active ancestors. The failing task has already
+                // emitted task.faulted in tryCatch or the plain-exception handler.
+                for (frame in workflowEvent.nodeStack.toList().asReversed()) {
+                    if (frame.position == NodePosition.root || frame.position.toString() == workflowEvent.error.position) continue
+                    lifecycleHook.onTaskFaulted(
+                        workflowInfo = workflowInfo,
+                        nodeStack = workflowEvent.nodeStack,
+                        nodePosition = frame.position,
+                        error = workflowEvent.error,
+                        faultedAt = workflowEvent.faultedAt,
+                    )
+                }
                 lifecycleHook.onWorkflowFaulted(
                     workflowInfo = workflowInfo,
                     nodeStack = workflowEvent.nodeStack,
@@ -265,6 +277,15 @@ object StepByStepOrchestrator {
             action()
         }
     } catch (e: Exception) {
+        if (e !is InternalException) {
+            lifecycleHook.onTaskFaulted(
+                workflowInfo = workflowInfo,
+                nodeStack = nodeStack,
+                nodePosition = node.position,
+                error = InternalException.Error.from(e, node.position),
+                faultedAt = Clock.System.now(),
+            )
+        }
         // Uncaught failure within a fork branch
         hasForkBranchFaulted(nodeStack, node, e)
         // Uncaught failure

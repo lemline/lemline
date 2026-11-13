@@ -382,6 +382,7 @@ class LifecycleEventHookTest : FunSpec() {
                 "task.created:raiseError",
                 "task.started:raiseError",
                 "task.faulted:raiseError",
+                "task.faulted:do",
                 "workflow.faulted"
             )
         }
@@ -417,6 +418,40 @@ class LifecycleEventHookTest : FunSpec() {
                 "task.created:raiseError",
                 "task.started:raiseError",
                 "task.faulted:raiseError",
+                "task.faulted:do",
+                "workflow.faulted"
+            )
+        }
+
+        test("plain exception faults the failing task and active ancestors") {
+            val hook = CapturingLifecycleHook()
+            val yaml = """
+                do:
+                  - outer:
+                      do:
+                        - fail:
+                            raise:
+                              error: missingError
+            """
+
+            try {
+                executeWorkflow(yaml, lifecycleHook = hook)
+            } catch (_: Exception) {
+                // Expected to fail
+            }
+
+            hook.events.stripWorkflowIds() shouldBe listOf(
+                "workflow.created",
+                "workflow.started",
+                "task.created:do",
+                "task.started:do",
+                "task.created:outer",
+                "task.started:outer",
+                "task.created:fail",
+                "task.started:fail",
+                "task.faulted:fail",
+                "task.faulted:outer",
+                "task.faulted:do",
                 "workflow.faulted"
             )
         }
