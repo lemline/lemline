@@ -2,6 +2,7 @@
 package com.lemline.core.testcases
 
 import com.lemline.core.testcases.impl.WorkflowTestCase
+import com.lemline.core.testcases.impl.WorkflowTestValidators.expectErrorContaining
 import com.lemline.core.testcases.impl.WorkflowTestValidators.expectOutput
 
 import kotlinx.serialization.json.JsonArray
@@ -19,6 +20,64 @@ import kotlinx.serialization.json.put
 object ForTaskTestCases {
 
     val cases = listOf(
+        WorkflowTestCase(
+            name = "for in and while evaluate delimited expressions",
+            yaml = $$"""
+                do:
+                  - loop:
+                      for:
+                        in: ${ .items }
+                      while: ${ (.seen | length) < 2 }
+                      do:
+                        - collect:
+                            set:
+                              seen: ${ .seen + [$item] }
+            """.trimIndent(),
+            input = buildJsonObject {
+                put("items", buildJsonArray { add(JsonPrimitive(1)); add(JsonPrimitive(2)) })
+                put("seen", buildJsonArray { })
+            },
+            validate = expectOutput(buildJsonObject {
+                put("seen", buildJsonArray { add(JsonPrimitive(1)); add(JsonPrimitive(2)) })
+            })
+        ),
+
+        WorkflowTestCase(
+            name = "for in without delimiters is not evaluated in strict mode",
+            yaml = $$"""
+                do:
+                  - loop:
+                      for:
+                        in: .items
+                      do:
+                        - collect:
+                            set:
+                              seen: ${ .seen + [$item] }
+            """.trimIndent(),
+            input = buildJsonObject { put("items", buildJsonArray { add(JsonPrimitive(1)) }) },
+            validate = expectErrorContaining("'.for.in' expression must be an array")
+        ),
+
+        WorkflowTestCase(
+            name = "while without delimiters is not evaluated in strict mode",
+            yaml = $$"""
+                do:
+                  - loop:
+                      for:
+                        in: ${ .items }
+                      while: .continue
+                      do:
+                        - collect:
+                            set:
+                              seen: ${ .seen + [$item] }
+            """.trimIndent(),
+            input = buildJsonObject {
+                put("items", buildJsonArray { add(JsonPrimitive(1)) })
+                put("continue", true)
+            },
+            validate = expectErrorContaining("'.while' expression must be a boolean")
+        ),
+
         WorkflowTestCase(
             name = "for task iterates over simple array",
             yaml = $$"""

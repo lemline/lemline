@@ -8,4 +8,4 @@ do:
       listen:
         to:
           any: []
-          until: ( . | length ) > 3 #wait until 3 events have been consumed
+          until: ${ ( . | length ) > 3 } #wait until 3 events have been consumed
