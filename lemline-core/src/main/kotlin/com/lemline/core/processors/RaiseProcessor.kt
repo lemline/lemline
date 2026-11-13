@@ -2,6 +2,7 @@
 package com.lemline.core.processors
 
 import com.lemline.core.errors.InternalException
+import com.lemline.core.errors.WorkflowErrorType.CONFIGURATION
 import com.lemline.core.errors.WorkflowErrorType.RUNTIME
 import com.lemline.core.nodes.Node
 import com.lemline.core.processors.scope.Scope
@@ -45,8 +46,8 @@ class RaiseProcessor(
             type = errorDef.getErrorType(),
             status = errorDef.status,
             position = node.position.toString(),
-            title = errorDef.title,
-            details = errorDef.detail
+            title = errorDef.title?.let { evalString(transformedInput, it, "raise.error.title", scope) },
+            details = errorDef.detail?.let { evalString(transformedInput, it, "raise.error.detail", scope) }
         )
 
         // Throw WorkflowException - this will be caught by CompleteOrchestrator
@@ -56,8 +57,8 @@ class RaiseProcessor(
 
     private fun RaiseTaskError.getErrorDef(): io.serverlessworkflow.api.types.Error {
         return when (val error = get()) {
-            // Reference to named error in workflow.use.errors - not supported yet in new execution model
-            is String -> throw IllegalArgumentException("Named error references not yet supported: $error")
+            is String -> use?.errors?.additionalProperties?.get(error)
+                ?: raiseError(CONFIGURATION, "Unknown error name '$error'")
             is io.serverlessworkflow.api.types.Error -> error
             else -> throw IllegalArgumentException("Unknown Error '$error'")
         }

@@ -18,6 +18,32 @@ object TryTaskTestCases {
 
     val cases = listOf(
         WorkflowTestCase(
+            name = "try catch - named error type filtering matches",
+            yaml = """
+                use:
+                  errors:
+                    notImplemented:
+                      type: https://serverlessworkflow.io/errors/not-implemented
+                      status: 501
+                do:
+                  - trySomething:
+                      try:
+                        - raiseError:
+                            raise:
+                              error: notImplemented
+                      catch:
+                        errors:
+                          with:
+                            type: https://serverlessworkflow.io/errors/not-implemented
+                        do:
+                          - handleError:
+                              set:
+                                caught: true
+            """.trimIndent(),
+            validate = expectOutput(buildJsonObject { put("caught", true) })
+        ),
+
+        WorkflowTestCase(
             name = "try catch - basic error is caught",
             yaml = """
                 do:

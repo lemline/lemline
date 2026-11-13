@@ -359,6 +359,8 @@ class CloudEventLifecycleHook(
             type = type,
             status = status,
             title = title ?: "Unknown error",
+            instance = position,
+            detail = details,
         )
     }
 
