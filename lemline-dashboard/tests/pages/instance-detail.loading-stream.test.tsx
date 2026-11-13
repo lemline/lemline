@@ -119,6 +119,62 @@ describe("InstanceDetailPage loading and stream behavior", () => {
     expect(reconnect).toHaveBeenCalledTimes(1);
   });
 
+  it.each(["PENDING", "RUNNING", "UNKNOWN"])(
+    "shows the stream connection for an active %s instance",
+    (status) => {
+      mockUseViewportWidth.mockReturnValue(900);
+      mockUseWatchWorkflowProjection.mockReturnValue({
+        data: baseTimelineData(status),
+        isLoading: false,
+        isError: false,
+        reconnect: vi.fn(),
+        liveConnected: true,
+      });
+
+      const { rerender } = renderPage();
+      expect(screen.getByText("Live")).toBeInTheDocument();
+      expect(screen.queryByText("Disconnected")).not.toBeInTheDocument();
+      const connectedFavicon = document.head.querySelector('link[rel="icon"]')?.getAttribute("href");
+
+      mockUseWatchWorkflowProjection.mockReturnValue({
+        data: baseTimelineData(status),
+        isLoading: false,
+        isError: false,
+        reconnect: vi.fn(),
+        liveConnected: false,
+      });
+      rerender(
+        <MemoryRouter initialEntries={["/id/01956f7a-7777-7777-8777-777777777777"]}>
+          <Routes>
+            <Route path="/id/:workflowId" element={<InstanceDetailPage />} />
+          </Routes>
+        </MemoryRouter>,
+      );
+      expect(screen.getByText("Disconnected")).toBeInTheDocument();
+      expect(document.head.querySelector('link[rel="icon"]')?.getAttribute("href")).not.toBe(connectedFavicon);
+    },
+  );
+
+  it.each([
+    ["COMPLETED", true],
+    ["COMPLETED", false],
+    ["FAULTED", true],
+    ["FAULTED", false],
+  ])("hides stream status for a %s instance when connected is %s", (status, liveConnected) => {
+    mockUseViewportWidth.mockReturnValue(900);
+    mockUseWatchWorkflowProjection.mockReturnValue({
+      data: baseTimelineData(status),
+      isLoading: false,
+      isError: false,
+      reconnect: vi.fn(),
+      liveConnected,
+    });
+
+    renderPage();
+    expect(screen.queryByText("Live")).not.toBeInTheDocument();
+    expect(screen.queryByText("Disconnected")).not.toBeInTheDocument();
+  });
+
   it("shows copy failure toast when clipboard write fails", async () => {
     mockUseViewportWidth.mockReturnValue(1280);
     mockUseWatchWorkflowProjection.mockReturnValue({

@@ -21,6 +21,7 @@ export function InstanceDetailPage() {
   const timeline = useWatchWorkflowProjection(workflowId);
   const timelineStatus = timeline.data?.status;
   const liveConnected = timeline.liveConnected;
+  const isTerminal = timelineStatus === "COMPLETED" || timelineStatus === "FAULTED";
   const viewportWidth = useViewportWidth();
   const showGantt = viewportWidth >= 1024;
   const pageTitle = useMemo(() => {
@@ -30,8 +31,9 @@ export function InstanceDetailPage() {
   const faviconTone = useMemo<FaviconTone>(() => {
     if (timelineStatus === "FAULTED") return "faulted";
     if (timelineStatus === "COMPLETED") return "completed";
+    if (timelineStatus && !liveConnected) return "disconnected";
     if (timelineStatus === "PENDING") return "pending";
-    if (timelineStatus === "RUNNING") return liveConnected ? "running" : "disconnected";
+    if (timelineStatus === "RUNNING") return "running";
     return "default";
   }, [liveConnected, timelineStatus]);
 
@@ -120,7 +122,7 @@ export function InstanceDetailPage() {
               <Copy className="h-4 w-4" />
             </button>
           </div>
-          <LiveIndicator live={timelineStatus === "RUNNING" && liveConnected} />
+          {!isTerminal && <LiveIndicator live={liveConnected} />}
         </div>
       </Card>
 
