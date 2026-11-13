@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.gateway.outbox
 
+import com.lemline.common.values.IDV7
 import com.lemline.runner.common.config.DatabaseConfig
 import com.lemline.runner.common.config.OutboxConfig
 import com.lemline.runner.common.messaging.CommandEmitter
@@ -10,6 +11,8 @@ import com.lemline.runner.common.repositories.with.WithOutboxRepository
 import io.quarkus.runtime.Startup
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
+import java.util.concurrent.Semaphore
+import kotlinx.coroutines.launch
 
 /**
  * Outbox processor for gateway workflow start commands.
@@ -49,7 +52,29 @@ class GatewayCommandOutbox : AbstractOutbox<GatewayCommandModel>() {
 
     override val outboxConfig: OutboxConfig by lazy { gatewayCommandConfig.outbox }
 
+    private val immediateRelays = Semaphore(4)
+
     override suspend fun process(entity: GatewayCommandModel) {
         commandEmitter.send(entity.instanceMessage, entity.id)
+    }
+
+    /** Try the new command immediately after its insert commits; the scheduled relay remains the recovery path. */
+    suspend fun processNow(id: IDV7) {
+        if (!enabled || isShuttingDown.get() || !immediateRelays.tryAcquire()) return
+
+        scope.launch {
+            try {
+                databaseConfig.withTransaction { conn ->
+                    val entity = gatewayCommandRepository.findReadyById(id, outboxConfig.maxAttempts, conn)
+                        ?: return@withTransaction
+                    processEntitiesWith(listOf(entity), outboxConfig.maxAttempts, outboxConfig.retryDelay) { process(it) }
+                    gatewayCommandRepository.update(entity, conn)
+                }
+            } catch (e: Exception) {
+                logger.warn(e) { "Immediate gateway command relay failed; scheduled relay will retry" }
+            } finally {
+                immediateRelays.release()
+            }
+        }
     }
 }

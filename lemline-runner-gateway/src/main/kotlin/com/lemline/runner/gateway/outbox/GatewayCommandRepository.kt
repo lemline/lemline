@@ -13,6 +13,10 @@ import com.lemline.runner.common.repositories.ops.CrudRepository
 import com.lemline.runner.common.repositories.ops.ID_COLUMN
 import com.lemline.runner.common.repositories.ops.IdRepository
 import com.lemline.runner.common.repositories.ops.InstanceRepository
+import com.lemline.runner.common.repositories.ops.OUTBOX_ATTEMPT_COUNT_COLUMN
+import com.lemline.runner.common.repositories.ops.OUTBOX_COMPLETED_AT_COLUMN
+import com.lemline.runner.common.repositories.ops.OUTBOX_DELAYED_UNTIL_COLUMN
+import com.lemline.runner.common.repositories.ops.OUTBOX_FAILED_AT_COLUMN
 import com.lemline.runner.common.repositories.ops.OUTBOX_SCHEDULED_FOR_COLUMN
 import com.lemline.runner.common.repositories.ops.OutboxRepository
 import com.lemline.runner.common.repositories.ops.cleanupColumns
@@ -30,7 +34,10 @@ import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
 import java.sql.Connection
 import java.sql.ResultSet
+import java.sql.Timestamp
+import kotlin.time.Clock
 import kotlin.time.Instant
+import kotlin.time.toJavaInstant
 
 const val GATEWAY_COMMAND_OUTBOX_TABLE = "lemline_gateway_command_outbox"
 
@@ -66,6 +73,31 @@ class GatewayCommandRepository : CrudRepository<GatewayCommandModel>(),
     // Delegate WithOutboxRepository methods
     override suspend fun findEntitiesToProcess(maxAttempts: Int, limit: Int, connection: Connection?) =
         outboxRepository.findEntitiesToProcess(maxAttempts, limit, connection)
+
+    /** Claim one committed start command without racing the scheduled relay. */
+    suspend fun findReadyById(id: IDV7, maxAttempts: Int, connection: Connection): GatewayCommandModel? =
+        databaseConfig.withConnection(connection) { conn ->
+            conn.prepareStatement(findReadyByIdSql).use { stmt ->
+                idHelper.set(stmt, 1, id)
+                stmt.setTimestamp(2, Timestamp.from(Clock.System.now().toJavaInstant()))
+                stmt.setInt(3, maxAttempts)
+                stmt.executeQuery().use { rs -> if (rs.next()) createModel(rs) else null }
+            }
+        }
+
+    private val findReadyByIdSql by lazy {
+        """
+            SELECT * FROM $tableName
+            WHERE $ID_COLUMN = ?
+              AND $OUTBOX_COMPLETED_AT_COLUMN IS NULL
+              AND $OUTBOX_FAILED_AT_COLUMN IS NULL
+              AND $OUTBOX_DELAYED_UNTIL_COLUMN IS NOT NULL
+              AND $OUTBOX_DELAYED_UNTIL_COLUMN <= ?
+              AND $OUTBOX_ATTEMPT_COUNT_COLUMN < ?
+            LIMIT 1
+            FOR UPDATE SKIP LOCKED
+        """.trimIndent()
+    }
 
     // Delegate WithCleanerRepository methods
     override suspend fun findEntitiesToDelete(cutoffDate: Instant, batchSize: Int, connection: Connection?) =
