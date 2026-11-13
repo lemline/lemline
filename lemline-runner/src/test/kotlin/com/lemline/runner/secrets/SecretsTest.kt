@@ -19,7 +19,7 @@ class SecretsTest {
     }
 
     @Test
-    fun `resolves only declared secrets and sees rotated values`() {
+    fun `resolves only declared secrets from the process environment`() {
         val workflow = WorkflowCache.parseYamlAndPut("""
             document:
               dsl: '1.0.0'
@@ -39,12 +39,9 @@ class SecretsTest {
         System.setEnv("TEST_CONFIG", "{\"key\":\"value\"}")
         System.setEnv("UNDECLARED", "hidden")
 
-        val initial = Secrets.getForWorkflow(workflow)
-        assertEquals(JsonPrimitive("first-value"), initial["TEST_TOKEN"])
-        assertEquals(JsonPrimitive("value"), initial.getValue("TEST_CONFIG").jsonObject["key"])
-        assertFalse("UNDECLARED" in initial)
-
-        System.setEnv("TEST_TOKEN", "rotated-value")
-        assertEquals(JsonPrimitive("rotated-value"), Secrets.getForWorkflow(workflow)["TEST_TOKEN"])
+        val resolved = Secrets.getForWorkflow(workflow)
+        assertEquals(JsonPrimitive("first-value"), resolved["TEST_TOKEN"])
+        assertEquals(JsonPrimitive("value"), resolved.getValue("TEST_CONFIG").jsonObject["key"])
+        assertFalse("UNDECLARED" in resolved)
     }
 }

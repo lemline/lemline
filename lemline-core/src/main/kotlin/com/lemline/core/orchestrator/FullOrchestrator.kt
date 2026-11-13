@@ -185,7 +185,7 @@ object FullOrchestrator {
 
         is WorkflowEvent.RunWorkflowStarted -> resumeWith(
             workflow,
-            handleRunWorkflowStarted(event, serde, activityExecutor, functionResolver, cloudEventHook, lifecycleHook),
+            handleRunWorkflowStarted(event, serde, activityExecutor, functionResolver, cloudEventHook, lifecycleHook, secrets),
             serde,
             activityExecutor,
             functionResolver,
@@ -341,6 +341,7 @@ object FullOrchestrator {
         functionResolver: FunctionResolver,
         cloudEventHook: CloudEventHook,
         lifecycleHook: LifecycleEventHook,
+        secrets: JsonObject,
     ): WorkflowCommand {
         val childWorkflow = WorkflowCache.getWorkflow(
             namespace = event.config.namespace,
@@ -361,7 +362,8 @@ object FullOrchestrator {
                     activityExecutor,
                     functionResolver,
                     cloudEventHook,
-                    lifecycleHook
+                    lifecycleHook,
+                    secrets,
                 )
                 logger.debug { "Child workflow completed" }
                 when (result) {
@@ -384,7 +386,8 @@ object FullOrchestrator {
                         activityExecutor,
                         functionResolver,
                         cloudEventHook,
-                        lifecycleHook
+                        lifecycleHook,
+                        secrets,
                     )
                     logger.debug { "Child workflow completed" }
                 }

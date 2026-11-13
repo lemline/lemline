@@ -101,10 +101,12 @@ object StepByStepOrchestrator {
         secrets: JsonObject = buildJsonObject {},
     ): WorkflowEvent {
         // RootStateProto omits the definition; restore it from the loaded workflow before evaluating scope.
+        val declaredSecrets = workflow.use?.secrets.orEmpty()
+        val visibleSecrets = JsonObject(secrets.filterKeys { it in declaredSecrets })
         val nodeStack = command.nodeStack
             .withWorkflowDefinition(WorkflowCache.getDefinitionJson(workflow))
-            .withSecrets(secrets)
-        workflow.use?.secrets?.firstOrNull { it !in secrets }?.let { missing ->
+            .withSecrets(visibleSecrets)
+        declaredSecrets.firstOrNull { it !in visibleSecrets }?.let { missing ->
             val event = WorkflowFaulted(
                 nodeStack = nodeStack,
                 rawInput = null,
