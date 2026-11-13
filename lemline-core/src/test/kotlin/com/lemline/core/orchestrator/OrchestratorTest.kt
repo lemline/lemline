@@ -108,7 +108,9 @@ class OrchestratorTest : FunSpec() {
             functionResolver = MockFunctionResolver(),
             cloudEventHook = cloudEventHook,
             lifecycleHook = lifecycleHook,
-            secrets = secrets,
+            secretsForWorkflow = { definition ->
+                JsonObject(secrets.filterKeys { it in definition.use?.secrets.orEmpty() })
+            },
         )
 
         return outcome.value()
