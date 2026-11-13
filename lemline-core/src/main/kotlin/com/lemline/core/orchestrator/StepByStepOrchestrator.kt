@@ -151,7 +151,7 @@ object StepByStepOrchestrator {
             )
         }
 
-        emitLifecycleEventsForEvent(event, workflowInfo, lifecycleHook)
+        emitLifecycleEventsForEvent(event, workflowInfo, lifecycleHook, command.nodePosition)
 
         return event
     }
@@ -174,6 +174,7 @@ object StepByStepOrchestrator {
         workflowEvent: WorkflowEvent,
         workflowInfo: WorkflowInfo,
         lifecycleHook: LifecycleEventHook,
+        faultedTaskPosition: NodePosition? = null,
     ) {
         when (workflowEvent) {
             is WorkflowCompleted -> {
@@ -186,6 +187,18 @@ object StepByStepOrchestrator {
             }
 
             is WorkflowFaulted -> {
+                // The stack contains the active ancestors. The current task has already
+                // emitted task.faulted in tryCatch or the plain-exception handler.
+                for (frame in workflowEvent.nodeStack.toList().asReversed()) {
+                    if (frame.position == NodePosition.root || frame.position == faultedTaskPosition) continue
+                    lifecycleHook.onTaskFaulted(
+                        workflowInfo = workflowInfo,
+                        nodeStack = workflowEvent.nodeStack,
+                        nodePosition = frame.position,
+                        error = workflowEvent.error,
+                        faultedAt = workflowEvent.faultedAt,
+                    )
+                }
                 lifecycleHook.onWorkflowFaulted(
                     workflowInfo = workflowInfo,
                     nodeStack = workflowEvent.nodeStack,
@@ -265,8 +278,17 @@ object StepByStepOrchestrator {
             action()
         }
     } catch (e: Exception) {
+        if (e !is InternalException) {
+            lifecycleHook.onTaskFaulted(
+                workflowInfo = workflowInfo,
+                nodeStack = nodeStack,
+                nodePosition = node.position,
+                error = InternalException.Error.from(e, node.position),
+                faultedAt = Clock.System.now(),
+            )
+        }
         // Uncaught failure within a fork branch
-        hasForkBranchFaulted(nodeStack, node, e)
+        hasForkBranchFaulted(nodeStack, node, e, workflowInfo, lifecycleHook)
         // Uncaught failure
             ?: WorkflowFaulted(
                 nodeStack = nodeStack,
@@ -348,7 +370,7 @@ object StepByStepOrchestrator {
             }
         } catch (e: Exception) {
             // Uncaught failure within a fork branch
-            hasForkBranchFaulted(nodeStack, node, e)?.let { return it }
+            hasForkBranchFaulted(nodeStack, node, e, workflowInfo, lifecycleHook)?.let { return it }
             // Uncaught failure
             WorkflowFaulted(
                 nodeStack = nodeStack,
@@ -381,7 +403,7 @@ object StepByStepOrchestrator {
         lifecycleHook.onTaskFaulted(
             workflowInfo = workflowInfo,
             nodeStack = nodeStack,
-            nodePosition = NodePosition(e.error.position),
+            nodePosition = current.position,
             error = e.error,
             faultedAt = Clock.System.now(),
         )
@@ -559,10 +581,12 @@ object StepByStepOrchestrator {
     /**
      * Handles the failure of a branch execution stemming from a Fork task in a workflow (if any)
      */
-    private fun hasForkBranchFaulted(
+    private suspend fun hasForkBranchFaulted(
         nodeStack: NodeStack,
         failingNode: Node<*>,
-        exception: Exception
+        exception: Exception,
+        workflowInfo: WorkflowInfo,
+        lifecycleHook: LifecycleEventHook,
     ): ForkBranchFaulted? {
         // Find the nearest Fork task up the current node
         var current: Node<*> = failingNode
@@ -571,12 +595,24 @@ object StepByStepOrchestrator {
             val forkNode = current.parent
 
             if (forkNode.task is ForkTask) {
+                val faultedAt = Clock.System.now()
+                val error = InternalException.Error.from(exception, failingNode.position)
+                for (frame in nodeStack.toList().asReversed().takeWhile { it.position != forkNode.position }) {
+                    if (frame.position == failingNode.position) continue
+                    lifecycleHook.onTaskFaulted(
+                        workflowInfo = workflowInfo,
+                        nodeStack = nodeStack,
+                        nodePosition = frame.position,
+                        error = error,
+                        faultedAt = faultedAt,
+                    )
+                }
                 // Pop all states up to and including the fork node
                 return ForkBranchFaulted(
                     nodeStack = nodeStack.popUntil(forkNode.position).incrementTopCounter(),
                     branchPosition = current.position,
-                    error = InternalException.Error.from(exception, failingNode.position),
-                    faultedAt = Clock.System.now(),
+                    error = error,
+                    faultedAt = faultedAt,
                 )
             }
             current = current.parent

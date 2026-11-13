@@ -212,6 +212,18 @@ function ganttRowLabels(container: HTMLElement, labels: string[]): string[] {
 }
 
 describe("GanttChart", () => {
+  it.each(["completed", "faulted"])("stops open task bars when the workflow is %s", (status) => {
+    const events = buildEvents().filter((event) => !event.eventType.includes(".task.completed."));
+    events[events.length - 1] = {
+      ...events[events.length - 1],
+      eventType: `io.serverlessworkflow.workflow.${status}.v1`,
+    };
+
+    render(<GanttChart events={events} />);
+
+    expect(screen.getByRole("button", { name: "SendEmail: Running, 5s" })).toBeInTheDocument();
+  });
+
   it("supports zoom controls via buttons and keyboard reset", () => {
     render(<GanttChart events={buildEvents()} />);
 
