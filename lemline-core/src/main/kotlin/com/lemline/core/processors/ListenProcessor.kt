@@ -13,7 +13,6 @@ import com.lemline.core.workflows.CachedEventConsumption
 import io.serverlessworkflow.api.types.ListenTask
 import io.serverlessworkflow.api.types.ListenTaskConfiguration.ListenAndReadAs
 import io.serverlessworkflow.api.types.Timeout
-import io.serverlessworkflow.impl.expressions.ExpressionUtils
 import kotlin.time.Clock
 import kotlin.time.Duration
 import kotlinx.serialization.json.JsonElement
@@ -84,12 +83,11 @@ class ListenProcessor(
         val listenTo = listenConfig.to
             ?: raiseError(CONFIGURATION, "Listen task missing 'listen.to' configuration")
 
-        val consumption = CachedEventConsumption.from(listenTo.get())
+        val consumption = CachedEventConsumption.from(listenTo.get(), node.evaluationMode)
         val strategy = consumption.strategy
         val filters = consumption.filters.map { it.standard }
-        val until = consumption.untilExpression?.let {
-            UntilCondition.Expression(if (ExpressionUtils.isExpr(it)) ExpressionUtils.trimExpr(it) else it)
-        } ?: consumption.untilEvents?.let { UntilCondition.Event(it) }
+        val until = consumption.untilExpression?.let { UntilCondition.Expression(it) }
+            ?: consumption.untilEvents?.let { UntilCondition.Event(it) }
 
         // Read mode (defaults to DATA if not specified)
         val readAs = listenConfig.read ?: ListenAndReadAs.DATA

@@ -31,6 +31,7 @@ import com.lemline.core.testcases.impl.TestMocks.stopMonitoringEvent
 import com.lemline.core.testcases.impl.TestMocks.userRegisteredCloudEvent
 import com.lemline.core.testcases.impl.TestMocks.userRegisteredData
 import com.lemline.core.testcases.impl.WorkflowTestCase
+import com.lemline.core.testcases.impl.WorkflowTestValidators.expectErrorContaining
 import com.lemline.core.testcases.impl.WorkflowTestValidators.expectOutput
 import io.serverlessworkflow.api.types.ListenTaskConfiguration.ListenAndReadAs
 import kotlinx.serialization.json.JsonArray
@@ -482,9 +483,11 @@ object ListenTestCases {
         // ─────────────────────────────────────────────────────────────────────────
 
         WorkflowTestCase(
-            name = "listen any with until expression accumulates events until condition is true",
+            name = "listen loose mode accepts bare until expression",
             cloudEvents = listOf(reading1Event, reading2Event, reading3ThresholdEvent),
             yaml = """
+                evaluate:
+                  mode: loose
                 do:
                   - collectReadings:
                       listen:
@@ -506,6 +509,21 @@ object ListenTestCases {
         ),
 
         WorkflowTestCase(
+            name = "listen strict mode rejects bare until expression",
+            yaml = """
+                evaluate:
+                  mode: strict
+                do:
+                  - collectReadings:
+                      listen:
+                        to:
+                          any: []
+                          until: length >= 2
+            """.trimIndent(),
+            validate = expectErrorContaining("listen.to.any.until expression must use")
+        ),
+
+        WorkflowTestCase(
             name = "listen any with until expression can use length condition",
             cloudEvents = listOf(
                 reading1Event,
@@ -522,7 +540,7 @@ object ListenTestCases {
                           any:
                             - with:
                                 type: sensor.reading
-                          until: length >= 2
+                          until: ${'$'}{ length >= 2 }
             """.trimIndent(),
             tags = setOf("listen", "until", "expression"),
             validate = expectOutput(
@@ -822,7 +840,7 @@ object ListenTestCases {
                           any:
                             - with:
                                 type: sensor.reading
-                          until: any(.source | contains("roof"))
+                          until: ${'$'}{ any(.source | contains("roof")) }
             """.trimIndent(),
             tags = setOf("listen", "any", "until", "read", "envelope", "expression"),
             validate = expectOutput(
@@ -846,7 +864,7 @@ object ListenTestCases {
                         read: envelope
                         to:
                           any: []
-                          until: any(.type == "monitoring.stopped")
+                          until: ${'$'}{ any(.type == "monitoring.stopped") }
             """.trimIndent(),
             tags = setOf("listen", "any", "until", "read", "envelope", "expression"),
             validateDefinition = false,
@@ -873,7 +891,7 @@ object ListenTestCases {
                           any:
                             - with:
                                 type: sensor.reading
-                          until: any(.data.value > 40)
+                          until: ${'$'}{ any(.data.value > 40) }
             """.trimIndent(),
             tags = setOf("listen", "any", "until", "read", "envelope", "expression"),
             validate = expectOutput(
@@ -965,7 +983,7 @@ object ListenTestCases {
                           any:
                             - with:
                                 type: sensor.reading
-                          until: . | any(.value > 100)
+                          until: ${ . | any(.value > 100) }
                       foreach:
                         do:
                           - processReading:
@@ -1106,7 +1124,7 @@ object ListenTestCases {
                           any:
                             - with:
                                 type: sensor.reading
-                          until: . | any(.value > 100)
+                          until: ${ . | any(.value > 100) }
                       foreach:
                         do:
                           - captureContext:
@@ -1151,7 +1169,7 @@ object ListenTestCases {
                           any:
                             - with:
                                 type: sensor.reading
-                          until: . | any(.value > 100)
+                          until: ${ . | any(.value > 100) }
                       foreach:
                         do:
                           - handleEvent:
@@ -1218,7 +1236,7 @@ object ListenTestCases {
                                 any:
                                   - with:
                                       type: sensor.reading
-                                until: . | any(.value > 100)
+                                until: ${ . | any(.value > 100) }
                             foreach:
                               do:
                                 - checkValue:
@@ -1332,7 +1350,7 @@ object ListenTestCases {
                           any:
                             - with:
                                 type: sensor.reading
-                          until: any(.value > 100)
+                          until: ${ any(.value > 100) }
                       foreach:
                         item: reading
                         at: counter

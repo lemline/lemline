@@ -16,7 +16,6 @@ import io.serverlessworkflow.api.types.EventDataschema
 import io.serverlessworkflow.api.types.EventSource
 import io.serverlessworkflow.api.types.EventTime
 import io.serverlessworkflow.api.types.UriTemplate
-import io.serverlessworkflow.impl.expressions.ExpressionUtils
 import java.net.URI
 import java.time.OffsetDateTime
 import java.util.*
@@ -158,11 +157,7 @@ class EmitProcessor(
             raiseError(CONFIGURATION, "CloudEvent 'type' is required")
         }
 
-        return if (ExpressionUtils.isExpr(type)) {
-            evaluateExpression(type, data, scope)
-        } else {
-            type
-        }
+        return evaluateExpression(type, data, scope)
     }
 
     /**
@@ -193,11 +188,7 @@ class EmitProcessor(
     ): String? {
         if (value == null) return null
 
-        return if (ExpressionUtils.isExpr(value)) {
-            evaluateExpression(value, data, scope)
-        } else {
-            value
-        }
+        return evaluateExpression(value, data, scope)
     }
 
     /**
@@ -230,15 +221,7 @@ class EmitProcessor(
         if (eventData == null) return null
 
         return when (val value = eventData.get()) {
-            is String -> {
-                // Runtime expression - evaluate it
-                if (ExpressionUtils.isExpr(value)) {
-                    val trimmed = ExpressionUtils.trimExpr(value)
-                    eval(data, JsonPrimitive(trimmed), scope, false)
-                } else {
-                    JsonPrimitive(value)
-                }
-            }
+            is String -> eval(data, JsonPrimitive(value), scope, false)
 
             else -> {
                 // Object - convert to JsonElement
@@ -267,13 +250,8 @@ class EmitProcessor(
         expression: String,
         data: JsonElement,
         scope: Scope
-    ): String = if (ExpressionUtils.isExpr(expression)) {
-        val trimmed = ExpressionUtils.trimExpr(expression)
-        when (val result = eval(data, JsonPrimitive(trimmed), scope, false)) {
+    ): String = when (val result = eval(data, JsonPrimitive(expression), scope, false)) {
             is JsonPrimitive -> result.content
             else -> raiseError(RUNTIME, "Expression must evaluate to a string, but got: $result")
-        }
-    } else {
-        expression
     }
 }

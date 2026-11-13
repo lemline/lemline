@@ -2,6 +2,8 @@
 package com.lemline.core.workflows
 
 import com.fasterxml.jackson.databind.JsonNode
+import com.lemline.common.json.LemlineJson
+import com.lemline.core.expressions.EvaluationMode
 import io.serverlessworkflow.api.WorkflowFormat
 import io.serverlessworkflow.api.WorkflowReader
 import java.util.concurrent.Callable
@@ -9,6 +11,8 @@ import java.util.concurrent.Executors
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Test
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 
 class WorkflowDefinitionReaderTest {
     private val nestedWorkflow = """
@@ -35,6 +39,33 @@ class WorkflowDefinitionReaderTest {
                 format.mapper().valueToTree<JsonNode>(expected),
                 format.mapper().valueToTree<JsonNode>(actual),
             )
+        }
+    }
+
+    @Test
+    fun `evaluate mode survives parsing and workflow serialization`() {
+        val definition = nestedWorkflow + "\nevaluate:\n  language: jq\n  mode: loose"
+        for (format in WorkflowFormat.entries) {
+            val workflow = WorkflowDefinitionReader.read(encode(definition, format), format)
+            assertEquals(EvaluationMode.LOOSE, (workflow as EvaluatedWorkflow).evaluationMode)
+            assertEquals("loose", format.mapper().valueToTree<JsonNode>(workflow).get("evaluate").get("mode").textValue())
+            val serialized = LemlineJson.encodeToElement(workflow)
+            assertEquals("loose", serialized["evaluate"]!!.jsonObject["mode"]!!.jsonPrimitive.content)
+            assertEquals(
+                EvaluationMode.LOOSE,
+                (WorkflowDefinitionReader.read(serialized.toString(), WorkflowFormat.JSON) as EvaluatedWorkflow).evaluationMode,
+            )
+            assertEquals(EvaluationMode.LOOSE, WorkflowParser.createRootNode(workflow).evaluationMode)
+        }
+    }
+
+    @Test
+    fun `evaluate rejects invalid configuration`() {
+        for (evaluate in listOf("mode: unknown", "mode: 2", "language: python", "extra: value")) {
+            val definition = nestedWorkflow + "\nevaluate:\n  $evaluate"
+            assertThrows(IllegalArgumentException::class.java) {
+                WorkflowDefinitionReader.read(definition, WorkflowFormat.YAML)
+            }
         }
     }
 

@@ -61,7 +61,7 @@ abstract class EventScheduleServiceTestBase {
     @BeforeEach
     fun isolate() { namespace = WorkflowNamespace("events-${IDV7.random()}") }
 
-    private suspend fun define(on: String, name: String = "trigger", ns: WorkflowNamespace = namespace): DefinitionModel {
+    private suspend fun define(on: String, name: String = "trigger", ns: WorkflowNamespace = namespace, mode: String? = null): DefinitionModel {
         val definition = DefinitionModel.from("""
             document:
               dsl: '1.0.0'
@@ -70,7 +70,8 @@ abstract class EventScheduleServiceTestBase {
               version: '1.0.0'
             schedule:
               on:
-        """.trimIndent() + "\n" + on.prependIndent("    ") + "\ndo:\n  - result:\n      set:\n        received: \${ \$workflow.input }\n")
+        """.trimIndent() + "\n" + on.prependIndent("    ") + "\ndo:\n  - result:\n      set:\n        received: \${ \$workflow.input }\n" +
+            (mode?.let { "evaluate:\n  mode: $it\n" } ?: ""))
         definitions.insert(definition) shouldBe 1
         WorkflowCache.parseYamlAndPut(definition.definition)
         return definition
@@ -502,6 +503,14 @@ abstract class EventScheduleServiceTestBase {
         starts().single().eventIds() shouldBe listOf("a1", "a2")
         service().handleCloudEvent(event(id = "a3"), namespace) shouldBe 0
         service().handleCloudEvent(event(id = "a4"), namespace) shouldBe 1
+    }
+
+    @Test
+    fun `loose mode evaluates a bare schedule until expression`() = runTest {
+        define("any:\n  - with: { type: a }\nuntil: length == 2", mode = "loose")
+        service().handleCloudEvent(event(id = "a1"), namespace) shouldBe 0
+        service().handleCloudEvent(event(id = "a2"), namespace) shouldBe 1
+        starts().single().eventIds() shouldBe listOf("a1", "a2")
     }
 
     @Test

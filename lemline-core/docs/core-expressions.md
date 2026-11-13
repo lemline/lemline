@@ -49,6 +49,25 @@ Workflow secrets declared under `use.secrets` are resolved from same-named envir
 
 The DSL defaults to strict evaluation: runtime expressions must use `${ ... }`, including `for.in`, `while`, and `switch.when`. Lemline still accepts bare JQ in some other fields as a legacy behavior, but workflow definitions should use the delimiters for portability.
 
+### Evaluation Mode
+
+The workflow-level `evaluate.mode` setting defaults to `strict`. Set `mode: loose` to evaluate bare JQ expressions; values that cannot be evaluated remain strings. Lemline supports `jq` as the evaluation language. The bundled SDK schema still requires delimiters in URI-shaped fields such as HTTP endpoints.
+
+```yaml
+evaluate:
+  language: jq
+  mode: loose
+do:
+  - loop:
+      for:
+        in: .items
+      while: true
+      do:
+        - collect:
+            set:
+              value: $item
+```
+
 ### Runtime Expressions
 
 ```yaml

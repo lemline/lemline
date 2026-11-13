@@ -626,7 +626,7 @@ abstract class AbstractProcessor<T : TaskBase, S : NodeState>(
 
 
     private fun eval(data: JsonElement, expr: String, scope: JsonObject): JsonElement = try {
-        JQExpression.eval(data, JsonPrimitive(expr), scope, false)
+        JQExpression.eval(data, JsonPrimitive(expr), scope, false, node.evaluationMode)
     } catch (e: Exception) {
         raiseError(EXPRESSION, e.message, e.stackTraceToString())
     }
@@ -637,7 +637,7 @@ abstract class AbstractProcessor<T : TaskBase, S : NodeState>(
         scope: JsonObject,
         force: Boolean = false
     ) = try {
-        JQExpression.eval(data, expr, scope, force)
+        JQExpression.eval(data, expr, scope, force, node.evaluationMode)
     } catch (e: Exception) {
         raiseError(EXPRESSION, e.message, e.stackTraceToString())
     }

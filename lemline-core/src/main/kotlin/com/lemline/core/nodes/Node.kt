@@ -3,6 +3,7 @@ package com.lemline.core.nodes
 
 import com.lemline.common.json.LemlineJson
 import com.lemline.common.values.NodePosition
+import com.lemline.core.expressions.EvaluationMode
 import com.lemline.core.processors.NodeProcessors
 import com.lemline.core.workflows.WorkflowParser
 import io.serverlessworkflow.api.types.CallAsyncAPI
@@ -33,6 +34,13 @@ import kotlinx.serialization.json.JsonObject
  * @property parent The parent node of this task node, or null if it is a root node.
  */
 data class Node<T : TaskBase>(val position: NodePosition, val task: T, val name: String, val parent: Node<*>? = null) {
+    val evaluationMode: EvaluationMode by lazy {
+        when (val root = generateSequence(this as Node<*>) { it.parent }.last().task) {
+            is RootTask -> root.evaluationMode
+            else -> EvaluationMode.STRICT
+        }
+    }
+
     val definition: JsonObject by lazy { LemlineJson.encodeToElement(task) }
 
     val processor by lazy { NodeProcessors.createProcessor(this) }
