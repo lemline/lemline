@@ -429,9 +429,14 @@ class LifecycleEventHookTest : FunSpec() {
                 do:
                   - outer:
                       do:
-                        - fail:
-                            raise:
-                              error: missingError
+                        - findPet:
+                            call: openapi
+                            with:
+                              document:
+                                endpoint: https://petstore.swagger.io/v2/swagger.json
+                              operationId: findPetsByStatus
+                              parameters:
+                                status: available
             """
 
             try {
@@ -447,9 +452,9 @@ class LifecycleEventHookTest : FunSpec() {
                 "task.started:do",
                 "task.created:outer",
                 "task.started:outer",
-                "task.created:fail",
-                "task.started:fail",
-                "task.faulted:fail",
+                "task.created:findPet",
+                "task.started:findPet",
+                "task.faulted:findPet",
                 "task.faulted:outer",
                 "task.faulted:do",
                 "workflow.faulted"
@@ -721,6 +726,39 @@ class LifecycleEventHookTest : FunSpec() {
                 "task.completed:raceWork",
                 "task.completed:do",
                 "workflow.completed"
+            )
+        }
+
+        test("faulted fork branch closes its tasks and the fork before the workflow") {
+            val hook = CapturingLifecycleHook()
+            val yaml = """
+                do:
+                  - parallel:
+                      fork:
+                        compete: false
+                        branches:
+                          - brokenBranch:
+                              do:
+                                - fail:
+                                    raise:
+                                      error: missingError
+                          - healthyBranch:
+                              set:
+                                ok: true
+            """
+
+            try {
+                executeWorkflow(yaml, lifecycleHook = hook)
+            } catch (_: Exception) {
+                // Expected to fail
+            }
+
+            hook.events.stripWorkflowIds().filter { it.startsWith("task.faulted:") || it == "workflow.faulted" } shouldBe listOf(
+                "task.faulted:fail",
+                "task.faulted:brokenBranch",
+                "task.faulted:parallel",
+                "task.faulted:do",
+                "workflow.faulted"
             )
         }
 
