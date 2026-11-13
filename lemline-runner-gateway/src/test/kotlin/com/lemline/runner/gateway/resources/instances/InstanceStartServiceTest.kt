@@ -239,6 +239,52 @@ class InstanceStartServiceTest {
         }
     }
 
+    @Test
+    fun `cron start registers only a schedule and preserves its first run time on retry`() = runTest {
+        val request = StartInstanceRequest.newBuilder()
+            .setNamespace("team-a")
+            .setName("orders")
+            .setInstanceId("018f40c4-5f0f-7bf2-b0f7-4a4931227c31")
+            .build()
+        val schedule = slot<ScheduleModel>()
+        coEvery { definitions.get(WorkflowNamespace("team-a"), WorkflowName("orders"), null) } returns
+            scheduledWorkflow("cron: '* * * * *'")
+        coEvery { scheduleRepository.insert(capture(schedule), any<Connection>()) } returns 1
+
+        val first = service.start(request, principal)
+
+        first.scheduleOnly shouldBe true
+        first.nextRunAt shouldBe schedule.captured.outboxScheduledFor
+        checkNotNull(first.nextRunAt)
+        coVerify(exactly = 0) { gatewayCommandRepository.insert(any<GatewayCommandModel>(), any<Connection>()) }
+        coVerify(exactly = 0) { lifecycleHook.onWorkflowCreated(any(), any()) }
+
+        coEvery { scheduleRepository.insert(any<ScheduleModel>(), any<Connection>()) } returns 0
+        coEvery { scheduleRepository.findByWorkflowId(WorkflowId(IDV7.from(request.instanceId))) } returns schedule.captured
+
+        val retry = service.start(request, principal)
+
+        retry.result shouldBe StartInstanceOutcome.ACCEPTED_EXISTING
+        retry.scheduleOnly shouldBe true
+        retry.nextRunAt shouldBe first.nextRunAt
+    }
+
+    @Test
+    fun `every schedule accepts an immediate instance start`() = runTest {
+        coEvery { definitions.get(WorkflowNamespace("team-a"), WorkflowName("orders"), null) } returns
+            scheduledWorkflow("every: PT1M")
+        coEvery { gatewayCommandRepository.insert(any<GatewayCommandModel>(), any<Connection>()) } returns 1
+
+        val result = service.start(
+            StartInstanceRequest.newBuilder().setNamespace("team-a").setName("orders").build(),
+            principal,
+        )
+
+        result.scheduleOnly shouldBe false
+        result.nextRunAt shouldBe null
+        coVerify(exactly = 1) { scheduleRepository.insert(any<ScheduleModel>(), any<Connection>()) }
+    }
+
     private fun existingOutbox(
         workflowId: WorkflowId,
         workflowInput: JsonElement,
@@ -265,6 +311,24 @@ class InstanceStartServiceTest {
               namespace: team-a
               name: orders
               version: '$version'
+            do:
+              - log:
+                  call: log
+                  with:
+                    message: "Hello"
+            """.trimIndent()
+        )
+
+    private fun scheduledWorkflow(schedule: String): Workflow =
+        WorkflowCache.parseYaml(
+            """
+            document:
+              dsl: '1.0.0'
+              namespace: team-a
+              name: orders
+              version: '1.0.0'
+            schedule:
+              $schedule
             do:
               - log:
                   call: log

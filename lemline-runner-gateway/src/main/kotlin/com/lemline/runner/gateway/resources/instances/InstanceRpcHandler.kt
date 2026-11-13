@@ -34,6 +34,7 @@ import com.lemline.runner.gateway.grpc.toProtoTimestamp
 import com.lemline.runner.gateway.grpc.validateCreatedRange
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
+import kotlin.time.toJavaInstant
 
 @ApplicationScoped
 class InstanceRpcHandler(
@@ -57,13 +58,15 @@ class InstanceRpcHandler(
         principal: GatewayPrincipal,
     ): StartInstanceResponse {
         val result = startService.start(request, principal)
-        return StartInstanceResponse.newBuilder()
+        val response = StartInstanceResponse.newBuilder()
             .setInstanceId(result.instanceId.toString())
             .setNamespace(result.namespace.toString())
             .setName(result.name.toString())
             .setVersion(result.version.toString())
             .setResult(toProtoStartInstanceResult(result))
-            .build()
+            .setScheduleOnly(result.scheduleOnly)
+        result.nextRunAt?.let { response.setNextRunAt(toProtoTimestamp(it.toJavaInstant())) }
+        return response.build()
     }
 
     suspend fun getInstance(
