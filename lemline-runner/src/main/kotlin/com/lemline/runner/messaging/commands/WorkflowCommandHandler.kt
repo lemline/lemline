@@ -30,6 +30,7 @@ import com.lemline.runner.failures.FailureRepository
 import com.lemline.runner.messaging.WithHealthCheckMessageHandler
 import com.lemline.runner.messaging.cloudevents.CloudEventsEmitter
 import com.lemline.runner.messaging.events.WorkflowEventEmitter
+import com.lemline.runner.secrets.Secrets
 import io.serverlessworkflow.api.types.Workflow
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.enterprise.inject.Instance
@@ -291,6 +292,7 @@ internal class WorkflowCommandHandler(
     private suspend fun InstanceMessage<WorkflowCommand>.executeStep(workflow: Workflow): InstanceMessage<WorkflowCommand>? {
         // Execute using StepByStepOrchestrator
         logger.debug { "resumeFromTask state=$workflowState" }
+        val secrets = Secrets.getForWorkflow(workflow)
 
         val event = when (config.orchestrator().mode()) {
             LemlineConfiguration.OrchestratorMode.ALL -> StepByStepOrchestrator.runByTask(
@@ -299,6 +301,7 @@ internal class WorkflowCommandHandler(
                 workflowInfo,
                 lifecycleHook,
                 functionResolver::resolve,
+                secrets,
             )
 
             LemlineConfiguration.OrchestratorMode.ACTION -> StepByStepOrchestrator.runByActivity(
@@ -307,6 +310,7 @@ internal class WorkflowCommandHandler(
                 workflowInfo,
                 lifecycleHook,
                 functionResolver::resolve,
+                secrets,
             )
         }
 

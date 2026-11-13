@@ -16,6 +16,7 @@ import com.lemline.core.cloudevents.CloudEventHook
 import com.lemline.core.cloudevents.InMemoryCloudEventHook
 import com.lemline.core.getWorkflowToTest
 import com.lemline.core.lifecycleevents.LifecycleEventHook
+import com.lemline.core.states.WorkflowEvent
 import com.lemline.core.workflows.WorkflowCache
 import io.kotest.core.spec.style.FunSpec
 import kotlin.test.assertEquals
@@ -77,6 +78,7 @@ class OrchestratorTest : FunSpec() {
         version: String = "0.1.0",
         activityExecutor: ActivityExecutor? = null,
         cloudEventHook: CloudEventHook = InMemoryCloudEventHook(),
+        secrets: JsonObject = buildJsonObject {},
     ): JsonElement {
         val workflow = getWorkflowToTest(yaml, namespace, name, version)
 
@@ -98,6 +100,7 @@ class OrchestratorTest : FunSpec() {
             functionResolver = MockFunctionResolver(),
             cloudEventHook = cloudEventHook,
             lifecycleHook = LifecycleEventHook.NOOP,
+            secrets = secrets,
         )
 
         return outcome.value()
@@ -106,6 +109,48 @@ class OrchestratorTest : FunSpec() {
     init {
         afterEach {
             WorkflowCache.clear()
+        }
+
+        test("resolves declared secrets across serialized task commands") {
+            val yaml = $$"""
+                use:
+                  secrets:
+                    - GITHUB_TOKEN
+                do:
+                  - first:
+                      set:
+                        value: ${ $secrets.GITHUB_TOKEN }
+                  - second:
+                      set:
+                        value: ${ $secrets.GITHUB_TOKEN }
+            """.trimIndent()
+
+            val output = executeWorkflow(yaml, secrets = buildJsonObject { put("GITHUB_TOKEN", "private-value") })
+            assertEquals("private-value", output.jsonObject.getValue("value").jsonPrimitive.content)
+        }
+
+        test("faults with authorization when a declared secret is unavailable") {
+            val workflow = getWorkflowToTest($$"""
+                use:
+                  secrets:
+                    - GITHUB_TOKEN
+                do:
+                  - first:
+                      set:
+                        value: ${ $secrets.GITHUB_TOKEN }
+            """.trimIndent())
+            val outcome = FullOrchestrator.resume(
+                workflow = workflow,
+                command = StepByStepOrchestrator.initCmd(),
+                serde = true,
+                activityExecutor = MockActivityExecutor.empty { },
+                functionResolver = MockFunctionResolver(),
+                cloudEventHook = InMemoryCloudEventHook(),
+                lifecycleHook = LifecycleEventHook.NOOP,
+            )
+            assertTrue(outcome is WorkflowEvent.WorkflowFaulted)
+            assertEquals(403, outcome.error.status)
+            assertTrue(outcome.error.title!!.contains("GITHUB_TOKEN"))
         }
 
         // ========================================

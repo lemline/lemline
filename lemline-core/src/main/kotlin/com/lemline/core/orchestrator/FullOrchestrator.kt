@@ -38,6 +38,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 
 internal class EarlyCompletionException(val event: WorkflowEvent.Outcome) : Exception()
@@ -57,6 +58,7 @@ object FullOrchestrator {
         functionResolver: FunctionResolver,
         cloudEventHook: CloudEventHook,
         lifecycleHook: LifecycleEventHook,
+        secrets: JsonObject = buildJsonObject {},
     ): JsonElement {
         val cmd = StepByStepOrchestrator.initCmd(workflowId, workflowInput, hasWaitingParent, startedAt)
         return resume(
@@ -66,7 +68,8 @@ object FullOrchestrator {
             activityExecutor = activityExecutor,
             functionResolver = functionResolver,
             cloudEventHook = cloudEventHook,
-            lifecycleHook = lifecycleHook
+            lifecycleHook = lifecycleHook,
+            secrets = secrets,
         ).value()
     }
 
@@ -78,6 +81,7 @@ object FullOrchestrator {
         functionResolver: FunctionResolver,
         cloudEventHook: CloudEventHook,
         lifecycleHook: LifecycleEventHook,
+        secrets: JsonObject = buildJsonObject {},
     ): WorkflowEvent.Outcome {
         val serdeCommand = validateSerde(command, serde)
         // Convert FunctionResolver to lambda for StepByStepOrchestrator
@@ -86,7 +90,8 @@ object FullOrchestrator {
             command = serdeCommand,
             workflowInfo = workflow.info,
             lifecycleHook = lifecycleHook,
-            functionResolver = functionResolver::resolve
+            functionResolver = functionResolver::resolve,
+            secrets = secrets,
         )
         val serdeEvent = validateSerde(event, serde)
 
@@ -97,7 +102,8 @@ object FullOrchestrator {
             activityExecutor,
             functionResolver,
             cloudEventHook,
-            lifecycleHook
+            lifecycleHook,
+            secrets,
         )
     }
 
@@ -154,26 +160,27 @@ object FullOrchestrator {
         functionResolver: FunctionResolver,
         cloudEventHook: CloudEventHook,
         lifecycleHook: LifecycleEventHook,
+        secrets: JsonObject,
     ): WorkflowEvent.Outcome = when (event) {
         // All activities (HTTP, Script, Shell, Emit) go through ActivityExecutor
         is WorkflowEvent.ActivityStarted -> resumeWith(
             workflow, handleActivityStarted(event, activityExecutor),
-            serde, activityExecutor, functionResolver, cloudEventHook, lifecycleHook
+            serde, activityExecutor, functionResolver, cloudEventHook, lifecycleHook, secrets
         )
 
         is WorkflowEvent.WaitStarted -> resumeWith(
             workflow, handleWaitStarted(event),
-            serde, activityExecutor, functionResolver, cloudEventHook, lifecycleHook
+            serde, activityExecutor, functionResolver, cloudEventHook, lifecycleHook, secrets
         )
 
         is WorkflowEvent.TaskScheduled -> resumeWith(
             workflow, event.resume(),
-            serde, activityExecutor, functionResolver, cloudEventHook, lifecycleHook
+            serde, activityExecutor, functionResolver, cloudEventHook, lifecycleHook, secrets
         )
 
         is WorkflowEvent.TaskRetryScheduled -> resumeWith(
             workflow, handleTaskRetryScheduled(event),
-            serde, activityExecutor, functionResolver, cloudEventHook, lifecycleHook
+            serde, activityExecutor, functionResolver, cloudEventHook, lifecycleHook, secrets
         )
 
         is WorkflowEvent.RunWorkflowStarted -> resumeWith(
@@ -183,7 +190,8 @@ object FullOrchestrator {
             activityExecutor,
             functionResolver,
             cloudEventHook,
-            lifecycleHook
+            lifecycleHook,
+            secrets,
         )
 
         // CallFunctionStarted is no longer emitted - CallFunction is now a control-flow task
@@ -198,13 +206,15 @@ object FullOrchestrator {
                 activityExecutor,
                 functionResolver,
                 cloudEventHook,
-                lifecycleHook
+                lifecycleHook,
+                secrets,
             ),
             serde,
             activityExecutor,
             functionResolver,
             cloudEventHook,
-            lifecycleHook
+            lifecycleHook,
+            secrets,
         )
 
         is WorkflowEvent.ListenStarted -> try {
@@ -217,13 +227,15 @@ object FullOrchestrator {
                     activityExecutor,
                     functionResolver,
                     cloudEventHook,
-                    lifecycleHook
+                    lifecycleHook,
+                    secrets,
                 ),
                 serde,
                 activityExecutor,
                 functionResolver,
                 cloudEventHook,
-                lifecycleHook
+                lifecycleHook,
+                secrets,
             )
         } catch (e: EarlyCompletionException) {
             e.event
@@ -240,8 +252,9 @@ object FullOrchestrator {
         functionResolver: FunctionResolver,
         cloudEventHook: CloudEventHook,
         lifecycleHook: LifecycleEventHook,
+        secrets: JsonObject,
     ): WorkflowEvent.Outcome =
-        resume(workflow, command, serde, activityExecutor, functionResolver, cloudEventHook, lifecycleHook)
+        resume(workflow, command, serde, activityExecutor, functionResolver, cloudEventHook, lifecycleHook, secrets)
 
     private suspend fun handleActivityStarted(
         event: WorkflowEvent.ActivityStarted,
@@ -282,6 +295,7 @@ object FullOrchestrator {
         functionResolver: FunctionResolver,
         cloudEventHook: CloudEventHook,
         lifecycleHook: LifecycleEventHook,
+        secrets: JsonObject,
     ): WorkflowCommand {
         logger.debug { "Listening for CloudEvents: strategy=${listenStarted.config.strategy} filters=${listenStarted.config.filters} until=${listenStarted.config.until}" }
 
@@ -290,7 +304,7 @@ object FullOrchestrator {
 
         val foreachProcessor = listenNode.foreachBlock?.let { foreachBlock ->
             ListenEventCollector.createForeachProcessor(foreachBlock.position, foreachBlock.task) { cmd ->
-                resume(workflow, cmd, serde, activityExecutor, functionResolver, cloudEventHook, lifecycleHook)
+                resume(workflow, cmd, serde, activityExecutor, functionResolver, cloudEventHook, lifecycleHook, secrets)
             }
         }
 
@@ -391,6 +405,7 @@ object FullOrchestrator {
         functionResolver: FunctionResolver,
         cloudEventHook: CloudEventHook,
         lifecycleHook: LifecycleEventHook,
+        secrets: JsonObject,
     ): WorkflowCommand {
         val forkNode = workflow.getNode(event.nodePosition, functionResolver::resolve) as Node<ForkTask>
         val branches = forkNode.branches.ifEmpty {
@@ -401,12 +416,14 @@ object FullOrchestrator {
             val output = if (forkNode.task.fork.isCompete) {
                 ForkBranchExecutor.executeCompete(
                     workflow, event.nodeStack, branches, event.rawInput,
-                    serde, activityExecutor, functionResolver, cloudEventHook, lifecycleHook, ::resume
+                    serde, activityExecutor, functionResolver, cloudEventHook, lifecycleHook,
+                    { w, c, s, a, f, e, l -> resume(w, c, s, a, f, e, l, secrets) }
                 )
             } else {
                 ForkBranchExecutor.executeCooperative(
                     workflow, event.nodeStack, branches, event.rawInput,
-                    serde, activityExecutor, functionResolver, cloudEventHook, lifecycleHook, ::resume
+                    serde, activityExecutor, functionResolver, cloudEventHook, lifecycleHook,
+                    { w, c, s, a, f, e, l -> resume(w, c, s, a, f, e, l, secrets) }
                 )
             }
             logger.debug { "Fork completed: output=$output" }

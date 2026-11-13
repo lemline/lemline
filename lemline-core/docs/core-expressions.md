@@ -4,6 +4,8 @@
 
 Lemline uses JQ 1.6 for data transformation and condition evaluation. Expressions are evaluated within a hierarchical scope.
 
+Workflow secrets declared under `use.secrets` are resolved from same-named environment variables by the runner for each command. They are injected as `$secrets` in the root scope and are available to all workflow expressions, including task definitions and output expressions. A missing declared secret faults the workflow with an `authorization` error (HTTP status 403). Resolved secret values are not included in the serialized root state; a workflow expression can still explicitly copy one into task data, output, logs, or a call request. Authors should limit where they reference secrets.
+
 ## Key Files
 
 | File | Purpose |
