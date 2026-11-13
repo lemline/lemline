@@ -17,6 +17,7 @@ import com.lemline.runner.gateway.errors.GatewayBadRequestException
 import com.lemline.runner.gateway.errors.GatewayConflictException
 import com.lemline.runner.gateway.errors.GatewayNotFoundException
 import com.lemline.runner.gateway.outbox.GatewayCommandModel
+import com.lemline.runner.gateway.outbox.GatewayCommandOutbox
 import com.lemline.runner.gateway.outbox.GatewayCommandRepository
 import com.lemline.runner.schedules.ScheduleRepository
 import com.lemline.runner.starters.Starter
@@ -59,6 +60,9 @@ class InstanceStartService {
     lateinit var gatewayCommandRepository: GatewayCommandRepository
 
     @Inject
+    lateinit var gatewayCommandOutbox: GatewayCommandOutbox
+
+    @Inject
     lateinit var lifecycleHook: LifecycleEventHook
 
     @Inject
@@ -97,6 +101,7 @@ class InstanceStartService {
             ?: preparedWorkflow.scheduleModel?.instanceMessage?.workflowInfo
             ?: error("Prepared workflow must contain workflow info")
 
+        var newCommandId: IDV7? = null
         val existingResult = databaseConfig.withTransaction { conn ->
             val outboxResult = preparedWorkflow.instanceMessage?.let { message ->
                 val outboxEntry = GatewayCommandModel(
@@ -110,7 +115,7 @@ class InstanceStartService {
                     workflowInfo = resolvedWorkflowInfo,
                     workflowInput = workflowInput,
                     loadExisting = { gatewayCommandRepository.findByWorkflowId(instanceId) },
-                )
+                ).also { if (it == null) newCommandId = outboxEntry.id }
             }
 
             outboxResult ?: preparedWorkflow.scheduleModel?.let { scheduleModel ->
@@ -127,6 +132,7 @@ class InstanceStartService {
 
         val outcome = existingResult ?: run {
             preparedWorkflow.onWorkflowCreated(lifecycleHook)
+            newCommandId?.let { gatewayCommandOutbox.processNow(it) }
             // Loud first-contact signal: WARN + counter when the namespace shows no runner activity
             namespaceActivityMonitor.onInstanceAccepted(resolvedWorkflowInfo.namespace.toString())
             StartInstanceOutcome.ACCEPTED_NEW

@@ -22,6 +22,7 @@ import com.lemline.runner.gateway.auth.GatewayAuthorizer
 import com.lemline.runner.gateway.auth.GatewayPrincipal
 import com.lemline.runner.gateway.errors.GatewayConflictException
 import com.lemline.runner.gateway.outbox.GatewayCommandModel
+import com.lemline.runner.gateway.outbox.GatewayCommandOutbox
 import com.lemline.runner.gateway.outbox.GatewayCommandRepository
 import com.lemline.runner.schedules.ScheduleModel
 import com.lemline.runner.schedules.ScheduleRepository
@@ -30,11 +31,15 @@ import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.shouldBe
 import io.mockk.coEvery
 import io.mockk.coVerify
+import io.mockk.coVerifyOrder
+import io.mockk.Called
+import io.mockk.clearMocks
 import io.mockk.every
 import io.mockk.just
 import io.mockk.mockk
 import io.mockk.runs
 import io.mockk.slot
+import io.mockk.verify
 import io.serverlessworkflow.api.types.Workflow
 import java.sql.Connection
 import kotlinx.coroutines.test.runTest
@@ -55,6 +60,7 @@ class InstanceStartServiceTest {
     }
     private val scheduleRepository = mockk<ScheduleRepository>()
     private val gatewayCommandRepository = mockk<GatewayCommandRepository>()
+    private val gatewayCommandOutbox = mockk<GatewayCommandOutbox>(relaxed = true)
     private val lifecycleHook = mockk<LifecycleEventHook>(relaxed = true)
     private val authorizer = mockk<GatewayAuthorizer>()
 
@@ -73,6 +79,7 @@ class InstanceStartServiceTest {
         this.databaseConfig = this@InstanceStartServiceTest.databaseConfig
         this.scheduleRepository = this@InstanceStartServiceTest.scheduleRepository
         this.gatewayCommandRepository = this@InstanceStartServiceTest.gatewayCommandRepository
+        this.gatewayCommandOutbox = this@InstanceStartServiceTest.gatewayCommandOutbox
         this.lifecycleHook = this@InstanceStartServiceTest.lifecycleHook
         this.authorizer = this@InstanceStartServiceTest.authorizer
         this.namespaceActivityMonitor = mockk(relaxed = true)
@@ -87,6 +94,7 @@ class InstanceStartServiceTest {
     @BeforeEach
     fun setUp() {
         WorkflowCache.clear()
+        clearMocks(gatewayCommandOutbox, answers = false)
         every { authorizer.requireScope(principal, "lemline.start") } just runs
         every { authorizer.requireNamespace(principal, any()) } just runs
         coEvery { scheduleRepository.insert(any<ScheduleModel>(), any<Connection>()) } returns 1
@@ -110,6 +118,11 @@ class InstanceStartServiceTest {
         result.result shouldBe StartInstanceOutcome.ACCEPTED_NEW
         result.version shouldBe WorkflowVersion("1.0.0")
         coVerify(exactly = 1) { lifecycleHook.onWorkflowCreated(any(), any()) }
+        coVerify(exactly = 1) { gatewayCommandOutbox.processNow(inserted.captured.id) }
+        coVerifyOrder {
+            lifecycleHook.onWorkflowCreated(any(), any())
+            gatewayCommandOutbox.processNow(inserted.captured.id)
+        }
     }
 
     @Test
@@ -200,6 +213,7 @@ class InstanceStartServiceTest {
 
         result.result shouldBe StartInstanceOutcome.ACCEPTED_EXISTING
         coVerify(exactly = 0) { lifecycleHook.onWorkflowCreated(any(), any()) }
+        verify { gatewayCommandOutbox wasNot Called }
     }
 
     @Test
