@@ -529,7 +529,7 @@ object StepByStepOrchestrator {
             lifecycleHook.onWorkflowStarted(
                 workflowInfo = workflowInfo,
                 nodeStack = nodeStack,
-                startedAt = nodeStack.rootState.startedAt,
+                startedAt = now,
             )
             // Also emit task.created for /do since it's the first task
             // (not scheduled via TaskScheduled event)

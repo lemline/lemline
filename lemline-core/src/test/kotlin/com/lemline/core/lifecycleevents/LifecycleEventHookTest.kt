@@ -24,8 +24,12 @@ import java.util.concurrent.CopyOnWriteArrayList
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
+import kotlin.time.toJavaInstant
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 
 /**
  * Tests for lifecycle event hooks in StepByStepOrchestrator.
@@ -760,6 +764,35 @@ class LifecycleEventHookTest : FunSpec() {
                 "task.faulted:do",
                 "workflow.faulted"
             )
+        }
+
+        test("workflow.started records execution time after the instance was queued") {
+            val createdAt = Instant.parse("2020-01-01T00:00:00Z")
+            val emitter = CapturingEmitter()
+            executeWorkflowDeterministic(
+                yaml = """
+                    do:
+                      - step1:
+                          set:
+                            a: 1
+                """,
+                workflowId = WorkflowId.random(),
+                startedAt = createdAt,
+                emitter = emitter,
+            )
+
+            val created = emitter.events.single { it.type == LifecycleEventType.WORKFLOW_CREATED.type }
+            val started = emitter.events.single { it.type == LifecycleEventType.WORKFLOW_STARTED.type }
+            val doStarted = emitter.events.first { it.type == LifecycleEventType.TASK_STARTED.type }
+            val startedAtInData = Json.parseToJsonElement(String(started.data!!.toBytes()))
+                .jsonObject.getValue("startedAt").jsonPrimitive.content
+            val createdTime = requireNotNull(created.time)
+            val startedTime = requireNotNull(started.time)
+
+            createdTime.toInstant() shouldBe createdAt.toJavaInstant()
+            startedTime.toInstant().isAfter(createdTime.toInstant()) shouldBe true
+            startedTime shouldBe doStarted.time
+            Instant.parse(startedAtInData).toJavaInstant() shouldBe startedTime.toInstant()
         }
 
         // ========================================
