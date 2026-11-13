@@ -460,7 +460,8 @@ message StartInstanceRequest {
 
 // Response for StartInstance.
 message StartInstanceResponse {
-    // The created or reused instance identifier.
+    // The created or reused instance identifier. For schedule_only, this is the
+    // request's idempotency key and does not identify a runnable instance.
     string instance_id = 1;
 
     // Resolved definition namespace.
@@ -474,6 +475,12 @@ message StartInstanceResponse {
 
     // Outcome of the start request.
     StartInstanceResult result = 5;
+
+    // True when only a schedule was registered and no instance start was accepted.
+    bool schedule_only = 6;
+
+    // First scheduled execution time for a schedule_only response, if known.
+    google.protobuf.Timestamp next_run_at = 7;
 }
 
 // Request for GetInstance.

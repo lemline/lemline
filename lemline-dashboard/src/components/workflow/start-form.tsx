@@ -2,12 +2,12 @@ import { create } from "@bufbuild/protobuf";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { uuidv7 } from "uuidv7";
 import { toast } from "sonner";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { StartInstanceRequestSchema } from "../../gen/proto/lemline/gateway/v1/gateway_pb";
 import { gatewayClient } from "../../lib/grpc-client";
 import { useNamespaces } from "../../hooks/use-namespaces";
 import { useDefinitions } from "../../hooks/use-definitions";
-import { valueFromJsonText } from "../../lib/proto";
+import { timestampToMilliseconds, valueFromJsonText } from "../../lib/proto";
 import { Input } from "../ui/input";
 import { Select } from "../ui/select";
 import { Button } from "../ui/button";
@@ -30,6 +30,7 @@ export function StartForm({ initialNamespace, initialName, initialVersion }: Sta
   const [zoneId, setZoneId] = useState("UTC");
   const [inputJson, setInputJson] = useState("{}");
   const [error, setError] = useState<string | null>(null);
+  const [scheduleConfirmation, setScheduleConfirmation] = useState<{ path: string; nextRunAt?: number } | null>(null);
   const [loading, setLoading] = useState(false);
   const redirectTimerRef = useRef<number | null>(null);
 
@@ -81,6 +82,11 @@ export function StartForm({ initialNamespace, initialName, initialVersion }: Sta
   const onSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setError(null);
+    setScheduleConfirmation(null);
+    if (redirectTimerRef.current != null) {
+      window.clearTimeout(redirectTimerRef.current);
+      redirectTimerRef.current = null;
+    }
     setLoading(true);
 
     try {
@@ -101,6 +107,20 @@ export function StartForm({ initialNamespace, initialName, initialVersion }: Sta
         }),
       );
 
+      if (response.scheduleOnly) {
+        const path = `/ns/${encodeURIComponent(response.namespace)}/name/${encodeURIComponent(response.name)}`;
+        const scheduledAt = timestampToMilliseconds(response.nextRunAt);
+        const nextRunAt = scheduledAt != null && scheduledAt > Date.now() ? scheduledAt : undefined;
+        setScheduleConfirmation({ path, nextRunAt });
+        toast.success("Workflow scheduled", {
+          description: nextRunAt
+            ? `Next run at ${new Date(nextRunAt).toLocaleString()}`
+            : "The workflow will run on its schedule.",
+          action: { label: "View workflow", onClick: () => navigate(path) },
+        });
+        return;
+      }
+
       const instancePath = `/id/${response.instanceId}`;
       toast.success("Workflow started", {
         description: "Redirecting to instance details...",
@@ -111,9 +131,6 @@ export function StartForm({ initialNamespace, initialName, initialVersion }: Sta
         },
       });
 
-      if (redirectTimerRef.current != null) {
-        window.clearTimeout(redirectTimerRef.current);
-      }
       redirectTimerRef.current = window.setTimeout(() => {
         redirectTimerRef.current = null;
         navigate(instancePath);
@@ -136,6 +153,7 @@ export function StartForm({ initialNamespace, initialName, initialVersion }: Sta
             <Select
               value={namespace}
               onChange={(event) => {
+                setScheduleConfirmation(null);
                 setNamespace(event.target.value);
                 setName("");
                 setVersion("");
@@ -149,6 +167,7 @@ export function StartForm({ initialNamespace, initialName, initialVersion }: Sta
             <Select
               value={name}
               onChange={(event) => {
+                setScheduleConfirmation(null);
                 setName(event.target.value);
                 setVersion("");
               }}
@@ -160,7 +179,10 @@ export function StartForm({ initialNamespace, initialName, initialVersion }: Sta
             <label className="mb-1 block text-sm font-medium">Version</label>
             <Select
               value={version}
-              onChange={(event) => setVersion(event.target.value)}
+              onChange={(event) => {
+                setScheduleConfirmation(null);
+                setVersion(event.target.value);
+              }}
               options={versionOptions}
               disabled={!name}
             />
@@ -170,11 +192,17 @@ export function StartForm({ initialNamespace, initialName, initialVersion }: Sta
         <div className="grid gap-4 md:grid-cols-2">
           <div>
             <label className="mb-1 block text-sm font-medium">Workflow ID (UUIDv7)</label>
-            <Input value={workflowId} onChange={(event) => setWorkflowId(event.target.value)} />
+            <Input value={workflowId} onChange={(event) => {
+              setScheduleConfirmation(null);
+              setWorkflowId(event.target.value);
+            }} />
           </div>
           <div>
             <label className="mb-1 block text-sm font-medium">Zone ID</label>
-            <Input value={zoneId} onChange={(event) => setZoneId(event.target.value)} />
+            <Input value={zoneId} onChange={(event) => {
+              setScheduleConfirmation(null);
+              setZoneId(event.target.value);
+            }} />
           </div>
         </div>
 
@@ -183,11 +211,22 @@ export function StartForm({ initialNamespace, initialName, initialVersion }: Sta
           <textarea
             className="min-h-40 w-full rounded-md border border-slate-300 bg-slate-50 p-3 font-mono text-sm outline-hidden focus:border-slate-500 dark:border-slate-700 dark:bg-slate-900"
             value={inputJson}
-            onChange={(event) => setInputJson(event.target.value)}
+            onChange={(event) => {
+              setScheduleConfirmation(null);
+              setInputJson(event.target.value);
+            }}
           />
         </div>
 
         {error && <p className="text-sm text-red-600 dark:text-red-300">{error}</p>}
+        {scheduleConfirmation && (
+          <div role="status" className="rounded-md border border-emerald-300 bg-emerald-50 p-3 text-sm text-emerald-950 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-100">
+            <p>Workflow scheduled{scheduleConfirmation.nextRunAt != null
+              ? ` — next run at ${new Date(scheduleConfirmation.nextRunAt).toLocaleString()}`
+              : ""}.</p>
+            <Link className="font-medium underline" to={scheduleConfirmation.path}>View workflow instances</Link>
+          </div>
+        )}
         {namespacesQuery.isLoading && (
           <p className="text-sm text-slate-500 dark:text-slate-400">Loading namespaces...</p>
         )}

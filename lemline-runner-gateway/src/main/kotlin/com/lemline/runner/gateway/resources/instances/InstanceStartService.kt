@@ -25,6 +25,7 @@ import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
 import java.time.ZoneId
 import kotlin.time.Clock
+import kotlin.time.Instant
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
@@ -42,6 +43,8 @@ data class InstanceStartResult(
     val name: WorkflowName,
     val version: WorkflowVersion,
     val result: StartInstanceOutcome,
+    val scheduleOnly: Boolean,
+    val nextRunAt: Instant?,
 )
 
 @ApplicationScoped
@@ -102,6 +105,7 @@ class InstanceStartService {
             ?: error("Prepared workflow must contain workflow info")
 
         var newCommandId: IDV7? = null
+        var nextRunAt = preparedWorkflow.scheduleModel?.outboxScheduledFor
         val existingResult = databaseConfig.withTransaction { conn ->
             val outboxResult = preparedWorkflow.instanceMessage?.let { message ->
                 val outboxEntry = GatewayCommandModel(
@@ -126,6 +130,7 @@ class InstanceStartService {
                     workflowInput = workflowInput,
                     loadExisting = { scheduleRepository.findByWorkflowId(instanceId) },
                     extraConflictCheck = { existing -> existing.zone != zoneId },
+                    onExisting = { existing -> nextRunAt = existing.outboxScheduledFor },
                 )
             }
         }
@@ -144,6 +149,8 @@ class InstanceStartService {
             name = resolvedWorkflowInfo.name,
             version = resolvedWorkflowInfo.version,
             result = outcome,
+            scheduleOnly = preparedWorkflow.instanceMessage == null,
+            nextRunAt = if (preparedWorkflow.instanceMessage == null) nextRunAt else null,
         )
     }
 
@@ -154,6 +161,7 @@ class InstanceStartService {
         workflowInput: JsonElement,
         loadExisting: suspend () -> T?,
         extraConflictCheck: (T) -> Boolean = { false },
+        onExisting: (T) -> Unit = {},
     ): StartInstanceOutcome? {
         if (inserted > 0) return null
 
@@ -167,6 +175,7 @@ class InstanceStartService {
             )
         }
 
+        onExisting(existing)
         return StartInstanceOutcome.ACCEPTED_EXISTING
     }
 
