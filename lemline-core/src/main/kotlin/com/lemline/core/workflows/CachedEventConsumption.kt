@@ -64,7 +64,7 @@ data class CachedEventConsumption(
     fun allFilters(): List<CachedEventFilter> = filters + untilEvents?.allFilters().orEmpty()
 
     companion object {
-        fun from(strategy: Any, mode: EvaluationMode = EvaluationMode.STRICT): CachedEventConsumption = when (strategy) {
+        fun from(strategy: Any, mode: EvaluationMode): CachedEventConsumption = when (strategy) {
             is OneEventConsumptionStrategy -> CachedEventConsumption(
                 ListenStrategy.ONE, listOf(CachedEventFilter.from(strategy.one))
             )

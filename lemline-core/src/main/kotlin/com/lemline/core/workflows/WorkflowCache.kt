@@ -193,7 +193,9 @@ object WorkflowCache {
     fun getEventConsumption(workflow: Workflow): CachedEventConsumption? {
         val entry = current.entries[workflow.info]
         return if (entry?.workflow === workflow) entry.schedule?.consumption
-        else workflow.schedule?.on?.get()?.let(CachedEventConsumption::from)
+        else workflow.schedule?.on?.get()?.let {
+            CachedEventConsumption.from(it, (workflow as? EvaluatedWorkflow)?.evaluationMode ?: EvaluationMode.STRICT)
+        }
     }
 
     /** Reuse the parsed JSON for the cached instance; avoid a stale entry with the same identity. */
