@@ -5,12 +5,13 @@ import { Button } from "../ui/button";
 
 interface ErrorPanelProps {
   title: string;
+  detail?: string;
   type: string;
   status: number;
   payloadJson: string;
 }
 
-export function ErrorPanel({ title, type, status, payloadJson }: ErrorPanelProps) {
+export function ErrorPanel({ title, detail, type, status, payloadJson }: ErrorPanelProps) {
   const [open, setOpen] = useState(false);
   const [highlightedHtml, setHighlightedHtml] = useState("");
   const { resolvedTheme } = useTheme();
@@ -46,9 +47,15 @@ export function ErrorPanel({ title, type, status, payloadJson }: ErrorPanelProps
       <p className="text-sm text-red-700 dark:text-red-300">
         Type: {type} | Status: {status}
       </p>
+      {detail && (
+        <div className="mt-3">
+          <p className="text-sm font-semibold text-red-700 dark:text-red-300">Details</p>
+          <pre className="mt-1 max-h-64 overflow-auto whitespace-pre-wrap break-words text-sm text-red-800 dark:text-red-200">{detail}</pre>
+        </div>
+      )}
       <div className="mt-3">
         <Button variant="outline" onClick={() => setOpen((current) => !current)}>
-          {open ? "Hide full error details" : "Show full error details"}
+          {open ? "Hide raw event" : "Show raw event"}
         </Button>
       </div>
       {open && (

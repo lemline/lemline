@@ -3,8 +3,11 @@ package com.lemline.runner.activities
 
 import com.lemline.common.json.LemlineJson
 import com.lemline.common.logger.logger
+import com.lemline.common.values.NodePosition
 import com.lemline.core.activities.ActivityExecutor
 import com.lemline.core.cloudevents.CloudEventFactory
+import com.lemline.core.errors.InternalException
+import com.lemline.core.errors.WorkflowErrorType
 import com.lemline.core.processors.CallHttpConfig
 import com.lemline.core.processors.EmitConfig
 import com.lemline.core.processors.HttpAuthentication
@@ -53,6 +56,10 @@ class DefaultActivityExecutor(
     private val emitCloudEvent: (suspend (CloudEvent) -> Unit)? = null,
 ) : ActivityExecutor {
 
+    private companion object {
+        const val MAX_ERROR_BODY_LENGTH = 4096
+    }
+
     private val logger = logger()
 
     private val httpClient by lazy {
@@ -75,7 +82,7 @@ class DefaultActivityExecutor(
 
     override suspend fun execute(event: ActivityStarted): JsonElement = when (event) {
         is EmitStarted -> executeEmit(event.config, event.input)
-        is CallHttpStarted -> executeHttp(event.config)
+        is CallHttpStarted -> executeHttp(event.config, event.nodePosition)
         is RunScriptStarted -> executeScript(event.config, event.input)
         is RunShellStarted -> executeShell(event.config, event.input)
     }
@@ -100,7 +107,7 @@ class DefaultActivityExecutor(
     // HTTP Execution
     // ========================================
 
-    private suspend fun executeHttp(config: CallHttpConfig): JsonElement {
+    private suspend fun executeHttp(config: CallHttpConfig, position: NodePosition): JsonElement {
         val method = HttpMethod.parse(config.method)
 
         // Build URL with query parameters
@@ -150,7 +157,23 @@ class DefaultActivityExecutor(
         // Check status
         if (!response.status.isSuccess()) {
             val body = response.bodyAsText()
-            throw RuntimeException("HTTP ${response.status.value}: $body")
+            val details = buildString {
+                append("Response content type: ${response.contentType() ?: "unknown"}")
+                if (body.isNotBlank()) {
+                    append("\nResponse body:\n")
+                    append(body.take(MAX_ERROR_BODY_LENGTH))
+                    if (body.length > MAX_ERROR_BODY_LENGTH) append("\n[response body truncated]")
+                }
+            }
+            throw InternalException(
+                InternalException.Error(
+                    errorType = WorkflowErrorType.RUNTIME,
+                    status = response.status.value,
+                    position = position,
+                    title = "HTTP ${response.status.value} ${response.status.description}",
+                    details = details,
+                )
+            )
         }
 
         val result = when (config.output) {

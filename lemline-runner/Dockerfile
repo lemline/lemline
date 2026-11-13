@@ -21,6 +21,7 @@ COPY lemline-runner-common ./lemline-runner-common
 COPY lemline-runner-cli ./lemline-runner-cli
 COPY lemline-runner-analytics ./lemline-runner-analytics
 COPY lemline-runner-definitions ./lemline-runner-definitions
+COPY lemline-runner-event-schedules ./lemline-runner-event-schedules
 COPY lemline-runner-failures ./lemline-runner-failures
 COPY lemline-runner-forks ./lemline-runner-forks
 COPY lemline-runner-gateway ./lemline-runner-gateway

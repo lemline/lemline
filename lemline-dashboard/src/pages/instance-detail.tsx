@@ -59,8 +59,14 @@ export function InstanceDetailPage() {
     try {
       const payload = JSON.parse(faulted.payloadJson);
       const details = payload?.data?.error;
+      const rawTitle = String(details?.title ?? "Workflow faulted");
+      const legacyHttpError = /^HTTP (\d{3}):\s*([\s\S]*)$/.exec(rawTitle);
+      const legacyHtmlBody = legacyHttpError && /^\s*(?:<!doctype html|<html\b)/i.test(legacyHttpError[2])
+        ? legacyHttpError[2]
+        : undefined;
       return {
-        title: String(details?.title ?? "Workflow faulted"),
+        title: legacyHtmlBody && legacyHttpError ? `HTTP ${legacyHttpError[1]}` : rawTitle,
+        detail: typeof details?.detail === "string" ? details.detail : legacyHtmlBody,
         type: String(details?.type ?? "about:blank"),
         status: Number(details?.status ?? 0),
         payloadJson: JSON.stringify(payload, null, 2),
@@ -127,7 +133,7 @@ export function InstanceDetailPage() {
       </Card>
 
       {error && (
-        <ErrorPanel title={error.title} type={error.type} status={error.status} payloadJson={error.payloadJson} />
+        <ErrorPanel title={error.title} detail={error.detail} type={error.type} status={error.status} payloadJson={error.payloadJson} />
       )}
 
       {showGantt && <GanttChart events={timelineData.events} />}

@@ -31,7 +31,9 @@ vi.mock("../../src/components/timeline/event-log", () => ({
 }));
 
 vi.mock("../../src/components/workflow/error-panel", () => ({
-  ErrorPanel: () => <div data-testid="error-panel">error</div>,
+  ErrorPanel: ({ title, detail }: { title: string; detail?: string }) => (
+    <div data-testid="error-panel" data-title={title} data-detail={detail}>error</div>
+  ),
 }));
 
 function renderPage() {
@@ -117,6 +119,32 @@ describe("InstanceDetailPage loading and stream behavior", () => {
     fireEvent.click(screen.getByRole("button", { name: "Retry" }));
 
     expect(reconnect).toHaveBeenCalledTimes(1);
+  });
+
+  it("moves an HTML response out of a legacy error title", () => {
+    const responseBody = '<!DOCTYPE html><html><title>403 Forbidden</title></html>';
+    mockUseViewportWidth.mockReturnValue(900);
+    mockUseWatchWorkflowProjection.mockReturnValue({
+      data: {
+        ...baseTimelineData("FAULTED"),
+        events: [{
+          sequence: 2,
+          eventType: "io.serverlessworkflow.workflow.faulted.v1",
+          eventTime: "2025-01-01T10:00:01.000Z",
+          category: "WORKFLOW",
+          payloadJson: JSON.stringify({ data: { error: { title: `HTTP 403: ${responseBody}`, status: 500 } } }),
+        }],
+      },
+      isLoading: false,
+      isError: false,
+      reconnect: vi.fn(),
+      liveConnected: false,
+    });
+
+    renderPage();
+
+    expect(screen.getByTestId("error-panel")).toHaveAttribute("data-title", "HTTP 403");
+    expect(screen.getByTestId("error-panel")).toHaveAttribute("data-detail", responseBody);
   });
 
   it.each(["PENDING", "RUNNING", "UNKNOWN"])(
