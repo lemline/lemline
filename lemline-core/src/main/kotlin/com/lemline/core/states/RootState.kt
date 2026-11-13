@@ -12,6 +12,7 @@ import kotlin.time.Instant
 import kotlin.time.toJavaInstant
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.encodeToJsonElement
 
@@ -25,9 +26,13 @@ data class RootState(
 
     lateinit var secrets: Map<String, String>
 
+    // Rehydrated from the loaded workflow on each command; intentionally absent from RootStateProto.
+    private lateinit var definition: JsonObject
+
     private val workflowDescriptor
         get() = WorkflowDescriptor(
             id = workflowId.toString(),
+            definition = definition,
             input = workflowInput,
             startedAt = LemlineJson.encodeToElement(
                 DateTimeDescriptor.from(startedAt.toJavaInstant())
@@ -52,11 +57,17 @@ data class RootState(
      * @param newContext The context to merge with the existing context
      * @return A new RootState with the merged context
      */
-    fun withContext(newContext: Scope): RootState {
-        val state = copy(context = context.merge(newContext))
-        // copy also transient fields
-        if (this::secrets.isInitialized) state.secrets = this.secrets
+    fun withContext(newContext: Scope): RootState = copyRuntimeFieldsTo(copy(context = context.merge(newContext)))
 
-        return state
+    fun withIdentity(workflowId: WorkflowId, startedAt: Instant): RootState =
+        copyRuntimeFieldsTo(copy(workflowId = workflowId, startedAt = startedAt))
+
+    fun withDefinition(definition: JsonObject): RootState = copyRuntimeFieldsTo(copy()).also {
+        it.definition = definition
+    }
+
+    private fun copyRuntimeFieldsTo(state: RootState): RootState = state.also {
+        if (this::secrets.isInitialized) it.secrets = secrets
+        if (this::definition.isInitialized) it.definition = definition
     }
 }

@@ -32,6 +32,7 @@ import com.lemline.core.states.WorkflowEvent.WorkflowCompleted
 import com.lemline.core.states.WorkflowEvent.WorkflowFaulted
 import com.lemline.core.tasks.toJava
 import com.lemline.core.tasks.toKotlin
+import com.lemline.core.workflows.WorkflowCache
 import com.lemline.core.workflows.getNode
 import io.serverlessworkflow.api.types.FlowDirective
 import io.serverlessworkflow.api.types.ForkTask
@@ -96,11 +97,13 @@ object StepByStepOrchestrator {
         lifecycleHook: LifecycleEventHook,
         functionResolver: suspend (String) -> Task = { error("Function resolver not configured") },
     ): WorkflowEvent {
+        // RootStateProto omits the definition; restore it from the loaded workflow before evaluating scope.
+        val nodeStack = command.nodeStack.withWorkflowDefinition(WorkflowCache.getDefinitionJson(workflow))
         val node = workflow.getNode(command.nodePosition, functionResolver)
 
         val event = when (command) {
             is WorkflowCommand.ResumeFromTask -> resumeFromTask(
-                nodeStack = command.nodeStack,
+                nodeStack = nodeStack,
                 node = node,
                 rawInput = command.rawInput,
                 flowDirective = command.flowDirective?.toJava(),
@@ -109,7 +112,7 @@ object StepByStepOrchestrator {
             )
 
             is WorkflowCommand.ResumeWithCompletedTask -> resumeFromCompletedTask(
-                nodeStack = command.nodeStack,
+                nodeStack = nodeStack,
                 node = node,
                 rawOutput = command.rawOutput,
                 workflowInfo = workflowInfo,
@@ -117,7 +120,7 @@ object StepByStepOrchestrator {
             )
 
             is WorkflowCommand.ResumeWithFaultedTask -> resumeFromFaultedTask(
-                nodeStack = command.nodeStack,
+                nodeStack = nodeStack,
                 node = node,
                 error = command.error,
                 workflowInfo = workflowInfo,
