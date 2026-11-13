@@ -22,7 +22,7 @@ import kotlinx.serialization.json.JsonElement
  *   for:
  *     each: order      # itemVarName
  *     at: orderIndex   # indexVarName
- *     in: .orders      # Expression to evaluate collection
+ *     in: ${ .orders }  # Expression to evaluate collection
  *   do:
  *     - processOrder:
  *         set:

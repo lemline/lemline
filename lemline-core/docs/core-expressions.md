@@ -36,26 +36,28 @@ Workflow secrets declared under `use.secrets` are resolved from same-named envir
 
 ## Expression Usage
 
-| Usage | DSL Field | Evaluation |
+| Usage | DSL Field | Result |
 |-------|-----------|------------|
-| Input transform | `input.from` | Direct JQ |
-| Condition | `if` | Direct JQ → boolean |
-| Output transform | `output.as` | Direct JQ |
-| Export | `export.as` | Direct JQ → object |
-| Iteration | `for.in`, `for.while` | Direct JQ |
-| Switch | `switch.when` | Direct JQ → boolean |
-| Error filter | `catch.when` | Direct JQ → boolean |
-| String interpolation | Any string field | `${...}` syntax |
+| Input transform | `input.from` | Transformed input |
+| Condition | `if` | Boolean |
+| Output transform | `output.as` | Transformed output |
+| Export | `export.as` | Object |
+| Iteration | `for.in`, `while` | Array, boolean |
+| Switch | `switch.when` | Boolean |
+| Error filter | `catch.when` | Boolean |
+| String interpolation | Expression-bearing string fields | Evaluated value |
 
-### Runtime vs Direct Expressions
+The DSL defaults to strict evaluation: runtime expressions must use `${ ... }`, including `for.in`, `while`, and `switch.when`. Lemline still accepts bare JQ in some other fields as a legacy behavior, but workflow definitions should use the delimiters for portability.
+
+### Runtime Expressions
 
 ```yaml
 # Runtime expression (${} required)
 endpoint: "https://api.example.com/users/${.userId}"
 
-# Direct JQ (no ${} needed in from/as/when/in fields)
+# Input transformation
 input:
-  from: ".user | {name, email}"
+  from: '${ .user | {name, email} }'
 ```
 
 ---
@@ -191,7 +193,7 @@ fun `should evaluate object construction`() {
 
 | Issue | Solution |
 |-------|----------|
-| Expression not evaluated | Add `${}` wrapper or use in from/as/when field |
+| Expression not evaluated | Wrap the runtime expression in `${ ... }` |
 | Variable not found | Check scope chain provides variable |
 | Type mismatch | Use `type` function to debug |
 | Null values | Use `// default` operator |

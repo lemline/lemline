@@ -7,9 +7,9 @@ do:
   - checkup:
       for:
         each: pet
-        in: .pets
+        in: ${ .pets }
         at: childIndex
-      while: .vet != null
+      while: ${ .vet != null }
       do:
         - waitForCheckup:
             listen:
@@ -18,4 +18,4 @@ do:
                   with:
                     type: com.fake.petclinic.pets.checkup.completed.v2
             output:
-              as: '.pets + [{ "id": $pet.id }]'        
+              as: '${ .pets + [{ "id": $pet.id }] }'
