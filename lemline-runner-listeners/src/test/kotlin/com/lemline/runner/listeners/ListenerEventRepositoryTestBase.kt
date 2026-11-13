@@ -25,7 +25,13 @@ import com.lemline.runner.definitions.DefinitionRepository
 import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe
 import io.serverlessworkflow.api.types.ListenTaskConfiguration.ListenAndReadAs
+import java.util.concurrent.CyclicBarrier
+import java.util.concurrent.TimeUnit
 import kotlin.time.Clock
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonNull
 import org.junit.jupiter.api.BeforeEach
@@ -786,6 +792,33 @@ abstract class ListenerEventRepositoryTestBase {
         val ready = getEventRepository().findEntitiesToProcess(maxAttempts = 10, limit = 10, connection = null)
         ready.size shouldBe 1
         ready.first().sortKey shouldBe 0
+    }
+
+    @Test
+    fun `concurrent markReadyForForeach calls should ready only one event per listener`() = runTest {
+        repeat(20) { iteration ->
+            val listener = createListener(hasForeach = true, strategy = ListenStrategy.ALL, filtersCount = 2)
+            getListenerRepository().insert(listener)
+
+            val firstKey = createQueryKey(listener, filterIndex = 0).copy(listenerStrategy = ListenerStrategy.ALL)
+            val secondKey = createQueryKey(listener, filterIndex = 1).copy(listenerStrategy = ListenerStrategy.ALL)
+            getEventRepository().batchInsertForAllAnyUntil(listOf(firstKey), "concurrent-$iteration-0", """{"idx":0}""")
+            getEventRepository().batchInsertForAllAnyUntil(listOf(secondKey), "concurrent-$iteration-1", """{"idx":1}""")
+
+            val start = CyclicBarrier(2)
+            coroutineScope {
+                List(2) {
+                    async(Dispatchers.IO) {
+                        start.await(10, TimeUnit.SECONDS)
+                        getEventRepository().markReadyForForeach(limit = 10)
+                    }
+                }.awaitAll()
+            }
+
+            val rows = getEventRepository().listAll().filter { it.listenerId == listener.id }
+            rows.count { !it.foreachCompleted && it.outboxDelayedUntil != null } shouldBe 1
+            rows.single { it.outboxDelayedUntil != null }.sortKey shouldBe 0
+        }
     }
 
     @Test

@@ -20,10 +20,13 @@ import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
 import io.serverlessworkflow.api.types.ListenTaskConfiguration.ListenAndReadAs
 import java.net.URI
+import java.util.concurrent.CyclicBarrier
+import java.util.concurrent.TimeUnit
 import kotlin.random.Random
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.hours
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.async
@@ -251,6 +254,43 @@ abstract class ListenerRepositoryTestBase {
             service(model).handleCloudEvent(closing, model.workflowInfo.namespace)
             getEventRepository().listAll().count { it.listenerId == model.id } shouldBe 1
             getRepository().findById(model.id)!!.closedAt shouldNotBe null
+        }
+
+        @Test fun `concurrent CloudEvent delivery and marking ready preserves one foreach head`() = runTest {
+            repeat(20) {
+                getEventRepository().deleteAll()
+                getRepository().deleteAll()
+
+                val model = listener(rule(ListenStrategy.ONE, "stop"), foreach = true)
+                val firstEvent = event("data")
+                val secondEvent = event("data")
+                val firstService = service(model)
+                val secondService = service(model)
+                val start = CyclicBarrier(3)
+
+                coroutineScope {
+                    val first = async(Dispatchers.IO) {
+                        start.await(10, TimeUnit.SECONDS)
+                        firstService.handleCloudEvent(firstEvent, model.workflowInfo.namespace)
+                    }
+                    val second = async(Dispatchers.IO) {
+                        start.await(10, TimeUnit.SECONDS)
+                        secondService.handleCloudEvent(secondEvent, model.workflowInfo.namespace)
+                    }
+                    val marker = async(Dispatchers.IO) {
+                        start.await(10, TimeUnit.SECONDS)
+                        getEventRepository().markReadyForForeach(10)
+                    }
+                    awaitAll(first, second, marker)
+                }
+
+                // The marker may run before both inserts; a later poll must ready one head.
+                getEventRepository().markReadyForForeach(10)
+                val rows = getEventRepository().listAll().filter { it.listenerId == model.id }
+                rows.size shouldBe 2
+                rows.count { !it.foreachCompleted && it.outboxDelayedUntil != null } shouldBe 1
+                rows.single { it.outboxDelayedUntil != null }.sortKey shouldBe 0
+            }
         }
 
         @Test fun `committed redelivery cannot prematurely satisfy an until expression`() = runTest {
