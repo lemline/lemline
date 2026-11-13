@@ -27,6 +27,7 @@ static_resources:
                       cors:
                         allow_origin_string_match:
                           - exact: "http://localhost:5173"
+                          - exact: "http://127.0.0.1:5174"
                         allow_methods: "GET,POST,OPTIONS"
                         allow_headers: "Accept,Authorization,Content-Type,Grpc-Timeout,X-Grpc-Web,X-User-Agent"
                         expose_headers: "Grpc-Status,Grpc-Message,Grpc-Status-Details-Bin"
