@@ -24,7 +24,8 @@ data class RootState(
     val hasWaitingParent: Boolean = false,
 ) : NodeState() {
 
-    lateinit var secrets: Map<String, String>
+    // Resolved per command; never included in RootStateProto.
+    private var secrets: JsonObject = buildJsonObject {}
 
     // Rehydrated from the loaded workflow on each command; intentionally absent from RootStateProto.
     private lateinit var definition: JsonObject
@@ -43,7 +44,7 @@ data class RootState(
         buildJsonObject {
             put("context", context)
             put("runtime", Json.encodeToJsonElement(RuntimeDescriptor))
-            //put("secrets", Json.encodeToJsonElement(secrets))
+            put("secrets", secrets)
             put("workflow", Json.encodeToJsonElement(workflowDescriptor))
         }
     }
@@ -66,8 +67,12 @@ data class RootState(
         it.definition = definition
     }
 
+    fun withSecrets(secrets: JsonObject): RootState = copyRuntimeFieldsTo(copy()).also {
+        it.secrets = secrets
+    }
+
     private fun copyRuntimeFieldsTo(state: RootState): RootState = state.also {
-        if (this::secrets.isInitialized) it.secrets = secrets
+        it.secrets = secrets
         if (this::definition.isInitialized) it.definition = definition
     }
 }

@@ -36,6 +36,8 @@ or waiting for multiple tasks to complete in parallel.
   business logic errors.
 * **Stateless Workers** Horizontal scaling is as simple as starting more Lemline workers. No sticky sessions, no shared
   state.
+* **Workflow Secrets** Resolve names declared in `use.secrets` from the runner environment for use in expressions,
+  without including resolved values in the serialized root state.
 * **Quarkus Native Binary** Deploy Lemline as a lean, self-contained binary built with GraalVM/Mandrel. Startup in
   milliseconds, reduced memory footprint, perfect for containerized and serverless environments.
 
@@ -283,6 +285,7 @@ This project is licensed under the [Business Source License 1.1](LICENSE.md).
 
 - [x] Namespace
 - [x] Catalog
+- [x] Secrets
 - [ ] Extensions
 
 ## 📬 Contact

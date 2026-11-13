@@ -40,6 +40,21 @@ class NodeStackTest {
     }
 
     @Test
+    fun `secrets are available in root scope without entering the message`() {
+        val stack = NodeStack(listOf(StackFrame(
+            NodePosition.root,
+            RootState(startedAt = Clock.System.now(), workflowId = WorkflowId.random())
+        ))).withWorkflowDefinition(buildJsonObject {})
+        val secrets = buildJsonObject { put("TOKEN", "private-value") }
+        val hydrated = stack.withSecrets(secrets)
+
+        assertEquals(secrets, hydrated.stateScope.getValue("secrets"))
+        assertEquals(secrets, hydrated.withContext(buildJsonObject {}).stateScope.getValue("secrets"))
+        assertEquals(secrets, hydrated.duplicate(WorkflowId.random(), Clock.System.now()).stateScope.getValue("secrets"))
+        assertEquals(NodeStackProtobufMapper.toProto(stack), NodeStackProtobufMapper.toProto(hydrated))
+    }
+
+    @Test
     fun `should serialize and deserialize preserving hierarchy`() {
         // Given - a hierarchical stack with RFC 6901 compliant positions
         val root = NodePosition.root

@@ -2,6 +2,7 @@
 package com.lemline.core.orchestrator
 
 import com.lemline.common.values.WorkflowId
+import com.lemline.common.values.WorkflowInfo
 import com.lemline.core.activities.ActivityExecutor
 import com.lemline.core.activities.mock.HttpMockMatcher
 import com.lemline.core.activities.mock.HttpMockResponse
@@ -16,16 +17,23 @@ import com.lemline.core.cloudevents.CloudEventHook
 import com.lemline.core.cloudevents.InMemoryCloudEventHook
 import com.lemline.core.getWorkflowToTest
 import com.lemline.core.lifecycleevents.LifecycleEventHook
+import com.lemline.core.errors.InternalException
+import com.lemline.core.states.NodeStack
+import com.lemline.core.states.WorkflowEvent
 import com.lemline.core.workflows.WorkflowCache
 import io.kotest.core.spec.style.FunSpec
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Clock
+import kotlin.time.Instant
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.boolean
 import kotlinx.serialization.json.buildJsonObject
@@ -77,6 +85,8 @@ class OrchestratorTest : FunSpec() {
         version: String = "0.1.0",
         activityExecutor: ActivityExecutor? = null,
         cloudEventHook: CloudEventHook = InMemoryCloudEventHook(),
+        secrets: JsonObject = buildJsonObject {},
+        lifecycleHook: LifecycleEventHook = LifecycleEventHook.NOOP,
     ): JsonElement {
         val workflow = getWorkflowToTest(yaml, namespace, name, version)
 
@@ -97,7 +107,10 @@ class OrchestratorTest : FunSpec() {
             activityExecutor = executor,
             functionResolver = MockFunctionResolver(),
             cloudEventHook = cloudEventHook,
-            lifecycleHook = LifecycleEventHook.NOOP,
+            lifecycleHook = lifecycleHook,
+            secretsForWorkflow = { definition ->
+                JsonObject(secrets.filterKeys { it in definition.use?.secrets.orEmpty() })
+            },
         )
 
         return outcome.value()
@@ -106,6 +119,48 @@ class OrchestratorTest : FunSpec() {
     init {
         afterEach {
             WorkflowCache.clear()
+        }
+
+        test("resolves declared secrets across serialized task commands") {
+            val yaml = $$"""
+                use:
+                  secrets:
+                    - GITHUB_TOKEN
+                do:
+                  - first:
+                      set:
+                        value: ${ $secrets.GITHUB_TOKEN }
+                  - second:
+                      set:
+                        value: ${ $secrets.GITHUB_TOKEN }
+            """.trimIndent()
+
+            val output = executeWorkflow(yaml, secrets = buildJsonObject { put("GITHUB_TOKEN", "private-value") })
+            assertEquals("private-value", output.jsonObject.getValue("value").jsonPrimitive.content)
+        }
+
+        test("faults with authorization when a declared secret is unavailable") {
+            val workflow = getWorkflowToTest($$"""
+                use:
+                  secrets:
+                    - GITHUB_TOKEN
+                do:
+                  - first:
+                      set:
+                        value: ${ $secrets.GITHUB_TOKEN }
+            """.trimIndent())
+            val outcome = FullOrchestrator.resume(
+                workflow = workflow,
+                command = StepByStepOrchestrator.initCmd(),
+                serde = true,
+                activityExecutor = MockActivityExecutor.empty { },
+                functionResolver = MockFunctionResolver(),
+                cloudEventHook = InMemoryCloudEventHook(),
+                lifecycleHook = LifecycleEventHook.NOOP,
+            )
+            assertTrue(outcome is WorkflowEvent.WorkflowFaulted)
+            assertEquals(403, outcome.error.status)
+            assertTrue(outcome.error.title!!.contains("GITHUB_TOKEN"))
         }
 
         // ========================================
@@ -273,6 +328,87 @@ class OrchestratorTest : FunSpec() {
         // ========================================
         // Sub-workflow Tests
         // ========================================
+
+        test("supplies each declared secret to a synchronous child workflow") {
+            getWorkflowToTest($$"""
+                use:
+                  secrets:
+                    - CHILD_TOKEN
+                do:
+                  - useSecret:
+                      set:
+                        childValue: ${ $secrets.CHILD_TOKEN }
+                        parentSecretVisible: ${ $secrets.PARENT_TOKEN }
+            """.trimIndent(), namespace = "test", name = "secret-child", version = "0.1.0")
+
+            val parentYaml = $$"""
+                use:
+                  secrets:
+                    - PARENT_TOKEN
+                do:
+                  - useParentSecret:
+                      set:
+                        parentValue: ${ $secrets.PARENT_TOKEN }
+                  - callChild:
+                      run:
+                        workflow:
+                          namespace: test
+                          name: secret-child
+                          version: '0.1.0'
+            """.trimIndent()
+            val output = executeWorkflow(parentYaml, secrets = buildJsonObject {
+                put("PARENT_TOKEN", "parent-value")
+                put("CHILD_TOKEN", "child-value")
+            }).jsonObject
+
+            assertEquals("child-value", output.getValue("childValue").jsonPrimitive.content)
+            assertEquals(JsonNull, output["parentSecretVisible"])
+        }
+
+        test("supplies declared secrets to an asynchronous child workflow") {
+            getWorkflowToTest($$"""
+                use:
+                  secrets:
+                    - CHILD_TOKEN
+                do:
+                  - useSecret:
+                      set:
+                        childValue: ${ $secrets.CHILD_TOKEN }
+            """.trimIndent(), namespace = "test", name = "secret-child", version = "0.1.0")
+
+            val childOutcome = CompletableDeferred<JsonElement>()
+            val hook = object : LifecycleEventHook by LifecycleEventHook.NOOP {
+                override suspend fun onWorkflowCompleted(
+                    workflowInfo: WorkflowInfo,
+                    nodeStack: NodeStack,
+                    output: JsonElement,
+                    completedAt: Instant,
+                ) {
+                    if (workflowInfo.name.toString() == "secret-child") childOutcome.complete(output)
+                }
+
+                override suspend fun onWorkflowFaulted(
+                    workflowInfo: WorkflowInfo,
+                    nodeStack: NodeStack,
+                    error: InternalException.Error,
+                    faultedAt: Instant,
+                ) {
+                    if (workflowInfo.name.toString() == "secret-child") childOutcome.completeExceptionally(IllegalStateException(error.toString()))
+                }
+            }
+            executeWorkflow("""
+                do:
+                  - callChild:
+                      run:
+                        await: false
+                        workflow:
+                          namespace: test
+                          name: secret-child
+                          version: '0.1.0'
+            """.trimIndent(), secrets = buildJsonObject { put("CHILD_TOKEN", "child-value") }, lifecycleHook = hook)
+
+            assertEquals("child-value", withTimeout(5_000) { childOutcome.await() }.jsonObject.getValue("childValue").jsonPrimitive.content)
+        }
 
         test("should execute sub-workflow inline and wait for completion") {
             // Define child workflow

@@ -100,6 +100,9 @@ class NodeStack internal constructor(
     /** Attach the loaded definition for expression evaluation without serializing it into messages. */
     fun withWorkflowDefinition(definition: JsonObject): NodeStack = withRootState(rootState.withDefinition(definition))
 
+    /** Attach resolved secrets to expression scope without serializing them into messages. */
+    fun withSecrets(secrets: JsonObject): NodeStack = withRootState(rootState.withSecrets(secrets))
+
     /** Push a new frame onto the stack.*/
     fun push(position: NodePosition, state: NodeState, executionIndex: Int = 0): NodeStack =
         NodeStack(frames + StackFrame(position, state, executionIndex))

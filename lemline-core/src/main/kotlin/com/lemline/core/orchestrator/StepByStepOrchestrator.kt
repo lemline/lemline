@@ -5,6 +5,7 @@ import com.lemline.common.values.NodePosition
 import com.lemline.common.values.WorkflowId
 import com.lemline.common.values.WorkflowInfo
 import com.lemline.core.errors.InternalException
+import com.lemline.core.errors.WorkflowErrorType
 import com.lemline.core.lifecycleevents.LifecycleEventHook
 import com.lemline.core.nodes.Node
 import com.lemline.core.orchestrator.StepByStepOrchestrator.completeTask
@@ -42,6 +43,7 @@ import io.serverlessworkflow.api.types.Workflow
 import kotlin.time.Clock
 import kotlin.time.Instant
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 
 /**
@@ -96,9 +98,30 @@ object StepByStepOrchestrator {
         workflowInfo: WorkflowInfo,
         lifecycleHook: LifecycleEventHook,
         functionResolver: suspend (String) -> Task = { error("Function resolver not configured") },
+        secrets: JsonObject = buildJsonObject {},
     ): WorkflowEvent {
         // RootStateProto omits the definition; restore it from the loaded workflow before evaluating scope.
-        val nodeStack = command.nodeStack.withWorkflowDefinition(WorkflowCache.getDefinitionJson(workflow))
+        val declaredSecrets = workflow.use?.secrets.orEmpty()
+        val visibleSecrets = JsonObject(secrets.filterKeys { it in declaredSecrets })
+        val nodeStack = command.nodeStack
+            .withWorkflowDefinition(WorkflowCache.getDefinitionJson(workflow))
+            .withSecrets(visibleSecrets)
+        declaredSecrets.firstOrNull { it !in visibleSecrets }?.let { missing ->
+            val event = WorkflowFaulted(
+                nodeStack = nodeStack,
+                rawInput = null,
+                rawOutput = null,
+                flowDirective = null,
+                error = InternalException.Error(
+                    errorType = WorkflowErrorType.AUTHORIZATION,
+                    position = command.nodePosition,
+                    title = "Required secret '$missing' is unavailable",
+                ),
+                faultedAt = Clock.System.now(),
+            )
+            emitLifecycleEventsForEvent(event, workflowInfo, lifecycleHook)
+            return event
+        }
         val node = workflow.getNode(command.nodePosition, functionResolver)
 
         val event = when (command) {
@@ -206,13 +229,14 @@ object StepByStepOrchestrator {
         workflowInfo: WorkflowInfo,
         lifecycleHook: LifecycleEventHook,
         functionResolver: suspend (String) -> Task = { error("Function resolver not configured") },
+        secrets: JsonObject = buildJsonObject {},
     ): WorkflowEvent {
 
-        return when (val event = runByTask(workflow, command, workflowInfo, lifecycleHook, functionResolver)) {
+        return when (val event = runByTask(workflow, command, workflowInfo, lifecycleHook, functionResolver, secrets)) {
             is TaskScheduled -> if (workflow.getNode(event.nodePosition, functionResolver).isActivity()) {
                 event
             } else {
-                runByActivity(workflow, event.resume(), workflowInfo, lifecycleHook, functionResolver)
+                runByActivity(workflow, event.resume(), workflowInfo, lifecycleHook, functionResolver, secrets)
             }
 
             is ActivityStarted -> event
