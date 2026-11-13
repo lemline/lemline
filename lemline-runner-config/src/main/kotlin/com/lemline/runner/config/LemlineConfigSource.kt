@@ -741,10 +741,6 @@ class LemlineConfigSource(context: ConfigSourceContext? = null) : PropertiesConf
             set("rabbitmq-username", props[LEMLINE_MESSAGING_RABBITMQ_USERNAME] ?: RABBITMQ_USER_DEFAULT)
             set("rabbitmq-password", props[LEMLINE_MESSAGING_RABBITMQ_PASSWORD] ?: RABBITMQ_PASSWORD_DEFAULT)
             set("rabbitmq-virtual-host", props[LEMLINE_MESSAGING_RABBITMQ_VIRTUAL_HOST] ?: RABBITMQ_VHOST_DEFAULT)
-            // Vert.x's own consumer restart callback can outlive application teardown.
-            // Use RabbitMQ Java client's connection and topology recovery instead.
-            set("mp.messaging.connector.smallrye-rabbitmq.automatic-recovery-enabled", "true")
-            set("mp.messaging.connector.smallrye-rabbitmq.reconnect-attempts", "0")
             // Optional values
             props[LEMLINE_MESSAGING_RABBITMQ_SSL_ENABLED]?.let { set("rabbitmq-ssl", it) }
 
@@ -882,7 +878,9 @@ class LemlineConfigSource(context: ConfigSourceContext? = null) : PropertiesConf
                 val queueDLQ = props[LEMLINE_MESSAGING_RABBITMQ_LIFECYCLE_EVENTS_CONSUMER_QUEUE_DLQ] ?: "$queue.dlq"
                 set("$incoming.connector", RABBITMQ_CONNECTOR)
                 set("$incoming.queue.name", queue)
-                set("$incoming.broadcast", "true")
+                // No broadcast: a Mutiny broadcast never cancels its upstream when the subscriber leaves,
+                // so the RabbitMQ consumer would stay live through shutdown and Vert.x would restart it
+                // once the connector closes the connection, after the event loop has stopped.
                 set("$incoming.queue.durable", "true")
                 set("$incoming.auto-ack", "false")
                 set("$incoming.deserializer", RABBITMQ_STRING_SERIALIZER)

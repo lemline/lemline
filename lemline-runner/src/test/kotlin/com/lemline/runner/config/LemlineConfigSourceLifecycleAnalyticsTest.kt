@@ -83,14 +83,9 @@ class LemlineConfigSourceLifecycleAnalyticsTest {
             val incoming = "mp.messaging.incoming.$LIFECYCLEEVENTS_IN_CHANNEL"
             assertEquals("smallrye-rabbitmq", source.getValue("$incoming.connector"))
             assertEquals("lemline-lifecycle-events-custom", source.getValue("$incoming.queue.name"))
-            assertEquals("true", source.getValue("$incoming.broadcast"))
+            assertNull(source.getValue("$incoming.broadcast"))
             assertEquals("lemline-lifecycle-events-exchange", source.getValue("$incoming.exchange.name"))
             assertEquals("reject", source.getValue("$incoming.failure-strategy"))
-            assertEquals(
-                "true",
-                source.getValue("mp.messaging.connector.smallrye-rabbitmq.automatic-recovery-enabled")
-            )
-            assertEquals("0", source.getValue("mp.messaging.connector.smallrye-rabbitmq.reconnect-attempts"))
             assertEquals("19", source.getValue(LEMLINE_MESSAGING_LIFECYCLE_EVENTS_CONSUMER_CONCURRENCY))
         }
     }
