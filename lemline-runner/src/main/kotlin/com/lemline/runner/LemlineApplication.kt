@@ -85,6 +85,13 @@ class LemlineApplication : QuarkusApplication {
                 // Check if the command line arguments contain help or version options
                 val helpOrVersion = parseResults.any { it.isUsageHelpRequested || it.isVersionHelpRequested }
 
+                // Help and version only need Picocli. Starting Quarkus here initializes
+                // services such as Flyway even when the database is disabled.
+                if (helpOrVersion) {
+                    tempCli.execute(*args)
+                    return
+                }
+
                 // Set the logging level
                 setLoggingLevel(parseResults)
 
@@ -97,7 +104,7 @@ class LemlineApplication : QuarkusApplication {
                 // config create doesn't need an existing config file
                 val isConfigCreate = parseResults.command<ConfigCreateCommand>() != null
 
-                if (ConfigPathHolder.configPath == null && !helpOrVersion && !isConfigCreate) {
+                if (ConfigPathHolder.configPath == null && !isConfigCreate) {
                     System.err.println("No valid configuration file found. Please provide one, using one of the following methods:")
                     System.err.println("1. Pass the path to the file as a command-line argument (e.g., --config=<path>).")
                     System.err.println("2. Set the LEMLINE_CONFIG environment variable to the file's path.")
@@ -107,51 +114,44 @@ class LemlineApplication : QuarkusApplication {
                     exitProcess(1)
                 }
 
-                if (helpOrVersion) {
+                // the gateway start command, if any
+                val gatewayStart = parseResults.command<GatewayStartCommand>()
+
+                // The listen command, if any
+                val listen = parseResults.command<ListenCommand>()
+
+                // the instance start command, if any
+                val instanceStart = parseResults.command<InstanceStartCommand>()
+
+                // the failures replay command, if any
+                val failuresReplay = parseResults.command<FailuresReplayCommand>()
+
+                if (listen == null && gatewayStart == null) {
                     disableMetricsEndpoint()
                     disableMessaging()
-                    disableDatabase()
                     disableScheduled()
-                } else {
-                    // the gateway start command, if any
-                    val gatewayStart = parseResults.command<GatewayStartCommand>()
+                    if (isConfigCreate) disableDatabase()
+                }
 
-                    // The listen command, if any
-                    val listen = parseResults.command<ListenCommand>()
+                if (listen != null) {
+                    listen.metricsPort?.let { setMetricsPort(it) }
+                    enableListening()
+                }
 
-                    // the instance start command, if any
-                    val instanceStart = parseResults.command<InstanceStartCommand>()
+                if (instanceStart != null) {
+                    enableInstanceStart()
+                }
 
-                    // the failures replay command, if any
-                    val failuresReplay = parseResults.command<FailuresReplayCommand>()
+                if (failuresReplay != null) {
+                    // replayed payloads may be commands or events; enable both producers
+                    System.setProperty(LEMLINE_MESSAGING_COMMANDS_PRODUCER_ENABLED, "true")
+                    System.setProperty(LEMLINE_MESSAGING_EVENTS_PRODUCER_ENABLED, "true")
+                }
 
-                    if (listen == null && gatewayStart == null) {
-                        disableMetricsEndpoint()
-                        disableMessaging()
-                        disableScheduled()
-                        if (isConfigCreate) disableDatabase()
-                    }
-
-                    if (listen != null) {
-                        listen.metricsPort?.let { setMetricsPort(it) }
-                        enableListening()
-                    }
-
-                    if (instanceStart != null) {
-                        enableInstanceStart()
-                    }
-
-                    if (failuresReplay != null) {
-                        // replayed payloads may be commands or events; enable both producers
-                        System.setProperty(LEMLINE_MESSAGING_COMMANDS_PRODUCER_ENABLED, "true")
-                        System.setProperty(LEMLINE_MESSAGING_EVENTS_PRODUCER_ENABLED, "true")
-                    }
-
-                    if (gatewayStart != null) {
-                        gatewayStart.grpcPort?.let { setGrpcPort(it) }
-                        gatewayStart.metricsPort?.let { setMetricsPort(it) }
-                        enableGateway()
-                    }
+                if (gatewayStart != null) {
+                    gatewayStart.grpcPort?.let { setGrpcPort(it) }
+                    gatewayStart.metricsPort?.let { setMetricsPort(it) }
+                    enableGateway()
                 }
             } catch (ex: Exception) {
                 // Handle all exceptions in a unified way
