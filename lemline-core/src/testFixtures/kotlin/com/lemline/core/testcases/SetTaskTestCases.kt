@@ -17,6 +17,23 @@ object SetTaskTestCases {
 
     val cases = listOf(
         WorkflowTestCase(
+            name = "set task can read the workflow definition",
+            yaml = $$"""
+                do:
+                  - inspectWorkflow:
+                      set:
+                        namespace: ${ $workflow.definition.document.namespace }
+                        version: ${ $workflow.definition.document.version }
+                        taskCount: ${ $workflow.definition.do | length }
+            """.trimIndent(),
+            validate = expectOutput(buildJsonObject {
+                put("namespace", "default")
+                put("version", "0.1.0")
+                put("taskCount", 1)
+            })
+        ),
+
+        WorkflowTestCase(
             name = "set task assigns simple values",
             yaml = """
                 do:

@@ -22,6 +22,8 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.Assertions.assertNotSame
+import org.junit.jupiter.api.Assertions.assertSame
 import org.junit.jupiter.api.assertDoesNotThrow
 import org.junit.jupiter.api.assertThrows
 
@@ -132,6 +134,19 @@ class DefinitionsTest {
         // Verify the root node is created and cached
         val rootNode = WorkflowCache.getRootNode(workflow)
         rootNode.task.shouldBeInstanceOf<RootTask>()
+    }
+
+    @Test
+    fun `definition JSON is built once per cached workflow instance`() {
+        val workflow = WorkflowCache.parseYamlAndPut(sampleYamlWorkflow)
+        val first = WorkflowCache.getDefinitionJson(workflow)
+
+        assertSame(first, WorkflowCache.getDefinitionJson(workflow))
+
+        val replacement = WorkflowCache.parseYamlAndPut(sampleYamlWorkflow.replace("Hello, World!", "Hello again"))
+        val replacementJson = WorkflowCache.getDefinitionJson(replacement)
+        assertNotSame(first, replacementJson)
+        assertNotSame(replacementJson, WorkflowCache.getDefinitionJson(workflow))
     }
 
     @Test

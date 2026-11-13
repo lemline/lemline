@@ -7,6 +7,7 @@ import com.lemline.common.values.WorkflowId
 import com.lemline.core.processors.scope.Scope
 import com.lemline.core.processors.scope.merge
 import kotlin.time.Instant
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import org.jetbrains.annotations.TestOnly
 
@@ -91,10 +92,13 @@ class NodeStack internal constructor(
 
     /** A new instance of the same workflow: its own id and its own start time. */
     fun duplicate(workflowId: WorkflowId, startedAt: Instant): NodeStack =
-        withRootState(rootState.copy(workflowId = workflowId, startedAt = startedAt))
+        withRootState(rootState.withIdentity(workflowId, startedAt))
 
     /** Creates a new TaskStack with updated context in the root state.*/
     fun withContext(newContext: Scope): NodeStack = withRootState(rootState.withContext(newContext))
+
+    /** Attach the loaded definition for expression evaluation without serializing it into messages. */
+    fun withWorkflowDefinition(definition: JsonObject): NodeStack = withRootState(rootState.withDefinition(definition))
 
     /** Push a new frame onto the stack.*/
     fun push(position: NodePosition, state: NodeState, executionIndex: Int = 0): NodeStack =
@@ -123,7 +127,7 @@ class NodeStack internal constructor(
 
     /** Creates a new TaskStack with a new root state, replacing the existing one.*/
     private fun withRootState(newRoot: RootState): NodeStack =
-        NodeStack(listOf(StackFrame(NodePosition.root, newRoot)) + frames.drop(1))
+        NodeStack(listOf(frames.first().copy(state = newRoot)) + frames.drop(1))
 
     override fun equals(other: Any?): Boolean {
         if (this === other) return true

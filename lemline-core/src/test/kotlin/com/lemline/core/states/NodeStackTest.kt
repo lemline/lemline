@@ -10,10 +10,34 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 import kotlin.time.Clock
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.put
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 
 class NodeStackTest {
+
+    @Test
+    fun `workflow definition is available in scope without entering the message`() {
+        val stack = NodeStack(listOf(StackFrame(
+            NodePosition.root,
+            RootState(startedAt = Clock.System.now(), workflowId = WorkflowId.random()),
+            counter = 7
+        )))
+        val definition = buildJsonObject { put("marker", "definition-only") }
+        val hydrated = stack.withWorkflowDefinition(definition)
+
+        assertEquals(NodeStackProtobufMapper.toProto(stack), NodeStackProtobufMapper.toProto(hydrated))
+        assertEquals(7, hydrated.first().counter)
+        assertEquals(definition, hydrated.stateScope.getValue("workflow").jsonObject.getValue("definition"))
+        val updatedContext = hydrated.withContext(buildJsonObject { put("key", "value") })
+        assertEquals(7, updatedContext.first().counter)
+        assertEquals(definition, updatedContext.stateScope.getValue("workflow").jsonObject.getValue("definition"))
+        val duplicate = hydrated.duplicate(WorkflowId.random(), Clock.System.now())
+        assertEquals(7, duplicate.first().counter)
+        assertEquals(definition, duplicate.stateScope.getValue("workflow").jsonObject.getValue("definition"))
+    }
 
     @Test
     fun `should serialize and deserialize preserving hierarchy`() {

@@ -24,6 +24,7 @@ import io.serverlessworkflow.api.types.ListenTaskConfiguration
 import io.serverlessworkflow.api.types.Task
 import io.serverlessworkflow.api.types.Workflow
 import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.json.JsonObject
 import org.jetbrains.annotations.TestOnly
 
 /**
@@ -58,7 +59,9 @@ object WorkflowCache {
         val listens: List<CachedListenTask>,
         val schedule: CachedEventSchedule?,
         val source: String?,
-    )
+    ) {
+        val definitionJson: JsonObject by lazy { LemlineJson.encodeToElement(workflow) }
+    }
 
     class Snapshot internal constructor(internal val entries: Map<WorkflowInfo, Entry>)
 
@@ -201,6 +204,12 @@ object WorkflowCache {
         val entry = current.entries[workflow.info]
         return if (entry?.workflow === workflow) entry.schedule?.consumption
         else workflow.schedule?.on?.get()?.let(CachedEventConsumption::from)
+    }
+
+    /** Reuse the parsed JSON for the cached instance; avoid a stale entry with the same identity. */
+    fun getDefinitionJson(workflow: Workflow): JsonObject {
+        val entry = current.entries[workflow.info]
+        return if (entry?.workflow === workflow) entry.definitionJson else LemlineJson.encodeToElement(workflow)
     }
 
     fun getEventSchedules(namespace: WorkflowNamespace): List<CachedEventSchedule> =
