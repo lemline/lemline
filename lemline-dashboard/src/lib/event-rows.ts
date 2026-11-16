@@ -38,7 +38,7 @@ function describe(event: TimelineEventView, task: string): { what: string; isErr
 export function toEventRows(events: TimelineEventView[], startMs: number): EventRow[] {
   return events.map((event, index) => {
     const names = event.taskPointer ? taskNamesOf(event.taskPointer) : [];
-    const task = names[names.length - 1] ?? "Workflow";
+    const task = names[names.length - 1] ?? (event.taskPointer === "/do" ? "do" : "Workflow");
     const { what, isError } = describe(event, task);
     const timeMs = Date.parse(event.eventTime);
     const offset = Number.isFinite(timeMs) ? ` · +${formatSpan(Math.max(0, timeMs - startMs))} after the start` : "";

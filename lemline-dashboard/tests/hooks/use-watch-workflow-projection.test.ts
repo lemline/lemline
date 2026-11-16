@@ -47,6 +47,39 @@ describe("buildWorkflowProjection", () => {
 
     expect(projection.events.map((event) => event.sequence.toString())).toEqual(["10", "20", "30"]);
   });
+
+  it("shows a terminal workflow event after task events with the same timestamp", () => {
+    const events: WorkflowProjectionInputEvent[] = [
+      timelineEvent(217n, "io.serverlessworkflow.workflow.faulted.v1", "2026-11-16T00:34:30.592Z"),
+      timelineEvent(219n, "io.serverlessworkflow.task.faulted.v1", "2026-11-16T00:34:30.592Z", "/do"),
+    ];
+
+    const projection = buildWorkflowProjection("wf-1", events);
+
+    expect(projection.events.map((event) => event.sequence.toString())).toEqual(["219", "217"]);
+  });
+
+  it("shows workflow started before task started with the same timestamp", () => {
+    const events: WorkflowProjectionInputEvent[] = [
+      timelineEvent(212n, "io.serverlessworkflow.task.started.v1", "2026-11-16T00:34:30.545Z", "/do"),
+      timelineEvent(213n, "io.serverlessworkflow.workflow.started.v1", "2026-11-16T00:34:30.545Z"),
+    ];
+
+    const projection = buildWorkflowProjection("wf-1", events);
+
+    expect(projection.events.map((event) => event.sequence.toString())).toEqual(["213", "212"]);
+  });
+
+  it("keeps submillisecond event times ahead of the terminal tie-breaker", () => {
+    const task = timelineEvent(219n, "io.serverlessworkflow.task.faulted.v1", "2026-11-16T00:34:30.592Z", "/do");
+    const workflow = timelineEvent(217n, "io.serverlessworkflow.workflow.faulted.v1", "2026-11-16T00:34:30.592Z");
+    task.sortTimeMs = Date.parse(task.eventTime) + 0.865;
+    workflow.sortTimeMs = Date.parse(workflow.eventTime) + 0.864;
+
+    const projection = buildWorkflowProjection("wf-1", [task, workflow]);
+
+    expect(projection.events.map((event) => event.sequence.toString())).toEqual(["217", "219"]);
+  });
 });
 
 function timelineEvent(

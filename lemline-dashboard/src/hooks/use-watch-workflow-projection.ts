@@ -11,7 +11,7 @@ import {
   WatchInstanceEventsRequestSchema,
 } from "../gen/proto/lemline/gateway/v1/gateway_pb";
 import { gatewayClient } from "../lib/grpc-client";
-import { durationToMilliseconds, timestampToIsoString, timestampToMilliseconds } from "../lib/proto";
+import { durationToMilliseconds, timestampToIsoString } from "../lib/proto";
 
 const EVENT_HISTORY_PAGE_SIZE = 500;
 const MAX_STREAM_RETRIES = 5;
@@ -352,7 +352,9 @@ function parseInstanceEvent(event: InstanceEvent, streamIndex: number): Workflow
     taskName,
     payloadJson: event.cloudEventJson,
     scope: extractWorkflowScopeFromCloudEvent(cloudEvent),
-    sortTimeMs: timestampToMilliseconds(event.eventTime) ?? parseTimeMs(eventTime),
+    sortTimeMs: event.eventTime
+      ? Number(event.eventTime.seconds) * 1000 + event.eventTime.nanos / 1_000_000
+      : parseTimeMs(eventTime),
     streamIndex,
   };
 }
@@ -510,6 +512,13 @@ function compareTimelineEvents(left: WorkflowProjectionInputEvent, right: Workfl
     return left.sortTimeMs - right.sortTimeMs;
   }
 
+  // Events emitted at the same instant can reach analytics out of order. The
+  // workflow starts before its tasks and reaches a terminal state after them.
+  if (left.sortTimeMs !== undefined && left.sortTimeMs === right.sortTimeMs) {
+    const workflowOrder = workflowEventOrder(left.eventType) - workflowEventOrder(right.eventType);
+    if (workflowOrder !== 0) return workflowOrder;
+  }
+
   if (
     left.streamIndex !== undefined &&
     right.streamIndex !== undefined &&
@@ -522,6 +531,13 @@ function compareTimelineEvents(left: WorkflowProjectionInputEvent, right: Workfl
   if (sequenceComparison !== 0) return sequenceComparison;
 
   return (left.eventType || "").localeCompare(right.eventType || "");
+}
+
+function workflowEventOrder(eventType: string): number {
+  if (eventType.includes("workflow.created")) return -2;
+  if (eventType.includes("workflow.started")) return -1;
+  if (eventType.includes("workflow.completed") || eventType.includes("workflow.faulted")) return 1;
+  return 0;
 }
 
 function compareSequenceValues(
