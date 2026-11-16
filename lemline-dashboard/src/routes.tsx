@@ -1,5 +1,6 @@
-import { lazy, Suspense, type ReactNode } from "react";
-import { Navigate, Route, Routes, useParams } from "react-router-dom";
+import { lazy, Suspense, useEffect, type ReactNode } from "react";
+import { Navigate, Route, Routes, useNavigate, useParams } from "react-router-dom";
+import { useGlobalNamespace } from "./context/namespace-context";
 import { instancesPath } from "./lib/paths";
 
 const InstancesPage = lazy(() => import("./pages/instances").then((module) => ({ default: module.InstancesPage })));
@@ -37,8 +38,19 @@ function LegacyInstanceRedirect() {
 
 function LegacyScopeRedirect() {
   const { namespace = "", name = "", version = "" } = useParams();
-  if (!name) return <Navigate to="/definitions" replace />;
+  if (!name) return <LegacyNamespaceRedirect namespace={namespace} />;
   return <Navigate to={instancesPath({ ns: namespace, wf: name, ver: version })} replace />;
+}
+
+/** "/ns/shop" showed one namespace: the workflows page shows it once it is the namespace picked. */
+function LegacyNamespaceRedirect({ namespace }: { namespace: string }) {
+  const { setNamespace } = useGlobalNamespace();
+  const navigate = useNavigate();
+  useEffect(() => {
+    setNamespace(namespace);
+    navigate("/definitions", { replace: true });
+  }, [namespace, navigate, setNamespace]);
+  return null;
 }
 
 function withSuspense(element: ReactNode) {
