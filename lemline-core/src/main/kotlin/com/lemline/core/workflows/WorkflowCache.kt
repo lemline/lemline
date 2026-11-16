@@ -416,13 +416,14 @@ object WorkflowCache {
             nodes.any { node ->
                 val reference = (node.task as? CallFunction)?.call
                 reference != null && reference !in entry.workflow.useFunctions.orEmpty() &&
-                    entry.functions.keys.none { it.first == reference }
+                    !entry.functions.containsKey(reference to false)
             }
         }
 
     suspend fun loadFunctionListeners(info: WorkflowInfo, reference: String, resolver: suspend (String) -> Task) {
         val entry = current.entries[info] ?: return
-        if (entry.functions.keys.any { it.first == reference }) return
+        // Only the unsuppressed tree carries extension listeners; a suppressed one does not stand in for it.
+        if (entry.functions.containsKey(reference to false)) return
         val task = entry.workflow.useFunctions?.get(reference) ?: resolver(reference)
         // A definition replaced during remote resolution must not receive stale templates.
         if (current.entries[info] === entry) functionNodes(entry.workflow, task, reference, false)
