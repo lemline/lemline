@@ -77,6 +77,13 @@ service GatewayService {
     // then tails live events. This is intentionally different from other Watch*
     // RPCs because full event history is the primary per-instance timeline view.
     rpc WatchInstanceEvents(WatchInstanceEventsRequest) returns (stream WatchInstanceEventsResponse);
+
+    // Returns the configuration the gateway runs with and where each value comes from,
+    // plus the external configuration file as it was read at startup.
+    //
+    // Read-only. Secret values are never returned. Requires the `lemline.config` scope
+    // when authentication is enabled.
+    rpc GetGatewayConfig(GetGatewayConfigRequest) returns (GetGatewayConfigResponse);
 }
 
 // A lightweight definition row used in catalog and selector views.
@@ -629,4 +636,116 @@ message WatchInstanceEventsRequest {
 message WatchInstanceEventsResponse {
     // Next event in the ordered instance timeline.
     InstanceEvent event = 1;
+}
+
+// Request for GetGatewayConfig.
+message GetGatewayConfigRequest {}
+
+// Response for GetGatewayConfig.
+message GetGatewayConfigResponse {
+    // Gateway settings (lemline.gateway.* and lemline.namespaces), sorted by key.
+    // Every declared key is listed, including unset ones.
+    repeated GatewaySetting settings = 1;
+
+    // The external configuration file, when one was loaded.
+    optional ConfigFile config_file = 2;
+
+    // When the gateway process started and read its configuration.
+    google.protobuf.Timestamp loaded_at = 3;
+}
+
+// One configuration key and the origin of its effective value.
+message GatewaySetting {
+    // Full key, e.g. "lemline.gateway.cors.origins".
+    string key = 1;
+
+    // Effective value as text. Absent when the key is unset, or when the setting is a secret.
+    optional string value = 2;
+
+    // Where the effective value comes from.
+    SettingOrigin origin = 3;
+
+    // Name to look for at the origin: the environment variable (LEMLINE_GATEWAY_CORS_ORIGINS),
+    // the system property, or the configuration file path. Empty for the other origins.
+    string origin_detail = 4;
+
+    // Built-in default, when the key has one.
+    optional string default_value = 5;
+
+    // True for secrets: the value is never sent and is_set tells whether one is configured.
+    bool secret = 6;
+
+    // True when the key has a value, whatever its origin.
+    bool is_set = 7;
+
+    // Lower-priority origins that also set this key and are hidden by `origin`, highest first.
+    repeated SettingOrigin shadowed = 8;
+}
+
+// Where a configuration value comes from, highest priority first.
+enum SettingOrigin {
+    SETTING_ORIGIN_UNSPECIFIED = 0;
+    // -Dkey=value, or a command-line option mapped to it.
+    SETTING_ORIGIN_SYSTEM_PROPERTY = 1;
+    SETTING_ORIGIN_ENVIRONMENT = 2;
+    // The external configuration file (see ConfigFile).
+    SETTING_ORIGIN_CONFIG_FILE = 3;
+    // application.properties / application.yaml packaged with Lemline.
+    SETTING_ORIGIN_APPLICATION = 4;
+    // Built-in default of the setting.
+    SETTING_ORIGIN_DEFAULT = 5;
+    // No value and no default.
+    SETTING_ORIGIN_UNSET = 6;
+    // Forced by the Lemline command being run (e.g. `gateway start` always enables the gateway),
+    // or by one of its options (--grpc-port). origin_detail names the command.
+    SETTING_ORIGIN_COMMAND = 7;
+}
+
+// The external configuration file as read at startup.
+message ConfigFile {
+    // Absolute path of the file.
+    string path = 1;
+
+    // How the file was found.
+    ConfigFileLocator located_by = 2;
+
+    // Full text with comments and layout kept, secret values replaced by "••••••••".
+    // Absent when the file is larger than 256 KiB or could not be parsed.
+    optional string text = 3;
+
+    // Keys set in the file, in file order, with their line in `text`.
+    repeated ConfigFileKey keys = 4;
+}
+
+// A key set in the configuration file.
+message ConfigFileKey {
+    // Full key, e.g. "lemline.gateway.cors.origins".
+    string key = 1;
+
+    // 1-based line of the key in ConfigFile.text.
+    int32 line = 2;
+
+    // Set when a higher-priority origin replaces the file value with a different one.
+    // A higher origin that sets the same value leaves this UNSPECIFIED: the file line still applies.
+    SettingOrigin overridden_by = 3;
+
+    // Environment variable, system property or command that replaces the file value.
+    string overridden_by_detail = 4;
+
+    // True when the value was redacted.
+    bool secret = 5;
+
+    // The value that applies instead of the file's. Absent for secrets.
+    optional string overriding_value = 6;
+}
+
+// How the configuration file was found.
+enum ConfigFileLocator {
+    CONFIG_FILE_LOCATOR_UNSPECIFIED = 0;
+    // Passed with --config / -c.
+    CONFIG_FILE_LOCATOR_OPTION = 1;
+    // Named by the LEMLINE_CONFIG environment variable.
+    CONFIG_FILE_LOCATOR_ENVIRONMENT = 2;
+    // Found at a default location: ./.lemline.yaml, ~/.config/lemline/config.yaml or ~/.lemline.yaml.
+    CONFIG_FILE_LOCATOR_DEFAULT_PATH = 3;
 }

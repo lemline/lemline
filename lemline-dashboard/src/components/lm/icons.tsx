@@ -80,6 +80,15 @@ export const DefinitionsIcon = (props: IconProps) => (
   </Svg>
 );
 
+export const SettingsIcon = (props: IconProps) => (
+  <Svg size={18} {...props}>
+    <path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12" />
+    <circle cx="16" cy="6" r="2" />
+    <circle cx="10" cy="12" r="2" />
+    <circle cx="18" cy="18" r="2" />
+  </Svg>
+);
+
 export const MoonIcon = (props: IconProps) => (
   <Svg {...props}>
     <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z" />

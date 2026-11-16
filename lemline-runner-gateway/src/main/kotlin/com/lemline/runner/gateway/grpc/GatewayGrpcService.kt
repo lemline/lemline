@@ -3,6 +3,8 @@ package com.lemline.runner.gateway.grpc
 
 import com.lemline.gateway.v1.GetDefinitionRequest
 import com.lemline.gateway.v1.GetDefinitionResponse
+import com.lemline.gateway.v1.GetGatewayConfigRequest
+import com.lemline.gateway.v1.GetGatewayConfigResponse
 import com.lemline.gateway.v1.GetInstanceRequest
 import com.lemline.gateway.v1.GetInstanceResponse
 import com.lemline.gateway.v1.ListDefinitionStatsRequest
@@ -28,6 +30,7 @@ import com.lemline.runner.config.gatewayAuthenticationEnabled
 import com.lemline.runner.gateway.auth.GatewayAuthContext
 import com.lemline.runner.gateway.auth.GatewayAuthorizer
 import com.lemline.runner.gateway.auth.GatewayPrincipal
+import com.lemline.runner.gateway.resources.config.GatewayConfigRpcHandler
 import com.lemline.runner.gateway.resources.definitions.DefinitionRpcHandler
 import com.lemline.runner.gateway.resources.definitionstats.DefinitionStatsRpcHandler
 import com.lemline.runner.gateway.resources.instanceevents.InstanceEventRpcHandler
@@ -64,6 +67,9 @@ class GatewayGrpcService(
 
     @Inject
     lateinit var instanceEventRpcHandler: InstanceEventRpcHandler
+
+    @Inject
+    lateinit var gatewayConfigRpcHandler: GatewayConfigRpcHandler
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO + ApplicationClassLoaderContext())
 
@@ -164,6 +170,16 @@ class GatewayGrpcService(
         val principal = requirePrincipal(responseObserver) ?: return
         launchStreaming(responseObserver) { emit ->
             instanceEventRpcHandler.watchInstanceEvents(request, principal, emit)
+        }
+    }
+
+    override fun getGatewayConfig(
+        request: GetGatewayConfigRequest,
+        responseObserver: StreamObserver<GetGatewayConfigResponse>,
+    ) {
+        val principal = requirePrincipal(responseObserver) ?: return
+        launchUnary(responseObserver) {
+            gatewayConfigRpcHandler.getGatewayConfig(principal)
         }
     }
 

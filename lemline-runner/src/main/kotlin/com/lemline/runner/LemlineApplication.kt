@@ -21,6 +21,8 @@ import com.lemline.runner.common.config.LEMLINE_MESSAGING_EVENTS_PRODUCER_ENABLE
 import com.lemline.runner.common.config.LEMLINE_MESSAGING_LIFECYCLE_EVENTS_CONSUMER_ENABLED
 import com.lemline.runner.common.config.LEMLINE_MESSAGING_LIFECYCLE_EVENTS_PRODUCER_ENABLED
 import com.lemline.runner.common.config.LEMLINE_SCHEDULED_ENABLED
+import com.lemline.runner.config.CommandSetProperties
+import com.lemline.runner.config.ConfigFileLocator
 import io.quarkus.picocli.runtime.annotations.TopCommand
 import io.quarkus.runtime.Quarkus
 import io.quarkus.runtime.QuarkusApplication
@@ -114,6 +116,9 @@ class LemlineApplication : QuarkusApplication {
                     exitProcess(1)
                 }
 
+                // Lemline settings present before the command applies its own (typed -D flags)
+                val typedProperties = lemlineSystemProperties()
+
                 // the gateway start command, if any
                 val gatewayStart = parseResults.command<GatewayStartCommand>()
 
@@ -153,6 +158,12 @@ class LemlineApplication : QuarkusApplication {
                     gatewayStart.metricsPort?.let { setMetricsPort(it) }
                     enableGateway()
                 }
+
+                // Remember what the command itself set, so the gateway can tell it apart from typed flags
+                CommandSetProperties.record(
+                    command = parseResults.last().commandSpec().qualifiedName(" ").substringAfter(' ', ""),
+                    keys = lemlineSystemProperties().filter { (key, value) -> typedProperties[key] != value }.keys,
+                )
             } catch (ex: Exception) {
                 // Handle all exceptions in a unified way
                 System.err.println("⚠️ ${ex.message}")
@@ -248,22 +259,22 @@ class LemlineApplication : QuarkusApplication {
                     ?: parseResult.matchedOptionValue<String>("-c", null)
 
                 optionPath?.let {
-                    if (checkConfigLocation(Paths.get(it), true)) return
+                    if (checkConfigLocation(Paths.get(it), true, ConfigFileLocator.OPTION)) return
                 }
             }
 
             // If not found via CLI, or if parseResult was null, check other sources:
             System.getenv("LEMLINE_CONFIG")?.trim()?.takeIf { it.isNotEmpty() }?.let {
-                if (checkConfigLocation(Paths.get(it), true)) return
+                if (checkConfigLocation(Paths.get(it), true, ConfigFileLocator.ENVIRONMENT)) return
             }
 
-            if (checkConfigLocation(Paths.get(".lemline.yaml"), false)) return
+            if (checkConfigLocation(Paths.get(".lemline.yaml"), false, ConfigFileLocator.DEFAULT_PATH)) return
 
             System.getProperty("user.home")?.let {
                 val xdgPath = Paths.get(it, ".config", "lemline", "config.yaml")
-                if (checkConfigLocation(xdgPath, false)) return
+                if (checkConfigLocation(xdgPath, false, ConfigFileLocator.DEFAULT_PATH)) return
                 val homePath = Paths.get(it, ".lemline.yaml")
-                if (checkConfigLocation(homePath, false)) return
+                if (checkConfigLocation(homePath, false, ConfigFileLocator.DEFAULT_PATH)) return
             }
                 ?: System.err.println("Warning: Could not determine user home directory. Skipping user-specific config locations.")
 
@@ -271,7 +282,7 @@ class LemlineApplication : QuarkusApplication {
     }
 }
 
-private fun checkConfigLocation(filePath: Path, provided: Boolean): Boolean {
+private fun checkConfigLocation(filePath: Path, provided: Boolean, locator: ConfigFileLocator): Boolean {
     val path = filePath.normalize()
     val fileExists = Files.exists(path)
     val isRegularFile = Files.isRegularFile(path)
@@ -283,10 +294,16 @@ private fun checkConfigLocation(filePath: Path, provided: Boolean): Boolean {
     }
     if (fileExists && isRegularFile) {
         ConfigPathHolder.configPath = path
+        ConfigPathHolder.locator = locator
         return true
     }
     return false
 }
+
+private fun lemlineSystemProperties(): Map<String, String> =
+    System.getProperties().entries
+        .filter { it.key.toString().startsWith("lemline.") }
+        .associate { it.key.toString() to it.value.toString() }
 
 private fun setGrpcPort(port: Int) {
     System.setProperty(LEMLINE_GATEWAY_GRPC_PORT, port.toString())

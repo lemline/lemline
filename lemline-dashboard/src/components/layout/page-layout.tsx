@@ -1,10 +1,12 @@
 import type { ReactNode } from "react";
 import { useViewportWidth } from "../../hooks/use-viewport-width";
-import { NamespaceDropdown, Sidebar } from "./sidebar";
+import { NamespaceDropdown, Sidebar, ThemeToggle } from "./sidebar";
 
 export function PageLayout({ children }: { children: ReactNode }) {
   const width = useViewportWidth();
   const narrow = width < 900;
+  // On phones the top bar has no room left: the theme toggle moves next to the namespace.
+  const phone = width < 480;
 
   return (
     <div
@@ -19,7 +21,7 @@ export function PageLayout({ children }: { children: ReactNode }) {
             : { flex: "0 0 240px", width: 240, alignSelf: "flex-start", height: "100vh", minHeight: 480 }
         }
       >
-        <Sidebar compact={narrow} />
+        <Sidebar compact={narrow} hideTheme={phone} />
       </div>
 
       <main className="flex min-w-0 flex-col" style={{ flex: narrow ? "1 1 auto" : "1 1 0" }}>
@@ -28,7 +30,16 @@ export function PageLayout({ children }: { children: ReactNode }) {
             className="relative z-[25] flex w-full flex-wrap items-center gap-2.5 border-b border-lm-line bg-lm-panel"
             style={{ padding: width < 640 ? "10px 16px" : "12px 40px" }}
           >
-            <NamespaceDropdown stretch={width < 640} />
+            {phone ? (
+              <div className="flex w-full items-center gap-2.5">
+                <div className="min-w-0 flex-1">
+                  <NamespaceDropdown stretch />
+                </div>
+                <ThemeToggle compact />
+              </div>
+            ) : (
+              <NamespaceDropdown stretch={width < 640} />
+            )}
           </div>
         )}
         {children}

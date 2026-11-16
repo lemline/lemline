@@ -39,6 +39,10 @@ and set `gatewayBaseUrl` to the dev server origin (`window.location.origin`) in 
   refuses to start such a workflow by hand.
 - **Instance**: status and cause, a timeline of each task (attempts, waits before retry, waits for an event,
   long waits shortened), the lifecycle events, and the instance input and output.
+- **Settings**: the gateway URL the dashboard calls and where it comes from, the configuration file the gateway
+  loaded (passwords hidden, lines replaced by another origin struck through), and the settings the gateway
+  received from its environment or command line. Reading the gateway configuration needs the `lemline.config`
+  scope when authentication is enabled.
 
 The namespace picked in the menu applies to every page. The light and dark themes follow the system until
 one is picked in the menu.
@@ -55,7 +59,7 @@ window.__CONFIG__ = {
 
 Notes:
 - Use a full origin URL (`https://host:port`).
-- If `window.__CONFIG__.gatewayBaseUrl` is missing, the default is `https://localhost:9000`.
+- If `window.__CONFIG__.gatewayBaseUrl` is missing, the default is `https://localhost:9443`.
 - For container deployments, override `config.js` in the served static files.
 
 Gateway-side requirements:
@@ -69,6 +73,8 @@ Security behavior:
 - The dashboard client does not currently attach an `Authorization` header.
 - For direct browser access, run gateway with `lemline.gateway.authentication.enabled=false`.
 - If security stays enabled, place an auth-aware edge/proxy in front that injects auth metadata for gateway calls.
+- Scopes checked by the gateway: `lemline.watch` (live lists), `lemline.start` (start an instance),
+  `lemline.config` (Settings page: read the gateway configuration).
 
 ## Protobuf Sync
 
