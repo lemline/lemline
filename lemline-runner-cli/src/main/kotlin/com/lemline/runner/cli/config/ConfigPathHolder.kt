@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.cli.config
 
+import com.lemline.runner.config.ConfigFileLocator
 import com.lemline.runner.config.ConfigPathHolder as SharedConfigPathHolder
 import java.nio.file.Path
 
@@ -12,5 +13,11 @@ object ConfigPathHolder {
         get() = SharedConfigPathHolder.configPath
         set(value) {
             SharedConfigPathHolder.configPath = value
+        }
+
+    var locator: ConfigFileLocator?
+        get() = SharedConfigPathHolder.locator
+        set(value) {
+            SharedConfigPathHolder.locator = value
         }
 }

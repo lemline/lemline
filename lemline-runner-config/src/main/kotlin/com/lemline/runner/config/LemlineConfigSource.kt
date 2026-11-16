@@ -269,11 +269,15 @@ class LemlineConfigSource(context: ConfigSourceContext? = null) : PropertiesConf
 
             // Load user properties from file
             ConfigPathHolder.configPath?.let { path ->
+                val fileProps = mutableMapOf<String, String>()
                 ExtraFileConfigFactory().getConfig(path).properties.forEach { (name, value) ->
                     if (name.startsWith(LEMLINE_PREFIX)) {
-                        lemlineProps[name] = value.replaceFirst(Regex("""\s+#.*$"""), "").trim()
+                        val cleaned = value.replaceFirst(Regex("""\s+#.*$"""), "").trim()
+                        lemlineProps[name] = cleaned
+                        fileProps[name] = cleaned
                     }
                 }
+                LoadedConfigFile.capture(path, ConfigPathHolder.locator, fileProps)
             }
 
             logger.info { "Lemline file properties:\n${lemlineProps.toPrint()}" }
