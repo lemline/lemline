@@ -93,7 +93,7 @@ docker compose -f docker/e2e/docker-compose.yml ps
 ## Endpoints
 
 - Dashboard: http://localhost:5173
-- gRPC-Web proxy (used by dashboard): http://localhost:9446
+- gRPC-Web proxy: http://localhost:9446 (the dashboard reaches it through its own origin, so it also works on another host port)
 - Gateway gRPC (TLS): https://localhost:9443
 - Gateway metrics + health: http://localhost:9444
 - Worker metrics + health: http://localhost:9445
@@ -145,7 +145,7 @@ docker compose -f docker/e2e/docker-compose.yml exec worker \
   instance start test wait-duration-inline 0.1.0 --input '{"from":"docker-e2e"}'
 ```
 
-You can also start instances from the dashboard with **Start Workflow**.
+You can also start instances from the dashboard: **Definitions**, open a workflow, then **Start instance**.
 
 The worker follows the namespaces of the seeded examples (`lemline.namespaces` in
 `config/lemline.yaml`). An instance started in any other namespace stays pending.
