@@ -254,6 +254,38 @@ do:
     expect(instanceSummary(model.rows, "RUNNING", undefined).title).toBe("Waiting to start step");
   });
 
+  it("keeps the loop's lifetime separate from its repeated internal do block", () => {
+    const { root } = parseWorkflowSource(`
+do:
+  - eachItem:
+      for: { each: item, in: '\${ [1, 2] }' }
+      do:
+        - pause: { wait: { seconds: 4 } }
+`);
+    const loop = "/do/0/eachItem";
+    const body = `${loop}/do`;
+    const pause = `${body}/0/pause`;
+    const events = [event("workflow.started", 0), event("task.created", 0, { task: loop }), event("task.started", 1, { task: loop })];
+    for (let index = 0; index < 2; index++) {
+      const start = index * 5_000;
+      events.push(
+        event("task.created", start + 2, { task: body }),
+        event("task.started", start + 3, { task: body }),
+        event("task.created", start + 4, { task: pause }),
+        event("task.started", start + 5, { task: pause }),
+        event("task.completed", start + 4_005, { task: pause }),
+        event("task.completed", start + 4_006, { task: body }),
+      );
+    }
+    events.push(event("task.completed", 9_007, { task: loop }), event("workflow.completed", 9_008));
+
+    const model = buildTimeline(events, "COMPLETED", root, T0 + 60_000);
+
+    expect(model.rows.map((row) => row.pointer)).toEqual([loop, pause, pause]);
+    expect(model.rows[0]).toMatchObject({ typeLabel: "for", state: "completed", start: T0 + 1, end: T0 + 9_007, isGroup: true });
+    expect(model.rows.slice(1).map((row) => row.iteration)).toEqual([1, 2]);
+  });
+
   describe("a task still open when the instance ends", () => {
     const forkRoot = parseWorkflowSource(`
 document: { dsl: '1.0.0', namespace: shop, name: race, version: '1.0.0' }

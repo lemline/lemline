@@ -2,7 +2,7 @@ import type { TimelineEventView } from "../hooks/use-watch-workflow-projection";
 import { readableError } from "./errors";
 import { formatEventClock, formatSpan, formatUtc } from "./format";
 import { cloudEventOf } from "./timeline";
-import { taskNamesOf } from "./workflow-source";
+import { isTaskPointer, taskNamesOf } from "./workflow-source";
 
 export interface EventRow {
   key: string;
@@ -35,10 +35,13 @@ function describe(event: TimelineEventView, task: string): { what: string; isErr
   return { what: type, isError: false };
 }
 
-export function toEventRows(events: TimelineEventView[], startMs: number): EventRow[] {
+export function toEventRows(events: TimelineEventView[], startMs: number, root?: Record<string, unknown>): EventRow[] {
   return events.map((event, index) => {
     const names = event.taskPointer ? taskNamesOf(event.taskPointer) : [];
-    const task = names[names.length - 1] ?? (event.taskPointer === "/do" ? "do" : "Workflow");
+    let task = names[names.length - 1] ?? (event.taskPointer === "/do" ? "do" : "Workflow");
+    if (names.length > 0 && event.taskPointer && !isTaskPointer(event.taskPointer, root)) {
+      task += ` / ${event.taskPointer.split("/").at(-1)}`;
+    }
     const { what, isError } = describe(event, task);
     const timeMs = Date.parse(event.eventTime);
     const offset = Number.isFinite(timeMs) ? ` · +${formatSpan(Math.max(0, timeMs - startMs))} after the start` : "";

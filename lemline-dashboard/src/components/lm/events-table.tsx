@@ -6,10 +6,10 @@ import { cn } from "../../lib/utils";
 import { CodeBlock } from "./code-block";
 import { Drawer, DrawerBody, DrawerHeader } from "./drawer";
 
-export function EventsTable({ events, startMs }: { events: TimelineEventView[]; startMs: number }) {
+export function EventsTable({ events, startMs, root }: { events: TimelineEventView[]; startMs: number; root?: Record<string, unknown> }) {
   const narrow = useViewportWidth() < 720;
   const [open, setOpen] = useState<string | null>(null);
-  const rows = toEventRows(events, startMs);
+  const rows = toEventRows(events, startMs, root);
   const current = rows.find((row) => row.key === open);
   const columns = narrow ? "128px 140px minmax(0,1fr)" : "170px 240px minmax(0,1fr)";
   const padX = narrow ? 16 : 24;

@@ -186,7 +186,7 @@ export function InstancePage() {
 
         <section aria-label="Events" className="flex flex-col gap-3">
           <SectionTitle>Events</SectionTitle>
-          <EventsTable events={events} startMs={startedMs} />
+          <EventsTable events={events} startMs={startedMs} root={root} />
         </section>
       </div>
 

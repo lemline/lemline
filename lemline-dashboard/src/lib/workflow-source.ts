@@ -101,7 +101,8 @@ export function shortEventType(type: string): string {
   return parts.slice(-keep).join(".");
 }
 
-const TASK_KINDS = ["call", "do", "emit", "for", "fork", "listen", "raise", "run", "set", "switch", "try", "wait"];
+// A for task also has a do body; the loop determines its kind.
+const TASK_KINDS = ["call", "for", "do", "emit", "fork", "listen", "raise", "run", "set", "switch", "try", "wait"];
 
 export interface TaskInfo {
   kind?: string;
@@ -116,11 +117,17 @@ export function taskAt(root: Json | undefined, pointer: string): TaskInfo {
   const empty: TaskInfo = { typeLabel: "", listensTo: [] };
   if (!root || !pointer.startsWith("/")) return empty;
   let node: unknown = root;
-  for (const raw of pointer.split("/").slice(1)) {
-    const segment = raw.replace(/~1/g, "/").replace(/~0/g, "~");
+  const parts = pointer.split("/").slice(1);
+  for (let index = 0; index < parts.length; index++) {
+    const segment = parts[index].replace(/~1/g, "/").replace(/~0/g, "~");
     if (Array.isArray(node)) {
       node = node[Number(segment)];
     } else if (isObject(node)) {
+      // A loop's /do is an internal block; a declared do task keeps its own identity.
+      if (segment === "do" && index === parts.length - 1 && TASK_KINDS.some((key) => key in (node as Json))) {
+        if ("for" in node) node = { do: node.do };
+        break;
+      }
       node = node[segment];
     } else {
       return empty;
@@ -177,8 +184,12 @@ export function taskNamesOf(pointer: string): string[] {
 }
 
 /** True when the pointer ends on a named task ("/do/0/callApi"), not on a block inside it ("/do/0/a/try"). */
-export function isTaskPointer(pointer: string): boolean {
+export function isTaskPointer(pointer: string, root?: Json): boolean {
   const segments = pointer.split("/").slice(1);
+  if (segments.at(-1) === "do" && /^\d+$/.test(segments.at(-3) ?? "")) {
+    if (taskAt(root, pointer.slice(0, -3)).kind === "for") return false;
+    segments.pop();
+  }
   if (segments.length < 2) return false;
   return /^\d+$/.test(segments[segments.length - 2]) && !/^\d+$/.test(segments[segments.length - 1]);
 }

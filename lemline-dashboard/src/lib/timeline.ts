@@ -197,7 +197,7 @@ export function buildTimeline(
     if (!event.view.eventType.includes(".task.")) continue;
     const pointer = event.view.taskPointer?.trim();
     if (!pointer) continue;
-    if (!isTaskPointer(pointer)) {
+    if (!isTaskPointer(pointer, root)) {
       if (kindOf(event.view.eventType) === "retried") blockRetries.push({ block: pointer, event });
       continue;
     }
