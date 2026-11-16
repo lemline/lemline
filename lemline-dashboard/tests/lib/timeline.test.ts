@@ -128,6 +128,43 @@ do:
     expect(instanceSummary(model.rows, "RUNNING", undefined).title).toBe("Waiting to start chargePayment");
   });
 
+  it("draws each run of a loop on its own row, the next one waiting to start", () => {
+    const loopRoot = parseWorkflowSource(`
+document: { dsl: '1.0.0', namespace: shop, name: batch, version: '1.0.0' }
+do:
+  - loop:
+      for:
+        each: item
+        in: \${ .items }
+      do:
+        - step:
+            set: { done: true }
+`).root;
+    const step = "/do/0/loop/do/0/step";
+    const events = [
+      event("workflow.started", 0),
+      event("task.started", 0, { task: "/do/0/loop" }),
+      event("task.created", 0, { task: step }),
+      event("task.started", 100, { task: step }),
+      event("task.completed", 1_000, { task: step }),
+      event("task.created", 1_000, { task: step }),
+      event("task.started", 1_100, { task: step }),
+      event("task.completed", 2_000, { task: step }),
+      event("task.created", 2_000, { task: step }),
+    ];
+
+    const model = buildTimeline(events, "RUNNING", loopRoot, T0 + 5_000);
+    const runs = model.rows.filter((row) => row.pointer === step);
+
+    expect(runs.map((row) => row.state)).toEqual(["completed", "completed", "scheduled"]);
+    expect(runs.map((row) => row.iteration)).toEqual([1, 2, 3]);
+    expect(new Set(model.rows.map((row) => row.id)).size).toBe(model.rows.length);
+    expect(runs[1].start).toBe(T0 + 1_100);
+    expect(runs[1].end).toBe(T0 + 2_000);
+    expect(runs[2].typeLabel).toContain("run 3");
+    expect(instanceSummary(model.rows, "RUNNING", undefined).title).toBe("Waiting to start step");
+  });
+
   describe("a task still open when the instance ends", () => {
     const forkRoot = parseWorkflowSource(`
 document: { dsl: '1.0.0', namespace: shop, name: race, version: '1.0.0' }

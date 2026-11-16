@@ -30,7 +30,11 @@ export interface Attempt {
 }
 
 export interface StepRow {
+  /** Unique per row: the pointer, plus the iteration when the task ran several times (loops). */
+  id: string;
   pointer: string;
+  /** 1-based iteration, only when the task ran more than once (each run of a loop is a row). */
+  iteration?: number;
   label: string;
   indent: number;
   typeLabel: string;
@@ -181,10 +185,20 @@ export function buildTimeline(
     const isGroup =
       (info.kind !== undefined && CONTAINER_KINDS.has(info.kind)) ||
       pointers.some((other) => other !== pointer && other.startsWith(`${pointer}/`));
-    rows.push(buildRow(pointer, list, info, isGroup, bounds.terminal, tEnd));
+    const runs = splitRuns(list);
+    runs.forEach((run, index) => {
+      const iteration = runs.length > 1 ? index + 1 : undefined;
+      rows.push(buildRow(pointer, iteration, run, info, isGroup, bounds.terminal, tEnd));
+    });
   }
 
-  rows.sort((left, right) => left.start - right.start || left.indent - right.indent || left.pointer.localeCompare(right.pointer));
+  rows.sort(
+    (left, right) =>
+      left.start - right.start ||
+      left.indent - right.indent ||
+      left.pointer.localeCompare(right.pointer) ||
+      (left.iteration ?? 0) - (right.iteration ?? 0),
+  );
   // A task may be stamped a few milliseconds before the workflow: the axis starts at the earliest.
   const t0 = Math.min(bounds.startedAt, ...rows.map((row) => row.start));
   const minIndent = rows.reduce((min, row) => Math.min(min, row.indent), Number.POSITIVE_INFINITY);
@@ -199,8 +213,34 @@ export function buildTimeline(
   return { t0, tEnd, rows, ticks, toPct: scale.toPct };
 }
 
+/**
+ * The runs of one task, in order: a loop runs the same tasks (same pointers) at each iteration.
+ * A run ends when the task completes, or fails without a retry; the next task.created or
+ * task.started then begins a new run. A retry stays in its run, as further attempts.
+ */
+function splitRuns(list: ParsedEvent[]): ParsedEvent[][] {
+  const ordered = [...list].sort((left, right) => left.time - right.time);
+  const runs: ParsedEvent[][] = [];
+  let current: ParsedEvent[] = [];
+  let ended = false;
+  for (const event of ordered) {
+    const kind = kindOf(event.view.eventType);
+    if (ended && (kind === "created" || kind === "started")) {
+      runs.push(current);
+      current = [];
+      ended = false;
+    }
+    current.push(event);
+    if (kind === "completed" || kind === "faulted") ended = true;
+    else if (kind === "retried") ended = false;
+  }
+  if (current.length > 0) runs.push(current);
+  return runs;
+}
+
 function buildRow(
   pointer: string,
+  iteration: number | undefined,
   list: ParsedEvent[],
   info: ReturnType<typeof taskAt>,
   isGroup: boolean,
@@ -213,6 +253,8 @@ function buildRow(
   const segments: Segment[] = [];
   let open: Attempt | null = null;
   let backoffFrom: number | null = null;
+  // Announced (task.created) and not started yet.
+  let scheduledFrom: number | null = null;
   let input: unknown;
   let output: unknown;
   let hasOutput = false;
@@ -226,6 +268,7 @@ function buildRow(
   };
   const openAttempt = (time: number) => {
     closeBackoff(time);
+    scheduledFrom = null;
     open = { start: time, outcome: "running" };
     attempts.push(open);
   };
@@ -234,7 +277,10 @@ function buildRow(
     const kind = kindOf(event.view.eventType);
     if (kind === "created") {
       if (input === undefined && "input" in event.data) input = event.data.input;
+      // After a retry the new attempt starts with its task.created; otherwise the task waits
+      // to start until its task.started.
       if (backoffFrom !== null) openAttempt(event.time);
+      else if (!open) scheduledFrom = event.time;
     } else if (kind === "started") {
       if (!open) openAttempt(event.time);
     } else if (kind === "completed") {
@@ -279,6 +325,10 @@ function buildRow(
       state = "failed";
     }
     backoffFrom = null;
+  } else if (scheduledFrom !== null) {
+    // Waiting to start, or cut short before starting if the instance has ended.
+    state = terminal ? "interrupted" : "scheduled";
+    segments.push({ start: scheduledFrom, end: tEnd, kind: terminal ? "interrupted" : "scheduled" });
   } else if (last?.outcome === "running") {
     if (terminal) {
       // No task.completed: the instance ended while this task ran (another branch of a fork
@@ -291,10 +341,6 @@ function buildRow(
     }
   } else if (last?.outcome === "failed") {
     state = "failed";
-  } else if (!last) {
-    // Announced but never started: waiting to start, or cut short if the instance has ended.
-    state = terminal ? "interrupted" : "scheduled";
-    segments.push({ start, end: tEnd, kind: terminal ? "interrupted" : "scheduled" });
   }
 
   for (const attempt of attempts) {
@@ -307,14 +353,17 @@ function buildRow(
   segments.sort((left, right) => left.start - right.start);
 
   const ongoing = state === "running" || state === "waiting" || state === "retrying" || state === "scheduled";
-  const end = ongoing ? undefined : (last?.end ?? (state === "interrupted" ? tEnd : start));
+  const end = ongoing ? undefined : state === "interrupted" ? tEnd : (last?.end ?? start);
   const groupSegments: Segment[] = isGroup ? [{ start, end: end ?? tEnd, kind: "group" }] : segments;
 
   let typeLabel = info.typeLabel || "task";
+  if (iteration !== undefined) typeLabel += ` · run ${iteration}`;
   if (!isGroup && attempts.length > 1) typeLabel += ` · ${attempts.length} attempts`;
 
   return {
+    id: iteration !== undefined ? `${pointer}#${iteration}` : pointer,
     pointer,
+    iteration,
     label: names[names.length - 1] ?? pointer,
     indent: Math.max(0, names.length - 1),
     typeLabel,
@@ -448,6 +497,7 @@ function noteOf(row: StepRow, nowMs: number): string {
   const duration = (row.end ?? nowMs) - row.start;
   if (row.isGroup) return row.end === undefined ? `running for ${formatSpan(duration)}…` : formatSpan(duration);
   if (row.state === "waiting") return `waiting for ${formatSpan(duration)}…`;
+  if (row.state === "scheduled") return `waiting to start for ${formatSpan(duration)}…`;
   if (row.attempts.length > 1 || row.state === "retrying") {
     const parts: string[] = [];
     row.attempts.forEach((attempt, index) => {
@@ -472,7 +522,6 @@ function noteOf(row: StepRow, nowMs: number): string {
     return `${code} after ${formatSpan(duration)}`;
   }
   if (row.state === "running") return `running for ${formatSpan(duration)}…`;
-  if (row.state === "scheduled") return `waiting to start for ${formatSpan(duration)}…`;
   if (row.state === "interrupted") return `interrupted after ${formatSpan(duration)}`;
   if (row.listensTo.length > 0 || row.segments.some((segment) => segment.kind === "waiting")) return `waited ${formatSpan(duration)}`;
   return formatSpan(duration);
@@ -487,6 +536,7 @@ function detailOf(row: StepRow, nowMs: number): string {
       : `Ran the tasks inside it. Finished after ${duration}.`;
   }
   if (row.state === "waiting") return events ? `Still waiting for ${events}.` : `Still waiting, for ${duration} so far.`;
+  if (row.state === "scheduled") return `Waiting for a worker to start it, for ${duration} so far.`;
   if (row.attempts.length > 1 || row.state === "retrying") {
     const sentences = row.attempts.map((attempt, index) => {
       const span = attempt.end !== undefined ? formatSpan(attempt.end - attempt.start) : "";
@@ -506,7 +556,6 @@ function detailOf(row: StepRow, nowMs: number): string {
     return `Failed after ${duration}: ${error.headline}.${error.explanation ? ` ${error.explanation}.` : ""}`;
   }
   if (row.state === "running") return `Running for ${duration}.`;
-  if (row.state === "scheduled") return `Waiting for a worker to start it, for ${duration} so far.`;
   if (row.state === "interrupted") return `Interrupted after ${duration}: the instance ended before this task finished.`;
   if (events) return `Waited ${duration} for ${events}.`;
   return `Took ${duration}.`;

@@ -78,7 +78,7 @@ export function Gantt({ model, nowMs }: GanttProps) {
   const minWidth = narrow ? 520 : width < 1100 ? 660 : 900;
   const available = width - (width >= 900 ? 240 : 0) - (narrow ? 32 : 80) - 2;
   const columns = `${labelWidth}px minmax(0,1fr)`;
-  const current = model.rows.find((row) => row.pointer === selected);
+  const current = model.rows.find((row) => row.id === selected);
   // Keep tick labels apart on the width the axis really has.
   const axisPx = Math.max(minWidth, available) - labelWidth - 40;
   const ticks: typeof model.ticks = [];
@@ -129,13 +129,13 @@ export function Gantt({ model, nowMs }: GanttProps) {
             const left = model.toPct(row.start);
             return (
               <button
-                key={row.pointer}
+                key={row.id}
                 type="button"
                 aria-haspopup="dialog"
-                onClick={() => setSelected(row.pointer)}
+                onClick={() => setSelected(row.id)}
                 className={cn(
                   "lm-row-hover grid w-full cursor-pointer border-0 border-b border-lm-line-soft p-0 text-left text-lm-text last:border-b-0",
-                  selected === row.pointer ? "bg-lm-accent-soft" : "bg-lm-panel",
+                  selected === row.id ? "bg-lm-accent-soft" : "bg-lm-panel",
                 )}
                 style={{ gridTemplateColumns: columns }}
               >
