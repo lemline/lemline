@@ -70,6 +70,8 @@ export interface TimelineModel {
 interface ParsedEvent {
   view: TimelineEventView;
   time: number;
+  /** Position in the event stream, as the runtime emitted it. */
+  order: number;
   data: Record<string, unknown>;
 }
 
@@ -112,10 +114,18 @@ function kindOf(eventType: string): "created" | "started" | "completed" | "fault
   return "other";
 }
 
+/**
+ * Events are given in stream order, and kept in it: times cannot order them, since a
+ * task.retried is stamped with the planned retry time, ahead of the events that follow it.
+ */
 function parseEvents(events: TimelineEventView[]): ParsedEvent[] {
   return events
-    .map((view) => ({ view, time: Date.parse(view.eventTime), data: dataOf(view) }))
+    .map((view, order) => ({ view, time: Date.parse(view.eventTime), order, data: dataOf(view) }))
     .filter((event) => Number.isFinite(event.time));
+}
+
+function byStreamOrder(left: ParsedEvent, right: ParsedEvent): number {
+  return left.order - right.order;
 }
 
 export function workflowBounds(events: TimelineEventView[], status: WorkflowRuntimeStatus, nowMs: number) {
@@ -127,7 +137,9 @@ export function workflowBounds(events: TimelineEventView[], status: WorkflowRunt
     .find((event) => event.view.eventType.includes("workflow.completed") || event.view.eventType.includes("workflow.faulted"));
   const first = started?.time ?? created?.time ?? parsed[0]?.time ?? nowMs;
   const terminal = status === "COMPLETED" || status === "FAULTED";
-  const end = ended?.time ?? (terminal ? (parsed[parsed.length - 1]?.time ?? nowMs) : nowMs);
+  // A task.retried carries the planned retry time, not the time it happened.
+  const lastHappened = parsed.filter((event) => kindOf(event.view.eventType) !== "retried").pop();
+  const end = ended?.time ?? (terminal ? (lastHappened?.time ?? nowMs) : nowMs);
   return {
     start: Math.min(created?.time ?? first, first),
     startedAt: first,
@@ -159,7 +171,7 @@ export function buildTimeline(
     byPointer.set(pointer, list);
   };
   const blockRetries: { block: string; event: ParsedEvent }[] = [];
-  const faults: { pointer: string; time: number }[] = [];
+  const faults: { pointer: string; order: number }[] = [];
   for (const event of parsed) {
     if (!event.view.eventType.includes(".task.")) continue;
     const pointer = event.view.taskPointer?.trim();
@@ -168,13 +180,13 @@ export function buildTimeline(
       if (kindOf(event.view.eventType) === "retried") blockRetries.push({ block: pointer, event });
       continue;
     }
-    if (kindOf(event.view.eventType) === "faulted") faults.push({ pointer, time: event.time });
+    if (kindOf(event.view.eventType) === "faulted") faults.push({ pointer, order: event.order });
     add(pointer, event);
   }
   // The runtime announces a retry on the try block it re-enters ("/do/1/charge/try"), not on the
   // task that failed in it: the retry goes to the last task of that block that failed before it.
   for (const { block, event } of blockRetries) {
-    const failed = faults.filter((fault) => fault.time <= event.time && fault.pointer.startsWith(`${block}/`)).pop();
+    const failed = faults.filter((fault) => fault.order < event.order && fault.pointer.startsWith(`${block}/`)).pop();
     if (failed) add(failed.pointer, event);
   }
 
@@ -219,7 +231,7 @@ export function buildTimeline(
  * task.started then begins a new run. A retry stays in its run, as further attempts.
  */
 function splitRuns(list: ParsedEvent[]): ParsedEvent[][] {
-  const ordered = [...list].sort((left, right) => left.time - right.time);
+  const ordered = [...list].sort(byStreamOrder);
   const runs: ParsedEvent[][] = [];
   let current: ParsedEvent[] = [];
   let ended = false;
@@ -247,7 +259,7 @@ function buildRow(
   terminal: boolean,
   tEnd: number,
 ): StepRow {
-  const ordered = [...list].sort((left, right) => left.time - right.time);
+  const ordered = [...list].sort(byStreamOrder);
   const names = taskNamesOf(pointer);
   const attempts: Attempt[] = [];
   const segments: Segment[] = [];
@@ -273,8 +285,11 @@ function buildRow(
     attempts.push(open);
   };
 
+  let previousTime: number | undefined;
   for (const event of ordered) {
     const kind = kindOf(event.view.eventType);
+    const eventPreviousTime = previousTime;
+    if (kind !== "retried") previousTime = event.time;
     if (kind === "created") {
       if (input === undefined && "input" in event.data) input = event.data.input;
       // After a retry the new attempt starts with its task.created; otherwise the task waits
@@ -302,14 +317,20 @@ function buildRow(
       lastError = current.error ?? lastError;
       open = null;
     } else if (kind === "retried") {
+      // Stamped with the planned retry time: the wait before retry starts when the attempt
+      // failed, at its task.faulted, or else at the last event seen before the retry.
+      const failedAt = Math.min(
+        open ? (eventPreviousTime ?? event.time) : (attempts[attempts.length - 1]?.end ?? eventPreviousTime ?? event.time),
+        event.time,
+      );
       if (open) {
         const current = open as Attempt;
-        current.end = event.time;
+        current.end = failedAt;
         current.outcome = "failed";
         current.error = current.error ?? lastError;
         open = null;
       }
-      backoffFrom = event.time;
+      backoffFrom = failedAt;
     }
   }
 

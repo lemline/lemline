@@ -99,8 +99,9 @@ do:
       event("task.started", 0, { task: "/do/0/chargePayment" }),
       event("task.started", 0, { task: call }),
       event("task.faulted", 2_000, { task: call, error: { status: 503, title: "Service Unavailable" } }),
-      // As the runtime emits it: on the try block it re-enters, not on the task.
-      event("task.retried", 2_000, { task: "/do/0/chargePayment/try", retryCount: 1 }),
+      // As the runtime emits it: on the try block it re-enters, stamped with the planned retry
+      // time (8 s after the failure).
+      event("task.retried", 10_000, { task: "/do/0/chargePayment/try", retryCount: 1 }),
     ];
 
     const model = buildTimeline(events, "RUNNING", tryRoot, T0 + 5_000);
@@ -108,6 +109,8 @@ do:
 
     expect(row?.state).toBe("retrying");
     expect(row?.segments.map((segment) => segment.kind)).toEqual(["failed", "backoff"]);
+    // The wait runs from the failure to now, not from the planned retry time.
+    expect(row?.segments[1]).toMatchObject({ start: T0 + 2_000, end: T0 + 5_000 });
     expect(instanceSummary(model.rows, "RUNNING", undefined).title).toBe("Retrying callPayments");
   });
 
@@ -126,6 +129,27 @@ do:
     expect(charge?.end).toBeUndefined();
     expect(charge?.segments.map((segment) => segment.kind)).toEqual(["scheduled"]);
     expect(instanceSummary(model.rows, "RUNNING", undefined).title).toBe("Waiting to start chargePayment");
+  });
+
+  it("keeps a retry in its row when it resumes before its planned time", () => {
+    const events = [
+      event("workflow.started", 0),
+      event("task.started", 0, { task: "/do/1/chargePayment" }),
+      event("task.faulted", 2_000, { task: "/do/1/chargePayment", error: { status: 503 } }),
+      event("task.retried", 10_000, { task: "/do/1/chargePayment", retryCount: 1 }),
+      // Stamped a little before the planned time (clocks of two workers).
+      event("task.created", 9_900, { task: "/do/1/chargePayment" }),
+      event("task.started", 9_950, { task: "/do/1/chargePayment" }),
+      event("task.completed", 11_000, { task: "/do/1/chargePayment" }),
+    ];
+
+    const model = buildTimeline(events, "RUNNING", root, T0 + 20_000);
+    const rows = model.rows.filter((row) => row.label === "chargePayment");
+
+    expect(rows).toHaveLength(1);
+    expect(rows[0].attempts).toHaveLength(2);
+    expect(rows[0].segments.map((segment) => segment.kind)).toEqual(["failed", "backoff", "ran"]);
+    expect(rows[0].segments[1]).toMatchObject({ start: T0 + 2_000, end: T0 + 9_900 });
   });
 
   it("draws each run of a loop on its own row, the next one waiting to start", () => {
