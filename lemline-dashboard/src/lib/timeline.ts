@@ -470,12 +470,29 @@ interface Scale {
 const AXIS_MAX_PCT = 94;
 
 /** Long stretches where no task works (waiting or idle) are drawn with a fixed, short width. */
+/**
+ * The owner's own work: its attempts minus the time its extension blocks run. Those blocks are
+ * rows of their own, and their waits must stay compressible.
+ */
+function activeBodyOf(owner: StepRow, rows: StepRow[], tEnd: number): { start: number; end: number }[] {
+  const cuts = rows
+    .filter((row) => row.pointer.startsWith(`${owner.pointer}/_ext/`))
+    .flatMap((row) => row.attempts.map((attempt) => ({ start: attempt.start, end: attempt.end ?? tEnd })));
+  let pieces = owner.attempts.map((attempt) => ({ start: attempt.start, end: attempt.end ?? tEnd }));
+  for (const cut of cuts) {
+    pieces = pieces.flatMap((piece) => cut.end <= piece.start || cut.start >= piece.end
+      ? [piece]
+      : [{ start: piece.start, end: cut.start }, { start: cut.end, end: piece.end }].filter((part) => part.end > part.start));
+  }
+  return pieces;
+}
+
 function buildScale(rows: StepRow[], t0: number, tEnd: number): Scale {
   const total = tEnd - t0;
   const busy = rows
     .filter((row) => !row.isGroup || row.hasActiveBody)
     .flatMap((row) => row.hasActiveBody
-      ? row.attempts.map((attempt) => ({ start: attempt.start, end: attempt.end ?? tEnd }))
+      ? activeBodyOf(row, rows, tEnd)
       : row.segments.filter((segment) => segment.kind !== "waiting" && segment.kind !== "backoff"))
     .map((segment) => [Math.max(t0, segment.start), Math.min(tEnd, segment.end)] as const)
     .filter(([start, end]) => end >= start)

@@ -560,4 +560,55 @@ do:
     expect(model.rows.find((row) => row.pointer === "/do/1/invoke")?.hasActiveBody).toBe(false);
     expect(model.ticks.some((tick) => tick.strong)).toBe(true);
   });
+
+  it("shortens a long wait in an extension block around an activity", () => {
+    const extendedRoot = parseWorkflowSource(`
+document: { dsl: '1.0.0', namespace: shop, name: extended, version: '1.0.0' }
+use:
+  extensions:
+    - throttle:
+        extend: call
+        before:
+          - pause: { wait: { hours: 1 } }
+do:
+  - charge:
+      call: http
+      with: { method: post, endpoint: https://payments.example.com/charges }
+`).root;
+    const hour = 3_600_000;
+    const pause = "/do/0/charge/_ext/0/before/do/0/pause";
+    const events = [
+      event("workflow.started", 0),
+      event("task.started", 0, { task: "/do/0/charge" }),
+      event("task.started", 0, { task: pause }),
+      event("task.completed", hour, { task: pause }),
+      event("task.completed", hour + 4_000, { task: "/do/0/charge" }),
+      event("workflow.completed", hour + 4_000),
+    ];
+
+    const model = buildTimeline(events, "COMPLETED", extendedRoot, T0 + 2 * hour);
+
+    expect(model.rows.find((row) => row.pointer === "/do/0/charge")?.hasActiveBody).toBe(true);
+    expect(model.ticks.some((tick) => tick.strong)).toBe(true);
+  });
+
+  it("shows a listen task named do as waiting", () => {
+    const namedRoot = parseWorkflowSource(`
+document: { dsl: '1.0.0', namespace: shop, name: named, version: '1.0.0' }
+do:
+  - do:
+      listen:
+        to:
+          one:
+            with: { type: com.example.ready }
+`).root;
+    const events = [
+      event("workflow.started", 0),
+      event("task.started", 0, { task: "/do/0/do" }),
+    ];
+
+    const model = buildTimeline(events, "RUNNING", namedRoot, T0 + 1_000);
+
+    expect(model.rows.find((row) => row.pointer === "/do/0/do")).toMatchObject({ state: "waiting", isGroup: false, listensTo: ["com.example.ready"] });
+  });
 });

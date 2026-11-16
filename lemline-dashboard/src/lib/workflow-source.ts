@@ -149,7 +149,9 @@ function resolveTask(root: Json, pointer: string): { node?: Json; extension?: Ta
       node = node[Number(segment)];
     } else if (isObject(node)) {
       // The engine appends /do to a declared do task's position; a loop's /do is its internal block.
-      if (segment === "do" && i === parts.length - 1 && TASK_KINDS.some((key) => key in (node as Json))) {
+      // Right after a list index, node is the item wrapper and "do" is the name of the task.
+      const afterIndex = /^\d+$/.test(parts[i - 1] ?? "");
+      if (segment === "do" && i === parts.length - 1 && !afterIndex && TASK_KINDS.some((key) => key in (node as Json))) {
         if ("for" in node) node = { do: node.do };
         break;
       }
