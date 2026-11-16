@@ -70,6 +70,7 @@ enum SettingOrigin {
     SETTING_ORIGIN_APPLICATION = 4;        // application.* packaged with Lemline
     SETTING_ORIGIN_DEFAULT = 5;
     SETTING_ORIGIN_UNSET = 6;
+    SETTING_ORIGIN_COMMAND = 7;            // forced by the Lemline command (gateway start) or its options
 }
 
 message ConfigFile {
@@ -82,9 +83,10 @@ message ConfigFile {
 message ConfigFileKey {
     string key = 1;
     int32 line = 2;
-    SettingOrigin overridden_by = 3;       // UNSPECIFIED when the file value applies
+    SettingOrigin overridden_by = 3;       // UNSPECIFIED when the file value applies, or is set again unchanged
     string overridden_by_detail = 4;
     bool secret = 5;
+    optional string overriding_value = 6;  // the value that applies instead; absent for secrets
 }
 
 enum ConfigFileLocator {
@@ -128,7 +130,11 @@ So only the file needs extra bookkeeping:
    a value falls back to `DEFAULT` when the mapping declares a `@WithDefault`, or else `UNSET`.
 3. `shadowed` lists the lower-priority sources that also hold the key, plus `CONFIG_FILE` when the file
    set a key that a higher origin replaces.
-4. The environment name is derived from the key by the MicroProfile rule (`lemline.gateway.cors.origins`
+4. Some system properties are set by Lemline's own command, not typed by anyone: `gateway start`
+   always sets `lemline.gateway.enabled=true` and turns lifecycle event consumption off. `LemlineApplication`
+   records the `lemline.*` properties the command adds or changes (`CommandSetProperties`), and those keys get
+   the `COMMAND` origin, with the command name as detail.
+5. The environment name is derived from the key by the MicroProfile rule (`lemline.gateway.cors.origins`
    → `LEMLINE_GATEWAY_CORS_ORIGINS`).
 
 SmallRye may decorate source names (`PropertiesConfigSource[source=LemlineConfigSource]`): the merged
@@ -178,8 +184,9 @@ the effective settings. It answers "what did I write?", while the settings answe
 - **Comments are not redacted.** A credential written in a comment is returned as written. Keep
   credentials out of comments.
 - **Line annotations.** For each key in the file, return its line and whether a higher-priority
-  origin overrides it. This comes from the origin map of §4.2: a key whose final origin is not
-  `CONFIG_FILE`, while the file also sets it, is overridden.
+  origin overrides it with a different value, and that value (unless it is a secret). A higher origin
+  that sets the same value is not an override: the line still applies as written. Values are compared
+  after trimming, booleans without case.
 - **Size limit.** If the file is larger than 256 KiB, return `path`, `located_by` and `keys` without
   `text`. The UI then says that the file is too large to show.
 - `ExtraFileConfigFactory` accepts `.properties` names but always parses with `YamlConfigSource`, so
@@ -207,13 +214,13 @@ its default: operators think in terms of the file they wrote, plus what override
      at default location"), the line count, and a Copy button that copies the redacted text;
    - the text with line numbers, comments kept, secrets shown as `••••••••` in muted color;
    - an overridden line is struck through, with a left bar and a label in the overriding origin's
-     color, for example "Overridden by LEMLINE_GATEWAY_CORS_ORIGINS". A system property is not shown
-     as "-D…": Lemline's commands set some of them themselves (`gateway start` sets
-     `lemline.gateway.enabled`), so the label says "Overridden by a system property";
+     color, with the value that applies: "Overridden by LEMLINE_GATEWAY_CORS_ORIGINS → https://…",
+     "Forced by the lemline gateway start command → false", "Overridden by a system property → 128".
+     A typed system property is not shown as "-D…", since it may come from a launcher script;
    - no file loaded: the section says so, and names the places Lemline looks for one.
 3. **Set outside the file**: the settings whose origin is `ENVIRONMENT` or `SYSTEM_PROPERTY`, one
-   row each, with the key, the value, the variable or property name, and either "Replaces line N of
-   lemline.yaml" or "Not in lemline.yaml". This catches values that the file cannot show: in a
+   row each (`COMMAND` included), with the key, the value, the variable name or command, and one of
+   "Replaces line N of lemline.yaml", "Same value as line N of lemline.yaml" or "Not in lemline.yaml". This catches values that the file cannot show: in a
    container configured only through environment variables, this list is the whole configuration.
    The section is hidden when the list is empty.
 

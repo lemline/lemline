@@ -14,6 +14,9 @@ import org.eclipse.microprofile.config.spi.ConfigSource
 /** Where an effective configuration value comes from, highest priority first. */
 enum class SettingOrigin {
     SYSTEM_PROPERTY,
+
+    /** A system property the Lemline command sets itself ([CommandSetProperties]), e.g. `gateway start`. */
+    COMMAND,
     ENVIRONMENT,
     CONFIG_FILE,
     APPLICATION,
@@ -47,6 +50,8 @@ class ConfigOriginResolver(
     private val config: SmallRyeConfig,
     private val fileProperties: Map<String, String>,
     private val filePath: String?,
+    private val commandKeys: Set<String> = CommandSetProperties.keys,
+    private val command: String = CommandSetProperties.command,
 ) {
     fun resolve(declared: DeclaredKey): ResolvedSetting {
         val key = declared.key
@@ -73,7 +78,7 @@ class ConfigOriginResolver(
     private fun classify(key: String, sourceName: String?, ordinal: Int): SettingOrigin {
         val source = config.configSources.firstOrNull { it.name == sourceName }
         return when {
-            source is SysPropConfigSource -> SettingOrigin.SYSTEM_PROPERTY
+            source is SysPropConfigSource -> if (key in commandKeys) SettingOrigin.COMMAND else SettingOrigin.SYSTEM_PROPERTY
             source is EnvConfigSource -> SettingOrigin.ENVIRONMENT
             ordinal <= 0 -> SettingOrigin.DEFAULT
             source != null && source.isLemlineSource() && key in fileProperties -> SettingOrigin.CONFIG_FILE
@@ -106,6 +111,7 @@ class ConfigOriginResolver(
 
     private fun detail(key: String, origin: SettingOrigin): String = when (origin) {
         SettingOrigin.SYSTEM_PROPERTY -> key
+        SettingOrigin.COMMAND -> command
         SettingOrigin.ENVIRONMENT -> environmentName(key)
         SettingOrigin.CONFIG_FILE -> filePath.orEmpty()
         SettingOrigin.APPLICATION, SettingOrigin.DEFAULT, SettingOrigin.UNSET -> ""

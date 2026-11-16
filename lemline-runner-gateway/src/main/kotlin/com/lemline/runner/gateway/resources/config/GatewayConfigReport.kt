@@ -57,8 +57,10 @@ object GatewayConfigReport {
             val entry = ConfigFileKey.newBuilder().setKey(key.key).setLine(key.line).setSecret(key.secret)
             if (key.key.startsWith("lemline.")) {
                 val resolved = resolver.resolve(DeclaredKey(key.key, null))
-                if (resolved.origin < SettingOrigin.CONFIG_FILE) {
+                val fileValue = file.properties[key.key]
+                if (resolved.origin < SettingOrigin.CONFIG_FILE && !sameValue(fileValue, resolved.value)) {
                     entry.setOverriddenBy(toProto(resolved.origin)).setOverriddenByDetail(resolved.originDetail)
+                    if (!key.secret && !resolved.secret) resolved.value?.let(entry::setOverridingValue)
                 }
             }
             b.addKeys(entry)
@@ -66,8 +68,18 @@ object GatewayConfigReport {
         return b.build()
     }
 
+    /** Values equal as configuration: surrounding spaces and boolean case do not matter. */
+    private fun sameValue(a: String?, b: String?): Boolean {
+        if (a == null || b == null) return a == b
+        val x = a.trim()
+        val y = b.trim()
+        val booleans = setOf("true", "false")
+        return x == y || (x.lowercase() in booleans && x.equals(y, ignoreCase = true))
+    }
+
     private fun toProto(origin: SettingOrigin): ProtoOrigin = when (origin) {
         SettingOrigin.SYSTEM_PROPERTY -> ProtoOrigin.SETTING_ORIGIN_SYSTEM_PROPERTY
+        SettingOrigin.COMMAND -> ProtoOrigin.SETTING_ORIGIN_COMMAND
         SettingOrigin.ENVIRONMENT -> ProtoOrigin.SETTING_ORIGIN_ENVIRONMENT
         SettingOrigin.CONFIG_FILE -> ProtoOrigin.SETTING_ORIGIN_CONFIG_FILE
         SettingOrigin.APPLICATION -> ProtoOrigin.SETTING_ORIGIN_APPLICATION

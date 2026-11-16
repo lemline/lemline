@@ -6,13 +6,14 @@ import {
 } from "../gen/proto/lemline/gateway/v1/gateway_pb";
 
 /** Origins that win over the configuration file. */
-const ABOVE_FILE = new Set([SettingOrigin.SYSTEM_PROPERTY, SettingOrigin.ENVIRONMENT]);
+const ABOVE_FILE = new Set([SettingOrigin.SYSTEM_PROPERTY, SettingOrigin.COMMAND, SettingOrigin.ENVIRONMENT]);
 
 export type OriginKind = "cli" | "env" | "file" | "app" | "default";
 
 export function originKind(origin: SettingOrigin): OriginKind {
   switch (origin) {
     case SettingOrigin.SYSTEM_PROPERTY:
+    case SettingOrigin.COMMAND:
       return "cli";
     case SettingOrigin.ENVIRONMENT:
       return "env";
@@ -29,6 +30,8 @@ export function originLabel(origin: SettingOrigin): string {
   switch (origin) {
     case SettingOrigin.SYSTEM_PROPERTY:
       return "System property";
+    case SettingOrigin.COMMAND:
+      return "Lemline command";
     case SettingOrigin.ENVIRONMENT:
       return "Environment";
     case SettingOrigin.CONFIG_FILE:
@@ -48,12 +51,25 @@ export function originLabel(origin: SettingOrigin): string {
  * sets lemline.gateway.enabled), so nobody may have typed it.
  */
 export function originName(origin: SettingOrigin, detail: string): string {
-  if (origin === SettingOrigin.SYSTEM_PROPERTY) return "Set when the gateway started (-D or a command option)";
+  if (origin === SettingOrigin.SYSTEM_PROPERTY) return "Set as a system property when the gateway started";
+  if (origin === SettingOrigin.COMMAND) return commandText(detail);
   return detail;
 }
 
-function overrideLabel(origin: SettingOrigin, detail: string): string {
-  return origin === SettingOrigin.SYSTEM_PROPERTY ? "Overridden by a system property" : `Overridden by ${detail}`;
+/** "Forced by the lemline gateway start command". */
+function commandText(command: string): string {
+  return command ? `Forced by the lemline ${command} command` : "Forced by the lemline command";
+}
+
+/** "Overridden by LEMLINE_GATEWAY_CORS_ORIGINS → https://…", "Forced by the lemline gateway start command → false". */
+function overrideLabel(origin: SettingOrigin, detail: string, value?: string): string {
+  const by =
+    origin === SettingOrigin.COMMAND
+      ? commandText(detail)
+      : origin === SettingOrigin.SYSTEM_PROPERTY
+        ? "Overridden by a system property"
+        : `Overridden by ${detail}`;
+  return value === undefined ? by : `${by} → ${value}`;
 }
 
 export function locatorLabel(locator: ConfigFileLocator): string {
@@ -102,7 +118,7 @@ export function fileLines(file: ConfigFile): FileLine[] {
         overriddenBy: overridden
           ? {
               kind: originKind(key.overriddenBy),
-              label: overrideLabel(key.overriddenBy, key.overriddenByDetail),
+              label: overrideLabel(key.overriddenBy, key.overriddenByDetail, key.overridingValue),
             }
           : undefined,
       };
@@ -118,18 +134,18 @@ export interface OutsideRow {
   kind: OriginKind;
   origin: string;
   name: string;
-  /** "Replaces line 26 of lemline.yaml", "Not in lemline.yaml", or empty without a file. */
+  /** "Replaces line 26 of lemline.yaml", "Same value as line 35…", "Not in lemline.yaml", or empty without a file. */
   relation: string;
 }
 
 /** Settings the gateway received from its environment or command line: the file cannot show them. */
 export function outsideFileRows(settings: GatewaySetting[], file?: ConfigFile): OutsideRow[] {
-  const lines = new Map((file?.keys ?? []).map((key) => [key.key, key.line]));
+  const fileKeys = new Map((file?.keys ?? []).map((key) => [key.key, key]));
   const name = file ? fileName(file.path) : "";
   return settings
     .filter((setting) => ABOVE_FILE.has(setting.origin))
     .map((setting) => {
-      const line = lines.get(setting.key);
+      const fileKey = fileKeys.get(setting.key);
       return {
         key: setting.key,
         label: setting.key.replace(/^lemline\./, ""),
@@ -138,7 +154,13 @@ export function outsideFileRows(settings: GatewaySetting[], file?: ConfigFile): 
         kind: originKind(setting.origin),
         origin: originLabel(setting.origin),
         name: originName(setting.origin, setting.originDetail),
-        relation: !file ? "" : line ? `Replaces line ${line} of ${name}` : `Not in ${name}`,
+        relation: !file
+          ? ""
+          : !fileKey
+            ? `Not in ${name}`
+            : ABOVE_FILE.has(fileKey.overriddenBy)
+              ? `Replaces line ${fileKey.line} of ${name}`
+              : `Same value as line ${fileKey.line} of ${name}`,
       };
     });
 }

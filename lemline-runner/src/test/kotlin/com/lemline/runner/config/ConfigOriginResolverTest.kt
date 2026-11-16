@@ -69,6 +69,19 @@ class ConfigOriginResolverTest {
     }
 
     @Test
+    fun `system property set by the command itself`() {
+        System.setProperty("lemline.gateway.authentication.enabled", "false")
+        val resolver = ConfigOriginResolver(
+            config(), fileProps, filePath,
+            commandKeys = setOf("lemline.gateway.authentication.enabled"),
+            command = "gateway start",
+        )
+        val s = resolver.resolve(DeclaredKey("lemline.gateway.authentication.enabled", "true"))
+        assertEquals(SettingOrigin.COMMAND, s.origin)
+        assertEquals("gateway start", s.originDetail)
+    }
+
+    @Test
     fun `value from the packaged application file`() {
         val s = resolver(config(application = mapOf("lemline.gateway.watch.batch-size" to "64")))
             .resolve(DeclaredKey("lemline.gateway.watch.batch-size", "256"))

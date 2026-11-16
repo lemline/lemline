@@ -19,8 +19,10 @@ const file = create(ConfigFileSchema, {
       line: 5,
       overriddenBy: SettingOrigin.ENVIRONMENT,
       overriddenByDetail: "LEMLINE_GATEWAY_CORS_ORIGINS",
+      overridingValue: "https://d.example",
     }),
     create(ConfigFileKeySchema, { key: "lemline.gateway.tls.trust-store-password", line: 7, secret: true }),
+    create(ConfigFileKeySchema, { key: "lemline.gateway.grpc.port", line: 3 }),
   ],
 });
 
@@ -37,8 +39,30 @@ describe("fileLines", () => {
 
   it("marks the line another origin replaces", () => {
     const lines = fileLines(file);
-    expect(lines[4].overriddenBy).toEqual({ kind: "env", label: "Overridden by LEMLINE_GATEWAY_CORS_ORIGINS" });
+    expect(lines[4].overriddenBy).toEqual({
+      kind: "env",
+      label: "Overridden by LEMLINE_GATEWAY_CORS_ORIGINS → https://d.example",
+    });
     expect(lines[6]).toMatchObject({ secret: true, overriddenBy: undefined });
+  });
+
+  it("names the command that forces a value, and shows that value", () => {
+    const forced = create(ConfigFileSchema, {
+      ...file,
+      keys: [
+        create(ConfigFileKeySchema, {
+          key: "lemline.gateway.cors.origins",
+          line: 5,
+          overriddenBy: SettingOrigin.COMMAND,
+          overriddenByDetail: "gateway start",
+          overridingValue: "false",
+        }),
+      ],
+    });
+    expect(fileLines(forced)[4].overriddenBy).toEqual({
+      kind: "cli",
+      label: "Forced by the lemline gateway start command → false",
+    });
   });
 
   it("does not pretend a system property was typed as -D", () => {
@@ -50,10 +74,11 @@ describe("fileLines", () => {
           line: 5,
           overriddenBy: SettingOrigin.SYSTEM_PROPERTY,
           overriddenByDetail: "lemline.gateway.cors.origins",
+          overridingValue: "x",
         }),
       ],
     });
-    expect(fileLines(withCli)[4].overriddenBy).toEqual({ kind: "cli", label: "Overridden by a system property" });
+    expect(fileLines(withCli)[4].overriddenBy?.label).toBe("Overridden by a system property → x");
   });
 });
 
@@ -81,7 +106,19 @@ describe("outsideFileRows", () => {
     expect(rows[2]).toMatchObject({
       value: "Set (hidden)",
       origin: "System property",
-      name: "Set when the gateway started (-D or a command option)",
+      name: "Set as a system property when the gateway started",
+    });
+  });
+
+  it("says when a value outside the file equals the file's", () => {
+    const rows = outsideFileRows(
+      [setting("lemline.gateway.grpc.port", SettingOrigin.COMMAND, "gateway start", "9443")],
+      file,
+    );
+    expect(rows[0]).toMatchObject({
+      origin: "Lemline command",
+      name: "Forced by the lemline gateway start command",
+      relation: "Same value as line 3 of lemline.yaml",
     });
   });
 

@@ -21,6 +21,7 @@ import com.lemline.runner.common.config.LEMLINE_MESSAGING_EVENTS_PRODUCER_ENABLE
 import com.lemline.runner.common.config.LEMLINE_MESSAGING_LIFECYCLE_EVENTS_CONSUMER_ENABLED
 import com.lemline.runner.common.config.LEMLINE_MESSAGING_LIFECYCLE_EVENTS_PRODUCER_ENABLED
 import com.lemline.runner.common.config.LEMLINE_SCHEDULED_ENABLED
+import com.lemline.runner.config.CommandSetProperties
 import com.lemline.runner.config.ConfigFileLocator
 import io.quarkus.picocli.runtime.annotations.TopCommand
 import io.quarkus.runtime.Quarkus
@@ -115,6 +116,9 @@ class LemlineApplication : QuarkusApplication {
                     exitProcess(1)
                 }
 
+                // Lemline settings present before the command applies its own (typed -D flags)
+                val typedProperties = lemlineSystemProperties()
+
                 // the gateway start command, if any
                 val gatewayStart = parseResults.command<GatewayStartCommand>()
 
@@ -154,6 +158,12 @@ class LemlineApplication : QuarkusApplication {
                     gatewayStart.metricsPort?.let { setMetricsPort(it) }
                     enableGateway()
                 }
+
+                // Remember what the command itself set, so the gateway can tell it apart from typed flags
+                CommandSetProperties.record(
+                    command = parseResults.last().commandSpec().qualifiedName(" ").substringAfter(' ', ""),
+                    keys = lemlineSystemProperties().filter { (key, value) -> typedProperties[key] != value }.keys,
+                )
             } catch (ex: Exception) {
                 // Handle all exceptions in a unified way
                 System.err.println("⚠️ ${ex.message}")
@@ -289,6 +299,11 @@ private fun checkConfigLocation(filePath: Path, provided: Boolean, locator: Conf
     }
     return false
 }
+
+private fun lemlineSystemProperties(): Map<String, String> =
+    System.getProperties().entries
+        .filter { it.key.toString().startsWith("lemline.") }
+        .associate { it.key.toString() to it.value.toString() }
 
 private fun setGrpcPort(port: Int) {
     System.setProperty(LEMLINE_GATEWAY_GRPC_PORT, port.toString())

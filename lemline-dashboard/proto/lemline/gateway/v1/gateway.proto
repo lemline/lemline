@@ -696,6 +696,9 @@ enum SettingOrigin {
     SETTING_ORIGIN_DEFAULT = 5;
     // No value and no default.
     SETTING_ORIGIN_UNSET = 6;
+    // Forced by the Lemline command being run (e.g. `gateway start` always enables the gateway),
+    // or by one of its options (--grpc-port). origin_detail names the command.
+    SETTING_ORIGIN_COMMAND = 7;
 }
 
 // The external configuration file as read at startup.
@@ -722,14 +725,18 @@ message ConfigFileKey {
     // 1-based line of the key in ConfigFile.text.
     int32 line = 2;
 
-    // Set when a higher-priority origin replaces the file value.
+    // Set when a higher-priority origin replaces the file value with a different one.
+    // A higher origin that sets the same value leaves this UNSPECIFIED: the file line still applies.
     SettingOrigin overridden_by = 3;
 
-    // Environment variable or system property that replaces the file value.
+    // Environment variable, system property or command that replaces the file value.
     string overridden_by_detail = 4;
 
     // True when the value was redacted.
     bool secret = 5;
+
+    // The value that applies instead of the file's. Absent for secrets.
+    optional string overriding_value = 6;
 }
 
 // How the configuration file was found.

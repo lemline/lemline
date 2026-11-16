@@ -106,8 +106,36 @@ class GatewayConfigReportTest {
         origins.line shouldBe 11
         origins.overriddenBy shouldBe SettingOrigin.SETTING_ORIGIN_ENVIRONMENT
         origins.overriddenByDetail shouldBe "LEMLINE_GATEWAY_CORS_ORIGINS"
+        origins.overridingValue shouldBe "https://dashboard.example"
         file.keysList.single { it.key == "lemline.gateway.grpc.port" }.overriddenBy shouldBe
             SettingOrigin.SETTING_ORIGIN_UNSPECIFIED
+    }
+
+    @Test
+    fun `an override with the same value leaves the file line as it is`() {
+        val sameEnv = mapOf("LEMLINE_GATEWAY_GRPC_PORT" to "9443")
+        val sameConfig = SmallRyeConfigBuilder()
+            .withSources(EnvConfigSource(sameEnv, 300))
+            .withSources(PropertiesConfigSource(fileProps, LemlineConfigConstants.CONFIG_SOURCE_NAME, LemlineConfigConstants.CONFIG_ORDINAL))
+            .build()
+        val port = GatewayConfigReport.build(sameConfig, snapshot, Timestamp.getDefaultInstance())
+            .configFile.keysList.single { it.key == "lemline.gateway.grpc.port" }
+        port.overriddenBy shouldBe SettingOrigin.SETTING_ORIGIN_UNSPECIFIED
+        port.hasOverridingValue() shouldBe false
+    }
+
+    @Test
+    fun `never reveals the value replacing a secret`() {
+        val secretEnv = mapOf("LEMLINE_GATEWAY_TLS_TRUST_STORE_PASSWORD" to "env-s3cret")
+        val secretConfig = SmallRyeConfigBuilder()
+            .withSources(EnvConfigSource(secretEnv, 300))
+            .withSources(PropertiesConfigSource(fileProps, LemlineConfigConstants.CONFIG_SOURCE_NAME, LemlineConfigConstants.CONFIG_ORDINAL))
+            .build()
+        val report = GatewayConfigReport.build(secretConfig, snapshot, Timestamp.getDefaultInstance())
+        val line = report.configFile.keysList.single { it.key == "lemline.gateway.tls.trust-store-password" }
+        line.overriddenBy shouldBe SettingOrigin.SETTING_ORIGIN_ENVIRONMENT
+        line.hasOverridingValue() shouldBe false
+        (report.toString() + report.toByteString().toStringUtf8()) shouldNotContain "env-s3cret"
     }
 
     @Test
