@@ -14,18 +14,22 @@ export function Drawer({ label, closeLabel, onClose, children }: DrawerProps) {
   const { closing, close } = useDrawerClose(onClose);
   const panelRef = useRef<HTMLElement>(null);
 
+  // Once, when the drawer opens: the page behind may rerender every second while it is open.
+  useEffect(() => {
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    panelRef.current?.focus();
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, []);
+
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (event.key === "Escape") close();
     };
     window.addEventListener("keydown", onKey);
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    panelRef.current?.focus();
-    return () => {
-      window.removeEventListener("keydown", onKey);
-      document.body.style.overflow = previousOverflow;
-    };
+    return () => window.removeEventListener("keydown", onKey);
   }, [close]);
 
   return createPortal(
