@@ -91,6 +91,27 @@ class ConfigOriginResolverTest {
     }
 
     @Test
+    fun `lists every lower origin that also sets the key, read source by source`() {
+        // Environment over the packaged application file: the application value is still reported as hidden.
+        val env = mapOf("LEMLINE_GATEWAY_WATCH_BATCH_SIZE" to "32")
+        val app = mapOf("lemline.gateway.watch.batch-size" to "64")
+        val fromEnv = resolver(config(env = env, application = app)).resolve(DeclaredKey("lemline.gateway.watch.batch-size", "256"))
+        assertEquals(SettingOrigin.ENVIRONMENT, fromEnv.origin)
+        assertEquals(listOf(SettingOrigin.APPLICATION), fromEnv.shadowed)
+
+        // A system property over an environment variable over the file: both are reported as hidden.
+        System.setProperty("lemline.gateway.cors.origins", "https://from-property.example")
+        try {
+            val origins = mapOf("LEMLINE_GATEWAY_CORS_ORIGINS" to "https://from-env.example")
+            val s = resolver(config(env = origins)).resolve(DeclaredKey("lemline.gateway.cors.origins", null))
+            assertEquals(SettingOrigin.SYSTEM_PROPERTY, s.origin)
+            assertEquals(listOf(SettingOrigin.ENVIRONMENT, SettingOrigin.CONFIG_FILE), s.shadowed)
+        } finally {
+            System.clearProperty("lemline.gateway.cors.origins")
+        }
+    }
+
+    @Test
     fun `built-in default`() {
         val s = resolver(config()).resolve(DeclaredKey("lemline.gateway.watch.poll-interval-ms", "250"))
         assertEquals("250", s.value)

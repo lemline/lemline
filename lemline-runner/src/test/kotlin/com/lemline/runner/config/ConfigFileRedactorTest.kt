@@ -104,6 +104,16 @@ class ConfigFileRedactorTest {
     }
 
     @Test
+    fun `masks a credential URL inside a property expression`() {
+        val text = "lemline:\n  gateway:\n    authentication:\n      jwt:\n" +
+            "        jwks-url: \${JWKS_URL:https://svc:exprpw@issuer.example/jwks}\n"
+        val result = assertNotNull(ConfigFileRedactor.redact(text))
+        assertFalse("exprpw" in result.text)
+        assertTrue(result.keys.single { it.key == "lemline.gateway.authentication.jwt.jwks-url" }.secret)
+        assertFalse(ConfigFileRedactor.hasEmbeddedPassword("\${JWKS_URL:https://issuer.example:8443/jwks}"))
+    }
+
+    @Test
     fun `refuses text it cannot parse`() {
         assertNull(ConfigFileRedactor.redact("lemline: [unclosed\n  password: x"))
     }

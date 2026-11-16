@@ -151,8 +151,9 @@ source is recognised by type or by a name containing `LemlineConfigSource`.
 
 A key is a secret when its leaf name is `password`, `secret` or `token`, ends with `-password`,
 `-secret` or `-token`, or is one of `jaas-config`, `sasl-jaas-config`, `api-key`, `access-key`,
-`secret-key`, `credentials`, `passphrase` (`ConfigFileRedactor.isSecret`). A value that is a URL
-carrying `user:password@` is treated as a secret whatever its key.
+`secret-key`, `credentials`, `passphrase` (`ConfigFileRedactor.isSecret`). A value that contains a URL
+carrying `user:password@`, anywhere in it (for instance as the fallback of a `${…}` property
+expression), is treated as a secret whatever its key.
 For a secret, `value` is never set and `secret = true`. `is_set` tells whether a value is configured.
 
 Paths such as `tls.certificate` and `tls.private-key` are not secrets: they are file locations, and

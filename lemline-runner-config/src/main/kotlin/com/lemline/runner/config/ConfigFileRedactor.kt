@@ -28,8 +28,11 @@ object ConfigFileRedactor {
         "jaas-config", "sasl-jaas-config", "api-key", "access-key", "secret-key", "credentials", "passphrase",
     )
 
-    /** A URL carrying `user:password@`. */
-    private val URL_WITH_PASSWORD = Regex("""^[a-zA-Z][a-zA-Z0-9+.-]*://[^/@\s:]*:[^/@\s]*@""")
+    /**
+     * A URL carrying `user:password@`, anywhere in the value: it may sit inside a property expression,
+     * such as the fallback of `${JWKS_URL:https://svc:pw@issuer.example/jwks}`.
+     */
+    private val URL_WITH_PASSWORD = Regex("""[a-zA-Z][a-zA-Z0-9+.-]*://[^/@\s:]*:[^/@\s]*@""")
 
     /** True for keys whose value must never leave the process. Paths such as `tls.private-key` are not secrets. */
     fun isSecret(key: String): Boolean {
@@ -41,7 +44,7 @@ object ConfigFileRedactor {
     }
 
     /** True for a value that embeds credentials whatever its key, such as `postgresql://app:pw@db/lemline`. */
-    fun hasEmbeddedPassword(value: String?): Boolean = value != null && URL_WITH_PASSWORD.containsMatchIn(value.trim())
+    fun hasEmbeddedPassword(value: String?): Boolean = value != null && URL_WITH_PASSWORD.containsMatchIn(value)
 
     /**
      * Returns the redacted text and the keys it sets, or null when the text cannot be parsed:
