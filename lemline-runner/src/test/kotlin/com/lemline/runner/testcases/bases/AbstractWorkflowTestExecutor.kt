@@ -7,6 +7,7 @@ import com.lemline.common.values.WorkflowName
 import com.lemline.common.values.WorkflowNamespace
 import com.lemline.common.values.WorkflowVersion
 import com.lemline.core.activities.mock.MockConfiguration
+import com.lemline.core.functions.FunctionCache
 import com.lemline.core.lifecycleevents.LifecycleEventHook
 import com.lemline.core.states.WorkflowCommand
 import com.lemline.core.testcases.impl.WorkflowDependency
@@ -133,6 +134,8 @@ internal abstract class AbstractWorkflowTestExecutor : WorkflowTestExecutor {
         mockConfig: MockConfiguration,
         cloudEvents: List<CloudEvent>,
         validateDefinition: Boolean,
+        validateLifecycleEvents: ((List<CloudEvent>) -> String?)?,
+        rebuildCachesOnListen: Boolean,
     ): WorkflowTestResult {
         val uniqueName = "workflow-${yaml.hashCode()}"
         val workflowId = WorkflowId.random()
@@ -144,11 +147,15 @@ internal abstract class AbstractWorkflowTestExecutor : WorkflowTestExecutor {
 
             prepareAndStartWorkflow(workflowId, namespace, uniqueName, version, input)
 
-            if (cloudEvents.isNotEmpty()) {
-                executeWithCloudEvents(workflowId, cloudEvents, namespace)
+            val result = if (cloudEvents.isNotEmpty()) {
+                executeWithCloudEvents(workflowId, cloudEvents, namespace, rebuildCachesOnListen)
             } else {
                 awaitCompletion(workflowId, timeoutSeconds = defaultTimeoutSeconds)
             }
+            validateLifecycleEvents?.let {
+                workflowResultAwaiter.validateLifecycleEvents(workflowId, it, defaultTimeoutSeconds.seconds)
+            }
+            result
         } catch (e: Exception) {
             WorkflowTestResult.Failure(
                 error = e.message ?: e::class.simpleName ?: "Unknown error",
@@ -195,7 +202,8 @@ internal abstract class AbstractWorkflowTestExecutor : WorkflowTestExecutor {
     private suspend fun executeWithCloudEvents(
         workflowId: WorkflowId,
         cloudEvents: List<CloudEvent>,
-        namespace: String
+        namespace: String,
+        rebuildCachesOnListen: Boolean
     ): WorkflowTestResult {
         val listenerFound = waitForListenerRegistration(workflowId)
         if (!listenerFound) {
@@ -206,6 +214,10 @@ internal abstract class AbstractWorkflowTestExecutor : WorkflowTestExecutor {
         }
 
         onListenerRegistered()
+        if (rebuildCachesOnListen) {
+            WorkflowCache.clear()
+            FunctionCache.clear()
+        }
         sendCloudEvents(cloudEvents, namespace)
         onCloudEventsSent()
 

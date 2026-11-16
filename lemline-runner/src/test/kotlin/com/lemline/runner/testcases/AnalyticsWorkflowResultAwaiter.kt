@@ -86,6 +86,29 @@ internal class AnalyticsWorkflowResultAwaiter(
             .firstOrNull()
     }
 
+    /** Await the full task history: terminal workflow ingestion can race earlier event batches. */
+    suspend fun validateLifecycleEvents(
+        workflowId: WorkflowId,
+        validate: (List<CloudEvent>) -> String?,
+        timeout: Duration = 5.seconds
+    ) {
+        val deadline = System.currentTimeMillis() + timeout.inWholeMilliseconds
+        var validationError: String?
+        do {
+            var cursor = 0L
+            val events = mutableListOf<CloudEvent>()
+            do {
+                val rows = analyticsEventSource.listByWorkflowIdAfter(workflowId, cursor, QUERY_BATCH_SIZE)
+                rows.forEach { events.add(CloudEventService.deserialize(it.cloudEventJson)) }
+                rows.lastOrNull()?.let { cursor = it.cursor }
+            } while (rows.size == QUERY_BATCH_SIZE)
+            validationError = validate(events)
+            if (validationError == null) return
+            delay(POLL_INTERVAL_MS)
+        } while (System.currentTimeMillis() <= deadline)
+        throw AssertionError("Lifecycle validation failed for $workflowId: $validationError")
+    }
+
     suspend fun summary(workflowId: WorkflowId): String {
         val rows = analyticsEventSource.listByWorkflowIdAfter(
             workflowId = workflowId,

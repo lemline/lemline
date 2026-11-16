@@ -777,3 +777,31 @@ The implementation is rebased onto `main` after dashboard PR #69 merged. The new
 - Dashboard tests, TypeScript/production build, and ESLint pass. Source lookup, local/outer retries, loop ownership, streaming/reload, and active HTTP body durations are covered.
 - `buf lint`, `buf build`, and `buf breaking` against the starting branch pass.
 - Gradle cannot initialize its local lock/socket services in this sandbox. The checks above were run with the cached Kotlin compiler, Wire generator, and JUnit Platform/Kotest launchers. Full logs are in `/tmp/lemline-<module>-extensions.log`. A normal Gradle run and live PostgreSQL/MySQL validation remain required before merge.
+
+### Runner end-to-end coverage
+
+`ExtensionTaskTestCases` adds 14 shared workflow scenarios to the existing InMemory, Kafka, RabbitMQ,
+and PGMQ execution suites (56 runner test instances), as well as `FullOrchestrator` with `serde = true`.
+The runner scenarios exercise command/event transport, durable wait/retry/listener/parent/fork services,
+and lifecycle ingestion into analytics. HTTP activities use the existing mock configuration mechanism.
+
+Assertions cover frozen selection and block ordering, delayed loop initialization, short circuits,
+prepared HTTP results across an after suspension, actual listener delivery, child-workflow completion,
+mixed `_fn`/`_ext` paths after cache eviction, local versus outer retry invocation counts, both fork modes,
+and error origin/owner closure after suspension. The lifecycle assertions read the persisted analytics
+history, including subsequent pages, and wait for late event batches instead of treating workflow
+completion alone as proof that its tasks were closed.
+
+Run these cases through the normal runner suite, without a separate CI workflow:
+
+```bash
+set -o pipefail
+./gradlew :lemline-runner:test --tests '*ExtensionExecutionTest' \
+  --tests '*AnalyticsWorkflowResultAwaiterTest' 2>&1 | tee /tmp/lemline-runner-extensions.log
+```
+
+Validation after adding these cases: 762 core/common tests pass (6 existing skips), including all 14
+shared extension scenarios; the runner test sources compile and the three analytics-awaiting harness
+tests pass. Execution of the Quarkus runner scenarios remains unverified here: the Gradle wrapper is
+blocked opening its lock file by sandbox permissions. These results do not replace a successful run
+of the broker suites.

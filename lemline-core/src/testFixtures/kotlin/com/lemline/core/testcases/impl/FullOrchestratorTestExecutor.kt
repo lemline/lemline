@@ -5,8 +5,12 @@ import com.lemline.common.values.WorkflowId
 import com.lemline.core.activities.mock.MockActivityExecutor
 import com.lemline.core.activities.mock.MockConfiguration
 import com.lemline.core.activities.mock.MockFunctionResolver
+import com.lemline.core.cloudevents.CloudEventHook
 import com.lemline.core.cloudevents.InMemoryCloudEventHook
 import com.lemline.core.errors.InternalException
+import com.lemline.core.functions.FunctionCache
+import com.lemline.core.lifecycleevents.CloudEventLifecycleHook
+import com.lemline.core.lifecycleevents.LifecycleEventEmitter
 import com.lemline.core.lifecycleevents.LifecycleEventHook
 import com.lemline.core.orchestrator.FullOrchestrator
 import com.lemline.core.orchestrator.StepByStepOrchestrator
@@ -14,6 +18,7 @@ import com.lemline.core.workflows.WorkflowCache
 import io.cloudevents.CloudEvent
 import io.serverlessworkflow.api.types.Workflow
 import kotlin.time.Clock
+import kotlinx.coroutines.flow.onStart
 import kotlinx.serialization.json.JsonElement
 
 /**
@@ -43,8 +48,11 @@ class FullOrchestratorTestExecutor : WorkflowTestExecutor {
         dependencies: List<WorkflowDependency>,
         mockConfig: MockConfiguration,
         cloudEvents: List<CloudEvent>,
-        validateDefinition: Boolean
+        validateDefinition: Boolean,
+        validateLifecycleEvents: ((List<CloudEvent>) -> String?)?,
+        rebuildCachesOnListen: Boolean
     ): WorkflowTestResult {
+        val events = java.util.concurrent.CopyOnWriteArrayList<CloudEvent>()
         return try {
             // Register dependencies first
             dependencies.forEach { dep ->
@@ -64,8 +72,25 @@ class FullOrchestratorTestExecutor : WorkflowTestExecutor {
             cloudEvents.forEach { event ->
                 cloudEventHook.emit(event)
             }
+            val executionCloudEvents = object : CloudEventHook by cloudEventHook {
+                override fun receive() = cloudEventHook.receive().onStart {
+                    if (rebuildCachesOnListen) {
+                        WorkflowCache.clear()
+                        FunctionCache.clear()
+                        dependencies.forEach { dep ->
+                            createWorkflow(dep.yaml, dep.namespace, dep.name, dep.version, validateDefinition)
+                        }
+                        // FullOrchestrator retains the definition object across its recursive resumes.
+                        // Rebuild its node/function caches; the runner reloads the definition from DB.
+                        WorkflowCache.putWorkflow(workflow)
+                    }
+                }
+            }
 
-            val lifecycleHook = LifecycleEventHook.NOOP
+            val lifecycleHook = if (validateLifecycleEvents == null) LifecycleEventHook.NOOP else
+                CloudEventLifecycleHook(object : LifecycleEventEmitter {
+                    override suspend fun emit(cloudEvent: CloudEvent) { events.add(cloudEvent) }
+                })
 
             // Create FunctionResolver with mock configuration (for remote functions)
             val functionResolver = MockFunctionResolver(mockConfig)
@@ -80,7 +105,7 @@ class FullOrchestratorTestExecutor : WorkflowTestExecutor {
                 serde = true, // For testing, we want to ensure serialization works
                 activityExecutor = activityExecutor,
                 functionResolver = functionResolver,
-                cloudEventHook = cloudEventHook,
+                cloudEventHook = executionCloudEvents,
                 lifecycleHook = lifecycleHook
             )
 
@@ -102,6 +127,10 @@ class FullOrchestratorTestExecutor : WorkflowTestExecutor {
                 error = errorDetails,
                 exception = e
             )
+        }.also { result ->
+            validateLifecycleEvents?.invoke(events)?.let { error ->
+                throw AssertionError("Lifecycle validation failed: $error; workflow result: $result")
+            }
         }
     }
 

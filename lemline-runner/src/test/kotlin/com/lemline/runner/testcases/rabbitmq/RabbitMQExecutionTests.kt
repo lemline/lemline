@@ -3,6 +3,7 @@ package com.lemline.runner.testcases.rabbitmq
 
 import com.lemline.core.testcases.CallHttpTestCases
 import com.lemline.core.testcases.DoTaskTestCases
+import com.lemline.core.testcases.ExtensionTaskTestCases
 import com.lemline.core.testcases.ExportContextTestCases
 import com.lemline.core.testcases.ForTaskTestCases
 import com.lemline.core.testcases.ForkTaskTestCases
@@ -102,3 +103,8 @@ internal class RabbitMQWaitExecutionTest : BrokerWorkflowTest(WaitTestCases.case
 @QuarkusTest
 @TestProfile(RabbitMQTestCaseProfile::class)
 internal class RabbitMQListenExecutionTest : BrokerWorkflowTest(ListenTestCases.cases)
+
+@RequiresDocker
+@QuarkusTest
+@TestProfile(RabbitMQTestCaseProfile::class)
+internal class RabbitMQExtensionExecutionTest : BrokerWorkflowTest(ExtensionTaskTestCases.cases)

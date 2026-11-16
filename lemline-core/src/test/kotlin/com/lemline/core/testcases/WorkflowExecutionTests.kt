@@ -108,3 +108,7 @@ class TryTaskExecutionTest : AbstractWorkflowExecutionTest(TryTaskTestCases.case
 class WaitExecutionTest : AbstractWorkflowExecutionTest(WaitTestCases.cases) {
     override fun createExecutor() = FullOrchestratorTestExecutor()
 }
+
+class ExtensionTaskExecutionTest : AbstractWorkflowExecutionTest(ExtensionTaskTestCases.cases) {
+    override fun createExecutor() = FullOrchestratorTestExecutor()
+}

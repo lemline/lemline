@@ -4,6 +4,7 @@ package com.lemline.runner.testcases.inMemory
 import com.lemline.core.testcases.CallFunctionTestCases
 import com.lemline.core.testcases.CallHttpTestCases
 import com.lemline.core.testcases.DoTaskTestCases
+import com.lemline.core.testcases.ExtensionTaskTestCases
 import com.lemline.core.testcases.ExportContextTestCases
 import com.lemline.core.testcases.ForTaskTestCases
 import com.lemline.core.testcases.ForkTaskTestCases
@@ -86,3 +87,7 @@ internal class InMemoryWaitExecutionTest : InMemoryWorkflowTest(WaitTestCases.ca
 @QuarkusTest
 @TestProfile(InMemoryTestCaseProfile::class)
 internal class InMemoryListenExecutionTest : InMemoryWorkflowTest(ListenTestCases.cases)
+
+@QuarkusTest
+@TestProfile(InMemoryTestCaseProfile::class)
+internal class InMemoryExtensionExecutionTest : InMemoryWorkflowTest(ExtensionTaskTestCases.cases)

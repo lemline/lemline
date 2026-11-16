@@ -67,7 +67,9 @@ abstract class AbstractWorkflowExecutionTest(
                                 dependencies = case.dependencies,
                                 mockConfig = case.mockConfig,
                                 cloudEvents = case.cloudEvents,
-                                validateDefinition = case.validateDefinition
+                                validateDefinition = case.validateDefinition,
+                                validateLifecycleEvents = case.validateLifecycleEvents,
+                                rebuildCachesOnListen = case.rebuildCachesOnListen
                             )
 
                             val validationError = case.validate(result)
