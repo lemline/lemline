@@ -1,0 +1,14 @@
+document:
+  dsl: "1.0.0"
+  namespace: test
+  name: openapi-spec-only
+  version: "1.0.0"
+do:
+  - callApi:
+      call: openapi
+      with:
+        document:
+          endpoint:
+            uri: https://example.com/openapi.json
+        operationId: getOrder
+

@@ -1,0 +1,12 @@
+document:
+  dsl: "1.0.0"
+  namespace: test
+  name: invalid-run-script-language
+  version: "1.0.0"
+do:
+  - runScript:
+      run:
+        script:
+          language: ruby
+          code: puts "hi"
+

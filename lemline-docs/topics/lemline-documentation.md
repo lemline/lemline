@@ -85,6 +85,7 @@ Welcome to the official documentation for Lemline, the modern runtime for Server
 
 * [Complete Serverless Workflow DSL Syntax](lemline-ref-dsl-syntax.md)
 * [Task Types Reference](lemline-ref-task-types.md)
+* [AI Workflow Conversation Library](lemline-ref-ai-workflow-library.md)
 
 ### ⚙️ Runner Reference
 

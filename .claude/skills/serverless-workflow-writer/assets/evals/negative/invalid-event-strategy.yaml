@@ -1,0 +1,16 @@
+document:
+  dsl: "1.0.0"
+  namespace: test
+  name: invalid-event-strategy
+  version: "1.0.0"
+do:
+  - waitEvent:
+      listen:
+        to:
+          all:
+            - with:
+                type: com.example.a.v1
+          one:
+            with:
+              type: com.example.b.v1
+

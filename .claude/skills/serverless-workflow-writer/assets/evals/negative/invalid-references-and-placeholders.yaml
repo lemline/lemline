@@ -1,0 +1,23 @@
+document:
+  dsl: "1.0.0"
+  namespace: test
+  name: invalid-references-and-placeholders
+  version: "1.0.0"
+do:
+  - callSomething:
+      timeout: unknownTimeout
+      call: http
+      with:
+        method: post
+        endpoint:
+          uri: https://example.com
+        body:
+          message: TODO replace me
+  - trySomething:
+      try:
+        - child:
+            set:
+              ok: true
+      catch:
+        retry: unknownRetry
+

@@ -1,0 +1,29 @@
+document:
+  dsl: "1.0.0"
+  namespace: sample
+  name: event-listener
+  version: "1.0.0"
+  title: Event Listener Template
+schedule:
+  on:
+    one:
+      with:
+        type: com.example.order.created.v1
+do:
+  - waitForApproval:
+      listen:
+        to:
+          one:
+            with:
+              type: com.example.order.approved.v1
+              data: ${ .approved == true }
+        read: data
+  - emitApprovedEvent:
+      emit:
+        event:
+          with:
+            source: https://workflows.example.com/order
+            type: com.example.workflow.order.approved.v1
+            data:
+              approvalEvents: ${ . }
+

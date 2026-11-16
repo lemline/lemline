@@ -1,0 +1,52 @@
+document:
+  dsl: "1.0.0"
+  namespace: sample
+  name: batch-loop-switch
+  version: "1.0.0"
+  title: Batch Loop And Switch Template
+do:
+  - processItems:
+      for:
+        each: item
+        in: .items
+        at: index
+      do:
+        - routeItem:
+            switch:
+              - approve:
+                  when: ${ $item.score >= 80 }
+                  then: markApproved
+              - reject:
+                  when: ${ $item.score < 80 }
+                  then: markRejected
+              - default:
+                  then: markRejected
+        - markApproved:
+            call: http
+            with:
+              method: post
+              endpoint:
+                uri: https://api.example.com/items/approve
+              body:
+                id: ${ $item.id }
+                index: ${ $index }
+            then: continue
+        - markRejected:
+            call: http
+            with:
+              method: post
+              endpoint:
+                uri: https://api.example.com/items/reject
+              body:
+                id: ${ $item.id }
+                index: ${ $index }
+            then: continue
+  - publishSummary:
+      emit:
+        event:
+          with:
+            source: https://workflows.example.com/batch
+            type: com.example.batch.completed.v1
+            data:
+              result: ${ . }
+
