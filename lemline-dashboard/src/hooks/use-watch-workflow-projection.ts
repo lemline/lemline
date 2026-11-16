@@ -38,6 +38,11 @@ export interface TimelineEventView {
   taskPointer?: string;
   taskName?: string;
   payloadJson: string;
+  /**
+   * Position in the instance's event stream, in the order the gateway sent the events. The
+   * cursor cannot give it: it is opaque.
+   */
+  streamIndex?: number;
 }
 
 export interface WorkflowTaskProjection {
@@ -71,7 +76,6 @@ interface WorkflowProjectionSeed extends WorkflowScope {
 export interface WorkflowProjectionInputEvent extends TimelineEventView {
   sortTimeMs?: number;
   scope?: WorkflowScope;
-  streamIndex?: number;
 }
 
 interface UseWatchWorkflowProjectionResult {
@@ -502,6 +506,7 @@ function stripEventInternals(event: WorkflowProjectionInputEvent): TimelineEvent
     taskPointer: event.taskPointer,
     taskName: event.taskName,
     payloadJson: event.payloadJson,
+    streamIndex: event.streamIndex,
   };
 }
 

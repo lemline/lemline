@@ -92,8 +92,10 @@ export function useStatusCounts(filter: StatsFilter) {
     queryKey,
     refetchInterval: polling ? REFRESH_MS : false,
     queryFn: async ({ signal }) => {
+      // One query per status, plus one without a status: the change stream below has no status
+      // filter, and the gateway only accepts a watch cursor taken with the same filters.
       const responses = await Promise.all(
-        COUNTED.map((status) =>
+        [...COUNTED, undefined].map((status) =>
           gatewayClient.listInstances(
             create(ListInstancesRequestSchema, {
               namespace: namespace || undefined,
@@ -108,13 +110,14 @@ export function useStatusCounts(filter: StatsFilter) {
         ),
       );
       const [pending, running, faulted, completed] = responses.map((response) => asNumber(response.totalCount));
+      const unfiltered = responses[COUNTED.length];
       const counts: StatusCounts = {
         running: pending + running,
         faulted,
         completed,
         all: pending + running + faulted + completed,
       };
-      return { counts, watchCursor: responses[0].watchCursor };
+      return { counts, watchCursor: unfiltered.watchCursor };
     },
   });
   // One change stream for the four counts: any instance of the scope that changes refreshes them.

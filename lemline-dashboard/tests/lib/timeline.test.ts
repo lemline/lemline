@@ -143,10 +143,16 @@ do:
       event("task.completed", 11_000, { task: "/do/1/chargePayment" }),
     ];
 
-    // Given in stream order, and as the instance page gives them: sorted by time.
+    // Given in stream order, and as the instance page gives them: with opaque cursors, numbered
+    // as they arrive, then sorted by time.
     const timeSorted = buildWorkflowProjection(
       "wf-1",
-      events.map((item) => ({ ...item, sortTimeMs: Date.parse(item.eventTime) })),
+      events.map((item, index) => ({
+        ...item,
+        sequence: btoa(JSON.stringify({ instanceId: "wf-1", sequence: 2_000 + index })),
+        sortTimeMs: Date.parse(item.eventTime),
+        streamIndex: index,
+      })),
     ).events;
     expect(timeSorted.map((item) => item.eventType)).not.toEqual(events.map((item) => item.eventType));
 
@@ -160,6 +166,55 @@ do:
       expect(rows[0].segments.map((segment) => segment.kind)).toEqual(["failed", "backoff", "ran"]);
       expect(rows[0].segments[1]).toMatchObject({ start: T0 + 2_000, end: T0 + 9_900 });
     }
+  });
+
+  it("orders a task's events as they happened, not as the runtime wrote them", () => {
+    const tryRoot = parseWorkflowSource(`
+document: { dsl: '1.0.0', namespace: test, name: retry-check, version: '0.1.0' }
+do:
+  - tryIt:
+      try:
+        - fail:
+            raise:
+              error:
+                type: https://serverlessworkflow.io/spec/1.0.0/errors/communication
+                status: 503
+      catch:
+        errors:
+          with: { status: 503 }
+        retry:
+          delay: { seconds: 4 }
+          limit:
+            attempt: { count: 2 }
+`).root;
+    const block = "/do/0/tryIt/try";
+    const fail = `${block}/0/fail`;
+    const error = { status: 503, title: "Service Unavailable" };
+    // The stream order recorded from a real instance: within one step, a retry is written
+    // before the failure that caused it, and a start before its creation.
+    const events = [
+      event("workflow.started", 72),
+      event("task.started", 88, { task: fail }),
+      event("task.retried", 4_093, { task: block, retryCount: 1 }),
+      event("task.created", 87, { task: fail }),
+      event("task.faulted", 90, { task: fail, error }),
+      event("task.created", 9_554, { task: fail }),
+      event("task.started", 9_557, { task: fail }),
+      event("task.retried", 13_560, { task: block, retryCount: 2 }),
+      event("task.faulted", 9_558, { task: fail, error }),
+      event("task.started", 19_508, { task: fail }),
+      event("task.faulted", 19_509, { task: fail, error }),
+      event("task.created", 19_506, { task: fail }),
+      event("workflow.completed", 19_538),
+    ];
+
+    const model = buildTimeline(events, "COMPLETED", tryRoot, T0 + 60_000);
+    const rows = model.rows.filter((row) => row.pointer === fail);
+
+    expect(rows).toHaveLength(1);
+    expect(rows[0].attempts.map((attempt) => attempt.outcome)).toEqual(["failed", "failed", "failed"]);
+    expect(rows[0].segments.map((segment) => segment.kind)).toEqual(["failed", "backoff", "failed", "backoff", "failed"]);
+    expect(rows[0].segments[1]).toMatchObject({ start: T0 + 90, end: T0 + 9_554 });
   });
 
   it("draws each run of a loop on its own row, the next one waiting to start", () => {

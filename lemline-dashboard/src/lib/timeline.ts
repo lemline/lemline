@@ -114,33 +114,39 @@ function kindOf(eventType: string): "created" | "started" | "completed" | "fault
   return "other";
 }
 
-/** The event's position in the instance's stream: its cursor, a growing number. */
-function streamPosition(view: TimelineEventView): bigint | undefined {
-  if (typeof view.sequence === "bigint") return view.sequence;
-  return /^\d+$/.test(view.sequence) ? BigInt(view.sequence) : undefined;
-}
-
 /**
- * Events are put back in stream order, whatever order they are given in (the instance page
- * sorts them by time): times cannot order them, since a task.retried is stamped with the
- * planned retry time, ahead of the events that follow it.
+ * `order` is the event's position in the stream: its `streamIndex` when given (the instance
+ * page numbers events as they arrive), otherwise its place in the array (the instance list reads
+ * the history in stream order). It only breaks ties between events stamped at the same time:
+ * the runtime writes the events of one step in no particular order (a task.retried before the
+ * task.faulted that caused it, a task.started before its task.created).
  */
 function parseEvents(events: TimelineEventView[]): ParsedEvent[] {
   return events
-    .map((view, index) => ({ view, index, position: streamPosition(view) }))
-    .sort((left, right) =>
-      left.position !== undefined && right.position !== undefined && left.position !== right.position
-        ? left.position < right.position
-          ? -1
-          : 1
-        : left.index - right.index,
-    )
+    .map((view, index) => ({ view, position: view.streamIndex ?? index }))
+    .sort((left, right) => left.position - right.position)
     .map(({ view }, order) => ({ view, time: Date.parse(view.eventTime), order, data: dataOf(view) }))
     .filter((event) => Number.isFinite(event.time));
 }
 
-function byStreamOrder(left: ParsedEvent, right: ParsedEvent): number {
-  return left.order - right.order;
+/**
+ * The events of one task in the order they happened: by time, except a task.retried, which is
+ * stamped with the planned retry time. It is put right after the failure it follows (the last
+ * task.faulted stamped before that planned time), where the wait before retry starts.
+ */
+function inHappeningOrder(list: ParsedEvent[]): ParsedEvent[] {
+  const faults = list.filter((event) => kindOf(event.view.eventType) === "faulted");
+  const at = (event: ParsedEvent) => {
+    if (kindOf(event.view.eventType) !== "retried") return event.time;
+    const failure = faults.filter((fault) => fault.time <= event.time).reduce<ParsedEvent | undefined>(
+      (latest, fault) => (latest === undefined || fault.time >= latest.time ? fault : latest),
+      undefined,
+    );
+    return failure?.time ?? event.time;
+  };
+  const isRetry = (event: ParsedEvent) => (kindOf(event.view.eventType) === "retried" ? 1 : 0);
+  // Same time: the stream order, except that a retry always follows its failure.
+  return [...list].sort((left, right) => at(left) - at(right) || isRetry(left) - isRetry(right) || left.order - right.order);
 }
 
 export function workflowBounds(events: TimelineEventView[], status: WorkflowRuntimeStatus, nowMs: number) {
@@ -186,7 +192,7 @@ export function buildTimeline(
     byPointer.set(pointer, list);
   };
   const blockRetries: { block: string; event: ParsedEvent }[] = [];
-  const faults: { pointer: string; order: number }[] = [];
+  const faults: { pointer: string; time: number }[] = [];
   for (const event of parsed) {
     if (!event.view.eventType.includes(".task.")) continue;
     const pointer = event.view.taskPointer?.trim();
@@ -195,13 +201,19 @@ export function buildTimeline(
       if (kindOf(event.view.eventType) === "retried") blockRetries.push({ block: pointer, event });
       continue;
     }
-    if (kindOf(event.view.eventType) === "faulted") faults.push({ pointer, order: event.order });
+    if (kindOf(event.view.eventType) === "faulted") faults.push({ pointer, time: event.time });
     add(pointer, event);
   }
   // The runtime announces a retry on the try block it re-enters ("/do/1/charge/try"), not on the
-  // task that failed in it: the retry goes to the last task of that block that failed before it.
+  // task that failed in it: the retry goes to the task of that block that failed last before its
+  // planned time.
   for (const { block, event } of blockRetries) {
-    const failed = faults.filter((fault) => fault.order < event.order && fault.pointer.startsWith(`${block}/`)).pop();
+    const failed = faults
+      .filter((fault) => fault.time <= event.time && fault.pointer.startsWith(`${block}/`))
+      .reduce<{ pointer: string; time: number } | undefined>(
+        (latest, fault) => (latest === undefined || fault.time >= latest.time ? fault : latest),
+        undefined,
+      );
     if (failed) add(failed.pointer, event);
   }
 
@@ -212,7 +224,7 @@ export function buildTimeline(
     const isGroup =
       (info.kind !== undefined && CONTAINER_KINDS.has(info.kind)) ||
       pointers.some((other) => other !== pointer && other.startsWith(`${pointer}/`));
-    const runs = splitRuns(list);
+    const runs = splitRuns(inHappeningOrder(list));
     runs.forEach((run, index) => {
       const iteration = runs.length > 1 ? index + 1 : undefined;
       rows.push(buildRow(pointer, iteration, run, info, isGroup, bounds.terminal, tEnd));
@@ -245,8 +257,7 @@ export function buildTimeline(
  * A run ends when the task completes, or fails without a retry; the next task.created or
  * task.started then begins a new run. A retry stays in its run, as further attempts.
  */
-function splitRuns(list: ParsedEvent[]): ParsedEvent[][] {
-  const ordered = [...list].sort(byStreamOrder);
+function splitRuns(ordered: ParsedEvent[]): ParsedEvent[][] {
   const runs: ParsedEvent[][] = [];
   let current: ParsedEvent[] = [];
   let ended = false;
@@ -268,13 +279,13 @@ function splitRuns(list: ParsedEvent[]): ParsedEvent[][] {
 function buildRow(
   pointer: string,
   iteration: number | undefined,
-  list: ParsedEvent[],
+  /** The run's events, in the order they happened. */
+  ordered: ParsedEvent[],
   info: ReturnType<typeof taskAt>,
   isGroup: boolean,
   terminal: boolean,
   tEnd: number,
 ): StepRow {
-  const ordered = [...list].sort(byStreamOrder);
   const names = taskNamesOf(pointer);
   const attempts: Attempt[] = [];
   const segments: Segment[] = [];
