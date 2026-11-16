@@ -35,3 +35,19 @@ it("retains extension metadata when a remote function source is unavailable", ()
     kind: "wait", extension: { name: "audit", phase: "before", owner: "/do/0/invoke/_fn/do/0/remoteOwner" },
   });
 });
+
+it("resolves tasks whose names are spelled like path markers", () => {
+  const named = parseWorkflowSource(`
+do:
+  - _ext:
+      listen: { to: { one: { with: { type: ext.ready } } } }
+  - _fn:
+      wait: { seconds: 1 }
+  - do:
+      listen: { to: { one: { with: { type: do.ready } } } }
+`).root;
+  expect(taskAt(named, "/do/0/_ext")).toMatchObject({ kind: "listen", listensTo: ["ext.ready"] });
+  expect(taskAt(named, "/do/1/_fn").kind).toBe("wait");
+  expect(taskAt(named, "/do/2/do")).toMatchObject({ kind: "listen", listensTo: ["do.ready"] });
+  expect(isTaskPointer("/do/0/_ext", named)).toBe(true);
+});

@@ -130,7 +130,12 @@ function resolveTask(root: Json, pointer: string): { node?: Json; extension?: Ta
   const use = isObject(root.use) ? root.use : {};
   for (let i = 0; i < parts.length; i++) {
     const segment = parts[i].replace(/~1/g, "/").replace(/~0/g, "~");
-    if (segment === "_ext") {
+    // Right after a list index, node is the item wrapper and the segment is a task's name,
+    // even when that name is spelled like a marker ("_ext", "_fn") or a block token ("do").
+    const afterIndex = /^\d+$/.test(parts[i - 1] ?? "");
+    if (afterIndex && isObject(node)) {
+      node = node[segment];
+    } else if (segment === "_ext") {
       const index = Number(parts[++i]);
       const phase = parts[++i];
       if (!Number.isInteger(index) || (phase !== "before" && phase !== "after")) return;
@@ -149,9 +154,7 @@ function resolveTask(root: Json, pointer: string): { node?: Json; extension?: Ta
       node = node[Number(segment)];
     } else if (isObject(node)) {
       // The engine appends /do to a declared do task's position; a loop's /do is its internal block.
-      // Right after a list index, node is the item wrapper and "do" is the name of the task.
-      const afterIndex = /^\d+$/.test(parts[i - 1] ?? "");
-      if (segment === "do" && i === parts.length - 1 && !afterIndex && TASK_KINDS.some((key) => key in (node as Json))) {
+      if (segment === "do" && i === parts.length - 1 && TASK_KINDS.some((key) => key in (node as Json))) {
         if ("for" in node) node = { do: node.do };
         break;
       }
