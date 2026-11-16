@@ -17,6 +17,7 @@ import com.lemline.core.workflows.WorkflowCache
 import com.lemline.runner.common.activities.TestModeConfiguration
 import com.lemline.runner.common.messaging.InstanceMessage
 import com.lemline.runner.config.DatabaseManager
+import com.lemline.runner.definitions.DefinitionCacheSync
 import com.lemline.runner.definitions.DefinitionModel
 import com.lemline.runner.definitions.DefinitionRepository
 import com.lemline.runner.listeners.ListenerRepository
@@ -24,6 +25,7 @@ import com.lemline.runner.starters.Starter
 import com.lemline.runner.testcases.AnalyticsWorkflowResultAwaiter
 import io.cloudevents.CloudEvent
 import io.cloudevents.jackson.JsonFormat
+import jakarta.inject.Inject
 import java.util.concurrent.TimeoutException
 import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.delay
@@ -61,6 +63,9 @@ internal abstract class AbstractWorkflowTestExecutor : WorkflowTestExecutor {
     protected abstract val lifecycleHook: LifecycleEventHook
     protected abstract val listenerRepository: ListenerRepository
     protected abstract val testModeConfiguration: TestModeConfiguration
+
+    @Inject
+    lateinit var definitionCacheSync: DefinitionCacheSync
 
     /** Default timeout for workflow completion in seconds (configurable via system property) */
     protected open val defaultTimeoutSeconds: Long by lazy {
@@ -217,6 +222,9 @@ internal abstract class AbstractWorkflowTestExecutor : WorkflowTestExecutor {
         if (rebuildCachesOnListen) {
             WorkflowCache.clear()
             FunctionCache.clear()
+            // A fresh worker loads its persisted catalog before consuming CloudEvents.
+            // Clearing a live worker's cache alone leaves its startup guard initialized.
+            definitionCacheSync.refresh()
         }
         sendCloudEvents(cloudEvents, namespace)
         onCloudEventsSent()

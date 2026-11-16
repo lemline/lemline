@@ -802,6 +802,11 @@ set -o pipefail
 
 Validation after adding these cases: 762 core/common tests pass (6 existing skips), including all 14
 shared extension scenarios; the runner test sources compile and the three analytics-awaiting harness
-tests pass. Execution of the Quarkus runner scenarios remains unverified here: the Gradle wrapper is
-blocked opening its lock file by sandbox permissions. These results do not replace a successful run
-of the broker suites.
+tests pass. A subsequent normal Gradle run executed 97 tests: 89 passed and 8 failed. Of the 56 runner
+extension scenarios, 48 passed; both cache-eviction listener cases failed on each of the four transports.
+The test cleared a live worker's catalog while leaving its startup guard initialized, then delivered
+the event before rebuilding the catalog. The test now invokes the normal database-backed
+`DefinitionCacheSync.refresh()` after eviction, matching the catalog initialization of a fresh worker.
+The adjusted runner sources compile; a normal Gradle rerun remains required because the sandbox still
+blocks the Gradle wrapper lock file. The original run is preserved in
+`/tmp/lemline-runner-extensions.log`; local recheck output is in `/tmp/lemline-runner-extensions-recheck.log`.
