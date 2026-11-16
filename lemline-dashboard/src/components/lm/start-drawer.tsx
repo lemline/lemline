@@ -65,8 +65,9 @@ export function StartDrawer({ ns, wf, version, trigger, onClose, onStarted, onSe
       }
       onStarted(response.instanceId);
     } catch (cause) {
+      // The ID is kept: the gateway may have accepted a start whose answer was lost, and
+      // retrying with the same ID returns that instance instead of starting a second one.
       setError(ConnectError.from(cause).rawMessage || "The instance could not be started.");
-      setInstanceId(uuidv7());
     } finally {
       setStarting(false);
     }

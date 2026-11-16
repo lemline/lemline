@@ -20,10 +20,11 @@ const REFRESH_MS = 5_000;
 /** Pages loaded at most for the periodic refresh: going deep in the list stops it. */
 const REFRESHED_PAGES = 2;
 
-const SERVER_STATUS: Record<UiStatus, InstanceStatus> = {
-  running: InstanceStatus.RUNNING,
-  faulted: InstanceStatus.FAULTED,
-  completed: InstanceStatus.COMPLETED,
+/** The gateway statuses behind each status a person sees: a pending instance is shown as running. */
+const SERVER_STATUSES: Record<UiStatus, InstanceStatus[]> = {
+  running: [InstanceStatus.PENDING, InstanceStatus.RUNNING],
+  faulted: [InstanceStatus.FAULTED],
+  completed: [InstanceStatus.COMPLETED],
 };
 
 export interface InstanceListFilters {
@@ -126,53 +127,51 @@ function compareNewestFirst(left: InstanceSummary, right: InstanceSummary): numb
 
 /**
  * Instances shown page by page. The gateway pages with cursors and filters on one status, so:
- * all statuses = one unfiltered list; one status = one filtered list; two statuses = two
- * filtered lists merged by creation time. Only the rows up to the page shown are loaded.
+ * all statuses = one unfiltered list; otherwise one filtered list per gateway status behind the
+ * statuses selected (Running is Pending + Running), merged by creation time. That is at most three
+ * lists, for two statuses selected. Only the rows up to the page shown are loaded.
  */
 export function useInstanceList(filters: InstanceListFilters) {
   const { namespace, name, version, statuses, timeFrom, perPage, page } = filters;
   const all = statuses.length === UI_STATUSES.length;
   const needed = (page + 1) * perPage;
   const common = { namespace, name, version, timeFrom, pageSize: Math.max(25, perPage), needed, refresh: page === 0 };
+  const serverStatuses: (InstanceStatus | undefined)[] = all ? [undefined] : statuses.flatMap((status) => SERVER_STATUSES[status]);
 
-  const first = useInstanceStream({
-    ...common,
-    status: all || statuses.length === 0 ? undefined : SERVER_STATUS[statuses[0]],
-    enabled: statuses.length > 0,
-  });
-  const second = useInstanceStream({
-    ...common,
-    status: statuses.length === 2 ? SERVER_STATUS[statuses[1]] : undefined,
-    enabled: statuses.length === 2,
-  });
-  const merged = statuses.length === 2;
+  // A fixed number of lists, so the hooks are called the same way on every render.
+  const streams = [
+    useInstanceStream({ ...common, status: serverStatuses[0], enabled: serverStatuses.length > 0 }),
+    useInstanceStream({ ...common, status: serverStatuses[1], enabled: serverStatuses.length > 1 }),
+    useInstanceStream({ ...common, status: serverStatuses[2], enabled: serverStatuses.length > 2 }),
+  ];
+  const active = streams.slice(0, serverStatuses.length);
+  const merged = active.length > 1;
+  const [first, second, third] = streams;
 
   const rows = useMemo<InstanceSummary[]>(() => {
-    const list = merged ? [...first.rows, ...second.rows] : first.rows;
+    const list = merged ? [first.rows, second.rows, third.rows].slice(0, active.length).flat() : first.rows;
     const unique = new Map<string, InstanceSummary>();
     for (const instance of list) unique.set(instance.instanceId, instance);
     const result = Array.from(unique.values());
     return merged ? result.sort(compareNewestFirst) : result;
-  }, [first.rows, merged, second.rows]);
+  }, [active.length, first.rows, merged, second.rows, third.rows]);
 
-  const exactTotal = merged
-    ? first.total !== undefined && second.total !== undefined
-      ? first.total + second.total
-      : undefined
-    : first.total;
-  const covered = first.covered && second.covered;
+  const totals = active.map((stream) => stream.total);
+  const exactTotal = totals.length > 0 && totals.every((total) => total !== undefined)
+    ? totals.reduce<number>((sum, total) => sum + (total ?? 0), 0)
+    : undefined;
+  const covered = streams.every((stream) => stream.covered);
   const enabled = statuses.length > 0;
 
   return {
     rows,
-    // Merged lists are only exact once both are loaded past the page shown.
+    // Merged lists are only exact once all of them are loaded past the page shown.
     pageRows: covered || !merged ? rows.slice(page * perPage, page * perPage + perPage) : [],
     exactTotal,
-    loadingPage: enabled && (first.isLoading || second.isLoading || !covered),
-    isError: first.isError || second.isError,
+    loadingPage: enabled && (active.some((stream) => stream.isLoading) || !covered),
+    isError: active.some((stream) => stream.isError),
     refetch: () => {
-      void first.refetch();
-      if (merged) void second.refetch();
+      for (const stream of active) void stream.refetch();
     },
     enabled,
   };
