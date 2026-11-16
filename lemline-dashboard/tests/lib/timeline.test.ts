@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { TimelineEventView } from "../../src/hooks/use-watch-workflow-projection";
+import { buildWorkflowProjection, type TimelineEventView } from "../../src/hooks/use-watch-workflow-projection";
 import { buildTimeline, instanceSummary } from "../../src/lib/timeline";
 import { parseWorkflowSource } from "../../src/lib/workflow-source";
 
@@ -143,13 +143,23 @@ do:
       event("task.completed", 11_000, { task: "/do/1/chargePayment" }),
     ];
 
-    const model = buildTimeline(events, "RUNNING", root, T0 + 20_000);
-    const rows = model.rows.filter((row) => row.label === "chargePayment");
+    // Given in stream order, and as the instance page gives them: sorted by time.
+    const timeSorted = buildWorkflowProjection(
+      "wf-1",
+      events.map((item) => ({ ...item, sortTimeMs: Date.parse(item.eventTime) })),
+    ).events;
+    expect(timeSorted.map((item) => item.eventType)).not.toEqual(events.map((item) => item.eventType));
 
-    expect(rows).toHaveLength(1);
-    expect(rows[0].attempts).toHaveLength(2);
-    expect(rows[0].segments.map((segment) => segment.kind)).toEqual(["failed", "backoff", "ran"]);
-    expect(rows[0].segments[1]).toMatchObject({ start: T0 + 2_000, end: T0 + 9_900 });
+    for (const given of [events, timeSorted]) {
+      const model = buildTimeline(given, "RUNNING", root, T0 + 20_000);
+      const rows = model.rows.filter((row) => row.label === "chargePayment");
+
+      expect(rows).toHaveLength(1);
+      expect(rows[0].attempts).toHaveLength(2);
+      expect(rows[0].state).toBe("completed");
+      expect(rows[0].segments.map((segment) => segment.kind)).toEqual(["failed", "backoff", "ran"]);
+      expect(rows[0].segments[1]).toMatchObject({ start: T0 + 2_000, end: T0 + 9_900 });
+    }
   });
 
   it("draws each run of a loop on its own row, the next one waiting to start", () => {

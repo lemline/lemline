@@ -114,13 +114,28 @@ function kindOf(eventType: string): "created" | "started" | "completed" | "fault
   return "other";
 }
 
+/** The event's position in the instance's stream: its cursor, a growing number. */
+function streamPosition(view: TimelineEventView): bigint | undefined {
+  if (typeof view.sequence === "bigint") return view.sequence;
+  return /^\d+$/.test(view.sequence) ? BigInt(view.sequence) : undefined;
+}
+
 /**
- * Events are given in stream order, and kept in it: times cannot order them, since a
- * task.retried is stamped with the planned retry time, ahead of the events that follow it.
+ * Events are put back in stream order, whatever order they are given in (the instance page
+ * sorts them by time): times cannot order them, since a task.retried is stamped with the
+ * planned retry time, ahead of the events that follow it.
  */
 function parseEvents(events: TimelineEventView[]): ParsedEvent[] {
   return events
-    .map((view, order) => ({ view, time: Date.parse(view.eventTime), order, data: dataOf(view) }))
+    .map((view, index) => ({ view, index, position: streamPosition(view) }))
+    .sort((left, right) =>
+      left.position !== undefined && right.position !== undefined && left.position !== right.position
+        ? left.position < right.position
+          ? -1
+          : 1
+        : left.index - right.index,
+    )
+    .map(({ view }, order) => ({ view, time: Date.parse(view.eventTime), order, data: dataOf(view) }))
     .filter((event) => Number.isFinite(event.time));
 }
 
