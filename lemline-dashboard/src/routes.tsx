@@ -9,6 +9,7 @@ const DefinitionsPage = lazy(() =>
 );
 const DefinitionPage = lazy(() => import("./pages/definition").then((module) => ({ default: module.DefinitionPage })));
 const InstancePage = lazy(() => import("./pages/instance").then((module) => ({ default: module.InstancePage })));
+const SettingsPage = lazy(() => import("./pages/settings").then((module) => ({ default: module.SettingsPage })));
 
 export function DashboardRoutes() {
   return (
@@ -18,6 +19,7 @@ export function DashboardRoutes() {
       <Route path="/instances/:instanceId" element={withSuspense(<InstancePage />)} />
       <Route path="/definitions" element={withSuspense(<DefinitionsPage />)} />
       <Route path="/definitions/:namespace/:name" element={withSuspense(<DefinitionPage />)} />
+      <Route path="/settings" element={withSuspense(<SettingsPage />)} />
 
       {/* Addresses of the previous dashboard keep working. */}
       <Route path="/id/:instanceId" element={<LegacyInstanceRedirect />} />

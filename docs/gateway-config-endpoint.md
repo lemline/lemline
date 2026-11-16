@@ -1,6 +1,6 @@
 # Gateway configuration endpoint
 
-Status: proposal
+Status: implemented (gateway `GetGatewayConfig`, dashboard Settings page)
 
 ## 1. Why
 
@@ -37,90 +37,61 @@ Out of scope:
 
 ## 3. API
 
-A new unary RPC on `GatewayService`, following the existing `Get*` convention.
+A new unary RPC on `GatewayService`, following the existing `Get*` convention. The canonical
+definition, with field comments, is in `lemline-runner-gateway/src/main/proto/lemline/gateway/v1/gateway.proto`.
 
 ```proto
-// Returns the configuration the gateway is running with, and where each value comes from.
-// Read-only. Secrets are never returned: see GatewaySetting.secret.
 rpc GetGatewayConfig(GetGatewayConfigRequest) returns (GetGatewayConfigResponse);
 
 message GetGatewayConfigRequest {}
 
 message GetGatewayConfigResponse {
-    // Settings, sorted by key.
-    repeated GatewaySetting settings = 1;
-    // Absolute path of the external configuration file, if one was loaded: --config / -c, then
-    // LEMLINE_CONFIG, then ./.lemline.yaml, ~/.config/lemline/config.yaml, ~/.lemline.yaml.
-    optional string config_file = 2;
-    // When the gateway process read its configuration (process start).
+    repeated GatewaySetting settings = 1;  // lemline.gateway.* and lemline.namespaces, sorted by key
+    optional ConfigFile config_file = 2;   // absent when no file was loaded
     google.protobuf.Timestamp loaded_at = 3;
-    // The external configuration file as it was read at startup, secrets redacted. Absent when no
-    // file was loaded. See §4.5.
-    optional ConfigFile config_file_content = 4;
-}
-
-message ConfigFile {
-    // Same as GetGatewayConfigResponse.config_file.
-    string path = 1;
-    // How the file was found.
-    ConfigFileLocator located_by = 2;
-    // Full text, comments and layout kept, secret values replaced by "••••••••".
-    string text = 3;
-    // One entry per key set in the file, to let the UI annotate lines.
-    repeated ConfigFileKey keys = 4;
-}
-
-message ConfigFileKey {
-    // Full key, e.g. "lemline.gateway.cors.origins".
-    string key = 1;
-    // 1-based line of the key in `text`.
-    int32 line = 2;
-    // True when a higher-priority origin overrides this value; `overridden_by` says which one.
-    bool overridden = 3;
-    SettingOrigin overridden_by = 4;
-    // Environment variable or system property name of the override.
-    string overridden_by_detail = 5;
-    // True when the value was redacted.
-    bool secret = 6;
-}
-
-enum ConfigFileLocator {
-    CONFIG_FILE_LOCATOR_UNSPECIFIED = 0;
-    CONFIG_FILE_LOCATOR_OPTION = 1;       // --config / -c
-    CONFIG_FILE_LOCATOR_ENVIRONMENT = 2;  // LEMLINE_CONFIG
-    CONFIG_FILE_LOCATOR_DEFAULT_PATH = 3; // ./.lemline.yaml, ~/.config/lemline/config.yaml, ~/.lemline.yaml
 }
 
 message GatewaySetting {
-    // Full key, e.g. "lemline.gateway.cors.origins".
     string key = 1;
-    // Effective value as a string. Absent when the key is not set and has no default,
-    // or when the setting is a secret.
-    optional string value = 2;
-    // Where the effective value comes from.
+    optional string value = 2;             // absent when unset, or for a secret
     SettingOrigin origin = 3;
-    // Name used at the origin, to let an operator find it:
-    // the environment variable name (LEMLINE_GATEWAY_CORS_ORIGINS), the system property
-    // (lemline.gateway.cors.origins), or the file path. Empty for DEFAULT and UNSET.
-    string origin_detail = 4;
-    // The built-in default, when the key has one. Lets the UI show "default: 9000".
-    optional string default_value = 5;
-    // True for secrets. The value is never sent; is_set tells whether one is configured.
+    string origin_detail = 4;              // env var name, system property, or file path
+    optional string default_value = 5;     // absent for a secret
     bool secret = 6;
     bool is_set = 7;
-    // Lower-priority origins that also define this key and are hidden by `origin`
-    // (e.g. a value in lemline.yaml overridden by an environment variable).
-    repeated SettingOrigin shadowed = 8;
+    repeated SettingOrigin shadowed = 8;   // lower-priority origins hidden by `origin`
 }
 
 enum SettingOrigin {
     SETTING_ORIGIN_UNSPECIFIED = 0;
-    SETTING_ORIGIN_SYSTEM_PROPERTY = 1; // -Dkey=value or a CLI option mapped to it
+    SETTING_ORIGIN_SYSTEM_PROPERTY = 1;    // -Dkey=value, or a CLI option mapped to it
     SETTING_ORIGIN_ENVIRONMENT = 2;
-    SETTING_ORIGIN_CONFIG_FILE = 3;     // external file passed with --config
-    SETTING_ORIGIN_APPLICATION = 4;     // application.properties / application.yaml packaged with Lemline
-    SETTING_ORIGIN_DEFAULT = 5;         // @WithDefault in LemlineConfiguration
-    SETTING_ORIGIN_UNSET = 6;           // no value and no default
+    SETTING_ORIGIN_CONFIG_FILE = 3;
+    SETTING_ORIGIN_APPLICATION = 4;        // application.* packaged with Lemline
+    SETTING_ORIGIN_DEFAULT = 5;
+    SETTING_ORIGIN_UNSET = 6;
+}
+
+message ConfigFile {
+    string path = 1;
+    ConfigFileLocator located_by = 2;
+    optional string text = 3;              // redacted; absent when too large or unparsable
+    repeated ConfigFileKey keys = 4;
+}
+
+message ConfigFileKey {
+    string key = 1;
+    int32 line = 2;
+    SettingOrigin overridden_by = 3;       // UNSPECIFIED when the file value applies
+    string overridden_by_detail = 4;
+    bool secret = 5;
+}
+
+enum ConfigFileLocator {
+    CONFIG_FILE_LOCATOR_UNSPECIFIED = 0;
+    CONFIG_FILE_LOCATOR_OPTION = 1;        // --config / -c
+    CONFIG_FILE_LOCATOR_ENVIRONMENT = 2;   // LEMLINE_CONFIG
+    CONFIG_FILE_LOCATOR_DEFAULT_PATH = 3;  // ./.lemline.yaml, ~/.config/lemline/config.yaml, ~/.lemline.yaml
 }
 ```
 
@@ -138,33 +109,30 @@ information ("not configured"), so it is returned with `origin = UNSET`.
 
 ### 4.2 Origin resolution
 
-The origin cannot be read directly from SmallRye for keys loaded from the external file.
-`LemlineConfigSource` merges the `--config` file, `application.*` values and higher-priority values into
-a single `PropertiesConfigSource` named `LemlineConfigSource` (ordinal 275). After that merge,
-`ConfigValue.sourceName` says `LemlineConfigSource` for all of them.
+`LemlineConfigSource` (ordinal 275) merges the external file, the packaged `application.*` values and
+the higher-priority values into one source. SmallRye alone therefore cannot tell a file value from a
+packaged one. Everything else it can tell:
 
-So the origin must be recorded while the merge happens:
+- environment variables and system properties keep their own sources (ordinals 300 and 400), so
+  `getConfigValue(key).sourceName` names them directly;
+- mapping defaults have an ordinal ≤ 0.
 
-1. In `LemlineConfigSource.buildProperties`, keep a `Map<String, Origin>` next to `lemlineProps`.
-   Each time a key is written, record where it came from:
-   - contextual value with ordinal ≤ 275: `APPLICATION` (or `SYSTEM_PROPERTY`/`ENVIRONMENT` if its
-     source name says so);
-   - value from `ExtraFileConfigFactory`: `CONFIG_FILE`, with `ConfigPathHolder.configPath` as detail
-     (the file may have been passed with `--config`, set by `LEMLINE_CONFIG`, or found in a default
-     location);
-   - contextual value with ordinal > 275 (re-applied last): `ENVIRONMENT` when its source is the
-     env-var source, `SYSTEM_PROPERTY` otherwise. For environment values, report the variable name
-     derived from the key by the MicroProfile rule (`lemline.gateway.cors.origins` →
-     `LEMLINE_GATEWAY_CORS_ORIGINS`). Checking which variant was actually set (`lemline_gateway_…`
-     is also accepted) is not required.
-   Every earlier writer of the same key goes to `shadowed`.
-2. Publish this map in a small holder, `LemlineConfigOrigins`, readable after startup. The config
-   source is built before CDI, so a plain object is acceptable, as `ConfigPathHolder` already does.
-3. A key with no recorded origin falls back to `DEFAULT` when the mapping has a `@WithDefault`, or else
-   `UNSET`.
+So only the file needs extra bookkeeping:
 
-The test-profile path (`context == null`) reads system properties only; record them as
-`SYSTEM_PROPERTY`.
+1. While merging, `LemlineConfigSource` passes the `lemline.*` values read from the file to
+   `LoadedConfigFile.capture`, together with the file path and how it was found (`ConfigPathHolder.locator`,
+   set by `LemlineApplication.setConfigPath`). The first capture of a path wins: the source can be built
+   several times, and the file must be reported as it was at startup.
+2. `ConfigOriginResolver` classifies the winning source: system property, environment, then — for the
+   merged Lemline source — `CONFIG_FILE` when the file set the key, `APPLICATION` otherwise. A key without
+   a value falls back to `DEFAULT` when the mapping declares a `@WithDefault`, or else `UNSET`.
+3. `shadowed` lists the lower-priority sources that also hold the key, plus `CONFIG_FILE` when the file
+   set a key that a higher origin replaces.
+4. The environment name is derived from the key by the MicroProfile rule (`lemline.gateway.cors.origins`
+   → `LEMLINE_GATEWAY_CORS_ORIGINS`).
+
+SmallRye may decorate source names (`PropertiesConfigSource[source=LemlineConfigSource]`): the merged
+source is recognised by type or by a name containing `LemlineConfigSource`.
 
 ### 4.3 Values
 
@@ -175,14 +143,15 @@ The test-profile path (`context == null`) reads system properties only; record t
 
 ### 4.4 Secrets
 
-A key is a secret when its leaf name is `password`, ends with `-password`, or is in an explicit
-allowlist kept next to the walker: `tls.trust-store-password`, plus any future `*.secret` or `*.token`.
+A key is a secret when its leaf name is `password`, `secret` or `token`, or ends with `-password`,
+`-secret` or `-token` (`ConfigFileRedactor.isSecret`).
 For a secret, `value` is never set and `secret = true`. `is_set` tells whether a value is configured.
 
 Paths such as `tls.certificate` and `tls.private-key` are not secrets: they are file locations, and
 operators need them to diagnose TLS. The file contents are never read.
 
-A test must fail when a new key matching the secret pattern is returned with a value.
+A secret's `default_value` is not sent either. Tests check that no secret string appears anywhere in the
+serialized response.
 
 ### 4.5 Configuration file
 
@@ -197,16 +166,22 @@ the effective settings. It answers "what did I write?", while the settings answe
   process runs with, not the new content.
 - **Redaction keeps the layout.** Parse the file with SnakeYAML's node API (the parser behind
   `YamlConfigSource`), which gives each scalar's start and end position. Replace the characters of
-  each secret scalar in the original text with `••••••••`. Comments, order and indentation stay as
-  written. The secret rule is the one from §4.4, applied to every key in the file, not only gateway
-  keys. Database and messaging passwords are the main case.
+  each secret scalar in the original text with `••••••••`, keeping its line breaks so line numbers stay
+  valid. Comments, order and indentation stay as written. The secret rule is the one from §4.4, applied
+  to every key in the file, not only gateway keys. Database and messaging passwords are the main case.
+- **Aliases.** A secret reached through an alias (`password: *pw`) resolves to the anchored node, so the
+  anchor's value is masked where it is written.
+- **Unparsable text is never returned.** If SnakeYAML cannot parse the file, its secrets cannot be
+  located: `text` is omitted.
+- **Comments are not redacted.** A credential written in a comment is returned as written. Keep
+  credentials out of comments.
 - **Line annotations.** For each key in the file, return its line and whether a higher-priority
   origin overrides it. This comes from the origin map of §4.2: a key whose final origin is not
   `CONFIG_FILE`, while the file also sets it, is overridden.
 - **Size limit.** If the file is larger than 256 KiB, return `path`, `located_by` and `keys` without
   `text`. The UI then says that the file is too large to show.
-- `.properties` files are allowed by `ExtraFileConfigFactory`. The same rules apply, with
-  line-based positions instead of YAML nodes.
+- `ExtraFileConfigFactory` accepts `.properties` names but always parses with `YamlConfigSource`, so
+  one YAML path covers every accepted file.
 
 ## 5. Access control
 
@@ -215,8 +190,7 @@ the effective settings. It answers "what did I write?", while the settings answe
 - The namespace pin does not filter the response: configuration is global to the gateway process.
 - With authentication disabled, the RPC follows the rest of the API and is open. This matches the
   current behaviour, where an unauthenticated gateway already serves every read RPC.
-- Add `lemline.config` to the list of scopes documented in the gateway docs and in the README of
-  `lemline-dashboard`.
+- `lemline.config` is listed with the other scopes in the README of `lemline-dashboard`.
 
 ## 6. Dashboard
 
@@ -226,7 +200,7 @@ its default: operators think in terms of the file they wrote, plus what override
 1. **Dashboard**: one row, the gateway URL the dashboard calls and where it comes from (`/config.js`
    or the built-in default). The browser knows it without calling the gateway, so it is shown even
    when the gateway is unreachable.
-2. **lemline.yaml**: the configuration file (from `config_file_content`):
+2. **lemline.yaml** (titled with the file name): the configuration file (from `config_file`):
    - header: the file path, how it was found ("Passed with --config", "From LEMLINE_CONFIG", "Found
      at default location"), the line count, and a Copy button that copies the redacted text;
    - the text with line numbers, comments kept, secrets shown as `••••••••` in muted color;
@@ -266,12 +240,11 @@ Error states:
   `PERMISSION_DENIED`; with authentication disabled, the call succeeds.
 - Completeness: every leaf of `GatewayConfig` appears exactly once, so new keys cannot be forgotten.
 
-## 8. Open questions
+## 8. Decisions
 
-1. Should the endpoint also cover non-gateway settings (database, messaging) now? Same shape and
-   scope; the cost is mostly the secret list, which grows a lot (database passwords, broker
-   credentials).
-2. With authentication disabled but a namespace pin set, should configuration stay readable by anyone?
-   The current proposal says yes, for consistency with other read RPCs.
-3. Should `loaded_at` be complemented by the Lemline version and build, to tell which release reports
-   this configuration?
+1. Settings cover the gateway only (`lemline.gateway.*` and `lemline.namespaces`). The file is returned
+   whole, so database and messaging values are visible there, redacted; overrides of non-gateway keys are
+   still marked on their file line.
+2. With authentication disabled, the configuration is readable by anyone who can reach the gateway, even
+   with a namespace pin, as for the other read RPCs.
+3. The response does not carry the Lemline version yet.

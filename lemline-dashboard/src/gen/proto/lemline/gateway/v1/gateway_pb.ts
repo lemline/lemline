@@ -12,7 +12,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file proto/lemline/gateway/v1/gateway.proto.
  */
 export const file_proto_lemline_gateway_v1_gateway: GenFile = /*@__PURE__*/
-  fileDesc("CiZwcm90by9sZW1saW5lL2dhdGV3YXkvdjEvZ2F0ZXdheS5wcm90bxISbGVtbGluZS5nYXRld2F5LnYxIs8BChFEZWZpbml0aW9uU3VtbWFyeRIRCgluYW1lc3BhY2UYASABKAkSDAoEbmFtZRgCIAEoCRIPCgd2ZXJzaW9uGAMgASgJEhEKCWlzX2xhdGVzdBgEIAEoCBIVCg12ZXJzaW9uX2NvdW50GAUgASgFEi4KCmNyZWF0ZWRfYXQYBiABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEi4KCnVwZGF0ZWRfYXQYByABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wItIBChJXb3JrZmxvd0RlZmluaXRpb24SEQoJbmFtZXNwYWNlGAEgASgJEgwKBG5hbWUYAiABKAkSDwoHdmVyc2lvbhgDIAEoCRIOCgZzb3VyY2UYBCABKAkSGgoSYXZhaWxhYmxlX3ZlcnNpb25zGAUgAygJEi4KCmNyZWF0ZWRfYXQYBiABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEi4KCnVwZGF0ZWRfYXQYByABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wIqwBCg9EZWZpbml0aW9uU3RhdHMSEQoJbmFtZXNwYWNlGAEgASgJEgwKBG5hbWUYAiABKAkSDwoHdmVyc2lvbhgDIAEoCRIVCg1zdGFydGVkX2NvdW50GAQgASgDEhcKD2NvbXBsZXRlZF9jb3VudBgFIAEoAxIVCg1mYXVsdGVkX2NvdW50GAYgASgDEiAKGHJ1bm5pbmdfY291bnRfYXRfdGltZV90bxgHIAEoAyJLCgxFcnJvclN1bW1hcnkSDAoEdHlwZRgBIAEoCRITCgZzdGF0dXMYAiABKAVIAIgBARINCgV0aXRsZRgDIAEoCUIJCgdfc3RhdHVzIqwDCg9JbnN0YW5jZVN1bW1hcnkSEwoLaW5zdGFuY2VfaWQYASABKAkSEQoJbmFtZXNwYWNlGAIgASgJEgwKBG5hbWUYAyABKAkSDwoHdmVyc2lvbhgEIAEoCRIyCgZzdGF0dXMYBSABKA4yIi5sZW1saW5lLmdhdGV3YXkudjEuSW5zdGFuY2VTdGF0dXMSLgoKY3JlYXRlZF9hdBgGIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASLgoKc3RhcnRlZF9hdBgHIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASMAoMY29tcGxldGVkX2F0GAggASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIuCgpmYXVsdGVkX2F0GAkgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIrCghkdXJhdGlvbhgKIAEoCzIZLmdvb2dsZS5wcm90b2J1Zi5EdXJhdGlvbhIvCgVlcnJvchgLIAEoCzIgLmxlbWxpbmUuZ2F0ZXdheS52MS5FcnJvclN1bW1hcnkikgEKDUluc3RhbmNlRXZlbnQSDgoGY3Vyc29yGAEgASgJEhMKC2luc3RhbmNlX2lkGAIgASgJEhIKCmV2ZW50X3R5cGUYAyABKAkSLgoKZXZlbnRfdGltZRgEIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASGAoQY2xvdWRfZXZlbnRfanNvbhgFIAEoCSKPAQoVRGVmaW5pdGlvblN0YXRzQ2hhbmdlEkIKC2NoYW5nZV90eXBlGAEgASgOMi0ubGVtbGluZS5nYXRld2F5LnYxLkRlZmluaXRpb25TdGF0c0NoYW5nZVR5cGUSMgoFc3RhdHMYAiABKAsyIy5sZW1saW5lLmdhdGV3YXkudjEuRGVmaW5pdGlvblN0YXRzIoQBCg5JbnN0YW5jZUNoYW5nZRI7CgtjaGFuZ2VfdHlwZRgBIAEoDjImLmxlbWxpbmUuZ2F0ZXdheS52MS5JbnN0YW5jZUNoYW5nZVR5cGUSNQoIaW5zdGFuY2UYAiABKAsyIy5sZW1saW5lLmdhdGV3YXkudjEuSW5zdGFuY2VTdW1tYXJ5IsEBChZMaXN0RGVmaW5pdGlvbnNSZXF1ZXN0EhYKCW5hbWVzcGFjZRgBIAEoCUgAiAEBEhEKBG5hbWUYAiABKAlIAYgBARIYCgtsYXRlc3Rfb25seRgDIAEoCEgCiAEBEhEKCXBhZ2Vfc2l6ZRgEIAEoBRIYCgtwYWdlX2N1cnNvchgFIAEoCUgDiAEBQgwKCl9uYW1lc3BhY2VCBwoFX25hbWVCDgoMX2xhdGVzdF9vbmx5Qg4KDF9wYWdlX2N1cnNvciKzAQoXTGlzdERlZmluaXRpb25zUmVzcG9uc2USOgoLZGVmaW5pdGlvbnMYASADKAsyJS5sZW1saW5lLmdhdGV3YXkudjEuRGVmaW5pdGlvblN1bW1hcnkSHQoQbmV4dF9wYWdlX2N1cnNvchgCIAEoCUgAiAEBEhgKC3RvdGFsX2NvdW50GAMgASgDSAGIAQFCEwoRX25leHRfcGFnZV9jdXJzb3JCDgoMX3RvdGFsX2NvdW50IlkKFEdldERlZmluaXRpb25SZXF1ZXN0EhEKCW5hbWVzcGFjZRgBIAEoCRIMCgRuYW1lGAIgASgJEhQKB3ZlcnNpb24YAyABKAlIAIgBAUIKCghfdmVyc2lvbiJTChVHZXREZWZpbml0aW9uUmVzcG9uc2USOgoKZGVmaW5pdGlvbhgBIAEoCzImLmxlbWxpbmUuZ2F0ZXdheS52MS5Xb3JrZmxvd0RlZmluaXRpb24imQIKGkxpc3REZWZpbml0aW9uU3RhdHNSZXF1ZXN0EhYKCW5hbWVzcGFjZRgBIAEoCUgAiAEBEhEKBG5hbWUYAiABKAlIAYgBARIUCgd2ZXJzaW9uGAMgASgJSAKIAQESLQoJdGltZV9mcm9tGAQgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIrCgd0aW1lX3RvGAUgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIRCglwYWdlX3NpemUYBiABKAUSGAoLcGFnZV9jdXJzb3IYByABKAlIA4gBAUIMCgpfbmFtZXNwYWNlQgcKBV9uYW1lQgoKCF92ZXJzaW9uQg4KDF9wYWdlX2N1cnNvciLbAQobTGlzdERlZmluaXRpb25TdGF0c1Jlc3BvbnNlEjIKBXN0YXRzGAEgAygLMiMubGVtbGluZS5nYXRld2F5LnYxLkRlZmluaXRpb25TdGF0cxIdChBuZXh0X3BhZ2VfY3Vyc29yGAIgASgJSACIAQESGQoMd2F0Y2hfY3Vyc29yGAMgASgJSAGIAQESGAoLdG90YWxfY291bnQYBCABKANIAogBAUITChFfbmV4dF9wYWdlX2N1cnNvckIPCg1fd2F0Y2hfY3Vyc29yQg4KDF90b3RhbF9jb3VudCKJAgobV2F0Y2hEZWZpbml0aW9uU3RhdHNSZXF1ZXN0EhYKCW5hbWVzcGFjZRgBIAEoCUgAiAEBEhEKBG5hbWUYAiABKAlIAYgBARIUCgd2ZXJzaW9uGAMgASgJSAKIAQESLQoJdGltZV9mcm9tGAQgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIrCgd0aW1lX3RvGAUgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIZCgxhZnRlcl9jdXJzb3IYBiABKAlIA4gBAUIMCgpfbmFtZXNwYWNlQgcKBV9uYW1lQgoKCF92ZXJzaW9uQg8KDV9hZnRlcl9jdXJzb3IiaQocV2F0Y2hEZWZpbml0aW9uU3RhdHNSZXNwb25zZRIOCgZjdXJzb3IYASABKAkSOQoGY2hhbmdlGAIgASgLMikubGVtbGluZS5nYXRld2F5LnYxLkRlZmluaXRpb25TdGF0c0NoYW5nZSLMAQoUU3RhcnRJbnN0YW5jZVJlcXVlc3QSEQoJbmFtZXNwYWNlGAEgASgJEgwKBG5hbWUYAiABKAkSFAoHdmVyc2lvbhgDIAEoCUgAiAEBEhgKC2luc3RhbmNlX2lkGAQgASgJSAGIAQESJQoFaW5wdXQYBSABKAsyFi5nb29nbGUucHJvdG9idWYuVmFsdWUSFAoHem9uZV9pZBgGIAEoCUgCiAEBQgoKCF92ZXJzaW9uQg4KDF9pbnN0YW5jZV9pZEIKCghfem9uZV9pZCLfAQoVU3RhcnRJbnN0YW5jZVJlc3BvbnNlEhMKC2luc3RhbmNlX2lkGAEgASgJEhEKCW5hbWVzcGFjZRgCIAEoCRIMCgRuYW1lGAMgASgJEg8KB3ZlcnNpb24YBCABKAkSNwoGcmVzdWx0GAUgASgOMicubGVtbGluZS5nYXRld2F5LnYxLlN0YXJ0SW5zdGFuY2VSZXN1bHQSFQoNc2NoZWR1bGVfb25seRgGIAEoCBIvCgtuZXh0X3J1bl9hdBgHIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXAiKQoSR2V0SW5zdGFuY2VSZXF1ZXN0EhMKC2luc3RhbmNlX2lkGAEgASgJIoYBChNHZXRJbnN0YW5jZVJlc3BvbnNlEjUKCGluc3RhbmNlGAEgASgLMiMubGVtbGluZS5nYXRld2F5LnYxLkluc3RhbmNlU3VtbWFyeRIgChNsYXRlc3RfZXZlbnRfY3Vyc29yGAIgASgJSACIAQFCFgoUX2xhdGVzdF9ldmVudF9jdXJzb3IilQMKFExpc3RJbnN0YW5jZXNSZXF1ZXN0EhYKCW5hbWVzcGFjZRgBIAEoCUgAiAEBEhEKBG5hbWUYAiABKAlIAYgBARIUCgd2ZXJzaW9uGAMgASgJSAKIAQESNwoGc3RhdHVzGAQgASgOMiIubGVtbGluZS5nYXRld2F5LnYxLkluc3RhbmNlU3RhdHVzSAOIAQESMAoMY3JlYXRlZF9mcm9tGAUgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIuCgpjcmVhdGVkX3RvGAYgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIRCglwYWdlX3NpemUYByABKAUSGAoLcGFnZV9jdXJzb3IYCCABKAlIBIgBARIfChJpbnN0YW5jZV9pZF9wcmVmaXgYCSABKAlIBYgBAUIMCgpfbmFtZXNwYWNlQgcKBV9uYW1lQgoKCF92ZXJzaW9uQgkKB19zdGF0dXNCDgoMX3BhZ2VfY3Vyc29yQhUKE19pbnN0YW5jZV9pZF9wcmVmaXgi2QEKFUxpc3RJbnN0YW5jZXNSZXNwb25zZRI2CglpbnN0YW5jZXMYASADKAsyIy5sZW1saW5lLmdhdGV3YXkudjEuSW5zdGFuY2VTdW1tYXJ5Eh0KEG5leHRfcGFnZV9jdXJzb3IYAiABKAlIAIgBARIYCgt0b3RhbF9jb3VudBgDIAEoA0gBiAEBEhkKDHdhdGNoX2N1cnNvchgEIAEoCUgCiAEBQhMKEV9uZXh0X3BhZ2VfY3Vyc29yQg4KDF90b3RhbF9jb3VudEIPCg1fd2F0Y2hfY3Vyc29yIoUDChVXYXRjaEluc3RhbmNlc1JlcXVlc3QSFgoJbmFtZXNwYWNlGAEgASgJSACIAQESEQoEbmFtZRgCIAEoCUgBiAEBEhQKB3ZlcnNpb24YAyABKAlIAogBARI3CgZzdGF0dXMYBCABKA4yIi5sZW1saW5lLmdhdGV3YXkudjEuSW5zdGFuY2VTdGF0dXNIA4gBARIwCgxjcmVhdGVkX2Zyb20YBSABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEi4KCmNyZWF0ZWRfdG8YBiABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEh8KEmluc3RhbmNlX2lkX3ByZWZpeBgHIAEoCUgEiAEBEhkKDGFmdGVyX2N1cnNvchgIIAEoCUgFiAEBQgwKCl9uYW1lc3BhY2VCBwoFX25hbWVCCgoIX3ZlcnNpb25CCQoHX3N0YXR1c0IVChNfaW5zdGFuY2VfaWRfcHJlZml4Qg8KDV9hZnRlcl9jdXJzb3IiXAoWV2F0Y2hJbnN0YW5jZXNSZXNwb25zZRIOCgZjdXJzb3IYASABKAkSMgoGY2hhbmdlGAIgASgLMiIubGVtbGluZS5nYXRld2F5LnYxLkluc3RhbmNlQ2hhbmdlIm8KGUxpc3RJbnN0YW5jZUV2ZW50c1JlcXVlc3QSEwoLaW5zdGFuY2VfaWQYASABKAkSGQoMYWZ0ZXJfY3Vyc29yGAIgASgJSACIAQESEQoJcGFnZV9zaXplGAMgASgFQg8KDV9hZnRlcl9jdXJzb3IieQoaTGlzdEluc3RhbmNlRXZlbnRzUmVzcG9uc2USMQoGZXZlbnRzGAEgAygLMiEubGVtbGluZS5nYXRld2F5LnYxLkluc3RhbmNlRXZlbnQSGAoLbmV4dF9jdXJzb3IYAiABKAlIAIgBAUIOCgxfbmV4dF9jdXJzb3IiXQoaV2F0Y2hJbnN0YW5jZUV2ZW50c1JlcXVlc3QSEwoLaW5zdGFuY2VfaWQYASABKAkSGQoMYWZ0ZXJfY3Vyc29yGAIgASgJSACIAQFCDwoNX2FmdGVyX2N1cnNvciJPChtXYXRjaEluc3RhbmNlRXZlbnRzUmVzcG9uc2USMAoFZXZlbnQYASABKAsyIS5sZW1saW5lLmdhdGV3YXkudjEuSW5zdGFuY2VFdmVudCqnAQoOSW5zdGFuY2VTdGF0dXMSHwobSU5TVEFOQ0VfU1RBVFVTX1VOU1BFQ0lGSUVEEAASGwoXSU5TVEFOQ0VfU1RBVFVTX1BFTkRJTkcQARIbChdJTlNUQU5DRV9TVEFUVVNfUlVOTklORxACEh0KGUlOU1RBTkNFX1NUQVRVU19DT01QTEVURUQQAxIbChdJTlNUQU5DRV9TVEFUVVNfRkFVTFRFRBAEKpwBChlEZWZpbml0aW9uU3RhdHNDaGFuZ2VUeXBlEiwKKERFRklOSVRJT05fU1RBVFNfQ0hBTkdFX1RZUEVfVU5TUEVDSUZJRUQQABInCiNERUZJTklUSU9OX1NUQVRTX0NIQU5HRV9UWVBFX1VQU0VSVBABEigKJERFRklOSVRJT05fU1RBVFNfQ0hBTkdFX1RZUEVfUkVNT1ZFRBACKn0KEkluc3RhbmNlQ2hhbmdlVHlwZRIkCiBJTlNUQU5DRV9DSEFOR0VfVFlQRV9VTlNQRUNJRklFRBAAEh8KG0lOU1RBTkNFX0NIQU5HRV9UWVBFX1VQU0VSVBABEiAKHElOU1RBTkNFX0NIQU5HRV9UWVBFX1JFTU9WRUQQAiqRAQoTU3RhcnRJbnN0YW5jZVJlc3VsdBIlCiFTVEFSVF9JTlNUQU5DRV9SRVNVTFRfVU5TUEVDSUZJRUQQABImCiJTVEFSVF9JTlNUQU5DRV9SRVNVTFRfQUNDRVBURURfTkVXEAESKwonU1RBUlRfSU5TVEFOQ0VfUkVTVUxUX0FDQ0VQVEVEX0VYSVNUSU5HEAIy3QgKDkdhdGV3YXlTZXJ2aWNlEmoKD0xpc3REZWZpbml0aW9ucxIqLmxlbWxpbmUuZ2F0ZXdheS52MS5MaXN0RGVmaW5pdGlvbnNSZXF1ZXN0GisubGVtbGluZS5nYXRld2F5LnYxLkxpc3REZWZpbml0aW9uc1Jlc3BvbnNlEmQKDUdldERlZmluaXRpb24SKC5sZW1saW5lLmdhdGV3YXkudjEuR2V0RGVmaW5pdGlvblJlcXVlc3QaKS5sZW1saW5lLmdhdGV3YXkudjEuR2V0RGVmaW5pdGlvblJlc3BvbnNlEnYKE0xpc3REZWZpbml0aW9uU3RhdHMSLi5sZW1saW5lLmdhdGV3YXkudjEuTGlzdERlZmluaXRpb25TdGF0c1JlcXVlc3QaLy5sZW1saW5lLmdhdGV3YXkudjEuTGlzdERlZmluaXRpb25TdGF0c1Jlc3BvbnNlEnsKFFdhdGNoRGVmaW5pdGlvblN0YXRzEi8ubGVtbGluZS5nYXRld2F5LnYxLldhdGNoRGVmaW5pdGlvblN0YXRzUmVxdWVzdBowLmxlbWxpbmUuZ2F0ZXdheS52MS5XYXRjaERlZmluaXRpb25TdGF0c1Jlc3BvbnNlMAESZAoNU3RhcnRJbnN0YW5jZRIoLmxlbWxpbmUuZ2F0ZXdheS52MS5TdGFydEluc3RhbmNlUmVxdWVzdBopLmxlbWxpbmUuZ2F0ZXdheS52MS5TdGFydEluc3RhbmNlUmVzcG9uc2USXgoLR2V0SW5zdGFuY2USJi5sZW1saW5lLmdhdGV3YXkudjEuR2V0SW5zdGFuY2VSZXF1ZXN0GicubGVtbGluZS5nYXRld2F5LnYxLkdldEluc3RhbmNlUmVzcG9uc2USZAoNTGlzdEluc3RhbmNlcxIoLmxlbWxpbmUuZ2F0ZXdheS52MS5MaXN0SW5zdGFuY2VzUmVxdWVzdBopLmxlbWxpbmUuZ2F0ZXdheS52MS5MaXN0SW5zdGFuY2VzUmVzcG9uc2USaQoOV2F0Y2hJbnN0YW5jZXMSKS5sZW1saW5lLmdhdGV3YXkudjEuV2F0Y2hJbnN0YW5jZXNSZXF1ZXN0GioubGVtbGluZS5nYXRld2F5LnYxLldhdGNoSW5zdGFuY2VzUmVzcG9uc2UwARJzChJMaXN0SW5zdGFuY2VFdmVudHMSLS5sZW1saW5lLmdhdGV3YXkudjEuTGlzdEluc3RhbmNlRXZlbnRzUmVxdWVzdBouLmxlbWxpbmUuZ2F0ZXdheS52MS5MaXN0SW5zdGFuY2VFdmVudHNSZXNwb25zZRJ4ChNXYXRjaEluc3RhbmNlRXZlbnRzEi4ubGVtbGluZS5nYXRld2F5LnYxLldhdGNoSW5zdGFuY2VFdmVudHNSZXF1ZXN0Gi8ubGVtbGluZS5nYXRld2F5LnYxLldhdGNoSW5zdGFuY2VFdmVudHNSZXNwb25zZTABQigKFmNvbS5sZW1saW5lLmdhdGV3YXkudjFCDEdhdGV3YXlQcm90b1ABYgZwcm90bzM", [file_google_protobuf_duration, file_google_protobuf_struct, file_google_protobuf_timestamp]);
+  fileDesc("CiZwcm90by9sZW1saW5lL2dhdGV3YXkvdjEvZ2F0ZXdheS5wcm90bxISbGVtbGluZS5nYXRld2F5LnYxIs8BChFEZWZpbml0aW9uU3VtbWFyeRIRCgluYW1lc3BhY2UYASABKAkSDAoEbmFtZRgCIAEoCRIPCgd2ZXJzaW9uGAMgASgJEhEKCWlzX2xhdGVzdBgEIAEoCBIVCg12ZXJzaW9uX2NvdW50GAUgASgFEi4KCmNyZWF0ZWRfYXQYBiABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEi4KCnVwZGF0ZWRfYXQYByABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wItIBChJXb3JrZmxvd0RlZmluaXRpb24SEQoJbmFtZXNwYWNlGAEgASgJEgwKBG5hbWUYAiABKAkSDwoHdmVyc2lvbhgDIAEoCRIOCgZzb3VyY2UYBCABKAkSGgoSYXZhaWxhYmxlX3ZlcnNpb25zGAUgAygJEi4KCmNyZWF0ZWRfYXQYBiABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEi4KCnVwZGF0ZWRfYXQYByABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wIqwBCg9EZWZpbml0aW9uU3RhdHMSEQoJbmFtZXNwYWNlGAEgASgJEgwKBG5hbWUYAiABKAkSDwoHdmVyc2lvbhgDIAEoCRIVCg1zdGFydGVkX2NvdW50GAQgASgDEhcKD2NvbXBsZXRlZF9jb3VudBgFIAEoAxIVCg1mYXVsdGVkX2NvdW50GAYgASgDEiAKGHJ1bm5pbmdfY291bnRfYXRfdGltZV90bxgHIAEoAyJLCgxFcnJvclN1bW1hcnkSDAoEdHlwZRgBIAEoCRITCgZzdGF0dXMYAiABKAVIAIgBARINCgV0aXRsZRgDIAEoCUIJCgdfc3RhdHVzIqwDCg9JbnN0YW5jZVN1bW1hcnkSEwoLaW5zdGFuY2VfaWQYASABKAkSEQoJbmFtZXNwYWNlGAIgASgJEgwKBG5hbWUYAyABKAkSDwoHdmVyc2lvbhgEIAEoCRIyCgZzdGF0dXMYBSABKA4yIi5sZW1saW5lLmdhdGV3YXkudjEuSW5zdGFuY2VTdGF0dXMSLgoKY3JlYXRlZF9hdBgGIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASLgoKc3RhcnRlZF9hdBgHIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASMAoMY29tcGxldGVkX2F0GAggASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIuCgpmYXVsdGVkX2F0GAkgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIrCghkdXJhdGlvbhgKIAEoCzIZLmdvb2dsZS5wcm90b2J1Zi5EdXJhdGlvbhIvCgVlcnJvchgLIAEoCzIgLmxlbWxpbmUuZ2F0ZXdheS52MS5FcnJvclN1bW1hcnkikgEKDUluc3RhbmNlRXZlbnQSDgoGY3Vyc29yGAEgASgJEhMKC2luc3RhbmNlX2lkGAIgASgJEhIKCmV2ZW50X3R5cGUYAyABKAkSLgoKZXZlbnRfdGltZRgEIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASGAoQY2xvdWRfZXZlbnRfanNvbhgFIAEoCSKPAQoVRGVmaW5pdGlvblN0YXRzQ2hhbmdlEkIKC2NoYW5nZV90eXBlGAEgASgOMi0ubGVtbGluZS5nYXRld2F5LnYxLkRlZmluaXRpb25TdGF0c0NoYW5nZVR5cGUSMgoFc3RhdHMYAiABKAsyIy5sZW1saW5lLmdhdGV3YXkudjEuRGVmaW5pdGlvblN0YXRzIoQBCg5JbnN0YW5jZUNoYW5nZRI7CgtjaGFuZ2VfdHlwZRgBIAEoDjImLmxlbWxpbmUuZ2F0ZXdheS52MS5JbnN0YW5jZUNoYW5nZVR5cGUSNQoIaW5zdGFuY2UYAiABKAsyIy5sZW1saW5lLmdhdGV3YXkudjEuSW5zdGFuY2VTdW1tYXJ5IsEBChZMaXN0RGVmaW5pdGlvbnNSZXF1ZXN0EhYKCW5hbWVzcGFjZRgBIAEoCUgAiAEBEhEKBG5hbWUYAiABKAlIAYgBARIYCgtsYXRlc3Rfb25seRgDIAEoCEgCiAEBEhEKCXBhZ2Vfc2l6ZRgEIAEoBRIYCgtwYWdlX2N1cnNvchgFIAEoCUgDiAEBQgwKCl9uYW1lc3BhY2VCBwoFX25hbWVCDgoMX2xhdGVzdF9vbmx5Qg4KDF9wYWdlX2N1cnNvciKzAQoXTGlzdERlZmluaXRpb25zUmVzcG9uc2USOgoLZGVmaW5pdGlvbnMYASADKAsyJS5sZW1saW5lLmdhdGV3YXkudjEuRGVmaW5pdGlvblN1bW1hcnkSHQoQbmV4dF9wYWdlX2N1cnNvchgCIAEoCUgAiAEBEhgKC3RvdGFsX2NvdW50GAMgASgDSAGIAQFCEwoRX25leHRfcGFnZV9jdXJzb3JCDgoMX3RvdGFsX2NvdW50IlkKFEdldERlZmluaXRpb25SZXF1ZXN0EhEKCW5hbWVzcGFjZRgBIAEoCRIMCgRuYW1lGAIgASgJEhQKB3ZlcnNpb24YAyABKAlIAIgBAUIKCghfdmVyc2lvbiJTChVHZXREZWZpbml0aW9uUmVzcG9uc2USOgoKZGVmaW5pdGlvbhgBIAEoCzImLmxlbWxpbmUuZ2F0ZXdheS52MS5Xb3JrZmxvd0RlZmluaXRpb24imQIKGkxpc3REZWZpbml0aW9uU3RhdHNSZXF1ZXN0EhYKCW5hbWVzcGFjZRgBIAEoCUgAiAEBEhEKBG5hbWUYAiABKAlIAYgBARIUCgd2ZXJzaW9uGAMgASgJSAKIAQESLQoJdGltZV9mcm9tGAQgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIrCgd0aW1lX3RvGAUgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIRCglwYWdlX3NpemUYBiABKAUSGAoLcGFnZV9jdXJzb3IYByABKAlIA4gBAUIMCgpfbmFtZXNwYWNlQgcKBV9uYW1lQgoKCF92ZXJzaW9uQg4KDF9wYWdlX2N1cnNvciLbAQobTGlzdERlZmluaXRpb25TdGF0c1Jlc3BvbnNlEjIKBXN0YXRzGAEgAygLMiMubGVtbGluZS5nYXRld2F5LnYxLkRlZmluaXRpb25TdGF0cxIdChBuZXh0X3BhZ2VfY3Vyc29yGAIgASgJSACIAQESGQoMd2F0Y2hfY3Vyc29yGAMgASgJSAGIAQESGAoLdG90YWxfY291bnQYBCABKANIAogBAUITChFfbmV4dF9wYWdlX2N1cnNvckIPCg1fd2F0Y2hfY3Vyc29yQg4KDF90b3RhbF9jb3VudCKJAgobV2F0Y2hEZWZpbml0aW9uU3RhdHNSZXF1ZXN0EhYKCW5hbWVzcGFjZRgBIAEoCUgAiAEBEhEKBG5hbWUYAiABKAlIAYgBARIUCgd2ZXJzaW9uGAMgASgJSAKIAQESLQoJdGltZV9mcm9tGAQgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIrCgd0aW1lX3RvGAUgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIZCgxhZnRlcl9jdXJzb3IYBiABKAlIA4gBAUIMCgpfbmFtZXNwYWNlQgcKBV9uYW1lQgoKCF92ZXJzaW9uQg8KDV9hZnRlcl9jdXJzb3IiaQocV2F0Y2hEZWZpbml0aW9uU3RhdHNSZXNwb25zZRIOCgZjdXJzb3IYASABKAkSOQoGY2hhbmdlGAIgASgLMikubGVtbGluZS5nYXRld2F5LnYxLkRlZmluaXRpb25TdGF0c0NoYW5nZSLMAQoUU3RhcnRJbnN0YW5jZVJlcXVlc3QSEQoJbmFtZXNwYWNlGAEgASgJEgwKBG5hbWUYAiABKAkSFAoHdmVyc2lvbhgDIAEoCUgAiAEBEhgKC2luc3RhbmNlX2lkGAQgASgJSAGIAQESJQoFaW5wdXQYBSABKAsyFi5nb29nbGUucHJvdG9idWYuVmFsdWUSFAoHem9uZV9pZBgGIAEoCUgCiAEBQgoKCF92ZXJzaW9uQg4KDF9pbnN0YW5jZV9pZEIKCghfem9uZV9pZCLfAQoVU3RhcnRJbnN0YW5jZVJlc3BvbnNlEhMKC2luc3RhbmNlX2lkGAEgASgJEhEKCW5hbWVzcGFjZRgCIAEoCRIMCgRuYW1lGAMgASgJEg8KB3ZlcnNpb24YBCABKAkSNwoGcmVzdWx0GAUgASgOMicubGVtbGluZS5nYXRld2F5LnYxLlN0YXJ0SW5zdGFuY2VSZXN1bHQSFQoNc2NoZWR1bGVfb25seRgGIAEoCBIvCgtuZXh0X3J1bl9hdBgHIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXAiKQoSR2V0SW5zdGFuY2VSZXF1ZXN0EhMKC2luc3RhbmNlX2lkGAEgASgJIoYBChNHZXRJbnN0YW5jZVJlc3BvbnNlEjUKCGluc3RhbmNlGAEgASgLMiMubGVtbGluZS5nYXRld2F5LnYxLkluc3RhbmNlU3VtbWFyeRIgChNsYXRlc3RfZXZlbnRfY3Vyc29yGAIgASgJSACIAQFCFgoUX2xhdGVzdF9ldmVudF9jdXJzb3IilQMKFExpc3RJbnN0YW5jZXNSZXF1ZXN0EhYKCW5hbWVzcGFjZRgBIAEoCUgAiAEBEhEKBG5hbWUYAiABKAlIAYgBARIUCgd2ZXJzaW9uGAMgASgJSAKIAQESNwoGc3RhdHVzGAQgASgOMiIubGVtbGluZS5nYXRld2F5LnYxLkluc3RhbmNlU3RhdHVzSAOIAQESMAoMY3JlYXRlZF9mcm9tGAUgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIuCgpjcmVhdGVkX3RvGAYgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIRCglwYWdlX3NpemUYByABKAUSGAoLcGFnZV9jdXJzb3IYCCABKAlIBIgBARIfChJpbnN0YW5jZV9pZF9wcmVmaXgYCSABKAlIBYgBAUIMCgpfbmFtZXNwYWNlQgcKBV9uYW1lQgoKCF92ZXJzaW9uQgkKB19zdGF0dXNCDgoMX3BhZ2VfY3Vyc29yQhUKE19pbnN0YW5jZV9pZF9wcmVmaXgi2QEKFUxpc3RJbnN0YW5jZXNSZXNwb25zZRI2CglpbnN0YW5jZXMYASADKAsyIy5sZW1saW5lLmdhdGV3YXkudjEuSW5zdGFuY2VTdW1tYXJ5Eh0KEG5leHRfcGFnZV9jdXJzb3IYAiABKAlIAIgBARIYCgt0b3RhbF9jb3VudBgDIAEoA0gBiAEBEhkKDHdhdGNoX2N1cnNvchgEIAEoCUgCiAEBQhMKEV9uZXh0X3BhZ2VfY3Vyc29yQg4KDF90b3RhbF9jb3VudEIPCg1fd2F0Y2hfY3Vyc29yIoUDChVXYXRjaEluc3RhbmNlc1JlcXVlc3QSFgoJbmFtZXNwYWNlGAEgASgJSACIAQESEQoEbmFtZRgCIAEoCUgBiAEBEhQKB3ZlcnNpb24YAyABKAlIAogBARI3CgZzdGF0dXMYBCABKA4yIi5sZW1saW5lLmdhdGV3YXkudjEuSW5zdGFuY2VTdGF0dXNIA4gBARIwCgxjcmVhdGVkX2Zyb20YBSABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEi4KCmNyZWF0ZWRfdG8YBiABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEh8KEmluc3RhbmNlX2lkX3ByZWZpeBgHIAEoCUgEiAEBEhkKDGFmdGVyX2N1cnNvchgIIAEoCUgFiAEBQgwKCl9uYW1lc3BhY2VCBwoFX25hbWVCCgoIX3ZlcnNpb25CCQoHX3N0YXR1c0IVChNfaW5zdGFuY2VfaWRfcHJlZml4Qg8KDV9hZnRlcl9jdXJzb3IiXAoWV2F0Y2hJbnN0YW5jZXNSZXNwb25zZRIOCgZjdXJzb3IYASABKAkSMgoGY2hhbmdlGAIgASgLMiIubGVtbGluZS5nYXRld2F5LnYxLkluc3RhbmNlQ2hhbmdlIm8KGUxpc3RJbnN0YW5jZUV2ZW50c1JlcXVlc3QSEwoLaW5zdGFuY2VfaWQYASABKAkSGQoMYWZ0ZXJfY3Vyc29yGAIgASgJSACIAQESEQoJcGFnZV9zaXplGAMgASgFQg8KDV9hZnRlcl9jdXJzb3IieQoaTGlzdEluc3RhbmNlRXZlbnRzUmVzcG9uc2USMQoGZXZlbnRzGAEgAygLMiEubGVtbGluZS5nYXRld2F5LnYxLkluc3RhbmNlRXZlbnQSGAoLbmV4dF9jdXJzb3IYAiABKAlIAIgBAUIOCgxfbmV4dF9jdXJzb3IiXQoaV2F0Y2hJbnN0YW5jZUV2ZW50c1JlcXVlc3QSEwoLaW5zdGFuY2VfaWQYASABKAkSGQoMYWZ0ZXJfY3Vyc29yGAIgASgJSACIAQFCDwoNX2FmdGVyX2N1cnNvciJPChtXYXRjaEluc3RhbmNlRXZlbnRzUmVzcG9uc2USMAoFZXZlbnQYASABKAsyIS5sZW1saW5lLmdhdGV3YXkudjEuSW5zdGFuY2VFdmVudCIZChdHZXRHYXRld2F5Q29uZmlnUmVxdWVzdCLJAQoYR2V0R2F0ZXdheUNvbmZpZ1Jlc3BvbnNlEjQKCHNldHRpbmdzGAEgAygLMiIubGVtbGluZS5nYXRld2F5LnYxLkdhdGV3YXlTZXR0aW5nEjgKC2NvbmZpZ19maWxlGAIgASgLMh4ubGVtbGluZS5nYXRld2F5LnYxLkNvbmZpZ0ZpbGVIAIgBARItCglsb2FkZWRfYXQYAyABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wQg4KDF9jb25maWdfZmlsZSKIAgoOR2F0ZXdheVNldHRpbmcSCwoDa2V5GAEgASgJEhIKBXZhbHVlGAIgASgJSACIAQESMQoGb3JpZ2luGAMgASgOMiEubGVtbGluZS5nYXRld2F5LnYxLlNldHRpbmdPcmlnaW4SFQoNb3JpZ2luX2RldGFpbBgEIAEoCRIaCg1kZWZhdWx0X3ZhbHVlGAUgASgJSAGIAQESDgoGc2VjcmV0GAYgASgIEg4KBmlzX3NldBgHIAEoCBIzCghzaGFkb3dlZBgIIAMoDjIhLmxlbWxpbmUuZ2F0ZXdheS52MS5TZXR0aW5nT3JpZ2luQggKBl92YWx1ZUIQCg5fZGVmYXVsdF92YWx1ZSKiAQoKQ29uZmlnRmlsZRIMCgRwYXRoGAEgASgJEjkKCmxvY2F0ZWRfYnkYAiABKA4yJS5sZW1saW5lLmdhdGV3YXkudjEuQ29uZmlnRmlsZUxvY2F0b3ISEQoEdGV4dBgDIAEoCUgAiAEBEi8KBGtleXMYBCADKAsyIS5sZW1saW5lLmdhdGV3YXkudjEuQ29uZmlnRmlsZUtleUIHCgVfdGV4dCKSAQoNQ29uZmlnRmlsZUtleRILCgNrZXkYASABKAkSDAoEbGluZRgCIAEoBRI4Cg1vdmVycmlkZGVuX2J5GAMgASgOMiEubGVtbGluZS5nYXRld2F5LnYxLlNldHRpbmdPcmlnaW4SHAoUb3ZlcnJpZGRlbl9ieV9kZXRhaWwYBCABKAkSDgoGc2VjcmV0GAUgASgIKqcBCg5JbnN0YW5jZVN0YXR1cxIfChtJTlNUQU5DRV9TVEFUVVNfVU5TUEVDSUZJRUQQABIbChdJTlNUQU5DRV9TVEFUVVNfUEVORElORxABEhsKF0lOU1RBTkNFX1NUQVRVU19SVU5OSU5HEAISHQoZSU5TVEFOQ0VfU1RBVFVTX0NPTVBMRVRFRBADEhsKF0lOU1RBTkNFX1NUQVRVU19GQVVMVEVEEAQqnAEKGURlZmluaXRpb25TdGF0c0NoYW5nZVR5cGUSLAooREVGSU5JVElPTl9TVEFUU19DSEFOR0VfVFlQRV9VTlNQRUNJRklFRBAAEicKI0RFRklOSVRJT05fU1RBVFNfQ0hBTkdFX1RZUEVfVVBTRVJUEAESKAokREVGSU5JVElPTl9TVEFUU19DSEFOR0VfVFlQRV9SRU1PVkVEEAIqfQoSSW5zdGFuY2VDaGFuZ2VUeXBlEiQKIElOU1RBTkNFX0NIQU5HRV9UWVBFX1VOU1BFQ0lGSUVEEAASHwobSU5TVEFOQ0VfQ0hBTkdFX1RZUEVfVVBTRVJUEAESIAocSU5TVEFOQ0VfQ0hBTkdFX1RZUEVfUkVNT1ZFRBACKpEBChNTdGFydEluc3RhbmNlUmVzdWx0EiUKIVNUQVJUX0lOU1RBTkNFX1JFU1VMVF9VTlNQRUNJRklFRBAAEiYKIlNUQVJUX0lOU1RBTkNFX1JFU1VMVF9BQ0NFUFRFRF9ORVcQARIrCidTVEFSVF9JTlNUQU5DRV9SRVNVTFRfQUNDRVBURURfRVhJU1RJTkcQAirpAQoNU2V0dGluZ09yaWdpbhIeChpTRVRUSU5HX09SSUdJTl9VTlNQRUNJRklFRBAAEiIKHlNFVFRJTkdfT1JJR0lOX1NZU1RFTV9QUk9QRVJUWRABEh4KGlNFVFRJTkdfT1JJR0lOX0VOVklST05NRU5UEAISHgoaU0VUVElOR19PUklHSU5fQ09ORklHX0ZJTEUQAxIeChpTRVRUSU5HX09SSUdJTl9BUFBMSUNBVElPThAEEhoKFlNFVFRJTkdfT1JJR0lOX0RFRkFVTFQQBRIYChRTRVRUSU5HX09SSUdJTl9VTlNFVBAGKqMBChFDb25maWdGaWxlTG9jYXRvchIjCh9DT05GSUdfRklMRV9MT0NBVE9SX1VOU1BFQ0lGSUVEEAASHgoaQ09ORklHX0ZJTEVfTE9DQVRPUl9PUFRJT04QARIjCh9DT05GSUdfRklMRV9MT0NBVE9SX0VOVklST05NRU5UEAISJAogQ09ORklHX0ZJTEVfTE9DQVRPUl9ERUZBVUxUX1BBVEgQAzLMCQoOR2F0ZXdheVNlcnZpY2USagoPTGlzdERlZmluaXRpb25zEioubGVtbGluZS5nYXRld2F5LnYxLkxpc3REZWZpbml0aW9uc1JlcXVlc3QaKy5sZW1saW5lLmdhdGV3YXkudjEuTGlzdERlZmluaXRpb25zUmVzcG9uc2USZAoNR2V0RGVmaW5pdGlvbhIoLmxlbWxpbmUuZ2F0ZXdheS52MS5HZXREZWZpbml0aW9uUmVxdWVzdBopLmxlbWxpbmUuZ2F0ZXdheS52MS5HZXREZWZpbml0aW9uUmVzcG9uc2USdgoTTGlzdERlZmluaXRpb25TdGF0cxIuLmxlbWxpbmUuZ2F0ZXdheS52MS5MaXN0RGVmaW5pdGlvblN0YXRzUmVxdWVzdBovLmxlbWxpbmUuZ2F0ZXdheS52MS5MaXN0RGVmaW5pdGlvblN0YXRzUmVzcG9uc2USewoUV2F0Y2hEZWZpbml0aW9uU3RhdHMSLy5sZW1saW5lLmdhdGV3YXkudjEuV2F0Y2hEZWZpbml0aW9uU3RhdHNSZXF1ZXN0GjAubGVtbGluZS5nYXRld2F5LnYxLldhdGNoRGVmaW5pdGlvblN0YXRzUmVzcG9uc2UwARJkCg1TdGFydEluc3RhbmNlEigubGVtbGluZS5nYXRld2F5LnYxLlN0YXJ0SW5zdGFuY2VSZXF1ZXN0GikubGVtbGluZS5nYXRld2F5LnYxLlN0YXJ0SW5zdGFuY2VSZXNwb25zZRJeCgtHZXRJbnN0YW5jZRImLmxlbWxpbmUuZ2F0ZXdheS52MS5HZXRJbnN0YW5jZVJlcXVlc3QaJy5sZW1saW5lLmdhdGV3YXkudjEuR2V0SW5zdGFuY2VSZXNwb25zZRJkCg1MaXN0SW5zdGFuY2VzEigubGVtbGluZS5nYXRld2F5LnYxLkxpc3RJbnN0YW5jZXNSZXF1ZXN0GikubGVtbGluZS5nYXRld2F5LnYxLkxpc3RJbnN0YW5jZXNSZXNwb25zZRJpCg5XYXRjaEluc3RhbmNlcxIpLmxlbWxpbmUuZ2F0ZXdheS52MS5XYXRjaEluc3RhbmNlc1JlcXVlc3QaKi5sZW1saW5lLmdhdGV3YXkudjEuV2F0Y2hJbnN0YW5jZXNSZXNwb25zZTABEnMKEkxpc3RJbnN0YW5jZUV2ZW50cxItLmxlbWxpbmUuZ2F0ZXdheS52MS5MaXN0SW5zdGFuY2VFdmVudHNSZXF1ZXN0Gi4ubGVtbGluZS5nYXRld2F5LnYxLkxpc3RJbnN0YW5jZUV2ZW50c1Jlc3BvbnNlEngKE1dhdGNoSW5zdGFuY2VFdmVudHMSLi5sZW1saW5lLmdhdGV3YXkudjEuV2F0Y2hJbnN0YW5jZUV2ZW50c1JlcXVlc3QaLy5sZW1saW5lLmdhdGV3YXkudjEuV2F0Y2hJbnN0YW5jZUV2ZW50c1Jlc3BvbnNlMAESbQoQR2V0R2F0ZXdheUNvbmZpZxIrLmxlbWxpbmUuZ2F0ZXdheS52MS5HZXRHYXRld2F5Q29uZmlnUmVxdWVzdBosLmxlbWxpbmUuZ2F0ZXdheS52MS5HZXRHYXRld2F5Q29uZmlnUmVzcG9uc2VCKAoWY29tLmxlbWxpbmUuZ2F0ZXdheS52MUIMR2F0ZXdheVByb3RvUAFiBnByb3RvMw", [file_google_protobuf_duration, file_google_protobuf_struct, file_google_protobuf_timestamp]);
 
 /**
  * A lightweight definition row used in catalog and selector views.
@@ -1309,6 +1309,220 @@ export const WatchInstanceEventsResponseSchema: GenMessage<WatchInstanceEventsRe
   messageDesc(file_proto_lemline_gateway_v1_gateway, 27);
 
 /**
+ * Request for GetGatewayConfig.
+ *
+ * @generated from message lemline.gateway.v1.GetGatewayConfigRequest
+ */
+export type GetGatewayConfigRequest = Message<"lemline.gateway.v1.GetGatewayConfigRequest"> & {
+};
+
+/**
+ * Describes the message lemline.gateway.v1.GetGatewayConfigRequest.
+ * Use `create(GetGatewayConfigRequestSchema)` to create a new message.
+ */
+export const GetGatewayConfigRequestSchema: GenMessage<GetGatewayConfigRequest> = /*@__PURE__*/
+  messageDesc(file_proto_lemline_gateway_v1_gateway, 28);
+
+/**
+ * Response for GetGatewayConfig.
+ *
+ * @generated from message lemline.gateway.v1.GetGatewayConfigResponse
+ */
+export type GetGatewayConfigResponse = Message<"lemline.gateway.v1.GetGatewayConfigResponse"> & {
+  /**
+   * Gateway settings (lemline.gateway.* and lemline.namespaces), sorted by key.
+   * Every declared key is listed, including unset ones.
+   *
+   * @generated from field: repeated lemline.gateway.v1.GatewaySetting settings = 1;
+   */
+  settings: GatewaySetting[];
+
+  /**
+   * The external configuration file, when one was loaded.
+   *
+   * @generated from field: optional lemline.gateway.v1.ConfigFile config_file = 2;
+   */
+  configFile?: ConfigFile | undefined;
+
+  /**
+   * When the gateway process started and read its configuration.
+   *
+   * @generated from field: google.protobuf.Timestamp loaded_at = 3;
+   */
+  loadedAt?: Timestamp | undefined;
+};
+
+/**
+ * Describes the message lemline.gateway.v1.GetGatewayConfigResponse.
+ * Use `create(GetGatewayConfigResponseSchema)` to create a new message.
+ */
+export const GetGatewayConfigResponseSchema: GenMessage<GetGatewayConfigResponse> = /*@__PURE__*/
+  messageDesc(file_proto_lemline_gateway_v1_gateway, 29);
+
+/**
+ * One configuration key and the origin of its effective value.
+ *
+ * @generated from message lemline.gateway.v1.GatewaySetting
+ */
+export type GatewaySetting = Message<"lemline.gateway.v1.GatewaySetting"> & {
+  /**
+   * Full key, e.g. "lemline.gateway.cors.origins".
+   *
+   * @generated from field: string key = 1;
+   */
+  key: string;
+
+  /**
+   * Effective value as text. Absent when the key is unset, or when the setting is a secret.
+   *
+   * @generated from field: optional string value = 2;
+   */
+  value?: string | undefined;
+
+  /**
+   * Where the effective value comes from.
+   *
+   * @generated from field: lemline.gateway.v1.SettingOrigin origin = 3;
+   */
+  origin: SettingOrigin;
+
+  /**
+   * Name to look for at the origin: the environment variable (LEMLINE_GATEWAY_CORS_ORIGINS),
+   * the system property, or the configuration file path. Empty for the other origins.
+   *
+   * @generated from field: string origin_detail = 4;
+   */
+  originDetail: string;
+
+  /**
+   * Built-in default, when the key has one.
+   *
+   * @generated from field: optional string default_value = 5;
+   */
+  defaultValue?: string | undefined;
+
+  /**
+   * True for secrets: the value is never sent and is_set tells whether one is configured.
+   *
+   * @generated from field: bool secret = 6;
+   */
+  secret: boolean;
+
+  /**
+   * True when the key has a value, whatever its origin.
+   *
+   * @generated from field: bool is_set = 7;
+   */
+  isSet: boolean;
+
+  /**
+   * Lower-priority origins that also set this key and are hidden by `origin`, highest first.
+   *
+   * @generated from field: repeated lemline.gateway.v1.SettingOrigin shadowed = 8;
+   */
+  shadowed: SettingOrigin[];
+};
+
+/**
+ * Describes the message lemline.gateway.v1.GatewaySetting.
+ * Use `create(GatewaySettingSchema)` to create a new message.
+ */
+export const GatewaySettingSchema: GenMessage<GatewaySetting> = /*@__PURE__*/
+  messageDesc(file_proto_lemline_gateway_v1_gateway, 30);
+
+/**
+ * The external configuration file as read at startup.
+ *
+ * @generated from message lemline.gateway.v1.ConfigFile
+ */
+export type ConfigFile = Message<"lemline.gateway.v1.ConfigFile"> & {
+  /**
+   * Absolute path of the file.
+   *
+   * @generated from field: string path = 1;
+   */
+  path: string;
+
+  /**
+   * How the file was found.
+   *
+   * @generated from field: lemline.gateway.v1.ConfigFileLocator located_by = 2;
+   */
+  locatedBy: ConfigFileLocator;
+
+  /**
+   * Full text with comments and layout kept, secret values replaced by "••••••••".
+   * Absent when the file is larger than 256 KiB or could not be parsed.
+   *
+   * @generated from field: optional string text = 3;
+   */
+  text?: string | undefined;
+
+  /**
+   * Keys set in the file, in file order, with their line in `text`.
+   *
+   * @generated from field: repeated lemline.gateway.v1.ConfigFileKey keys = 4;
+   */
+  keys: ConfigFileKey[];
+};
+
+/**
+ * Describes the message lemline.gateway.v1.ConfigFile.
+ * Use `create(ConfigFileSchema)` to create a new message.
+ */
+export const ConfigFileSchema: GenMessage<ConfigFile> = /*@__PURE__*/
+  messageDesc(file_proto_lemline_gateway_v1_gateway, 31);
+
+/**
+ * A key set in the configuration file.
+ *
+ * @generated from message lemline.gateway.v1.ConfigFileKey
+ */
+export type ConfigFileKey = Message<"lemline.gateway.v1.ConfigFileKey"> & {
+  /**
+   * Full key, e.g. "lemline.gateway.cors.origins".
+   *
+   * @generated from field: string key = 1;
+   */
+  key: string;
+
+  /**
+   * 1-based line of the key in ConfigFile.text.
+   *
+   * @generated from field: int32 line = 2;
+   */
+  line: number;
+
+  /**
+   * Set when a higher-priority origin replaces the file value.
+   *
+   * @generated from field: lemline.gateway.v1.SettingOrigin overridden_by = 3;
+   */
+  overriddenBy: SettingOrigin;
+
+  /**
+   * Environment variable or system property that replaces the file value.
+   *
+   * @generated from field: string overridden_by_detail = 4;
+   */
+  overriddenByDetail: string;
+
+  /**
+   * True when the value was redacted.
+   *
+   * @generated from field: bool secret = 5;
+   */
+  secret: boolean;
+};
+
+/**
+ * Describes the message lemline.gateway.v1.ConfigFileKey.
+ * Use `create(ConfigFileKeySchema)` to create a new message.
+ */
+export const ConfigFileKeySchema: GenMessage<ConfigFileKey> = /*@__PURE__*/
+  messageDesc(file_proto_lemline_gateway_v1_gateway, 32);
+
+/**
  * Current lifecycle status of one instance.
  *
  * @generated from enum lemline.gateway.v1.InstanceStatus
@@ -1459,6 +1673,103 @@ export const StartInstanceResultSchema: GenEnum<StartInstanceResult> = /*@__PURE
   enumDesc(file_proto_lemline_gateway_v1_gateway, 3);
 
 /**
+ * Where a configuration value comes from, highest priority first.
+ *
+ * @generated from enum lemline.gateway.v1.SettingOrigin
+ */
+export enum SettingOrigin {
+  /**
+   * @generated from enum value: SETTING_ORIGIN_UNSPECIFIED = 0;
+   */
+  UNSPECIFIED = 0,
+
+  /**
+   * -Dkey=value, or a command-line option mapped to it.
+   *
+   * @generated from enum value: SETTING_ORIGIN_SYSTEM_PROPERTY = 1;
+   */
+  SYSTEM_PROPERTY = 1,
+
+  /**
+   * @generated from enum value: SETTING_ORIGIN_ENVIRONMENT = 2;
+   */
+  ENVIRONMENT = 2,
+
+  /**
+   * The external configuration file (see ConfigFile).
+   *
+   * @generated from enum value: SETTING_ORIGIN_CONFIG_FILE = 3;
+   */
+  CONFIG_FILE = 3,
+
+  /**
+   * application.properties / application.yaml packaged with Lemline.
+   *
+   * @generated from enum value: SETTING_ORIGIN_APPLICATION = 4;
+   */
+  APPLICATION = 4,
+
+  /**
+   * Built-in default of the setting.
+   *
+   * @generated from enum value: SETTING_ORIGIN_DEFAULT = 5;
+   */
+  DEFAULT = 5,
+
+  /**
+   * No value and no default.
+   *
+   * @generated from enum value: SETTING_ORIGIN_UNSET = 6;
+   */
+  UNSET = 6,
+}
+
+/**
+ * Describes the enum lemline.gateway.v1.SettingOrigin.
+ */
+export const SettingOriginSchema: GenEnum<SettingOrigin> = /*@__PURE__*/
+  enumDesc(file_proto_lemline_gateway_v1_gateway, 4);
+
+/**
+ * How the configuration file was found.
+ *
+ * @generated from enum lemline.gateway.v1.ConfigFileLocator
+ */
+export enum ConfigFileLocator {
+  /**
+   * @generated from enum value: CONFIG_FILE_LOCATOR_UNSPECIFIED = 0;
+   */
+  UNSPECIFIED = 0,
+
+  /**
+   * Passed with --config / -c.
+   *
+   * @generated from enum value: CONFIG_FILE_LOCATOR_OPTION = 1;
+   */
+  OPTION = 1,
+
+  /**
+   * Named by the LEMLINE_CONFIG environment variable.
+   *
+   * @generated from enum value: CONFIG_FILE_LOCATOR_ENVIRONMENT = 2;
+   */
+  ENVIRONMENT = 2,
+
+  /**
+   * Found at a default location: ./.lemline.yaml, ~/.config/lemline/config.yaml or ~/.lemline.yaml.
+   *
+   * @generated from enum value: CONFIG_FILE_LOCATOR_DEFAULT_PATH = 3;
+   */
+  DEFAULT_PATH = 3,
+}
+
+/**
+ * Describes the enum lemline.gateway.v1.ConfigFileLocator.
+ */
+export const ConfigFileLocatorSchema: GenEnum<ConfigFileLocator> = /*@__PURE__*/
+  enumDesc(file_proto_lemline_gateway_v1_gateway, 5);
+
+/**
  * Public gateway API.
  *
  * Conventions:
@@ -1599,6 +1910,20 @@ export const GatewayService: GenService<{
     methodKind: "server_streaming";
     input: typeof WatchInstanceEventsRequestSchema;
     output: typeof WatchInstanceEventsResponseSchema;
+  },
+  /**
+   * Returns the configuration the gateway runs with and where each value comes from,
+   * plus the external configuration file as it was read at startup.
+   *
+   * Read-only. Secret values are never returned. Requires the `lemline.config` scope
+   * when authentication is enabled.
+   *
+   * @generated from rpc lemline.gateway.v1.GatewayService.GetGatewayConfig
+   */
+  getGatewayConfig: {
+    methodKind: "unary";
+    input: typeof GetGatewayConfigRequestSchema;
+    output: typeof GetGatewayConfigResponseSchema;
   },
 }> = /*@__PURE__*/
   serviceDesc(file_proto_lemline_gateway_v1_gateway, 0);

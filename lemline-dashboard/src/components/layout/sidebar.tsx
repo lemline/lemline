@@ -4,12 +4,13 @@ import { useGlobalNamespace } from "../../context/namespace-context";
 import { useCatalog } from "../../hooks/use-catalog";
 import { cn } from "../../lib/utils";
 import { Dropdown } from "../lm/dropdown";
-import { DefinitionsIcon, InstancesIcon, MoonIcon, SunIcon } from "../lm/icons";
+import { DefinitionsIcon, InstancesIcon, MoonIcon, SettingsIcon, SunIcon } from "../lm/icons";
 
-type Section = "instances" | "definitions";
+type Section = "instances" | "definitions" | "settings";
 
 function useActiveSection(): Section {
   const { pathname } = useLocation();
+  if (pathname.startsWith("/settings")) return "settings";
   return pathname.startsWith("/definitions") ? "definitions" : "instances";
 }
 
@@ -35,7 +36,7 @@ export function NamespaceDropdown({ block, stretch }: { block?: boolean; stretch
   );
 }
 
-function ThemeToggle({ compact }: { compact: boolean }) {
+export function ThemeToggle({ compact }: { compact: boolean }) {
   const { resolvedTheme, setTheme } = useTheme();
   const dark = resolvedTheme === "dark";
   const aria = dark ? "Switch to the light theme" : "Switch to the dark theme";
@@ -60,7 +61,7 @@ function NavButton({
   compact,
   onClick,
 }: {
-  label: string;
+  label?: string;
   icon: React.ReactNode;
   current: boolean;
   compact: boolean;
@@ -71,6 +72,8 @@ function NavButton({
       type="button"
       onClick={onClick}
       aria-current={current ? "page" : undefined}
+      aria-label={label ? undefined : "Settings"}
+      title={label ? undefined : "Settings"}
       className={cn(
         "flex min-h-11 cursor-pointer items-center rounded-[10px] border-[1.5px] border-transparent text-left text-[15px]",
         compact ? "gap-2 px-2.5" : "gap-2.5 px-3",
@@ -83,8 +86,11 @@ function NavButton({
   );
 }
 
-/** Left menu on wide screens; a top bar under 900 px. */
-export function Sidebar({ compact }: { compact: boolean }) {
+/**
+ * Left menu on wide screens; a top bar under 900 px.
+ * `hideTheme`: the layout shows the theme toggle elsewhere (phones, where the top bar is full).
+ */
+export function Sidebar({ compact, hideTheme = false }: { compact: boolean; hideTheme?: boolean }) {
   const navigate = useNavigate();
   const active = useActiveSection();
 
@@ -132,8 +138,19 @@ export function Sidebar({ compact }: { compact: boolean }) {
         />
       </div>
 
-      <div className={cn("flex flex-col items-start gap-2.5", compact ? "ml-auto" : "mt-auto")}>
-        <ThemeToggle compact={compact} />
+      <div className={cn("flex gap-2.5", compact ? "ml-auto flex-row items-center" : "mt-auto flex-col items-stretch")}>
+        <NavButton
+          label={compact ? undefined : "Settings"}
+          icon={<SettingsIcon />}
+          current={active === "settings"}
+          compact={compact}
+          onClick={() => navigate("/settings")}
+        />
+        {!hideTheme && (
+          <div className={compact ? undefined : "self-start"}>
+            <ThemeToggle compact={compact} />
+          </div>
+        )}
       </div>
     </nav>
   );
