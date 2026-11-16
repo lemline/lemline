@@ -438,7 +438,7 @@ object StepByStepOrchestrator {
                 val tryState = frame.state
                 val processor = current.processor as TryProcessor
                 // check that this node actually can handle this error
-                if (processor.isCatching(exception.error, tryState, nodeStack.stateScope)) {
+                if (processor.isCatching(exception.error, tryState, processor.filterScope(tryState, nodeStack))) {
                     val event = processor.handleError(
                         error = exception.error,
                         state = tryState,

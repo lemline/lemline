@@ -5,6 +5,7 @@ import com.lemline.common.json.LemlineJson
 import com.lemline.core.errors.InternalException
 import com.lemline.core.nodes.Node
 import com.lemline.core.processors.scope.Scope
+import com.lemline.core.processors.scope.taskScope
 import com.lemline.core.states.NodeStack
 import com.lemline.core.states.TryState
 import com.lemline.core.states.WorkflowEvent
@@ -126,6 +127,12 @@ class TryProcessor(
      * Determines whether the current `TryTask` is catching a specified error based on its state,
      * configuration, and evaluation of filters.
      */
+    /**
+     * Scope of catch and retry filters: the same `$task` as the try's other expressions, so a try
+     * inside an extension block sees its extension owner.
+     */
+    internal fun filterScope(state: TryState, nodeStack: NodeStack): Scope = nodeStack.taskScope(node, state.startedAt)
+
     internal fun isCatching(error: InternalException.Error, state: TryState, scope: Scope): Boolean {
         // running catch = true means we are running the catch block
         if (state.runningCatch) return false
@@ -178,7 +185,7 @@ class TryProcessor(
     ): WorkflowEvent {
 
         // Check if we should retry
-        val shouldRetry = shouldRetry(state, nodeStack.stateScope)
+        val shouldRetry = shouldRetry(state, filterScope(state, nodeStack))
 
         return when (shouldRetry) {
             // Retry if attempts remain

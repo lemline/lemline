@@ -252,6 +252,35 @@ class ExtensionExecutionTest {
     }
 
     @Test
+    fun `catch and retry filters of a try inside an extension see the owner task`() = runBlocking<Unit> {
+        val workflow = parse("""
+            use:
+              extensions:
+                - audit:
+                    extend: set
+                    after:
+                      - guarded:
+                          try:
+                            - fail: { raise: { error: { type: 'https://example.com/audit', status: 503 } } }
+                          catch:
+                            when: '§{ §task.name == "charge" }'
+                            retry:
+                              when: '§{ §task.name == "charge" }'
+                              delay: { milliseconds: 1 }
+                              limit: { attempt: { count: 1 } }
+                            do:
+                              - recovered: { set: { owner: '§{ §task.name }' } }
+            do:
+              - charge: { set: { paid: true } }
+        """)
+        val capture = Capture()
+        assertEquals(Json.parseToJsonElement("""{"paid":true}"""), run(workflow, capture))
+        val fail = "/do/0/charge/_ext/0/after/do/0/guarded/try/0/fail"
+        assertEquals(2, capture.matching(fail, "faulted").size)
+        assertEquals(1, capture.matching("/do/0/charge/_ext/0/after/do/0/guarded/catch/0/recovered", "completed").size)
+    }
+
+    @Test
     fun `mixed function extension paths preserve owner scope and suppress recursive extensions`() = runBlocking<Unit> {
         val workflow = parse("""
             use:
