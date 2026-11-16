@@ -1,0 +1,507 @@
+import type { TimelineEventView, WorkflowRuntimeStatus } from "../hooks/use-watch-workflow-projection";
+import { readableError, type RawError } from "./errors";
+import { formatElapsedTick, formatSpan, prettyJson } from "./format";
+import { isTaskPointer, shortEventType, taskAt, taskNamesOf } from "./workflow-source";
+
+/**
+ * Builds what the instance page draws from the lifecycle events of one instance:
+ * one row per task, each made of segments (ran, running, failed, waiting before retry,
+ * waiting for an event), on a time axis where long idle waits are shortened.
+ */
+
+export type SegmentKind = "ran" | "running" | "failed" | "backoff" | "waiting" | "group";
+export type StepState = "completed" | "running" | "waiting" | "failed" | "retrying";
+
+export interface Segment {
+  start: number;
+  end: number;
+  kind: SegmentKind;
+}
+
+export interface Attempt {
+  start: number;
+  end?: number;
+  outcome: "succeeded" | "failed" | "running";
+  error?: RawError;
+}
+
+export interface StepRow {
+  pointer: string;
+  label: string;
+  indent: number;
+  typeLabel: string;
+  state: StepState;
+  segments: Segment[];
+  attempts: Attempt[];
+  start: number;
+  end?: number;
+  input?: unknown;
+  output?: unknown;
+  hasOutput: boolean;
+  error?: RawError;
+  listensTo: string[];
+  isGroup: boolean;
+  note: string;
+  detail: string;
+}
+
+export interface Tick {
+  pct: number;
+  label: string;
+  strong?: boolean;
+}
+
+export interface TimelineModel {
+  t0: number;
+  tEnd: number;
+  rows: StepRow[];
+  ticks: Tick[];
+  toPct: (time: number) => number;
+}
+
+interface ParsedEvent {
+  view: TimelineEventView;
+  time: number;
+  data: Record<string, unknown>;
+}
+
+function isObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+export function cloudEventOf(view: TimelineEventView): Record<string, unknown> | undefined {
+  try {
+    const parsed = JSON.parse(view.payloadJson);
+    return isObject(parsed) ? parsed : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function dataOf(view: TimelineEventView): Record<string, unknown> {
+  const cloudEvent = cloudEventOf(view);
+  return cloudEvent && isObject(cloudEvent.data) ? cloudEvent.data : {};
+}
+
+function errorOf(data: Record<string, unknown>): RawError | undefined {
+  const error = data.error;
+  if (!isObject(error)) return undefined;
+  return {
+    type: typeof error.type === "string" ? error.type : undefined,
+    status: typeof error.status === "number" ? error.status : undefined,
+    title: typeof error.title === "string" ? error.title : undefined,
+    detail: typeof error.detail === "string" ? error.detail : undefined,
+    instance: typeof error.instance === "string" ? error.instance : undefined,
+  };
+}
+
+function kindOf(eventType: string): "created" | "started" | "completed" | "faulted" | "retried" | "other" {
+  if (eventType.includes("task.created")) return "created";
+  if (eventType.includes("task.started")) return "started";
+  if (eventType.includes("task.completed")) return "completed";
+  if (eventType.includes("task.faulted")) return "faulted";
+  if (eventType.includes("task.retried")) return "retried";
+  return "other";
+}
+
+function parseEvents(events: TimelineEventView[]): ParsedEvent[] {
+  return events
+    .map((view) => ({ view, time: Date.parse(view.eventTime), data: dataOf(view) }))
+    .filter((event) => Number.isFinite(event.time));
+}
+
+export function workflowBounds(events: TimelineEventView[], status: WorkflowRuntimeStatus, nowMs: number) {
+  const parsed = parseEvents(events);
+  const created = parsed.find((event) => event.view.eventType.includes("workflow.created"));
+  const started = parsed.find((event) => event.view.eventType.includes("workflow.started"));
+  const ended = [...parsed]
+    .reverse()
+    .find((event) => event.view.eventType.includes("workflow.completed") || event.view.eventType.includes("workflow.faulted"));
+  const first = started?.time ?? created?.time ?? parsed[0]?.time ?? nowMs;
+  const terminal = status === "COMPLETED" || status === "FAULTED";
+  const end = ended?.time ?? (terminal ? (parsed[parsed.length - 1]?.time ?? nowMs) : nowMs);
+  return {
+    start: Math.min(created?.time ?? first, first),
+    startedAt: first,
+    end,
+    terminal,
+    input: created ? created.data.input : undefined,
+    output: ended && ended.view.eventType.includes("workflow.completed") ? ended.data.output : undefined,
+    hasOutput: Boolean(ended && ended.view.eventType.includes("workflow.completed") && "output" in ended.data),
+    error: ended && ended.view.eventType.includes("workflow.faulted") ? errorOf(ended.data) : undefined,
+  };
+}
+
+const CONTAINER_KINDS = new Set(["fork", "do", "try", "for"]);
+
+export function buildTimeline(
+  events: TimelineEventView[],
+  status: WorkflowRuntimeStatus,
+  root: Record<string, unknown> | undefined,
+  nowMs: number,
+): TimelineModel {
+  const parsed = parseEvents(events);
+  const bounds = workflowBounds(events, status, nowMs);
+  const tEnd = Math.max(bounds.end, bounds.startedAt + 1);
+
+  const byPointer = new Map<string, ParsedEvent[]>();
+  for (const event of parsed) {
+    if (!event.view.eventType.includes(".task.")) continue;
+    const pointer = event.view.taskPointer?.trim();
+    if (!pointer || !isTaskPointer(pointer)) continue;
+    const list = byPointer.get(pointer) ?? [];
+    list.push(event);
+    byPointer.set(pointer, list);
+  }
+
+  const pointers = Array.from(byPointer.keys());
+  const rows: StepRow[] = [];
+  for (const [pointer, list] of byPointer.entries()) {
+    const info = taskAt(root, pointer);
+    const isGroup =
+      (info.kind !== undefined && CONTAINER_KINDS.has(info.kind)) ||
+      pointers.some((other) => other !== pointer && other.startsWith(`${pointer}/`));
+    rows.push(buildRow(pointer, list, info, isGroup, bounds.terminal, tEnd));
+  }
+
+  rows.sort((left, right) => left.start - right.start || left.indent - right.indent || left.pointer.localeCompare(right.pointer));
+  // A task may be stamped a few milliseconds before the workflow: the axis starts at the earliest.
+  const t0 = Math.min(bounds.startedAt, ...rows.map((row) => row.start));
+  const minIndent = rows.reduce((min, row) => Math.min(min, row.indent), Number.POSITIVE_INFINITY);
+  for (const row of rows) row.indent -= Number.isFinite(minIndent) ? minIndent : 0;
+
+  const scale = buildScale(rows, t0, tEnd);
+  const ticks = buildTicks(scale, t0, tEnd, !bounds.terminal);
+  for (const row of rows) {
+    row.note = noteOf(row, tEnd);
+    row.detail = detailOf(row, tEnd);
+  }
+  return { t0, tEnd, rows, ticks, toPct: scale.toPct };
+}
+
+function buildRow(
+  pointer: string,
+  list: ParsedEvent[],
+  info: ReturnType<typeof taskAt>,
+  isGroup: boolean,
+  terminal: boolean,
+  tEnd: number,
+): StepRow {
+  const ordered = [...list].sort((left, right) => left.time - right.time);
+  const names = taskNamesOf(pointer);
+  const attempts: Attempt[] = [];
+  const segments: Segment[] = [];
+  let open: Attempt | null = null;
+  let backoffFrom: number | null = null;
+  let input: unknown;
+  let output: unknown;
+  let hasOutput = false;
+  let lastError: RawError | undefined;
+
+  const closeBackoff = (time: number) => {
+    if (backoffFrom !== null) {
+      segments.push({ start: backoffFrom, end: Math.max(time, backoffFrom), kind: "backoff" });
+      backoffFrom = null;
+    }
+  };
+  const openAttempt = (time: number) => {
+    closeBackoff(time);
+    open = { start: time, outcome: "running" };
+    attempts.push(open);
+  };
+
+  for (const event of ordered) {
+    const kind = kindOf(event.view.eventType);
+    if (kind === "created") {
+      if (input === undefined && "input" in event.data) input = event.data.input;
+      if (backoffFrom !== null) openAttempt(event.time);
+    } else if (kind === "started") {
+      if (!open) openAttempt(event.time);
+    } else if (kind === "completed") {
+      if (!open) openAttempt(event.time);
+      const current = open as unknown as Attempt;
+      current.end = event.time;
+      current.outcome = "succeeded";
+      open = null;
+      if ("output" in event.data) {
+        output = event.data.output;
+        hasOutput = true;
+      }
+    } else if (kind === "faulted") {
+      if (!open) openAttempt(event.time);
+      const current = open as unknown as Attempt;
+      current.end = event.time;
+      current.outcome = "failed";
+      current.error = errorOf(event.data);
+      lastError = current.error ?? lastError;
+      open = null;
+    } else if (kind === "retried") {
+      if (open) {
+        const current = open as Attempt;
+        current.end = event.time;
+        current.outcome = "failed";
+        current.error = current.error ?? lastError;
+        open = null;
+      }
+      backoffFrom = event.time;
+    }
+  }
+
+  const waitsForEvent = info.kind === "listen" || info.kind === "wait";
+  const start = attempts[0]?.start ?? ordered[0]?.time ?? tEnd;
+  let state: StepState = "completed";
+  const last = attempts[attempts.length - 1];
+  if (backoffFrom !== null) {
+    if (!terminal) {
+      state = "retrying";
+      segments.push({ start: backoffFrom, end: tEnd, kind: "backoff" });
+    } else {
+      state = "failed";
+    }
+    backoffFrom = null;
+  } else if (last?.outcome === "running") {
+    if (terminal) {
+      last.end = tEnd;
+      last.outcome = "succeeded";
+    } else {
+      state = waitsForEvent ? "waiting" : "running";
+    }
+  } else if (last?.outcome === "failed") {
+    state = "failed";
+  }
+
+  for (const attempt of attempts) {
+    const end = attempt.end ?? tEnd;
+    let kind: SegmentKind = attempt.outcome === "failed" ? "failed" : attempt.outcome === "running" ? "running" : "ran";
+    if (waitsForEvent && attempt.outcome !== "failed") kind = "waiting";
+    segments.push({ start: attempt.start, end: Math.max(end, attempt.start), kind });
+  }
+  segments.sort((left, right) => left.start - right.start);
+
+  const end = state === "running" || state === "waiting" || state === "retrying" ? undefined : (last?.end ?? start);
+  const groupSegments: Segment[] = isGroup ? [{ start, end: end ?? tEnd, kind: "group" }] : segments;
+
+  let typeLabel = info.typeLabel || "task";
+  if (!isGroup && attempts.length > 1) typeLabel += ` · ${attempts.length} attempts`;
+
+  return {
+    pointer,
+    label: names[names.length - 1] ?? pointer,
+    indent: Math.max(0, names.length - 1),
+    typeLabel,
+    state,
+    segments: groupSegments,
+    attempts,
+    start,
+    end,
+    input,
+    output,
+    hasOutput,
+    error: state === "failed" ? (last?.error ?? lastError) : undefined,
+    listensTo: info.listensTo,
+    isGroup,
+    note: "",
+    detail: "",
+  };
+}
+
+interface Scale {
+  toPct: (time: number) => number;
+  breaks: { start: number; end: number; fromPct: number; toPct: number }[];
+}
+
+const AXIS_MAX_PCT = 94;
+
+/** Long stretches where no task works (waiting or idle) are drawn with a fixed, short width. */
+function buildScale(rows: StepRow[], t0: number, tEnd: number): Scale {
+  const total = tEnd - t0;
+  const busy = rows
+    .filter((row) => !row.isGroup)
+    .flatMap((row) => row.segments.filter((segment) => segment.kind !== "waiting" && segment.kind !== "backoff"))
+    .map((segment) => [Math.max(t0, segment.start), Math.min(tEnd, segment.end)] as const)
+    .filter(([start, end]) => end >= start)
+    .sort((left, right) => left[0] - right[0]);
+
+  const gaps: { start: number; end: number }[] = [];
+  let cursor = t0;
+  for (const [start, end] of busy) {
+    if (start > cursor) gaps.push({ start: cursor, end: start });
+    cursor = Math.max(cursor, end);
+  }
+  if (tEnd > cursor) gaps.push({ start: cursor, end: tEnd });
+
+  const threshold = Math.max(5_000, total * 0.25);
+  const candidates = gaps.filter((gap) => gap.end - gap.start > threshold).slice(0, 3);
+  // Shortening only makes sense next to work drawn to scale.
+  const long = total - candidates.reduce((sum, gap) => sum + (gap.end - gap.start), 0) > 0 ? candidates : [];
+  const compressed = long.reduce((sum, gap) => sum + (gap.end - gap.start), 0);
+  const normal = total - compressed;
+  // About a quarter of the axis for one shortened wait, less each when there are several.
+  const breakPct = long.length > 0 ? Math.min(24, 45 / long.length) : 0;
+  const normalPct = AXIS_MAX_PCT - breakPct * long.length;
+
+  const breaks: Scale["breaks"] = [];
+  const toPct = (time: number) => {
+    const t = Math.min(Math.max(time, t0), tEnd);
+    if (long.length === 0) return total <= 0 ? 0 : ((t - t0) / total) * AXIS_MAX_PCT;
+    let pct = 0;
+    let previous = t0;
+    for (const gap of long) {
+      const normalSpan = Math.min(t, gap.start) - previous;
+      if (normalSpan > 0) pct += normal > 0 ? (normalSpan / normal) * normalPct : 0;
+      if (t <= gap.start) return pct;
+      const inGap = Math.min(t, gap.end) - gap.start;
+      pct += (inGap / (gap.end - gap.start)) * breakPct;
+      if (t <= gap.end) return pct;
+      previous = gap.end;
+    }
+    if (t > previous && normal > 0) pct += ((t - previous) / normal) * normalPct;
+    return pct;
+  };
+  for (const gap of long) breaks.push({ ...gap, fromPct: toPct(gap.start), toPct: toPct(gap.end) });
+  return { toPct, breaks };
+}
+
+const NICE_STEPS = [
+  100, 200, 500, 1_000, 2_000, 5_000, 10_000, 15_000, 30_000, 60_000, 120_000, 300_000, 600_000, 900_000, 1_800_000,
+  3_600_000, 7_200_000, 21_600_000, 43_200_000, 86_400_000,
+];
+const MIN_TICK_GAP_PCT = 9;
+
+function buildTicks(scale: Scale, t0: number, tEnd: number, live: boolean): Tick[] {
+  const candidates: (Tick & { priority: number })[] = [{ pct: 0, label: "0 s", priority: 3 }];
+  for (const gap of scale.breaks) {
+    candidates.push({
+      pct: (gap.fromPct + gap.toPct) / 2 - 3,
+      label: `⋯ ${formatSpan(gap.end - gap.start)} ⋯`,
+      strong: true,
+      priority: 4,
+    });
+  }
+  candidates.push({ pct: scale.toPct(tEnd), label: live ? "now" : formatElapsedTick(tEnd - t0), priority: 3 });
+
+  // Regular ticks in the parts drawn to scale.
+  const runs: [number, number][] = [];
+  let previous = t0;
+  for (const gap of scale.breaks) {
+    runs.push([previous, gap.start]);
+    previous = gap.end;
+  }
+  runs.push([previous, tEnd]);
+  for (const [start, end] of runs) {
+    const span = end - start;
+    const spanPct = scale.toPct(end) - scale.toPct(start);
+    if (span <= 0 || spanPct <= 0) continue;
+    const msPerGap = (span / spanPct) * MIN_TICK_GAP_PCT;
+    const step = NICE_STEPS.find((value) => value >= msPerGap) ?? NICE_STEPS[NICE_STEPS.length - 1];
+    for (let elapsed = Math.ceil((start - t0) / step) * step; t0 + elapsed < end; elapsed += step) {
+      if (elapsed <= 0) continue;
+      candidates.push({ pct: scale.toPct(t0 + elapsed), label: formatElapsedTick(elapsed), priority: 1 });
+    }
+  }
+
+  const kept: Tick[] = [];
+  for (const candidate of [...candidates].sort((left, right) => right.priority - left.priority)) {
+    const width = candidate.strong ? 12 : MIN_TICK_GAP_PCT - 2;
+    if (kept.every((tick) => Math.abs(tick.pct - candidate.pct) >= (tick.strong ? 12 : width))) {
+      kept.push({ pct: Math.max(0, candidate.pct), label: candidate.label, strong: candidate.strong });
+    }
+  }
+  return kept.sort((left, right) => left.pct - right.pct);
+}
+
+function errorCode(error?: RawError): string {
+  if (error?.status && error.status > 0) return String(error.status);
+  return "failed";
+}
+
+function noteOf(row: StepRow, nowMs: number): string {
+  const duration = (row.end ?? nowMs) - row.start;
+  if (row.isGroup) return row.end === undefined ? `running for ${formatSpan(duration)}…` : formatSpan(duration);
+  if (row.state === "waiting") return `waiting for ${formatSpan(duration)}…`;
+  if (row.attempts.length > 1 || row.state === "retrying") {
+    const parts: string[] = [];
+    row.attempts.forEach((attempt, index) => {
+      if (attempt.outcome === "failed") {
+        parts.push(errorCode(attempt.error));
+        const next = row.attempts[index + 1];
+        const pause = (next?.start ?? (row.state === "retrying" ? nowMs : attempt.end ?? 0)) - (attempt.end ?? 0);
+        if (next || row.state === "retrying") parts.push(`retry in ${formatSpan(Math.max(0, pause))}`);
+      } else if (attempt.outcome === "succeeded") {
+        parts.push("ok");
+      } else {
+        parts.push("running…");
+      }
+    });
+    return parts.join(" → ");
+  }
+  if (row.state === "failed") {
+    const error = readableError(row.error);
+    const code = error.headline.startsWith("HTTP ") && row.error?.status ? `HTTP ${row.error.status}` : error.headline;
+    return `${code} after ${formatSpan(duration)}`;
+  }
+  if (row.state === "running") return `running for ${formatSpan(duration)}…`;
+  if (row.listensTo.length > 0 || row.segments.some((segment) => segment.kind === "waiting")) return `waited ${formatSpan(duration)}`;
+  return formatSpan(duration);
+}
+
+function detailOf(row: StepRow, nowMs: number): string {
+  const duration = formatSpan((row.end ?? nowMs) - row.start);
+  const events = row.listensTo.join(" or ");
+  if (row.isGroup) {
+    return row.end === undefined
+      ? `Runs the tasks inside it. Started ${duration} ago.`
+      : `Ran the tasks inside it. Finished after ${duration}.`;
+  }
+  if (row.state === "waiting") return events ? `Still waiting for ${events}.` : `Still waiting, for ${duration} so far.`;
+  if (row.attempts.length > 1 || row.state === "retrying") {
+    const sentences = row.attempts.map((attempt, index) => {
+      const span = attempt.end !== undefined ? formatSpan(attempt.end - attempt.start) : "";
+      if (attempt.outcome === "failed") {
+        const error = readableError(attempt.error);
+        return `Attempt ${index + 1} failed${attempt.error ? ` with ${error.headline}` : ""}${span ? ` after ${span}` : ""}.`;
+      }
+      if (attempt.outcome === "succeeded") return `Attempt ${index + 1} succeeded after ${span}.`;
+      return `Attempt ${index + 1} is running.`;
+    });
+    if (row.state === "retrying") sentences.push("Waiting before the next attempt.");
+    return sentences.join(" ");
+  }
+  if (row.state === "failed") {
+    const error = readableError(row.error);
+    return `Failed after ${duration}: ${error.headline}.${error.explanation ? ` ${error.explanation}.` : ""}`;
+  }
+  if (row.state === "running") return `Running for ${duration}.`;
+  if (events) return `Waited ${duration} for ${events}.`;
+  return `Took ${duration}.`;
+}
+
+/** Status of the instance in one line: what it does now, or why it failed, and where. */
+export function instanceSummary(
+  rows: StepRow[],
+  status: WorkflowRuntimeStatus,
+  error: RawError | undefined,
+): { title: string; text: string } {
+  if (status === "FAULTED") {
+    const failed = [...rows].reverse().find((row) => row.state === "failed" && !row.isGroup);
+    const where = failed?.pointer ?? error?.instance;
+    return { title: readableError(error ?? failed?.error).headline, text: where ? `at ${where}` : "" };
+  }
+  if (status === "RUNNING" || status === "PENDING") {
+    const active = rows.filter((row) => !row.isGroup && row.state !== "completed" && row.state !== "failed");
+    const current = active[active.length - 1];
+    if (!current) return { title: status === "PENDING" ? "Waiting to start" : "Running", text: "" };
+    let title = `Running ${current.label}`;
+    if (current.state === "waiting") {
+      title = current.listensTo.length > 0 ? `Waiting for ${current.listensTo.map(shortEventType).join(", ")}` : `Waiting in ${current.label}`;
+    } else if (current.state === "retrying") {
+      title = `Retrying ${current.label}`;
+    }
+    return { title, text: `at ${current.pointer}` };
+  }
+  return { title: "", text: "" };
+}
+
+export function jsonText(value: unknown): string {
+  return value === undefined ? "" : prettyJson(value);
+}

@@ -1,30 +1,36 @@
-import { useState } from "react";
-import { Header } from "./header";
-import { CommandPalette } from "./command-palette";
-import { CascadingSelects } from "./cascading-selects";
+import type { ReactNode } from "react";
 import { useViewportWidth } from "../../hooks/use-viewport-width";
+import { NamespaceDropdown, Sidebar } from "./sidebar";
 
-interface PageLayoutProps {
-  children: React.ReactNode;
-  hideScopeBar?: boolean;
-}
-
-export function PageLayout({ children, hideScopeBar }: PageLayoutProps) {
-  const [paletteOpen, setPaletteOpen] = useState(false);
-  const viewportWidth = useViewportWidth();
-  const isMobile = viewportWidth < 768;
+export function PageLayout({ children }: { children: ReactNode }) {
+  const width = useViewportWidth();
+  const narrow = width < 900;
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-100 to-slate-50 text-slate-900 dark:from-slate-950 dark:to-slate-900 dark:text-slate-100">
-      <Header onOpenPalette={() => setPaletteOpen(true)} />
-      <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} />
-      <main className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-6 py-6">
-        {isMobile && (
-          <div className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
-            Best viewed on desktop. Mobile support is limited in v1.
+    <div
+      className="relative flex min-h-screen w-full items-stretch bg-lm-bg font-sans text-lm-text"
+      style={{ flexDirection: narrow ? "column" : "row" }}
+    >
+      <div
+        className="sticky top-0 z-20 flex flex-col bg-lm-nav-bg"
+        style={
+          narrow
+            ? { flex: "0 0 auto", width: "auto", alignSelf: "stretch", boxShadow: "inset 0 -1px 0 var(--lm-line)" }
+            : { flex: "0 0 240px", width: 240, alignSelf: "flex-start", height: "100vh", minHeight: 480 }
+        }
+      >
+        <Sidebar compact={narrow} />
+      </div>
+
+      <main className="flex min-w-0 flex-col" style={{ flex: narrow ? "1 1 auto" : "1 1 0" }}>
+        {narrow && (
+          <div
+            className="relative z-[25] flex w-full flex-wrap items-center gap-2.5 border-b border-lm-line bg-lm-panel"
+            style={{ padding: width < 640 ? "10px 16px" : "12px 40px" }}
+          >
+            <NamespaceDropdown stretch={width < 640} />
           </div>
         )}
-        {!hideScopeBar && <CascadingSelects />}
         {children}
       </main>
     </div>

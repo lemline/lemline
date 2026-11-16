@@ -6,6 +6,7 @@ import { MutationCache, QueryCache, QueryClient, QueryClientProvider } from "@ta
 import { ThemeProvider } from "next-themes";
 import { Toaster, toast } from "sonner";
 import App from "./App";
+import { NamespaceProvider } from "./context/namespace";
 import "./index.css";
 
 const QUERY_TOAST_THROTTLE_MS = 8_000;
@@ -138,12 +139,14 @@ const queryClient = new QueryClient({
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+    <ThemeProvider attribute="data-lm-theme" defaultTheme="system" enableSystem storageKey="lemline.dashboard.theme">
       <QueryClientProvider client={queryClient}>
-        <BrowserRouter>
-          <App />
-        </BrowserRouter>
-        <Toaster richColors position="top-right" />
+        <NamespaceProvider>
+          <BrowserRouter>
+            <App />
+          </BrowserRouter>
+        </NamespaceProvider>
+        <Toaster richColors position="top-right" theme="system" />
       </QueryClientProvider>
     </ThemeProvider>
   </StrictMode>,
