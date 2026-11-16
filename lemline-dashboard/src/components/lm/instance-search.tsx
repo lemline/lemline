@@ -10,8 +10,9 @@ import { STATUS_LABEL, uiStatusOf } from "../../lib/status";
 
 const MIN_CHARS = 3;
 const MAX_RESULTS = 4;
+const RECENT_SCANNED = 500;
 
-/** Normalizes what was typed or pasted into the start of an instance ID. */
+/** Normalizes what was typed or pasted into a piece of an instance ID. */
 function idPrefixOf(text: string): string {
   return text.trim().toLowerCase().replace(/^.*\//, "").replace(/[^0-9a-f-]/g, "");
 }
@@ -21,7 +22,7 @@ interface InstanceSearchProps {
   onOpen: (id: string) => void;
 }
 
-/** "Find an instance by ID": suggests instances whose ID starts with what is typed. */
+/** "Find an instance by ID": suggests instances whose ID starts with, or contains, what is typed. */
 export function InstanceSearch({ namespace, onOpen }: InstanceSearchProps) {
   const [query, setQuery] = useState("");
   const [debounced, setDebounced] = useState("");
@@ -60,7 +61,31 @@ export function InstanceSearch({ namespace, onOpen }: InstanceSearchProps) {
       ).instances,
   });
 
-  const items = searchable && debounced === prefix ? (results.data ?? []) : [];
+  // The gateway matches the start of an ID; a piece from the middle ("9b3e-5f1c") is looked for
+  // among the most recent instances.
+  const recent = useQuery({
+    queryKey: ["instance-search-recent", namespace],
+    enabled: searchable,
+    staleTime: 10_000,
+    queryFn: async ({ signal }) =>
+      (
+        await gatewayClient.listInstances(
+          create(ListInstancesRequestSchema, { namespace: namespace || undefined, pageSize: RECENT_SCANNED }),
+          { signal },
+        )
+      ).instances,
+  });
+  const flat = (value: string) => value.toLowerCase().replace(/[^0-9a-f]/g, "");
+  const wanted = flat(debounced);
+  const byPrefix = searchable && debounced === prefix ? (results.data ?? []) : [];
+  const byPiece =
+    searchable && debounced === prefix && wanted.length >= MIN_CHARS
+      ? (recent.data ?? []).filter(
+          (instance) =>
+            flat(instance.instanceId).includes(wanted) && !byPrefix.some((item) => item.instanceId === instance.instanceId),
+        )
+      : [];
+  const items = [...byPrefix, ...byPiece].slice(0, MAX_RESULTS);
   const hasQuery = query.trim().length > 0;
   const reset = () => {
     setQuery("");
@@ -73,8 +98,8 @@ export function InstanceSearch({ namespace, onOpen }: InstanceSearchProps) {
 
   let message = "";
   if (prefix.length < MIN_CHARS) message = "Type at least 3 characters of the instance ID.";
-  else if (results.isFetching && items.length === 0) message = "Searching…";
-  else if (items.length === 0 && searchable) message = `No instance has an ID starting with “${query.trim()}”.`;
+  else if ((results.isFetching || recent.isFetching) && items.length === 0) message = "Searching…";
+  else if (items.length === 0 && searchable) message = `No instance has an ID containing “${query.trim()}”.`;
 
   return (
     <div ref={rootRef} className="relative min-w-0 max-w-[460px] flex-[1_1_280px]">

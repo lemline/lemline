@@ -1,17 +1,21 @@
 import { create } from "@bufbuild/protobuf";
 import { type InfiniteData, useInfiniteQuery } from "@tanstack/react-query";
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   InstanceStatus,
   type InstanceSummary,
   type ListInstancesResponse,
   ListInstancesRequestSchema,
+  WatchInstancesRequestSchema,
+  type WatchInstancesResponse,
 } from "../gen/proto/lemline/gateway/v1/gateway_pb";
 import { gatewayClient } from "../lib/grpc-client";
 import { timestampFromIsoString, timestampToMilliseconds } from "../lib/proto";
 import { asNumber } from "../lib/utils";
 import { UI_STATUSES, type UiStatus } from "../lib/status";
+import { useLiveInvalidation } from "./use-live-invalidation";
 
+/** Fallback refresh when the change stream is unavailable. */
 const REFRESH_MS = 5_000;
 /** Pages loaded at most for the periodic refresh: going deep in the list stops it. */
 const REFRESHED_PAGES = 2;
@@ -48,12 +52,16 @@ interface StreamFilters {
 /** One list of instances filtered by the gateway, newest first, loaded until `needed` rows. */
 function useInstanceStream(filters: StreamFilters) {
   const { namespace, name, version, timeFrom, status, pageSize, needed, refresh, enabled } = filters;
+  const queryKey = ["instance-list", namespace, name, version, status, timeFrom, pageSize];
+  const identity = JSON.stringify(queryKey);
+  const [lostIdentity, setLostIdentity] = useState<string | null>(null);
+  const polling = lostIdentity === identity;
   const query = useInfiniteQuery<ListInstancesResponse, Error, InfiniteData<ListInstancesResponse>, unknown[], string | undefined>({
-    queryKey: ["instance-list", namespace, name, version, status, timeFrom, pageSize],
+    queryKey,
     enabled,
     initialPageParam: undefined as string | undefined,
     refetchInterval: (current) =>
-      refresh && (current.state.data?.pages.length ?? 0) <= REFRESHED_PAGES ? REFRESH_MS : false,
+      polling && refresh && (current.state.data?.pages.length ?? 0) <= REFRESHED_PAGES ? REFRESH_MS : false,
     queryFn: async ({ pageParam, signal }) =>
       gatewayClient.listInstances(
         create(ListInstancesRequestSchema, {
@@ -68,6 +76,28 @@ function useInstanceStream(filters: StreamFilters) {
         { signal },
       ),
     getNextPageParam: (lastPage) => lastPage.nextPageCursor || undefined,
+  });
+
+  // Each change of an instance in this list (new, finished, faulted) refreshes it at once.
+  useLiveInvalidation<WatchInstancesResponse>({
+    enabled: enabled && query.isSuccess,
+    queryKey,
+    identity,
+    onLost: setLostIdentity,
+    initialCursor: query.data?.pages[0]?.watchCursor,
+    cursorOf: (message) => message.cursor,
+    watch: (cursor, signal) =>
+      gatewayClient.watchInstances(
+        create(WatchInstancesRequestSchema, {
+          namespace: namespace || undefined,
+          name: name || undefined,
+          version: version || undefined,
+          status,
+          createdFrom: timestampFromIsoString(timeFrom),
+          afterCursor: cursor,
+        }),
+        { signal },
+      ),
   });
 
   const rows = useMemo(() => query.data?.pages.flatMap((response) => response.instances) ?? [], [query.data?.pages]);

@@ -32,10 +32,11 @@ and set `gatewayBaseUrl` to the dev server origin (`window.location.origin`) in 
 
 ## Pages
 
-- **Instances** (home): find an instance by the start of its ID, filter by workflow, version, period and status.
+- **Instances** (home): find an instance from a piece of its ID, filter by workflow, version, period and status.
 - **Definitions**: deployed workflows by namespace, with their running or faulted instances.
-- **Definition**: how the workflow starts, its instances of the last 24 hours, its YAML, and a start panel
-  (not offered for workflows that start on an event: the gateway refuses to start them by hand).
+- **Definition**: how the workflow starts, its instances of the last 24 hours, its YAML, and a start panel.
+  For a workflow that starts on an event, the panel explains that only its event starts it: the runtime
+  refuses to start such a workflow by hand.
 - **Instance**: status and cause, a timeline of each task (attempts, waits before retry, waits for an event,
   long waits shortened), the lifecycle events, and the instance input and output.
 

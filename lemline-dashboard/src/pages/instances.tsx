@@ -6,6 +6,7 @@ import { useDefinition } from "../hooks/use-definition";
 import { buildPageTitle, useDocumentMeta } from "../hooks/use-document-meta";
 import { useInstanceList } from "../hooks/use-instance-list";
 import { useNow } from "../hooks/use-now";
+import { useRunningReasons } from "../hooks/use-running-reasons";
 import { useDashboardNavigation } from "../hooks/use-navigation";
 import { useStatusCounts } from "../hooks/use-status-counts";
 import { toInstanceRow } from "../lib/instance-row";
@@ -74,7 +75,7 @@ export function InstancesPage() {
   const { workflows } = useCatalog();
   const { openInstance, openDefinition } = useDashboardNavigation();
   const { scope, statuses, period, update } = useInstancesUrlState();
-  const nowMs = useNow(30_000);
+  const nowMs = useNow(5_000);
   const [perPage, setPerPage] = useState(10);
   const [page, setPage] = useState(0);
 
@@ -117,7 +118,12 @@ export function InstancesPage() {
   const total = list.exactTotal ?? selectedCount ?? list.rows.length;
   const pages = Math.max(1, Math.ceil(total / perPage));
   const current = Math.min(page, pages - 1);
-  const rows = list.pageRows.map((instance) => toInstanceRow(instance, nowMs));
+  const reasons = useRunningReasons(list.pageRows, nowMs);
+  const rows = list.pageRows.map((instance) => {
+    const row = toInstanceRow(instance, nowMs);
+    const reason = reasons.get(instance.instanceId);
+    return reason ? { ...row, ...reason } : row;
+  });
   const showLoading = list.loadingPage && rows.length === 0;
   const isEmpty = !showLoading && !list.isError && rows.length === 0;
 

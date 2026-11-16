@@ -33,6 +33,8 @@ export function StartDrawer({ ns, wf, version, trigger, onClose, onStarted, onSe
   const [error, setError] = useState<string | null>(null);
   const [scheduled, setScheduled] = useState<{ nextRunAt?: number } | null>(null);
   const pad = useDrawerPadding();
+  // The runtime refuses to start by hand a workflow that starts on an event.
+  const eventOnly = trigger.kind === "event";
 
   let valid = true;
   try {
@@ -42,7 +44,7 @@ export function StartDrawer({ ns, wf, version, trigger, onClose, onStarted, onSe
   }
 
   const start = async () => {
-    if (!valid || starting) return;
+    if (!valid || starting || eventOnly) return;
     setStarting(true);
     setError(null);
     try {
@@ -84,6 +86,18 @@ export function StartDrawer({ ns, wf, version, trigger, onClose, onStarted, onSe
             }
           />
           <DrawerBody>
+            {trigger.kind === "event" && (
+              <div className="flex gap-3 rounded-[10px] border border-lm-warn-line bg-lm-warn-soft px-4 py-3.5">
+                <WarningIcon className="mt-px shrink-0 text-lm-warn" />
+                <div className="flex flex-col gap-1">
+                  <p className="m-0 text-[15px] font-semibold text-lm-warn">This workflow normally starts on an event</p>
+                  <p className="m-0 text-sm leading-normal text-lm-warn">
+                    Lemline starts it each time {trigger.eventTypes.join(" or ")} arrives, and does not start it by hand.
+                    Send that event instead: the example below shows the input the workflow then receives.
+                  </p>
+                </div>
+              </div>
+            )}
             {trigger.kind === "schedule" && (
               <div className="flex gap-3 rounded-[10px] border border-lm-warn-line bg-lm-warn-soft px-4 py-3.5">
                 <WarningIcon className="mt-px shrink-0 text-lm-warn" />
@@ -101,6 +115,7 @@ export function StartDrawer({ ns, wf, version, trigger, onClose, onStarted, onSe
                 <label htmlFor="start-input" className="text-[15px] font-semibold">
                   Input
                 </label>
+{!eventOnly && (
                 <button
                   type="button"
                   onClick={() => setText(example)}
@@ -108,6 +123,7 @@ export function StartDrawer({ ns, wf, version, trigger, onClose, onStarted, onSe
                 >
                   Reset to example
                 </button>
+                )}
               </div>
               <textarea
                 id="start-input"
@@ -115,6 +131,7 @@ export function StartDrawer({ ns, wf, version, trigger, onClose, onStarted, onSe
                 spellCheck={false}
                 value={text}
                 onChange={(event) => setText(event.target.value)}
+                readOnly={eventOnly}
                 className={cn(
                   "w-full resize-y rounded-[10px] border bg-lm-subtle px-4 py-3.5 font-mono text-sm leading-[1.6] text-lm-text",
                   valid ? "border-lm-line-strong" : "border-lm-fail-bar",
@@ -197,16 +214,21 @@ export function StartDrawer({ ns, wf, version, trigger, onClose, onStarted, onSe
             style={{ padding: pad.foot }}
           >
             <p className="m-0 text-sm text-lm-muted">
-              {trigger.kind === "schedule" ? "The schedule starts the instances." : "You'll be taken to the new instance."}
+              {eventOnly
+                ? "Starts when the event arrives."
+                : trigger.kind === "schedule"
+                  ? "The schedule starts the instances."
+                  : "You'll be taken to the new instance."}
             </p>
             <div className="flex gap-2">
               <button
                 type="button"
                 onClick={() => void start()}
-                disabled={!valid || starting}
+                disabled={!valid || starting || eventOnly}
+                title={eventOnly ? "Lemline starts this workflow only when its event arrives" : undefined}
                 className={cn(
                   "flex min-h-11 cursor-pointer items-center gap-2 rounded-lg border-0 px-[18px] text-[15px] font-semibold text-lm-panel",
-                  valid && !starting ? "bg-lm-primary-bg" : "bg-lm-line-strong",
+                  valid && !starting && !eventOnly ? "bg-lm-primary-bg" : "bg-lm-line-strong",
                 )}
               >
                 <PlayIcon />

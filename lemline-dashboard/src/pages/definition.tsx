@@ -60,18 +60,15 @@ export function DefinitionPage() {
             onChange={(value) => setParams({ version: value }, { replace: true })}
             className="[&_[role=listbox]]:min-w-[200px]"
           />
-          {/* The gateway refuses to start by hand a workflow that starts on an event: no button then. */}
-          {trigger.kind !== "event" && (
-            <button
-              type="button"
-              onClick={() => setStartOpen(true)}
-              disabled={!definition}
-              className="flex min-h-11 cursor-pointer items-center gap-2 rounded-lg border border-lm-line-strong bg-lm-panel px-4 text-[15px] font-semibold text-lm-text disabled:opacity-55"
-            >
-              <PlayIcon />
-              {trigger.kind === "manual" ? "Start instance" : "Start manually"}
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={() => setStartOpen(true)}
+            disabled={!definition}
+            className="flex min-h-11 cursor-pointer items-center gap-2 rounded-lg border border-lm-line-strong bg-lm-panel px-4 text-[15px] font-semibold text-lm-text disabled:opacity-55"
+          >
+            <PlayIcon />
+            {trigger.kind === "manual" ? "Start instance" : "Start manually"}
+          </button>
         </div>
 
         {definitionQuery.isError && !definition && (
