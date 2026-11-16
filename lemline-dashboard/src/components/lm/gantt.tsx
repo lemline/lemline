@@ -13,6 +13,7 @@ const SEGMENT_STYLE: Record<Segment["kind"], string> = {
   failed: "bg-lm-fail-bar",
   backoff: "border-[1.5px] border-dashed border-lm-muted bg-transparent",
   waiting: "lm-waiting",
+  interrupted: "bg-lm-line-strong",
   group: "bg-[var(--lm-group)]",
 };
 
@@ -22,6 +23,7 @@ const STATE_PILL: Record<StepState, { label: string; className: string }> = {
   waiting: { label: "Waiting for an event", className: "border-lm-warn-line bg-lm-warn-soft text-lm-warn" },
   retrying: { label: "Waiting before retry", className: "border-lm-warn-line bg-lm-warn-soft text-lm-warn" },
   failed: { label: "Failed", className: "border-lm-fail-line bg-lm-fail-soft text-lm-fail-strong" },
+  interrupted: { label: "Interrupted", className: "border-lm-line-strong bg-lm-subtle text-lm-text2" },
 };
 
 function Legend() {
@@ -48,6 +50,10 @@ function Legend() {
       <li className={item}>
         <span className={cn(swatch, SEGMENT_STYLE.waiting)} />
         Waiting for an event or a delay
+      </li>
+      <li className={item}>
+        <span className={cn(swatch, SEGMENT_STYLE.interrupted)} />
+        Interrupted
       </li>
     </ul>
   );
@@ -216,7 +222,9 @@ function TaskDrawer({ row, t0, nowMs, onClose }: { row: StepRow; t0: number; now
                         ? `Failed${error ? ` · ${error}` : ""}${span}`
                         : attempt.outcome === "running"
                           ? "Running"
-                          : `Succeeded${span}`;
+                          : attempt.outcome === "interrupted"
+                            ? `Interrupted${span}`
+                            : `Succeeded${span}`;
                     return (
                       <li
                         key={index}

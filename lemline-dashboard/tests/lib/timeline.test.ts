@@ -111,6 +111,54 @@ do:
     expect(instanceSummary(model.rows, "RUNNING", undefined).title).toBe("Retrying callPayments");
   });
 
+  describe("a task still open when the instance ends", () => {
+    const forkRoot = parseWorkflowSource(`
+document: { dsl: '1.0.0', namespace: shop, name: race, version: '1.0.0' }
+do:
+  - race:
+      fork:
+        compete: true
+        branches:
+          - fast:
+              set: { winner: fast }
+          - slow:
+              call: http
+              with: { method: get, endpoint: https://slow.example.com }
+`).root;
+    const fast = "/do/0/race/fork/branches/0/fast";
+    const slow = "/do/0/race/fork/branches/1/slow";
+    const opened = [
+      event("workflow.started", 0),
+      event("task.started", 0, { task: "/do/0/race" }),
+      event("task.started", 0, { task: fast }),
+      event("task.started", 0, { task: slow }),
+      event("task.completed", 1_000, { task: fast }),
+    ];
+
+    it.each(["COMPLETED", "FAULTED"] as const)("is interrupted, not succeeded, when the instance is %s", (status) => {
+      const ending = status === "COMPLETED" ? "workflow.completed" : "workflow.faulted";
+      const model = buildTimeline([...opened, event(ending, 2_000)], status, forkRoot, T0 + 60_000);
+      const row = model.rows.find((item) => item.pointer === slow);
+
+      expect(row?.state).toBe("interrupted");
+      expect(row?.segments.map((segment) => segment.kind)).toEqual(["interrupted"]);
+      expect(row?.end).toBe(T0 + 2_000);
+      expect(model.rows.find((item) => item.pointer === fast)?.state).toBe("completed");
+    });
+
+    it("leaves every task of a normal run completed", () => {
+      const events = [
+        ...opened,
+        event("task.completed", 1_500, { task: slow }),
+        event("task.completed", 1_500, { task: "/do/0/race" }),
+        event("workflow.completed", 2_000),
+      ];
+      const model = buildTimeline(events, "COMPLETED", forkRoot, T0 + 60_000);
+
+      expect(model.rows.map((row) => row.state)).toEqual(["completed", "completed", "completed"]);
+    });
+  });
+
   it("shows a listen task as waiting while the instance runs, and shortens the long wait", () => {
     const events = [
       event("workflow.started", 0),

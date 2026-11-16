@@ -9,8 +9,9 @@ import { isTaskPointer, shortEventType, taskAt, taskNamesOf } from "./workflow-s
  * waiting for an event), on a time axis where long idle waits are shortened.
  */
 
-export type SegmentKind = "ran" | "running" | "failed" | "backoff" | "waiting" | "group";
-export type StepState = "completed" | "running" | "waiting" | "failed" | "retrying";
+export type SegmentKind = "ran" | "running" | "failed" | "backoff" | "waiting" | "interrupted" | "group";
+/** "interrupted": still open when the instance ended, so it never finished. */
+export type StepState = "completed" | "running" | "waiting" | "failed" | "retrying" | "interrupted";
 
 export interface Segment {
   start: number;
@@ -21,7 +22,7 @@ export interface Segment {
 export interface Attempt {
   start: number;
   end?: number;
-  outcome: "succeeded" | "failed" | "running";
+  outcome: "succeeded" | "failed" | "running" | "interrupted";
   error?: RawError;
 }
 
@@ -277,8 +278,11 @@ function buildRow(
     backoffFrom = null;
   } else if (last?.outcome === "running") {
     if (terminal) {
+      // No task.completed: the instance ended while this task ran (another branch of a fork
+      // ended it, or it failed elsewhere).
       last.end = tEnd;
-      last.outcome = "succeeded";
+      last.outcome = "interrupted";
+      state = "interrupted";
     } else {
       state = waitsForEvent ? "waiting" : "running";
     }
@@ -290,6 +294,7 @@ function buildRow(
     const end = attempt.end ?? tEnd;
     let kind: SegmentKind = attempt.outcome === "failed" ? "failed" : attempt.outcome === "running" ? "running" : "ran";
     if (waitsForEvent && attempt.outcome !== "failed") kind = "waiting";
+    if (attempt.outcome === "interrupted") kind = "interrupted";
     segments.push({ start: attempt.start, end: Math.max(end, attempt.start), kind });
   }
   segments.sort((left, right) => left.start - right.start);
@@ -445,6 +450,8 @@ function noteOf(row: StepRow, nowMs: number): string {
         if (next || row.state === "retrying") parts.push(`retry in ${formatSpan(Math.max(0, pause))}`);
       } else if (attempt.outcome === "succeeded") {
         parts.push("ok");
+      } else if (attempt.outcome === "interrupted") {
+        parts.push("interrupted");
       } else {
         parts.push("running…");
       }
@@ -457,6 +464,7 @@ function noteOf(row: StepRow, nowMs: number): string {
     return `${code} after ${formatSpan(duration)}`;
   }
   if (row.state === "running") return `running for ${formatSpan(duration)}…`;
+  if (row.state === "interrupted") return `interrupted after ${formatSpan(duration)}`;
   if (row.listensTo.length > 0 || row.segments.some((segment) => segment.kind === "waiting")) return `waited ${formatSpan(duration)}`;
   return formatSpan(duration);
 }
@@ -478,6 +486,7 @@ function detailOf(row: StepRow, nowMs: number): string {
         return `Attempt ${index + 1} failed${attempt.error ? ` with ${error.headline}` : ""}${span ? ` after ${span}` : ""}.`;
       }
       if (attempt.outcome === "succeeded") return `Attempt ${index + 1} succeeded after ${span}.`;
+      if (attempt.outcome === "interrupted") return `Attempt ${index + 1} was interrupted after ${span}, when the instance ended.`;
       return `Attempt ${index + 1} is running.`;
     });
     if (row.state === "retrying") sentences.push("Waiting before the next attempt.");
@@ -488,6 +497,7 @@ function detailOf(row: StepRow, nowMs: number): string {
     return `Failed after ${duration}: ${error.headline}.${error.explanation ? ` ${error.explanation}.` : ""}`;
   }
   if (row.state === "running") return `Running for ${duration}.`;
+  if (row.state === "interrupted") return `Interrupted after ${duration}: the instance ended before this task finished.`;
   if (events) return `Waited ${duration} for ${events}.`;
   return `Took ${duration}.`;
 }
