@@ -2,6 +2,7 @@ import { create } from "@bufbuild/protobuf";
 import { useQueries, useQueryClient } from "@tanstack/react-query";
 import {
   GetDefinitionRequestSchema,
+  InstanceStatus,
   ListInstanceEventsRequestSchema,
   type InstanceEvent,
   type InstanceSummary,
@@ -30,7 +31,10 @@ export interface RunningReason {
  */
 export function useRunningReasons(instances: InstanceSummary[], nowMs: number): Map<string, RunningReason> {
   const queryClient = useQueryClient();
-  const running = instances.filter((instance) => uiStatusOf(instance.status) === "running");
+  // Pending instances keep the row's own "Waiting to start": they have not run anything yet.
+  const running = instances.filter(
+    (instance) => uiStatusOf(instance.status) === "running" && instance.status !== InstanceStatus.PENDING,
+  );
 
   const eventQueries = useQueries({
     queries: running.map((instance) => ({

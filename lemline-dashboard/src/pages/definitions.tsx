@@ -20,6 +20,8 @@ const COLUMNS = "minmax(220px,1fr) 220px 200px";
 
 function enterKey(action: () => void) {
   return (event: KeyboardEvent) => {
+    // A key pressed on a button inside the row is that button's: it activates it natively.
+    if (event.target !== event.currentTarget) return;
     if (event.key === "Enter" || event.key === " ") {
       event.preventDefault();
       action();
