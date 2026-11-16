@@ -25,9 +25,10 @@ export function useDashboardNavigation() {
     [navigate],
   );
 
+  /** `justStarted`: the instance was just started, so the page waits for it to appear. */
   const openInstance = useCallback(
-    (id: string) => {
-      navigate(instancePath(id));
+    (id: string, options?: { justStarted?: boolean }) => {
+      navigate(instancePath(id), options?.justStarted ? { state: { justStarted: true } } : undefined);
       window.scrollTo(0, 0);
     },
     [navigate],

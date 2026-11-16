@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useNow } from "../hooks/use-now";
-import { useParams } from "react-router-dom";
+import { useLocation, useParams } from "react-router-dom";
 import { useDefinition } from "../hooks/use-definition";
 import { buildPageTitle, useDocumentMeta, type FaviconTone } from "../hooks/use-document-meta";
 import { useDashboardNavigation } from "../hooks/use-navigation";
@@ -24,7 +24,9 @@ export function InstancePage() {
   const pagePad = usePagePadding();
   const narrow = useViewportWidth() < 720;
   const { navigate, openDefinition } = useDashboardNavigation();
-  const projection = useWatchWorkflowProjection(instanceId);
+  const location = useLocation();
+  const justStarted = (location.state as { justStarted?: boolean } | null)?.justStarted === true;
+  const projection = useWatchWorkflowProjection(instanceId, justStarted);
   const data = projection.data;
   const runtime = data?.status ?? "UNKNOWN";
   const terminal = runtime === "COMPLETED" || runtime === "FAULTED";
@@ -62,7 +64,12 @@ export function InstancePage() {
       <div className="flex min-h-[760px] w-full flex-col bg-lm-bg">
         {header}
         <div className="flex flex-col gap-8" style={{ padding: pagePad }}>
-          <LoadingBlock label="Loading the instance" height={96} />
+          {projection.starting && (
+            <p role="status" className="m-0 text-[15px] text-lm-muted">
+              Starting the instance: it appears here as soon as a worker picks it up.
+            </p>
+          )}
+          <LoadingBlock label={projection.starting ? "Starting the instance" : "Loading the instance"} height={96} />
           <LoadingBlock label="Loading the timeline" height={260} />
         </div>
       </div>
@@ -74,7 +81,14 @@ export function InstancePage() {
       <div className="flex min-h-[760px] w-full flex-col bg-lm-bg">
         {header}
         <div style={{ padding: pagePad }}>
-          <ErrorBlock text={`Instance ${instanceId} could not be loaded.`} onRetry={projection.reconnect} />
+          <ErrorBlock
+            text={
+              projection.notVisibleYet
+                ? `Instance ${instanceId} was accepted, but Lemline does not show it yet: no worker has started it.`
+                : `Instance ${instanceId} could not be loaded.`
+            }
+            onRetry={projection.reconnect}
+          />
         </div>
       </div>
     );

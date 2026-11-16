@@ -140,7 +140,7 @@ export function DefinitionPage() {
           onClose={() => setStartOpen(false)}
           onStarted={(id) => {
             setStartOpen(false);
-            openInstance(id);
+            openInstance(id, { justStarted: true });
           }}
           onSeeInstances={() => {
             setStartOpen(false);

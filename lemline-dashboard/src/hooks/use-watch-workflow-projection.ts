@@ -1,4 +1,5 @@
 import { create } from "@bufbuild/protobuf";
+import { Code, ConnectError } from "@connectrpc/connect";
 import { useQuery } from "@tanstack/react-query";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -14,6 +15,11 @@ import { durationToMilliseconds, timestampToIsoString, timestampToMilliseconds }
 
 const EVENT_HISTORY_PAGE_SIZE = 500;
 const MAX_STREAM_RETRIES = 5;
+/**
+ * How long a page opened right after a start waits for the instance to appear: the gateway
+ * accepts a start before the worker's first lifecycle event makes the instance readable.
+ */
+const START_VISIBLE_WAIT_MS = 30_000;
 
 export type WorkflowRuntimeStatus = "PENDING" | "RUNNING" | "COMPLETED" | "FAULTED" | "UNKNOWN";
 type TaskTerminalKind = "COMPLETED" | "FAILED";
@@ -84,15 +90,28 @@ interface UseWatchWorkflowProjectionResult {
   isError: boolean;
   error?: Error;
   liveConnected: boolean;
+  /** Opened right after a start, and the gateway does not show the instance yet. */
+  starting: boolean;
+  /** The start was accepted, but the instance did not appear within the wait. */
+  notVisibleYet: boolean;
   reconnect: () => void;
 }
 
-export function useWatchWorkflowProjection(workflowId: string | undefined): UseWatchWorkflowProjectionResult {
+/**
+ * @param justStarted the page was opened right after this instance was started: until the
+ *   gateway shows it, "not found" means "not visible yet", for a bounded wait.
+ */
+export function useWatchWorkflowProjection(
+  workflowId: string | undefined,
+  justStarted = false,
+): UseWatchWorkflowProjectionResult {
   const [projection, setProjection] = useState<WorkflowProjection | undefined>(undefined);
   const [isLoading, setIsLoading] = useState(Boolean(workflowId));
   const [isError, setIsError] = useState(false);
   const [error, setError] = useState<Error | undefined>(undefined);
   const [liveConnected, setLiveConnected] = useState(false);
+  const [starting, setStarting] = useState(false);
+  const [notVisibleYet, setNotVisibleYet] = useState(false);
   const [reconnectToken, setReconnectToken] = useState(0);
 
   const reconnect = useCallback(() => {
@@ -107,6 +126,8 @@ export function useWatchWorkflowProjection(workflowId: string | undefined): UseW
     setIsError(false);
     setError(undefined);
     setLiveConnected(false);
+    setStarting(false);
+    setNotVisibleYet(false);
   }
 
   useEffect(() => {
@@ -135,11 +156,35 @@ export function useWatchWorkflowProjection(workflowId: string | undefined): UseW
       publishProjection();
     };
 
+    const getInstance = () =>
+      gatewayClient.getInstance(create(GetInstanceRequestSchema, { instanceId: workflowId }), {
+        signal: controller.signal,
+      });
+
+    // Right after a start, waits for the instance to appear; anywhere else, not found is an error.
+    const getStartedInstance = async () => {
+      const startedAt = Date.now();
+      for (let attempt = 1; ; attempt += 1) {
+        try {
+          const response = await getInstance();
+          setStarting(false);
+          return response;
+        } catch (cause) {
+          const notFound = ConnectError.from(cause).code === Code.NotFound;
+          if (!justStarted || !notFound || controller.signal.aborted || disposed) throw cause;
+          if (Date.now() - startedAt >= START_VISIBLE_WAIT_MS) {
+            setStarting(false);
+            setNotVisibleYet(true);
+            throw cause;
+          }
+          setStarting(true);
+          await delay(Math.min(250 * 2 ** (attempt - 1), 2_000));
+        }
+      }
+    };
+
     const loadSummaryAndHistory = async () => {
-      const instanceResponse = await gatewayClient.getInstance(
-        create(GetInstanceRequestSchema, { instanceId: workflowId }),
-        { signal: controller.signal },
-      );
+      const instanceResponse = await getStartedInstance();
 
       seed = instanceResponse.instance ? seedFromSummary(instanceResponse.instance) : undefined;
       publishProjection();
@@ -235,7 +280,7 @@ export function useWatchWorkflowProjection(workflowId: string | undefined): UseW
       controller.abort();
       setLiveConnected(false);
     };
-  }, [reconnectToken, workflowId]);
+  }, [justStarted, reconnectToken, workflowId]);
 
   return {
     data: projection,
@@ -243,6 +288,8 @@ export function useWatchWorkflowProjection(workflowId: string | undefined): UseW
     isError,
     error,
     liveConnected,
+    starting,
+    notVisibleYet,
     reconnect,
   };
 }
