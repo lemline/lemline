@@ -104,6 +104,28 @@ class ConfigFileRedactorTest {
     }
 
     @Test
+    fun `masks credentials assigned inside a value`() {
+        val text = """
+            kafka.sasl.jaas.config: org.apache.kafka.common.security.plain.PlainLoginModule required username="svc" password="dottedpw";
+            kafka:
+              sasl:
+                jaas:
+                  config: PlainLoginModule required username="svc" password="nestedpw";
+            lemline:
+              analytics:
+                url: jdbc:postgresql://db.internal/lemline?user=app&password=querypw
+              gateway:
+                grpc:
+                  host: 0.0.0.0
+        """.trimIndent()
+        val result = assertNotNull(ConfigFileRedactor.redact(text))
+        listOf("dottedpw", "nestedpw", "querypw").forEach { assertFalse(it in result.text, "$it leaked") }
+        assertTrue("host: 0.0.0.0" in result.text)
+        assertTrue(ConfigFileRedactor.isSecret("kafka.sasl.jaas.config"))
+        assertFalse(ConfigFileRedactor.hasEmbeddedPassword("passwordless-mode"))
+    }
+
+    @Test
     fun `masks a credential URL inside a property expression`() {
         val text = "lemline:\n  gateway:\n    authentication:\n      jwt:\n" +
             "        jwks-url: \${JWKS_URL:https://svc:exprpw@issuer.example/jwks}\n"

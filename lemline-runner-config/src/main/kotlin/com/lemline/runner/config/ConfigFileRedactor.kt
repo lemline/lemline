@@ -34,17 +34,28 @@ object ConfigFileRedactor {
      */
     private val URL_WITH_PASSWORD = Regex("""[a-zA-Z][a-zA-Z0-9+.-]*://[^/@\s:]*:[^/@\s]*@""")
 
+    /**
+     * A credential assigned inside a value: a JAAS line (`password="pw";`) or a URL query (`?password=pw`).
+     * Kafka spells its JAAS key `sasl.jaas.config`, whose leaf `config` names nothing secret: the value tells.
+     */
+    private val ASSIGNED_PASSWORD = Regex("""(?i)\b(password|passwd|pwd|secret|token)\s*=""")
+
     /** True for keys whose value must never leave the process. Paths such as `tls.private-key` are not secrets. */
     fun isSecret(key: String): Boolean {
         val leaf = key.substringAfterLast('.').substringBefore('[').lowercase()
         return leaf == "password" || leaf.endsWith("-password") ||
             leaf == "secret" || leaf.endsWith("-secret") ||
             leaf == "token" || leaf.endsWith("-token") ||
-            leaf in SECRET_LEAVES
+            leaf in SECRET_LEAVES ||
+            key.lowercase().endsWith("jaas.config")
     }
 
-    /** True for a value that embeds credentials whatever its key, such as `postgresql://app:pw@db/lemline`. */
-    fun hasEmbeddedPassword(value: String?): Boolean = value != null && URL_WITH_PASSWORD.containsMatchIn(value)
+    /**
+     * True for a value that embeds credentials whatever its key: a URL carrying `user:password@`
+     * (`postgresql://app:pw@db/lemline`), or an assignment such as `password="pw"` or `?password=pw`.
+     */
+    fun hasEmbeddedPassword(value: String?): Boolean =
+        value != null && (URL_WITH_PASSWORD.containsMatchIn(value) || ASSIGNED_PASSWORD.containsMatchIn(value))
 
     /**
      * Returns the redacted text and the keys it sets, or null when the text cannot be parsed:
