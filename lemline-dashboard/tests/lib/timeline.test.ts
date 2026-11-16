@@ -76,6 +76,41 @@ describe("buildTimeline", () => {
     expect(model.rows[0].output).toEqual({ valid: true });
   });
 
+  it("puts a retry announced on the try block on the task that failed in it", () => {
+    const tryRoot = parseWorkflowSource(`
+document: { dsl: '1.0.0', namespace: shop, name: payment, version: '1.0.0' }
+do:
+  - chargePayment:
+      try:
+        - callPayments:
+            call: http
+            with: { method: post, endpoint: https://payments.example.com/charges }
+      catch:
+        errors:
+          with: { status: 503 }
+        retry:
+          delay: { seconds: 8 }
+          limit:
+            attempt: { count: 3 }
+`).root;
+    const call = "/do/0/chargePayment/try/0/callPayments";
+    const events = [
+      event("workflow.started", 0),
+      event("task.started", 0, { task: "/do/0/chargePayment" }),
+      event("task.started", 0, { task: call }),
+      event("task.faulted", 2_000, { task: call, error: { status: 503, title: "Service Unavailable" } }),
+      // As the runtime emits it: on the try block it re-enters, not on the task.
+      event("task.retried", 2_000, { task: "/do/0/chargePayment/try", retryCount: 1 }),
+    ];
+
+    const model = buildTimeline(events, "RUNNING", tryRoot, T0 + 5_000);
+    const row = model.rows.find((item) => item.pointer === call);
+
+    expect(row?.state).toBe("retrying");
+    expect(row?.segments.map((segment) => segment.kind)).toEqual(["failed", "backoff"]);
+    expect(instanceSummary(model.rows, "RUNNING", undefined).title).toBe("Retrying callPayments");
+  });
+
   it("shows a listen task as waiting while the instance runs, and shortens the long wait", () => {
     const events = [
       event("workflow.started", 0),

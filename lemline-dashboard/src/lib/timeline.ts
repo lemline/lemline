@@ -145,13 +145,29 @@ export function buildTimeline(
   const tEnd = Math.max(bounds.end, bounds.startedAt + 1);
 
   const byPointer = new Map<string, ParsedEvent[]>();
-  for (const event of parsed) {
-    if (!event.view.eventType.includes(".task.")) continue;
-    const pointer = event.view.taskPointer?.trim();
-    if (!pointer || !isTaskPointer(pointer)) continue;
+  const add = (pointer: string, event: ParsedEvent) => {
     const list = byPointer.get(pointer) ?? [];
     list.push(event);
     byPointer.set(pointer, list);
+  };
+  const blockRetries: { block: string; event: ParsedEvent }[] = [];
+  const faults: { pointer: string; time: number }[] = [];
+  for (const event of parsed) {
+    if (!event.view.eventType.includes(".task.")) continue;
+    const pointer = event.view.taskPointer?.trim();
+    if (!pointer) continue;
+    if (!isTaskPointer(pointer)) {
+      if (kindOf(event.view.eventType) === "retried") blockRetries.push({ block: pointer, event });
+      continue;
+    }
+    if (kindOf(event.view.eventType) === "faulted") faults.push({ pointer, time: event.time });
+    add(pointer, event);
+  }
+  // The runtime announces a retry on the try block it re-enters ("/do/1/charge/try"), not on the
+  // task that failed in it: the retry goes to the last task of that block that failed before it.
+  for (const { block, event } of blockRetries) {
+    const failed = faults.filter((fault) => fault.time <= event.time && fault.pointer.startsWith(`${block}/`)).pop();
+    if (failed) add(failed.pointer, event);
   }
 
   const pointers = Array.from(byPointer.keys());
