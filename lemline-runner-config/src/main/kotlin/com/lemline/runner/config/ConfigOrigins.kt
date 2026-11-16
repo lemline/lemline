@@ -65,7 +65,7 @@ class ConfigOriginResolver(
             origin = origin,
             originDetail = detail(key, origin),
             defaultValue = declared.defaultValue,
-            secret = ConfigFileRedactor.isSecret(key),
+            secret = ConfigFileRedactor.isSecret(key) || ConfigFileRedactor.hasEmbeddedPassword(effective),
             shadowed = shadowed,
         )
     }

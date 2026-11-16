@@ -41,7 +41,7 @@ describe("fileLines", () => {
     expect(lines[6]).toMatchObject({ secret: true, overriddenBy: undefined });
   });
 
-  it("names a system property override as it is typed", () => {
+  it("does not pretend a system property was typed as -D", () => {
     const withCli = create(ConfigFileSchema, {
       ...file,
       keys: [
@@ -53,7 +53,7 @@ describe("fileLines", () => {
         }),
       ],
     });
-    expect(fileLines(withCli)[4].overriddenBy?.label).toBe("Overridden by -Dlemline.gateway.cors.origins");
+    expect(fileLines(withCli)[4].overriddenBy).toEqual({ kind: "cli", label: "Overridden by a system property" });
   });
 });
 
@@ -78,7 +78,11 @@ describe("outsideFileRows", () => {
     const rows = outsideFileRows(settings, file);
     expect(rows[0]).toMatchObject({ label: "gateway.enabled", relation: "Not in lemline.yaml", origin: "Environment" });
     expect(rows[1].relation).toBe("Replaces line 5 of lemline.yaml");
-    expect(rows[2]).toMatchObject({ value: "Set (hidden)", name: "-Dlemline.gateway.tls.trust-store-password" });
+    expect(rows[2]).toMatchObject({
+      value: "Set (hidden)",
+      origin: "System property",
+      name: "Set when the gateway started (-D or a command option)",
+    });
   });
 
   it("is empty when everything comes from the file or defaults", () => {

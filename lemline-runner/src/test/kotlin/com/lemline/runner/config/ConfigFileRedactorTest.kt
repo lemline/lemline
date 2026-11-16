@@ -80,6 +80,30 @@ class ConfigFileRedactorTest {
     }
 
     @Test
+    fun `masks credentials stored under other names or inside a URL`() {
+        val text = """
+            quarkus:
+              kafka:
+                sasl:
+                  jaas-config: org.apache.kafka.common.security.plain.PlainLoginModule required password="k4fka";
+            lemline:
+              analytics:
+                url: postgresql://app:urlpw@db.internal/lemline
+              gateway:
+                cors:
+                  origins: https://dashboard.example
+              brokers:
+                - kafka://svc:listpw@kafka-1:9092
+        """.trimIndent()
+        val result = assertNotNull(ConfigFileRedactor.redact(text))
+        listOf("k4fka", "urlpw", "listpw").forEach { assertFalse(it in result.text, "$it leaked") }
+        assertTrue("origins: https://dashboard.example" in result.text)
+        assertTrue(result.keys.single { it.key == "lemline.analytics.url" }.secret)
+        assertTrue(ConfigFileRedactor.hasEmbeddedPassword("https://user:pw@host/path"))
+        assertFalse(ConfigFileRedactor.hasEmbeddedPassword("https://host:9443/path"))
+    }
+
+    @Test
     fun `refuses text it cannot parse`() {
         assertNull(ConfigFileRedactor.redact("lemline: [unclosed\n  password: x"))
     }

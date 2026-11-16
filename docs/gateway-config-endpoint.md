@@ -143,8 +143,10 @@ source is recognised by type or by a name containing `LemlineConfigSource`.
 
 ### 4.4 Secrets
 
-A key is a secret when its leaf name is `password`, `secret` or `token`, or ends with `-password`,
-`-secret` or `-token` (`ConfigFileRedactor.isSecret`).
+A key is a secret when its leaf name is `password`, `secret` or `token`, ends with `-password`,
+`-secret` or `-token`, or is one of `jaas-config`, `sasl-jaas-config`, `api-key`, `access-key`,
+`secret-key`, `credentials`, `passphrase` (`ConfigFileRedactor.isSecret`). A value that is a URL
+carrying `user:password@` is treated as a secret whatever its key.
 For a secret, `value` is never set and `secret = true`. `is_set` tells whether a value is configured.
 
 Paths such as `tls.certificate` and `tls.private-key` are not secrets: they are file locations, and
@@ -205,7 +207,9 @@ its default: operators think in terms of the file they wrote, plus what override
      at default location"), the line count, and a Copy button that copies the redacted text;
    - the text with line numbers, comments kept, secrets shown as `••••••••` in muted color;
    - an overridden line is struck through, with a left bar and a label in the overriding origin's
-     color, for example "Overridden by LEMLINE_GATEWAY_CORS_ORIGINS";
+     color, for example "Overridden by LEMLINE_GATEWAY_CORS_ORIGINS". A system property is not shown
+     as "-D…": Lemline's commands set some of them themselves (`gateway start` sets
+     `lemline.gateway.enabled`), so the label says "Overridden by a system property";
    - no file loaded: the section says so, and names the places Lemline looks for one.
 3. **Set outside the file**: the settings whose origin is `ENVIRONMENT` or `SYSTEM_PROPERTY`, one
    row each, with the key, the value, the variable or property name, and either "Replaces line N of

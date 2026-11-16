@@ -28,7 +28,7 @@ export function originKind(origin: SettingOrigin): OriginKind {
 export function originLabel(origin: SettingOrigin): string {
   switch (origin) {
     case SettingOrigin.SYSTEM_PROPERTY:
-      return "Command line";
+      return "System property";
     case SettingOrigin.ENVIRONMENT:
       return "Environment";
     case SettingOrigin.CONFIG_FILE:
@@ -42,10 +42,18 @@ export function originLabel(origin: SettingOrigin): string {
   }
 }
 
-/** What to look for at the origin: "-Dlemline.gateway.cors.origins", "LEMLINE_GATEWAY_CORS_ORIGINS". */
+/**
+ * What to look for at the origin. An environment variable is named ("LEMLINE_GATEWAY_CORS_ORIGINS").
+ * A system property is not shown as "-D…": Lemline's own commands set some of them (`gateway start`
+ * sets lemline.gateway.enabled), so nobody may have typed it.
+ */
 export function originName(origin: SettingOrigin, detail: string): string {
-  if (!detail) return "";
-  return origin === SettingOrigin.SYSTEM_PROPERTY ? `-D${detail}` : detail;
+  if (origin === SettingOrigin.SYSTEM_PROPERTY) return "Set when the gateway started (-D or a command option)";
+  return detail;
+}
+
+function overrideLabel(origin: SettingOrigin, detail: string): string {
+  return origin === SettingOrigin.SYSTEM_PROPERTY ? "Overridden by a system property" : `Overridden by ${detail}`;
 }
 
 export function locatorLabel(locator: ConfigFileLocator): string {
@@ -94,7 +102,7 @@ export function fileLines(file: ConfigFile): FileLine[] {
         overriddenBy: overridden
           ? {
               kind: originKind(key.overriddenBy),
-              label: `Overridden by ${originName(key.overriddenBy, key.overriddenByDetail)}`,
+              label: overrideLabel(key.overriddenBy, key.overriddenByDetail),
             }
           : undefined,
       };
