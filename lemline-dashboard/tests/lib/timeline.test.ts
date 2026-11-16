@@ -111,6 +111,23 @@ do:
     expect(instanceSummary(model.rows, "RUNNING", undefined).title).toBe("Retrying callPayments");
   });
 
+  it("keeps a task announced but not started yet as waiting to start", () => {
+    const events = [
+      event("workflow.started", 0),
+      event("task.started", 0, { task: "/do/0/validateOrder" }),
+      event("task.completed", 500, { task: "/do/0/validateOrder" }),
+      event("task.created", 500, { task: "/do/1/chargePayment", input: {} }),
+    ];
+
+    const model = buildTimeline(events, "RUNNING", root, T0 + 3_000);
+    const charge = model.rows.find((row) => row.label === "chargePayment");
+
+    expect(charge?.state).toBe("scheduled");
+    expect(charge?.end).toBeUndefined();
+    expect(charge?.segments.map((segment) => segment.kind)).toEqual(["scheduled"]);
+    expect(instanceSummary(model.rows, "RUNNING", undefined).title).toBe("Waiting to start chargePayment");
+  });
+
   describe("a task still open when the instance ends", () => {
     const forkRoot = parseWorkflowSource(`
 document: { dsl: '1.0.0', namespace: shop, name: race, version: '1.0.0' }

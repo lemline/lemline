@@ -9,9 +9,12 @@ import { isTaskPointer, shortEventType, taskAt, taskNamesOf } from "./workflow-s
  * waiting for an event), on a time axis where long idle waits are shortened.
  */
 
-export type SegmentKind = "ran" | "running" | "failed" | "backoff" | "waiting" | "interrupted" | "group";
-/** "interrupted": still open when the instance ended, so it never finished. */
-export type StepState = "completed" | "running" | "waiting" | "failed" | "retrying" | "interrupted";
+export type SegmentKind = "ran" | "running" | "failed" | "backoff" | "waiting" | "scheduled" | "interrupted" | "group";
+/**
+ * "scheduled": announced (task.created) but not started yet, for instance while workers are busy.
+ * "interrupted": still open when the instance ended, so it never finished.
+ */
+export type StepState = "completed" | "running" | "waiting" | "failed" | "retrying" | "scheduled" | "interrupted";
 
 export interface Segment {
   start: number;
@@ -288,6 +291,10 @@ function buildRow(
     }
   } else if (last?.outcome === "failed") {
     state = "failed";
+  } else if (!last) {
+    // Announced but never started: waiting to start, or cut short if the instance has ended.
+    state = terminal ? "interrupted" : "scheduled";
+    segments.push({ start, end: tEnd, kind: terminal ? "interrupted" : "scheduled" });
   }
 
   for (const attempt of attempts) {
@@ -299,7 +306,8 @@ function buildRow(
   }
   segments.sort((left, right) => left.start - right.start);
 
-  const end = state === "running" || state === "waiting" || state === "retrying" ? undefined : (last?.end ?? start);
+  const ongoing = state === "running" || state === "waiting" || state === "retrying" || state === "scheduled";
+  const end = ongoing ? undefined : (last?.end ?? (state === "interrupted" ? tEnd : start));
   const groupSegments: Segment[] = isGroup ? [{ start, end: end ?? tEnd, kind: "group" }] : segments;
 
   let typeLabel = info.typeLabel || "task";
@@ -464,6 +472,7 @@ function noteOf(row: StepRow, nowMs: number): string {
     return `${code} after ${formatSpan(duration)}`;
   }
   if (row.state === "running") return `running for ${formatSpan(duration)}…`;
+  if (row.state === "scheduled") return `waiting to start for ${formatSpan(duration)}…`;
   if (row.state === "interrupted") return `interrupted after ${formatSpan(duration)}`;
   if (row.listensTo.length > 0 || row.segments.some((segment) => segment.kind === "waiting")) return `waited ${formatSpan(duration)}`;
   return formatSpan(duration);
@@ -497,6 +506,7 @@ function detailOf(row: StepRow, nowMs: number): string {
     return `Failed after ${duration}: ${error.headline}.${error.explanation ? ` ${error.explanation}.` : ""}`;
   }
   if (row.state === "running") return `Running for ${duration}.`;
+  if (row.state === "scheduled") return `Waiting for a worker to start it, for ${duration} so far.`;
   if (row.state === "interrupted") return `Interrupted after ${duration}: the instance ended before this task finished.`;
   if (events) return `Waited ${duration} for ${events}.`;
   return `Took ${duration}.`;
@@ -522,6 +532,8 @@ export function instanceSummary(
       title = current.listensTo.length > 0 ? `Waiting for ${current.listensTo.map(shortEventType).join(", ")}` : `Waiting in ${current.label}`;
     } else if (current.state === "retrying") {
       title = `Retrying ${current.label}`;
+    } else if (current.state === "scheduled") {
+      title = `Waiting to start ${current.label}`;
     }
     return { title, text: `at ${current.pointer}` };
   }

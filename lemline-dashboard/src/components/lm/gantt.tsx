@@ -13,6 +13,7 @@ const SEGMENT_STYLE: Record<Segment["kind"], string> = {
   failed: "bg-lm-fail-bar",
   backoff: "border-[1.5px] border-dashed border-lm-muted bg-transparent",
   waiting: "lm-waiting",
+  scheduled: "border-[1.5px] border-dashed border-lm-line-strong bg-transparent",
   interrupted: "bg-lm-line-strong",
   group: "bg-[var(--lm-group)]",
 };
@@ -23,6 +24,7 @@ const STATE_PILL: Record<StepState, { label: string; className: string }> = {
   waiting: { label: "Waiting for an event", className: "border-lm-warn-line bg-lm-warn-soft text-lm-warn" },
   retrying: { label: "Waiting before retry", className: "border-lm-warn-line bg-lm-warn-soft text-lm-warn" },
   failed: { label: "Failed", className: "border-lm-fail-line bg-lm-fail-soft text-lm-fail-strong" },
+  scheduled: { label: "Waiting to start", className: "border-lm-line-strong bg-lm-subtle text-lm-text2" },
   interrupted: { label: "Interrupted", className: "border-lm-line-strong bg-lm-subtle text-lm-text2" },
 };
 
@@ -50,6 +52,10 @@ function Legend() {
       <li className={item}>
         <span className={cn(swatch, SEGMENT_STYLE.waiting)} />
         Waiting for an event or a delay
+      </li>
+      <li className={item}>
+        <span className={cn(swatch, SEGMENT_STYLE.scheduled)} />
+        Waiting to start
       </li>
       <li className={item}>
         <span className={cn(swatch, SEGMENT_STYLE.interrupted)} />

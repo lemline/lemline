@@ -80,8 +80,10 @@ function useInstanceStream(filters: StreamFilters) {
   });
 
   // Each change of an instance in this list (new, finished, faulted) refreshes it at once.
+  // The stream stays open while rows are shown, even if one refresh failed: the next change
+  // retries it, and a stream lost for good switches to polling.
   useLiveInvalidation<WatchInstancesResponse>({
-    enabled: enabled && query.isSuccess,
+    enabled: enabled && query.data !== undefined,
     queryKey,
     identity,
     onLost: setLostIdentity,
@@ -102,10 +104,11 @@ function useInstanceStream(filters: StreamFilters) {
   });
 
   const rows = useMemo(() => query.data?.pages.flatMap((response) => response.instances) ?? [], [query.data?.pages]);
-  const { hasNextPage, isFetching, fetchNextPage } = query;
+  const { hasNextPage, isFetching, isFetchNextPageError, fetchNextPage } = query;
+  // After a page failed (retries included), loading stops until the person asks to retry.
   useEffect(() => {
-    if (enabled && rows.length < needed && hasNextPage && !isFetching) void fetchNextPage();
-  }, [enabled, fetchNextPage, hasNextPage, isFetching, needed, rows.length]);
+    if (enabled && rows.length < needed && hasNextPage && !isFetching && !isFetchNextPageError) void fetchNextPage();
+  }, [enabled, fetchNextPage, hasNextPage, isFetching, isFetchNextPageError, needed, rows.length]);
 
   const total = query.data?.pages[0]?.totalCount;
   return {
@@ -170,7 +173,7 @@ export function useInstanceList(filters: InstanceListFilters) {
     // Merged lists are only exact once all of them are loaded past the page shown.
     pageRows: covered || !merged ? rows.slice(page * perPage, page * perPage + perPage) : [],
     exactTotal,
-    loadingPage: enabled && (active.some((stream) => stream.isLoading) || !covered),
+    loadingPage: enabled && !active.some((stream) => stream.isError) && (active.some((stream) => stream.isLoading) || !covered),
     isError: active.some((stream) => stream.isError),
     refetch: () => {
       for (const stream of active) void stream.refetch();

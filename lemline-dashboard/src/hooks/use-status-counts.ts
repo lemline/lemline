@@ -54,7 +54,7 @@ export function useDefinitionStatsRows(filter: StatsFilter, enabled = true) {
   });
   // Counters follow the gateway's change stream; polling only if the stream is lost.
   useLiveInvalidation<WatchDefinitionStatsResponse>({
-    enabled: enabled && query.isSuccess,
+    enabled: enabled && query.data !== undefined,
     queryKey,
     identity,
     onLost: setLostIdentity,
@@ -119,7 +119,7 @@ export function useStatusCounts(filter: StatsFilter) {
   });
   // One change stream for the four counts: any instance of the scope that changes refreshes them.
   useLiveInvalidation<WatchInstancesResponse>({
-    enabled: query.isSuccess,
+    enabled: query.data !== undefined,
     queryKey,
     identity,
     onLost: setLostIdentity,
