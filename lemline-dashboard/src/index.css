@@ -145,11 +145,22 @@
   --shadow-lm-card: var(--lm-card-shadow);
   --shadow-lm-pop: 0 8px 24px var(--lm-pop-shadow);
   --font-display: "Lexend", "Inter", system-ui, sans-serif;
+  /* The mockup keeps the browser's normal line height unless a style sets one. */
+  --text-xs--line-height: normal;
+  --text-sm--line-height: normal;
+  --text-base--line-height: normal;
+  --text-lg--line-height: normal;
+  --text-xl--line-height: normal;
 }
 
 @layer base {
   * {
     box-sizing: border-box;
+  }
+
+  html,
+  body {
+    line-height: normal;
   }
 
   body {
