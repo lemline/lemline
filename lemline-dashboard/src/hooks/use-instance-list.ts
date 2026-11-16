@@ -149,6 +149,8 @@ export function useInstanceList(filters: InstanceListFilters) {
   const [first, second, third] = streams;
 
   const rows = useMemo<InstanceSummary[]>(() => {
+    // No status selected: nothing, even though a disabled list still holds its earlier rows.
+    if (active.length === 0) return [];
     const list = merged ? [first.rows, second.rows, third.rows].slice(0, active.length).flat() : first.rows;
     const unique = new Map<string, InstanceSummary>();
     for (const instance of list) unique.set(instance.instanceId, instance);

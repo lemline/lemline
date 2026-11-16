@@ -118,6 +118,11 @@ export function InstancesPage() {
   const total = list.exactTotal ?? selectedCount ?? list.rows.length;
   const pages = Math.max(1, Math.ceil(total / perPage));
   const current = Math.min(page, pages - 1);
+  // The list shrank under the page shown (instances changed status): go to its new last page.
+  // Every row is loaded at that point, so the last page is known from them.
+  if (page > 0 && !list.loadingPage && !list.isError && list.pageRows.length === 0) {
+    setPage(Math.max(0, Math.ceil(list.rows.length / perPage) - 1));
+  }
   const reasons = useRunningReasons(list.pageRows, nowMs);
   const rows = list.pageRows.map((instance) => {
     const row = toInstanceRow(instance, nowMs);
