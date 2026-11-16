@@ -1,7 +1,7 @@
 import { create } from "@bufbuild/protobuf";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
-import { ListInstancesRequestSchema } from "../../gen/proto/lemline/gateway/v1/gateway_pb";
+import { type InstanceSummary, ListInstancesRequestSchema } from "../../gen/proto/lemline/gateway/v1/gateway_pb";
 import { gatewayClient } from "../../lib/grpc-client";
 import { formatRelative, shortInstanceId } from "../../lib/format";
 import { cn } from "../../lib/utils";
@@ -67,13 +67,24 @@ export function InstanceSearch({ namespace, onOpen }: InstanceSearchProps) {
     queryKey: ["instance-search-recent", namespace],
     enabled: searchable,
     staleTime: 10_000,
-    queryFn: async ({ signal }) =>
-      (
-        await gatewayClient.listInstances(
-          create(ListInstancesRequestSchema, { namespace: namespace || undefined, pageSize: RECENT_SCANNED }),
+    // The gateway returns at most 200 instances per page: follow the pages up to RECENT_SCANNED.
+    queryFn: async ({ signal }) => {
+      const instances: InstanceSummary[] = [];
+      let pageCursor: string | undefined;
+      do {
+        const response = await gatewayClient.listInstances(
+          create(ListInstancesRequestSchema, {
+            namespace: namespace || undefined,
+            pageSize: RECENT_SCANNED - instances.length,
+            pageCursor,
+          }),
           { signal },
-        )
-      ).instances,
+        );
+        instances.push(...response.instances);
+        pageCursor = response.nextPageCursor || undefined;
+      } while (pageCursor && instances.length < RECENT_SCANNED);
+      return instances.slice(0, RECENT_SCANNED);
+    },
   });
   const flat = (value: string) => value.toLowerCase().replace(/[^0-9a-f]/g, "");
   const wanted = flat(debounced);

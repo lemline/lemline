@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useGlobalNamespace } from "../context/namespace-context";
 import { useCatalog } from "../hooks/use-catalog";
@@ -71,7 +71,7 @@ function useInstancesUrlState() {
 export function InstancesPage() {
   useDocumentMeta(buildPageTitle(["Instances"]));
   const pagePad = usePagePadding();
-  const { namespace } = useGlobalNamespace();
+  const { namespace, setNamespace } = useGlobalNamespace();
   const { workflows } = useCatalog();
   const { openInstance, openDefinition } = useDashboardNavigation();
   const { scope, statuses, period, update } = useInstancesUrlState();
@@ -79,9 +79,15 @@ export function InstancesPage() {
   const [perPage, setPerPage] = useState(10);
   const [page, setPage] = useState(0);
 
-  // Changing the global namespace drops a workflow filter from another namespace.
+  // On arrival, a link's workflow wins over the saved namespace, as when navigating inside the
+  // dashboard. Afterwards, picking another namespace drops a workflow filter from another one.
+  const shownNamespace = useRef(namespace);
   useEffect(() => {
-    if (namespace && scope.ns && scope.ns !== namespace) update({ ns: "", wf: "", ver: "" });
+    const changed = shownNamespace.current !== namespace;
+    shownNamespace.current = namespace;
+    if (!namespace || !scope.ns || scope.ns === namespace) return;
+    if (changed) update({ ns: "", wf: "", ver: "" });
+    else setNamespace(scope.ns);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [namespace]);
 
