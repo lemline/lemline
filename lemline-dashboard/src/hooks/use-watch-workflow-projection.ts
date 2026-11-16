@@ -1,4 +1,5 @@
 import { create } from "@bufbuild/protobuf";
+import { Code, ConnectError } from "@connectrpc/connect";
 import { useQuery } from "@tanstack/react-query";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -10,10 +11,15 @@ import {
   WatchInstanceEventsRequestSchema,
 } from "../gen/proto/lemline/gateway/v1/gateway_pb";
 import { gatewayClient } from "../lib/grpc-client";
-import { durationToMilliseconds, timestampToIsoString, timestampToMilliseconds } from "../lib/proto";
+import { durationToMilliseconds, timestampToIsoString } from "../lib/proto";
 
 const EVENT_HISTORY_PAGE_SIZE = 500;
 const MAX_STREAM_RETRIES = 5;
+/**
+ * How long a page opened right after a start waits for the instance to appear: the gateway
+ * accepts a start before the worker's first lifecycle event makes the instance readable.
+ */
+const START_VISIBLE_WAIT_MS = 30_000;
 
 export type WorkflowRuntimeStatus = "PENDING" | "RUNNING" | "COMPLETED" | "FAULTED" | "UNKNOWN";
 type TaskTerminalKind = "COMPLETED" | "FAILED";
@@ -38,6 +44,11 @@ export interface TimelineEventView {
   taskPointer?: string;
   taskName?: string;
   payloadJson: string;
+  /**
+   * Position in the instance's event stream, in the order the gateway sent the events. The
+   * cursor cannot give it: it is opaque.
+   */
+  streamIndex?: number;
 }
 
 export interface WorkflowTaskProjection {
@@ -71,7 +82,6 @@ interface WorkflowProjectionSeed extends WorkflowScope {
 export interface WorkflowProjectionInputEvent extends TimelineEventView {
   sortTimeMs?: number;
   scope?: WorkflowScope;
-  streamIndex?: number;
 }
 
 interface UseWatchWorkflowProjectionResult {
@@ -80,15 +90,28 @@ interface UseWatchWorkflowProjectionResult {
   isError: boolean;
   error?: Error;
   liveConnected: boolean;
+  /** Opened right after a start, and the gateway does not show the instance yet. */
+  starting: boolean;
+  /** The start was accepted, but the instance did not appear within the wait. */
+  notVisibleYet: boolean;
   reconnect: () => void;
 }
 
-export function useWatchWorkflowProjection(workflowId: string | undefined): UseWatchWorkflowProjectionResult {
+/**
+ * @param justStarted the page was opened right after this instance was started: until the
+ *   gateway shows it, "not found" means "not visible yet", for a bounded wait.
+ */
+export function useWatchWorkflowProjection(
+  workflowId: string | undefined,
+  justStarted = false,
+): UseWatchWorkflowProjectionResult {
   const [projection, setProjection] = useState<WorkflowProjection | undefined>(undefined);
   const [isLoading, setIsLoading] = useState(Boolean(workflowId));
   const [isError, setIsError] = useState(false);
   const [error, setError] = useState<Error | undefined>(undefined);
   const [liveConnected, setLiveConnected] = useState(false);
+  const [starting, setStarting] = useState(false);
+  const [notVisibleYet, setNotVisibleYet] = useState(false);
   const [reconnectToken, setReconnectToken] = useState(0);
 
   const reconnect = useCallback(() => {
@@ -103,6 +126,8 @@ export function useWatchWorkflowProjection(workflowId: string | undefined): UseW
     setIsError(false);
     setError(undefined);
     setLiveConnected(false);
+    setStarting(false);
+    setNotVisibleYet(false);
   }
 
   useEffect(() => {
@@ -131,11 +156,35 @@ export function useWatchWorkflowProjection(workflowId: string | undefined): UseW
       publishProjection();
     };
 
+    const getInstance = () =>
+      gatewayClient.getInstance(create(GetInstanceRequestSchema, { instanceId: workflowId }), {
+        signal: controller.signal,
+      });
+
+    // Right after a start, waits for the instance to appear; anywhere else, not found is an error.
+    const getStartedInstance = async () => {
+      const startedAt = Date.now();
+      for (let attempt = 1; ; attempt += 1) {
+        try {
+          const response = await getInstance();
+          setStarting(false);
+          return response;
+        } catch (cause) {
+          const notFound = ConnectError.from(cause).code === Code.NotFound;
+          if (!justStarted || !notFound || controller.signal.aborted || disposed) throw cause;
+          if (Date.now() - startedAt >= START_VISIBLE_WAIT_MS) {
+            setStarting(false);
+            setNotVisibleYet(true);
+            throw cause;
+          }
+          setStarting(true);
+          await delay(Math.min(250 * 2 ** (attempt - 1), 2_000));
+        }
+      }
+    };
+
     const loadSummaryAndHistory = async () => {
-      const instanceResponse = await gatewayClient.getInstance(
-        create(GetInstanceRequestSchema, { instanceId: workflowId }),
-        { signal: controller.signal },
-      );
+      const instanceResponse = await getStartedInstance();
 
       seed = instanceResponse.instance ? seedFromSummary(instanceResponse.instance) : undefined;
       publishProjection();
@@ -231,7 +280,7 @@ export function useWatchWorkflowProjection(workflowId: string | undefined): UseW
       controller.abort();
       setLiveConnected(false);
     };
-  }, [reconnectToken, workflowId]);
+  }, [justStarted, reconnectToken, workflowId]);
 
   return {
     data: projection,
@@ -239,6 +288,8 @@ export function useWatchWorkflowProjection(workflowId: string | undefined): UseW
     isError,
     error,
     liveConnected,
+    starting,
+    notVisibleYet,
     reconnect,
   };
 }
@@ -301,7 +352,9 @@ function parseInstanceEvent(event: InstanceEvent, streamIndex: number): Workflow
     taskName,
     payloadJson: event.cloudEventJson,
     scope: extractWorkflowScopeFromCloudEvent(cloudEvent),
-    sortTimeMs: timestampToMilliseconds(event.eventTime) ?? parseTimeMs(eventTime),
+    sortTimeMs: event.eventTime
+      ? Number(event.eventTime.seconds) * 1000 + event.eventTime.nanos / 1_000_000
+      : parseTimeMs(eventTime),
     streamIndex,
   };
 }
@@ -459,6 +512,13 @@ function compareTimelineEvents(left: WorkflowProjectionInputEvent, right: Workfl
     return left.sortTimeMs - right.sortTimeMs;
   }
 
+  // Events emitted at the same instant can reach analytics out of order. The
+  // workflow starts before its tasks and reaches a terminal state after them.
+  if (left.sortTimeMs !== undefined && left.sortTimeMs === right.sortTimeMs) {
+    const workflowOrder = workflowEventOrder(left.eventType) - workflowEventOrder(right.eventType);
+    if (workflowOrder !== 0) return workflowOrder;
+  }
+
   if (
     left.streamIndex !== undefined &&
     right.streamIndex !== undefined &&
@@ -471,6 +531,13 @@ function compareTimelineEvents(left: WorkflowProjectionInputEvent, right: Workfl
   if (sequenceComparison !== 0) return sequenceComparison;
 
   return (left.eventType || "").localeCompare(right.eventType || "");
+}
+
+function workflowEventOrder(eventType: string): number {
+  if (eventType.includes("workflow.created")) return -2;
+  if (eventType.includes("workflow.started")) return -1;
+  if (eventType.includes("workflow.completed") || eventType.includes("workflow.faulted")) return 1;
+  return 0;
 }
 
 function compareSequenceValues(
@@ -502,6 +569,7 @@ function stripEventInternals(event: WorkflowProjectionInputEvent): TimelineEvent
     taskPointer: event.taskPointer,
     taskName: event.taskName,
     payloadJson: event.payloadJson,
+    streamIndex: event.streamIndex,
   };
 }
 

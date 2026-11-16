@@ -21,6 +21,28 @@ If the gateway proto changed, regenerate clients first:
 npm run proto:generate
 ```
 
+To develop against a gRPC-Web endpoint that does not allow the dev server origin (for example the
+`docker/e2e` stack on `http://localhost:9446`), let the dev server forward the gateway calls:
+
+```bash
+LEMLINE_GATEWAY_PROXY=http://localhost:9446 npm run dev
+```
+
+and set `gatewayBaseUrl` to the dev server origin (`window.location.origin`) in a local, uncommitted `public/config.js`.
+
+## Pages
+
+- **Instances** (home): find an instance from a piece of its ID, filter by workflow, version, period and status.
+- **Definitions**: deployed workflows by namespace, with their running or faulted instances.
+- **Definition**: how the workflow starts, its instances of the last 24 hours, its YAML, and a start panel.
+  For a workflow that starts on an event, the panel explains that only its event starts it: the runtime
+  refuses to start such a workflow by hand.
+- **Instance**: status and cause, a timeline of each task (attempts, waits before retry, waits for an event,
+  long waits shortened), the lifecycle events, and the instance input and output.
+
+The namespace picked in the menu applies to every page. The light and dark themes follow the system until
+one is picked in the menu.
+
 ## Configure Gateway Access
 
 The dashboard reads the gateway endpoint at runtime from `window.__CONFIG__.gatewayBaseUrl` in `public/config.js`.

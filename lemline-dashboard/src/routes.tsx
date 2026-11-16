@@ -1,51 +1,62 @@
-import { lazy, Suspense, type ReactNode } from "react";
-import { Navigate, Route, Routes } from "react-router-dom";
+import { lazy, Suspense, useEffect, type ReactNode } from "react";
+import { Navigate, Route, Routes, useNavigate, useParams } from "react-router-dom";
+import { useGlobalNamespace } from "./context/namespace-context";
+import { instancesPath } from "./lib/paths";
 
-const RootOverviewPage = lazy(() =>
-  import("./pages/root-overview").then((module) => ({ default: module.RootOverviewPage })),
+const InstancesPage = lazy(() => import("./pages/instances").then((module) => ({ default: module.InstancesPage })));
+const DefinitionsPage = lazy(() =>
+  import("./pages/definitions").then((module) => ({ default: module.DefinitionsPage })),
 );
-const NamespaceOverviewPage = lazy(() =>
-  import("./pages/namespace-overview").then((module) => ({ default: module.NamespaceOverviewPage })),
-);
-const WorkflowOverviewPage = lazy(() =>
-  import("./pages/workflow-overview").then((module) => ({ default: module.WorkflowOverviewPage })),
-);
-const VersionOverviewPage = lazy(() =>
-  import("./pages/version-overview").then((module) => ({ default: module.VersionOverviewPage })),
-);
-const InstanceDetailPage = lazy(() =>
-  import("./pages/instance-detail").then((module) => ({ default: module.InstanceDetailPage })),
-);
-const StartWorkflowPage = lazy(() =>
-  import("./pages/start-workflow").then((module) => ({ default: module.StartWorkflowPage })),
-);
+const DefinitionPage = lazy(() => import("./pages/definition").then((module) => ({ default: module.DefinitionPage })));
+const InstancePage = lazy(() => import("./pages/instance").then((module) => ({ default: module.InstancePage })));
 
 export function DashboardRoutes() {
   return (
     <Routes>
-      <Route path="/" element={withSuspense(<RootOverviewPage />)} />
-      <Route path="/ns/:namespace" element={withSuspense(<NamespaceOverviewPage />)} />
-      <Route path="/ns/:namespace/name/:name" element={withSuspense(<WorkflowOverviewPage />)} />
-      <Route
-        path="/ns/:namespace/name/:name/version/:version"
-        element={withSuspense(<VersionOverviewPage />)}
-      />
-      <Route path="/ns/:namespace/name/:name/v/:version" element={withSuspense(<VersionOverviewPage />)} />
-      <Route path="/id/:workflowId" element={withSuspense(<InstanceDetailPage />)} />
-      <Route path="/start" element={withSuspense(<StartWorkflowPage />)} />
-      <Route path="*" element={<Navigate to="/" replace />} />
+      <Route path="/" element={<Navigate to="/instances" replace />} />
+      <Route path="/instances" element={withSuspense(<InstancesPage />)} />
+      <Route path="/instances/:instanceId" element={withSuspense(<InstancePage />)} />
+      <Route path="/definitions" element={withSuspense(<DefinitionsPage />)} />
+      <Route path="/definitions/:namespace/:name" element={withSuspense(<DefinitionPage />)} />
+
+      {/* Addresses of the previous dashboard keep working. */}
+      <Route path="/id/:instanceId" element={<LegacyInstanceRedirect />} />
+      <Route path="/ns/:namespace" element={<LegacyScopeRedirect />} />
+      <Route path="/ns/:namespace/name/:name" element={<LegacyScopeRedirect />} />
+      <Route path="/ns/:namespace/name/:name/version/:version" element={<LegacyScopeRedirect />} />
+      <Route path="/ns/:namespace/name/:name/v/:version" element={<LegacyScopeRedirect />} />
+      <Route path="/start" element={<Navigate to="/definitions" replace />} />
+      <Route path="*" element={<Navigate to="/instances" replace />} />
     </Routes>
   );
 }
 
+function LegacyInstanceRedirect() {
+  const { instanceId = "" } = useParams();
+  return <Navigate to={`/instances/${encodeURIComponent(instanceId)}`} replace />;
+}
+
+function LegacyScopeRedirect() {
+  const { namespace = "", name = "", version = "" } = useParams();
+  if (!name) return <LegacyNamespaceRedirect namespace={namespace} />;
+  return <Navigate to={instancesPath({ ns: namespace, wf: name, ver: version })} replace />;
+}
+
+/** "/ns/shop" showed one namespace: the workflows page shows it once it is the namespace picked. */
+function LegacyNamespaceRedirect({ namespace }: { namespace: string }) {
+  const { setNamespace } = useGlobalNamespace();
+  const navigate = useNavigate();
+  useEffect(() => {
+    setNamespace(namespace);
+    navigate("/definitions", { replace: true });
+  }, [namespace, navigate, setNamespace]);
+  return null;
+}
+
 function withSuspense(element: ReactNode) {
-  return (
-    <Suspense fallback={<RouteLoading />}>
-      {element}
-    </Suspense>
-  );
+  return <Suspense fallback={<RouteLoading />}>{element}</Suspense>;
 }
 
 function RouteLoading() {
-  return <p className="text-sm text-slate-500">Loading page...</p>;
+  return <p className="m-10 text-sm text-lm-muted">Loading…</p>;
 }
