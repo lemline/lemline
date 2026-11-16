@@ -504,4 +504,60 @@ do:
     expect(model.rows.find((row) => row.pointer === local)?.attempts.map((attempt) => attempt.ownerAttempt)).toEqual([1, 1]);
   });
 
+  it("draws a for task once, without a row for its synthetic body", () => {
+    const loopRoot = parseWorkflowSource(`
+document: { dsl: '1.0.0', namespace: shop, name: loop, version: '1.0.0' }
+do:
+  - loop:
+      for: { each: item, in: '\${ .items }' }
+      do:
+        - step: { set: { seen: '\${ $item }' } }
+`).root;
+    const events = [
+      event("workflow.started", 0),
+      event("task.started", 0, { task: "/do/0/loop" }),
+      ...[0, 1].flatMap((index) => [
+        event("task.started", index * 100, { task: "/do/0/loop/do" }),
+        event("task.started", index * 100, { task: "/do/0/loop/do/0/step" }),
+        event("task.completed", index * 100 + 50, { task: "/do/0/loop/do/0/step" }),
+        event("task.completed", index * 100 + 50, { task: "/do/0/loop/do" }),
+      ]),
+      event("task.completed", 200, { task: "/do/0/loop" }),
+      event("workflow.completed", 200),
+    ];
+
+    const model = buildTimeline(events, "COMPLETED", loopRoot, T0 + 1_000);
+
+    expect(model.rows.filter((row) => row.label === "loop").map((row) => row.pointer)).toEqual(["/do/0/loop"]);
+  });
+
+  it("shortens a long wait inside a function call", () => {
+    const functionRoot = parseWorkflowSource(`
+document: { dsl: '1.0.0', namespace: shop, name: slow, version: '1.0.0' }
+use:
+  functions:
+    slow:
+      do:
+        - pause: { wait: { hours: 1 } }
+do:
+  - first: { set: { ok: true } }
+  - invoke: { call: slow }
+`).root;
+    const hour = 3_600_000;
+    const events = [
+      event("workflow.started", 0),
+      event("task.started", 0, { task: "/do/0/first" }),
+      event("task.completed", 4_000, { task: "/do/0/first" }),
+      event("task.started", 4_000, { task: "/do/1/invoke" }),
+      event("task.started", 4_000, { task: "/do/1/invoke/_fn/do/0/pause" }),
+      event("task.completed", 4_000 + hour, { task: "/do/1/invoke/_fn/do/0/pause" }),
+      event("task.completed", 4_000 + hour, { task: "/do/1/invoke" }),
+      event("workflow.completed", 4_000 + hour),
+    ];
+
+    const model = buildTimeline(events, "COMPLETED", functionRoot, T0 + 2 * hour);
+
+    expect(model.rows.find((row) => row.pointer === "/do/1/invoke")?.hasActiveBody).toBe(false);
+    expect(model.ticks.some((tick) => tick.strong)).toBe(true);
+  });
 });

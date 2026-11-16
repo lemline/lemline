@@ -236,10 +236,13 @@ export function buildTimeline(
     const isGroup =
       (info.kind !== undefined && CONTAINER_KINDS.has(info.kind)) ||
       pointers.some((other) => other !== pointer && other.startsWith(`${pointer}/`));
+    // A function call is control flow: its time is the time of the tasks inside it.
+    const callsFunction = pointers.some((other) => other.startsWith(`${pointer}/_fn/`));
     const runs = splitRuns(inHappeningOrder(list));
     runs.forEach((run, index) => {
       const iteration = runs.length > 1 ? index + 1 : undefined;
-      rows.push(buildRow(pointer, iteration, run, info, isGroup, bounds.terminal, tEnd));
+      const row = buildRow(pointer, iteration, run, info, isGroup, bounds.terminal, tEnd);
+      rows.push(callsFunction ? { ...row, hasActiveBody: false } : row);
     });
   }
 
