@@ -8,6 +8,7 @@ import com.lemline.core.states.SwitchState
 import io.serverlessworkflow.api.types.FlowDirective
 import io.serverlessworkflow.api.types.SwitchItem
 import io.serverlessworkflow.api.types.SwitchTask
+import kotlin.time.Instant
 import kotlinx.serialization.json.JsonElement
 
 /**
@@ -58,7 +59,7 @@ class SwitchProcessor(
     node: Node<SwitchTask>,
 ) : AbstractProcessor<SwitchTask, SwitchState>(node) {
 
-    override fun stateWhenEnteringFromParent(transformedInput: JsonElement, scope: Scope) = SwitchState()
+    override fun stateWhenEnteringFromParent(transformedInput: JsonElement, scope: Scope, startedAt: Instant) = SwitchState(startedAt = startedAt)
 
     // SwitchProcessor doesn't need updateState - it's a leaf node that evaluates once
     // The default implementation (returning state unchanged) is sufficient

@@ -6,7 +6,7 @@ import com.lemline.core.processors.scope.Scope
 import com.lemline.core.states.ForState
 import com.lemline.core.workflows.forBlock
 import io.serverlessworkflow.api.types.ForTask
-import kotlin.time.Clock
+import kotlin.time.Instant
 import kotlinx.serialization.json.JsonElement
 
 /**
@@ -55,8 +55,8 @@ class ForProcessor(
     node: Node<ForTask>
 ) : AbstractProcessor<ForTask, ForState>(node) {
 
-    override fun stateWhenEnteringFromParent(transformedInput: JsonElement, scope: Scope) = ForState(
-        startedAt = Clock.System.now(),
+    override fun stateWhenEnteringFromParent(transformedInput: JsonElement, scope: Scope, startedAt: Instant) = ForState(
+        startedAt = startedAt,
         collection = evalForIn(transformedInput, scope),
         index = 0,  // Start at first iteration
         forEach = node.task.`for`.each ?: "item",

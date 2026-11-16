@@ -26,6 +26,7 @@ import kotlin.time.Clock
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.DurationUnit
+import kotlin.time.Instant
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.buildJsonObject
 
@@ -74,8 +75,8 @@ class TryProcessor(
     /**
      * This state is initialized when entering the TryTask node for the first time
      */
-    override fun stateWhenEnteringFromParent(transformedInput: JsonElement, scope: Scope): TryState = TryState(
-        startedAt = Clock.System.now(),
+    override fun stateWhenEnteringFromParent(transformedInput: JsonElement, scope: Scope, startedAt: Instant): TryState = TryState(
+        startedAt = startedAt,
         transformedInput = transformedInput,  // Store for retries/catch
         attemptIndex = 0,  // Ready for first attempt
         runningCatch = false,

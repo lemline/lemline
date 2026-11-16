@@ -19,6 +19,7 @@ import io.serverlessworkflow.api.types.UriTemplate
 import java.net.URI
 import java.time.OffsetDateTime
 import java.util.*
+import kotlin.time.Instant
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonPrimitive
 
@@ -65,7 +66,7 @@ class EmitProcessor(
 
     override val isAsync = true
 
-    override fun stateWhenEnteringFromParent(transformedInput: JsonElement, scope: Scope) = EmitState()
+    override fun stateWhenEnteringFromParent(transformedInput: JsonElement, scope: Scope, startedAt: Instant) = EmitState(startedAt = startedAt)
 
     /**
      * Handles the event triggered when a workflow emit task is started.

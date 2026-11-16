@@ -80,6 +80,28 @@ describe("buildWorkflowProjection", () => {
 
     expect(projection.events.map((event) => event.sequence.toString())).toEqual(["217", "219"]);
   });
+  it("preserves extension failures and owner completion across streaming and history reload", () => {
+    const owner = "/do/0/charge";
+    const child = `${owner}/_ext/0/after/do/0/audit`;
+    const trace = [
+      timelineEvent(1n, "io.serverlessworkflow.task.started.v1", "2026-01-01T10:00:00Z", owner),
+      timelineEvent(2n, "io.serverlessworkflow.task.started.v1", "2026-01-01T10:00:02Z", child),
+      timelineEvent(3n, "io.serverlessworkflow.task.faulted.v1", "2026-01-01T10:00:03Z", child),
+      timelineEvent(4n, "io.serverlessworkflow.task.faulted.v1", "2026-01-01T10:00:03Z", owner),
+      timelineEvent(5n, "io.serverlessworkflow.workflow.faulted.v1", "2026-01-01T10:00:04Z"),
+    ];
+    trace[2].payloadJson = JSON.stringify({ data: { task: child, error: { status: 503, instance: child } } });
+    trace[3].payloadJson = JSON.stringify({ data: { task: owner, error: { status: 503, instance: child } } });
+    const pending = buildWorkflowProjection("wf-1", trace.slice(0, 2), 2n);
+    expect(pending.tasks[owner].terminalKind).toBeUndefined();
+    const streamed = buildWorkflowProjection("wf-1", trace, 5n);
+    const reloaded = buildWorkflowProjection("wf-1", [...trace].reverse(), 5n);
+    expect(reloaded).toEqual(streamed);
+    expect(streamed.tasks[owner].terminalKind).toBe("FAILED");
+    expect(streamed.tasks[child].terminalKind).toBe("FAILED");
+    expect(streamed.events.find((item) => item.taskPointer === child && item.eventType.includes("faulted"))?.payloadJson).toContain(child);
+  });
+
 });
 
 function timelineEvent(

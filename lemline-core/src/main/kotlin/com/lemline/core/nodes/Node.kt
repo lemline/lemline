@@ -33,7 +33,18 @@ import kotlinx.serialization.json.JsonObject
  * @property name The name of the task.
  * @property parent The parent node of this task node, or null if it is a root node.
  */
-data class Node<T : TaskBase>(val position: NodePosition, val task: T, val name: String, val parent: Node<*>? = null) {
+data class Node<T : TaskBase>(
+    val position: NodePosition,
+    val task: T,
+    val name: String,
+    val parent: Node<*>? = null,
+    val origin: NodeOrigin = NodeOrigin.DECLARED,
+) {
+    val extensionOwner: Node<*>? by lazy {
+        generateSequence(this as Node<*>) { it.parent }.firstOrNull { it.origin == NodeOrigin.EXTENSION_BLOCK }?.parent
+    }
+
+    val extensions by lazy { com.lemline.core.extensions.compileExtensions(this) }
     val evaluationMode: EvaluationMode by lazy {
         when (val root = generateSequence(this as Node<*>) { it.parent }.last().task) {
             is RootTask -> root.evaluationMode

@@ -13,6 +13,7 @@ import com.lemline.common.values.Token.WITH
 import com.lemline.core.expressions.EvaluationMode
 import com.lemline.core.nodes.ForeachTask
 import com.lemline.core.nodes.Node
+import com.lemline.core.nodes.NodeOrigin
 import com.lemline.core.nodes.RootTask
 import com.lemline.core.workflows.WorkflowParser.parseChildren
 import io.serverlessworkflow.api.types.CallAsyncAPI
@@ -55,6 +56,9 @@ object WorkflowParser {
      * @return A pair of (rootNode, nodesMap) where nodesMap contains all nodes indexed by position
      */
     fun parse(workflow: Workflow): Pair<Node<RootTask>, Map<NodePosition, Node<*>>> {
+        workflow.use?.extensions.orEmpty().forEach { item ->
+            requireNotNull(item.extension?.extend) { "Extension '${item.name}' requires extend" }
+        }
         val rootNode = createRootNode(workflow)
         val nodesMap = buildNodesMap(rootNode)
         return rootNode to nodesMap
@@ -82,6 +86,7 @@ object WorkflowParser {
         },
         name = NodePosition.root.toString(),
         parent = null,
+        origin = NodeOrigin.INTERNAL,
     )
 
     /**
@@ -101,6 +106,10 @@ object WorkflowParser {
             map[node.position] = node
 
             // Recursively add all children (triggers lazy child creation)
+            node.extensions.forEach { plan ->
+                plan.before?.let(::addNodeAndChildren)
+                plan.after?.let(::addNodeAndChildren)
+            }
             node.children?.forEach { child ->
                 addNodeAndChildren(child)
             }
@@ -161,6 +170,7 @@ private fun parseRootChildren(task: RootTask, parent: Node<*>): List<Node<*>> = 
         task = DoTask(task.`do`),
         name = "$DO",
         parent = parent,
+        origin = NodeOrigin.INTERNAL,
     ),
 )
 
@@ -186,6 +196,7 @@ private fun parseDoChildren(node: Node<*>): List<Node<*>> {
             task = child,
             name = taskItem.name,
             parent = node,
+            origin = if (node.extensionOwner != null) NodeOrigin.EXTENSION_DESCENDANT else NodeOrigin.DECLARED,
         )
     }
 }
@@ -211,6 +222,7 @@ private fun parseForChildren(node: Node<*>): List<Node<*>> {
             task = DoTask(task.`do`),
             name = "$DO",
             parent = node,
+            origin = if (node.extensionOwner != null) NodeOrigin.EXTENSION_DESCENDANT else NodeOrigin.INTERNAL,
         ),
     )
 }
@@ -239,6 +251,7 @@ private fun parseTryChildren(node: Node<*>): List<Node<*>> {
                 task = DoTask(task.`try`),
                 name = "$TRY",
                 parent = node,
+            origin = if (node.extensionOwner != null) NodeOrigin.EXTENSION_DESCENDANT else NodeOrigin.INTERNAL,
             )
         )
         task.`catch`.`do`?.let {
@@ -248,6 +261,7 @@ private fun parseTryChildren(node: Node<*>): List<Node<*>> {
                     task = DoTask(it),
                     name = "$CATCH",
                     parent = node,
+            origin = if (node.extensionOwner != null) NodeOrigin.EXTENSION_DESCENDANT else NodeOrigin.INTERNAL,
                 ),
             )
         }
@@ -284,6 +298,7 @@ private fun parseForkChildren(node: Node<*>): List<Node<*>>? {
             task = taskItem.toTask(),
             name = taskItem.name,
             parent = node,
+            origin = if (node.extensionOwner != null) NodeOrigin.EXTENSION_DESCENDANT else NodeOrigin.DECLARED,
         )
     }
 }
@@ -315,6 +330,7 @@ private fun parseListenChildren(node: Node<*>): List<Node<*>>? {
             ),
             name = "$FOREACH",
             parent = node,
+            origin = if (node.extensionOwner != null) NodeOrigin.EXTENSION_DESCENDANT else NodeOrigin.INTERNAL,
         ),
     )
 }
@@ -336,6 +352,7 @@ private fun parseForeachChildren(node: Node<*>): List<Node<*>> {
             task = task.doTask,
             name = "$DO",
             parent = node,
+            origin = if (node.extensionOwner != null) NodeOrigin.EXTENSION_DESCENDANT else NodeOrigin.INTERNAL,
         ),
     )
 }
@@ -360,6 +377,7 @@ private fun parseCallAsyncAPIChildren(node: Node<*>): List<Node<*>>? {
                 task = DoTask(it),
                 name = "$WITH.$SUBSCRIPTION.$FOREACH.$DO",
                 parent = node,
+            origin = if (node.extensionOwner != null) NodeOrigin.EXTENSION_DESCENDANT else NodeOrigin.INTERNAL,
             ),
         )
     }

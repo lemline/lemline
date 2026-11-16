@@ -8,6 +8,7 @@ import com.lemline.common.values.WorkflowName
 import com.lemline.common.values.WorkflowNamespace
 import com.lemline.common.values.WorkflowVersion
 import com.lemline.core.cloudevents.CloudEventMatcher
+import com.lemline.core.functions.FunctionResolver
 import com.lemline.core.processors.EventFilter
 import com.lemline.core.workflows.CachedEventSchedule
 import com.lemline.core.workflows.CachedListenTask
@@ -101,7 +102,17 @@ class DefinitionListenService {
     private val logger = logger()
 
     @Inject
-    private lateinit var listenerRepository: ListenerRepository
+    lateinit var listenerRepository: ListenerRepository
+
+    @Inject
+    lateinit var functionResolver: FunctionResolver
+
+    suspend fun prepareFunctionListeners(namespace: WorkflowNamespace) {
+        for ((info, position) in listenerRepository.activeFunctionFilters(namespace)) {
+            val reference = WorkflowCache.functionReference(position) ?: continue
+            WorkflowCache.loadFunctionListeners(info, reference) { functionResolver.resolve(it) }
+        }
+    }
 
     /**
      * Removes all listeners for a workflow definition.

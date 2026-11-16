@@ -6,16 +6,16 @@ import com.lemline.core.nodes.Node
 import com.lemline.core.processors.scope.Scope
 import com.lemline.core.states.ForeachState
 import com.lemline.core.workflows.foreachDoBlock
-import kotlin.time.Clock
+import kotlin.time.Instant
 import kotlinx.serialization.json.JsonElement
 
 class ForeachProcessor(
     node: Node<ForeachTask>
 ) : AbstractProcessor<ForeachTask, ForeachState>(node) {
 
-    override fun stateWhenEnteringFromParent(transformedInput: JsonElement, scope: Scope): ForeachState =
+    override fun stateWhenEnteringFromParent(transformedInput: JsonElement, scope: Scope, startedAt: Instant): ForeachState =
         ForeachState(
-            startedAt = Clock.System.now(),
+            startedAt = startedAt,
             item = transformedInput,
             index = 0,
             itemVar = node.task.itemVar,

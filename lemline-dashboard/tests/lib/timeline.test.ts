@@ -397,3 +397,111 @@ do:
     ]);
   });
 });
+
+describe("extension lifecycle projection", () => {
+  const owner = "/do/0/guarded/try/0/charge";
+  const audit = `${owner}/_ext/0/after/do/0/writeAudit`;
+  const source = parseWorkflowSource(`
+use:
+  extensions:
+    - audit:
+        extend: call
+        after:
+          - writeAudit:
+              call: http
+              with: { endpoint: https://example.com/audit }
+do:
+  - guarded:
+      try:
+        - charge:
+            call: http
+            with: { endpoint: https://example.com/charge }
+      catch: {}
+`).root;
+
+  it("attaches a retry to the fault chain, closes owners, and preserves body duration", () => {
+    const error = { status: 503, instance: audit };
+    const events = [
+      event("workflow.started", 0),
+      event("task.started", 0, { task: owner }),
+      event("task.started", 60_000, { task: audit }),
+      event("task.faulted", 61_000, { task: audit, error }),
+      event("task.faulted", 61_001, { task: owner, error }),
+      event("task.retried", 62_000, { task: "/do/0/guarded/try", retryCount: 1 }),
+      event("task.started", 62_000, { task: owner }),
+      event("task.started", 122_000, { task: audit }),
+      event("task.completed", 123_000, { task: audit, output: { logged: true } }),
+      event("task.completed", 123_001, { task: owner, output: { paymentId: "p-2" } }),
+      event("workflow.completed", 123_002),
+    ];
+    const model = buildTimeline(events, "COMPLETED", source, T0 + 124_000);
+    const parent = model.rows.find((row) => row.pointer === owner)!;
+    const child = model.rows.find((row) => row.pointer === audit)!;
+    expect(parent.attempts).toHaveLength(2);
+    expect(child.attempts).toHaveLength(2);
+    expect(parent.state).toBe("completed");
+    expect(parent.output).toEqual({ paymentId: "p-2" });
+    expect(child.output).toEqual({ logged: true });
+    expect(child.typeLabel).toContain("audit · after");
+    expect(child.indent).toBe(parent.indent + 1);
+    expect(child.ownerId).toBe(parent.id);
+    expect(child.attempts.map((attempt) => attempt.ownerAttempt)).toEqual([1, 2]);
+    expect(parent.typeLabel).toContain("2 attempts");
+    expect(parent.detail).toContain("Attempt 1 failed");
+    // The minute spent in the HTTP body is real activity, not a compressed gap.
+    expect(model.toPct(T0 + 60_000)).toBeGreaterThan(40);
+    expect(model.ticks.some((tick) => tick.strong)).toBe(false);
+    const streaming = buildTimeline(events.slice(0, 5), "RUNNING", source, T0 + 61_010);
+    expect(streaming.rows.find((row) => row.pointer === owner)?.state).toBe("failed");
+  });
+  it("associates extension steps with their owner iteration", () => {
+    const events = [event("workflow.started", 0)];
+    for (const start of [0, 10_000]) events.push(
+      event("task.started", start, { task: owner }),
+      event("task.started", start + 1000, { task: audit }),
+      event("task.completed", start + 2000, { task: audit }),
+      event("task.completed", start + 3000, { task: owner }),
+    );
+    events.push(event("workflow.completed", 14_000));
+    const model = buildTimeline(events, "COMPLETED", source, T0 + 14_000);
+    const children = model.rows.filter((row) => row.pointer === audit);
+    expect(children.map((row) => row.ownerId)).toEqual([`${owner}#1`, `${owner}#2`]);
+    expect(children.map((row) => row.ownerAttempt)).toEqual([1, 1]);
+  });
+
+  it("keeps a local after retry within one owner attempt", () => {
+    const localSource = parseWorkflowSource(`
+use:
+  extensions:
+    - audit:
+        extend: call
+        after:
+          - auditRetry:
+              try:
+                - writeAudit: { call: http }
+              catch: { retry: { delay: { seconds: 1 } } }
+do:
+  - guarded:
+      try:
+        - charge: { call: http }
+      catch: {}
+`).root;
+    const local = `${owner}/_ext/0/after/do/0/auditRetry/try/0/writeAudit`;
+    const error = { status: 503, instance: local };
+    const events = [
+      event("workflow.started", 0),
+      event("task.started", 0, { task: owner }),
+      event("task.started", 500, { task: local }),
+      event("task.faulted", 600, { task: local, error }),
+      event("task.retried", 1000, { task: `${owner}/_ext/0/after/do/0/auditRetry/try` }),
+      event("task.started", 1000, { task: local }),
+      event("task.completed", 1500, { task: local }),
+      event("task.completed", 2000, { task: owner }),
+      event("workflow.completed", 2001),
+    ];
+    const model = buildTimeline(events, "COMPLETED", localSource, T0 + 2001);
+    expect(model.rows.find((row) => row.pointer === owner)?.attempts).toHaveLength(1);
+    expect(model.rows.find((row) => row.pointer === local)?.attempts.map((attempt) => attempt.ownerAttempt)).toEqual([1, 1]);
+  });
+
+});

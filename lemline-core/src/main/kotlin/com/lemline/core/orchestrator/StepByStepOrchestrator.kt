@@ -5,6 +5,7 @@ import com.lemline.common.values.NodePosition
 import com.lemline.common.values.WorkflowId
 import com.lemline.common.values.WorkflowInfo
 import com.lemline.core.errors.InternalException
+import com.lemline.core.errors.StepExecutionException
 import com.lemline.core.errors.WorkflowErrorType
 import com.lemline.core.lifecycleevents.LifecycleEventHook
 import com.lemline.core.nodes.Node
@@ -12,8 +13,11 @@ import com.lemline.core.orchestrator.StepByStepOrchestrator.completeTask
 import com.lemline.core.orchestrator.StepByStepOrchestrator.processTaskFaulted
 import com.lemline.core.orchestrator.StepByStepOrchestrator.tryCatch
 import com.lemline.core.processors.TryProcessor
-import com.lemline.core.processors.scope.withTask
+import com.lemline.core.processors.scope.taskScope
+import com.lemline.core.states.ExtensionPhase
+import com.lemline.core.states.ExtensionReturn
 import com.lemline.core.states.NodeStack
+import com.lemline.core.states.PendingTaskState
 import com.lemline.core.states.RootState
 import com.lemline.core.states.StackFrame
 import com.lemline.core.states.TryState
@@ -33,6 +37,7 @@ import com.lemline.core.states.WorkflowEvent.WorkflowCompleted
 import com.lemline.core.states.WorkflowEvent.WorkflowFaulted
 import com.lemline.core.tasks.toJava
 import com.lemline.core.tasks.toKotlin
+import com.lemline.core.workflows.NodeResolutionException
 import com.lemline.core.workflows.WorkflowCache
 import com.lemline.core.workflows.getNode
 import io.serverlessworkflow.api.types.FlowDirective
@@ -42,6 +47,7 @@ import io.serverlessworkflow.api.types.TryTask
 import io.serverlessworkflow.api.types.Workflow
 import kotlin.time.Clock
 import kotlin.time.Instant
+import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
@@ -122,38 +128,49 @@ object StepByStepOrchestrator {
             emitLifecycleEventsForEvent(event, workflowInfo, lifecycleHook)
             return event
         }
-        val node = workflow.getNode(command.nodePosition, functionResolver)
+        var faultedTaskPosition = command.nodePosition
+        val event = try {
+            val node = workflow.getNode(command.nodePosition, functionResolver)
+            when (command) {
+                is WorkflowCommand.ResumeFromTask -> resumeFromTask(
+                    nodeStack = nodeStack,
+                    node = node,
+                    rawInput = command.rawInput,
+                    flowDirective = command.flowDirective?.toJava(),
+                    extensionReturn = command.extensionReturn,
+                    workflowInfo = workflowInfo,
+                    lifecycleHook = lifecycleHook,
+                )
 
-        val event = when (command) {
-            is WorkflowCommand.ResumeFromTask -> resumeFromTask(
-                nodeStack = nodeStack,
-                node = node,
-                rawInput = command.rawInput,
-                flowDirective = command.flowDirective?.toJava(),
-                workflowInfo = workflowInfo,
-                lifecycleHook = lifecycleHook,
-            )
+                is WorkflowCommand.ResumeWithCompletedTask -> resumeFromCompletedTask(
+                    nodeStack = nodeStack,
+                    node = node,
+                    rawOutput = command.rawOutput,
+                    workflowInfo = workflowInfo,
+                    lifecycleHook = lifecycleHook,
+                )
 
-            is WorkflowCommand.ResumeWithCompletedTask -> resumeFromCompletedTask(
-                nodeStack = nodeStack,
-                node = node,
-                rawOutput = command.rawOutput,
-                workflowInfo = workflowInfo,
-                lifecycleHook = lifecycleHook,
-            )
+                is WorkflowCommand.ResumeWithFaultedTask -> resumeFromFaultedTask(
+                    nodeStack = nodeStack,
+                    node = node,
+                    error = command.error,
+                    workflowInfo = workflowInfo,
+                    lifecycleHook = lifecycleHook,
+                )
+            }
 
-            is WorkflowCommand.ResumeWithFaultedTask -> resumeFromFaultedTask(
-                nodeStack = nodeStack,
-                node = node,
-                error = command.error,
-                workflowInfo = workflowInfo,
-                lifecycleHook = lifecycleHook,
-            )
+        } catch (e: NodeResolutionException) {
+            faultedTaskPosition = e.caller.position
+            resumeWithHandler(nodeStack, e.caller, null, null, null, workflowInfo, lifecycleHook) {
+                throw InternalException(InternalException.Error.from(e.failure, e.caller.position))
+            }
         }
 
-        emitLifecycleEventsForEvent(event, workflowInfo, lifecycleHook, command.nodePosition)
+        emitLifecycleEventsForEvent(event, workflowInfo, lifecycleHook, faultedTaskPosition)
 
-        return event
+        // Failed selection/initialization has no resumable continuation. Close lifecycle
+        // events above before dropping its transient pending frame from the terminal message.
+        return if (event is WorkflowFaulted) event.copy(nodeStack = NodeStack(event.nodeStack.filter { it.state !is PendingTaskState })) else event
     }
 
     /**
@@ -246,7 +263,8 @@ object StepByStepOrchestrator {
     ): WorkflowEvent {
 
         return when (val event = runByTask(workflow, command, workflowInfo, lifecycleHook, functionResolver, secrets)) {
-            is TaskScheduled -> if (workflow.getNode(event.nodePosition, functionResolver).isActivity()) {
+            is TaskScheduled -> if (try { workflow.getNode(event.nodePosition, functionResolver).isActivity() }
+                catch (_: NodeResolutionException) { false }) {
                 event
             } else {
                 runByActivity(workflow, event.resume(), workflowInfo, lifecycleHook, functionResolver, secrets)
@@ -272,33 +290,29 @@ object StepByStepOrchestrator {
         workflowInfo: WorkflowInfo,
         lifecycleHook: LifecycleEventHook,
         action: suspend () -> WorkflowEvent,
-    ): WorkflowEvent = try {
-        // run the next task within a try-catch block to handle workflow-caught exceptions
-        tryCatch(node, nodeStack, workflowInfo, lifecycleHook) {
-            action()
+    ): WorkflowEvent {
+        val failure: Exception
+        val stack: NodeStack
+        try {
+            return action()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: StepExecutionException) {
+            stack = e.nodeStack
+            failure = e.failure
+        } catch (e: Exception) {
+            stack = nodeStack
+            failure = e
         }
-    } catch (e: Exception) {
-        if (e !is InternalException) {
-            lifecycleHook.onTaskFaulted(
-                workflowInfo = workflowInfo,
-                nodeStack = nodeStack,
-                nodePosition = node.position,
-                error = InternalException.Error.from(e, node.position),
-                faultedAt = Clock.System.now(),
-            )
+        val error = InternalException.Error.from(failure, node.position)
+        lifecycleHook.onTaskFaulted(workflowInfo, stack, node.position, error, Clock.System.now())
+        return try {
+            processTaskFaulted(InternalException(error), node, stack, workflowInfo, lifecycleHook)
+        } catch (e: Exception) {
+            hasForkBranchFaulted(stack, node, e, workflowInfo, lifecycleHook)
+                ?: WorkflowFaulted(nodeStack = stack, nodePosition = node.position, rawInput = rawInput,
+                    rawOutput = rawOutput, flowDirective = flowDirective?.toKotlin(), exception = e, faultedAt = Clock.System.now())
         }
-        // Uncaught failure within a fork branch
-        hasForkBranchFaulted(nodeStack, node, e, workflowInfo, lifecycleHook)
-        // Uncaught failure
-            ?: WorkflowFaulted(
-                nodeStack = nodeStack,
-                nodePosition = node.position,
-                rawInput = rawInput,
-                rawOutput = rawOutput,
-                flowDirective = flowDirective?.toKotlin(),
-                exception = e,
-                faultedAt = Clock.System.now(),
-            )
     }
 
     /**
@@ -311,6 +325,7 @@ object StepByStepOrchestrator {
         node: Node<*>,
         rawInput: JsonElement,
         flowDirective: FlowDirective? = null,
+        extensionReturn: ExtensionReturn? = null,
         workflowInfo: WorkflowInfo,
         lifecycleHook: LifecycleEventHook,
     ): WorkflowEvent = resumeWithHandler(
@@ -322,7 +337,7 @@ object StepByStepOrchestrator {
         workflowInfo = workflowInfo,
         lifecycleHook = lifecycleHook
     ) {
-        startTask(nodeStack, node, rawInput, flowDirective, workflowInfo, lifecycleHook)
+        startTask(nodeStack, node, rawInput, flowDirective, workflowInfo, lifecycleHook, extensionReturn)
     }
 
     /**
@@ -361,26 +376,8 @@ object StepByStepOrchestrator {
         error: InternalException.Error,
         workflowInfo: WorkflowInfo,
         lifecycleHook: LifecycleEventHook,
-    ): WorkflowEvent {
-        return try {
-            // Resume the faulted task (hopefully, the error can be handled)
-            // task.faulted is emitted in tryCatch when the exception is caught
-            tryCatch(node, nodeStack, workflowInfo, lifecycleHook) {
-                throw InternalException(error)
-            }
-        } catch (e: Exception) {
-            // Uncaught failure within a fork branch
-            hasForkBranchFaulted(nodeStack, node, e, workflowInfo, lifecycleHook)?.let { return it }
-            // Uncaught failure
-            WorkflowFaulted(
-                nodeStack = nodeStack,
-                nodePosition = node.position,
-                rawInput = null,
-                rawOutput = null,
-                flowDirective = null,
-                exception = e
-            )
-        }
+    ): WorkflowEvent = resumeWithHandler(nodeStack, node, null, null, null, workflowInfo, lifecycleHook) {
+        throw InternalException(error)
     }
 
     /**
@@ -398,6 +395,8 @@ object StepByStepOrchestrator {
         block: suspend () -> WorkflowEvent
     ): WorkflowEvent = try {
         block()
+    } catch (e: StepExecutionException) {
+        tryCatch(current, e.nodeStack, workflowInfo, lifecycleHook) { throw e.failure }
     } catch (e: InternalException) {
         // Emit task.faulted - the task faulted with an error
         lifecycleHook.onTaskFaulted(
@@ -433,9 +432,10 @@ object StepByStepOrchestrator {
         do {
             // if we reached a try task, we check if this error can be handled by it
             // if yes, we continue from there (retry or catch)
-            if (current!!.task is TryTask) {
-                // current state of the try node
-                val tryState = nodeStack[current.position]?.state as TryState
+            val frame = nodeStack[current!!.position]
+            if (current.task is TryTask && frame?.state is TryState &&
+                (frame.extension == null || frame.extension.phase == ExtensionPhase.BODY) && current != failingNode) {
+                val tryState = frame.state
                 val processor = current.processor as TryProcessor
                 // check that this node actually can handle this error
                 if (processor.isCatching(exception.error, tryState, nodeStack.stateScope)) {
@@ -444,6 +444,11 @@ object StepByStepOrchestrator {
                         state = tryState,
                         nodeStack = nodeStack
                     )
+                    // Close abandoned invocations before their frames disappear, including extension owners.
+                    for (abandoned in nodeStack.toList().asReversed().takeWhile { it.position != current.position }) {
+                        if (abandoned.position == failingNode.position) continue
+                        lifecycleHook.onTaskFaulted(workflowInfo, nodeStack, abandoned.position, exception.error, Clock.System.now())
+                    }
                     // Emit task.retried if a retry was scheduled
                     if (event is TaskRetryScheduled) {
                         lifecycleHook.onTaskRetried(
@@ -457,22 +462,13 @@ object StepByStepOrchestrator {
                     return event
                 }
             }
+            val child = current
             current = current.parent
-            // Stop at error boundaries: fork tasks and listen tasks with foreach
-        } while (current != null && !isErrorBoundary(current))
+            if (current?.task is ForkTask && current.children.orEmpty().any { it.position == child.position }) break
+        } while (current != null)
 
         // No handler found - fail workflow
         throw exception
-    }
-
-    /**
-     * Check if a node is an error boundary.
-     * Error boundaries prevent errors from propagating beyond them:
-     * - ForkTask: errors in branches are handled by the fork
-     */
-    private fun isErrorBoundary(node: Node<*>): Boolean = when (node.task) {
-        is ForkTask -> true
-        else -> false
     }
 
     /**
@@ -489,9 +485,11 @@ object StepByStepOrchestrator {
         flowDirective: FlowDirective?,
         workflowInfo: WorkflowInfo,
         lifecycleHook: LifecycleEventHook,
+        extensionReturn: ExtensionReturn? = null,
     ): WorkflowEvent {
         val isFirstEntry = nodeStack[node.position] == null
 
+        require(!isFirstEntry || extensionReturn == null) { "Extension return has no owner frame at ${node.position}" }
         // Emit entry events (workflow.started, task.created, task.started)
         if (isFirstEntry) {
             emitTaskEntryEvents(nodeStack, node, rawInput, workflowInfo, lifecycleHook)
@@ -501,7 +499,7 @@ object StepByStepOrchestrator {
         val event = if (isFirstEntry) {
             node.processor.enterFromParent(nodeStack, workflowInfo, rawInput, lifecycleHook)
         } else {
-            node.processor.reEnterFromChild(nodeStack, workflowInfo, rawInput, flowDirective, lifecycleHook)
+            node.processor.reEnterFromChild(nodeStack, workflowInfo, rawInput, flowDirective, lifecycleHook, extensionReturn)
         }
 
         return event
@@ -564,7 +562,7 @@ object StepByStepOrchestrator {
         workflowInfo: WorkflowInfo,
         lifecycleHook: LifecycleEventHook,
     ): WorkflowEvent {
-        val scope = nodeStack.stateScope.withTask(node, nodeStack.currentState.startedAt)
+        val scope = nodeStack.taskScope(node)
 
         val event = node.processor.completeTask(
             rawOutput = rawOutput,
@@ -594,7 +592,7 @@ object StepByStepOrchestrator {
         while (current.parent != null) {
             val forkNode = current.parent
 
-            if (forkNode.task is ForkTask) {
+            if (forkNode.task is ForkTask && forkNode.children.orEmpty().any { it.position == current.position }) {
                 val faultedAt = Clock.System.now()
                 val error = InternalException.Error.from(exception, failingNode.position)
                 for (frame in nodeStack.toList().asReversed().takeWhile { it.position != forkNode.position }) {

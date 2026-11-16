@@ -8,7 +8,7 @@ import com.lemline.core.nodes.Node
 import com.lemline.core.processors.scope.Scope
 import com.lemline.core.states.CallFunctionState
 import io.serverlessworkflow.api.types.CallFunction
-import kotlin.time.Clock
+import kotlin.time.Instant
 import kotlinx.serialization.json.JsonElement
 
 /**
@@ -68,8 +68,8 @@ class CallFunctionProcessor(
 
     override val isAsync = false  // Control-flow, not async
 
-    override fun stateWhenEnteringFromParent(transformedInput: JsonElement, scope: Scope) = CallFunctionState(
-        startedAt = Clock.System.now(),
+    override fun stateWhenEnteringFromParent(transformedInput: JsonElement, scope: Scope, startedAt: Instant) = CallFunctionState(
+        startedAt = startedAt,
         entered = false
     )
 

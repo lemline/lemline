@@ -27,6 +27,7 @@ import io.serverlessworkflow.api.types.OAuth2AuthenticationPolicyConfiguration
 import io.serverlessworkflow.api.types.UriTemplate
 import io.serverlessworkflow.impl.expressions.ExpressionUtils
 import java.net.URI
+import kotlin.time.Instant
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonPrimitive
 
@@ -77,7 +78,7 @@ class CallHttpProcessor(
 
     override val isAsync = true
 
-    override fun stateWhenEnteringFromParent(transformedInput: JsonElement, scope: Scope) = CallState()
+    override fun stateWhenEnteringFromParent(transformedInput: JsonElement, scope: Scope, startedAt: Instant) = CallState(startedAt = startedAt)
 
     /**
      * Build the HTTP call configuration.

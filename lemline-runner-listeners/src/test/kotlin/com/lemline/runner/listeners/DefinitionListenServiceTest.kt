@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.listeners
 
+import com.lemline.common.values.WorkflowNamespace
+import com.lemline.common.values.WorkflowName
 import com.lemline.core.workflows.WorkflowCache
 import io.cloudevents.CloudEvent
 import io.cloudevents.core.builder.CloudEventBuilder
@@ -65,7 +67,7 @@ class DefinitionListenServiceTest {
                       one:
                         $filter
         """.trimIndent())
-        val namespace = com.lemline.common.values.WorkflowNamespace("default")
+        val namespace = WorkflowNamespace("default")
         for ((tenant, expected) in listOf("acme" to 1, "other" to 0)) {
             val event = CloudEventBuilder.from(buildCloudEvent("order")).withExtension("tenant", tenant).build()
             service.findMatchingListenTasks(event).size shouldBe expected
@@ -2266,7 +2268,7 @@ class DefinitionListenServiceTest {
                           any:
                             - with:
                                 type: com.example.Event
-                          until: .count >= 5
+                          until: '${'$'}{ .count >= 5 }'
             """.trimIndent()
             WorkflowCache.parseYamlAndPut(yaml)
 

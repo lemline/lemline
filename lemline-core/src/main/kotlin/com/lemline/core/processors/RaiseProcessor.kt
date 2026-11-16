@@ -9,7 +9,7 @@ import com.lemline.core.processors.scope.Scope
 import com.lemline.core.states.RaiseState
 import io.serverlessworkflow.api.types.RaiseTask
 import io.serverlessworkflow.api.types.RaiseTaskError
-import kotlin.time.Clock
+import kotlin.time.Instant
 import kotlinx.serialization.json.JsonElement
 
 /**
@@ -34,8 +34,8 @@ class RaiseProcessor(
     node: Node<RaiseTask>
 ) : AbstractProcessor<RaiseTask, RaiseState>(node) {
 
-    override fun stateWhenEnteringFromParent(transformedInput: JsonElement, scope: Scope) = RaiseState(
-        startedAt = Clock.System.now()
+    override fun stateWhenEnteringFromParent(transformedInput: JsonElement, scope: Scope, startedAt: Instant) = RaiseState(
+        startedAt = startedAt
     )
 
     override suspend fun execute(transformedInput: JsonElement, scope: Scope, state: RaiseState): JsonElement {

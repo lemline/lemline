@@ -105,6 +105,8 @@ export function shortEventType(type: string): string {
 const TASK_KINDS = ["call", "for", "do", "emit", "fork", "listen", "raise", "run", "set", "switch", "try", "wait"];
 
 export interface TaskInfo {
+  definition?: Json;
+  extension?: { name: string; phase: "before" | "after"; owner: string };
   kind?: string;
   /** "call http", "fork · 2 branches", "listen · shipment.created". */
   typeLabel: string;
@@ -116,24 +118,49 @@ export interface TaskInfo {
 export function taskAt(root: Json | undefined, pointer: string): TaskInfo {
   const empty: TaskInfo = { typeLabel: "", listensTo: [] };
   if (!root || !pointer.startsWith("/")) return empty;
+  const resolved = resolveTask(root, pointer);
+  if (!resolved) return empty;
+  return { ...(resolved.node ? describeTask(resolved.node) : empty), definition: resolved.node, extension: resolved.extension };
+}
+
+function resolveTask(root: Json, pointer: string): { node?: Json; extension?: TaskInfo["extension"] } | undefined {
   let node: unknown = root;
+  let extension: TaskInfo["extension"];
   const parts = pointer.split("/").slice(1);
-  for (let index = 0; index < parts.length; index++) {
-    const segment = parts[index].replace(/~1/g, "/").replace(/~0/g, "~");
-    if (Array.isArray(node)) {
+  const use = isObject(root.use) ? root.use : {};
+  for (let i = 0; i < parts.length; i++) {
+    const segment = parts[i].replace(/~1/g, "/").replace(/~0/g, "~");
+    if (segment === "_ext") {
+      const index = Number(parts[++i]);
+      const phase = parts[++i];
+      if (!Number.isInteger(index) || (phase !== "before" && phase !== "after")) return;
+      const item = Array.isArray(use.extensions) ? use.extensions[index] : undefined;
+      if (!isObject(item)) return;
+      const [name, definition] = Object.entries(item)[0] ?? [];
+      if (!isObject(definition) || !Array.isArray(definition[phase])) return;
+      extension = { name, phase, owner: "/" + parts.slice(0, i - 2).join("/") };
+      node = { do: definition[phase] };
+    } else if (segment === "_fn") {
+      const fn = isObject(node) && typeof node.call === "string" && isObject(use.functions) ? use.functions[node.call] : undefined;
+      // A remote function's source may be unavailable, but later _ext segments still
+      // resolve from this workflow's extension definitions.
+      node = isObject(fn) ? { do: Array.isArray(fn.do) ? fn.do : [{ functionTask: fn }] } : undefined;
+    } else if (Array.isArray(node)) {
       node = node[Number(segment)];
     } else if (isObject(node)) {
-      // A loop's /do is an internal block; a declared do task keeps its own identity.
-      if (segment === "do" && index === parts.length - 1 && TASK_KINDS.some((key) => key in (node as Json))) {
+      // The engine appends /do to a declared do task's position; a loop's /do is its internal block.
+      if (segment === "do" && i === parts.length - 1 && TASK_KINDS.some((key) => key in (node as Json))) {
         if ("for" in node) node = { do: node.do };
         break;
       }
       node = node[segment];
-    } else {
-      return empty;
-    }
+    } else node = undefined;
   }
-  if (!isObject(node)) return empty;
+  return isObject(node) ? { node, extension } : extension ? { extension } : undefined;
+}
+
+function describeTask(node: Json): TaskInfo {
+  const empty: TaskInfo = { typeLabel: "", listensTo: [] };
   const kind = TASK_KINDS.find((key) => key in node);
   if (!kind) return empty;
   const body = node[kind];
@@ -176,7 +203,7 @@ export function taskNamesOf(pointer: string): string[] {
   const segments = pointer.split("/").slice(1);
   const names: string[] = [];
   for (let index = 1; index < segments.length; index += 1) {
-    if (/^\d+$/.test(segments[index - 1]) && !/^\d+$/.test(segments[index])) {
+    if (/^\d+$/.test(segments[index - 1]) && !/^\d+$/.test(segments[index]) && segments[index - 2] !== "_ext") {
       names.push(segments[index].replace(/~1/g, "/").replace(/~0/g, "~"));
     }
   }
@@ -186,11 +213,11 @@ export function taskNamesOf(pointer: string): string[] {
 /** True when the pointer ends on a named task ("/do/0/callApi"), not on a block inside it ("/do/0/a/try"). */
 export function isTaskPointer(pointer: string, root?: Json): boolean {
   const segments = pointer.split("/").slice(1);
-  if (segments.at(-1) === "do" && /^\d+$/.test(segments.at(-3) ?? "")) {
+  if (segments.at(-1) === "do" && segments.at(-3) !== "_ext" && /^\d+$/.test(segments.at(-3) ?? "")) {
     if (taskAt(root, pointer.slice(0, -3)).kind === "for") return false;
     segments.pop();
   }
-  if (segments.length < 2) return false;
+  if (segments.length < 2 || segments.at(-3) === "_ext") return false;
   return /^\d+$/.test(segments[segments.length - 2]) && !/^\d+$/.test(segments[segments.length - 1]);
 }
 

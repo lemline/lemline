@@ -5,6 +5,7 @@ package lemline.internal.v1;
 import "google/protobuf/struct.proto";
 import "internal/common.proto";
 import "internal/state/node_stack.proto";
+import "internal/state/extensions.proto";
 
 option java_multiple_files = true;
 option java_package = "com.lemline.messages.internal.v1";
@@ -22,6 +23,7 @@ message ResumeFromTaskProto {
     string node_position = 2;
     google.protobuf.Value input_json = 3;
     FlowDirectiveProto flow_directive = 4;
+    ExtensionReturnProto extension_return = 5;
 }
 
 message ResumeWithCompletedTaskProto {

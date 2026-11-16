@@ -3,7 +3,9 @@ package com.lemline.core.states
 
 import com.lemline.common.values.NodePosition
 import com.lemline.common.values.WorkflowId
+import com.lemline.core.cloudevents.CloudEventHook
 import com.lemline.core.errors.InternalException
+import com.lemline.core.orchestrator.StepByStepOrchestrator
 import com.lemline.core.processors.CallHttpConfig
 import com.lemline.core.processors.EmitConfig
 import com.lemline.core.processors.ListenConfig
@@ -47,7 +49,8 @@ sealed class WorkflowCommand : WorkflowState() {
         override val nodeStack: NodeStack,
         override val nodePosition: NodePosition,
         val rawInput: JsonElement,
-        val flowDirective: FlowDirective? = null
+        val flowDirective: FlowDirective? = null,
+        val extensionReturn: ExtensionReturn? = null,
     ) : WorkflowCommand() {
 
         override fun toString() = "${this::class.simpleName}(" +
@@ -141,8 +144,8 @@ sealed class WorkflowEvent : WorkflowState() {
     /**
      * Event emitted when a task fails without the error being caught (outside a fork).
      *
-     * If rawInput is not null, this error comes from the [com.lemline.core.orchestrator.StepByStepOrchestrator.resumeFromTask] method
-     * If rawOutput is not null, this error comes from the [com.lemline.core.orchestrator.StepByStepOrchestrator.resumeFromCompletedTask] method
+     * If rawInput is not null, this error comes from the [StepByStepOrchestrator.resumeFromTask] method
+     * If rawOutput is not null, this error comes from the [StepByStepOrchestrator.resumeFromCompletedTask] method
      */
     data class WorkflowFaulted(
         override val nodeStack: NodeStack,
@@ -268,7 +271,8 @@ sealed class WorkflowEvent : WorkflowState() {
         override val nodeStack: NodeStack,
         override val nodePosition: NodePosition,
         val rawInput: JsonElement,
-        val flowDirective: FlowDirective?
+        val flowDirective: FlowDirective?,
+        val extensionReturn: ExtensionReturn? = null,
     ) : Suspension() {
 
         override fun toString() = "${this::class.simpleName}(" +
@@ -283,6 +287,7 @@ sealed class WorkflowEvent : WorkflowState() {
             nodePosition = nodePosition,
             rawInput = rawInput,
             flowDirective = flowDirective,
+            extensionReturn = extensionReturn,
         )
     }
 
@@ -467,7 +472,7 @@ sealed class WorkflowEvent : WorkflowState() {
      *
      * The config contains all data needed to build a CloudEvent. The actual
      * CloudEvent is built by the orchestrator using the CloudEvents SDK and
-     * emitted via [com.lemline.core.cloudevents.CloudEventHook].
+     * emitted via [CloudEventHook].
      *
      * The workflow continues immediately after publishing (fire-and-forget).
      */

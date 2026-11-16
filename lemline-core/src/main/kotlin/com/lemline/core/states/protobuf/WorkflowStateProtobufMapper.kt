@@ -147,7 +147,8 @@ object WorkflowStateProtobufMapper {
         node_stack = NodeStackProtobufMapper.toProto(nodeStack),
         node_position = nodePosition.toString(),
         input_json = rawInput.toProtoJsonValue(),
-        flow_directive = flowDirective?.toProto()
+        flow_directive = flowDirective?.toProto(),
+        extension_return = extensionReturn?.let(ExtensionProtobufMapper::toProto)
     )
 
     private fun ResumeFromTaskProto.toDomain() = WorkflowCommand.ResumeFromTask(
@@ -155,7 +156,8 @@ object WorkflowStateProtobufMapper {
             ?: error("ResumeFromTaskCommand.node_stack is required"),
         nodePosition = NodePosition(node_position),
         rawInput = input_json.toKotlinJsonElement(),
-        flowDirective = flow_directive?.toDomain()
+        flowDirective = flow_directive?.toDomain(),
+        extensionReturn = extension_return?.let(ExtensionProtobufMapper::fromProto)
     )
 
     private fun WorkflowCommand.ResumeWithCompletedTask.toProto() = ResumeWithCompletedTaskProto(
@@ -257,7 +259,8 @@ object WorkflowStateProtobufMapper {
         node_stack = NodeStackProtobufMapper.toProto(nodeStack),
         node_position = nodePosition.toString(),
         input_json = rawInput.toProtoJsonValue(),
-        flow_directive = flowDirective?.toProto()
+        flow_directive = flowDirective?.toProto(),
+        extension_return = extensionReturn?.let(ExtensionProtobufMapper::toProto)
     )
 
     private fun TaskScheduledProto.toDomain() = WorkflowEvent.TaskScheduled(
@@ -266,6 +269,7 @@ object WorkflowStateProtobufMapper {
         nodePosition = NodePosition(node_position),
         rawInput = input_json.toKotlinJsonElement(),
         flowDirective = flow_directive?.toDomain(),
+        extensionReturn = extension_return?.let(ExtensionProtobufMapper::fromProto)
     )
 
     private fun WorkflowEvent.WaitStarted.toProto() = WaitStartedProto(
@@ -687,7 +691,7 @@ object WorkflowStateProtobufMapper {
 
     private fun StringMapProto.toDomainStringMap(): Map<String, String> = values.toMap()
 
-    private fun FlowDirective.toProto(): FlowDirectiveProto =
+    internal fun FlowDirective.toProto(): FlowDirectiveProto =
         when (this) {
             is FlowDirectiveEnum.Continue -> FlowDirectiveProto(
                 directive = FlowDirectiveEnumProto.FLOW_DIRECTIVE_ENUM_PROTO_CONTINUE
@@ -704,7 +708,7 @@ object WorkflowStateProtobufMapper {
             is FlowDirectiveGoto -> FlowDirectiveProto(goto_target = target)
         }
 
-    private fun FlowDirectiveProto.toDomain(): FlowDirective {
+    internal fun FlowDirectiveProto.toDomain(): FlowDirective {
         directive?.let {
             return when (it) {
                 FlowDirectiveEnumProto.FLOW_DIRECTIVE_ENUM_PROTO_CONTINUE -> FlowDirectiveEnum.Continue
