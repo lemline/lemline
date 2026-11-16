@@ -3,6 +3,7 @@ package com.lemline.runner.listeners
 
 import com.lemline.common.values.WorkflowNamespace
 import com.lemline.common.values.WorkflowName
+import com.lemline.common.values.info
 import com.lemline.core.workflows.WorkflowCache
 import io.cloudevents.CloudEvent
 import io.cloudevents.core.builder.CloudEventBuilder
@@ -2376,4 +2377,45 @@ class DefinitionListenServiceTest {
         }
     }
 
+    @Test
+    fun `an unresolvable remote function does not block hydration of other registrations`() = kotlinx.coroutines.runBlocking<Unit> {
+        val namespace = WorkflowNamespace("hydration")
+        fun definition(name: String, reference: String) = WorkflowCache.parseYamlAndPut("""
+            document:
+              dsl: '1.0.0'
+              namespace: hydration
+              name: $name
+              version: '1.0.0'
+            do:
+              - invoke: { call: '$reference' }
+        """.trimIndent())
+        val broken = definition("broken", "https://example.com/missing.yaml")
+        val healthy = definition("healthy", "https://example.com/listen.yaml")
+        // Published elsewhere only to obtain the remote function body.
+        val function = WorkflowCache.parseYamlAndPut("""
+            document:
+              dsl: '1.0.0'
+              namespace: functions
+              name: function
+              version: '1.0.0'
+            do:
+              - ready: { listen: { to: { one: { with: { type: ready } } } } }
+        """.trimIndent()).`do`.single().task
+        val position = com.lemline.common.values.NodePosition("/_fn/https:~1~1example.com~1missing.yaml/do/0/ready")
+        service.listenerRepository = io.mockk.mockk {
+            io.mockk.coEvery { activeFunctionFilters(namespace) } returns listOf(
+                broken.info to position,
+                healthy.info to com.lemline.common.values.NodePosition("/_fn/https:~1~1example.com~1listen.yaml/do/0/ready"),
+            )
+        }
+        service.functionResolver = io.mockk.mockk {
+            io.mockk.coEvery { resolve("https://example.com/missing.yaml") } throws IllegalStateException("unavailable")
+            io.mockk.coEvery { resolve("https://example.com/listen.yaml") } returns function
+        }
+
+        service.prepareFunctionListeners(namespace)
+
+        service.findMatchingListenTasks(buildCloudEvent("ready")).map { it.workflowInfo }
+            .filter { it.namespace == namespace } shouldBe listOf(healthy.info)
+    }
 }
