@@ -4,6 +4,7 @@ package com.lemline.runner.testcases.pgmq
 import com.lemline.core.testcases.CallFunctionTestCases
 import com.lemline.core.testcases.CallHttpTestCases
 import com.lemline.core.testcases.DoTaskTestCases
+import com.lemline.core.testcases.ExtensionTaskTestCases
 import com.lemline.core.testcases.ExportContextTestCases
 import com.lemline.core.testcases.ForTaskTestCases
 import com.lemline.core.testcases.ForkTaskTestCases
@@ -108,3 +109,8 @@ internal class PgmqWaitExecutionTest : BrokerWorkflowTest(WaitTestCases.cases)
 @QuarkusTest
 @TestProfile(PgmqTestCaseProfile::class)
 internal class PgmqListenExecutionTest : BrokerWorkflowTest(ListenTestCases.cases)
+
+@RequiresDocker
+@QuarkusTest
+@TestProfile(PgmqTestCaseProfile::class)
+internal class PgmqExtensionExecutionTest : BrokerWorkflowTest(ExtensionTaskTestCases.cases)

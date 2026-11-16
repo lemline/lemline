@@ -53,7 +53,11 @@ data class WorkflowTestCase(
     val cloudEvents: List<CloudEvent> = emptyList(),
     val timeout: Duration = 5.seconds,
     val validateDefinition: Boolean = true,
-    val skip: Boolean = false
+    val skip: Boolean = false,
+    /** Validate emitted lifecycle events, or analytics-ingested events in runner tests. */
+    val validateLifecycleEvents: ((List<CloudEvent>) -> String?)? = null,
+    /** Evict definition/function caches while suspended on a listener, before event delivery. */
+    val rebuildCachesOnListen: Boolean = false
 )
 
 /**

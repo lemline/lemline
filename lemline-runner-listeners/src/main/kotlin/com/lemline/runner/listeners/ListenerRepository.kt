@@ -1,7 +1,10 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.listeners
 
+import kotlinx.serialization.json.JsonPrimitive
 import com.lemline.common.values.IDV7
+import com.lemline.common.values.NodePosition
+import com.lemline.common.values.WorkflowInfo
 import com.lemline.common.values.WorkflowName
 import com.lemline.common.values.WorkflowNamespace
 import com.lemline.common.values.WorkflowVersion
@@ -94,6 +97,27 @@ class ListenerRepository : CrudRepository<ListenerModel>(),
     override suspend fun deleteById(id: IDV7, connection: Connection?) =
         idRepository.deleteById(id, connection)
 
+    /** Active canonical function filter keys, without reading or deserializing workflow state. */
+    suspend fun activeFunctionFilters(namespace: WorkflowNamespace): List<Pair<WorkflowInfo, NodePosition>> =
+        databaseConfig.withConnection { conn ->
+            conn.prepareStatement("""
+                SELECT DISTINCT $WORKFLOW_NAME_COLUMN, $WORKFLOW_VERSION_COLUMN, workflow_position
+                FROM $tableName
+                WHERE $WORKFLOW_NAMESPACE_COLUMN = ? AND $CLOSED_AT_COLUMN IS NULL
+                    AND $OUTBOX_COMPLETED_AT_COLUMN IS NULL AND $OUTBOX_FAILED_AT_COLUMN IS NULL
+                    AND workflow_position LIKE '/!_fn/%' ESCAPE '!'
+            """.trimIndent()).use { stmt ->
+                stmt.setString(1, namespace.toString())
+                stmt.executeQuery().use { rs ->
+                    buildList {
+                        while (rs.next()) add(WorkflowInfo(namespace,
+                            WorkflowName(rs.getString(WORKFLOW_NAME_COLUMN)), WorkflowVersion(rs.getString(WORKFLOW_VERSION_COLUMN))) to
+                            NodePosition(rs.getString("workflow_position")))
+                    }
+                }
+            }
+        }
+
     /**
      * Batch finds listeners by their IDs in a single query.
      * Returns a map of ID to ListenerModel for efficient lookup.
@@ -149,6 +173,9 @@ class ListenerRepository : CrudRepository<ListenerModel>(),
         ColumnBindingsBuilder<ListenerModel>().apply {
             idColumn(idHelper)
             instanceColumns(idHelper)
+            column(com.lemline.runner.common.repositories.ops.WORKFLOW_POSITION_COLUMN) { stmt, entity, idx ->
+                stmt.setString(idx, entity.filterPosition.toString())
+            }
             cleanupColumns()
             outboxColumns()
 
@@ -193,6 +220,7 @@ class ListenerRepository : CrudRepository<ListenerModel>(),
         listenerStrategy = ListenerStrategy.valueOf(rs.getString(STRATEGY_COLUMN)),
         timeoutAt = rs.getInstant(TIMEOUT_AT_COLUMN),
     ).apply {
+        filterPosition = NodePosition(rs.getString(com.lemline.runner.common.repositories.ops.WORKFLOW_POSITION_COLUMN))
         // Listener-specific columns
         filtersCount = rs.getInt(FILTERS_COUNT_COLUMN).takeIf { !rs.wasNull() }
         hasUntil = rs.getBoolean(HAS_UNTIL_COLUMN)
@@ -579,7 +607,7 @@ class ListenerRepository : CrudRepository<ListenerModel>(),
             val array = Json.parseToJsonElement(json).jsonArray
             // MySQL aggregates the TEXT event column as JSON strings; PostgreSQL/H2
             // aggregate parsed objects. Both must yield the original event envelope.
-            array.map { if (it is kotlinx.serialization.json.JsonPrimitive && it.isString) it.content else Json.encodeToString(it) }
+            array.map { if (it is JsonPrimitive && it.isString) it.content else Json.encodeToString(it) }
         } catch (_: Exception) {
             emptyList()
         }

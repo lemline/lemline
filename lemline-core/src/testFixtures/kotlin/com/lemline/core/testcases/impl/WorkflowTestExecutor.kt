@@ -17,6 +17,8 @@ interface WorkflowTestExecutor {
         dependencies: List<WorkflowDependency> = emptyList(),
         mockConfig: MockConfiguration = MockConfiguration.empty(),
         cloudEvents: List<CloudEvent> = emptyList(),
-        validateDefinition: Boolean = true
+        validateDefinition: Boolean = true,
+        validateLifecycleEvents: ((List<CloudEvent>) -> String?)? = null,
+        rebuildCachesOnListen: Boolean = false
     ): WorkflowTestResult
 }

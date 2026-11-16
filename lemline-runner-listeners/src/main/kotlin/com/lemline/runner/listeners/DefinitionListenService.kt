@@ -8,6 +8,7 @@ import com.lemline.common.values.WorkflowName
 import com.lemline.common.values.WorkflowNamespace
 import com.lemline.common.values.WorkflowVersion
 import com.lemline.core.cloudevents.CloudEventMatcher
+import com.lemline.core.functions.FunctionResolver
 import com.lemline.core.processors.EventFilter
 import com.lemline.core.workflows.CachedEventSchedule
 import com.lemline.core.workflows.CachedListenTask
@@ -16,6 +17,7 @@ import io.cloudevents.CloudEvent
 import io.serverlessworkflow.api.types.ListenTaskConfiguration
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
+import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 
@@ -101,7 +103,31 @@ class DefinitionListenService {
     private val logger = logger()
 
     @Inject
-    private lateinit var listenerRepository: ListenerRepository
+    lateinit var listenerRepository: ListenerRepository
+
+    @Inject
+    lateinit var functionResolver: FunctionResolver
+
+    /**
+     * Hydrates filters of active remote-function registrations, one registration at a time.
+     *
+     * A function that cannot be resolved must not block the namespace: its failure is logged and
+     * the other registrations, listeners and event schedules keep matching. Its filter stays
+     * unloaded, so the next CloudEvent of the namespace attempts hydration again; events arriving
+     * meanwhile are not delivered to that listener.
+     */
+    suspend fun prepareFunctionListeners(namespace: WorkflowNamespace) {
+        for ((info, position) in listenerRepository.activeFunctionFilters(namespace)) {
+            val reference = WorkflowCache.functionReference(position) ?: continue
+            try {
+                WorkflowCache.loadFunctionListeners(info, reference) { functionResolver.resolve(it) }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                logger.error(e) { "Cannot hydrate listener filters of function '$reference' for $info at $position" }
+            }
+        }
+    }
 
     /**
      * Removes all listeners for a workflow definition.

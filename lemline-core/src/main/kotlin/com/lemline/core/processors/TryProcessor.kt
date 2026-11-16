@@ -5,6 +5,7 @@ import com.lemline.common.json.LemlineJson
 import com.lemline.core.errors.InternalException
 import com.lemline.core.nodes.Node
 import com.lemline.core.processors.scope.Scope
+import com.lemline.core.processors.scope.taskScope
 import com.lemline.core.states.NodeStack
 import com.lemline.core.states.TryState
 import com.lemline.core.states.WorkflowEvent
@@ -26,6 +27,7 @@ import kotlin.time.Clock
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.DurationUnit
+import kotlin.time.Instant
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.buildJsonObject
 
@@ -74,8 +76,8 @@ class TryProcessor(
     /**
      * This state is initialized when entering the TryTask node for the first time
      */
-    override fun stateWhenEnteringFromParent(transformedInput: JsonElement, scope: Scope): TryState = TryState(
-        startedAt = Clock.System.now(),
+    override fun stateWhenEnteringFromParent(transformedInput: JsonElement, scope: Scope, startedAt: Instant): TryState = TryState(
+        startedAt = startedAt,
         transformedInput = transformedInput,  // Store for retries/catch
         attemptIndex = 0,  // Ready for first attempt
         runningCatch = false,
@@ -125,6 +127,12 @@ class TryProcessor(
      * Determines whether the current `TryTask` is catching a specified error based on its state,
      * configuration, and evaluation of filters.
      */
+    /**
+     * Scope of catch and retry filters: the same `$task` as the try's other expressions, so a try
+     * inside an extension block sees its extension owner.
+     */
+    internal fun filterScope(state: TryState, nodeStack: NodeStack): Scope = nodeStack.taskScope(node, state.startedAt)
+
     internal fun isCatching(error: InternalException.Error, state: TryState, scope: Scope): Boolean {
         // running catch = true means we are running the catch block
         if (state.runningCatch) return false
@@ -177,7 +185,7 @@ class TryProcessor(
     ): WorkflowEvent {
 
         // Check if we should retry
-        val shouldRetry = shouldRetry(state, nodeStack.stateScope)
+        val shouldRetry = shouldRetry(state, filterScope(state, nodeStack))
 
         return when (shouldRetry) {
             // Retry if attempts remain

@@ -6,6 +6,7 @@ import "google/protobuf/struct.proto";
 import "google/protobuf/timestamp.proto";
 import "internal/common.proto";
 import "internal/state/node_stack.proto";
+import "internal/state/extensions.proto";
 import "internal/workflow/configs.proto";
 
 option java_multiple_files = true;
@@ -70,6 +71,7 @@ message TaskScheduledProto {
     string node_position = 2;
     google.protobuf.Value input_json = 3;
     FlowDirectiveProto flow_directive = 4;
+    ExtensionReturnProto extension_return = 5;
 }
 
 message WaitStartedProto {

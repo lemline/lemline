@@ -11,6 +11,7 @@ import com.lemline.core.states.ForState
 import com.lemline.core.states.ForeachState
 import com.lemline.core.states.NodeStack
 import com.lemline.core.states.NodeState
+import com.lemline.core.states.PendingTaskState
 import com.lemline.core.states.RootState
 import com.lemline.core.states.StackFrame
 import com.lemline.core.states.TaskState
@@ -22,6 +23,7 @@ import com.lemline.messages.internal.v1.ForeachStateProto
 import com.lemline.messages.internal.v1.InternalErrorProto
 import com.lemline.messages.internal.v1.NodeStackProto
 import com.lemline.messages.internal.v1.NodeStateProto
+import com.lemline.messages.internal.v1.PendingTaskStateProto
 import com.lemline.messages.internal.v1.RootStateProto
 import com.lemline.messages.internal.v1.StackFrameProto
 import com.lemline.messages.internal.v1.TaskStateProto
@@ -60,8 +62,9 @@ object NodeStackProtobufMapper {
     private fun StackFrame.toProto(relativePosition: String) = StackFrameProto(
         position = relativePosition,
         state = state.toProto(),
-        counter = counter
-    )
+        counter = counter,
+        extension = extension?.let(ExtensionProtobufMapper::toProto)
+    ).also { validateExtension() }
 
     private fun StackFrameProto.toNodePosition(previousPosition: NodePosition): NodePosition =
         when {
@@ -78,8 +81,14 @@ object NodeStackProtobufMapper {
     private fun StackFrameProto.toDomain(position: NodePosition) = StackFrame(
         position = position,
         state = state?.toDomain() ?: error("StackFrameMessage.state is required"),
-        counter = counter
-    )
+        counter = counter,
+        extension = extension?.let(ExtensionProtobufMapper::fromProto)
+    ).also { it.validateExtension() }
+
+    private fun StackFrame.validateExtension() {
+        require(state !is PendingTaskState || extension != null) { "PendingTaskState requires an extension continuation" }
+        extension?.validate(state)
+    }
 
     private fun NodeState.toProto(): NodeStateProto = when (this) {
         is RootState -> NodeStateProto(root_state = toProto())
@@ -89,9 +98,11 @@ object NodeStackProtobufMapper {
         is CallFunctionState -> NodeStateProto(call_function_state = toProto())
         is TryState -> NodeStateProto(try_state = toProto())
         is TaskState -> NodeStateProto(task_state = toProto())
+        is PendingTaskState -> NodeStateProto(pending_task_state = PendingTaskStateProto(started_at = startedAt.toProtoInstant()))
     }
 
     private fun NodeStateProto.toDomain(): NodeState {
+        pending_task_state?.let { return PendingTaskState(it.started_at?.toKotlinInstantOrEpoch() ?: error("PendingTaskState.started_at is required")) }
         root_state?.let { return it.toDomain() }
         do_state?.let { return it.toDomain() }
         for_state?.let { return it.toDomain() }

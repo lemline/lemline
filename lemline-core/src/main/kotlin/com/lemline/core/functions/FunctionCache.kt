@@ -5,6 +5,7 @@ import com.lemline.common.values.NodePosition
 import com.lemline.common.values.Token.FUN
 import com.lemline.common.values.WorkflowInfo
 import com.lemline.core.nodes.Node
+import com.lemline.core.nodes.NodeOrigin
 import com.lemline.core.nodes.RootTask
 import com.lemline.core.workflows.WorkflowParser
 import io.serverlessworkflow.api.types.CallTask
@@ -89,7 +90,7 @@ object FunctionCache {
      * /_fn/do/0/taskName (first task)
      * ```
      */
-    private fun buildFunctionNodesMap(task: Task): Map<NodePosition, Node<*>> {
+    internal fun buildFunctionNodesMap(task: Task, use: io.serverlessworkflow.api.types.Use? = null, suppressed: Boolean = false): Map<NodePosition, Node<*>> {
         val taskBase = task.toTaskBase()
 
         // Create a synthetic root for the function at /_fn position
@@ -107,14 +108,15 @@ object FunctionCache {
                 version = "1.0.0"
             },
             doTask.`do`,
-            null
+            use
         )
 
         val fnRootNode = Node(
             position = fnRootPosition,
             task = fnRootTask,
             name = "$FUN",
-            parent = null  // Parent will be set during position resolution
+            parent = null, // Parent will be set during position resolution
+            origin = if (suppressed) NodeOrigin.EXTENSION_BLOCK else NodeOrigin.INTERNAL
         )
 
         return WorkflowParser.buildNodesMap(fnRootNode)

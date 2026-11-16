@@ -286,7 +286,7 @@ This project is licensed under the [Business Source License 1.1](LICENSE.md).
 - [x] Namespace
 - [x] Catalog
 - [x] Secrets
-- [ ] Extensions
+- [x] Extensions
 
 ## 📬 Contact
 

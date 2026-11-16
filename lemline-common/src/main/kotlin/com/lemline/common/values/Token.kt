@@ -20,6 +20,7 @@ enum class Token(val token: String) {
     CALL("call"),
     EMIT("emit"),
     FUN("_fn"),  // Function body marker for inline function execution
+    EXT("_ext"),
     ;
 
     override fun toString() = token

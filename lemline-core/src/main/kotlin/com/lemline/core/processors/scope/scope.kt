@@ -2,6 +2,7 @@
 package com.lemline.core.processors.scope
 
 import com.lemline.core.nodes.Node
+import com.lemline.core.states.NodeStack
 import kotlin.time.Instant
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
@@ -66,6 +67,7 @@ fun Scope.withTransformedInput(
 fun Scope.withRawOutput(
     rawOutput: JsonElement
 ): Scope {
+    if (get("_extensionTaskScope") == JsonPrimitive(true)) return this
     val task = get("task")?.jsonObject ?: error("Scope missing 'task' key")
     return JsonObject(this + ("task" to JsonObject(task + ("output" to rawOutput))))
 }
@@ -76,3 +78,14 @@ fun Scope.withRawOutput(
 fun Scope.withTransformedOutput(
     transformedOutput: JsonElement
 ) = JsonObject(this + ("output" to transformedOutput))
+
+/** Reconstructs $task from durable data while keeping local scope variables. */
+fun NodeStack.taskScope(node: Node<*>, startedAt: Instant = currentState.startedAt, rawInput: JsonElement = JsonNull): Scope {
+    val owner = node.extensionOwner ?: node
+    val frame = this[owner.position]
+    val extension = frame?.extension
+    var scope = stateScope.withTask(owner, frame?.state?.startedAt ?: startedAt, extension?.rawInput ?: rawInput)
+    extension?.preparedResult?.let { scope = scope.withRawOutput(it.rawOutput) }
+    if (node.extensionOwner != null) scope = JsonObject(scope + ("_extensionTaskScope" to JsonPrimitive(true)))
+    return scope
+}

@@ -46,7 +46,7 @@ class WaitProcessor(
     node: Node<WaitTask>,
 ) : AbstractProcessor<WaitTask, WaitState>(node) {
     override val isAsync = true
-    override fun stateWhenEnteringFromParent(transformedInput: JsonElement, scope: Scope) = WaitState()
+    override fun stateWhenEnteringFromParent(transformedInput: JsonElement, scope: Scope, startedAt: Instant) = WaitState(startedAt = startedAt)
 
     /**
      * Handles the "started" event for a workflow by creating a `WaitStarted` event with

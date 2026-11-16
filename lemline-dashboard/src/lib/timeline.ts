@@ -27,6 +27,8 @@ export interface Attempt {
   end?: number;
   outcome: "succeeded" | "failed" | "running" | "interrupted";
   error?: RawError;
+  ownerId?: string;
+  ownerAttempt?: number;
 }
 
 export interface StepRow {
@@ -49,6 +51,10 @@ export interface StepRow {
   error?: RawError;
   listensTo: string[];
   isGroup: boolean;
+  /** A leaf body still does work when extensions make its row a group. */
+  hasActiveBody?: boolean;
+  ownerId?: string;
+  ownerAttempt?: number;
   note: string;
   detail: string;
 }
@@ -192,7 +198,7 @@ export function buildTimeline(
     byPointer.set(pointer, list);
   };
   const blockRetries: { block: string; event: ParsedEvent }[] = [];
-  const faults: { pointer: string; time: number }[] = [];
+  const faults: { pointer: string; time: number; origin?: string }[] = [];
   for (const event of parsed) {
     if (!event.view.eventType.includes(".task.")) continue;
     const pointer = event.view.taskPointer?.trim();
@@ -201,7 +207,7 @@ export function buildTimeline(
       if (kindOf(event.view.eventType) === "retried") blockRetries.push({ block: pointer, event });
       continue;
     }
-    if (kindOf(event.view.eventType) === "faulted") faults.push({ pointer, time: event.time });
+    if (kindOf(event.view.eventType) === "faulted") faults.push({ pointer, time: event.time, origin: typeof errorOf(event.data)?.instance === "string" ? errorOf(event.data)?.instance as string : undefined });
     add(pointer, event);
   }
   // The runtime announces a retry on the try block it re-enters ("/do/1/charge/try"), not on the
@@ -210,11 +216,17 @@ export function buildTimeline(
   for (const { block, event } of blockRetries) {
     const failed = faults
       .filter((fault) => fault.time <= event.time && fault.pointer.startsWith(`${block}/`))
-      .reduce<{ pointer: string; time: number } | undefined>(
+      .reduce<{ pointer: string; time: number; origin?: string } | undefined>(
         (latest, fault) => (latest === undefined || fault.time >= latest.time ? fault : latest),
         undefined,
       );
-    if (failed) add(failed.pointer, event);
+    if (failed) {
+      const origin = failed.origin ?? failed.pointer;
+      const chain = new Set(faults.filter((fault) => fault.time <= event.time && fault.pointer.startsWith(`${block}/`) &&
+        (fault.pointer === origin || origin.startsWith(`${fault.pointer}/`))).map((fault) => fault.pointer));
+      chain.add(failed.pointer);
+      for (const pointer of chain) add(pointer, event);
+    }
   }
 
   const pointers = Array.from(byPointer.keys());
@@ -224,13 +236,31 @@ export function buildTimeline(
     const isGroup =
       (info.kind !== undefined && CONTAINER_KINDS.has(info.kind)) ||
       pointers.some((other) => other !== pointer && other.startsWith(`${pointer}/`));
+    // A function call is control flow: its time is the time of the tasks inside it.
+    const callsFunction = pointers.some((other) => other.startsWith(`${pointer}/_fn/`));
     const runs = splitRuns(inHappeningOrder(list));
     runs.forEach((run, index) => {
       const iteration = runs.length > 1 ? index + 1 : undefined;
-      rows.push(buildRow(pointer, iteration, run, info, isGroup, bounds.terminal, tEnd));
+      const row = buildRow(pointer, iteration, run, info, isGroup, bounds.terminal, tEnd);
+      rows.push(callsFunction ? { ...row, hasActiveBody: false } : row);
     });
   }
 
+  // Associate each extension invocation with the enclosing owner's actual attempt interval.
+  for (const row of rows) {
+    const owner = taskAt(root, row.pointer).extension?.owner;
+    if (!owner) continue;
+    for (const attempt of row.attempts) {
+      const parent = rows.filter((candidate) => candidate.pointer === owner && candidate.start <= attempt.start &&
+        (candidate.end ?? tEnd) >= attempt.start).sort((a, b) => b.start - a.start)[0];
+      if (!parent) continue;
+      attempt.ownerId = parent.id;
+      const ownerAttempt = parent.attempts.findIndex((item) => item.start <= attempt.start && (item.end ?? tEnd) >= attempt.start);
+      if (ownerAttempt >= 0) attempt.ownerAttempt = ownerAttempt + 1;
+    }
+    row.ownerId = row.attempts[0]?.ownerId;
+    row.ownerAttempt = row.attempts[0]?.ownerAttempt;
+  }
   rows.sort(
     (left, right) =>
       left.start - right.start ||
@@ -404,8 +434,9 @@ function buildRow(
   const groupSegments: Segment[] = isGroup ? [{ start, end: end ?? tEnd, kind: "group" }] : segments;
 
   let typeLabel = info.typeLabel || "task";
+  if (info.extension) typeLabel += ` · ${info.extension.name} · ${info.extension.phase}`;
   if (iteration !== undefined) typeLabel += ` · run ${iteration}`;
-  if (!isGroup && attempts.length > 1) typeLabel += ` · ${attempts.length} attempts`;
+  if (attempts.length > 1) typeLabel += ` · ${attempts.length} attempts`;
 
   return {
     id: iteration !== undefined ? `${pointer}#${iteration}` : pointer,
@@ -425,6 +456,7 @@ function buildRow(
     error: state === "failed" ? (last?.error ?? lastError) : undefined,
     listensTo: info.listensTo,
     isGroup,
+    hasActiveBody: isGroup && info.kind !== undefined && !CONTAINER_KINDS.has(info.kind) && !waitsForEvent,
     note: "",
     detail: "",
   };
@@ -438,11 +470,30 @@ interface Scale {
 const AXIS_MAX_PCT = 94;
 
 /** Long stretches where no task works (waiting or idle) are drawn with a fixed, short width. */
+/**
+ * The owner's own work: its attempts minus the time its extension blocks run. Those blocks are
+ * rows of their own, and their waits must stay compressible.
+ */
+function activeBodyOf(owner: StepRow, rows: StepRow[], tEnd: number): { start: number; end: number }[] {
+  const cuts = rows
+    .filter((row) => row.pointer.startsWith(`${owner.pointer}/_ext/`))
+    .flatMap((row) => row.attempts.map((attempt) => ({ start: attempt.start, end: attempt.end ?? tEnd })));
+  let pieces = owner.attempts.map((attempt) => ({ start: attempt.start, end: attempt.end ?? tEnd }));
+  for (const cut of cuts) {
+    pieces = pieces.flatMap((piece) => cut.end <= piece.start || cut.start >= piece.end
+      ? [piece]
+      : [{ start: piece.start, end: cut.start }, { start: cut.end, end: piece.end }].filter((part) => part.end > part.start));
+  }
+  return pieces;
+}
+
 function buildScale(rows: StepRow[], t0: number, tEnd: number): Scale {
   const total = tEnd - t0;
   const busy = rows
-    .filter((row) => !row.isGroup)
-    .flatMap((row) => row.segments.filter((segment) => segment.kind !== "waiting" && segment.kind !== "backoff"))
+    .filter((row) => !row.isGroup || row.hasActiveBody)
+    .flatMap((row) => row.hasActiveBody
+      ? activeBodyOf(row, rows, tEnd)
+      : row.segments.filter((segment) => segment.kind !== "waiting" && segment.kind !== "backoff"))
     .map((segment) => [Math.max(t0, segment.start), Math.min(tEnd, segment.end)] as const)
     .filter(([start, end]) => end >= start)
     .sort((left, right) => left[0] - right[0]);
@@ -542,7 +593,7 @@ function errorCode(error?: RawError): string {
 
 function noteOf(row: StepRow, nowMs: number): string {
   const duration = (row.end ?? nowMs) - row.start;
-  if (row.isGroup) return row.end === undefined ? `running for ${formatSpan(duration)}…` : formatSpan(duration);
+  if (row.isGroup && row.attempts.length === 1 && (row.state === "completed" || row.state === "running")) return row.end === undefined ? `running for ${formatSpan(duration)}…` : formatSpan(duration);
   if (row.state === "waiting") return `waiting for ${formatSpan(duration)}…`;
   if (row.state === "scheduled") return `waiting to start for ${formatSpan(duration)}…`;
   if (row.attempts.length > 1 || row.state === "retrying") {
@@ -577,7 +628,7 @@ function noteOf(row: StepRow, nowMs: number): string {
 function detailOf(row: StepRow, nowMs: number): string {
   const duration = formatSpan((row.end ?? nowMs) - row.start);
   const events = row.listensTo.join(" or ");
-  if (row.isGroup) {
+  if (row.isGroup && row.attempts.length === 1 && (row.state === "completed" || row.state === "running")) {
     return row.end === undefined
       ? `Runs the tasks inside it. Started ${duration} ago.`
       : `Ran the tasks inside it. Finished after ${duration}.`;

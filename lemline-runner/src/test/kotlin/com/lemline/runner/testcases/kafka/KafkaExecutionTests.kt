@@ -4,6 +4,7 @@ package com.lemline.runner.testcases.kafka
 import com.lemline.core.testcases.CallFunctionTestCases
 import com.lemline.core.testcases.CallHttpTestCases
 import com.lemline.core.testcases.DoTaskTestCases
+import com.lemline.core.testcases.ExtensionTaskTestCases
 import com.lemline.core.testcases.ExportContextTestCases
 import com.lemline.core.testcases.ForTaskTestCases
 import com.lemline.core.testcases.ForkTaskTestCases
@@ -108,3 +109,8 @@ internal class KafkaWaitExecutionTest : BrokerWorkflowTest(WaitTestCases.cases)
 @QuarkusTest
 @TestProfile(KafkaTestCaseProfile::class)
 internal class KafkaListenExecutionTest : BrokerWorkflowTest(ListenTestCases.cases)
+
+@RequiresDocker
+@QuarkusTest
+@TestProfile(KafkaTestCaseProfile::class)
+internal class KafkaExtensionExecutionTest : BrokerWorkflowTest(ExtensionTaskTestCases.cases)

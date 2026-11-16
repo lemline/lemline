@@ -39,7 +39,7 @@ data class ListenerQueryKey(
 
         // For function listen tasks, use suffix matching (position ends with the function path)
         val positionCondition = if (isFromFunction) {
-            "$prefix${WORKFLOW_POSITION_COLUMN} LIKE ?"
+            "$prefix${WORKFLOW_POSITION_COLUMN} LIKE ? ESCAPE '!'"
         } else {
             "$prefix${WORKFLOW_POSITION_COLUMN} = ?"
         }
@@ -72,7 +72,7 @@ data class ListenerQueryKey(
         stmt.setString(idx++, workflowInfo.version.toString())
         // For function listen tasks, use LIKE pattern: %/_fn/do/0/waitForEvent
         val positionValue = if (isFromFunction) {
-            "%" + position.toString()
+            "%" + position.toString().replace("!", "!!").replace("%", "!%").replace("_", "!_")
         } else {
             position.toString()
         }
@@ -89,7 +89,8 @@ data class ListenerQueryKey(
         val receiptCondition = if (deliveryToken != null) {
             " AND EXISTS (SELECT 1 FROM lemline_listener_receipts r WHERE r.listener_id = ${prefix}id AND r.delivery_token = ?)"
         } else ""
-        return "($prefix$WORKFLOW_NAMESPACE_COLUMN = ? AND $prefix$WORKFLOW_NAME_COLUMN = ? AND $prefix$WORKFLOW_VERSION_COLUMN = ? AND $prefix${WORKFLOW_POSITION_COLUMN} = ?$receiptCondition)"
+        val positionCondition = if (isFromFunction) "$prefix${WORKFLOW_POSITION_COLUMN} LIKE ? ESCAPE '!'" else "$prefix${WORKFLOW_POSITION_COLUMN} = ?"
+        return "($prefix$WORKFLOW_NAMESPACE_COLUMN = ? AND $prefix$WORKFLOW_NAME_COLUMN = ? AND $prefix$WORKFLOW_VERSION_COLUMN = ? AND $positionCondition$receiptCondition)"
     }
 
     fun bindParametersWithoutCorrelation(stmt: PreparedStatement, startIndex: Int): Int {
@@ -97,7 +98,7 @@ data class ListenerQueryKey(
         stmt.setString(idx++, workflowInfo.namespace.toString())
         stmt.setString(idx++, workflowInfo.name.toString())
         stmt.setString(idx++, workflowInfo.version.toString())
-        stmt.setString(idx++, position.toString())
+        stmt.setString(idx++, if (isFromFunction) "%" + position.toString().replace("!", "!!").replace("%", "!%").replace("_", "!_") else position.toString())
         if (deliveryToken != null) stmt.setString(idx++, deliveryToken)
         return idx
     }

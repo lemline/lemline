@@ -132,6 +132,33 @@ class InstanceMessageCodecTest {
         assertEquals(state, decoded)
     }
 
+
+    @Test
+    fun `extension continuation and return survive transport and durable storage`() {
+        val extension = com.lemline.core.states.ExtensionExecutionState(
+            selectedExtensionIndices = listOf(0),
+            phase = com.lemline.core.states.ExtensionPhase.AFTER,
+            activeExtensionIndex = 0,
+            rawInput = kotlinx.serialization.json.JsonNull,
+            transformedInput = JsonPrimitive("input"),
+            preparedResult = com.lemline.core.states.PreparedTaskResult(
+                kotlinx.serialization.json.JsonNull, JsonPrimitive("prepared"), com.lemline.core.tasks.FlowDirectiveGoto("nextTask")),
+        )
+        val event = WorkflowEvent.TaskScheduled(
+            nodeStack = nodeStack().withExtension(extension), nodePosition = taskPosition,
+            rawInput = kotlinx.serialization.json.JsonNull, flowDirective = null,
+            extensionReturn = com.lemline.core.states.ExtensionReturn(
+                NodePosition("$taskPosition/_ext/0/after/do"), com.lemline.core.states.ExtensionReturnKind.COMPLETE),
+        )
+        for (state in listOf(event, event.resume())) {
+            val message = InstanceMessage(workflowInfo, state)
+            assertEquals(message, InstanceMessageCodec.fromTransportPayload(InstanceMessageCodec.toTransportPayload(message)))
+            val stored = InstanceMessageCodec.workflowStateToDbJson(state)
+            assertTrue(stored.startsWith("pb64:"))
+            assertEquals(state, InstanceMessageCodec.workflowStateFromDbJson(stored))
+        }
+    }
+
     private fun commandMessage(): InstanceMessage<WorkflowCommand> =
         InstanceMessage(
             workflowInfo = workflowInfo,

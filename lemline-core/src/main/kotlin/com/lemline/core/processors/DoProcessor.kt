@@ -6,7 +6,7 @@ import com.lemline.core.processors.scope.Scope
 import com.lemline.core.states.DoState
 import com.lemline.core.workflows.doBlock
 import io.serverlessworkflow.api.types.DoTask
-import kotlin.time.Clock
+import kotlin.time.Instant
 import kotlinx.serialization.json.JsonElement
 
 /**
@@ -43,8 +43,8 @@ class DoProcessor(
     node: Node<DoTask>
 ) : AbstractProcessor<DoTask, DoState>(node) {
 
-    override fun stateWhenEnteringFromParent(transformedInput: JsonElement, scope: Scope): DoState = DoState(
-        startedAt = Clock.System.now(),
+    override fun stateWhenEnteringFromParent(transformedInput: JsonElement, scope: Scope, startedAt: Instant): DoState = DoState(
+        startedAt = startedAt,
         index = 0  // Start at first child
     )
 

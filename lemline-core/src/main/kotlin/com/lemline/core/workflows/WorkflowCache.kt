@@ -12,9 +12,10 @@ import com.lemline.common.values.info
 import com.lemline.common.values.name
 import com.lemline.common.values.namespace
 import com.lemline.common.values.version
-import com.lemline.core.functions.FunctionCache
 import com.lemline.core.expressions.EvaluationMode
+import com.lemline.core.functions.FunctionCache
 import com.lemline.core.nodes.Node
+import com.lemline.core.nodes.NodeOrigin
 import com.lemline.core.nodes.RootTask
 import com.lemline.core.processors.ListenStrategy
 import io.serverlessworkflow.api.WorkflowFormat
@@ -23,6 +24,7 @@ import io.serverlessworkflow.api.types.ListenTask
 import io.serverlessworkflow.api.types.ListenTaskConfiguration
 import io.serverlessworkflow.api.types.Task
 import io.serverlessworkflow.api.types.Workflow
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.JsonObject
 import org.jetbrains.annotations.TestOnly
@@ -60,6 +62,10 @@ object WorkflowCache {
         val schedule: CachedEventSchedule?,
         val source: String?,
     ) {
+        val functions = java.util.concurrent.ConcurrentHashMap<Pair<String, Boolean>, Pair<Task, Map<NodePosition, Node<*>>>>()
+        val namedFunctionNodes by lazy {
+            workflow.useFunctions.orEmpty().mapValues { (_, task) -> FunctionCache.buildFunctionNodesMap(task, workflow.use) }
+        }
         val definitionJson: JsonObject by lazy { LemlineJson.encodeToElement(workflow) }
     }
 
@@ -251,9 +257,18 @@ object WorkflowCache {
     @JvmStatic
     fun getNodesMap(
         workflow: Workflow
-    ): Map<NodePosition, Node<*>> = current.entries[workflow.info]?.nodes
+    ): Map<NodePosition, Node<*>> = current.entries[workflow.info]?.takeIf { it.workflow === workflow }?.nodes
         ?: throw IllegalStateException("Workflow not found in cache for ${workflow.info}")
 
+
+    internal fun functionNodes(workflow: Workflow, task: Task, reference: String, suppressed: Boolean): Map<NodePosition, Node<*>> {
+        val entry = current.entries[workflow.info]?.takeIf { it.workflow === workflow }
+            ?: error("Workflow definition is no longer cached: ${workflow.info}")
+        return entry.functions.compute(reference to suppressed) { _, previous ->
+            previous?.takeIf { it.first === task }
+                ?: (task to FunctionCache.buildFunctionNodesMap(task, workflow.use, suppressed))
+        }!!.second
+    }
 
     /**
      * Retrieves the root node of the given workflow. The root node represents
@@ -268,8 +283,7 @@ object WorkflowCache {
     fun getRootNode(
         workflow: Workflow
     ): Node<RootTask> {
-        val nodesMap = current.entries[workflow.info]?.nodes
-            ?: throw IllegalStateException("Nodes map not found in cache for ${workflow.info}")
+        val nodesMap = getNodesMap(workflow)
 
         val rootNode = nodesMap[NodePosition.root]
             ?: throw IllegalStateException("Root node not found in nodes for ${workflow.info}")
@@ -315,7 +329,7 @@ object WorkflowCache {
      * @return A list of all cached listen tasks.
      */
     @JvmStatic
-    fun getAllListenTasks(): List<CachedListenTask> = current.entries.values.flatMap { it.listens }
+    fun getAllListenTasks(): List<CachedListenTask> = current.entries.keys.flatMap(::getListenTasks)
 
     /**
      * Returns cached listen tasks for a specific workflow.
@@ -325,7 +339,14 @@ object WorkflowCache {
      */
     @JvmStatic
     fun getListenTasks(workflowInfo: WorkflowInfo): List<CachedListenTask> =
-        current.entries[workflowInfo]?.listens ?: emptyList()
+        current.entries[workflowInfo]?.let { entry ->
+            entry.listens + entry.functions.entries.flatMap { (key, value) ->
+                val mode = (entry.workflow as? EvaluatedWorkflow)?.evaluationMode ?: EvaluationMode.STRICT
+                value.second.mapNotNull { (position, node) ->
+                    extractListenTaskFromNode(workflowInfo, functionListenPosition(key.first, position), node, mode, false)
+                }
+            }
+        }?.distinctBy { Triple(it.nodePosition, it.isFromFunction, it.consumption) } ?: emptyList()
 
     /**
      * Extracts listen tasks from a workflow's nodes map and its function definitions.
@@ -346,9 +367,13 @@ object WorkflowCache {
         }
 
         // Extract from functions in use.functions
-        workflow.useFunctions?.forEach { (_, functionTask) ->
-            extractListenTasksFromFunction(workflowInfo, functionTask, mode)
-                .forEach { listenTasks.add(it) }
+        workflow.useFunctions?.forEach { (reference, functionTask) ->
+            val nodes = FunctionCache.buildFunctionNodesMap(functionTask, workflow.use)
+            for ((position, node) in nodes) {
+                extractListenTaskFromNode(workflowInfo, functionListenPosition(reference, position), node, mode, isFromFunction = false)?.let(listenTasks::add)
+                // Keep routing pre-upgrade registrations stored at their execution positions.
+                extractListenTaskFromNode(workflowInfo, position, node, mode, isFromFunction = true)?.let(listenTasks::add)
+            }
         }
 
         return listenTasks
@@ -383,25 +408,51 @@ object WorkflowCache {
         )
     }
 
-    /**
-     * Extracts listen tasks from a function's task tree.
-     * Uses FunctionCache to build the function's node tree and then extracts any listen tasks.
-     */
-    private fun extractListenTasksFromFunction(
-        workflowInfo: WorkflowInfo,
-        functionTask: Task,
-        mode: EvaluationMode,
-    ): List<CachedListenTask> {
-        // Build function nodes map using FunctionCache
-        val functionNodesMap = FunctionCache.getOrBuild(
-            task = functionTask,
-            functionRef = "inline",  // ref doesn't matter for extraction
-            parentWorkflowInfo = workflowInfo
-        )
-
-        return functionNodesMap.mapNotNull { (position, node) ->
-            extractListenTaskFromNode(workflowInfo, position, node, mode, isFromFunction = true)
+    /** No remote I/O during parsing. Only active function registrations trigger filter hydration. */
+    fun requiresFunctionListenerRefresh(namespace: WorkflowNamespace): Boolean = current.entries.values
+        .filter { it.workflow.info.namespace == namespace }.any { entry ->
+            val nodes = entry.nodes.values + entry.namedFunctionNodes.values.flatMap { it.values } +
+                entry.functions.values.flatMap { it.second.values }
+            nodes.any { node ->
+                val reference = (node.task as? CallFunction)?.call
+                reference != null && reference !in entry.workflow.useFunctions.orEmpty() &&
+                    !entry.functions.containsKey(reference to false)
+            }
         }
+
+    suspend fun loadFunctionListeners(info: WorkflowInfo, reference: String, resolver: suspend (String) -> Task) {
+        val entry = current.entries[info] ?: return
+        // Only the unsuppressed tree carries extension listeners; a suppressed one does not stand in for it.
+        if (entry.functions.containsKey(reference to false)) return
+        val task = entry.workflow.useFunctions?.get(reference) ?: resolver(reference)
+        // A definition replaced during remote resolution must not receive stale templates.
+        if (current.entries[info] === entry) functionNodes(entry.workflow, task, reference, false)
+    }
+
+    fun functionReference(position: NodePosition): String? = position.toString().takeIf { it.startsWith("/_fn/") }
+        ?.removePrefix("/_fn/")?.substringBefore('/')?.replace("~1", "/")?.replace("~0", "~")
+
+    /** Stable filter identity; execution positions remain in the serialized message. */
+    private fun functionListenPosition(reference: String, relative: NodePosition) = NodePosition(
+        "/_fn/" + reference.replace("~", "~0").replace("/", "~1") + relative.toString().removePrefix("/_fn")
+    )
+
+    fun listenPosition(info: WorkflowInfo, runtime: NodePosition): NodePosition {
+        val entry = current.entries[info] ?: return runtime
+        val path = runtime.toString()
+        val boundary = path.lastIndexOf("/_fn/")
+        if (boundary < 0) return runtime
+        val caller = entry.workflow.getNode(NodePosition(path.substring(0, boundary))) { reference ->
+            entry.functions.entries.firstOrNull { it.key.first == reference }?.value?.first
+                ?: error("Function '$reference' is not loaded for $info")
+        }
+        val reference = (caller.task as CallFunction).call
+        return functionListenPosition(reference, NodePosition(path.substring(boundary)))
+    }
+
+    fun getListenTask(info: WorkflowInfo, runtime: NodePosition): CachedListenTask? {
+        val position = listenPosition(info, runtime)
+        return getListenTasks(info).firstOrNull { !it.isFromFunction && it.nodePosition == position }
     }
 
     @TestOnly
@@ -409,6 +460,8 @@ object WorkflowCache {
         synchronized(this) { current = Snapshot(emptyMap()) }
     }
 }
+
+internal class NodeResolutionException(val caller: Node<*>, val failure: Exception) : RuntimeException(failure)
 
 /**
  * Retrieves a node from the workflow based on its position.
@@ -497,14 +550,14 @@ private fun Workflow.resolveNodeThroughFunctions(
         val functionRef = currentParent.task.call
 
         // Resolve the function task
-        val functionTask = this.useFunctions?.get(functionRef) ?: runBlocking { functionResolver(functionRef) }
-
-        // Get or build the function's node tree
-        val functionNodesMap = FunctionCache.getOrBuild(
-            task = functionTask,
-            functionRef = functionRef,
-            parentWorkflowInfo = this.info
-        )
+        val functionNodesMap = try {
+            val functionTask = this.useFunctions?.get(functionRef) ?: runBlocking { functionResolver(functionRef) }
+            WorkflowCache.functionNodes(this, functionTask, functionRef, currentParent.extensionOwner != null)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            throw NodeResolutionException(currentParent, e)
+        }
 
         // Find the next _fn boundary (or end of path)
         val afterFn = remainingPath.substring(fnToken.length) // Skip the /_fn prefix
@@ -589,7 +642,8 @@ private fun buildParentChain(
                 position = fullPosition,
                 task = cachedNode.task,
                 name = cachedNode.name,
-                parent = currentNode
+                parent = currentNode,
+                origin = if (callFunctionNode.extensionOwner != null) NodeOrigin.EXTENSION_DESCENDANT else cachedNode.origin,
             )
         }
     }

@@ -11,6 +11,7 @@ import com.lemline.core.states.RunState
 import com.lemline.core.states.WorkflowEvent
 import com.lemline.core.states.WorkflowEvent.RunWorkflowStarted
 import io.serverlessworkflow.api.types.RunTask
+import kotlin.time.Instant
 import kotlinx.serialization.json.JsonElement
 
 /**
@@ -56,7 +57,7 @@ class RunWorkflowProcessor(
     node: Node<RunTask>,
 ) : AbstractProcessor<RunTask, RunState>(node) {
     override val isAsync = true
-    override fun stateWhenEnteringFromParent(transformedInput: JsonElement, scope: Scope) = RunState()
+    override fun stateWhenEnteringFromParent(transformedInput: JsonElement, scope: Scope, startedAt: Instant) = RunState(startedAt = startedAt)
 
     /**
      * Prepares and handles the event for starting a sub-workflow.

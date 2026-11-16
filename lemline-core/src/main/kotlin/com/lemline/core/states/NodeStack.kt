@@ -21,7 +21,8 @@ import org.jetbrains.annotations.TestOnly
 data class StackFrame(
     val position: NodePosition,
     val state: NodeState,
-    val counter: Int = 0
+    val counter: Int = 0,
+    val extension: ExtensionExecutionState? = null,
 ) {
     fun increment() = copy(counter = counter + 1)
     fun decrement() = copy(counter = counter - 1)
@@ -121,6 +122,11 @@ class NodeStack internal constructor(
     /** Update the current (top) state in the stack.*/
     fun updateTopState(newState: NodeState): NodeStack =
         NodeStack(frames.dropLast(1) + frames.last().copy(state = newState))
+
+    fun withExtension(extension: ExtensionExecutionState?): NodeStack =
+        NodeStack(frames.dropLast(1) + frames.last().copy(extension = extension))
+
+    val currentExtension: ExtensionExecutionState? get() = frames.last().extension
 
     private fun indexOfFirst(position: NodePosition): Int {
         val index = frames.indexOfFirst { it.position == position }

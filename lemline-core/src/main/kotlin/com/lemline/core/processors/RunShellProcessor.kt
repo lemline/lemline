@@ -10,6 +10,7 @@ import com.lemline.core.states.WorkflowEvent
 import com.lemline.core.states.WorkflowEvent.RunShellStarted
 import io.serverlessworkflow.api.types.RunTask
 import io.serverlessworkflow.api.types.RunTaskConfiguration.ProcessReturnType
+import kotlin.time.Instant
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonPrimitive
 
@@ -58,7 +59,7 @@ class RunShellProcessor(
 
     override val isAsync = true
 
-    override fun stateWhenEnteringFromParent(transformedInput: JsonElement, scope: Scope): RunState = RunState()
+    override fun stateWhenEnteringFromParent(transformedInput: JsonElement, scope: Scope, startedAt: Instant): RunState = RunState(startedAt = startedAt)
 
     /**
      * Build the shell command execution configuration.

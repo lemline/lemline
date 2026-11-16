@@ -7,6 +7,7 @@ import com.lemline.common.values.WorkflowName
 import com.lemline.common.values.WorkflowNamespace
 import com.lemline.common.values.WorkflowVersion
 import com.lemline.core.activities.mock.MockConfiguration
+import com.lemline.core.functions.FunctionCache
 import com.lemline.core.lifecycleevents.LifecycleEventHook
 import com.lemline.core.states.WorkflowCommand
 import com.lemline.core.testcases.impl.WorkflowDependency
@@ -16,6 +17,7 @@ import com.lemline.core.workflows.WorkflowCache
 import com.lemline.runner.common.activities.TestModeConfiguration
 import com.lemline.runner.common.messaging.InstanceMessage
 import com.lemline.runner.config.DatabaseManager
+import com.lemline.runner.definitions.DefinitionCacheSync
 import com.lemline.runner.definitions.DefinitionModel
 import com.lemline.runner.definitions.DefinitionRepository
 import com.lemline.runner.listeners.ListenerRepository
@@ -23,6 +25,7 @@ import com.lemline.runner.starters.Starter
 import com.lemline.runner.testcases.AnalyticsWorkflowResultAwaiter
 import io.cloudevents.CloudEvent
 import io.cloudevents.jackson.JsonFormat
+import jakarta.inject.Inject
 import java.util.concurrent.TimeoutException
 import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.delay
@@ -60,6 +63,9 @@ internal abstract class AbstractWorkflowTestExecutor : WorkflowTestExecutor {
     protected abstract val lifecycleHook: LifecycleEventHook
     protected abstract val listenerRepository: ListenerRepository
     protected abstract val testModeConfiguration: TestModeConfiguration
+
+    @Inject
+    lateinit var definitionCacheSync: DefinitionCacheSync
 
     /** Default timeout for workflow completion in seconds (configurable via system property) */
     protected open val defaultTimeoutSeconds: Long by lazy {
@@ -133,6 +139,8 @@ internal abstract class AbstractWorkflowTestExecutor : WorkflowTestExecutor {
         mockConfig: MockConfiguration,
         cloudEvents: List<CloudEvent>,
         validateDefinition: Boolean,
+        validateLifecycleEvents: ((List<CloudEvent>) -> String?)?,
+        rebuildCachesOnListen: Boolean,
     ): WorkflowTestResult {
         val uniqueName = "workflow-${yaml.hashCode()}"
         val workflowId = WorkflowId.random()
@@ -144,11 +152,15 @@ internal abstract class AbstractWorkflowTestExecutor : WorkflowTestExecutor {
 
             prepareAndStartWorkflow(workflowId, namespace, uniqueName, version, input)
 
-            if (cloudEvents.isNotEmpty()) {
-                executeWithCloudEvents(workflowId, cloudEvents, namespace)
+            val result = if (cloudEvents.isNotEmpty()) {
+                executeWithCloudEvents(workflowId, cloudEvents, namespace, rebuildCachesOnListen)
             } else {
                 awaitCompletion(workflowId, timeoutSeconds = defaultTimeoutSeconds)
             }
+            validateLifecycleEvents?.let {
+                workflowResultAwaiter.validateLifecycleEvents(workflowId, it, defaultTimeoutSeconds.seconds)
+            }
+            result
         } catch (e: Exception) {
             WorkflowTestResult.Failure(
                 error = e.message ?: e::class.simpleName ?: "Unknown error",
@@ -195,7 +207,8 @@ internal abstract class AbstractWorkflowTestExecutor : WorkflowTestExecutor {
     private suspend fun executeWithCloudEvents(
         workflowId: WorkflowId,
         cloudEvents: List<CloudEvent>,
-        namespace: String
+        namespace: String,
+        rebuildCachesOnListen: Boolean
     ): WorkflowTestResult {
         val listenerFound = waitForListenerRegistration(workflowId)
         if (!listenerFound) {
@@ -206,6 +219,13 @@ internal abstract class AbstractWorkflowTestExecutor : WorkflowTestExecutor {
         }
 
         onListenerRegistered()
+        if (rebuildCachesOnListen) {
+            WorkflowCache.clear()
+            FunctionCache.clear()
+            // A fresh worker loads its persisted catalog before consuming CloudEvents.
+            // Clearing a live worker's cache alone leaves its startup guard initialized.
+            definitionCacheSync.refresh()
+        }
         sendCloudEvents(cloudEvents, namespace)
         onCloudEventsSent()
 

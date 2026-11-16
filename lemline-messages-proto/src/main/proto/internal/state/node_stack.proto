@@ -3,6 +3,7 @@ syntax = "proto3";
 package lemline.internal.v1;
 
 import "internal/state/node_state.proto";
+import "internal/state/extensions.proto";
 
 option java_multiple_files = true;
 option java_package = "com.lemline.messages.internal.v1";
@@ -15,4 +16,5 @@ message StackFrameProto {
     string position = 1;
     NodeStateProto state = 2;
     int32 counter = 3;
+    ExtensionExecutionStateProto extension = 4;
 }

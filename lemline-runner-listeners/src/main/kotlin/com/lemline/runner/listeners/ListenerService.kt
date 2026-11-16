@@ -6,11 +6,14 @@ import com.lemline.common.json.LemlineJson
 import com.lemline.common.logger.logger
 import com.lemline.common.values.IDV7
 import com.lemline.core.expressions.JQExpression
+import com.lemline.core.functions.FunctionResolver
 import com.lemline.core.processors.ListenConfig
 import com.lemline.core.processors.UntilCondition
 import com.lemline.core.states.NodeStack
 import com.lemline.core.states.WorkflowEvent
 import com.lemline.core.workflows.WorkflowCache
+import com.lemline.core.workflows.WorkflowCache.getWorkflow
+import com.lemline.core.workflows.getNode
 import com.lemline.runner.common.messaging.InstanceMessage
 import io.serverlessworkflow.impl.expressions.ExpressionUtils
 import jakarta.enterprise.context.ApplicationScoped
@@ -35,6 +38,9 @@ class ListenerService {
 
     @Inject
     lateinit var listenerRepository: ListenerRepository
+
+    @Inject
+    lateinit var functionResolver: FunctionResolver
 
     private val logger = logger()
 
@@ -63,17 +69,10 @@ class ListenerService {
         // Set totalFilters (enables direct UPDATE optimization)
         listener.filtersCount = config.filters.size
 
-        // Lookup hasForeach and until configuration from cached workflow definition
-        // For function listen tasks, use suffix matching since the cached position (/_fn/do/0/task)
-        // differs from the runtime position (/do/0/call/_fn/do/0/task)
-        val listenTask = WorkflowCache.getListenTasks(instanceMessage.workflowInfo).find {
-            if (it.isFromFunction) {
-                // Suffix match: /do/0/call/_fn/do/0/task ends with /_fn/do/0/task
-                listenStarted.nodePosition.toString().endsWith(it.nodePosition.toString())
-            } else {
-                it.nodePosition == listenStarted.nodePosition
-            }
-        }
+        // The events worker may differ from the worker that executed the function.
+        instanceMessage.workflowInfo.getWorkflow()?.getNode(listenStarted.nodePosition) { functionResolver.resolve(it) }
+        listener.filterPosition = WorkflowCache.listenPosition(instanceMessage.workflowInfo, listenStarted.nodePosition)
+        val listenTask = WorkflowCache.getListenTask(instanceMessage.workflowInfo, listenStarted.nodePosition)
         listener.hasForeach = listenTask?.hasForeach ?: false
 
         // Store until configuration for expression evaluation

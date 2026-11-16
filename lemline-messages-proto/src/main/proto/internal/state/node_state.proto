@@ -18,7 +18,12 @@ message NodeStateProto {
         TaskStateProto task_state = 5;
         CallFunctionStateProto call_function_state = 6;
         TryStateProto try_state = 7;
+        PendingTaskStateProto pending_task_state = 8;
     }
+}
+
+message PendingTaskStateProto {
+    google.protobuf.Timestamp started_at = 1;
 }
 
 message RootStateProto {

@@ -10,6 +10,7 @@ import com.lemline.core.processors.UntilCondition
 import com.lemline.core.states.ForeachState
 import com.lemline.core.states.WorkflowEvent
 import com.lemline.core.workflows.EventConsumptionProgress
+import com.lemline.core.workflows.WorkflowCache
 import com.lemline.runner.common.config.DatabaseConfig
 import com.lemline.runner.common.messaging.InstanceMessage
 import io.cloudevents.CloudEvent
@@ -86,6 +87,12 @@ class ListenerEventService {
         // use a lazy provider to parse data only if needed, and only once
         val eventDataProvider: () -> JsonElement = {
             eventData ?: CloudEventService.parseData(event).also { eventData = it }
+        }
+
+        // Rebuild only filters of already registered remote functions on a fresh worker.
+        // Ordinary definitions retain the in-memory matching path.
+        if (WorkflowCache.requiresFunctionListenerRefresh(arrivalNamespace)) {
+            definitionListenService.prepareFunctionListeners(arrivalNamespace)
         }
 
         // No database requests are done here, we just inspect the workflow definition.

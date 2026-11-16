@@ -7,6 +7,7 @@ import com.lemline.core.states.ForkState
 import com.lemline.core.states.NodeStack
 import com.lemline.core.states.WorkflowEvent.ForkStarted
 import io.serverlessworkflow.api.types.ForkTask
+import kotlin.time.Instant
 import kotlinx.serialization.json.JsonElement
 
 /**
@@ -51,7 +52,7 @@ class ForkProcessor(
 
     override val isAsync = true
 
-    override fun stateWhenEnteringFromParent(transformedInput: JsonElement, scope: Scope) = ForkState()
+    override fun stateWhenEnteringFromParent(transformedInput: JsonElement, scope: Scope, startedAt: Instant) = ForkState(startedAt = startedAt)
 
     override fun startedEvent(
         nodeStack: NodeStack,

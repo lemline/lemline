@@ -7,6 +7,7 @@ import com.lemline.core.processors.scope.Scope
 import com.lemline.core.states.SetState
 import io.serverlessworkflow.api.types.SetTask
 import io.serverlessworkflow.api.types.SetTaskConfiguration
+import kotlin.time.Instant
 import kotlinx.serialization.json.JsonElement
 
 /**
@@ -48,7 +49,7 @@ class SetProcessor(
     node: Node<SetTask>,
 ) : AbstractProcessor<SetTask, SetState>(node) {
 
-    override fun stateWhenEnteringFromParent(transformedInput: JsonElement, scope: Scope) = SetState()
+    override fun stateWhenEnteringFromParent(transformedInput: JsonElement, scope: Scope, startedAt: Instant) = SetState(startedAt = startedAt)
 
     /**
      * Execute SetTask action.

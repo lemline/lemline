@@ -10,17 +10,25 @@ import com.lemline.core.errors.InternalException
 import com.lemline.core.errors.WorkflowErrorType
 import com.lemline.core.errors.WorkflowErrorType.EXPRESSION
 import com.lemline.core.errors.WorkflowErrorType.VALIDATION
+import com.lemline.core.errors.withExecutionStack
 import com.lemline.core.expressions.JQExpression
+import com.lemline.core.extensions.ExtensionController
 import com.lemline.core.lifecycleevents.LifecycleEventHook
 import com.lemline.core.nodes.ForeachTask
 import com.lemline.core.nodes.Node
+import com.lemline.core.nodes.NodeOrigin
 import com.lemline.core.nodes.RootTask
 import com.lemline.core.processors.scope.Scope
+import com.lemline.core.processors.scope.taskScope
 import com.lemline.core.processors.scope.withRawOutput
-import com.lemline.core.processors.scope.withTask
 import com.lemline.core.processors.scope.withTransformedInput
 import com.lemline.core.processors.scope.withTransformedOutput
 import com.lemline.core.schemas.SchemaValidator
+import com.lemline.core.states.ExtensionPhase
+import com.lemline.core.states.ExtensionReturn
+import com.lemline.core.states.ExtensionReturnKind
+import com.lemline.core.states.PendingTaskState
+import com.lemline.core.states.PreparedTaskResult
 import com.lemline.core.states.NodeStack
 import com.lemline.core.states.NodeState
 import com.lemline.core.states.WorkflowEvent
@@ -28,6 +36,7 @@ import com.lemline.core.states.WorkflowEvent.ForEachCompleted
 import com.lemline.core.states.WorkflowEvent.ForkBranchCompleted
 import com.lemline.core.states.WorkflowEvent.TaskScheduled
 import com.lemline.core.states.WorkflowEvent.WorkflowCompleted
+import com.lemline.core.tasks.toJava
 import com.lemline.core.tasks.toKotlin
 import com.lemline.core.workflows.branches
 import io.serverlessworkflow.api.types.ExportAs
@@ -41,6 +50,7 @@ import io.serverlessworkflow.api.types.SubflowInput
 import io.serverlessworkflow.api.types.TaskBase
 import io.serverlessworkflow.api.types.Use
 import kotlin.time.Clock
+import kotlin.time.Instant
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
@@ -61,7 +71,7 @@ abstract class AbstractProcessor<T : TaskBase, S : NodeState>(
      * Create the initial state for this node.
      * Subclasses override to create their specific state type.
      */
-    abstract fun stateWhenEnteringFromParent(transformedInput: JsonElement, scope: Scope): S
+    abstract fun stateWhenEnteringFromParent(transformedInput: JsonElement, scope: Scope, startedAt: Instant = Clock.System.now()): S
 
     /** Execute node action (for activity tasks).*/
     open suspend fun execute(
@@ -133,10 +143,7 @@ abstract class AbstractProcessor<T : TaskBase, S : NodeState>(
         val startedAt = Clock.System.now()
 
         // Get current scope from states
-        var scope = nodeStack.stateScope
-
-        // create a mutable local task context
-        scope = scope.withTask(node, startedAt, rawInput)
+        var scope = nodeStack.taskScope(node, startedAt, rawInput)
 
         // if this node is conditional, check if it should be executed, if not return to parent
         if (!checkIf(rawInput, scope)) {
@@ -163,12 +170,27 @@ abstract class AbstractProcessor<T : TaskBase, S : NodeState>(
         // Update context with transformed input
         scope = scope.withTransformedInput(transformedInput)
 
-        val nodeState = stateWhenEnteringFromParent(transformedInput, scope)
-
+        if (node.extensions.isNotEmpty()) {
+            val pending = nodeStack.push(node.position, PendingTaskState(startedAt))
+            return withExecutionStack(pending) {
+                val selected = node.extensions.filter { plan ->
+                    plan.condition?.let { condition ->
+                        try {
+                            evalBoolean(transformedInput, condition, "use.extensions[${plan.index}].${plan.name}.when", scope)
+                        } catch (e: InternalException) {
+                            throw InternalException(e.error.copy(title = "Extension '${plan.name}' when: ${e.error.title}"))
+                        }
+                    } ?: true
+                }
+                val continuation = ExtensionController.start(selected, rawInput, transformedInput)
+                continueExtension(pending.withExtension(continuation), workflowInfo, lifecycleHook)
+            }
+        }
+        val nodeState = stateWhenEnteringFromParent(transformedInput, scope, startedAt)
         val updatedStack = nodeStack.push(node.position, nodeState)
-
-        // get the next node and an updated state for the current node
-        return continueTo(updatedStack, workflowInfo, transformedInput, scope, lifecycleHook)
+        return withExecutionStack(updatedStack) {
+            continueTo(updatedStack, workflowInfo, transformedInput, scope, lifecycleHook)
+        }
     }
 
     // ========================================
@@ -188,7 +210,31 @@ abstract class AbstractProcessor<T : TaskBase, S : NodeState>(
         output: JsonElement,
         flowDirective: FlowDirective?,
         lifecycleHook: LifecycleEventHook,
+        extensionReturn: ExtensionReturn? = null,
     ): WorkflowEvent {
+        if (extensionReturn != null) {
+            ExtensionController.validateReturn(node, nodeStack.last(), extensionReturn)
+            val continuation = nodeStack.currentExtension!!
+            if (extensionReturn.kind == ExtensionReturnKind.END) return continueToEnd(nodeStack, workflowInfo, output, lifecycleHook)
+            return when (continuation.phase) {
+                ExtensionPhase.BEFORE -> if (extensionReturn.kind == ExtensionReturnKind.EXIT) {
+                    completeTask(output, getFlowDirective(), nodeStack.taskScope(node), nodeStack, workflowInfo, lifecycleHook, shortCircuit = true)
+                } else {
+                    continueExtension(nodeStack.withExtension(ExtensionController.afterBefore(node, continuation)), workflowInfo, lifecycleHook)
+                }
+                ExtensionPhase.AFTER -> continueExtension(
+                    nodeStack.withExtension(ExtensionController.afterAfter(node, continuation, extensionReturn.kind == ExtensionReturnKind.EXIT)), workflowInfo, lifecycleHook
+                )
+                else -> error("Unexpected extension return in ${continuation.phase}")
+            }
+        }
+        require(nodeStack.currentState !is PendingTaskState && (nodeStack.currentExtension == null || nodeStack.currentExtension?.phase == ExtensionPhase.BODY)) {
+            "Expected extension return at ${node.position}"
+        }
+        // Only the top-level synthetic block exports control to its owner.
+        if (node.origin == NodeOrigin.EXTENSION_BLOCK && flowDirective?.get() in listOf(FlowDirectiveEnum.EXIT, FlowDirectiveEnum.END)) {
+            return returnExtensionBlock(nodeStack, output, if (flowDirective?.get() == FlowDirectiveEnum.END) ExtensionReturnKind.END else ExtensionReturnKind.EXIT, workflowInfo, lifecycleHook)
+        }
         logger.debug {
             "ReEntering Up  node=${node.position} - ${node.task::class.simpleName}(input=$output${
                 flowDirective?.get()?.let { ", directive=$it" } ?: ""
@@ -196,12 +242,12 @@ abstract class AbstractProcessor<T : TaskBase, S : NodeState>(
         }
         @Suppress("UNCHECKED_CAST")
         val state = nodeStack.currentState as S
-        val scope = nodeStack.stateScope.withTask(node, state.startedAt)
+        val scope = nodeStack.taskScope(node, state.startedAt)
 
         val updatedState: S = stateWhenReEnteringFromChild(state, output, scope, flowDirective.nodeName)
         val updatedStack = nodeStack.updateTopState(updatedState).incrementTopCounter()
 
-        return when (val directive = flowDirective?.get()) {
+        return withExecutionStack(updatedStack) { when (val directive = flowDirective?.get()) {
             is FlowDirectiveEnum -> when (directive) {
                 // END: Workflow complete - recursive unwinding
                 FlowDirectiveEnum.END -> continueToEnd(
@@ -239,6 +285,40 @@ abstract class AbstractProcessor<T : TaskBase, S : NodeState>(
             )
 
             else -> throw IllegalArgumentException("Unknown flow directive: $directive")
+        } }
+    }
+
+    private suspend fun returnExtensionBlock(stack: NodeStack, output: JsonElement, kind: ExtensionReturnKind, info: WorkflowInfo, hook: LifecycleEventHook): TaskScheduled {
+        hook.onTaskCompleted(info, stack, node.position, output, Clock.System.now())
+        return TaskScheduled(
+            nodeStack = stack.pop().incrementTopCounter(),
+            nodePosition = requireNotNull(node.parent).position,
+            rawInput = output,
+            flowDirective = null,
+            extensionReturn = ExtensionReturn(node.position, kind),
+        )
+    }
+
+    private suspend fun continueExtension(stack: NodeStack, info: WorkflowInfo, hook: LifecycleEventHook): WorkflowEvent = withExecutionStack(stack) {
+        val extension = requireNotNull(stack.currentExtension)
+        when (extension.phase) {
+            ExtensionPhase.BEFORE, ExtensionPhase.AFTER -> {
+                extension.validate(stack.currentState)
+                TaskScheduled(stack, ExtensionController.block(node, extension).position,
+                    if (extension.phase == ExtensionPhase.BEFORE) extension.transformedInput else extension.preparedResult!!.transformedOutput, null)
+            }
+            ExtensionPhase.BODY -> {
+                require(stack.currentState is PendingTaskState) { "Body already initialized at ${node.position}" }
+                val scope = stack.taskScope(node).withTransformedInput(extension.transformedInput)
+                val state = stateWhenEnteringFromParent(extension.transformedInput, scope, stack.currentState.startedAt)
+                val ready = stack.updateTopState(state)
+                withExecutionStack(ready) { continueTo(ready, info, extension.transformedInput, scope, hook) }
+            }
+            ExtensionPhase.READY -> {
+                extension.validate(stack.currentState)
+                val result = requireNotNull(extension.preparedResult)
+                finalizeTask(result.transformedOutput, result.pendingFlowDirective?.toJava(), stack, info, hook)
+            }
         }
     }
 
@@ -332,7 +412,12 @@ abstract class AbstractProcessor<T : TaskBase, S : NodeState>(
         nodeStack: NodeStack,
         workflowInfo: WorkflowInfo,
         lifecycleHook: LifecycleEventHook,
+        shortCircuit: Boolean = false,
     ): WorkflowEvent {
+        val extension = nodeStack.currentExtension
+        require(extension == null || extension.phase == ExtensionPhase.BODY || (shortCircuit && extension.phase == ExtensionPhase.BEFORE)) {
+            "Unexpected completion at ${node.position} in ${extension?.phase}"
+        }
         // Update scope with raw output
         var scope = currentScope.withRawOutput(rawOutput)
 
@@ -348,6 +433,22 @@ abstract class AbstractProcessor<T : TaskBase, S : NodeState>(
         // Export to context if export.as is defined (throws ExpressionException or ValidationException)
         val exportedContext = exportToContext(transformedOutput, scope)
 
+        val updatedStack = exportedContext?.let { nodeStack.withContext(it) } ?: nodeStack
+        if (extension != null) {
+            val result = PreparedTaskResult(rawOutput, transformedOutput, currentFlowDirective?.toKotlin())
+            return continueExtension(updatedStack.withExtension(ExtensionController.prepared(node, extension, result, shortCircuit)), workflowInfo, lifecycleHook)
+        }
+        return finalizeTask(transformedOutput, currentFlowDirective, updatedStack, workflowInfo, lifecycleHook)
+    }
+
+    private suspend fun finalizeTask(
+        transformedOutput: JsonElement,
+        currentFlowDirective: FlowDirective?,
+        nodeStack: NodeStack,
+        workflowInfo: WorkflowInfo,
+        lifecycleHook: LifecycleEventHook,
+    ): WorkflowEvent {
+        if (node.origin == NodeOrigin.EXTENSION_BLOCK) return returnExtensionBlock(nodeStack, transformedOutput, ExtensionReturnKind.COMPLETE, workflowInfo, lifecycleHook)
         // Emit task completed events
         if (node.position != NodePosition.root) {
             lifecycleHook.onTaskCompleted(
@@ -361,8 +462,7 @@ abstract class AbstractProcessor<T : TaskBase, S : NodeState>(
 
         // Build the updated state stack: pop the current node's state (but never root)
         // State was pushed in enterFromParent, so it's always on the stack
-        var updatedStack = nodeStack.pop().incrementTopCounter()
-        exportedContext?.let { updatedStack = updatedStack.withContext(it) }
+        val updatedStack = nodeStack.pop().incrementTopCounter()
 
         return getNextEvent(
             nodeStack = updatedStack,

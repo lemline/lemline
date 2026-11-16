@@ -1,0 +1,49 @@
+syntax = "proto3";
+
+package lemline.internal.v1;
+
+import "google/protobuf/struct.proto";
+import "internal/common.proto";
+
+option java_multiple_files = true;
+option java_package = "com.lemline.messages.internal.v1";
+
+// The enclosing message preserves presence even when Wire maps Value to null.
+message ExtensionJsonValueProto {
+    google.protobuf.Value value = 1;
+}
+
+enum ExtensionPhaseProto {
+    EXTENSION_PHASE_PROTO_UNSPECIFIED = 0;
+    EXTENSION_PHASE_PROTO_BEFORE = 1;
+    EXTENSION_PHASE_PROTO_BODY = 2;
+    EXTENSION_PHASE_PROTO_AFTER = 3;
+    EXTENSION_PHASE_PROTO_READY = 4;
+}
+
+message ExtensionExecutionStateProto {
+    repeated int32 selected_extension_indices = 1;
+    ExtensionPhaseProto phase = 2;
+    optional int32 active_extension_index = 3;
+    ExtensionJsonValueProto raw_input_json = 4;
+    ExtensionJsonValueProto transformed_input_json = 5;
+    PreparedTaskResultProto prepared_result = 6;
+}
+
+message PreparedTaskResultProto {
+    ExtensionJsonValueProto raw_output_json = 1;
+    ExtensionJsonValueProto transformed_output_json = 2;
+    FlowDirectiveProto pending_flow_directive = 3;
+}
+
+enum ExtensionReturnKindProto {
+    EXTENSION_RETURN_KIND_PROTO_UNSPECIFIED = 0;
+    EXTENSION_RETURN_KIND_PROTO_COMPLETE = 1;
+    EXTENSION_RETURN_KIND_PROTO_EXIT = 2;
+    EXTENSION_RETURN_KIND_PROTO_END = 3;
+}
+
+message ExtensionReturnProto {
+    string block_position = 1;
+    ExtensionReturnKindProto kind = 2;
+}

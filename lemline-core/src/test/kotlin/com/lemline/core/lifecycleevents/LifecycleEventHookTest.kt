@@ -259,6 +259,51 @@ class LifecycleEventHookTest : FunSpec() {
     }
 
     init {
+        test("extension emits business CloudEvents once and replay keeps lifecycle identities") {
+            val yaml = """
+                use:
+                  extensions:
+                    - audit:
+                        extend: all
+                        after:
+                          - publish:
+                              emit:
+                                event:
+                                  with:
+                                    type: example.audit
+                                    source: https://tests/extensions
+                                    data: { owner: '§{ §task.reference }' }
+                do:
+                  - owner: { set: { value: 42 } }
+            """.trimIndent().replace('§', '$')
+            val workflow = getWorkflowToTest(yaml)
+            val command = StepByStepOrchestrator.initCmd()
+            val ids = mutableListOf<List<String>>()
+            repeat(2) {
+                val emitter = CapturingEmitter()
+                val business = InMemoryCloudEventHook()
+                FullOrchestrator.resume(workflow, command, serde = true,
+                    activityExecutor = MockActivityExecutor.empty { business.emit(it) },
+                    functionResolver = MockFunctionResolver(), cloudEventHook = business,
+                    lifecycleHook = CloudEventLifecycleHook(emitter))
+                business.emittedEvents.size shouldBe 1
+                business.emittedEvents.single().type shouldBe "example.audit"
+                val events = emitter.events
+                ids.add(events.map { it.id })
+                events.map { it.id }.distinct().size shouldBe events.size
+                fun task(event: CloudEvent) = Json.parseToJsonElement(String(event.data!!.toBytes())).jsonObject["task"]?.jsonPrimitive?.content
+                val started = events.filter { it.type.contains("task.started") }.mapNotNull(::task)
+                val closed = events.filter { it.type.contains("task.completed") }.mapNotNull(::task)
+                started.toSet() shouldBe closed.toSet()
+                closed.indexOf("/do/0/owner/_ext/0/after/do/0/publish") shouldBe 0
+                closed.last() shouldBe "/do"
+                val step = events.first { task(it)?.endsWith("/publish") == true }
+                step.getExtension("lemlineworkflowid") shouldBe command.workflowId.toString()
+                business.close()
+            }
+            ids[0] shouldBe ids[1]
+        }
+
         afterEach {
             WorkflowCache.clear()
         }
@@ -505,6 +550,7 @@ class LifecycleEventHookTest : FunSpec() {
                 "task.created:failingTask",
                 "task.started:failingTask",
                 "task.faulted:failingTask",
+                "task.faulted:try",
                 "task.created:catch",
                 "task.started:catch",
                 "task.created:recovery",

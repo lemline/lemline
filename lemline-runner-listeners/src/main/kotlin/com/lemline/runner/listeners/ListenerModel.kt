@@ -2,8 +2,8 @@
 package com.lemline.runner.listeners
 
 import com.lemline.common.values.IDV7
+import com.lemline.common.values.NodePosition
 import com.lemline.core.states.WorkflowEvent
-import com.lemline.core.workflows.WorkflowCache
 import com.lemline.runner.common.messaging.InstanceMessage
 import com.lemline.runner.common.models.WithCleanup
 import com.lemline.runner.common.models.WithId
@@ -58,6 +58,8 @@ data class ListenerModel(
     val listenerStrategy: ListenerStrategy = ListenerStrategy.from(instanceMessage.workflowState.config),
     val timeoutAt: Instant? = instanceMessage.workflowState.config.timeoutAt,
     var filtersCount: Int? = null,
+    /** Index identity for filters; the message keeps the full execution position. */
+    var filterPosition: NodePosition = instanceMessage.workflowState.nodePosition,
     var hasUntil: Boolean = false,
     var untilExpression: String? = null,
     var untilProgress: String? = null,
@@ -75,11 +77,7 @@ data class ListenerModel(
     override var cleanupAfter: Instant? = null,
 ) : WithId, WithInstanceMessage, WithOutbox, WithCleanup {
 
-    val readAs: ListenAndReadAs by lazy {
-        val listenTasks = WorkflowCache.getListenTasks(workflowInfo)
-        val listenTask = listenTasks.find { it.nodePosition == nodePosition }
-        listenTask?.readAs ?: ListenAndReadAs.DATA
-    }
+    val readAs: ListenAndReadAs get() = instanceMessage.workflowState.config.readAs
 
     companion object Companion
 }

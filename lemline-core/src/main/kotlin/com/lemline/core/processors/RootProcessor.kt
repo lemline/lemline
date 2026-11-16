@@ -5,6 +5,7 @@ import com.lemline.core.nodes.Node
 import com.lemline.core.nodes.RootTask
 import com.lemline.core.processors.scope.Scope
 import com.lemline.core.states.RootState
+import kotlin.time.Instant
 import kotlinx.serialization.json.JsonElement
 
 /**
@@ -45,7 +46,8 @@ class RootProcessor(
     // the RootProcessor should not create the root state
     override fun stateWhenEnteringFromParent(
         transformedInput: JsonElement,
-        scope: Scope
+        scope: Scope,
+        startedAt: Instant
     ): RootState = throw IllegalStateException("RootProcessor does not create state")
 
     // RootProcessor doesn't need updateState - root never re-enters from a child

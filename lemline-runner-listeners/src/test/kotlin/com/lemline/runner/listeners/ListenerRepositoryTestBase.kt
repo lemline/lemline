@@ -1,16 +1,30 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.listeners
 
+import com.lemline.common.values.WorkflowNamespace
 import com.lemline.common.values.IDV7
+import com.lemline.common.values.NodePosition
 import com.lemline.common.values.WorkflowId
+import com.lemline.common.values.WorkflowInfo
+import com.lemline.common.values.WorkflowName
+import com.lemline.common.values.WorkflowVersion
+import com.lemline.core.activities.mock.MockFunctionResolver
+import com.lemline.core.functions.FunctionCache
+import com.lemline.core.functions.FunctionResolver
+import com.lemline.core.lifecycleevents.LifecycleEventHook
+import com.lemline.core.orchestrator.StepByStepOrchestrator
 import com.lemline.core.processors.EventFilter
 import com.lemline.core.processors.ListenConfig
 import com.lemline.core.processors.ListenStrategy
 import com.lemline.core.processors.UntilCondition
+import com.lemline.core.states.WorkflowCommand
+import com.lemline.core.states.WorkflowEvent
 import com.lemline.core.workflows.CachedEventConsumption
 import com.lemline.core.workflows.CachedEventFilter
 import com.lemline.core.workflows.CachedListenTask
+import com.lemline.core.workflows.WorkflowCache
 import com.lemline.runner.common.config.DatabaseConfig
+import com.lemline.runner.common.messaging.InstanceMessage
 import com.lemline.runner.common.test.ops.CleanerRepositoryTest
 import com.lemline.runner.common.test.ops.CrudRepositoryTest
 import com.lemline.runner.common.test.ops.IdRepositoryTest
@@ -26,11 +40,13 @@ import kotlin.random.Random
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.hours
+import kotlin.time.Instant
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.async
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.Json
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
@@ -409,7 +425,7 @@ abstract class ListenerRepositoryTestBase {
             repository.deleteAll()
         }
 
-        private fun createListener(timeoutAt: kotlin.time.Instant?): ListenerModel {
+        private fun createListener(timeoutAt: Instant?): ListenerModel {
             return ListenerModel.random().copy(
                 timeoutAt = timeoutAt,
             ).apply {
@@ -993,7 +1009,7 @@ abstract class ListenerRepositoryTestBase {
             // When: Query with different position
             val queryKey = ListenerQueryKey(
                 workflowInfo = listener.instanceMessage.workflowInfo,
-                position = com.lemline.common.values.NodePosition("/different/position"),
+                position = NodePosition("/different/position"),
                 correlationValuesJson = null,
                 listenerStrategy = ListenerStrategy.ANY_UNTIL_EXPR
             )
@@ -1354,4 +1370,164 @@ abstract class ListenerRepositoryTestBase {
             updated?.outboxDelayedUntil shouldBe null
         }
     }
+    @Nested
+    inner class ExtensionListeners {
+        @BeforeEach fun clearDefinitions() = WorkflowCache.clear()
+        @org.junit.jupiter.api.AfterEach fun clearDefinitionsAfter() = WorkflowCache.clear()
+
+        private fun definition(functions: Boolean): String = if (functions) """
+            document: { dsl: '1.0.0', namespace: extensions, name: routing-functions, version: '1.0.0' }
+            use:
+              functions:
+                alpha:
+                  do:
+                    - receiver:
+                        listen: { to: { one: { with: { type: example.alpha } } } }
+                beta:
+                  do:
+                    - receiver:
+                        listen: { to: { one: { with: { type: example.beta } } } }
+            do:
+              - first: { call: alpha, if: '§{ .choice == "alpha" }' }
+              - second: { call: beta }
+        """.trimIndent().replace('§', '$') else """
+            document: { dsl: '1.0.0', namespace: extensions, name: routing-extensions, version: '1.0.0' }
+            use:
+              functions:
+                entry:
+                  do:
+                    - owner: { set: { done: true } }
+              extensions:
+                - first:
+                    extend: set
+                    before:
+                      - receiver:
+                          listen: { to: { one: { with: { type: example.alpha } } }, read: envelope }
+                - second:
+                    extend: set
+                    before:
+                      - receiver:
+                          listen: { to: { one: { with: { type: example.beta } } } }
+            do:
+              - invoke: { call: entry }
+        """.trimIndent()
+
+        private suspend fun start(source: String, choice: String, resolver: FunctionResolver = MockFunctionResolver()): InstanceMessage<WorkflowEvent.ListenStarted> {
+            val workflow = WorkflowCache.parseYamlAndPut(source)
+            var command: WorkflowCommand = StepByStepOrchestrator.initCmd(
+                workflowInput = Json.parseToJsonElement("""{"choice":"$choice"}""")
+            )
+            repeat(30) {
+                val event = StepByStepOrchestrator.runByTask(
+                    workflow, command, WorkflowInfo(
+                        WorkflowNamespace(workflow.document.namespace),
+                        WorkflowName(workflow.document.name),
+                        WorkflowVersion(workflow.document.version)),
+                    LifecycleEventHook.NOOP, functionResolver = resolver::resolve,
+                )
+                when (event) {
+                    is WorkflowEvent.TaskScheduled -> command = event.resume()
+                    is WorkflowEvent.ListenStarted -> return InstanceMessage(
+                        WorkflowInfo(WorkflowNamespace(workflow.document.namespace),
+                            WorkflowName(workflow.document.name), WorkflowVersion(workflow.document.version)), event)
+                    else -> error("Unexpected event $event")
+                }
+            }
+            error("Listener not reached")
+        }
+
+        private fun service(resolver: FunctionResolver = MockFunctionResolver()) = ListenerEventService().apply {
+            listenerRepository = getRepository()
+            listenerEventRepository = getEventRepository()
+            definitionListenService = DefinitionListenService().apply { listenerRepository = getRepository(); functionResolver = resolver }
+            databaseConfig = getDatabaseConfig()
+        }
+
+        private fun event(type: String) = CloudEventBuilder.v1().withId(IDV7.random().toString())
+            .withSource(URI("https://extension-tests")).withType(type)
+            .withData("application/json", "{\"value\":42}".toByteArray()).build()
+
+        @Test
+        fun `extension listener routes after cache reconstruction and preserves runtime position`() = runTest {
+            val source = definition(false)
+            val message = start(source, "alpha")
+            ListenerService().apply { listenerRepository = getRepository() }.handleListenStarted(message)
+            WorkflowCache.clear()
+            FunctionCache.clear()
+            WorkflowCache.parseYamlAndPut(source)
+            val id = message.workflowState.nodeStack.listenerId()
+            service().handleCloudEvent(event("example.beta"), message.workflowInfo.namespace)
+            getEventRepository().listAll().count { it.listenerId == id } shouldBe 0
+            val incoming = event("example.alpha")
+            service().handleCloudEvent(incoming, message.workflowInfo.namespace)
+            service().handleCloudEvent(incoming, message.workflowInfo.namespace)
+            getEventRepository().listAll().count { it.listenerId == id } shouldBe 1
+            val restored = getRepository().findById(id)!!
+            restored.instanceMessage.workflowState.nodePosition shouldBe message.workflowState.nodePosition
+            restored.filterPosition.toString() shouldBe "/_fn/entry/do/0/owner/_ext/0/before/do/0/receiver"
+            restored.readAs shouldBe ListenAndReadAs.ENVELOPE
+            restored.instanceMessage.workflowState.nodeStack.toList().any { it.extension != null } shouldBe true
+        }
+
+
+        @Test
+        fun `remote function extension listener hydrates filters on a different events worker`() = runTest {
+            val remote = "https://example.com/remote.yaml"
+            val function = WorkflowCache.parseYaml(
+                """document: { dsl: '1.0.0', namespace: extensions, name: unused, version: '1.0.0' }
+do: [{ owner: { set: { value: 42 } } }]""").`do`.single().task
+            var resolutions = 0
+            val resolver = object : FunctionResolver {
+                override suspend fun resolve(functionRef: String): io.serverlessworkflow.api.types.Task {
+                    functionRef shouldBe remote
+                    resolutions++
+                    return function
+                }
+            }
+            val source = """
+                document: { dsl: '1.0.0', namespace: extensions, name: remote-listener, version: '1.0.0' }
+                use:
+                  extensions:
+                    - prepare:
+                        extend: set
+                        before:
+                          - receiver:
+                              listen: { to: { one: { with: { type: example.remote } } } }
+                do:
+                  - invoke: { call: '$remote' }
+            """.trimIndent()
+            WorkflowCache.parseYamlAndPut(source)
+            resolutions shouldBe 0
+            val message = start(source, "remote", resolver)
+            // Registration and ingestion both happen on workers without the function cache.
+            WorkflowCache.clear()
+            WorkflowCache.parseYamlAndPut(source)
+            ListenerService().apply { listenerRepository = getRepository(); functionResolver = resolver }.handleListenStarted(message)
+            WorkflowCache.clear()
+            FunctionCache.clear()
+            WorkflowCache.parseYamlAndPut(source)
+            service(resolver).handleCloudEvent(event("example.remote"), message.workflowInfo.namespace)
+            getEventRepository().listAll().count { it.listenerId == message.workflowState.nodeStack.listenerId() } shouldBe 1
+        }
+
+        @Test
+        fun `same relative listen position in different functions does not cross route`() = runTest {
+            val source = definition(true)
+            val alpha = start(source, "alpha")
+            val beta = start(source, "beta")
+            val starter = ListenerService().apply { listenerRepository = getRepository() }
+            starter.handleListenStarted(alpha)
+            starter.handleListenStarted(beta)
+            WorkflowCache.clear()
+            WorkflowCache.parseYamlAndPut(source)
+            service().handleCloudEvent(event("example.alpha"), alpha.workflowInfo.namespace)
+            val alphaId = alpha.workflowState.nodeStack.listenerId()
+            val betaId = beta.workflowState.nodeStack.listenerId()
+            getEventRepository().listAll().count { it.listenerId == alphaId } shouldBe 1
+            getEventRepository().listAll().count { it.listenerId == betaId } shouldBe 0
+            service().handleCloudEvent(event("example.beta"), beta.workflowInfo.namespace)
+            getEventRepository().listAll().count { it.listenerId == betaId } shouldBe 1
+        }
+    }
+
 }

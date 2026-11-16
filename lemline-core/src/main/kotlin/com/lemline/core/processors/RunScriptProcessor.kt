@@ -15,6 +15,7 @@ import io.serverlessworkflow.api.types.RunTaskConfiguration.ProcessReturnType
 import java.net.URI
 import java.nio.file.Files
 import java.nio.file.Paths
+import kotlin.time.Instant
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonPrimitive
 
@@ -71,7 +72,7 @@ class RunScriptProcessor(
 
     override val isAsync = true
 
-    override fun stateWhenEnteringFromParent(transformedInput: JsonElement, scope: Scope): RunState = RunState()
+    override fun stateWhenEnteringFromParent(transformedInput: JsonElement, scope: Scope, startedAt: Instant): RunState = RunState(startedAt = startedAt)
 
     /**
      * Build the script execution configuration.
