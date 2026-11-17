@@ -97,7 +97,7 @@ object FunctionCache {
         val fnRootPosition = NodePosition.root.addToken(FUN)
 
         // Wrap the task in a DoTask if it's not already one
-        val doTask = taskBase as? DoTask ?: DoTask(listOf(TaskItem("functionTask", task)))
+        val doTask = taskBase as? DoTask ?: DoTask().withDo(listOf(TaskItem("functionTask", task)))
 
         // Create the function's root node (analogous to workflow root)
         val fnRootTask = RootTask(

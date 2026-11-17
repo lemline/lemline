@@ -33,7 +33,8 @@ import kotlinx.serialization.json.JsonPrimitive
  *         shell:
  *           command: echo
  *           arguments:
- *             -n: "Hello World"
+ *             - -n
+ *             - "Hello World"
  *           environment:
  *             MY_VAR: test
  *   - withExpression:
@@ -46,7 +47,8 @@ import kotlinx.serialization.json.JsonPrimitive
  *
  * The `shell` field contains shell-specific arguments:
  * - **command**: The shell command to execute (required)
- * - **arguments**: Optional map of arguments (keys with optional values)
+ * - **arguments**: Ordered list of arguments, including repeated and empty values
+ * - **stdin**: Optional standard input
  * - **environment**: Optional map of environment variables
  * - **await**: Whether to wait for command completion (defaults to true)
  * - **return**: What to return (stdout, stderr, code, all, none - defaults to stdout)
@@ -87,13 +89,9 @@ class RunShellProcessor(
         val command = evaluateString(transformedInput, shellConfig.command, "shell.command", scope)
 
         // Evaluate arguments if present
-        val arguments = shellConfig.arguments?.additionalProperties
-            ?.mapValues { (_, value) ->
-                evaluateString(transformedInput, value.toString(), "shell.arguments.value", scope)
-            }
-            ?.mapKeys { (key, _) ->
-                evaluateString(transformedInput, key.toString(), "shell.arguments.key", scope)
-            }
+        val arguments = shellConfig.arguments.orEmpty().map {
+            evaluateString(transformedInput, it, "shell.arguments", scope)
+        }
 
         // Evaluate environment variables if present
         val environment = shellConfig.environment?.additionalProperties?.mapValues { (_, value) ->
@@ -108,7 +106,8 @@ class RunShellProcessor(
             arguments = arguments,
             environment = environment,
             await = await,
-            returnType = returnType
+            returnType = returnType,
+            stdin = shellConfig.stdin?.let { evaluateString(transformedInput, it, "shell.stdin", scope) },
         )
 
         return RunShellStarted(

@@ -13,8 +13,8 @@ import kotlin.time.Duration.Companion.seconds
 /**
  * Converts a TimeoutAfter object to a Duration.
  */
-fun TimeoutAfter.toDuration() = when (val da = get()) {
-    is String -> Duration.parse(da)
+fun TimeoutAfter.toDuration(evaluateExpression: (String) -> String = { error("Duration expression requires a runtime context: $it") }) = when (val da = get()) {
+    is String -> Duration.parse(if (durationExpression != null) evaluateExpression(da) else da)
     is DurationInline -> da.toDuration()
     else -> error("Unknown TimeoutAfter: $da")
 }

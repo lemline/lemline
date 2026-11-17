@@ -229,11 +229,12 @@ class DefaultActivityExecutor(
         val shell = Shell(
             command = config.command,
             arguments = config.arguments,
-            environment = config.environment
+            environment = config.environment,
+            stdin = config.stdin,
         )
 
         if (!config.await) {
-            val process = shell.executeAsync()
+            val process = shell.executeAsync(discardOutput = true)
             logger.debug { "Launched shell command asynchronously with PID: ${process.pid()}" }
             return rawOutput
         }

@@ -50,7 +50,7 @@ object CallHttpTestCases {
                         method: GET
                         endpoint: https://jsonplaceholder.typicode.com/comments
                         query:
-                          postId: 1
+                          postId: '1'
             """.trimIndent(),
             tags = setOf("http", "external"),
             validate = expectOutput(commentsForPost1)

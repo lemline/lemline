@@ -121,7 +121,7 @@ object WorkflowCache {
         return Entry(
             workflow, nodes, extractListenTasks(workflow.info, nodes, workflow),
             workflow.schedule?.on?.get()?.let {
-                CachedEventSchedule(workflow.info, CachedEventConsumption.from(it, (workflow as? EvaluatedWorkflow)?.evaluationMode ?: EvaluationMode.STRICT))
+                CachedEventSchedule(workflow.info, CachedEventConsumption.from(it, workflow.evaluationMode))
             },
             source,
         )
@@ -200,7 +200,7 @@ object WorkflowCache {
         val entry = current.entries[workflow.info]
         return if (entry?.workflow === workflow) entry.schedule?.consumption
         else workflow.schedule?.on?.get()?.let {
-            CachedEventConsumption.from(it, (workflow as? EvaluatedWorkflow)?.evaluationMode ?: EvaluationMode.STRICT)
+            CachedEventConsumption.from(it, workflow.evaluationMode)
         }
     }
 
@@ -341,7 +341,7 @@ object WorkflowCache {
     fun getListenTasks(workflowInfo: WorkflowInfo): List<CachedListenTask> =
         current.entries[workflowInfo]?.let { entry ->
             entry.listens + entry.functions.entries.flatMap { (key, value) ->
-                val mode = (entry.workflow as? EvaluatedWorkflow)?.evaluationMode ?: EvaluationMode.STRICT
+                val mode = entry.workflow.evaluationMode
                 value.second.mapNotNull { (position, node) ->
                     extractListenTaskFromNode(workflowInfo, functionListenPosition(key.first, position), node, mode, false)
                 }
@@ -358,7 +358,7 @@ object WorkflowCache {
         workflow: Workflow
     ): List<CachedListenTask> {
         val listenTasks = mutableListOf<CachedListenTask>()
-        val mode = (workflow as? EvaluatedWorkflow)?.evaluationMode ?: EvaluationMode.STRICT
+        val mode = workflow.evaluationMode
 
         // Extract from main workflow tree
         for ((position, node) in nodesMap) {

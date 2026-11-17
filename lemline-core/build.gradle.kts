@@ -45,10 +45,9 @@ dependencies {
     implementation(libs.serverlessworkflow.api)
     implementation(libs.serverlessworkflow.impl.core)
 
-    // Override networknt json-schema-validator to fix oneOf validation bug with format
-    // SDK uses 1.5.5 which has issues with oneOf + format: date-time
-    // Using 1.5.9 (latest 1.5.x) for API compatibility with SDK
-    implementation("com.networknt:json-schema-validator:1.5.9")
+    // Used directly by Lemline; these are no longer provided by the SDK implementation core.
+    implementation("net.thisptr:jackson-jq:1.2.0")
+    implementation("com.networknt:json-schema-validator:2.0.7")
 
     // Ktor client for native Kotlin HTTP client with coroutine support
     implementation(platform(libs.ktor.bom))

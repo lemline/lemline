@@ -43,7 +43,8 @@ object RunShellTestCases {
                         shell:
                           command: echo
                           arguments:
-                            "Hello": World
+                            - Hello
+                            - World
             """.trimIndent(),
             tags = setOf("shell"),
             validate = expectOutput(JsonPrimitive("Hello World"))
@@ -59,7 +60,8 @@ object RunShellTestCases {
                         shell:
                           command: sh
                           arguments:
-                            "-c": echo $MY_VAR
+                            - -c
+                            - echo $MY_VAR
                           environment:
                             MY_VAR: TestValue
             """.trimIndent(),
@@ -113,7 +115,8 @@ object RunShellTestCases {
                         shell:
                           command: echo
                           arguments:
-                            "Hello": ${ .name }
+                            - Hello
+                            - ${ .name }
             """.trimIndent(),
             tags = setOf("shell"),
             validate = expectOutput(JsonPrimitive("Hello World"))
@@ -132,7 +135,8 @@ object RunShellTestCases {
                         shell:
                           command: sh
                           arguments:
-                            "-c": echo $MY_VAR
+                            - -c
+                            - echo $MY_VAR
                           environment:
                             MY_VAR: ${ .varValue }
             """.trimIndent(),
@@ -210,7 +214,7 @@ object RunShellTestCases {
                         shell:
                           command: ls -1
                           arguments:
-                            "": /tmp
+                            - /tmp
             """.trimIndent(),
             tags = setOf("shell"),
             validate = expectOutput(JsonPrimitive("file1.txt\nfile2.txt\ndir1"))

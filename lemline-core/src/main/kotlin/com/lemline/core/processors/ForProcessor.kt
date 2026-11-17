@@ -2,12 +2,14 @@
 package com.lemline.core.processors
 
 import com.lemline.core.nodes.Node
+import com.lemline.common.json.LemlineJson.toJsonElement
 import com.lemline.core.processors.scope.Scope
 import com.lemline.core.states.ForState
 import com.lemline.core.workflows.forBlock
 import io.serverlessworkflow.api.types.ForTask
 import kotlin.time.Instant
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonArray
 
 /**
  * Node instance for ForTask (iteration) - pure functional model.
@@ -109,6 +111,8 @@ class ForProcessor(
 
     private fun evalForIn(dataset: JsonElement, scope: Scope): List<JsonElement> {
         // For.in is evaluated during createState, before the full context exists
-        return evalList(dataset, node.task.`for`.`in`, "for.in", scope)
+        val collection = node.task.`for`.`in`
+        return collection.forInInlineArray?.let { (eval(dataset, it.toJsonElement(), scope) as JsonArray).toList() }
+            ?: evalList(dataset, collection.forInExpression, "for.in", scope)
     }
 }

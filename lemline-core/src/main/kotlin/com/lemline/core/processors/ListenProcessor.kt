@@ -99,11 +99,10 @@ class ListenProcessor(
                 is Timeout -> {
                     timeoutValue.after?.let { timeoutAfter ->
                         try {
-                            val duration = timeoutAfter.toDuration()
+                            val duration = timeoutAfter.toDuration { evalString(transformedInput, it, "timeout.after", scope) }
                             if (duration > Duration.ZERO) Clock.System.now() + duration else null
                         } catch (e: Exception) {
-                            logger.warn(e) { "Failed to parse listen timeout: $timeoutAfter" }
-                            null
+                            raiseError(CONFIGURATION, "Invalid listen timeout: ${e.message}")
                         }
                     }
                 }
