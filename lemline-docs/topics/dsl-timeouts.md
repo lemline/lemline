@@ -67,7 +67,7 @@ do:
 
 When a timeout occurs, the specific error raised **must** conform to the following:
 
-* **`type`**: `https://serverlessworkflow.io/spec/1.0.0/errors/timeout`
+* **`type`**: `https://open-workflow-specification.org/spec/1.0.0/errors/timeout`
 * **`status`**: `408` (Request Timeout) is recommended.
 * **`instance`**: Should point to the JSON Pointer of the workflow or task that timed out (e.g., `/`,
   `/do/callExternalService`).

@@ -86,6 +86,16 @@ abstract class DefinitionStatsQueryServiceTestBase {
             .shouldContainExactly(statsRow(started = 3, completed = 1, running = 2))
     }
 
+    @Test
+    fun `legacy lifecycle types remain visible alongside current types`() = runTest {
+        insertEvent(first, LifecycleEventType.WORKFLOW_STARTED, "2026-01-01T10:00:00Z", legacy = true)
+        insertEvent(first, LifecycleEventType.WORKFLOW_COMPLETED, "2026-01-01T11:00:00Z")
+
+        val result = service.listDefinitionStats(filter(timeTo = null), snapshotSequence = maxSequence())
+
+        result.stats.shouldContainExactly(statsRow(started = 1, completed = 1, running = 0))
+    }
+
     private fun filter(timeTo: Instant?) = DefinitionStatsFilter(timeFrom = timeFrom, timeTo = timeTo)
 
     private fun statsRow(started: Long, completed: Long, running: Long) = DefinitionStatsRow(
@@ -98,7 +108,7 @@ abstract class DefinitionStatsQueryServiceTestBase {
         runningCountAtTimeTo = running,
     )
 
-    private fun insertEvent(workflowId: UUID, type: LifecycleEventType, eventTime: String) {
+    private fun insertEvent(workflowId: UUID, type: LifecycleEventType, eventTime: String, legacy: Boolean = false) {
         dataSource().connection.use { conn ->
             conn.prepareStatement(
                 """
@@ -108,7 +118,7 @@ abstract class DefinitionStatsQueryServiceTestBase {
                 VALUES (?, ?, ?, 'team-a', 'orders', '1.0.0')
                 """.trimIndent()
             ).use { stmt ->
-                stmt.setString(1, type.type)
+                stmt.setString(1, if (legacy) type.legacyType else type.type)
                 stmt.setTimestamp(2, Timestamp.from(Instant.parse(eventTime)))
                 stmt.setObject(3, workflowId)
                 stmt.executeUpdate()

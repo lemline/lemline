@@ -9,7 +9,7 @@ import io.serverlessworkflow.api.types.TaskBase
 /**
  * Internal task representing a subscription iterator for Listen tasks.
  *
- * This task is NOT part of the Serverless Workflow SDK - it's an internal
+ * This task is NOT part of the Open Workflow SDK - it's an internal
  * structural node created when a ListenTask has a `foreach` configuration.
  *
  * ## Purpose

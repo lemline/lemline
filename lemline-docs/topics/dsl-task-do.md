@@ -2,7 +2,7 @@
 
 ## Purpose
 
-The `Do` task is a fundamental control flow construct in the Serverless Workflow DSL. Its primary purpose is to define a
+The `Do` task is a fundamental control flow construct in the Open Workflow DSL. Its primary purpose is to define a
 sequence of one or more sub-tasks that are executed in the order they are declared.
 
 The output of one task in the sequence becomes the input for the next, facilitating data flow through the

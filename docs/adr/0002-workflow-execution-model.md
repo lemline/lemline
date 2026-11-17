@@ -6,7 +6,7 @@ Accepted
 
 ## Context
 
-The Lemline project implements a runtime for the Serverless Workflow DSL, which requires a well-defined execution model to handle workflow instances, state management, and transitions between workflow states. We needed to decide on an execution model that would be efficient, maintainable, and aligned with the Serverless Workflow specification.
+The Lemline project implements a runtime for the Open Workflow DSL, which requires a well-defined execution model to handle workflow instances, state management, and transitions between workflow states. We needed to decide on an execution model that would be efficient, maintainable, and aligned with the Open Workflow Specification.
 
 ## Decision
 
@@ -217,5 +217,5 @@ The execution model implements a comprehensive error handling system:
 
 ## References
 
-- [Serverless Workflow Specification](https://serverlessworkflow.io/)
+- [Open Workflow Specification](https://open-workflow-specification.org/)
 - [Workflow Patterns](http://www.workflowpatterns.com/)

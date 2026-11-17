@@ -124,7 +124,7 @@ This object defines the core parameters for the listening behavior.
 
 * **`timeout`** (String - ISO 8601 Duration, Optional): Specifies the maximum time to wait for the required events based
   on the `listen.to` strategy. If the timeout is reached before the conditions are met, the task **must** fault with a
-  `Timeout` error (`https://serverlessworkflow.io/spec/1.0.0/errors/timeout`).
+  `Timeout` error (`https://open-workflow-specification.org/spec/1.0.0/errors/timeout`).
 
 ### Data Flow
 

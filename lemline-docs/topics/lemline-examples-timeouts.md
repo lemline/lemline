@@ -28,7 +28,7 @@ do:
       catch:
         - errors:
             with:
-              type: https://serverlessworkflow.io/spec/1.0.0/errors/timeout
+              type: https://open-workflow-specification.org/spec/1.0.0/errors/timeout
           as: timeoutError
           do:
             - handleTimeout:
@@ -39,7 +39,7 @@ do:
                     details: "Service did not respond within 5 seconds"
         - errors:
             with:
-              type: https://serverlessworkflow.io/spec/1.0.0/errors/communication
+              type: https://open-workflow-specification.org/spec/1.0.0/errors/communication
           as: communicationError
           do:
             - handleCommunicationError:
@@ -74,7 +74,7 @@ do:
       catch:
         errors:
           with:
-            type: https://serverlessworkflow.io/spec/1.0.0/errors/timeout
+            type: https://open-workflow-specification.org/spec/1.0.0/errors/timeout
         as: timeoutError
         do:
           - setDefaultCache:
@@ -100,7 +100,7 @@ do:
       catch:
         errors:
           with:
-            type: https://serverlessworkflow.io/spec/1.0.0/errors/timeout
+            type: https://open-workflow-specification.org/spec/1.0.0/errors/timeout
         as: dbTimeoutError
         export:
           as: '$context + { dbLookupSuccess: false, dbTimeoutError: $dbTimeoutError }'
@@ -121,7 +121,7 @@ do:
       catch:
         errors:
           with:
-            type: https://serverlessworkflow.io/spec/1.0.0/errors/timeout
+            type: https://open-workflow-specification.org/spec/1.0.0/errors/timeout
         as: fallbackTimeoutError
         export:
           as: '$context + { fallbackSuccess: false, fallbackTimeoutError: $fallbackTimeoutError }'
@@ -197,7 +197,7 @@ do:
       catch:
         - errors:
             with:
-              type: https://serverlessworkflow.io/spec/1.0.0/errors/timeout
+              type: https://open-workflow-specification.org/spec/1.0.0/errors/timeout
           do:
             - handleEventTimeout:
                 do:
@@ -243,7 +243,7 @@ do:
             catch:
               errors:
                 with:
-                  type: https://serverlessworkflow.io/spec/1.0.0/errors/timeout
+                  type: https://open-workflow-specification.org/spec/1.0.0/errors/timeout
               do:
                 - forceCancel:
                     then: cancelProcess
@@ -344,7 +344,7 @@ do:
       catch:
         errors:
           with:
-            type: https://serverlessworkflow.io/spec/1.0.0/errors/timeout
+            type: https://open-workflow-specification.org/spec/1.0.0/errors/timeout
         do:
           - handlePartialCompletion:
               call: http
@@ -443,7 +443,7 @@ do:
       catch:
         errors:
           with:
-            type: https://serverlessworkflow.io/spec/1.0.0/errors/timeout/workflow
+            type: https://open-workflow-specification.org/spec/1.0.0/errors/timeout/workflow
         do:
           - handleWorkflowTimeout:
               call: http
@@ -472,7 +472,7 @@ do:
       catch:
         errors:
           with:
-            type: https://serverlessworkflow.io/spec/1.0.0/errors/timeout/workflow
+            type: https://open-workflow-specification.org/spec/1.0.0/errors/timeout/workflow
         do:
           - handleTimeoutDuringCheck:
               export:
@@ -559,7 +559,7 @@ do:
       catch:
         errors:
           with:
-            type: https://serverlessworkflow.io/spec/1.0.0/errors/timeout
+            type: https://open-workflow-specification.org/spec/1.0.0/errors/timeout
         retry:
           delay:
             milliseconds: 500
@@ -588,7 +588,7 @@ do:
       catch:
         errors:
           with:
-            type: https://serverlessworkflow.io/spec/1.0.0/errors/timeout
+            type: https://open-workflow-specification.org/spec/1.0.0/errors/timeout
         do:
           - simplifyAndRetry:
               call: http
@@ -625,7 +625,7 @@ do:
       catch:
         errors:
           with:
-            type: https://serverlessworkflow.io/spec/1.0.0/errors/timeout
+            type: https://open-workflow-specification.org/spec/1.0.0/errors/timeout
         do:
           - requestAsyncProcessing:
               call: http
@@ -694,7 +694,7 @@ do:
       catch:
         errors:
           with:
-            type: https://serverlessworkflow.io/spec/1.0.0/errors/timeout
+            type: https://open-workflow-specification.org/spec/1.0.0/errors/timeout
         retry:
           delay:
             milliseconds: 500
@@ -717,7 +717,7 @@ do:
       catch:
         errors:
           with:
-            type: https://serverlessworkflow.io/spec/1.0.0/errors/timeout
+            type: https://open-workflow-specification.org/spec/1.0.0/errors/timeout
         do:
           - useCachedData:
               call: http
@@ -743,7 +743,7 @@ do:
       catch:
         errors:
           with:
-            type: https://serverlessworkflow.io/spec/1.0.0/errors/timeout
+            type: https://open-workflow-specification.org/spec/1.0.0/errors/timeout
         retry:
           when: ${ $context.retriesAttempted < 2 }  # Only retry twice
           delay:

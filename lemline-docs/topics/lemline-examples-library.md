@@ -1,10 +1,10 @@
 # Lemline Examples Library
 
-This document provides an overview of the examples available in the Lemline project, organized by category and use case. Each example demonstrates key features of the Serverless Workflow DSL as implemented by Lemline.
+This document provides an overview of the examples available in the Lemline project, organized by category and use case. Each example demonstrates key features of the Open Workflow DSL as implemented by Lemline.
 
 ## Introduction
 
-The examples in this library showcase how to implement various workflow patterns using the Serverless Workflow DSL. These examples range from simple, focused demonstrations of specific features to complex, real-world scenarios that combine multiple features.
+The examples in this library showcase how to implement various workflow patterns using the Open Workflow DSL. These examples range from simple, focused demonstrations of specific features to complex, real-world scenarios that combine multiple features.
 
 Each example follows a consistent pattern:
 - **Document metadata**: Defines the DSL version, namespace, workflow name, and version
@@ -24,7 +24,7 @@ The examples are organized into the following categories:
 
 ## Basic Workflow Patterns
 
-Basic workflow patterns demonstrate the fundamental building blocks of Serverless Workflow, such as:
+Basic workflow patterns demonstrate the fundamental building blocks of Open Workflow, such as:
 
 - Sequential task execution
 - Conditional logic with `switch` statements
@@ -126,7 +126,7 @@ do:
       catch:
         errors:
           with:
-            type: https://serverlessworkflow.io/spec/1.0.0/errors/communication
+            type: https://open-workflow-specification.org/spec/1.0.0/errors/communication
         retry:
           delay:
             seconds: 1
@@ -247,6 +247,6 @@ lemline instance start -n namespace.workflow-name -v version -i '{"key": "value"
 
 ## Conclusion
 
-These examples demonstrate the flexibility and power of the Serverless Workflow DSL as implemented by Lemline. Use them as a reference when building your own workflows, adapting and combining patterns to suit your specific use cases.
+These examples demonstrate the flexibility and power of the Open Workflow DSL as implemented by Lemline. Use them as a reference when building your own workflows, adapting and combining patterns to suit your specific use cases.
 
 For more detailed explanations of specific patterns, refer to the category-specific documents linked above.

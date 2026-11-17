@@ -9,9 +9,9 @@ This module implements scheduled workflow execution:
 - **Interval schedules** - Recurring execution (e.g., every 5 minutes)
 - **After schedules** - Execute again after workflow completes
 
-## Serverless Workflow DSL Reference
+## Open Workflow DSL Reference
 
-See [Schedule](https://serverlessworkflow.io/spec/latest/dsl-reference/#schedule) in the Serverless Workflow specification:
+See [Schedule](https://github.com/open-workflow-specification/specification/blob/v1.0.0/dsl-reference.md#schedule) in the Open Workflow Specification:
 
 ```yaml
 document:

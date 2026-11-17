@@ -148,7 +148,7 @@ When OAuth authentication fails, Lemline raises an `authentication` error:
       catch:
         - error:
             with:
-              type: "https://serverlessworkflow.io/spec/1.0.0/errors/authentication"
+              type: "https://open-workflow-specification.org/spec/1.0.0/errors/authentication"
           do:
             - handleAuthError:
                 # Handle authentication failure

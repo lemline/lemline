@@ -6,7 +6,7 @@ title: Workflow Definition Examples
 
 ## Introduction
 
-This page provides a collection of practical examples showing different approaches to defining Serverless Workflows. Each example demonstrates specific use cases, patterns, and combinations of features that can be employed when creating workflow definitions.
+This page provides a collection of practical examples showing different approaches to defining Open Workflows. Each example demonstrates specific use cases, patterns, and combinations of features that can be employed when creating workflow definitions.
 
 These examples range from simple sequential task execution to complex event-driven workflows with parallel processing and error handling. They showcase how the various properties and constructs of the DSL can be combined to solve real-world orchestration challenges.
 
@@ -228,7 +228,7 @@ do:
               results: "${ .forkedResults }"
         catch:
           - error:
-              type: https://serverlessworkflow.io/spec/1.0.0/errors/validation
+              type: https://open-workflow-specification.org/spec/1.0.0/errors/validation
             do:
               call: function
               with:
@@ -351,7 +351,7 @@ do:
               payment: "${ . }"
         catch:
           - error:
-              type: https://serverlessworkflow.io/spec/1.0.0/errors/validation
+              type: https://open-workflow-specification.org/spec/1.0.0/errors/validation
             do:
               set:
                 status: "REJECTED"

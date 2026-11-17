@@ -6,7 +6,7 @@ Accepted
 
 ## Context
 
-The listen task in Serverless Workflow DSL allows workflows to wait for CloudEvents. When multiple workflow instances
+The listen task in Open Workflow DSL allows workflows to wait for CloudEvents. When multiple workflow instances
 are listening for the same event type, we need a way to route events to the correct instance. This is achieved through
 **correlation** - matching event data against workflow-specific values.
 
@@ -233,7 +233,7 @@ Store correlations in a separate table with key-value pairs for indexed lookups.
 
 ## References
 
-- [Serverless Workflow Specification - Event Correlation](https://github.com/serverlessworkflow/specification/blob/main/specification.md#event-correlation)
+- [Open Workflow Specification - Event Correlation](https://github.com/open-workflow-specification/specification/blob/v1.0.0/dsl-reference.md#correlation)
 - [ADR-0003 Messaging Architecture](./0003-messaging-architecture.md)
 - [Listen Task Documentation](../listen-task.md)
 - `lemline-runner/src/main/kotlin/com/lemline/runner/definitions/DefinitionListenService.kt`

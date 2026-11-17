@@ -98,13 +98,14 @@ class NamespaceActivityMonitor(
     private suspend fun hasRunnerActivity(namespace: String): Boolean = withContext(Dispatchers.IO) {
         val sql = """
             SELECT 1 FROM $analyticsQualifiedTable
-            WHERE lemline_workflow_namespace = ? AND type <> ?
+            WHERE lemline_workflow_namespace = ? AND type NOT IN (?, ?)
             LIMIT 1
         """.trimIndent()
         analyticsDataSourceProvider.require().connection.use { conn ->
             conn.prepareStatement(sql).use { stmt ->
                 stmt.setString(1, namespace)
                 stmt.setString(2, LifecycleEventType.WORKFLOW_CREATED.type)
+                stmt.setString(3, LifecycleEventType.WORKFLOW_CREATED.legacyType)
                 stmt.executeQuery().use { rs -> rs.next() }
             }
         }

@@ -6,7 +6,7 @@ title: Secrets Management
 
 ## Introduction
 
-Secure handling of sensitive information is critical in modern workflow systems. The Serverless Workflow DSL provides a structured approach to secrets management that allows workflows to securely access protected resources without exposing sensitive information in workflow definitions.
+Secure handling of sensitive information is critical in modern workflow systems. The Open Workflow DSL provides a structured approach to secrets management that allows workflows to securely access protected resources without exposing sensitive information in workflow definitions.
 
 Secrets can include credentials, API keys, tokens, certificates, and other sensitive information required to access external services or systems.
 
@@ -88,7 +88,7 @@ use:
 If a workflow attempts to access a secret that doesn't exist or to which it doesn't have access, the workflow runtime will raise an error:
 
 ```
-https://serverlessworkflow.io/spec/1.0.0/errors/authorization
+https://open-workflow-specification.org/spec/1.0.0/errors/authorization
 ```
 
 This error should be handled appropriately using error handling mechanisms like the `Try` task:
@@ -106,7 +106,7 @@ do:
                 headers:
                   Authorization: "Bearer $SECRETS.api-key-secret"
         catch:
-          - error: https://serverlessworkflow.io/spec/1.0.0/errors/authorization
+          - error: https://open-workflow-specification.org/spec/1.0.0/errors/authorization
             as: secretError
             handle:
               - logSecretError:
@@ -125,4 +125,4 @@ The workflow simply references secrets by name, and the runtime handles resolvin
 
 ## Conclusion
 
-Effective secrets management is a critical aspect of secure workflow design. The Serverless Workflow DSL provides a clean separation between workflow logic and sensitive information through its secrets mechanism. By following best practices for secrets management, you can build workflows that securely access protected resources while maintaining the confidentiality of sensitive information. 
+Effective secrets management is a critical aspect of secure workflow design. The Open Workflow DSL provides a clean separation between workflow logic and sensitive information through its secrets mechanism. By following best practices for secrets management, you can build workflows that securely access protected resources while maintaining the confidentiality of sensitive information.

@@ -7,7 +7,7 @@ schedule:
   on:
     one:
       with:
-        type: io.serverlessworkflow.samples.events.trigger.v1
+        type: com.lemline.samples.events.trigger.v1
 do: 
   - initialize:
       set:

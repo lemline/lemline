@@ -23,7 +23,7 @@ object TryTaskTestCases {
                 use:
                   errors:
                     notImplemented:
-                      type: https://serverlessworkflow.io/errors/not-implemented
+                      type: https://open-workflow-specification.org/errors/not-implemented
                       status: 501
                 do:
                   - trySomething:
@@ -34,7 +34,7 @@ object TryTaskTestCases {
                       catch:
                         errors:
                           with:
-                            type: https://serverlessworkflow.io/errors/not-implemented
+                            type: https://open-workflow-specification.org/errors/not-implemented
                         do:
                           - handleError:
                               set:
@@ -52,7 +52,7 @@ object TryTaskTestCases {
                         - raiseError:
                             raise:
                               error:
-                                type: https://serverlessworkflow.io/spec/1.0.0/errors/runtime
+                                type: https://open-workflow-specification.org/spec/1.0.0/errors/runtime
                                 status: 500
                       catch:
                         do:
@@ -78,12 +78,12 @@ object TryTaskTestCases {
                         - raiseError:
                             raise:
                               error:
-                                type: https://serverlessworkflow.io/spec/1.0.0/errors/runtime
+                                type: https://open-workflow-specification.org/spec/1.0.0/errors/runtime
                                 status: 500
                       catch:
                         errors:
                           with:
-                            type: https://serverlessworkflow.io/spec/1.0.0/errors/validation
+                            type: https://open-workflow-specification.org/spec/1.0.0/errors/validation
                         do:
                           - handleError:
                               set:
@@ -101,12 +101,12 @@ object TryTaskTestCases {
                         - raiseError:
                             raise:
                               error:
-                                type: https://serverlessworkflow.io/spec/1.0.0/errors/validation
+                                type: https://open-workflow-specification.org/spec/1.0.0/errors/validation
                                 status: 400
                       catch:
                         errors:
                           with:
-                            type: https://serverlessworkflow.io/spec/1.0.0/errors/validation
+                            type: https://open-workflow-specification.org/spec/1.0.0/errors/validation
                         do:
                           - handleError:
                               set:
@@ -124,12 +124,12 @@ object TryTaskTestCases {
                         - raiseError:
                             raise:
                               error:
-                                type: https://serverlessworkflow.io/spec/1.0.0/errors/runtime
+                                type: https://open-workflow-specification.org/spec/1.0.0/errors/runtime
                                 status: 500
                       catch:
                         errors:
                           with:
-                            type: https://serverlessworkflow.io/spec/1.0.0/errors/validation
+                            type: https://open-workflow-specification.org/spec/1.0.0/errors/validation
                         do:
                           - handleError:
                               set:
@@ -147,7 +147,7 @@ object TryTaskTestCases {
                         - raiseError:
                             raise:
                               error:
-                                type: https://serverlessworkflow.io/spec/1.0.0/errors/runtime
+                                type: https://open-workflow-specification.org/spec/1.0.0/errors/runtime
                                 status: 500
                       catch:
                         errors:
@@ -170,7 +170,7 @@ object TryTaskTestCases {
                         - raiseError:
                             raise:
                               error:
-                                type: https://serverlessworkflow.io/spec/1.0.0/errors/runtime
+                                type: https://open-workflow-specification.org/spec/1.0.0/errors/runtime
                                 status: 500
                       catch:
                         do:
@@ -181,7 +181,7 @@ object TryTaskTestCases {
             """.trimIndent(),
             validate = expectOutput(
                 buildJsonObject {
-                    put("errorType", "https://serverlessworkflow.io/spec/1.0.0/errors/runtime")
+                    put("errorType", "https://open-workflow-specification.org/spec/1.0.0/errors/runtime")
                     put("errorStatus", 500)
                 }
             )
@@ -196,7 +196,7 @@ object TryTaskTestCases {
                         - raiseError:
                             raise:
                               error:
-                                type: https://serverlessworkflow.io/spec/1.0.0/errors/runtime
+                                type: https://open-workflow-specification.org/spec/1.0.0/errors/runtime
                                 status: 500
                       catch:
                         as: issue
@@ -208,7 +208,7 @@ object TryTaskTestCases {
             """.trimIndent(),
             validate = expectOutput(
                 buildJsonObject {
-                    put("issueType", "https://serverlessworkflow.io/spec/1.0.0/errors/runtime")
+                    put("issueType", "https://open-workflow-specification.org/spec/1.0.0/errors/runtime")
                     put("issueStatus", 500)
                 }
             )
@@ -223,7 +223,7 @@ object TryTaskTestCases {
                         - raiseError:
                             raise:
                               error:
-                                type: https://serverlessworkflow.io/spec/1.0.0/errors/runtime
+                                type: https://open-workflow-specification.org/spec/1.0.0/errors/runtime
                                 status: 500
                       catch:
                         when: ${ $error.status == 500 }
@@ -244,7 +244,7 @@ object TryTaskTestCases {
                         - raiseError:
                             raise:
                               error:
-                                type: https://serverlessworkflow.io/spec/1.0.0/errors/runtime
+                                type: https://open-workflow-specification.org/spec/1.0.0/errors/runtime
                                 status: 500
                       catch:
                         when: ${ $error.status == 404 }
@@ -290,7 +290,7 @@ object TryTaskTestCases {
                                     - deepTask:
                                         raise:
                                           error:
-                                            type: https://serverlessworkflow.io/spec/1.0.0/errors/runtime
+                                            type: https://open-workflow-specification.org/spec/1.0.0/errors/runtime
                                             status: 500
                       catch:
                         do:
@@ -316,7 +316,7 @@ object TryTaskTestCases {
                         - failingStep:
                             raise:
                               error:
-                                type: https://serverlessworkflow.io/spec/1.0.0/errors/runtime
+                                type: https://open-workflow-specification.org/spec/1.0.0/errors/runtime
                                 status: 500
                       catch:
                         do:

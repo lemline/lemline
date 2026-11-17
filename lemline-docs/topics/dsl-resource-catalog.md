@@ -7,7 +7,7 @@ title: Resource Catalogs
 ## Purpose
 
 A **Resource Catalog** is an external collection of reusable components, primarily [Functions](dsl-call-function.md) in
-current usage, that can be referenced and imported into Serverless Workflows.
+current usage, that can be referenced and imported into Open Workflows.
 
 The main goals of using catalogs are:
 
@@ -80,9 +80,9 @@ do:
 ## Catalog Structure
 
 To ensure portability and allow runtimes to consistently locate resources, catalogs hosted externally (especially in Git
-repositories) are expected to follow a specific file structure. The Serverless Workflow specification recommends a
+repositories) are expected to follow a specific file structure. The Open Workflow Specification recommends a
 structure like this (refer to
-the [official catalog structure documentation](https://github.com/serverlessworkflow/catalog?tab=readme-ov-file#structure)
+the [official catalog structure documentation](https://github.com/open-workflow-specification/catalog?tab=readme-ov-file#structure)
 for precise details):
 
 ```
@@ -150,10 +150,10 @@ document:
 use:
   secrets: [ gitHubToken, privateCatalogKey ]
   catalogs:
-    # Public, well-known catalog (e.g., official Serverless Workflow catalog)
+    # Public, well-known catalog (e.g., official Open Workflow catalog)
     swPublic:
       endpoint:
-        uri: https://github.com/serverlessworkflow/catalog
+        uri: https://github.com/open-workflow-specification/catalog
         # Maybe requires a token for higher rate limits or private access within org
         authentication:
           bearer: ${ $secrets.gitHubToken }
@@ -210,7 +210,7 @@ While the most concrete example provided by the specification is for [Functions]
 steps apply to any resource type potentially supported by a catalog:
 
 1. **Define the Resource**: Create a definition file (e.g., `function.yaml` for functions) that describes the resource
-   according to the Serverless Workflow specification. This file typically includes:
+   according to the Open Workflow Specification. This file typically includes:
     * Metadata (like name, version, description).
     * Input/Output schemas (if applicable, highly recommended for clarity and validation).
     * The core configuration or logic of the resource (e.g., the `run` definition for a function, the properties of an
@@ -225,7 +225,7 @@ steps apply to any resource type potentially supported by a catalog:
 
 4. **Publish (Optional)**:
     * For broader visibility and reuse, consider contributing your resource definitions to a public catalog, like the
-      official [Serverless Workflow Catalog](https://github.com/serverlessworkflow/catalog).
+      official [Open Workflow Catalog](https://github.com/open-workflow-specification/catalog).
     * For internal use, ensure the catalog is hosted where your organization's workflows can access it (e.g., an
       internal Git server, artifact repository).
 

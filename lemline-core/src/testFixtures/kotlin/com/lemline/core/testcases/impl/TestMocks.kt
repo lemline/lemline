@@ -267,7 +267,7 @@ object TestMocks {
         ),
         // Log function from catalog URL
         FunctionMockRule(
-            match = FunctionMockMatcher(functionRef = "*serverlessworkflow/catalog*log*"),
+            match = FunctionMockMatcher(functionRef = "*open-workflow-specification/catalog*log*"),
             response = FunctionMockResponse(output = logFunctionResponse)
         ),
         // Catch-all for any function

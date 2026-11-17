@@ -85,7 +85,7 @@ dependencies {
     implementation("io.quarkus:quarkus-messaging-rabbitmq")
     implementation(libs.smallrye.reactive.messaging.inmemory)
 
-    // Serverless Workflow SDK
+    // Open Workflow SDK
     implementation(libs.serverlessworkflow.api)
     implementation(libs.serverlessworkflow.impl.core)
 

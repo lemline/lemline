@@ -4,7 +4,7 @@ title: How to define a workflow
 
 # How to define a workflow
 
-This guide explains how to define a Serverless Workflow in Lemline using the YAML format. We'll cover the basic structure, components, and best practices.
+This guide explains how to define an Open Workflow in Lemline using the YAML format. We'll cover the basic structure, components, and best practices.
 
 ## Basic Workflow Structure
 
@@ -31,7 +31,7 @@ Let's break down the key elements:
 | `id` | Unique identifier for the workflow | Yes |
 | `name` | Human-readable name | Yes |
 | `version` | Workflow version (semantic versioning recommended) | Yes |
-| `specVersion` | Version of the Serverless Workflow spec (use '1.0') | Yes |
+| `specVersion` | Version of the Open Workflow spec (use '1.0') | Yes |
 | `start` | Name of the first task to execute | Yes |
 | `input` | Defines workflow input schema and defaults | No |
 | `functions` | Defines functions that can be called by tasks | No |

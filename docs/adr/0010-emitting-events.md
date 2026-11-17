@@ -6,7 +6,7 @@ Proposed
 
 ## Context
 
-The Serverless Workflow DSL v1.0 includes an `emit` task that allows workflows to publish CloudEvents to external systems. This capability enables workflows to broadcast notifications about business events, facilitating event-driven architectures and integration with downstream consumers.
+The Open Workflow DSL v1.0 includes an `emit` task that allows workflows to publish CloudEvents to external systems. This capability enables workflows to broadcast notifications about business events, facilitating event-driven architectures and integration with downstream consumers.
 
 Example use case from the specification:
 > "A workflow handling order processing might emit an event signaling the successful placement of an order, triggering downstream processes like inventory management or shipping."
@@ -56,7 +56,7 @@ We will implement the emit task feature with the following architecture:
 
 #### 1.1 EmitTask Model
 
-The `EmitTask` model already exists in the Serverless Workflow SDK (`io.serverlessworkflow.api.types.EmitTask`).
+The `EmitTask` model already exists in the Open Workflow SDK (`io.serverlessworkflow.api.types.EmitTask`).
 It is already:
 - Imported in `Node.kt`
 - Recognized as an activity in `Node.isActivity()`
@@ -314,7 +314,7 @@ Unlike wait/retry/fork events, emit events are **not persisted to the database**
 
 ### Positive
 
-- **Specification Compliance**: Implements the emit task as defined in Serverless Workflow DSL v1.0
+- **Specification Compliance**: Implements the emit task as defined in Open Workflow DSL v1.0
 - **Clean Separation**: External CloudEvents channel separates internal state from external notifications
 - **Low Latency**: Fire-and-forget design doesn't block workflow execution
 - **Idempotency**: Deterministic CloudEvent IDs enable safe replay and deduplication
@@ -380,8 +380,8 @@ Allow configuring external broker endpoints per emit task.
 
 ## References
 
-- [Serverless Workflow DSL v1.0 - Emit Task](https://github.com/serverlessworkflow/specification/blob/main/dsl.md#emitting-events)
-- [Serverless Workflow DSL Reference - Emit](https://github.com/serverlessworkflow/specification/blob/main/dsl-reference.md#emit)
+- [Open Workflow DSL v1.0 - Emit Task](https://github.com/open-workflow-specification/specification/blob/main/dsl.md#emitting-events)
+- [Open Workflow DSL Reference - Emit](https://github.com/open-workflow-specification/specification/blob/main/dsl-reference.md#emit)
 - [CloudEvents Specification v1.0](https://cloudevents.io/)
 - [CloudEvents JSON Format](https://github.com/cloudevents/spec/blob/v1.0.2/cloudevents/formats/json-format.md)
 - [ADR-0003 Messaging Architecture](0003-messaging-architecture.md)

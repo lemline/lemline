@@ -3,7 +3,7 @@
 
 ## Purpose & Concept
 
-The core concept of a "Call" task in the Serverless Workflow DSL is to enable interaction with external services, functions, or APIs. These tasks are the primary mechanism for orchestrating communication beyond the workflow's internal state management and control flow.
+The core concept of a "Call" task in the Open Workflow DSL is to enable interaction with external services, functions, or APIs. These tasks are the primary mechanism for orchestrating communication beyond the workflow's internal state management and control flow.
 
 Different types of `call` tasks cater to specific protocols or interaction patterns, providing a structured way to define how the workflow communicates with the outside world.
 

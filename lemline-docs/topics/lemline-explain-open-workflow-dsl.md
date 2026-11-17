@@ -1,10 +1,10 @@
-# Understanding the Serverless Workflow DSL
+# Understanding the Open Workflow DSL
 
-This document explains the Serverless Workflow Domain Specific Language (DSL), its design principles, and how Lemline implements it.
+This document explains the Open Workflow Domain Specific Language (DSL), its design principles, and how Lemline implements it.
 
-## What is Serverless Workflow DSL?
+## What is Open Workflow DSL?
 
-The Serverless Workflow DSL is a vendor-neutral, platform-independent workflow language created by the [Cloud Native Computing Foundation (CNCF)](https://www.cncf.io/). It provides a standard way to define workflow orchestration using a declarative approach. 
+The Open Workflow DSL is a vendor-neutral, platform-independent workflow language hosted by the [Cloud Native Computing Foundation (CNCF)](https://www.cncf.io/projects/open-workflow-specification/). It provides a standard way to define workflow orchestration using a declarative approach.
 
 Key characteristics of the DSL include:
 
@@ -18,7 +18,7 @@ Key characteristics of the DSL include:
 
 ### 1. Workflow as Code
 
-The Serverless Workflow DSL treats workflows as code, enabling:
+The Open Workflow DSL treats workflows as code, enabling:
 
 - **Version control**: Track changes with git or other VCS
 - **CI/CD integration**: Automate testing and deployment
@@ -114,7 +114,7 @@ transition:
 
 ## Lemline Implementation
 
-Lemline implements the Serverless Workflow DSL version 1.0.0 with:
+Lemline implements the Open Workflow DSL version 1.0.0 with:
 
 ### YAML-First Approach
 
@@ -249,9 +249,9 @@ do:
 
 ## Comparison to Other Workflow Languages
 
-### Serverless Workflow vs. AWS Step Functions
+### Open Workflow vs. AWS Step Functions
 
-| Feature | Serverless Workflow | AWS Step Functions |
+| Feature | Open Workflow | AWS Step Functions |
 |---------|---------------------|-------------------|
 | Syntax | YAML/JSON | JSON (Amazon States Language) |
 | Portability | Vendor-neutral | AWS-specific |
@@ -259,18 +259,18 @@ do:
 | Event Support | Rich event patterns | Basic event integration |
 | Error Handling | Try-catch with retry | Retry and fallback states |
 
-### Serverless Workflow vs. Argo Workflows
+### Open Workflow vs. Argo Workflows
 
-| Feature | Serverless Workflow | Argo Workflows |
+| Feature | Open Workflow | Argo Workflows |
 |---------|---------------------|----------------|
 | Focus | Service orchestration | Container orchestration |
 | Runtime | Cloud-agnostic | Kubernetes-based |
 | Paradigm | Event-driven + sequential | DAG-based tasks |
 | State Management | Built-in | Template-based |
 
-### Serverless Workflow vs. BPMN
+### Open Workflow vs. BPMN
 
-| Feature | Serverless Workflow | BPMN |
+| Feature | Open Workflow | BPMN |
 |---------|---------------------|------|
 | Representation | Code-first (YAML/JSON) | Visual-first (XML) |
 | Target Users | Developers | Business + Developers |
@@ -303,7 +303,7 @@ do:
 
 ## DSL Evolution
 
-The Serverless Workflow specification continues to evolve:
+The Open Workflow Specification continues to evolve:
 
 - **Version 0.8**: Initial public release
 - **Version 0.9**: Enhanced event correlation and function definition
@@ -312,8 +312,8 @@ The Serverless Workflow specification continues to evolve:
 
 ## Related Resources
 
-- [Serverless Workflow Specification](https://serverlessworkflow.io/)
-- [CNCF Serverless Workflow Project](https://github.com/serverlessworkflow/specification)
+- [Open Workflow Specification](https://open-workflow-specification.org/)
+- [CNCF Open Workflow Project](https://github.com/open-workflow-specification/specification)
 - [JQ Expressions Guide](lemline-howto-jq.md)
 - [Workflow Definition Guide](lemline-howto-define-workflow.md)
 - [Workflow Execution Model](lemline-explain-execution.md)

@@ -19,6 +19,7 @@ dependencies {
     implementation(enforcedPlatform(libs.quarkus.bom))
     implementation("io.quarkus:quarkus-arc")
     implementation("io.quarkus:quarkus-flyway")
+    implementation("org.flywaydb:flyway-database-postgresql")
     implementation("io.quarkus:quarkus-jdbc-postgresql")
 
     // Reactive Messaging (for Message, Channel types used by subscriber/handler)
@@ -39,4 +40,6 @@ dependencies {
     testImplementation("io.kotest:kotest-runner-junit5")
     testImplementation("io.kotest:kotest-assertions-core")
     testImplementation(libs.mockk)
+    testImplementation(libs.serverlessworkflow.api)
+    testImplementation(testFixtures(project(":lemline-runner-common")))
 }

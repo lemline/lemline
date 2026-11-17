@@ -183,7 +183,7 @@ do:
                   catch:
                     - errors:
                         with:
-                          type: https://serverlessworkflow.io/spec/1.0.0/errors/communication
+                          type: https://open-workflow-specification.org/spec/1.0.0/errors/communication
                           status: 429  # Too Many Requests
                       retry:
                         delay:
@@ -195,7 +195,7 @@ do:
                             count: 3
                     - errors:
                         with:
-                          type: https://serverlessworkflow.io/spec/1.0.0/errors/communication
+                          type: https://open-workflow-specification.org/spec/1.0.0/errors/communication
                       as: apiError
                       export:
                         as: '$context + { failures: $context.failures + [{ item: $item, error: $apiError }] }'
@@ -671,7 +671,7 @@ do:
                       catch:
                         errors:
                           with:
-                            type: https://serverlessworkflow.io/spec/1.0.0/errors/communication
+                            type: https://open-workflow-specification.org/spec/1.0.0/errors/communication
                         retry:
                           delay:
                             seconds: 2
@@ -697,7 +697,7 @@ When implementing API integrations in Lemline workflows, consider these best pra
 
 ## Conclusion
 
-These examples demonstrate how to implement various API integration patterns in Lemline workflows. By leveraging the Serverless Workflow DSL's capabilities, you can build robust API integrations that handle authentication, error conditions, pagination, and other common challenges.
+These examples demonstrate how to implement various API integration patterns in Lemline workflows. By leveraging the Open Workflow DSL's capabilities, you can build robust API integrations that handle authentication, error conditions, pagination, and other common challenges.
 
 Whether you're working with REST APIs, GraphQL, OpenAPI specifications, gRPC services, or event-driven AsyncAPI definitions, Lemline provides a consistent approach to API integration that emphasizes reliability, security, and maintainability.
 

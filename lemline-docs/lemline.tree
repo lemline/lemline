@@ -92,7 +92,7 @@
                 <toc-element topic="lemline-ref-cli.md"/>
                 <toc-element topic="lemline-ref-errors.md"/>
             </toc-element>
-            <toc-element toc-title="Auth & Secrets Reference">
+            <toc-element toc-title="Auth &amp; Secrets Reference">
                 <toc-element topic="lemline-ref-auth.md"/>
                 <toc-element topic="lemline-ref-secrets.md"/>
             </toc-element>
@@ -110,7 +110,7 @@
         <toc-element toc-title="Explanations">
             <toc-element topic="lemline-explain-event-driven.md"/>
             <toc-element topic="lemline-explain-execution.md"/>
-            <toc-element topic="lemline-explain-sw-dsl.md"/>
+            <toc-element topic="lemline-explain-open-workflow-dsl.md"/>
             <toc-element topic="lemline-explain-fan-in.md"/>
             <toc-element topic="lemline-explain-time.md"/>
             <toc-element topic="lemline-explain-errors.md"/>
@@ -134,7 +134,7 @@
         </toc-element>
         
         <!-- Observability & Performance section -->
-        <toc-element toc-title="Observability & Performance">
+        <toc-element toc-title="Observability &amp; Performance">
             <toc-element topic="lemline-observability-lifecycle.md"/>
             <toc-element topic="lemline-observability-performance.md"/>
             <toc-element topic="lemline-observability-io.md"/>

@@ -7,7 +7,7 @@
 
 [![License](https://img.shields.io/badge/License-BSL%201.1-blue.svg)](LICENSE.md)
 
-Lemline is a modern runtime for the [Serverless Workflow DSL](https://github.com/serverlessworkflow/specification)
+Lemline is a modern runtime for the [Open Workflow DSL](https://github.com/open-workflow-specification/specification)
 version 1.0,
 enabling the execution of complex workflows defined in YAML or JSON **on top of your existing infrastructure**. It
 leverages
@@ -27,8 +27,8 @@ or waiting for multiple tasks to complete in parallel.
 
 ## ✨ Features
 
-* **Serverless Workflow DSL Execution:** Faithfully implements
-  the [Serverless Workflow specification](https://serverlessworkflow.io) for defining and running workflows.
+* **Open Workflow DSL Execution:** Faithfully implements
+  the [Open Workflow Specification](https://open-workflow-specification.org) for defining and running workflows.
 * **Event-Driven Orchestration** State transitions are carried within broker messages, minimizing database load and
   improving throughput.
 * **Micrometer Integration** Built-in metrics and health checks, exposed through a dedicated endpoint for observability.
@@ -86,7 +86,7 @@ Other databases and brokers (e.g. Pulsar, SQS, Pub/Sub, Service Bus) are on the 
 
 ## 📦 Modules
 
-* **`lemline-core`:** Contains the core implementation of the Serverless Workflow DSL types and logic.
+* **`lemline-core`:** Contains the core implementation of the Open Workflow DSL types and logic.
 * **`lemline-runner`:** Quarkus-based runtime. Handles message I/O, workflow state management, and integration with
   databases/brokers.
 * **`lemline-docs`:** (WIP) Documentation for the project.
@@ -183,8 +183,8 @@ gradlew.bat -p lemline-runner quarkusBuild -Dquarkus.native.enabled=true -Dquark
 
 ## 📚 Documentation
 
-* **Serverless Workflow DSL Specification:**
-  See the [Offficial Specification](https://github.com/serverlessworkflow/specification)
+* **Open Workflow Specification:**
+  See the [official specification](https://github.com/open-workflow-specification/specification)
 * **Runner Configuration:** See [lemline-runner/README.md](./lemline-runner/README.md)
   for detailed configuration options.
 

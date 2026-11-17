@@ -34,7 +34,7 @@ lemline definition post /path/to/my-workflow.yaml
 ```
 
 This command:
-1. Validates the workflow definition against the Serverless Workflow schema
+1. Validates the workflow definition against the Open Workflow schema
 2. Adds the workflow to Lemline's registry
 3. Makes it available for instantiation
 
@@ -244,7 +244,7 @@ java -jar lemline-runner.jar -Dquarkus.profile=prod
 
 If you encounter errors when publishing a workflow:
 
-1. **Validation Errors**: Check that your workflow adheres to the Serverless Workflow schema
+1. **Validation Errors**: Check that your workflow adheres to the Open Workflow schema
 2. **Database Connectivity**: Ensure your database is running and accessible
 3. **Version Conflicts**: If the workflow already exists with the same version, use the `--update` flag
 

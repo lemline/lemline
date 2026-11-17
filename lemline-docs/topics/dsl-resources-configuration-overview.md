@@ -6,7 +6,7 @@ title: Resources & Configuration Overview
 
 ## Introduction
 
-Beyond the core workflow logic and task execution, the Serverless Workflow DSL provides mechanisms for managing reusable resources, defining specific syntaxes, and configuring cross-cutting concerns like security and timing. This section covers these essential aspects that help you build more robust, maintainable, and secure workflows.
+Beyond the core workflow logic and task execution, the Open Workflow DSL provides mechanisms for managing reusable resources, defining specific syntaxes, and configuring cross-cutting concerns like security and timing. This section covers these essential aspects that help you build more robust, maintainable, and secure workflows.
 
 Understanding these features allows you to effectively manage external dependencies, authentication details, and global settings within your workflow definitions.
 

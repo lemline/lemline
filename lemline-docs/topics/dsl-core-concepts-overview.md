@@ -7,7 +7,7 @@ title: Core Concepts Overview
 
 ## Introduction
 
-Before diving into specific workflow tasks, it's essential to understand the fundamental concepts that underpin the Serverless Workflow DSL. These core concepts define how data moves, how dynamic values are evaluated, how execution proceeds, and how errors are managed within a workflow.
+Before diving into specific workflow tasks, it's essential to understand the fundamental concepts that underpin the Open Workflow DSL. These core concepts define how data moves, how dynamic values are evaluated, how execution proceeds, and how errors are managed within a workflow.
 
 Mastering these concepts will enable you to design more effective, robust, and maintainable workflows that follow best practices and industry standards.
 

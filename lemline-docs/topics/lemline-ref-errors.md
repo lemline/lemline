@@ -4,18 +4,18 @@ This reference documents all standard error types, error codes, and error handli
 
 ## Standard Error Types
 
-Lemline implements the standardized error types defined in the Serverless Workflow specification, with the base URI `https://serverlessworkflow.io/spec/1.0.0/errors/`:
+Lemline implements the standardized error types defined in the Open Workflow Specification, with the base URI `https://open-workflow-specification.org/spec/1.0.0/errors/`:
 
 | Error Type | URI | Default Status | Description |
 |------------|-----|----------------|-------------|
-| Configuration | `https://serverlessworkflow.io/spec/1.0.0/errors/configuration` | 400 | Errors in workflow definition or structure |
-| Validation | `https://serverlessworkflow.io/spec/1.0.0/errors/validation` | 400 | Input/output data schema validation failures |
-| Expression | `https://serverlessworkflow.io/spec/1.0.0/errors/expression` | 400 | Expression evaluation errors (JQ syntax or execution) |
-| Authentication | `https://serverlessworkflow.io/spec/1.0.0/errors/authentication` | 401 | Authentication failures |
-| Authorization | `https://serverlessworkflow.io/spec/1.0.0/errors/authorization` | 403 | Authorization/permission failures |
-| Timeout | `https://serverlessworkflow.io/spec/1.0.0/errors/timeout` | 408 | Timeout violations (workflow or task) |
-| Communication | `https://serverlessworkflow.io/spec/1.0.0/errors/communication` | 500 | Errors communicating with external services |
-| Runtime | `https://serverlessworkflow.io/spec/1.0.0/errors/runtime` | 500 | General runtime execution errors |
+| Configuration | `https://open-workflow-specification.org/spec/1.0.0/errors/configuration` | 400 | Errors in workflow definition or structure |
+| Validation | `https://open-workflow-specification.org/spec/1.0.0/errors/validation` | 400 | Input/output data schema validation failures |
+| Expression | `https://open-workflow-specification.org/spec/1.0.0/errors/expression` | 400 | Expression evaluation errors (JQ syntax or execution) |
+| Authentication | `https://open-workflow-specification.org/spec/1.0.0/errors/authentication` | 401 | Authentication failures |
+| Authorization | `https://open-workflow-specification.org/spec/1.0.0/errors/authorization` | 403 | Authorization/permission failures |
+| Timeout | `https://open-workflow-specification.org/spec/1.0.0/errors/timeout` | 408 | Timeout violations (workflow or task) |
+| Communication | `https://open-workflow-specification.org/spec/1.0.0/errors/communication` | 500 | Errors communicating with external services |
+| Runtime | `https://open-workflow-specification.org/spec/1.0.0/errors/runtime` | 500 | General runtime execution errors |
 
 ## Error Structure
 
@@ -23,7 +23,7 @@ All errors in Lemline follow the RFC 7807 Problem Details format:
 
 ```json
 {
-  "type": "https://serverlessworkflow.io/spec/1.0.0/errors/validation",
+  "type": "https://open-workflow-specification.org/spec/1.0.0/errors/validation",
   "status": 400,
   "instance": "/do/0/validateInput",
   "title": "Input Validation Failed",
@@ -169,7 +169,7 @@ When using the HTTP API, error responses follow this format:
   "message": "Input validation failed",
   "path": "/workflows/instances",
   "details": {
-    "type": "https://serverlessworkflow.io/spec/1.0.0/errors/validation",
+    "type": "https://open-workflow-specification.org/spec/1.0.0/errors/validation",
     "instance": "/do/0/validateInput",
     "errors": [
       {
@@ -231,7 +231,7 @@ use:
       catch:
         - error:
             with:
-              type: "https://serverlessworkflow.io/spec/1.0.0/errors/timeout"
+              type: "https://open-workflow-specification.org/spec/1.0.0/errors/timeout"
             as: "timeoutError"
           do:
             - handleTimeout:
@@ -244,14 +244,14 @@ use:
 catch:
   - error:
       with:
-        type: "https://serverlessworkflow.io/spec/1.0.0/errors/communication"
+        type: "https://open-workflow-specification.org/spec/1.0.0/errors/communication"
         status: 429
       do:
         # Handle rate limiting
   
   - error:
       with:
-        type: "https://serverlessworkflow.io/spec/1.0.0/errors/communication"
+        type: "https://open-workflow-specification.org/spec/1.0.0/errors/communication"
         status: 503
       do:
         # Handle service unavailable

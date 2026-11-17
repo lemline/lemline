@@ -4,12 +4,12 @@ title: What Is Lemline?
 
 # What Is Lemline?
 
-Lemline is a modern runtime for the Serverless Workflow DSL (Domain Specific Language) that provides an efficient,
+Lemline is a modern runtime for the Open Workflow DSL (Domain Specific Language) that provides an efficient,
 reliable way to orchestrate tasks and services in distributed environments.
 
 ## Core Features
 
-* **Serverless Workflow DSL Implementation**: Implements the Serverless Workflow DSL 1.0 standard, a
+* **Open Workflow DSL Implementation**: Implements the Open Workflow DSL 1.0 standard, a
   CNCF project for workflow definitions (see [Supported Features](lemline-ref-supported-features.md) for details)
 * **Event-Driven Architecture**: Built from the ground up with event-driven principles
 * **Database-Optional Design**: Can operate without a central database for many workflow types

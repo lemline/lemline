@@ -1,13 +1,13 @@
 # Lemline Core
 
-The `lemline-core` module is the heart of the Lemline workflow engine. It provides a pure functional, stateless orchestrator capable of executing Serverless Workflow definitions with support for both synchronous and asynchronous execution modes.
+The `lemline-core` module is the heart of the Lemline workflow engine. It provides a pure functional, stateless orchestrator capable of executing Open Workflow definitions with support for both synchronous and asynchronous execution modes.
 
 ## Overview
 
 Lemline Core implements a robust workflow engine that emphasizes:
 
 *   **Pure Functional Design**: The orchestrator is stateless. It takes the current state and an event/input, and returns the next state and side effects. State is managed externally.
-*   **Serverless Workflow Support**: Native support for the [Serverless Workflow Specification](https://serverlessworkflow.io/), allowing you to define workflows using standard JSON or YAML.
+*   **Open Workflow Support**: Native support for the [Open Workflow Specification](https://open-workflow-specification.org/), allowing you to define workflows using standard JSON or YAML.
 *   **Step-by-Step Execution**: The orchestrator executes one step at a time, returning control after each step. This enables distributed execution where state can be persisted and resumed.
 
 ## Key Components
@@ -28,7 +28,7 @@ Each node type (e.g., `Operation`, `Switch`, `Sleep`) has a corresponding `Proce
 ## Implementation Strategy
 
 ### Workflow Tree Structure
-The workflow is represented as a tree of `Node<T>` objects. Each node wraps a Serverless Workflow `TaskBase` definition (e.g., `DoTask`, `SwitchTask`).
+The workflow is represented as a tree of `Node<T>` objects. Each node wraps an Open Workflow `TaskBase` definition (e.g., `DoTask`, `SwitchTask`).
 *   **Lazy Parsing**: Children of a node (e.g., steps in a `do` block) are parsed lazily. This allows for efficient handling of large workflow definitions.
 *   **Positioning**: Each node has a unique `NodePosition` which serves as a pointer (e.g., `root.do.0.switch.case1`).
 
@@ -44,7 +44,7 @@ The execution engine uses a pure functional approach implemented in `NodeProcess
     *   Flow directives for control flow.
 
 ### Spec Implementation
-The mapping between Serverless Workflow specification and implementation is direct:
+The mapping between Open Workflow Specification and implementation is direct:
 *   **TaskBase**: The SDK's `TaskBase` types are used directly in `Node<T>`.
 *   **Processors**: Each task type has a specific processor (e.g., `DoProcessor` for `DoTask`, `SwitchProcessor` for `SwitchTask`).
 *   **Control Flow**: Logic for `switch`, `foreach`, `try/catch` is handled by their respective processors, ensuring strict adherence to the spec's semantics.
@@ -62,7 +62,7 @@ implementation(project(":lemline-core"))
 ```kotlin
 import com.lemline.core.orchestrator.StepByStepOrchestrator
 
-val workflow = ... // Load your Serverless Workflow definition
+val workflow = ... // Load your Open Workflow definition
 val input = buildJsonObject { put("key", "value") }
 
 // Execute one step
@@ -86,7 +86,7 @@ val result = StepByStepOrchestrator.resume(
 ## Dependencies
 
 This module relies on:
-*   **Serverless Workflow SDK**: For parsing and validating workflow definitions.
+*   **Open Workflow SDK**: For parsing and validating workflow definitions.
 *   **Ktor Client**: For making HTTP requests within workflows.
 *   **Kotlin Serialization**: For JSON handling and state serialization.
 *   **Coroutines**: For non-blocking execution.

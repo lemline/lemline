@@ -459,7 +459,7 @@ object RunWorkflowTestCases {
                           - raiseError:
                               raise:
                                 error:
-                                  type: https://serverlessworkflow.io/errors/child
+                                  type: https://open-workflow-specification.org/errors/child
                                   status: 400
                                   title: Validation failed
                     """.trimIndent()
@@ -488,7 +488,7 @@ object RunWorkflowTestCases {
                           - raiseError:
                               raise:
                                 error:
-                                  type: https://serverlessworkflow.io/errors/child
+                                  type: https://open-workflow-specification.org/errors/child
                                   status: 400
                                   title: Validation failed
                     """.trimIndent()
@@ -526,7 +526,7 @@ object RunWorkflowTestCases {
                           - raiseError:
                               raise:
                                 error:
-                                  type: https://serverlessworkflow.io/errors/not-found
+                                  type: https://open-workflow-specification.org/errors/not-found
                                   status: 404
                                   title: Resource not found
                     """.trimIndent()
@@ -536,7 +536,7 @@ object RunWorkflowTestCases {
                 buildJsonObject {
                     put("handled", true)
                     put("errorStatus", 404)
-                    put("errorType", "https://serverlessworkflow.io/errors/not-found")
+                    put("errorType", "https://open-workflow-specification.org/errors/not-found")
                 }
             )
         ),

@@ -6,7 +6,7 @@ title: Run Workflow
 
 ## Purpose
 
-The `run: workflow` task allows a workflow to invoke and execute another Serverless Workflow definition as a sub-workflow. This facilitates modular design, reusability, and the composition of complex processes from smaller, focused workflows.
+The `run: workflow` task allows a workflow to invoke and execute another Open Workflow definition as a sub-workflow. This facilitates modular design, reusability, and the composition of complex processes from smaller, focused workflows.
 
 ## Usage Example
 
@@ -92,7 +92,7 @@ do:
       catch:
         # Catch any error from the sub-workflow execution itself
         errors: 
-          with: { type: "https://serverlessworkflow.io/spec/1.0.0/errors/runtime" }
+          with: { type: "https://open-workflow-specification.org/spec/1.0.0/errors/runtime" }
         as: runtimeError
         do:
           - logSubWorkflowFailure:
@@ -146,7 +146,7 @@ The configuration is provided under the `run` property, specifically within the 
 *   **`return`** (String - `stdout` | `stderr` | `code` | `all` | `none`, Optional, Default: `stdout`): Specifies what the task's `rawOutput` should be when `await` is `true`.
     *   `stdout`: The final output data of the sub-workflow (i.e., the result after its top-level `output.as` transformation), but only if it completed successfully.
     *   `stderr`: The WorkflowError object if the sub-workflow faulted. This object typically includes:
-        *   `type` (String): A URI identifying the error type (e.g., `https://serverlessworkflow.io/spec/1.0.0/errors/runtime`).
+        *   `type` (String): A URI identifying the error type (e.g., `https://open-workflow-specification.org/spec/1.0.0/errors/runtime`).
         *   `status` (Integer): An appropriate status code (often mirroring HTTP status codes).
         *   `instance` (String): A JSON Pointer indicating the component within the sub-workflow where the error originated.
         *   `title` (String, Optional): A short, human-readable summary.

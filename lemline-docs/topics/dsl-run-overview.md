@@ -6,7 +6,7 @@ title: Run Tasks
 
 ## Purpose
 
-The `run` task type in the Serverless Workflow DSL provides a powerful mechanism for executing external processes from within a workflow. This allows workflows to leverage existing scripts, command-line tools, containerized applications, or even trigger other workflows.
+The `run` task type in the Open Workflow DSL provides a powerful mechanism for executing external processes from within a workflow. This allows workflows to leverage existing scripts, command-line tools, containerized applications, or even trigger other workflows.
 
 This capability is essential for:
 
@@ -35,7 +35,7 @@ The specific type of process to execute is determined by the nested object provi
     *   See: [Run Shell Command Task](dsl-run-shell.md)
 
 *   **`run: workflow`**:
-    *   Invokes and executes another Serverless Workflow definition as a sub-workflow.
+    *   Invokes and executes another Open Workflow definition as a sub-workflow.
     *   Enables modular design and composition of complex processes.
     *   See: [Run Workflow Task](dsl-run-workflow.md)
 

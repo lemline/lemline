@@ -143,7 +143,7 @@ Provides error handling and retry capabilities.
       catch:
         - error:
             with:
-              type: "https://serverlessworkflow.io/spec/1.0.0/errors/timeout"
+              type: "https://open-workflow-specification.org/spec/1.0.0/errors/timeout"
             as: "timeoutError"
           do:
             - handleTimeout:

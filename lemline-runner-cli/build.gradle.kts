@@ -26,7 +26,7 @@ dependencies {
     implementation("io.quarkus:quarkus-picocli")
     implementation("io.quarkus:quarkus-kotlin")
 
-    // Serverless Workflow SDK (for Workflow type)
+    // Open Workflow SDK (for Workflow type)
     implementation(libs.serverlessworkflow.api)
     implementation(libs.serverlessworkflow.impl.core)
 
@@ -47,7 +47,7 @@ dependencies {
     testImplementation(libs.mockk)
     testImplementation(testFixtures(project(":lemline-core")))
 
-    // Serverless Workflow API for mock types
+    // Open Workflow API for mock types
     testImplementation(libs.serverlessworkflow.api)
 
     // Access to lemline-runner classes for tests (WorkflowCommandEmitter, LifecycleEventHookImpl)

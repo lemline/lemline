@@ -8,7 +8,7 @@ describe("readableError", () => {
   it("replaces an HTML body sent back by the called server with the HTTP status", () => {
     expect(
       readableError({
-        type: "https://serverlessworkflow.io/spec/1.0.0/errors/communication",
+        type: "https://open-workflow-specification.org/spec/1.0.0/errors/communication",
         status: 403,
         title: "HTTP 403: <!DOCTYPE html> <html lang..",
       }),
@@ -16,14 +16,14 @@ describe("readableError", () => {
   });
 
   it("recognizes an HTTP error typed as runtime by its reason phrase", () => {
-    expect(readableError({ type: "https://serverlessworkflow.io/spec/1.0.0/errors/runtime", status: 404, title: "Not Found" }).headline).toBe(
+    expect(readableError({ type: "https://open-workflow-specification.org/spec/1.0.0/errors/runtime", status: 404, title: "Not Found" }).headline).toBe(
       "HTTP 404 Not Found",
     );
   });
 
   it("keeps the title of an error raised by the workflow", () => {
     expect(
-      readableError({ type: "https://serverlessworkflow.io/errors/not-implemented", status: 500, title: "Not Implemented", detail: "Work in progress" }),
+      readableError({ type: "https://open-workflow-specification.org/errors/not-implemented", status: 500, title: "Not Implemented", detail: "Work in progress" }),
     ).toEqual({ headline: "Not Implemented", explanation: "Work in progress" });
   });
 });
@@ -51,9 +51,9 @@ describe("formatting", () => {
 describe("workflow source", () => {
   it("tells how a workflow starts", () => {
     const event = parseWorkflowSource(
-      "document: {name: set}\nschedule:\n  on:\n    one:\n      with:\n        type: io.serverlessworkflow.samples.events.trigger.v1\ndo: []",
+      "document: {name: set}\nschedule:\n  on:\n    one:\n      with:\n        type: com.lemline.samples.events.trigger.v1\ndo: []",
     );
-    expect(event.trigger).toEqual({ kind: "event", eventTypes: ["io.serverlessworkflow.samples.events.trigger.v1"] });
+    expect(event.trigger).toEqual({ kind: "event", eventTypes: ["com.lemline.samples.events.trigger.v1"] });
     expect(parseWorkflowSource("schedule:\n  every:\n    minutes: 5\ndo: []").trigger).toEqual({
       kind: "schedule",
       sentence: "A new instance starts every 5 min.",

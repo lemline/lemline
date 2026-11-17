@@ -168,7 +168,7 @@ do:
             if: ${ !.input.email || !.input.username || !.input.password }
             raise:
               error:
-                type: "https://serverlessworkflow.io/errors/validation/invalid-argument"
+                type: "https://open-workflow-specification.org/errors/validation/invalid-argument"
                 status: 400
                 title: "Missing required fields"
                 detail: "${ \"The following fields are required but missing: \" + [if(!.input.email) \"email\", if(!.input.username) \"username\", if(!.input.password) \"password\"].filter(Boolean).join(\", \") }"
@@ -177,7 +177,7 @@ do:
             if: ${ !.input.email.match(/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/) }
             raise:
               error:
-                type: "https://serverlessworkflow.io/errors/validation/invalid-argument"
+                type: "https://open-workflow-specification.org/errors/validation/invalid-argument"
                 status: 400
                 title: "Invalid email format"
                 detail: "${ \"Email address '\" + .input.email + \"' does not match the required format: username@domain.tld\" }"
@@ -186,7 +186,7 @@ do:
             if: ${ .input.password.length < 8 }
             raise:
               error:
-                type: "https://serverlessworkflow.io/errors/validation/invalid-argument"
+                type: "https://open-workflow-specification.org/errors/validation/invalid-argument"
                 status: 400
                 title: "Password too short"
                 detail: "${ \"Password must be at least 8 characters long. Current length: \" + .input.password.length }"
@@ -218,7 +218,7 @@ do:
             if: ${ .inventoryData.quantityAvailable < .input.quantity }
             raise:
               error:
-                type: "https://serverlessworkflow.io/errors/validation/failed-precondition"
+                type: "https://open-workflow-specification.org/errors/validation/failed-precondition"
                 status: 412
                 title: "Insufficient inventory"
                 detail: "${ \"Product '\" + .input.productId + \"' has insufficient inventory. Requested: \" + .input.quantity + \", Available: \" + .inventoryData.quantityAvailable + \". Next restock date: \" + .inventoryData.nextDeliveryDate }"
@@ -227,7 +227,7 @@ do:
             if: ${ .input.quantity > 10 && .input.customerType != "wholesale" }
             raise:
               error:
-                type: "https://serverlessworkflow.io/errors/authorization/permission-denied"
+                type: "https://open-workflow-specification.org/errors/authorization/permission-denied"
                 status: 403
                 title: "Retail customers are limited to 10 units per order"
                 detail: "${ \"Customer type '\" + .input.customerType + \"' is limited to \" + 10 + \" units per order. Requested quantity: \" + .input.quantity + \". Resolution: Apply for a wholesale account or reduce order quantity.\" }"
@@ -258,7 +258,7 @@ do:
                   if: ${ !.input.order.items || .input.order.items.length == 0 }
                   raise:
                     error:
-                      type: "https://serverlessworkflow.io/errors/validation/invalid-argument"
+                      type: "https://open-workflow-specification.org/errors/validation/invalid-argument"
                       status: 400
                       title: "Order must contain at least one item"
                       detail: "The order must contain at least one item to be processed"
@@ -267,7 +267,7 @@ do:
                   if: ${ !.input.paymentMethod || !.input.paymentMethod.type }
                   raise:
                     error:
-                      type: "https://serverlessworkflow.io/errors/validation/invalid-argument"
+                      type: "https://open-workflow-specification.org/errors/validation/invalid-argument"
                       status: 400
                       title: "Payment validation failed"
                       detail: "Payment information is required"

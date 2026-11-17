@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Runtime expressions are dynamic elements within the Serverless Workflow DSL that enable flexible and adaptable workflow
+Runtime expressions are dynamic elements within the Open Workflow DSL that enable flexible and adaptable workflow
 behaviors. They provide a powerful way to:
 
 * Access and manipulate data during workflow execution (e.g., input data, context data, task outputs).
@@ -121,7 +121,7 @@ rather than embedding them directly into general-purpose fields like log message
 If the evaluation of a runtime expression fails (e.g., due to invalid syntax, accessing a non-existent field in JQ), the
 runtime raises a standard error:
 
-* **Type**: `https://serverlessworkflow.io/spec/1.0.0/errors/expression`
+* **Type**: `https://open-workflow-specification.org/spec/1.0.0/errors/expression`
 * **Status**: `400` (Bad Request)
 
 This error can be caught and handled using a [`Try`](dsl-task-try.md) task. 

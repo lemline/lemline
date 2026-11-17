@@ -4,7 +4,7 @@ This document explains how Lemline executes workflows, from parsing the definiti
 
 ## Execution Model Overview
 
-Lemline implements a node-based execution model for Serverless Workflow DSL:
+Lemline implements a node-based execution model for Open Workflow DSL:
 
 1. **Parsing**: The workflow definition (YAML/JSON) is parsed into a structured object model
 2. **Graph Construction**: A directed graph of nodes is created from the model
@@ -26,7 +26,7 @@ When a workflow definition is submitted to Lemline:
 ```
 
 1. **Parsing**: The YAML/JSON is parsed into a data structure
-2. **Schema Validation**: The structure is validated against the Serverless Workflow schema
+2. **Schema Validation**: The structure is validated against the Open Workflow schema
 3. **Node Graph Construction**: A directed graph of `NodeInstance` objects is created
 4. **Registration**: The workflow is registered in the Lemline registry
 

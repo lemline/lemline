@@ -20,7 +20,7 @@ class WorkflowErrorTest {
         val json = LemlineJson.encodeToString(error)
         val expected = """
             {
-                "type":"https://serverlessworkflow.io/spec/1.0.0/errors/validation",
+                "type":"https://open-workflow-specification.org/spec/1.0.0/errors/validation",
                 "status":400,
                 "instance":"/do/0",
                 "title":"Invalid_input",
@@ -35,7 +35,7 @@ class WorkflowErrorTest {
     fun `test error deserialization from JSON`() {
         val json = """
             {
-                "type":"https://serverlessworkflow.io/spec/1.0.0/errors/validation",
+                "type":"https://open-workflow-specification.org/spec/1.0.0/errors/validation",
                 "status":408,
                 "instance":"/do/1/try",
                 "title":"Operation timed out",
@@ -45,7 +45,7 @@ class WorkflowErrorTest {
 
         val error: InternalException.Error = LemlineJson.decodeFromString(json)
 
-        assertEquals("https://serverlessworkflow.io/spec/1.0.0/errors/validation", error.type)
+        assertEquals("https://open-workflow-specification.org/spec/1.0.0/errors/validation", error.type)
         assertEquals("Operation timed out", error.title)
         assertEquals(408, error.status)
         assertEquals("The operation exceeded the maximum allowed time", error.details)
@@ -64,7 +64,7 @@ class WorkflowErrorTest {
         val json = LemlineJson.encodeToString(error)
         val expected = """
             {
-                "type":"https://serverlessworkflow.io/spec/1.0.0/errors/runtime",
+                "type":"https://open-workflow-specification.org/spec/1.0.0/errors/runtime",
                 "status":500,
                 "instance":"/do/2",
                 "title":"Internal_error",

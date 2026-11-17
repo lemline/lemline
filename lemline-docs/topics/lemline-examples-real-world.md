@@ -1,6 +1,6 @@
 # Lemline Real-World Examples
 
-This document presents comprehensive real-world examples that demonstrate how to build complex, practical workflows using the Serverless Workflow DSL with Lemline. These examples combine multiple workflow patterns, integration methods, and error handling strategies to address realistic business scenarios.
+This document presents comprehensive real-world examples that demonstrate how to build complex, practical workflows using the Open Workflow DSL with Lemline. These examples combine multiple workflow patterns, integration methods, and error handling strategies to address realistic business scenarios.
 
 ## E-Commerce Order Processing
 
@@ -70,7 +70,7 @@ do:
       catch:
         errors:
           with:
-            type: https://serverlessworkflow.io/spec/1.0.0/errors/communication
+            type: https://open-workflow-specification.org/spec/1.0.0/errors/communication
         retry:
           delay:
             seconds: 2
@@ -152,7 +152,7 @@ do:
           then: exit
         - errors:
             with:
-              type: https://serverlessworkflow.io/spec/1.0.0/errors/communication
+              type: https://open-workflow-specification.org/spec/1.0.0/errors/communication
           retry:
             delay:
               seconds: 5
@@ -321,7 +321,7 @@ do:
       catch:
         errors:
           with:
-            type: https://serverlessworkflow.io/spec/1.0.0/errors/communication
+            type: https://open-workflow-specification.org/spec/1.0.0/errors/communication
         retry:
           delay:
             seconds: 60
@@ -536,7 +536,7 @@ do:
       catch:
         errors:
           with:
-            type: https://serverlessworkflow.io/spec/1.0.0/errors/validation
+            type: https://open-workflow-specification.org/spec/1.0.0/errors/validation
         as: validationError
         do:
           - logValidationFailure:
@@ -919,7 +919,7 @@ do:
       catch:
         errors:
           with:
-            type: https://serverlessworkflow.io/spec/1.0.0/errors/communication
+            type: https://open-workflow-specification.org/spec/1.0.0/errors/communication
         retry:
           delay:
             seconds: 30
@@ -1036,7 +1036,7 @@ do:
                             catch:
                               errors:
                                 with:
-                                  type: https://serverlessworkflow.io/spec/1.0.0/errors/communication
+                                  type: https://open-workflow-specification.org/spec/1.0.0/errors/communication
                               retry:
                                 delay:
                                   seconds: 5
@@ -1109,7 +1109,7 @@ Based on these examples, here are some best practices for building robust real-w
 
 ## Conclusion
 
-These real-world examples demonstrate how to implement complex business processes as workflows using the Serverless Workflow DSL in Lemline. By combining basic patterns, integrations, and error handling strategies, you can build robust, maintainable workflows for virtually any business scenario.
+These real-world examples demonstrate how to implement complex business processes as workflows using the Open Workflow DSL in Lemline. By combining basic patterns, integrations, and error handling strategies, you can build robust, maintainable workflows for virtually any business scenario.
 
 The examples shown here represent common patterns across various industries, but the same principles can be applied to workflows in any domain, from manufacturing to healthcare, finance to e-commerce, and beyond.
 

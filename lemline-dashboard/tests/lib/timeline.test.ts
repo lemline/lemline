@@ -12,12 +12,12 @@ function event(type: string, offsetMs: number, data: Record<string, unknown> = {
   const pointer = typeof data.task === "string" ? data.task : undefined;
   return {
     sequence: String(sequence),
-    eventType: `io.serverlessworkflow.${type}.v1`,
+    eventType: `org.open-workflow-specification.${type}.v1`,
     eventTime,
     category: type.startsWith("task") ? "TASK" : "WORKFLOW",
     taskPointer: pointer,
     taskName: pointer?.split("/").pop(),
-    payloadJson: JSON.stringify({ type: `io.serverlessworkflow.${type}.v1`, time: eventTime, data }),
+    payloadJson: JSON.stringify({ type: `org.open-workflow-specification.${type}.v1`, time: eventTime, data }),
   };
 }
 
@@ -57,7 +57,7 @@ describe("buildTimeline", () => {
       event("task.started", 500, { task: "/do/1/chargePayment" }),
       event("task.faulted", 2_500, {
         task: "/do/1/chargePayment",
-        error: { type: "https://serverlessworkflow.io/spec/1.0.0/errors/communication", status: 503, title: "Service Unavailable" },
+        error: { type: "https://open-workflow-specification.org/spec/1.0.0/errors/communication", status: 503, title: "Service Unavailable" },
       }),
       event("task.retried", 2_500, { task: "/do/1/chargePayment", retryCount: 1 }),
       event("task.started", 10_500, { task: "/do/1/chargePayment" }),
@@ -177,7 +177,7 @@ do:
         - fail:
             raise:
               error:
-                type: https://serverlessworkflow.io/spec/1.0.0/errors/communication
+                type: https://open-workflow-specification.org/spec/1.0.0/errors/communication
                 status: 503
       catch:
         errors:
@@ -361,7 +361,7 @@ do:
   });
 
   it("names the failing task and the readable error of a faulted instance", () => {
-    const error = { type: "https://serverlessworkflow.io/spec/1.0.0/errors/communication", status: 403, title: "HTTP 403: <!DOCTYPE html>" };
+    const error = { type: "https://open-workflow-specification.org/spec/1.0.0/errors/communication", status: 403, title: "HTTP 403: <!DOCTYPE html>" };
     const events = [
       event("workflow.started", 0),
       event("task.started", 0, { task: "/do/1/chargePayment" }),

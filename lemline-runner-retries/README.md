@@ -9,9 +9,9 @@ This module implements the retry mechanism for failed tasks:
 - **State preservation** during retry delay
 - **Error tracking** for debugging and metrics
 
-## Serverless Workflow DSL Reference
+## Open Workflow DSL Reference
 
-See [Retry Policy](https://serverlessworkflow.io/spec/latest/dsl-reference/#retry) in the Serverless Workflow specification:
+See [Retry Policy](https://github.com/open-workflow-specification/specification/blob/v1.0.0/dsl-reference.md#retry) in the Open Workflow Specification:
 
 ```yaml
 do:

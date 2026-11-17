@@ -3,7 +3,7 @@
     SYSTEM "https://resources.jetbrains.com/writerside/1.0/product-profile.dtd">
 
 <instance-profile id="docs"
-                  name="Serverless Workflow DSL"
+                  name="Open Workflow DSL"
                   start-page="lemline-introduction.md">
 
     <toc-element topic="lemline-introduction.md"/>

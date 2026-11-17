@@ -218,6 +218,6 @@ This separation maintains clean boundaries between execution modes and avoids un
 - [ADR-0002: Workflow Execution Model](0002-workflow-execution-model.md) - Node-based execution and state management
 - [ADR-0003: Messaging Architecture](0003-messaging-architecture.md) - Event-driven message flow
 - [ADR-0005: Error Handling Approach](0005-error-handling-approach.md) - General error handling strategy
-- [Serverless Workflow Specification - Fork Task](https://github.com/serverlessworkflow/specification/blob/main/specification.md#fork-task) - DSL specification
+- [Open Workflow Specification - Fork Task](https://github.com/open-workflow-specification/specification/blob/v1.0.0/dsl-reference.md#fork) - DSL specification
 - `lemline-core/src/main/kotlin/com/lemline/core/processors/ForkProcessor.kt` - Current implementation
 - `lemline-core/src/main/kotlin/com/lemline/core/orchestrator/sync/ForkSync.kt` - Fork synchronization logic

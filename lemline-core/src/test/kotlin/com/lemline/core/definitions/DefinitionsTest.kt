@@ -403,7 +403,7 @@ class DefinitionsTest {
     }
 
     // NOTE: Test for "listen task with runtime expression time filter" is not included
-    // because the Serverless Workflow SDK uses JSON Schema Draft 2020-12 where format
+    // because the Open Workflow SDK uses JSON Schema Draft 2020-12 where format
     // validation is annotation-only by default. This causes oneOf validation to fail
     // with "2 are valid" because format:date-time doesn't actually reject runtime
     // expressions, so both oneOf options match.

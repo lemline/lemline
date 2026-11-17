@@ -26,7 +26,11 @@ with other systems and standardized event handling.
 
 ## Event Publishing
 
-Runtimes implementing the Serverless Workflow specification are expected to publish these events upon state changes.
+Runtimes implementing the
+[Open Workflow Specification](https://github.com/open-workflow-specification/specification/blob/main/dsl.md#workflow-lifecycle-events)
+are expected to publish these events upon state changes.
+Lemline emits the new `org.open-workflow-specification.*` types and continues to recognize the deprecated
+`io.serverlessworkflow.*` lifecycle types when reading previously stored events.
 While the recommended approach is using
 the [HTTP protocol binding](https://github.com/cloudevents/spec/blob/v1.0.2/cloudevents/bindings/http-protocol-binding.md)
 with [structured content mode](https://github.com/cloudevents/spec/blob/v1.0.2/cloudevents/bindings/http-protocol-binding.md#32-structured-content-mode),
@@ -39,19 +43,19 @@ carries consistent information including workflow identity, status transitions, 
 
 | Event Type                                                | Description                                            | Required |
 |-----------------------------------------------------------|--------------------------------------------------------|:--------:|
-| `io.serverlessworkflow.workflow.started.v1`               | Emitted when a workflow instance starts execution      |   Yes    |
-| `io.serverlessworkflow.workflow.suspended.v1`             | Emitted when a workflow execution is suspended         |   Yes    |
-| `io.serverlessworkflow.workflow.resumed.v1`               | Emitted when a suspended workflow resumes execution    |   Yes    |
-| `io.serverlessworkflow.workflow.correlation-started.v1`   | Emitted when a workflow begins correlating events      |   Yes    |
-| `io.serverlessworkflow.workflow.correlation-completed.v1` | Emitted when a workflow completes an event correlation |   Yes    |
-| `io.serverlessworkflow.workflow.cancelled.v1`             | Emitted when a workflow execution is cancelled         |   Yes    |
-| `io.serverlessworkflow.workflow.faulted.v1`               | Emitted when a workflow encounters an unhandled error  |   Yes    |
-| `io.serverlessworkflow.workflow.completed.v1`             | Emitted when a workflow successfully completes         |   Yes    |
-| `io.serverlessworkflow.workflow.status-changed.v1`        | Emitted when a workflow's status phase changes         |    No    |
+| `org.open-workflow-specification.workflow.started.v1`               | Emitted when a workflow instance starts execution      |   Yes    |
+| `org.open-workflow-specification.workflow.suspended.v1`             | Emitted when a workflow execution is suspended         |   Yes    |
+| `org.open-workflow-specification.workflow.resumed.v1`               | Emitted when a suspended workflow resumes execution    |   Yes    |
+| `org.open-workflow-specification.workflow.correlation-started.v1`   | Emitted when a workflow begins correlating events      |   Yes    |
+| `org.open-workflow-specification.workflow.correlation-completed.v1` | Emitted when a workflow completes an event correlation |   Yes    |
+| `org.open-workflow-specification.workflow.cancelled.v1`             | Emitted when a workflow execution is cancelled         |   Yes    |
+| `org.open-workflow-specification.workflow.faulted.v1`               | Emitted when a workflow encounters an unhandled error  |   Yes    |
+| `org.open-workflow-specification.workflow.completed.v1`             | Emitted when a workflow successfully completes         |   Yes    |
+| `org.open-workflow-specification.workflow.status-changed.v1`        | Emitted when a workflow's status phase changes         |    No    |
 
 ### Workflow Started Event
 
-The `io.serverlessworkflow.workflow.started.v1` event is emitted when a workflow instance begins execution. It typically
+The `org.open-workflow-specification.workflow.started.v1` event is emitted when a workflow instance begins execution. It typically
 includes:
 
 - **Workflow identity** (ID, namespace, name, version)
@@ -79,7 +83,7 @@ Example event data:
 
 ### Workflow Completed Event
 
-The `io.serverlessworkflow.workflow.completed.v1` event is emitted when a workflow successfully completes all its tasks.
+The `org.open-workflow-specification.workflow.completed.v1` event is emitted when a workflow successfully completes all its tasks.
 It typically includes:
 
 - **Workflow identity** (ID, namespace, name, version)
@@ -144,19 +148,19 @@ events help in monitoring task progress, identifying bottlenecks, and troublesho
 
 | Event Type                                     | Description                                  | Required |
 |------------------------------------------------|----------------------------------------------|:--------:|
-| `io.serverlessworkflow.task.created.v1`        | Emitted when a task is created               |   Yes    |
-| `io.serverlessworkflow.task.started.v1`        | Emitted when a task begins execution         |   Yes    |
-| `io.serverlessworkflow.task.suspended.v1`      | Emitted when a task is suspended             |   Yes    |
-| `io.serverlessworkflow.task.resumed.v1`        | Emitted when a suspended task resumes        |   Yes    |
-| `io.serverlessworkflow.task.retried.v1`        | Emitted when a task is retried after failure |   Yes    |
-| `io.serverlessworkflow.task.cancelled.v1`      | Emitted when a task is cancelled             |   Yes    |
-| `io.serverlessworkflow.task.faulted.v1`        | Emitted when a task encounters an error      |   Yes    |
-| `io.serverlessworkflow.task.completed.v1`      | Emitted when a task successfully completes   |   Yes    |
-| `io.serverlessworkflow.task.status-changed.v1` | Emitted when a task's status phase changes   |    No    |
+| `org.open-workflow-specification.task.created.v1`        | Emitted when a task is created               |   Yes    |
+| `org.open-workflow-specification.task.started.v1`        | Emitted when a task begins execution         |   Yes    |
+| `org.open-workflow-specification.task.suspended.v1`      | Emitted when a task is suspended             |   Yes    |
+| `org.open-workflow-specification.task.resumed.v1`        | Emitted when a suspended task resumes        |   Yes    |
+| `org.open-workflow-specification.task.retried.v1`        | Emitted when a task is retried after failure |   Yes    |
+| `org.open-workflow-specification.task.cancelled.v1`      | Emitted when a task is cancelled             |   Yes    |
+| `org.open-workflow-specification.task.faulted.v1`        | Emitted when a task encounters an error      |   Yes    |
+| `org.open-workflow-specification.task.completed.v1`      | Emitted when a task successfully completes   |   Yes    |
+| `org.open-workflow-specification.task.status-changed.v1` | Emitted when a task's status phase changes   |    No    |
 
 ### Task Started Event
 
-The `io.serverlessworkflow.task.started.v1` event is emitted when a task begins execution. It typically includes:
+The `org.open-workflow-specification.task.started.v1` event is emitted when a task begins execution. It typically includes:
 
 - **Task identity** (reference, type)
 - **Workflow identity** (ID, namespace, name, version)
@@ -194,7 +198,7 @@ Example event data:
 
 ### Task Completed Event
 
-The `io.serverlessworkflow.task.completed.v1` event is emitted when a task successfully completes. It typically
+The `org.open-workflow-specification.task.completed.v1` event is emitted when a task successfully completes. It typically
 includes:
 
 - **Task identity** (reference, type)
@@ -234,7 +238,7 @@ Example event data:
 
 ### Task Faulted Event
 
-The `io.serverlessworkflow.task.faulted.v1` event is emitted when a task encounters an error. This event is particularly
+The `org.open-workflow-specification.task.faulted.v1` event is emitted when a task encounters an error. This event is particularly
 valuable for monitoring and troubleshooting. It typically includes:
 
 - **Task identity** (reference, type)
@@ -256,7 +260,7 @@ Example event data:
   "startedAt": "2023-11-15T14:32:10Z",
   "faultedAt": "2023-11-15T14:32:12Z",
   "error": {
-    "type": "https://serverlessworkflow.io/spec/1.0.0/errors/validation",
+    "type": "https://open-workflow-specification.org/spec/1.0.0/errors/validation",
     "status": 400,
     "detail": "Invalid payment information: Credit card expired",
     "instance": "/do/processPayment"
@@ -266,7 +270,7 @@ Example event data:
 
 ### Task Retried Event
 
-The `io.serverlessworkflow.task.retried.v1` event is emitted when a task is retried after a failure. It includes:
+The `org.open-workflow-specification.task.retried.v1` event is emitted when a task is retried after a failure. It includes:
 
 - **Task identity** (reference, type)
 - **Workflow identity** (ID, namespace, name, version)
@@ -287,7 +291,7 @@ Example event data:
   "attemptNumber": 2,
   "delayMs": 1000,
   "previousError": {
-    "type": "https://serverlessworkflow.io/spec/1.0.0/errors/communication",
+    "type": "https://open-workflow-specification.org/spec/1.0.0/errors/communication",
     "status": 503,
     "detail": "Notification service temporarily unavailable"
   }
@@ -333,8 +337,8 @@ Lifecycle events can be consumed by:
 
 ## Status Changed Events
 
-The `status-changed` events (`io.serverlessworkflow.workflow.status-changed.v1` and
-`io.serverlessworkflow.task.status-changed.v1`) are optional convenience events. They:
+The `status-changed` events (`org.open-workflow-specification.workflow.status-changed.v1` and
+`org.open-workflow-specification.task.status-changed.v1`) are optional convenience events. They:
 
 - Contain minimal data (primarily just the status transition)
 - Provide a lightweight alternative for consumers who only need to track status changes
@@ -347,6 +351,6 @@ the main lifecycle events, their implementation is optional.
 
 Lifecycle events provide a comprehensive way to gain visibility into workflow and task execution. By leveraging these
 standardized events, developers can build more observable, auditable, and reactive systems that respond intelligently to
-workflow state changes. Runtime implementations adhering to the Serverless Workflow specification provide these events
+workflow state changes. Runtime implementations adhering to the Open Workflow Specification provide these events
 as part of their standard behavior, enabling consistent monitoring and integration patterns across different
-environments. 
+environments.

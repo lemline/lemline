@@ -8,7 +8,7 @@ title: Flow Control
 
 ## Purpose
 
-Flow control determines the order in which tasks are executed within a Serverless Workflow. While the default behavior
+Flow control determines the order in which tasks are executed within an Open Workflow. While the default behavior
 is simple sequential execution, the DSL provides explicit mechanisms, primarily through the `then` directive, to create
 more complex and conditional execution paths.
 
@@ -199,7 +199,7 @@ Some tasks inherently control the flow:
 ## Potential Errors
 
 * **Target Not Found**: If `then` specifies a task name that does not exist within the same scope, the workflow will
-  raise a `Configuration` error (e.g., `https://serverlessworkflow.io/spec/1.0.0/errors/configuration`).
+  raise a `Configuration` error (e.g., `https://open-workflow-specification.org/spec/1.0.0/errors/configuration`).
 
 * **Invalid Directive**: Using an unknown string (that isn't a valid task name or `continue`/`exit`/`end`) in the `then`
   property will also cause the workflow to raise a `Configuration` error.

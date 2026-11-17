@@ -4,13 +4,13 @@
 
 ## Purpose
 
-This module implements the `wait` task from Serverless Workflow DSL:
+This module implements the `wait` task from Open Workflow DSL:
 - **Duration-based waits** - Wait for a specified duration (e.g., PT10S)
 - **Timestamp-based waits** - Wait until a specific time
 
-## Serverless Workflow DSL Reference
+## Open Workflow DSL Reference
 
-See [Wait Task](https://serverlessworkflow.io/spec/latest/dsl-reference/#wait) in the Serverless Workflow specification:
+See [Wait Task](https://github.com/open-workflow-specification/specification/blob/v1.0.0/dsl-reference.md#wait) in the Open Workflow Specification:
 
 ```yaml
 do:

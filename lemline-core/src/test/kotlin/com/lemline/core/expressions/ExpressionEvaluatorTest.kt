@@ -225,7 +225,7 @@ class ExpressionEvaluatorTest {
     }
 
     @Test
-    fun `should handle serverless workflow filter syntax with dollar prefix`() {
+    fun `should handle open workflow filter syntax with dollar prefix`() {
         val input = """{"name": "World"}"""
         val filter = "\${.name}"
 

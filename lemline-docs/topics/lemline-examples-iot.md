@@ -45,7 +45,7 @@ do:
       catch:
         errors:
           with:
-            type: https://serverlessworkflow.io/spec/1.0.0/errors/communication
+            type: https://open-workflow-specification.org/spec/1.0.0/errors/communication
             status: 404
         as: notFoundError
         do:
@@ -79,7 +79,7 @@ do:
       catch:
         errors:
           with:
-            type: https://serverlessworkflow.io/spec/1.0.0/errors/communication
+            type: https://open-workflow-specification.org/spec/1.0.0/errors/communication
         retry:
           delay:
             seconds: 5

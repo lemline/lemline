@@ -11,6 +11,7 @@ import com.lemline.runner.config.analyticsSchemaResolved
 import com.lemline.runner.config.analyticsTypeResolved
 import com.lemline.runner.gateway.analytics.AnalyticsDataSourceProvider
 import com.lemline.runner.gateway.persistence.GatewayJdbcSupport
+import com.lemline.runner.gateway.persistence.lifecycleTypeSqlList
 import com.lemline.runner.gateway.persistence.SqlQuery
 import com.lemline.runner.gateway.persistence.getInstantOrNull
 import com.lemline.runner.gateway.persistence.normalizePageSize
@@ -104,7 +105,7 @@ class InstanceQueryService(
         where += "id > ?"
         params += afterSequenceExclusive
         where += "lemline_workflow_id IS NOT NULL"
-        where += "type IN ('${LifecycleEventType.WORKFLOW_CREATED.type}', '${LifecycleEventType.WORKFLOW_STARTED.type}', '${LifecycleEventType.WORKFLOW_COMPLETED.type}', '${LifecycleEventType.WORKFLOW_FAULTED.type}')"
+        where += "type IN (${lifecycleTypeSqlList(LifecycleEventType.WORKFLOW_CREATED, LifecycleEventType.WORKFLOW_STARTED, LifecycleEventType.WORKFLOW_COMPLETED, LifecycleEventType.WORKFLOW_FAULTED)})"
 
         filter.namespace?.trim()?.takeIf { it.isNotBlank() }?.let {
             where += "lemline_workflow_namespace = ?"
@@ -382,11 +383,11 @@ class InstanceQueryService(
                 MAX(lemline_workflow_namespace) AS lemline_workflow_namespace,
                 MAX(lemline_workflow_name) AS lemline_workflow_name,
                 MAX(lemline_workflow_version) AS lemline_workflow_version,
-                MIN(CASE WHEN type = '${LifecycleEventType.WORKFLOW_CREATED.type}' THEN event_time END) AS created_at,
-                MIN(CASE WHEN type = '${LifecycleEventType.WORKFLOW_STARTED.type}' THEN event_time END) AS started_at,
-                MAX(CASE WHEN type = '${LifecycleEventType.WORKFLOW_COMPLETED.type}' THEN event_time END) AS completed_at,
-                MAX(CASE WHEN type = '${LifecycleEventType.WORKFLOW_FAULTED.type}' THEN event_time END) AS faulted_at,
-                MAX(CASE WHEN type = '${LifecycleEventType.WORKFLOW_FAULTED.type}' THEN id END) AS latest_faulted_sequence,
+                MIN(CASE WHEN type IN (${lifecycleTypeSqlList(LifecycleEventType.WORKFLOW_CREATED)}) THEN event_time END) AS created_at,
+                MIN(CASE WHEN type IN (${lifecycleTypeSqlList(LifecycleEventType.WORKFLOW_STARTED)}) THEN event_time END) AS started_at,
+                MAX(CASE WHEN type IN (${lifecycleTypeSqlList(LifecycleEventType.WORKFLOW_COMPLETED)}) THEN event_time END) AS completed_at,
+                MAX(CASE WHEN type IN (${lifecycleTypeSqlList(LifecycleEventType.WORKFLOW_FAULTED)}) THEN event_time END) AS faulted_at,
+                MAX(CASE WHEN type IN (${lifecycleTypeSqlList(LifecycleEventType.WORKFLOW_FAULTED)}) THEN id END) AS latest_faulted_sequence,
                 MAX(id) AS latest_event_sequence
               FROM instance_events
               GROUP BY lemline_workflow_id

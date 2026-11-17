@@ -6,7 +6,7 @@ Accepted
 
 ## Context
 
-The Lemline project implements a runtime for the Serverless Workflow DSL, which requires a robust error handling approach to manage failures during workflow execution, task processing, and system operations. We needed to decide on an error handling approach that would be comprehensive, consistent, and aligned with the project's requirements.
+The Lemline project implements a runtime for the Open Workflow DSL, which requires a robust error handling approach to manage failures during workflow execution, task processing, and system operations. We needed to decide on an error handling approach that would be comprehensive, consistent, and aligned with the project's requirements.
 
 ## Decision
 

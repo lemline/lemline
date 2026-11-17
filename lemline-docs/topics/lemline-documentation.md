@@ -4,7 +4,7 @@ title: Lemline Documentation
 
 # Lemline Documentation
 
-Welcome to the official documentation for Lemline, the modern runtime for Serverless Workflow DSL.
+Welcome to the official documentation for Lemline, the modern runtime for Open Workflow DSL.
 
 ## 🏠 Home
 
@@ -83,7 +83,7 @@ Welcome to the official documentation for Lemline, the modern runtime for Server
 
 ### 🧾 DSL Reference
 
-* [Complete Serverless Workflow DSL Syntax](lemline-ref-dsl-syntax.md)
+* [Complete Open Workflow DSL Syntax](lemline-ref-dsl-syntax.md)
 * [Task Types Reference](lemline-ref-task-types.md)
 
 ### ⚙️ Runner Reference
@@ -119,7 +119,7 @@ Welcome to the official documentation for Lemline, the modern runtime for Server
 
 * [Why Event-Driven Orchestration Beats the Database](lemline-explain-event-driven.md)
 * [How Lemline Executes Workflows](lemline-explain-execution.md)
-* [What is Serverless Workflow DSL?](lemline-explain-sw-dsl.md)
+* [What is Open Workflow DSL?](lemline-explain-open-workflow-dsl.md)
 * [Inside a Fan-In](lemline-explain-fan-in.md)
 * [How Lemline Handles Time](lemline-explain-time.md)
 * [Error Propagation and Resilience Model](lemline-explain-errors.md)

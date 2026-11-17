@@ -25,7 +25,7 @@ data class InternalException(
      * @param title A short, human-readable summary of the error or a runtime expression
      * @param details A human-readable explanation specific to this occurrence of the error or a runtime expression
      *
-     * cf. https://github.com/serverlessworkflow/specification/blob/main/dsl-reference.md#error
+     * cf. https://github.com/open-workflow-specification/specification/blob/main/dsl-reference.md#error
      */
     @Serializable
     data class Error(
@@ -51,7 +51,7 @@ data class InternalException(
             details = details,
         )
         companion object Companion {
-            private const val URI_BASE = "https://serverlessworkflow.io/spec/1.0.0/errors"
+            private const val URI_BASE = "https://open-workflow-specification.org/spec/1.0.0/errors"
             fun from(e: Exception, position: NodePosition) = when (e) {
                 is InternalException -> e.error
                 else -> Error(

@@ -1,10 +1,10 @@
 ---
-description: Generate, validate, or optimize CNCF Serverless Workflows
+description: Generate, validate, or optimize CNCF Open Workflows
 ---
 
 # Workflow Command
 
-Generate, validate, or optimize CNCF Serverless Workflows using the Serverless Workflow DSL v1.0.
+Generate, validate, or optimize CNCF Open Workflows using the Open Workflow DSL v1.0.
 
 ## Usage
 
@@ -233,7 +233,7 @@ Fixed workflow saved.
 
 ## Notes
 
-- Lemline implements Serverless Workflow DSL v1.0
+- Lemline implements Open Workflow DSL v1.0
 - Workflows can be YAML or JSON format
 - Always validate after generation or modification
 - Test JQ expressions with sample data before using in workflows

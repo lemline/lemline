@@ -36,7 +36,7 @@ do:
       set:
         message: Hello, Lemline!
   - logMessage:
-      call: https://raw.githubusercontent.com/serverlessworkflow/catalog/main/functions/log/1.0.0/function.yaml
+      call: https://raw.githubusercontent.com/open-workflow-specification/catalog/main/functions/log/1.0.0/function.yaml
       with:
         message: ${ .message }
 ```
@@ -181,7 +181,7 @@ do:
       set:
         message: ${ "Hello, " + .user + "! Welcome, " + .role + "." }
   - logMessage:
-      call: https://raw.githubusercontent.com/serverlessworkflow/catalog/main/functions/log/1.0.0/function.yaml
+      call: https://raw.githubusercontent.com/open-workflow-specification/catalog/main/functions/log/1.0.0/function.yaml
       with:
         message: ${ .message }
 ```
@@ -257,7 +257,7 @@ do:
       set:
         message: ${ "Hello, " + .name + "!" }
   - logMessage:
-      call: https://raw.githubusercontent.com/serverlessworkflow/catalog/main/functions/log/1.0.0/function.yaml
+      call: https://raw.githubusercontent.com/open-workflow-specification/catalog/main/functions/log/1.0.0/function.yaml
       with:
         message: ${ .message }
 ```
@@ -339,7 +339,7 @@ do:
       set:
         message: ${ .greeting + ", " + .name + "!" }
   - logMessage:
-      call: https://raw.githubusercontent.com/serverlessworkflow/catalog/main/functions/log/1.0.0/function.yaml
+      call: https://raw.githubusercontent.com/open-workflow-specification/catalog/main/functions/log/1.0.0/function.yaml
       with:
         message: ${ .message }
 ```
@@ -385,7 +385,7 @@ java -jar lemline.jar instance start tutorial hello-workflow --input '{"name": "
 
 In this tutorial, you've learned how to:
 
-- Create workflow definitions using the Serverless Workflow DSL v1.0
+- Create workflow definitions using the Open Workflow DSL v1.0
 - Register workflow definitions with `definition post`
 - Start workflow instances with `instance start`
 - Use the `set` task to create and manipulate variables

@@ -10,7 +10,7 @@ Use English in code, comments, docs, commit messages, and PR text.
 
 ## Project Snapshot
 
-Lemline is an event-driven workflow orchestration runtime implementing Serverless Workflow DSL v1.0.
+Lemline is an event-driven workflow orchestration runtime implementing Open Workflow DSL v1.0.
 
 - Stack: Kotlin 2.2.10, Java 17, Quarkus 3.x
 - Runtime model: stateless workers, workflow state carried in messages
