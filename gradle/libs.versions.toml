@@ -12,9 +12,8 @@ kotlinxCoroutines = "1.11.0"
 # mp.messaging.*.connector properties. Fixed in 3.30.6.
 quarkus = "3.40.1.2"
 smallryeReactiveMessagingInMemory = "4.37.1"
-# The pinned SDK still publishes io.serverlessworkflow artifacts. Keep its DSL contract
-# until Lemline supports the newer SDK's workflow format.
-serverlessworkflow = "7.0.0.Final"
+# The published Java 17 SDK retains the io.serverlessworkflow coordinates.
+serverlessworkflow = "7.35.3.Final"
 uuidCreator = "6.1.1"
 javaSemver = "0.10.2"
 ktor = "3.6.1"

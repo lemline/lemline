@@ -921,11 +921,11 @@ object CallFunctionTestCases {
     private fun createSetTask(properties: Map<String, Any>): Task {
         return Task().apply {
             setTask = SetTask().apply {
-                set = SetTaskConfiguration().apply {
+                set = io.serverlessworkflow.api.types.Set().withSetTaskConfiguration(SetTaskConfiguration().apply {
                     properties.forEach { (key, value) ->
                         additionalProperties[key] = value
                     }
-                }
+                })
             }
         }
     }

@@ -2,37 +2,63 @@
 package com.lemline.core.schemas
 
 import com.fasterxml.jackson.databind.JsonNode
+import com.fasterxml.jackson.dataformat.yaml.YAMLMapper
+import com.fasterxml.jackson.dataformat.yaml.YAMLParser
 import com.lemline.common.json.LemlineJson
-import com.networknt.schema.JsonSchemaFactory
-import com.networknt.schema.SchemaValidatorsConfig
-import com.networknt.schema.SpecVersion.VersionFlag
-import com.networknt.schema.ValidationMessage
+import com.networknt.schema.SchemaRegistry
+import com.networknt.schema.SchemaRegistryConfig
+import com.networknt.schema.SpecificationVersion
 import io.serverlessworkflow.api.WorkflowFormat
 import io.serverlessworkflow.api.types.SchemaUnion
-import io.serverlessworkflow.impl.json.JsonUtils
 import io.serverlessworkflow.impl.resources.DefaultResourceLoaderFactory
-import java.util.function.Consumer
+import java.io.InputStream
+import java.net.URI
 import kotlinx.serialization.json.JsonElement
 
 object SchemaValidator {
-    private val resourceLoader = DefaultResourceLoaderFactory.get().getResourceLoader(null)
+    // Schema property names in arrays (for example required: [on]) are strings,
+    // not YAML 1.1 boolean aliases. Actual true/false schema keywords stay booleans.
+    private val yamlSchemaMapper = YAMLMapper.builder()
+        .enable(YAMLParser.Feature.PARSE_BOOLEAN_LIKE_WORDS_AS_STRINGS)
+        .build()
+
+    internal fun readSchema(input: InputStream, format: WorkflowFormat): JsonNode =
+        (if (format == WorkflowFormat.YAML) yamlSchemaMapper else WorkflowFormat.JSON.mapper()).readTree(input)
 
     // Use JSON Schema Draft 2020-12 for modern standards compliance
-    private val jsonSchemaFactory = JsonSchemaFactory.getInstance(VersionFlag.V202012)
-    private val schemaConfig = SchemaValidatorsConfig.builder().build()
+    private val schemaRegistry = SchemaRegistry.withDefaultDialect(SpecificationVersion.DRAFT_2020_12) {
+        it.schemaRegistryConfig(SchemaRegistryConfig.builder().formatAssertionsEnabled(true).build())
+        // networknt 2 disables external references by default; retain 1.x behavior.
+        it.schemaLoader { loader -> loader.fetchRemoteResources() }
+    }
 
     fun validate(node: JsonElement, schemaUnion: SchemaUnion) =
         validateSchema(with(LemlineJson) { node.toJsonNode() }, schemaUnionToSchema(schemaUnion))
 
     fun validateJsonNode(node: JsonNode, schema: JsonNode) = validateSchema(node, schema)
 
-    private fun schemaUnionToSchema(schemaUnion: SchemaUnion): JsonNode = when {
+    internal fun schemaUnionToSchema(
+        schemaUnion: SchemaUnion,
+        openHttp: (URI) -> InputStream = { it.toURL().openStream() },
+    ): JsonNode = when {
         schemaUnion.schemaInline != null ->
-            JsonUtils.mapper().convertValue(schemaUnion.schemaInline.document, JsonNode::class.java)
+            LemlineJson.jacksonMapper.valueToTree(schemaUnion.schemaInline.document)
 
         schemaUnion.schemaExternal != null -> {
-            val resource = resourceLoader.loadStatic(schemaUnion.schemaExternal.resource)
-            WorkflowFormat.fromFileName(resource.name()).mapper().readTree(resource.open())
+            // Keep the previous per-validation freshness semantics. The SDK's cache
+            // otherwise retains HTTP schemas forever when Last-Modified is absent.
+            DefaultResourceLoaderFactory.get().getResourceLoader(null, null).use { loader ->
+                val uri = loader.uri(schemaUnion.schemaExternal.resource.endpoint)
+                if (uri.scheme?.lowercase() in setOf("http", "https")) {
+                    // Fetch the declared URL unchanged. The SDK rewrites GitHub raw URLs
+                    // to invalid paths and drops query strings instead of following redirects.
+                    openHttp(uri).use { readSchema(it, WorkflowFormat.fromFileName(uri.path)) }
+                } else {
+                    loader.loadStatic(schemaUnion.schemaExternal.resource) { resource ->
+                        resource.open().use { readSchema(it, WorkflowFormat.fromFileName(resource.name())) }
+                    }
+                }
+            }
         }
 
         else -> throw IllegalArgumentException("Unknown schema type $schemaUnion")
@@ -52,18 +78,11 @@ object SchemaValidator {
             }
         }
 
-        val jsonSchema = jsonSchemaFactory.getSchema(schema, schemaConfig)
-        // Enable format assertions (disabled by default in Draft 2020-12)
-        val report = jsonSchema.validate(node) { executionContext ->
-            executionContext.executionConfig.formatAssertionsEnabled = true
-        }
+        val jsonSchema = schemaRegistry.getSchema(schema)
+        val report = jsonSchema.validate(node)
         if (report.isNotEmpty()) {
             val sb = StringBuilder("There are JsonSchema validation errors:")
-            report.forEach(
-                Consumer { m: ValidationMessage ->
-                    sb.append(System.lineSeparator()).append(m.message)
-                },
-            )
+            report.forEach { sb.append(System.lineSeparator()).append(it.message) }
             throw IllegalArgumentException(sb.toString())
         }
     }

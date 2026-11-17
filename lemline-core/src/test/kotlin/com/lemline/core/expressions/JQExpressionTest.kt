@@ -24,6 +24,16 @@ class JQExpressionTest {
     }
 
     @Test
+    fun `nested literal nulls are preserved while expressions are evaluated`() {
+        val input = """{"key":"value"}""".toJsonElement()
+        val filter = """{"missing":null,"values":[null,{"missing":null},"${'$'}{ .key }"]}""".toJsonElement()
+        val expected = """{"missing":null,"values":[null,{"missing":null},"value"]}""".toJsonElement()
+        for (mode in EvaluationMode.entries) {
+            assertEquals(expected, JQExpression.eval(input, filter, emptyScope, false, mode))
+        }
+    }
+
+    @Test
     fun `test eval evaluates JsonPrimitive correctly`() {
         val input = """{"key": "value"}""".toJsonElement()
         val filter = JsonPrimitive(".key")

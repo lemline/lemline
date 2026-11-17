@@ -1,0 +1,340 @@
+// SPDX-License-Identifier: BUSL-1.1
+package com.lemline.core.workflows
+
+import com.lemline.common.json.LemlineJson
+import com.lemline.common.values.info
+import com.lemline.core.activities.ActivityExecutor
+import com.lemline.core.activities.mock.MockFunctionResolver
+import com.lemline.core.cloudevents.InMemoryCloudEventHook
+import com.lemline.core.lifecycleevents.LifecycleEventHook
+import com.lemline.core.orchestrator.FullOrchestrator
+import com.lemline.core.orchestrator.StepByStepOrchestrator
+import com.lemline.core.states.WorkflowEvent
+import io.serverlessworkflow.api.WorkflowFormat
+import io.serverlessworkflow.api.types.Task
+import kotlin.test.assertEquals
+import kotlin.test.assertIs
+import kotlin.test.assertNotNull
+import kotlin.test.assertTrue
+import kotlin.time.Clock
+import kotlin.time.Duration.Companion.minutes
+import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.assertThrows
+
+class SdkCompatibilityTest {
+    private fun source(body: String) = """
+        document:
+          dsl: '1.0.0'
+          namespace: sdk
+          name: compatibility
+          version: '1.0.0'
+    """.trimIndent() + "\n" + body.trimIndent().replace('§', '$')
+
+    private suspend fun run(
+        body: String,
+        input: JsonElement = JsonObject(emptyMap()),
+        execute: suspend (WorkflowEvent.ActivityStarted) -> JsonElement = { error("Unexpected activity: $it") },
+    ): JsonElement = FullOrchestrator.start(
+        workflow = WorkflowCache.parseYamlAndPut(source(body)),
+        workflowInput = input,
+        serde = true,
+        activityExecutor = object : ActivityExecutor {
+            override suspend fun execute(event: WorkflowEvent.ActivityStarted) = execute(event)
+        },
+        functionResolver = MockFunctionResolver(),
+        cloudEventHook = InMemoryCloudEventHook(),
+        lifecycleHook = LifecycleEventHook.NOOP,
+    )
+
+    @Test
+    fun `set expression and inline for collection execute through serialized resumes`() = runTest {
+        val output = run("""
+            do:
+              - collect:
+                  for: { each: item, in: [1, 1, 2] }
+                  do:
+                    - append:
+                        set: '§{ . + [§item] }'
+        """, Json.parseToJsonElement("[]"))
+        assertEquals(Json.parseToJsonElement("[1,1,2]"), output)
+    }
+
+    @Test
+    fun `inline for collections evaluate nested expressions against the initial input`() = runTest {
+        val output = run("""
+            do:
+              - collect:
+                  for:
+                    each: item
+                    in: [literal, null, '§{ .customer }', { nested: '§{ .customer }', missing: null, values: [null] }]
+                  do:
+                    - append:
+                        set: '§{ .result += [§item] | .customer = "changed" }'
+        """, Json.parseToJsonElement("""{"customer":"Alice","result":[]}"""))
+        assertEquals(Json.parseToJsonElement("""{"customer":"changed","result":["literal",null,"Alice",{"nested":"Alice","missing":null,"values":[null]}]}"""), output)
+    }
+
+    @Test
+    fun `HTTP maps support whole object expressions and per value expressions`() = runTest {
+        for (wholeObject in listOf(false, true)) {
+            val headers = if (wholeObject) "'§{ .headers }'" else "{ X-Token: '§{ .token }', X-Literal: literal }"
+            val query = if (wholeObject) "'§{ .query }'" else "{ q: '§{ .search }', page: '2' }"
+            run("""
+                do:
+                  - request:
+                      call: http
+                      with:
+                        method: GET
+                        endpoint: https://example.com/search
+                        headers: $headers
+                        query: $query
+            """, Json.parseToJsonElement("""{"token":"secret","search":"hello world","headers":{"X-Token":"secret","X-Literal":"literal"},"query":{"q":"hello world","page":"2"}}""")) {
+                val config = assertIs<WorkflowEvent.CallHttpStarted>(it).config
+                assertEquals(mapOf("X-Token" to "secret", "X-Literal" to "literal"), config.headers)
+                assertEquals(mapOf("q" to "hello world", "page" to "2"), config.query)
+                JsonPrimitive("ok")
+            }
+        }
+    }
+
+    @Test
+    fun `shell arguments and stdin survive evaluation and serialized resumes`() = runTest {
+        run("""
+            do:
+              - shell:
+                  run:
+                    shell:
+                      command: cat
+                      arguments: ['§{ .arg }', '', '§{ .arg }', 'two words']
+                      stdin: '§{ .text }'
+        """, Json.parseToJsonElement("""{"arg":"repeated","text":"standard input"}""")) {
+            val config = assertIs<WorkflowEvent.RunShellStarted>(it).config
+            assertEquals(listOf("repeated", "", "repeated", "two words"), config.arguments)
+            assertEquals("standard input", config.stdin)
+            JsonPrimitive("ok")
+        }
+    }
+
+    @Test
+    fun `raised expressions match the SDK detail error filter`() = runTest {
+        val output = run("""
+            do:
+              - attempt:
+                  try:
+                    - fail:
+                        raise:
+                          error:
+                            type: https://example.com/error
+                            status: 400
+                            title: '§{ .title }'
+                            detail: '§{ .detail }'
+                  catch:
+                    errors:
+                      with:
+                        title: invalid
+                        detail: explanation
+                    do:
+                      - recovered:
+                          set: { caught: true }
+        """, Json.parseToJsonElement("""{"title":"invalid","detail":"explanation"}"""))
+        assertEquals(Json.parseToJsonElement("""{"caught":true}"""), output)
+    }
+
+    @Test
+    fun `catch transitions end or jump after an error without affecting successful tries`() = runTest {
+        for (fails in listOf(false, true)) {
+            for (target in listOf("end", "finish")) {
+                val action = if (fails) "raise: { error: { type: https://example.com/error, status: 400 } }" else "set: { success: true }"
+                val body = """
+                    do:
+                      - attempt:
+                          try:
+                            - action:
+                                $action
+                          catch:
+                            then: $target
+                      - skipped:
+                          set: { intermediate: true }
+                      - finish:
+                          set: '§{ . + {finished: true} }'
+                """
+                val parsed = WorkflowDefinitionReader.read(source(body), WorkflowFormat.YAML)
+                for (mapper in listOf(LemlineJson.jacksonMapper, LemlineJson.yamlMapper)) {
+                    WorkflowDefinitionReader.read(mapper.writeValueAsString(parsed), WorkflowFormat.YAML)
+                }
+                val output = run(body, Json.parseToJsonElement("""{"original":true}"""))
+                val expected = when {
+                    !fails -> """{"intermediate":true,"finished":true}"""
+                    target == "end" -> """{"original":true}"""
+                    else -> """{"original":true,"finished":true}"""
+                }
+                assertEquals(Json.parseToJsonElement(expected), output)
+            }
+        }
+    }
+
+    @Test
+    fun `wait and retry durations evaluate expressions in the runtime input`() = runTest {
+        val output = run("""
+            do:
+              - pause:
+                  wait: '§{ .delay }'
+              - attempt:
+                  try:
+                    - fail:
+                        raise:
+                          error: { type: https://example.com/error, status: 400 }
+                  catch:
+                    retry:
+                      delay: '§{ if §error.status == 400 then §input.delay else "PT1H" end }'
+                      limit:
+                        duration: '§{ §input.limit }'
+                        attempt:
+                          count: 1
+                          duration: '§{ §input.limit }'
+                      jitter:
+                        from: '§{ §input.delay }'
+                        to: '§{ §input.jitter }'
+                    do:
+                      - handled:
+                          set: { caught: true }
+        """, Json.parseToJsonElement("""{"delay":"PT0S","limit":"PT1M","jitter":"PT0.001S"}"""))
+        assertEquals(Json.parseToJsonElement("""{"caught":true}"""), output)
+    }
+
+    @Test
+    fun `listen timeout expressions use runtime input and reject invalid results`() = runTest {
+        val workflow = WorkflowCache.parseYamlAndPut(source("""
+            do:
+              - receive:
+                  listen:
+                    to: { one: { with: { type: example } } }
+                  timeout: { after: '§{ .delay }' }
+        """))
+        for (delay in listOf("PT1M", "invalid")) {
+            val before = Clock.System.now()
+            var event = StepByStepOrchestrator.runByTask(
+                workflow, StepByStepOrchestrator.initCmd(workflowInput = Json.parseToJsonElement("""{"delay":"$delay"}""")),
+                workflow.info, LifecycleEventHook.NOOP,
+            )
+            while (event is WorkflowEvent.TaskScheduled) {
+                event = StepByStepOrchestrator.runByTask(workflow, event.resume(), workflow.info, LifecycleEventHook.NOOP)
+            }
+            if (delay == "invalid") assertIs<WorkflowEvent.WorkflowFaulted>(event)
+            else {
+                val timeout = assertNotNull(assertIs<WorkflowEvent.ListenStarted>(event).config.timeoutAt)
+                assertTrue(timeout in before + 1.minutes..Clock.System.now() + 1.minutes)
+            }
+        }
+    }
+
+    @Test
+    fun `timer schedules reject runtime durations before registration`() {
+        for (property in listOf("every", "after")) {
+            val error = assertThrows<IllegalArgumentException> {
+                WorkflowDefinitionReader.read(source("do:\n  - value:\n      set: { ok: true }\nschedule:\n  $property: '§{ .delay }'"), WorkflowFormat.YAML)
+            }
+            assertTrue(error.message!!.contains("schedule.$property must be a static duration"))
+        }
+    }
+
+    @Test
+    fun `multiline inline and reusable errors survive parsing serialization and execution`() = runTest {
+        val error = """
+            type: https://example.com/error
+            status: 400
+            title: |-
+              first title line
+              second title line
+            detail: |-
+              first detail line
+              second detail line
+        """.trimIndent()
+        for (reusable in listOf(false, true)) {
+            val body = "use:\n  errors:\n    failure:\n${error.prependIndent("      ")}\n" + """
+                do:
+                  - attempt:
+                      try:
+                        - fail:
+                            raise:
+                              error:
+            """.trimIndent() + (if (reusable) " failure\n" else "\n${error.prependIndent("                  ")}\n") + """
+                      catch:
+                        do:
+                          - recovered:
+                              set: '§{ {title: §error.title, detail: §error.details} }'
+            """.trimIndent().prependIndent("      ")
+            val workflow = WorkflowDefinitionReader.read(source(body), WorkflowFormat.YAML)
+            for ((format, mapper) in listOf(WorkflowFormat.JSON to LemlineJson.jacksonMapper, WorkflowFormat.YAML to LemlineJson.yamlMapper)) {
+                val restored = WorkflowDefinitionReader.read(mapper.writeValueAsString(workflow), format)
+                val definition = restored.use.errors.additionalProperties.getValue("failure")
+                assertEquals("first title line\nsecond title line", definition.title.literalErrorTitle)
+                assertEquals("first detail line\nsecond detail line", definition.detail.literalErrorDetails)
+            }
+            assertEquals(Json.parseToJsonElement("""{"title":"first title line\nsecond title line","detail":"first detail line\nsecond detail line"}"""), run(body))
+        }
+    }
+
+    @Test
+    fun `workflow JSON and YAML round trips preserve null data and wildcard listeners`() {
+        val workflow = WorkflowDefinitionReader.read(source("""
+            do:
+              - data:
+                  set: { missing: null, empty: [] }
+              - wildcard:
+                  listen:
+                    to: { any: [] }
+        """), WorkflowFormat.YAML)
+        for (mapper in listOf(LemlineJson.jacksonMapper, LemlineJson.yamlMapper)) {
+            val text = mapper.writeValueAsString(workflow)
+            val restored = WorkflowDefinitionReader.read(text, WorkflowFormat.YAML)
+            assertEquals(LemlineJson.encodeToElement(workflow), LemlineJson.encodeToElement(restored))
+            val data = restored.`do`[0].task.setTask.set.setTaskConfiguration.additionalProperties
+            assertEquals(true, data.containsKey("missing"))
+            assertEquals(null, data["missing"])
+            assertEquals(emptyList<Any>(), data["empty"])
+            assertEquals(emptyList<Any>(), restored.`do`[1].task.listenTask.listen.to.anyEventConsumptionStrategy.any)
+        }
+    }
+
+    @Test
+    fun `timer and event schedules remain valid after JSON and YAML serialization`() {
+        val schedules = listOf(
+            "every: PT1M", "after: PT1M", "cron: '0 * * * *'",
+            "on: { one: { with: { type: example } } }\n  read: data",
+            "on: { one: { with: { type: example } } }\n  read: envelope",
+            "on: { one: { with: { type: example } } }\n  read: raw",
+        )
+        for (schedule in schedules) {
+            val workflow = WorkflowDefinitionReader.read(
+                source("do:\n  - data:\n      set: { value: ok }\nschedule:\n  $schedule"), WorkflowFormat.YAML,
+            )
+            for (mapper in listOf(LemlineJson.jacksonMapper, LemlineJson.yamlMapper)) {
+                val text = mapper.writeValueAsString(workflow)
+                val restored = WorkflowDefinitionReader.read(text, WorkflowFormat.YAML)
+                assertEquals(workflow.schedule.read, restored.schedule.read)
+                assertEquals(LemlineJson.encodeToElement(workflow), LemlineJson.encodeToElement(restored))
+            }
+        }
+    }
+
+    @Test
+    fun `external function task JSON uses SDK union serialization`() {
+        val tree = LemlineJson.yamlMapper.readTree("set: { answer: 42 }")
+        val task = LemlineJson.jacksonMapper.treeToValue(tree, Task::class.java)
+        assertEquals(tree, LemlineJson.jacksonMapper.valueToTree(task))
+    }
+
+    @Test
+    fun `external named function calls deserialize to the correct SDK union`() {
+        for (mapper in listOf(LemlineJson.jacksonMapper, LemlineJson.yamlMapper)) {
+            val task = mapper.readValue("""{"call":"customFunction","with":{"value":42}}""", Task::class.java)
+            assertEquals("customFunction", task.callTask.callFunction.call)
+        }
+    }
+}

@@ -1,18 +1,25 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.common.json
 
+import com.fasterxml.jackson.annotation.JsonInclude
 import com.fasterxml.jackson.core.JsonParser
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
+import com.fasterxml.jackson.databind.module.SimpleModule
 import com.fasterxml.jackson.dataformat.yaml.YAMLMapper
+import io.serverlessworkflow.api.types.ErrorDetails
+import io.serverlessworkflow.api.types.ErrorTitle
 import io.serverlessworkflow.api.types.ExportAs
 import io.serverlessworkflow.api.types.HTTPHeaders
 import io.serverlessworkflow.api.types.InputFrom
 import io.serverlessworkflow.api.types.OutputAs
+import io.serverlessworkflow.api.types.Schedule
 import io.serverlessworkflow.api.types.SetTaskConfiguration
 import io.serverlessworkflow.api.types.TaskBase
 import io.serverlessworkflow.api.types.Workflow
+import io.serverlessworkflow.api.types.jackson.JacksonMixInModule
 import io.serverlessworkflow.impl.expressions.DateTimeDescriptor
+import io.serverlessworkflow.serialization.BeanDeserializerModifierWithValidation
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -29,6 +36,16 @@ object LemlineJson {
 
     // Expose Jackson ObjectMapper - configure as needed
     val jacksonMapper = ObjectMapper().apply {
+        registerModule(JacksonMixInModule())
+        // SDK union deserialization relies on bean validation to distinguish
+        // named function calls from built-in protocol calls.
+        registerModule(SimpleModule().setDeserializerModifier(BeanDeserializerModifierWithValidation()))
+        addMixIn(Schedule::class.java, ScheduleMixIn::class.java)
+        addMixIn(ErrorDetails::class.java, ErrorDetailsMixIn::class.java)
+        addMixIn(ErrorTitle::class.java, ErrorTitleMixIn::class.java)
+        // SDK types no longer carry Jackson annotations. Omit absent bean properties,
+        // but preserve explicit null map values and empty arrays in workflow data.
+        setDefaultPropertyInclusion(JsonInclude.Value.construct(JsonInclude.Include.NON_NULL, JsonInclude.Include.ALWAYS))
         configure(JsonParser.Feature.ALLOW_UNQUOTED_CONTROL_CHARS, true)
         configure(JsonParser.Feature.ALLOW_SINGLE_QUOTES, true)
         configure(JsonParser.Feature.ALLOW_UNQUOTED_FIELD_NAMES, true)
@@ -36,7 +53,19 @@ object LemlineJson {
     }
 
     // Expose Jackson YAMLMapper
-    val yamlMapper = YAMLMapper()
+    val yamlMapper = YAMLMapper().apply {
+        registerModule(JacksonMixInModule())
+        registerModule(SimpleModule().setDeserializerModifier(BeanDeserializerModifierWithValidation()))
+        addMixIn(Schedule::class.java, ScheduleMixIn::class.java)
+        addMixIn(ErrorDetails::class.java, ErrorDetailsMixIn::class.java)
+        addMixIn(ErrorTitle::class.java, ErrorTitleMixIn::class.java)
+        setDefaultPropertyInclusion(JsonInclude.Value.construct(JsonInclude.Include.NON_NULL, JsonInclude.Include.ALWAYS))
+    }
+
+    // The SDK initializes read=data even for timers, but the schema permits read
+    // only with schedule.on. Omitting the default also preserves event semantics.
+    @JsonInclude(JsonInclude.Include.NON_DEFAULT)
+    private abstract class ScheduleMixIn
 
     // simply create a new JsonObject
     val jsonObject: JsonObject get() = JsonObject(emptyMap())

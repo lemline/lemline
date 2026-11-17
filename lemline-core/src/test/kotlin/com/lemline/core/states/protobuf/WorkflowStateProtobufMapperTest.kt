@@ -29,6 +29,8 @@ import com.lemline.core.tasks.FlowDirectiveEnum
 import com.lemline.core.tasks.FlowDirectiveGoto
 import com.lemline.core.workflows.CachedEventConsumption
 import com.lemline.core.workflows.CachedEventFilter
+import com.lemline.messages.internal.v1.StringMapProto
+import com.lemline.messages.internal.v1.WorkflowStateProto
 import io.serverlessworkflow.api.types.ListenTaskConfiguration.ListenAndReadAs
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -39,6 +41,29 @@ import kotlinx.serialization.json.put
 import org.junit.jupiter.api.Test
 
 class WorkflowStateProtobufMapperTest {
+
+    @Test
+    fun `shell ordered arguments and stdin survive binary transport`() {
+        val original = eventRunShellStarted().let {
+            it.copy(config = it.config.copy(arguments = listOf("-v", "", "-v", "two words"), stdin = "input\n"))
+        }
+        val encoded = WorkflowStateProtobufMapper.toProto(original).encode()
+        assertEquals(original, WorkflowStateProtobufMapper.fromProto(WorkflowStateProto.ADAPTER.decode(encoded)))
+    }
+
+    @Test
+    fun `legacy shell argument maps remain readable`() {
+        val original = WorkflowStateProtobufMapper.toProto(eventRunShellStarted())
+        val event = original.event!!
+        val shell = event.run_shell_started!!
+        val legacy = original.copy(event = event.copy(run_shell_started = shell.copy(config = shell.config!!.copy(
+            arguments = StringMapProto(values = linkedMapOf("-n" to "", "hello" to "world")),
+        ))))
+        val decoded = WorkflowStateProtobufMapper.fromProto(WorkflowStateProto.ADAPTER.decode(legacy.encode()))
+            as WorkflowEvent.RunShellStarted
+        assertEquals(listOf("-n", "hello", "world"), decoded.config.arguments)
+        assertEquals(null, decoded.config.stdin)
+    }
 
     @Test
     fun `complete until strategy preserves extension values in protobuf`() {

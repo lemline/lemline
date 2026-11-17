@@ -3,10 +3,11 @@ package com.lemline.core.workflows
 
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.node.ObjectNode
-import com.networknt.schema.InputFormat
-import com.networknt.schema.JsonSchemaFactory
-import com.networknt.schema.SchemaValidatorsConfig
-import com.networknt.schema.SpecVersion.VersionFlag
+import com.lemline.common.json.LemlineJson
+import com.lemline.core.schemas.SchemaValidator
+import com.networknt.schema.SchemaRegistry
+import com.networknt.schema.SchemaRegistryConfig
+import com.networknt.schema.SpecificationVersion
 import io.serverlessworkflow.api.WorkflowFormat
 import io.serverlessworkflow.api.types.Workflow
 
@@ -16,11 +17,9 @@ internal object WorkflowDefinitionReader {
         val resource = Thread.currentThread().contextClassLoader.getResourceAsStream("schema/workflow.yaml")
         requireNotNull(resource) { "Open Workflow schema/workflow.yaml is missing" }
         resource.use {
-            JsonSchemaFactory.getInstance(VersionFlag.V7).getSchema(
-                it,
-                InputFormat.YAML,
-                SchemaValidatorsConfig.builder().preloadJsonSchema(false).build(),
-            )
+            SchemaRegistry.withDefaultDialect(SpecificationVersion.DRAFT_7) { builder ->
+                builder.schemaRegistryConfig(SchemaRegistryConfig.builder().preloadSchema(false).build())
+            }.getSchema(SchemaValidator.readSchema(it, WorkflowFormat.YAML))
         }
     }
 
@@ -28,7 +27,7 @@ internal object WorkflowDefinitionReader {
         val mapper = format.mapper()
         val document = mapper.readValue(definition, JsonNode::class.java) as? ObjectNode
             ?: throw IllegalArgumentException("Workflow definition must be an object")
-        val evaluate = document.remove("evaluate")
+        val evaluate = document.get("evaluate")
         validateEvaluate(evaluate)
         if (validate) {
             val errors = schema.validate(document)
@@ -36,7 +35,11 @@ internal object WorkflowDefinitionReader {
         }
         // Avoid re-serializing the tree: the SDK mapper omits empty arrays, which would
         // turn an explicit `any: []` wildcard into a different consumption strategy.
-        return mapper.treeToValue(document, EvaluatedWorkflow::class.java).apply { this.evaluate = evaluate }
+        return LemlineJson.jacksonMapper.treeToValue(document, Workflow::class.java).also { workflow ->
+            // Timer schedules are registered before any workflow input/scope exists.
+            require(workflow.schedule?.every?.durationExpression == null) { "schedule.every must be a static duration" }
+            require(workflow.schedule?.after?.durationExpression == null) { "schedule.after must be a static duration" }
+        }
     }
 
     private fun validateEvaluate(evaluate: JsonNode?) {

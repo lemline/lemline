@@ -47,13 +47,13 @@ class WorkflowDefinitionReaderTest {
         val definition = nestedWorkflow + "\nevaluate:\n  language: jq\n  mode: loose"
         for (format in WorkflowFormat.entries) {
             val workflow = WorkflowDefinitionReader.read(encode(definition, format), format)
-            assertEquals(EvaluationMode.LOOSE, (workflow as EvaluatedWorkflow).evaluationMode)
+            assertEquals(EvaluationMode.LOOSE, workflow.evaluationMode)
             assertEquals("loose", format.mapper().valueToTree<JsonNode>(workflow).get("evaluate").get("mode").textValue())
             val serialized = LemlineJson.encodeToElement(workflow)
             assertEquals("loose", serialized["evaluate"]!!.jsonObject["mode"]!!.jsonPrimitive.content)
             assertEquals(
                 EvaluationMode.LOOSE,
-                (WorkflowDefinitionReader.read(serialized.toString(), WorkflowFormat.JSON) as EvaluatedWorkflow).evaluationMode,
+                WorkflowDefinitionReader.read(serialized.toString(), WorkflowFormat.JSON).evaluationMode,
             )
             assertEquals(EvaluationMode.LOOSE, WorkflowParser.createRootNode(workflow).evaluationMode)
         }
@@ -67,6 +67,14 @@ class WorkflowDefinitionReaderTest {
                 WorkflowDefinitionReader.read(definition, WorkflowFormat.YAML)
             }
         }
+    }
+
+    @Test
+    fun `event read mode requires schedule on using the literal property name`() {
+        val error = assertThrows(IllegalArgumentException::class.java) {
+            WorkflowDefinitionReader.read(nestedWorkflow + "\nschedule:\n  read: envelope", WorkflowFormat.YAML)
+        }
+        org.junit.jupiter.api.Assertions.assertTrue(error.message!!.contains("'on'"))
     }
 
     @Test

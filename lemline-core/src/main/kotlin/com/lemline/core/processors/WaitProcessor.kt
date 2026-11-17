@@ -62,7 +62,7 @@ class WaitProcessor(
         transformedInput: JsonElement,
         scope: Scope,
     ): WorkflowEvent {
-        val config = WaitConfig(waitUntil = Clock.System.now() + getDelay())
+        val config = WaitConfig(waitUntil = Clock.System.now() + getDelay(transformedInput, scope))
         return WaitStarted(
             nodeStack = nodeStack,
             rawOutput = transformedInput,
@@ -79,9 +79,9 @@ class WaitProcessor(
      * @return Duration to wait, parsed from the task's wait property
      * @throws IllegalArgumentException if the wait duration is invalid
      */
-    fun getDelay(): Duration {
+    private fun getDelay(input: JsonElement, scope: Scope): Duration {
         return try {
-            val duration = node.task.wait.toDuration()
+            val duration = node.task.wait.toDuration { evalString(input, it, "wait", scope) }
             logger.debug { "Wait task delay: $duration for task: ${node.name}" }
             if (duration > Duration.ZERO) duration else Duration.ZERO
         } catch (e: Exception) {

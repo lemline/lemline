@@ -4,7 +4,7 @@ package com.lemline.core.expressions
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.node.ArrayNode
 import com.fasterxml.jackson.databind.node.ObjectNode
-import io.serverlessworkflow.impl.json.JsonUtils
+import com.lemline.common.json.LemlineJson
 import net.thisptr.jackson.jq.BuiltinFunctionLoader
 import net.thisptr.jackson.jq.Output
 import net.thisptr.jackson.jq.Scope as JQScope
@@ -68,7 +68,7 @@ object JQExpression : ExpressionEvaluator {
      * Custom Output implementation to capture the result of the JQ expression evaluation.
      */
     private class JsonNodeOutput : Output {
-        private val mapper = JsonUtils.mapper()
+        private val mapper = LemlineJson.jacksonMapper
 
         // The result of the JQ expression evaluation.
         var result: JsonNode? = null

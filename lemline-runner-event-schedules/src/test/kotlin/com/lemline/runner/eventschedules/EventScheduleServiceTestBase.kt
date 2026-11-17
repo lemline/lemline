@@ -61,7 +61,7 @@ abstract class EventScheduleServiceTestBase {
     @BeforeEach
     fun isolate() { namespace = WorkflowNamespace("events-${IDV7.random()}") }
 
-    private suspend fun define(on: String, name: String = "trigger", ns: WorkflowNamespace = namespace, mode: String? = null): DefinitionModel {
+    private suspend fun define(on: String, name: String = "trigger", ns: WorkflowNamespace = namespace, mode: String? = null, read: String? = "envelope"): DefinitionModel {
         val definition = DefinitionModel.from("""
             document:
               dsl: '1.0.0'
@@ -70,7 +70,7 @@ abstract class EventScheduleServiceTestBase {
               version: '1.0.0'
             schedule:
               on:
-        """.trimIndent() + "\n" + on.prependIndent("    ") + "\ndo:\n  - result:\n      set:\n        received: \${ \$workflow.input }\n" +
+        """.trimIndent() + "\n" + on.prependIndent("    ") + (read?.let { "\n  read: $it" } ?: "") + "\ndo:\n  - result:\n      set:\n        received: \${ \$workflow.input }\n" +
             (mode?.let { "evaluate:\n  mode: $it\n" } ?: ""))
         definitions.insert(definition) shouldBe 1
         WorkflowCache.parseYamlAndPut(definition.definition)
@@ -88,6 +88,29 @@ abstract class EventScheduleServiceTestBase {
     private suspend fun starts() = repository.listAll().filter { it.workflowInfo.namespace == namespace }
     private fun EventScheduleModel.input() = instanceMessage.workflowState.nodeStack.rootState.workflowInput as JsonArray
     private fun EventScheduleModel.eventIds() = input().map { it.jsonObject.getValue("id").jsonPrimitive.content }
+
+    @Test
+    fun `event triggers honor data envelope raw and default read modes`() = runTest {
+        for (read in listOf(null, "data", "envelope", "raw")) {
+            val type = "read-${read ?: "default"}"
+            define("one:\n  with: { type: $type }", name = type, read = read)
+            val incoming = event(type)
+            service().handleCloudEvent(incoming, namespace) shouldBe 1
+            val input = starts().single { it.workflowInfo.name.toString() == type }.input()
+            input shouldBe JsonArray(listOf(when (read) {
+                "envelope" -> CloudEventService.parseEnvelope(incoming)
+                "raw" -> CloudEventService.parseRaw(incoming)
+                else -> CloudEventService.parseData(incoming)
+            }))
+        }
+    }
+
+    @Test
+    fun `event until expressions evaluate the selected data read mode`() = runTest {
+        define("any:\n  - with: { type: a }\nuntil: '\${ .[0].key == \"ready\" }'", read = "data")
+        service().handleCloudEvent(event(key = "ready"), namespace) shouldBe 1
+        starts().single().input() shouldBe Json.parseToJsonElement("""[{"key":"ready"}]""")
+    }
 
     private suspend fun stateId(): IDV7 = db.withConnection { conn ->
         conn.prepareStatement("SELECT id FROM lemline_event_schedule_state WHERE namespace = ?").use {

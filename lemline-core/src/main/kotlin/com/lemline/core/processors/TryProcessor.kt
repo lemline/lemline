@@ -6,6 +6,7 @@ import com.lemline.core.errors.InternalException
 import com.lemline.core.nodes.Node
 import com.lemline.core.processors.scope.Scope
 import com.lemline.core.processors.scope.taskScope
+import com.lemline.core.processors.scope.withTransformedInput
 import com.lemline.core.states.NodeStack
 import com.lemline.core.states.TryState
 import com.lemline.core.states.WorkflowEvent
@@ -119,7 +120,7 @@ class TryProcessor(
         // Completed - go to parent
         true -> NextInfo(
             nextNode = node.parent,
-            nextDirective = getFlowDirective()
+            nextDirective = if (state.runningCatch) node.task.catch.then ?: getFlowDirective() else getFlowDirective()
         )
     }
 
@@ -146,7 +147,7 @@ class TryProcessor(
             if (filter.status > 0 && filter.status != error.status) return false
             if (filter.instance != null && filter.instance != error.position) return false
             if (filter.title != null && filter.title != error.title) return false
-            if (filter.details != null && filter.details != error.details) return false
+            if (filter.detail != null && filter.detail != error.details) return false
         }
 
 
@@ -184,8 +185,12 @@ class TryProcessor(
         nodeStack: NodeStack
     ): WorkflowEvent {
 
-        // Check if we should retry
-        val shouldRetry = shouldRetry(state, filterScope(state, nodeStack))
+        val retryScope = buildJsonObject {
+            filterScope(state, nodeStack).withTransformedInput(state.transformedInput).forEach { (key, value) -> put(key, value) }
+            put(errorAs, LemlineJson.encodeToElement(error))
+        }
+        // Retry expressions share the caught error's scope.
+        val shouldRetry = shouldRetry(state, retryScope)
 
         return when (shouldRetry) {
             // Retry if attempts remain
@@ -198,7 +203,7 @@ class TryProcessor(
                     nodePosition = getDoTry().position,
                     rawInput = state.transformedInput,
                     flowDirective = null,
-                    retryAt = Clock.System.now() + retryPolicy!!.getRetryDelay(updatedState.attemptIndex)
+                    retryAt = Clock.System.now() + retryPolicy!!.getRetryDelay(updatedState.attemptIndex, state.transformedInput, retryScope)
                 )
             }
             // Otherwise, enter the catch block
@@ -282,7 +287,7 @@ class TryProcessor(
         }
 
         // Max duration
-        val durationLimit: Duration? = retryConfig.limit?.duration?.toDuration()
+        val durationLimit: Duration? = retryConfig.limit?.duration?.toDuration { evalString(state.transformedInput, it, "retry.limit.duration", scope) }
         if (durationLimit != null && (Clock.System.now() - state.startedAt) >= durationLimit) {
             logger.debug { "retryPolicy.limit.duration ($durationLimit) reached for node ${node.name}" }
             return false
@@ -295,13 +300,13 @@ class TryProcessor(
      * Calculates the delay duration before the next retry attempt based on the retry policy and the current attempt index.
      * The method considers factors such as base delay, backoff strategy, and jitter to compute the final retry delay.
      */
-    private fun RetryPolicy.getRetryDelay(attemptIndex: Int): Duration {
+    private fun RetryPolicy.getRetryDelay(attemptIndex: Int, input: JsonElement, scope: Scope): Duration {
 
         // Max attempt duration before a task attempt timeout
-        val attemptDurationLimit: Duration? = limit?.attempt?.duration?.toDuration()
+        val attemptDurationLimit: Duration? = limit?.attempt?.duration?.toDuration { evalString(input, it, "retry.limit.attempt.duration", scope) }
 
         // start with the base delay
-        var delay = delay.toDuration()
+        var delay = delay.toDuration { evalString(input, it, "retry.delay", scope) }
 
         // apply backoff if any
         delay = backoff?.get()?.let {
@@ -314,7 +319,7 @@ class TryProcessor(
         } ?: delay
 
         // apply jitter if any
-        delay += jitter.toRandomDuration()
+        delay += jitter.toRandomDuration { evalString(input, it, "retry.jitter", scope) }
 
         return when {
             delay <= Duration.ZERO -> {

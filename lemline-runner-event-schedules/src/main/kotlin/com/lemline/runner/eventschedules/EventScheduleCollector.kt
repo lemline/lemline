@@ -6,11 +6,12 @@ import com.lemline.core.cloudevents.CloudEventMatcher
 import com.lemline.core.processors.ListenStrategy
 import com.lemline.core.workflows.CachedEventConsumption
 import io.cloudevents.CloudEvent
+import io.serverlessworkflow.api.types.ListenTaskConfiguration.ListenAndReadAs
 import java.sql.Connection
 import kotlinx.serialization.json.JsonArray
 
 /** Mutates only affected collections; the caller owns the definition lock and transaction. */
-class EventScheduleCollector(private val repository: EventScheduleRepository) {
+class EventScheduleCollector(private val repository: EventScheduleRepository, private val readAs: ListenAndReadAs) {
     private fun queryKeys(strategy: CachedEventConsumption, event: CloudEvent, termination: Boolean = false): List<EventScheduleQueryKey> {
         if (strategy.wildcard) return listOf(EventScheduleQueryKey(emptyMap()))
         return strategy.filters.mapIndexedNotNull { index, filter ->
@@ -37,7 +38,7 @@ class EventScheduleCollector(private val repository: EventScheduleRepository) {
             groups.add(group)
         }
         suspend fun complete(group: EventScheduleCollection, input: JsonArray? = null) {
-            completed.add(input ?: repository.collectionInput(group.id, conn))
+            completed.add(input ?: repository.collectionInput(group.id, conn, readAs))
             repository.deleteCollection(group.id, conn)
             groups.remove(group)
             dirty.remove(group.id)
@@ -63,7 +64,7 @@ class EventScheduleCollector(private val repository: EventScheduleRepository) {
             val ready = when {
                 strategy.strategy == ListenStrategy.ALL -> group.matched.size == strategy.filters.size
                 untilExpression != null -> {
-                    input = repository.collectionInput(group.id, conn)
+                    input = repository.collectionInput(group.id, conn, readAs)
                     CloudEventMatcher.evaluateExpressionAsBoolean(untilExpression, input)
                 }
                 strategy.untilEvents != null -> false

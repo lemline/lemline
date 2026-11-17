@@ -36,8 +36,18 @@ internal interface ExpressionEvaluator {
         scope: JsonObject,
         force: Boolean,
         mode: EvaluationMode = EvaluationMode.STRICT,
+    ): JsonElement = if (expr is JsonNull) data else evalValue(data, expr, scope, force, mode)
+
+    // Only an absent top-level expression means identity. Nulls inside literal
+    // objects and arrays are data and must survive recursive evaluation.
+    private fun evalValue(
+        data: JsonElement,
+        expr: JsonElement,
+        scope: JsonObject,
+        force: Boolean,
+        mode: EvaluationMode,
     ): JsonElement = when (expr) {
-        is JsonNull -> data
+        is JsonNull -> JsonNull
 
         is JsonPrimitive -> when (expr.isString && (force || mode == EvaluationMode.LOOSE || ExpressionUtils.isExpr(expr.content))) {
             true -> try {
@@ -48,8 +58,8 @@ internal interface ExpressionEvaluator {
             false -> expr
         }
 
-        is JsonObject -> JsonObject(expr.mapValues { (_, value) -> eval(data, value, scope, force, mode) })
+        is JsonObject -> JsonObject(expr.mapValues { (_, value) -> evalValue(data, value, scope, force, mode) })
 
-        is JsonArray -> JsonArray(expr.map { value -> eval(data, value, scope, force, mode) })
+        is JsonArray -> JsonArray(expr.map { value -> evalValue(data, value, scope, force, mode) })
     }
 }

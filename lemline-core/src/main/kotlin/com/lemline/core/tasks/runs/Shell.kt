@@ -1,23 +1,32 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.tasks.runs
 
-import java.io.BufferedReader
-import java.io.InputStreamReader
+import java.nio.file.Files
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.future.await
 import kotlinx.coroutines.withContext
 
 /**
  * Represents a shell command execution with optional arguments and environment variables.
  *
  * @property command The shell command to execute (e.g., "echo", "sh").
- * @property arguments A map of arguments to pass to the command. Keys are argument names, and values are their corresponding values.
+ * @property arguments Arguments in order, preserving duplicates and empty strings.
  * @property environment A map of environment variables to set for the command execution.
  */
 data class Shell(
     val command: String,
-    val arguments: Map<String, String>? = null,
-    val environment: Map<String, String>? = null
+    val arguments: List<String> = emptyList(),
+    val environment: Map<String, String>? = null,
+    val stdin: String? = null,
 ) {
+
+    companion object {
+        // Pipe reads block. An elastic IO view prevents concurrent processes from
+        // exhausting the shared IO limit while their other pipe readers are queued.
+        private val pipeDispatcher = Dispatchers.IO.limitedParallelism(Int.MAX_VALUE)
+    }
 
     /**
      * Parses a command string into a list of arguments, handling quoted strings.
@@ -64,11 +73,7 @@ data class Shell(
     private fun buildCommandList(): List<String> {
         val fullCommand = parseCommand(command).toMutableList()
 
-        // Add additional arguments from the arguments map
-        arguments?.forEach { (key, value) ->
-            fullCommand.add(key)
-            if (value.isNotBlank()) fullCommand.add(value)
-        }
+        fullCommand.addAll(arguments)
 
         return fullCommand
     }
@@ -82,7 +87,7 @@ data class Shell(
      *
      * @return The [Process] object representing the running shell command.
      */
-    fun executeAsync(): Process {
+    fun executeAsync(discardOutput: Boolean = false): Process {
         val processBuilder = ProcessBuilder()
         processBuilder.command(buildCommandList())
 
@@ -94,8 +99,26 @@ data class Shell(
             }
         }
 
-        // Start the process and return it immediately
-        return processBuilder.start()
+        if (discardOutput) {
+            processBuilder.redirectOutput(ProcessBuilder.Redirect.DISCARD)
+            processBuilder.redirectError(ProcessBuilder.Redirect.DISCARD)
+        }
+        // Redirect input from a file so await:false also receives stdin without blocking
+        // on a child that writes output before reading its input.
+        val inputFile = stdin?.let { Files.createTempFile("lemline-shell-", ".stdin") }
+        try {
+            inputFile?.let {
+                Files.writeString(it, stdin)
+                processBuilder.redirectInput(it.toFile())
+            }
+            return processBuilder.start().also { process ->
+                process.outputStream.close()
+                inputFile?.let { file -> process.onExit().whenComplete { _, _ -> Files.deleteIfExists(file) } }
+            }
+        } catch (e: Exception) {
+            inputFile?.let { Files.deleteIfExists(it) }
+            throw e
+        }
     }
 
     /**
@@ -104,40 +127,22 @@ data class Shell(
      * This method:
      * - Starts the process using the built command and environment.
      * - Reads and collects all output from both stdout and stderr.
-     * - Waits up to 60 seconds for the process to complete.
+     * - Supplies standard input and drains both output streams concurrently.
      * - Returns a [ProcessResult] containing the exit code, stdout, and stderr.
      *
      * @return [ProcessResult] with the process exit code, standard output, and standard error.
      */
-    suspend fun execute(): ProcessResult {
-        val process = executeAsync()
-        val stdout = StringBuilder()
-        val stderr = StringBuilder()
-
-        val stdoutReader = BufferedReader(InputStreamReader(process.inputStream))
-        val stderrReader = BufferedReader(InputStreamReader(process.errorStream))
-
-        // Read standard output
-        var line: String?
-        while (stdoutReader.readLine().also { line = it } != null) {
-            stdout.append(line).append(System.lineSeparator())
+    suspend fun execute(): ProcessResult = withContext(pipeDispatcher) {
+        coroutineScope {
+            val process = executeAsync()
+            try {
+                val stdout = async { process.inputStream.bufferedReader().use { it.readText().trim() } }
+                val stderr = async { process.errorStream.bufferedReader().use { it.readText().trim() } }
+                process.onExit().await()
+                ProcessResult(code = process.exitValue(), stdout = stdout.await(), stderr = stderr.await())
+            } finally {
+                process.destroy()
+            }
         }
-
-        // Read standard error
-        while (stderrReader.readLine().also { line = it } != null) {
-            stderr.append(line).append(System.lineSeparator())
-        }
-
-        // Wait for the process to complete
-        withContext(Dispatchers.IO) {
-            process.waitFor()
-        }
-
-        // Return the result of the process execution
-        return ProcessResult(
-            code = process.exitValue(),
-            stdout = stdout.toString().trim(),
-            stderr = stderr.toString().trim()
-        )
     }
 }

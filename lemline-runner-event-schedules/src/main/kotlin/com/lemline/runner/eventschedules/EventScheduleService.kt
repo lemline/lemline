@@ -13,6 +13,7 @@ import com.lemline.runner.common.config.DatabaseConfig
 import com.lemline.runner.common.messaging.InstanceMessage
 import com.lemline.runner.definitions.DefinitionRepository
 import io.cloudevents.CloudEvent
+import io.serverlessworkflow.api.types.ListenTaskConfiguration.ListenAndReadAs
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
 
@@ -35,7 +36,8 @@ class EventScheduleService {
                 val workflow = WorkflowCache.refreshDefinition(candidate.workflowInfo, definition.definition)
                 val strategy = WorkflowCache.getEventConsumption(workflow) ?: return@withTransaction 0
                 val stateId = repository.loadState(definition, event, conn) ?: return@withTransaction 0
-                val consumed = EventScheduleCollector(repository).consume(stateId, strategy, event, conn)
+                val readAs = ListenAndReadAs.fromValue(workflow.schedule.read.toString())
+                val consumed = EventScheduleCollector(repository, readAs).consume(stateId, strategy, event, conn)
                 // A matching event needs a receipt even if its termination slot was already filled:
                 // otherwise a redelivery could contribute to the next collection after rearming.
                 if (!consumed.matched) return@withTransaction 0

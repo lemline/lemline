@@ -6,7 +6,7 @@ import com.lemline.core.nodes.Node
 import com.lemline.core.processors.scope.Scope
 import com.lemline.core.states.SetState
 import io.serverlessworkflow.api.types.SetTask
-import io.serverlessworkflow.api.types.SetTaskConfiguration
+import com.lemline.common.json.LemlineJson.toJsonElement
 import kotlin.time.Instant
 import kotlinx.serialization.json.JsonElement
 
@@ -67,8 +67,10 @@ class SetProcessor(
         state: SetState,
     ): JsonElement {
 
-        return eval(transformedInput, LemlineJson.encodeToElement(getSet()), scope)
+        val set = node.task.set ?: throw NoSuchElementException("SetTask has no set")
+        val value = set.setTaskConfiguration?.let { LemlineJson.encodeToElement(it) }
+            ?: set.string.toJsonElement()
+        return eval(transformedInput, value, scope)
     }
 
-    private fun getSet(): SetTaskConfiguration = node.task.set ?: throw NoSuchElementException("SetTask has no set")
 }

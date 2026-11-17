@@ -32,6 +32,7 @@ import java.sql.ResultSet
 import kotlin.time.Instant
 import com.lemline.runner.definitions.DefinitionModel
 import io.cloudevents.CloudEvent
+import io.serverlessworkflow.api.types.ListenTaskConfiguration.ListenAndReadAs
 import java.security.MessageDigest
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
@@ -240,11 +241,11 @@ class EventScheduleRepository : CrudRepository<EventScheduleModel>(),
         }
     }
 
-    suspend fun collectionInput(collectionId: IDV7, conn: Connection): JsonArray =
+    suspend fun collectionInput(collectionId: IDV7, conn: Connection, readAs: ListenAndReadAs = ListenAndReadAs.ENVELOPE): JsonArray =
         conn.prepareStatement("SELECT event FROM lemline_event_schedule_events WHERE collection_id = ? ORDER BY event_index").use {
             setIDV7(it, 1, collectionId)
             it.executeQuery().use { rs -> JsonArray(buildList {
-                while (rs.next()) add(CloudEventService.parseEnvelope(CloudEventService.deserialize(rs.getString("event"))))
+                while (rs.next()) add(CloudEventService.parseStringAsData(rs.getString("event"), readAs))
             }) }
         }
 

@@ -58,7 +58,7 @@ fun compileExtensions(node: Node<*>): List<ExtensionPlan> {
         fun block(phase: String, tasks: List<TaskItem>?): Node<DoTask>? = tasks?.takeIf { it.isNotEmpty() }?.let {
             Node(
                 node.position.addToken(Token.EXT).addIndex(index).addName(phase).addToken(Token.DO),
-                DoTask(it), item.name, node, NodeOrigin.EXTENSION_BLOCK,
+                DoTask().withDo(it), item.name, node, NodeOrigin.EXTENSION_BLOCK,
             )
         }
         ExtensionPlan(index, item.name, extension.`when`, block("before", extension.before), block("after", extension.after))

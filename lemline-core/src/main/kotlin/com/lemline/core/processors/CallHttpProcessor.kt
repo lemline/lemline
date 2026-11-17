@@ -3,6 +3,8 @@ package com.lemline.core.processors
 
 import com.lemline.common.json.LemlineJson
 import com.lemline.common.json.LemlineJson.toJsonPrimitive
+import com.lemline.common.json.LemlineJson.toJsonElement
+import com.lemline.core.errors.WorkflowErrorType.EXPRESSION
 import com.lemline.core.errors.WorkflowErrorType.CONFIGURATION
 import com.lemline.core.errors.WorkflowErrorType.RUNTIME
 import com.lemline.core.nodes.Node
@@ -29,6 +31,7 @@ import io.serverlessworkflow.impl.expressions.ExpressionUtils
 import java.net.URI
 import kotlin.time.Instant
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 
 /**
@@ -110,16 +113,15 @@ class CallHttpProcessor(
         val authentication = resolveAuthentication(httpArgs.endpoint)
 
         // Extract headers
-        val headers = httpArgs.headers?.additionalProperties?.mapValues {
-            it.value.toJsonPrimitive().content
-        } ?: emptyMap()
+        val headers = evaluateStringMap(
+            httpArgs.headers?.getHTTPHeaders()?.additionalProperties,
+            httpArgs.headers?.runtimeExpression, "headers", transformedInput, scope,
+        )
 
-        // Extract query parameters (evaluate runtime expressions)
-        // Note: The SDK pre-strips ${ } wrappers, so values like ".searchQuery"
-        // need to be evaluated as JQ expressions directly.
-        val query = httpArgs.query?.additionalProperties?.mapValues {
-            evalString(transformedInput, it.value.toJsonPrimitive().content, "query.${it.key}", scope)
-        } ?: emptyMap()
+        val query = evaluateStringMap(
+            httpArgs.query?.getHTTPQuery()?.additionalProperties,
+            httpArgs.query?.runtimeExpression, "query", transformedInput, scope,
+        )
 
         // Extract body
         val body: JsonElement? = httpArgs.body?.let {
@@ -148,6 +150,19 @@ class CallHttpProcessor(
             input = transformedInput,
             config = config
         )
+    }
+
+    private fun evaluateStringMap(
+        values: Map<String, Any?>?,
+        expression: String?,
+        name: String,
+        input: JsonElement,
+        scope: Scope,
+    ): Map<String, String> {
+        if (values == null && expression == null) return emptyMap()
+        val resolved = eval(input, expression?.toJsonElement() ?: values.toJsonElement(), scope)
+        if (resolved !is JsonObject) raiseError(EXPRESSION, "HTTP $name must evaluate to an object")
+        return resolved.mapValues { (_, value) -> value.toJsonPrimitive().content }
     }
 
     /**

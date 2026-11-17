@@ -79,10 +79,11 @@ data class RunScriptConfig(
  */
 data class RunShellConfig(
     val command: String,
-    val arguments: Map<String, String>? = null,
+    val arguments: List<String> = emptyList(),
     val environment: Map<String, String>? = null,
     val await: Boolean = true,
-    val returnType: ProcessReturnType = ProcessReturnType.STDOUT
+    val returnType: ProcessReturnType = ProcessReturnType.STDOUT,
+    val stdin: String? = null,
 )
 // ========================================
 // Listen Task Configuration

@@ -160,8 +160,11 @@ message RunScriptConfigProto {
 
 message RunShellConfigProto {
     string command = 1;
-    StringMapProto arguments = 2;
+    // Retained to read shell events persisted before SDK 7.35.3.
+    StringMapProto arguments = 2 [deprecated = true];
     StringMapProto environment = 3;
     bool await = 4;
     ProcessReturnTypeProto return_type = 5;
+    repeated string ordered_arguments = 6;
+    optional string stdin = 7;
 }

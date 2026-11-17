@@ -7,18 +7,18 @@ import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.DurationUnit
 
-internal fun RetryPolicyJitter?.toRandomDuration(): Duration {
+internal fun RetryPolicyJitter?.toRandomDuration(evaluateExpression: (String) -> String = { it }): Duration {
     if (this == null) return 0.seconds
 
     return when (to) {
         null -> when (from) {
             null -> 0.seconds
-            else -> error("Jitter can not be defined from '${from.toDuration()}' to '$to'")
+            else -> error("Jitter can not be defined from '${from.toDuration(evaluateExpression)}' to '$to'")
         }
 
         else -> when (from) {
-            null -> getRandomDuration(0.seconds, to.toDuration())
-            else -> getRandomDuration(from.toDuration(), to.toDuration())
+            null -> getRandomDuration(0.seconds, to.toDuration(evaluateExpression))
+            else -> getRandomDuration(from.toDuration(evaluateExpression), to.toDuration(evaluateExpression))
         }
     }
 }

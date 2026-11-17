@@ -5,6 +5,9 @@ import com.lemline.core.tasks.runs.Shell
 import kotlin.test.assertEquals
 import kotlin.test.assertNotEquals
 import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.seconds
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.condition.DisabledOnOs
@@ -15,9 +18,44 @@ class ShellRunTest {
 
     @Test
     @EnabledOnOs(OS.LINUX, OS.MAC)
+    fun `concurrent shell output cannot starve pipe readers`() = runTest(timeout = 30.seconds) {
+        List(80) {
+            async {
+                val result = Shell("sh", listOf("-c", "head -c 131072 /dev/zero >&2; printf done")).execute()
+                assertEquals(0, result.code)
+                assertEquals("done", result.stdout)
+                assertEquals(131072, result.stderr.length)
+            }
+        }.awaitAll()
+    }
+
+    @Test
+    @EnabledOnOs(OS.LINUX, OS.MAC)
+    fun `should preserve repeated empty and spaced arguments`() = runTest {
+        val result = Shell("printf", listOf("<%s>\\n", "repeat", "", "repeat", "two words")).execute()
+        assertEquals("<repeat>\n<>\n<repeat>\n<two words>", result.stdout)
+    }
+
+    @Test
+    @EnabledOnOs(OS.LINUX, OS.MAC)
+    fun `should supply stdin and close it when omitted`() = runTest {
+        assertEquals("payload", Shell("cat", stdin = "payload").execute().stdout)
+        assertEquals("", Shell("cat").execute().stdout)
+    }
+
+    @Test
+    @EnabledOnOs(OS.LINUX, OS.MAC)
+    fun `asynchronous shell receives stdin`() {
+        val process = Shell("cat", stdin = "background input").executeAsync()
+        assertEquals("background input", process.inputStream.bufferedReader().use { it.readText() })
+        assertEquals(0, process.waitFor())
+    }
+
+    @Test
+    @EnabledOnOs(OS.LINUX, OS.MAC)
     fun `should execute simple echo command successfully`() = runTest {
         // Given
-        val shellRun = Shell(command = "echo", arguments = mapOf("Hello" to "World"))
+        val shellRun = Shell(command = "echo", arguments = listOf("Hello", "World"))
 
         // When
         val result = shellRun.execute()
@@ -32,7 +70,7 @@ class ShellRunTest {
     @EnabledOnOs(OS.WINDOWS)
     fun `should execute simple echo command successfully on Windows`() = runTest {
         // Given
-        val shellRun = Shell(command = "cmd", arguments = mapOf("/c" to "echo Hello World"))
+        val shellRun = Shell(command = "cmd", arguments = listOf("/c", "echo Hello World"))
 
         // When
         val result = shellRun.execute()
@@ -49,9 +87,9 @@ class ShellRunTest {
         // Given
         val shellRun = Shell(
             command = "echo",
-            arguments = mapOf(
-                "-n" to "",
-                "No" to "newline"
+            arguments = listOf(
+                "-n",
+                "No", "newline"
             )
         )
 
@@ -70,7 +108,7 @@ class ShellRunTest {
         // Given
         val shellRun = Shell(
             command = "sh",
-            arguments = mapOf("-c" to "echo \$TEST_VAR"),
+            arguments = listOf("-c", "echo \$TEST_VAR"),
             environment = mapOf("TEST_VAR" to "test_value")
         )
 
@@ -89,7 +127,7 @@ class ShellRunTest {
         // Given
         val shellRun = Shell(
             command = "cmd",
-            arguments = mapOf("/c" to "echo %TEST_VAR%"),
+            arguments = listOf("/c", "echo %TEST_VAR%"),
             environment = mapOf("TEST_VAR" to "test_value")
         )
 
@@ -176,7 +214,7 @@ class ShellRunTest {
         // Given
         val shellRun = Shell(
             command = "echo \"Hello\"",
-            arguments = mapOf("World" to "from test")
+            arguments = listOf("World", "from test")
         )
 
         // When
@@ -198,7 +236,7 @@ class ShellRunTest {
         // Given
         val shellRun = Shell(
             command = "sh",
-            arguments = mapOf("-c" to "echo 'error message' >&2")
+            arguments = listOf("-c", "echo 'error message' >&2")
         )
 
         // When
@@ -216,7 +254,7 @@ class ShellRunTest {
         // Given
         val shellRun = Shell(
             command = "cmd",
-            arguments = mapOf("/c" to "echo error message 1>&2")
+            arguments = listOf("/c", "echo error message 1>&2")
         )
 
         // When
@@ -234,7 +272,7 @@ class ShellRunTest {
         // Given
         val shellRun = Shell(
             command = "sh",
-            arguments = mapOf("-c" to "exit 1")
+            arguments = listOf("-c", "exit 1")
         )
 
         // When
@@ -252,7 +290,7 @@ class ShellRunTest {
         // Given
         val shellRun = Shell(
             command = "cmd",
-            arguments = mapOf("/c" to "exit 1")
+            arguments = listOf("/c", "exit 1")
         )
 
         // When
@@ -283,7 +321,7 @@ class ShellRunTest {
     @EnabledOnOs(OS.WINDOWS)
     fun `should handle command with no arguments on Windows`() = runTest {
         // Given
-        val shellRun = Shell(command = "cmd", arguments = mapOf("/c" to "echo Hello"))
+        val shellRun = Shell(command = "cmd", arguments = listOf("/c", "echo Hello"))
 
         // When
         val result = shellRun.execute()
@@ -300,7 +338,7 @@ class ShellRunTest {
         // Given
         val shellRun = Shell(
             command = "sh",
-            arguments = mapOf("-c" to "echo 'stdout message'; echo 'stderr message' >&2")
+            arguments = listOf("-c", "echo 'stdout message'; echo 'stderr message' >&2")
         )
 
         // When
@@ -365,7 +403,7 @@ class ShellRunTest {
             // Test with a command containing spaces and arguments
             val shellRun = Shell(
                 command = "\"${scriptFile.absolutePath}\"",
-                arguments = mapOf("arg1" to "value 1", "arg2" to "value 2")
+                arguments = listOf("arg1", "value 1", "arg2", "value 2")
             )
 
             // When

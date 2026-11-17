@@ -83,7 +83,8 @@ The configuration is provided under the `run` property, specifically within the 
 
 *   **`shell`** (Object, Required): Defines the shell command process configuration.
     *   **`command`** (String, Required): The shell command line to execute. This string is typically passed directly to the system's shell interpreter.
-    *   **`arguments`** (Map<String, Any>, Optional): A key/value map defining arguments passed to the shell command. *Note: How these are passed (e.g., as command-line arguments appended to `command`, or made available in the environment) might depend on the runtime implementation. Using `environment` is often more explicit.*
+    *   **`arguments`** (List<String>, Optional): An ordered list appended to the command, for example `["-n", "Hello world"]`. Entries can use [Runtime Expressions](dsl-runtime-expressions.md). Duplicate arguments, empty strings, and spaces within an entry are preserved. Older definitions using argument maps must be converted to lists.
+    *   **`stdin`** (String, Optional): Standard input passed to the process, either a literal string or a runtime expression. Input is closed after the supplied content, including when no content is supplied.
     *   **`environment`** (Map<String, String>, Optional): A key/value map of environment variables to set specifically for the execution of this shell command. Values can be static strings or evaluated from [Runtime Expressions](dsl-runtime-expressions.md). This is a common way to pass dynamic data to the command.
 *   **`await`** (Boolean, Optional, Default: `true`):
     *   `true`: The workflow task waits for the shell command process to complete before proceeding. The task's output is determined by the `return` property.
@@ -108,4 +109,4 @@ The configuration is provided under the `run` property, specifically within the 
 
 ### Flow Control
 <include from="_common-task-flow_control.md" element-id="common-flow-control"/>
-**Note**: If `await` is `true` and the shell command exits with a non-zero status code, a `Runtime` error is typically raised, and the `then` directive is *not* followed (unless caught by `Try`). 
+**Note**: If `await` is `true` and the shell command exits with a non-zero status code, a `Runtime` error is typically raised, and the `then` directive is *not* followed (unless caught by `Try`).

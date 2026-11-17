@@ -391,7 +391,7 @@ do:
               endpoint: https://scheduling.hospital.example/api/availability
               query:
                 departmentId: "primary_care"
-                daysForward: 14
+                daysForward: '14'
               output: availableSlots
         - sendAppointmentOptions:
             call: http

@@ -2,6 +2,14 @@
 package com.lemline.core.schemas
 
 import com.fasterxml.jackson.databind.ObjectMapper
+import com.sun.net.httpserver.HttpServer
+import io.serverlessworkflow.api.WorkflowFormat
+import io.serverlessworkflow.api.types.SchemaUnion
+import java.nio.file.Files
+import java.net.InetSocketAddress
+import java.util.concurrent.atomic.AtomicReference
+import kotlin.test.assertEquals
+import kotlinx.serialization.json.Json
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertDoesNotThrow
 import org.junit.jupiter.api.assertThrows
@@ -9,6 +17,103 @@ import org.junit.jupiter.api.assertThrows
 class SchemaValidatorTest {
 
     private val mapper = ObjectMapper()
+
+    @Test
+    fun `external GitHub raw schema URLs preserve their declared path and query`() {
+        val url = "https://github.com/open-workflow-specification/specification/raw/refs/heads/main/schema/workflow.yaml?download=1"
+        val schema = WorkflowFormat.YAML.mapper().readValue("format: json\nresource:\n  endpoint: '$url'\n", SchemaUnion::class.java)
+        val loaded = SchemaValidator.schemaUnionToSchema(schema) { requested ->
+            assertEquals(url, requested.toString())
+            "type: string".byteInputStream()
+        }
+        assertEquals(mapper.readTree("""{"type":"string"}"""), loaded)
+    }
+
+    @Test
+    fun `schemas resolve external HTTP and file references`() {
+        val content = """{"type":"object","required":["value"],"properties":{"value":{"type":"boolean"}}}"""
+        val file = Files.createTempFile("lemline-referenced-schema-", ".json")
+        val server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
+        server.createContext("/referenced.json") { exchange ->
+            exchange.use {
+                val bytes = content.toByteArray()
+                it.sendResponseHeaders(200, bytes.size.toLong())
+                it.responseBody.write(bytes)
+            }
+        }
+        server.start()
+        try {
+            Files.writeString(file, content)
+            for (uri in listOf(file.toUri().toString(), "http://127.0.0.1:${server.address.port}/referenced.json")) {
+                val schema = mapper.createObjectNode().put("\$ref", uri)
+                assertDoesNotThrow { SchemaValidator.validateJsonNode(mapper.readTree("""{"value":true}"""), schema) }
+                assertThrows<IllegalArgumentException> { SchemaValidator.validateJsonNode(mapper.readTree("""{"value":1}"""), schema) }
+                assertThrows<IllegalArgumentException> { SchemaValidator.validateJsonNode(mapper.readTree("{}"), schema) }
+            }
+        } finally {
+            server.stop(0)
+            Files.deleteIfExists(file)
+        }
+    }
+
+    @Test
+    fun `external HTTP schemas refresh without last modified or HEAD support`() {
+        for (headStatus in listOf(200, 405)) {
+            val content = AtomicReference("""{"type":"object","required":["old"]}""")
+            val server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
+            server.createContext("/schema.json") { exchange ->
+                exchange.use {
+                    if (it.requestMethod == "HEAD") it.sendResponseHeaders(headStatus, -1)
+                    else {
+                        val bytes = content.get().toByteArray()
+                        it.sendResponseHeaders(200, bytes.size.toLong())
+                        it.responseBody.write(bytes)
+                    }
+                }
+            }
+            server.createContext("/redirect.json") { exchange ->
+                exchange.use {
+                    it.responseHeaders.add("Location", "/schema.json")
+                    it.sendResponseHeaders(302, -1)
+                }
+            }
+            server.start()
+            try {
+                val schema = WorkflowFormat.YAML.mapper().readValue(
+                    "format: json\nresource:\n  endpoint: 'http://127.0.0.1:${server.address.port}/redirect.json'\n", SchemaUnion::class.java,
+                )
+                val data = Json.parseToJsonElement("""{"old":true}""")
+                assertDoesNotThrow { SchemaValidator.validate(data, schema) }
+                content.set("""{"type":"object","required":["new"]}""")
+                assertThrows<IllegalArgumentException> { SchemaValidator.validate(data, schema) }
+                assertDoesNotThrow { SchemaValidator.validate(Json.parseToJsonElement("""{"new":true}"""), schema) }
+            } finally {
+                server.stop(0)
+            }
+        }
+    }
+
+    @Test
+    fun `external JSON and YAML schemas use the SDK resource loader`() {
+        for ((suffix, content) in listOf(
+            ".json" to """{"type":"object","required":["name","on"],"properties":{"name":{"type":"string"},"on":{"type":"boolean"}},"additionalProperties":false}""",
+            ".yaml" to "type: object\nrequired: [name, on]\nproperties:\n  name: { type: string }\n  on: { type: boolean }\nadditionalProperties: false\n",
+        )) {
+            val file = Files.createTempFile("lemline-schema-", suffix)
+            try {
+                Files.writeString(file, content)
+                val schema = WorkflowFormat.YAML.mapper().readValue(
+                    "format: json\nresource:\n  endpoint: '${file.toUri()}'\n", SchemaUnion::class.java,
+                )
+                assertDoesNotThrow { SchemaValidator.validate(Json.parseToJsonElement("""{"name":"valid","on":true}"""), schema) }
+                assertThrows<IllegalArgumentException> { SchemaValidator.validate(Json.parseToJsonElement("""{"name":1,"on":true}"""), schema) }
+                assertThrows<IllegalArgumentException> { SchemaValidator.validate(Json.parseToJsonElement("""{"name":"valid"}"""), schema) }
+                assertThrows<IllegalArgumentException> { SchemaValidator.validate(Json.parseToJsonElement("""{"name":"valid","on":true,"extra":1}"""), schema) }
+            } finally {
+                Files.deleteIfExists(file)
+            }
+        }
+    }
 
     @Test
     fun `test validate simple required field - valid`() {

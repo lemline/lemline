@@ -498,18 +498,23 @@ object WorkflowStateProtobufMapper {
 
     private fun RunShellConfig.toProto() = RunShellConfigProto(
         command = command,
-        arguments = arguments?.toProtoStringMap(),
+        ordered_arguments = arguments,
         environment = environment?.toProtoStringMap(),
         await = await,
-        return_type = returnType.toProto()
+        return_type = returnType.toProto(),
+        stdin = stdin,
     )
 
     private fun RunShellConfigProto.toDomain() = RunShellConfig(
         command = command,
-        arguments = arguments?.toDomainStringMap(),
+        arguments = ordered_arguments.takeIf { it.isNotEmpty() }
+            ?: arguments?.toDomainStringMap()?.flatMap { (key, value) ->
+                listOf(key) + listOfNotNull(value.takeIf { it.isNotBlank() })
+            }.orEmpty(),
         environment = environment?.toDomainStringMap(),
         await = await,
         returnType = return_type.toDomain(),
+        stdin = stdin,
     )
 
     private fun ListenStrategy.toProto(): ListenStrategyProto = when (this) {

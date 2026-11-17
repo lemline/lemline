@@ -111,7 +111,7 @@ do:
               endpoint: https://api.example/users
               query:
                 page: ${ $context.nextPage }
-                limit: 100
+                limit: '100'
               output: pageResult
         - processPage:
             set:

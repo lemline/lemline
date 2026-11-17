@@ -10,7 +10,6 @@ import com.lemline.common.values.Token.FORK
 import com.lemline.common.values.Token.SUBSCRIPTION
 import com.lemline.common.values.Token.TRY
 import com.lemline.common.values.Token.WITH
-import com.lemline.core.expressions.EvaluationMode
 import com.lemline.core.nodes.ForeachTask
 import com.lemline.core.nodes.Node
 import com.lemline.core.nodes.NodeOrigin
@@ -79,7 +78,7 @@ object WorkflowParser {
             workflow.document,
             workflow.`do`,
             workflow.use,
-            (workflow as? EvaluatedWorkflow)?.evaluationMode ?: EvaluationMode.STRICT,
+            workflow.evaluationMode,
         ).also {
             it.output = workflow.output
             it.input = workflow.input
@@ -167,7 +166,7 @@ private fun TaskItem.toTask(): TaskBase = when (val task = task.get()) {
 private fun parseRootChildren(task: RootTask, parent: Node<*>): List<Node<*>> = listOf(
     Node(
         position = parent.position.addToken(DO),
-        task = DoTask(task.`do`),
+        task = DoTask().withDo(task.`do`),
         name = "$DO",
         parent = parent,
         origin = NodeOrigin.INTERNAL,
@@ -219,7 +218,7 @@ private fun parseForChildren(node: Node<*>): List<Node<*>> {
     return listOf(
         Node(
             position = node.position.addToken(DO),
-            task = DoTask(task.`do`),
+            task = DoTask().withDo(task.`do`),
             name = "$DO",
             parent = node,
             origin = if (node.extensionOwner != null) NodeOrigin.EXTENSION_DESCENDANT else NodeOrigin.INTERNAL,
@@ -248,7 +247,7 @@ private fun parseTryChildren(node: Node<*>): List<Node<*>> {
         add(
             Node(
                 position = node.position.addToken(TRY),
-                task = DoTask(task.`try`),
+                task = DoTask().withDo(task.`try`),
                 name = "$TRY",
                 parent = node,
             origin = if (node.extensionOwner != null) NodeOrigin.EXTENSION_DESCENDANT else NodeOrigin.INTERNAL,
@@ -258,7 +257,7 @@ private fun parseTryChildren(node: Node<*>): List<Node<*>> {
             add(
                 Node(
                     position = node.position.addToken(CATCH),
-                    task = DoTask(it),
+                    task = DoTask().withDo(it),
                     name = "$CATCH",
                     parent = node,
             origin = if (node.extensionOwner != null) NodeOrigin.EXTENSION_DESCENDANT else NodeOrigin.INTERNAL,
@@ -324,7 +323,7 @@ private fun parseListenChildren(node: Node<*>): List<Node<*>>? {
             task = ForeachTask(
                 itemVar = foreach.item ?: "item",
                 indexVar = foreach.at ?: "index",
-                doTask = DoTask(doTasks),
+                doTask = DoTask().withDo(doTasks),
                 foreachOutput = foreach.output,
                 foreachExport = foreach.export,
             ),
@@ -374,7 +373,7 @@ private fun parseCallAsyncAPIChildren(node: Node<*>): List<Node<*>>? {
         listOf(
             Node(
                 position = node.position.addToken(WITH).addToken(SUBSCRIPTION).addToken(FOREACH).addToken(DO),
-                task = DoTask(it),
+                task = DoTask().withDo(it),
                 name = "$WITH.$SUBSCRIPTION.$FOREACH.$DO",
                 parent = node,
             origin = if (node.extensionOwner != null) NodeOrigin.EXTENSION_DESCENDANT else NodeOrigin.INTERNAL,
