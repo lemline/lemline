@@ -1,0 +1,482 @@
+[
+  {
+    "case": "jq-scalar-100-items",
+    "fork": 0,
+    "iteration": 0,
+    "ns_per_op": 45106.6617965368,
+    "bytes_per_op": 281695.01515151514,
+    "operations": 11088
+  },
+  {
+    "case": "jq-scalar-100-items",
+    "fork": 0,
+    "iteration": 1,
+    "ns_per_op": 49307.201938136255,
+    "bytes_per_op": 281664.0093970243,
+    "operations": 10216
+  },
+  {
+    "case": "jq-scalar-100-items",
+    "fork": 0,
+    "iteration": 2,
+    "ns_per_op": 46319.61037037037,
+    "bytes_per_op": 281664.0088888889,
+    "operations": 10800
+  },
+  {
+    "case": "jq-scalar-100-items",
+    "fork": 0,
+    "iteration": 3,
+    "ns_per_op": 43725.52814685315,
+    "bytes_per_op": 281664.00839160837,
+    "operations": 11440
+  },
+  {
+    "case": "jq-scalar-100-items",
+    "fork": 0,
+    "iteration": 4,
+    "ns_per_op": 43725.13479020979,
+    "bytes_per_op": 281664.00839160837,
+    "operations": 11440
+  },
+  {
+    "case": "jq-object-3-expressions",
+    "fork": 0,
+    "iteration": 0,
+    "ns_per_op": 109490.90608581436,
+    "bytes_per_op": 700419.7863397548,
+    "operations": 4568
+  },
+  {
+    "case": "jq-object-3-expressions",
+    "fork": 0,
+    "iteration": 1,
+    "ns_per_op": 109646.234676007,
+    "bytes_per_op": 700416.0210157618,
+    "operations": 4568
+  },
+  {
+    "case": "jq-object-3-expressions",
+    "fork": 0,
+    "iteration": 2,
+    "ns_per_op": 111909.72517889088,
+    "bytes_per_op": 700416.0214669051,
+    "operations": 4472
+  },
+  {
+    "case": "jq-object-3-expressions",
+    "fork": 0,
+    "iteration": 3,
+    "ns_per_op": 111115.85990230906,
+    "bytes_per_op": 700416.0674955595,
+    "operations": 4504
+  },
+  {
+    "case": "jq-object-3-expressions",
+    "fork": 0,
+    "iteration": 4,
+    "ns_per_op": 109891.22012302285,
+    "bytes_per_op": 700416.0210896309,
+    "operations": 4552
+  },
+  {
+    "case": "workflow-8-sets",
+    "fork": 0,
+    "iteration": 0,
+    "ns_per_op": 1803086.7571428572,
+    "bytes_per_op": 9732202.771428572,
+    "operations": 280
+  },
+  {
+    "case": "workflow-8-sets",
+    "fork": 0,
+    "iteration": 1,
+    "ns_per_op": 1733789.1317567567,
+    "bytes_per_op": 9727805.0,
+    "operations": 296
+  },
+  {
+    "case": "workflow-8-sets",
+    "fork": 0,
+    "iteration": 2,
+    "ns_per_op": 1718407.2364864864,
+    "bytes_per_op": 9725321.243243244,
+    "operations": 296
+  },
+  {
+    "case": "workflow-8-sets",
+    "fork": 0,
+    "iteration": 3,
+    "ns_per_op": 1690438.4831081082,
+    "bytes_per_op": 9724820.378378378,
+    "operations": 296
+  },
+  {
+    "case": "workflow-8-sets",
+    "fork": 0,
+    "iteration": 4,
+    "ns_per_op": 1711348.1148648649,
+    "bytes_per_op": 9724862.108108109,
+    "operations": 296
+  },
+  {
+    "case": "workflow-8-sets-protobuf",
+    "fork": 0,
+    "iteration": 0,
+    "ns_per_op": 8577410.8125,
+    "bytes_per_op": 38083038.375,
+    "operations": 64
+  },
+  {
+    "case": "workflow-8-sets-protobuf",
+    "fork": 0,
+    "iteration": 1,
+    "ns_per_op": 8341391.265625,
+    "bytes_per_op": 38079396.0,
+    "operations": 64
+  },
+  {
+    "case": "workflow-8-sets-protobuf",
+    "fork": 0,
+    "iteration": 2,
+    "ns_per_op": 8345073.5625,
+    "bytes_per_op": 38076054.375,
+    "operations": 64
+  },
+  {
+    "case": "workflow-8-sets-protobuf",
+    "fork": 0,
+    "iteration": 3,
+    "ns_per_op": 8357123.046875,
+    "bytes_per_op": 38074954.875,
+    "operations": 64
+  },
+  {
+    "case": "workflow-8-sets-protobuf",
+    "fork": 0,
+    "iteration": 4,
+    "ns_per_op": 8315163.40625,
+    "bytes_per_op": 38074352.0,
+    "operations": 64
+  },
+  {
+    "case": "jq-scalar-100-items",
+    "fork": 1,
+    "iteration": 0,
+    "ns_per_op": 42923.29770075498,
+    "bytes_per_op": 281696.0082361016,
+    "operations": 11656
+  },
+  {
+    "case": "jq-scalar-100-items",
+    "fork": 1,
+    "iteration": 1,
+    "ns_per_op": 43058.812586088156,
+    "bytes_per_op": 281696.0082644628,
+    "operations": 11616
+  },
+  {
+    "case": "jq-scalar-100-items",
+    "fork": 1,
+    "iteration": 2,
+    "ns_per_op": 42627.61307089298,
+    "bytes_per_op": 281696.0081799591,
+    "operations": 11736
+  },
+  {
+    "case": "jq-scalar-100-items",
+    "fork": 1,
+    "iteration": 3,
+    "ns_per_op": 42515.16825288919,
+    "bytes_per_op": 281696.00815771584,
+    "operations": 11768
+  },
+  {
+    "case": "jq-scalar-100-items",
+    "fork": 1,
+    "iteration": 4,
+    "ns_per_op": 42363.687076558264,
+    "bytes_per_op": 281696.0081300813,
+    "operations": 11808
+  },
+  {
+    "case": "jq-object-3-expressions",
+    "fork": 1,
+    "iteration": 0,
+    "ns_per_op": 109821.57346491228,
+    "bytes_per_op": 697000.0210526315,
+    "operations": 4560
+  },
+  {
+    "case": "jq-object-3-expressions",
+    "fork": 1,
+    "iteration": 1,
+    "ns_per_op": 107788.92780172414,
+    "bytes_per_op": 697000.0655172414,
+    "operations": 4640
+  },
+  {
+    "case": "jq-object-3-expressions",
+    "fork": 1,
+    "iteration": 2,
+    "ns_per_op": 108590.22352430556,
+    "bytes_per_op": 697000.0208333334,
+    "operations": 4608
+  },
+  {
+    "case": "jq-object-3-expressions",
+    "fork": 1,
+    "iteration": 3,
+    "ns_per_op": 109274.25699300699,
+    "bytes_per_op": 697000.020979021,
+    "operations": 4576
+  },
+  {
+    "case": "jq-object-3-expressions",
+    "fork": 1,
+    "iteration": 4,
+    "ns_per_op": 110497.70870141343,
+    "bytes_per_op": 697000.0212014135,
+    "operations": 4528
+  },
+  {
+    "case": "workflow-8-sets",
+    "fork": 1,
+    "iteration": 0,
+    "ns_per_op": 1739081.8854166667,
+    "bytes_per_op": 9734412.833333334,
+    "operations": 288
+  },
+  {
+    "case": "workflow-8-sets",
+    "fork": 1,
+    "iteration": 1,
+    "ns_per_op": 1725800.5337837837,
+    "bytes_per_op": 9730562.432432432,
+    "operations": 296
+  },
+  {
+    "case": "workflow-8-sets",
+    "fork": 1,
+    "iteration": 2,
+    "ns_per_op": 1674205.457236842,
+    "bytes_per_op": 9728025.815789474,
+    "operations": 304
+  },
+  {
+    "case": "workflow-8-sets",
+    "fork": 1,
+    "iteration": 3,
+    "ns_per_op": 1634554.0865384615,
+    "bytes_per_op": 9727606.871794872,
+    "operations": 312
+  },
+  {
+    "case": "workflow-8-sets",
+    "fork": 1,
+    "iteration": 4,
+    "ns_per_op": 1624332.2628205128,
+    "bytes_per_op": 9727607.692307692,
+    "operations": 312
+  },
+  {
+    "case": "workflow-8-sets-protobuf",
+    "fork": 1,
+    "iteration": 0,
+    "ns_per_op": 8507515.625,
+    "bytes_per_op": 39022634.125,
+    "operations": 64
+  },
+  {
+    "case": "workflow-8-sets-protobuf",
+    "fork": 1,
+    "iteration": 1,
+    "ns_per_op": 8357774.734375,
+    "bytes_per_op": 39018810.125,
+    "operations": 64
+  },
+  {
+    "case": "workflow-8-sets-protobuf",
+    "fork": 1,
+    "iteration": 2,
+    "ns_per_op": 8325236.328125,
+    "bytes_per_op": 39016758.25,
+    "operations": 64
+  },
+  {
+    "case": "workflow-8-sets-protobuf",
+    "fork": 1,
+    "iteration": 3,
+    "ns_per_op": 8328478.515625,
+    "bytes_per_op": 39016471.5,
+    "operations": 64
+  },
+  {
+    "case": "workflow-8-sets-protobuf",
+    "fork": 1,
+    "iteration": 4,
+    "ns_per_op": 8343839.1875,
+    "bytes_per_op": 39016429.875,
+    "operations": 64
+  },
+  {
+    "case": "jq-scalar-100-items",
+    "fork": 2,
+    "iteration": 0,
+    "ns_per_op": 43685.12700908456,
+    "bytes_per_op": 281640.00838574424,
+    "operations": 11448
+  },
+  {
+    "case": "jq-scalar-100-items",
+    "fork": 2,
+    "iteration": 1,
+    "ns_per_op": 43517.705462769656,
+    "bytes_per_op": 281640.0083507307,
+    "operations": 11496
+  },
+  {
+    "case": "jq-scalar-100-items",
+    "fork": 2,
+    "iteration": 2,
+    "ns_per_op": 43238.34068118949,
+    "bytes_per_op": 281640.00829875516,
+    "operations": 11568
+  },
+  {
+    "case": "jq-scalar-100-items",
+    "fork": 2,
+    "iteration": 3,
+    "ns_per_op": 44108.66557868737,
+    "bytes_per_op": 281640.0084685956,
+    "operations": 11336
+  },
+  {
+    "case": "jq-scalar-100-items",
+    "fork": 2,
+    "iteration": 4,
+    "ns_per_op": 43255.53633217993,
+    "bytes_per_op": 281640.0083044983,
+    "operations": 11560
+  },
+  {
+    "case": "jq-object-3-expressions",
+    "fork": 2,
+    "iteration": 0,
+    "ns_per_op": 109558.5777145359,
+    "bytes_per_op": 696961.8073555166,
+    "operations": 4568
+  },
+  {
+    "case": "jq-object-3-expressions",
+    "fork": 2,
+    "iteration": 1,
+    "ns_per_op": 110035.51559753955,
+    "bytes_per_op": 696960.0210896309,
+    "operations": 4552
+  },
+  {
+    "case": "jq-object-3-expressions",
+    "fork": 2,
+    "iteration": 2,
+    "ns_per_op": 108769.61956521739,
+    "bytes_per_op": 696960.0208695652,
+    "operations": 4600
+  },
+  {
+    "case": "jq-object-3-expressions",
+    "fork": 2,
+    "iteration": 3,
+    "ns_per_op": 108954.57665505227,
+    "bytes_per_op": 696960.0662020906,
+    "operations": 4592
+  },
+  {
+    "case": "jq-object-3-expressions",
+    "fork": 2,
+    "iteration": 4,
+    "ns_per_op": 109405.32124125875,
+    "bytes_per_op": 696960.020979021,
+    "operations": 4576
+  },
+  {
+    "case": "workflow-8-sets",
+    "fork": 2,
+    "iteration": 0,
+    "ns_per_op": 1736828.9930555555,
+    "bytes_per_op": 9731366.861111112,
+    "operations": 288
+  },
+  {
+    "case": "workflow-8-sets",
+    "fork": 2,
+    "iteration": 1,
+    "ns_per_op": 1694267.4527027027,
+    "bytes_per_op": 9726942.45945946,
+    "operations": 296
+  },
+  {
+    "case": "workflow-8-sets",
+    "fork": 2,
+    "iteration": 2,
+    "ns_per_op": 1649776.5921052631,
+    "bytes_per_op": 9725140.421052631,
+    "operations": 304
+  },
+  {
+    "case": "workflow-8-sets",
+    "fork": 2,
+    "iteration": 3,
+    "ns_per_op": 1660229.167763158,
+    "bytes_per_op": 9725079.684210526,
+    "operations": 304
+  },
+  {
+    "case": "workflow-8-sets",
+    "fork": 2,
+    "iteration": 4,
+    "ns_per_op": 1672498.2203947369,
+    "bytes_per_op": 9725079.44736842,
+    "operations": 304
+  },
+  {
+    "case": "workflow-8-sets-protobuf",
+    "fork": 2,
+    "iteration": 0,
+    "ns_per_op": 8458304.03125,
+    "bytes_per_op": 38081677.125,
+    "operations": 64
+  },
+  {
+    "case": "workflow-8-sets-protobuf",
+    "fork": 2,
+    "iteration": 1,
+    "ns_per_op": 8385538.40625,
+    "bytes_per_op": 38080347.0,
+    "operations": 64
+  },
+  {
+    "case": "workflow-8-sets-protobuf",
+    "fork": 2,
+    "iteration": 2,
+    "ns_per_op": 8482494.78125,
+    "bytes_per_op": 38081156.625,
+    "operations": 64
+  },
+  {
+    "case": "workflow-8-sets-protobuf",
+    "fork": 2,
+    "iteration": 3,
+    "ns_per_op": 8388738.28125,
+    "bytes_per_op": 38076511.375,
+    "operations": 64
+  },
+  {
+    "case": "workflow-8-sets-protobuf",
+    "fork": 2,
+    "iteration": 4,
+    "ns_per_op": 8322553.390625,
+    "bytes_per_op": 38076474.125,
+    "operations": 64
+  }
+]

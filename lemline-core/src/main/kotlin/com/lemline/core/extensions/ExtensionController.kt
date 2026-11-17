@@ -1,17 +1,18 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.extensions
 
+import com.fasterxml.jackson.databind.JsonNode
+import com.lemline.common.json.*
 import com.lemline.core.nodes.Node
 import com.lemline.core.states.ExtensionExecutionState
 import com.lemline.core.states.ExtensionPhase
 import com.lemline.core.states.ExtensionReturn
 import com.lemline.core.states.PreparedTaskResult
 import com.lemline.core.states.StackFrame
-import kotlinx.serialization.json.JsonElement
 
 /** Pure decisions only: invocation data belongs to the stack, never to a processor. */
 object ExtensionController {
-    fun start(selected: List<ExtensionPlan>, rawInput: JsonElement, input: JsonElement): ExtensionExecutionState {
+    fun start(selected: List<ExtensionPlan>, rawInput: JsonNode, input: JsonNode): ExtensionExecutionState {
         val first = selected.firstOrNull { it.before != null }
         return ExtensionExecutionState(
             selectedExtensionIndices = selected.map { it.index },

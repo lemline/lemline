@@ -1,7 +1,12 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.gateway.resources.instances
 
+import com.fasterxml.jackson.databind.JsonNode
+import com.fasterxml.jackson.databind.node.ArrayNode
+import com.fasterxml.jackson.databind.node.NullNode
+import com.fasterxml.jackson.databind.node.ObjectNode
 import com.google.protobuf.Value
+import com.lemline.common.json.*
 import com.lemline.common.values.IDV7
 import com.lemline.common.values.WorkflowId
 import com.lemline.common.values.WorkflowInfo
@@ -26,11 +31,6 @@ import jakarta.inject.Inject
 import java.time.ZoneId
 import kotlin.time.Clock
 import kotlin.time.Instant
-import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonNull
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
 
 enum class StartInstanceOutcome {
     ACCEPTED_NEW,
@@ -158,7 +158,7 @@ class InstanceStartService {
         inserted: Int,
         instanceId: WorkflowId,
         workflowInfo: WorkflowInfo,
-        workflowInput: JsonElement,
+        workflowInput: JsonNode,
         loadExisting: suspend () -> T?,
         extraConflictCheck: (T) -> Boolean = { false },
         onExisting: (T) -> Unit = {},
@@ -216,22 +216,22 @@ class InstanceStartService {
         }
     }
 
-    private fun parseInput(request: StartInstanceRequest): JsonElement {
-        if (!request.hasInput()) return JsonObject(emptyMap())
+    private fun parseInput(request: StartInstanceRequest): JsonNode {
+        if (!request.hasInput()) return ObjectNode(emptyMap())
         return valueToJson(request.input)
     }
 
-    private fun valueToJson(value: Value): JsonElement =
+    private fun valueToJson(value: Value): JsonNode =
         when (value.kindCase) {
-            Value.KindCase.NULL_VALUE -> JsonNull
-            Value.KindCase.NUMBER_VALUE -> JsonPrimitive(value.numberValue)
-            Value.KindCase.STRING_VALUE -> JsonPrimitive(value.stringValue)
-            Value.KindCase.BOOL_VALUE -> JsonPrimitive(value.boolValue)
-            Value.KindCase.STRUCT_VALUE -> JsonObject(
+            Value.KindCase.NULL_VALUE -> NullNode.instance
+            Value.KindCase.NUMBER_VALUE -> jsonValue(value.numberValue)
+            Value.KindCase.STRING_VALUE -> jsonValue(value.stringValue)
+            Value.KindCase.BOOL_VALUE -> jsonValue(value.boolValue)
+            Value.KindCase.STRUCT_VALUE -> ObjectNode(
                 value.structValue.fieldsMap.mapValues { (_, child) -> valueToJson(child) }
             )
 
-            Value.KindCase.LIST_VALUE -> JsonArray(
+            Value.KindCase.LIST_VALUE -> ArrayNode(
                 value.listValue.valuesList.map(::valueToJson)
             )
 

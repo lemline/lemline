@@ -1,10 +1,12 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.eventschedules
 
+import com.fasterxml.jackson.databind.node.ArrayNode
+import com.lemline.common.json.*
 import com.lemline.common.values.IDV7
 import com.lemline.core.states.WorkflowCommand
-import com.lemline.runner.common.config.DatabaseType
 import com.lemline.runner.common.config.DatabaseConfig
+import com.lemline.runner.common.config.DatabaseType
 import com.lemline.runner.common.namespaces.NamespaceScope
 import com.lemline.runner.common.repositories.helpers.ColumnBindings
 import com.lemline.runner.common.repositories.helpers.ColumnBindingsBuilder
@@ -25,18 +27,17 @@ import com.lemline.runner.common.repositories.ops.readOutboxFields
 import com.lemline.runner.common.repositories.with.WithCleanerRepository
 import com.lemline.runner.common.repositories.with.WithIdRepository
 import com.lemline.runner.common.repositories.with.WithOutboxRepository
+import com.lemline.runner.definitions.DefinitionModel
+import com.lemline.runner.listeners.CloudEventService
+import io.cloudevents.CloudEvent
+import io.serverlessworkflow.api.types.ListenTaskConfiguration.ListenAndReadAs
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
+import java.security.MessageDigest
 import java.sql.Connection
 import java.sql.ResultSet
 import kotlin.time.Instant
-import com.lemline.runner.definitions.DefinitionModel
-import io.cloudevents.CloudEvent
-import io.serverlessworkflow.api.types.ListenTaskConfiguration.ListenAndReadAs
-import java.security.MessageDigest
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonArray
-import com.lemline.runner.listeners.CloudEventService
 
 const val EVENT_SCHEDULE_TABLE = "lemline_event_schedule_starts"
 
@@ -88,7 +89,7 @@ class EventScheduleRepository : CrudRepository<EventScheduleModel>(),
                     } else {
                         rs.getString("collections")?.let { payload ->
                             // One-time conversion, in the same transaction as processing the event.
-                            val legacy = Json.decodeFromString<LegacyEventScheduleState>(payload)
+                            val legacy = LemlineJson.decodeFromString<LegacyEventScheduleState>(payload)
                             legacy.groups.forEachIndexed { index, group ->
                                 val collection = EventScheduleCollection(
                                     index = index.toLong(), correlations = group.correlations.toMutableMap(),
@@ -149,8 +150,8 @@ class EventScheduleRepository : CrudRepository<EventScheduleModel>(),
         val correlations = if (databaseConfig.dbType == DatabaseType.MYSQL) "CAST(correlations AS BINARY)" else "correlations"
         val conditions = keys.map { key ->
             val parts = key.correlations.map { (name, value) ->
-                val property = Json.encodeToString(name) + ":"
-                val pair = property + Json.encodeToString(value)
+                val property = LemlineJson.encodeToString(name) + ":"
+                val pair = property + LemlineJson.encodeToString(value)
                 parameters.addAll(listOf(
                     likeLiteral("{" + property) + "%", "%" + likeLiteral("," + property) + "%",
                     "%" + likeLiteral(pair + ",") + "%", "%" + likeLiteral(pair + "}"),
@@ -202,9 +203,9 @@ class EventScheduleRepository : CrudRepository<EventScheduleModel>(),
             setIDV7(it, 1, group.id)
             setIDV7(it, 2, stateId)
             it.setLong(3, group.index)
-            it.setString(4, Json.encodeToString(group.correlations))
-            it.setString(5, Json.encodeToString(group.matched))
-            it.setString(6, Json.encodeToString(group.termination))
+            it.setString(4, LemlineJson.encodeToString(group.correlations))
+            it.setString(5, LemlineJson.encodeToString(group.matched))
+            it.setString(6, LemlineJson.encodeToString(group.termination))
             it.setLong(7, group.eventCount)
             it.executeUpdate()
         }
@@ -215,9 +216,9 @@ class EventScheduleRepository : CrudRepository<EventScheduleModel>(),
             UPDATE lemline_event_schedule_collections
             SET correlations = ?, matched_filters = ?, until_filters = ?, event_count = ? WHERE id = ?
         """.trimIndent()).use {
-            it.setString(1, Json.encodeToString(group.correlations))
-            it.setString(2, Json.encodeToString(group.matched))
-            it.setString(3, Json.encodeToString(group.termination))
+            it.setString(1, LemlineJson.encodeToString(group.correlations))
+            it.setString(2, LemlineJson.encodeToString(group.matched))
+            it.setString(3, LemlineJson.encodeToString(group.termination))
             it.setLong(4, group.eventCount)
             setIDV7(it, 5, group.id)
             it.executeUpdate()
@@ -241,10 +242,10 @@ class EventScheduleRepository : CrudRepository<EventScheduleModel>(),
         }
     }
 
-    suspend fun collectionInput(collectionId: IDV7, conn: Connection, readAs: ListenAndReadAs = ListenAndReadAs.ENVELOPE): JsonArray =
+    suspend fun collectionInput(collectionId: IDV7, conn: Connection, readAs: ListenAndReadAs = ListenAndReadAs.ENVELOPE): ArrayNode =
         conn.prepareStatement("SELECT event FROM lemline_event_schedule_events WHERE collection_id = ? ORDER BY event_index").use {
             setIDV7(it, 1, collectionId)
-            it.executeQuery().use { rs -> JsonArray(buildList {
+            it.executeQuery().use { rs -> ArrayNode(buildList {
                 while (rs.next()) add(CloudEventService.parseStringAsData(rs.getString("event"), readAs))
             }) }
         }

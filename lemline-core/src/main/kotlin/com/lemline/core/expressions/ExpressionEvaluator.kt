@@ -2,24 +2,15 @@
 package com.lemline.core.expressions
 
 import com.fasterxml.jackson.databind.JsonNode
+import com.fasterxml.jackson.databind.node.ArrayNode
+import com.fasterxml.jackson.databind.node.NullNode
 import com.fasterxml.jackson.databind.node.ObjectNode
-import com.lemline.common.json.LemlineJson
+import com.fasterxml.jackson.databind.node.ValueNode
+import com.lemline.common.json.*
 import io.serverlessworkflow.impl.expressions.ExpressionUtils
-import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonNull
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
 
 internal interface ExpressionEvaluator {
     fun eval(input: JsonNode, expr: String, scope: ObjectNode): JsonNode
-
-    /**
-     * Convert JsonElement to JsonNode and JsonObject to ObjectNode then evaluate the expression.
-     */
-    private fun eval(input: JsonElement, expr: String, scope: JsonObject): JsonElement = with(LemlineJson) {
-        eval(input.toJsonNode(), ExpressionUtils.trimExpr(expr), scope.toJsonNode() as ObjectNode).toJsonElement()
-    }
 
     /**
      * Evaluates an expression against a given JSON element within a specified scope.
@@ -28,38 +19,39 @@ internal interface ExpressionEvaluator {
      * @param expr The JQ expression to evaluate.
      * @param scope The scope in which to evaluate the expression.
      * @param force If true, forces evaluation of the expression even if not surrounded by `${}`.
-     * @return The result of the evaluation as a JsonElement.
+     * @return The result of the evaluation as a JsonNode.
      */
     fun eval(
-        data: JsonElement,
-        expr: JsonElement,
-        scope: JsonObject,
+        data: JsonNode,
+        expr: JsonNode,
+        scope: ObjectNode,
         force: Boolean,
         mode: EvaluationMode = EvaluationMode.STRICT,
-    ): JsonElement = if (expr is JsonNull) data else evalValue(data, expr, scope, force, mode)
+    ): JsonNode = if (expr is NullNode) data else evalValue(data, expr, scope, force, mode)
 
     // Only an absent top-level expression means identity. Nulls inside literal
     // objects and arrays are data and must survive recursive evaluation.
     private fun evalValue(
-        data: JsonElement,
-        expr: JsonElement,
-        scope: JsonObject,
+        data: JsonNode,
+        expr: JsonNode,
+        scope: ObjectNode,
         force: Boolean,
         mode: EvaluationMode,
-    ): JsonElement = when (expr) {
-        is JsonNull -> JsonNull
+    ): JsonNode = when (expr) {
+        is NullNode -> NullNode.instance
 
-        is JsonPrimitive -> when (expr.isString && (force || mode == EvaluationMode.LOOSE || ExpressionUtils.isExpr(expr.content))) {
+        is ValueNode -> when (expr.isString && (force || mode == EvaluationMode.LOOSE || ExpressionUtils.isExpr(expr.content))) {
             true -> try {
-                eval(data, expr.content, scope)
+                eval(data, ExpressionUtils.trimExpr(expr.content), scope)
             } catch (e: Exception) {
                 if (mode == EvaluationMode.LOOSE) expr else throw e
             }
             false -> expr
         }
 
-        is JsonObject -> JsonObject(expr.mapValues { (_, value) -> evalValue(data, value, scope, force, mode) })
+        is ObjectNode -> ObjectNode(expr.mapValues { (_, value) -> evalValue(data, value, scope, force, mode) })
 
-        is JsonArray -> JsonArray(expr.map { value -> evalValue(data, value, scope, force, mode) })
+        is ArrayNode -> ArrayNode(expr.map { value -> evalValue(data, value, scope, force, mode) })
+        else -> error("Unsupported JSON node: ${expr.nodeType}")
     }
 }

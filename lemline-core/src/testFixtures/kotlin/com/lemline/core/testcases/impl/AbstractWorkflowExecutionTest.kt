@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.testcases.impl
 
+import com.fasterxml.jackson.databind.JsonNode
+import com.fasterxml.jackson.databind.node.ArrayNode
+import com.fasterxml.jackson.databind.node.ObjectNode
+import com.fasterxml.jackson.databind.node.ValueNode
+import com.lemline.common.json.*
 import io.kotest.core.spec.style.FunSpec
 import java.math.BigDecimal
-import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.booleanOrNull
 
 /**
  * Abstract base class for workflow execution tests.
@@ -121,7 +121,7 @@ object WorkflowTestValidators {
      * Validates that the workflow output equals the expected value exactly.
      * On failure, displays both expected and actual values for easy debugging.
      */
-    fun expectOutput(expected: JsonElement): (WorkflowTestResult) -> String? = { result ->
+    fun expectOutput(expected: JsonNode): (WorkflowTestResult) -> String? = { result ->
         when (result) {
             is WorkflowTestResult.Success -> {
                 if (!jsonSemanticallyEquals(result.output, expected)) {
@@ -137,7 +137,7 @@ object WorkflowTestValidators {
      * Validates the successful output with a custom predicate.
      */
     fun validateOutput(
-        predicate: (JsonElement) -> Boolean
+        predicate: (JsonNode) -> Boolean
     ): (WorkflowTestResult) -> String? = { result ->
         when (result) {
             is WorkflowTestResult.Success -> {
@@ -150,25 +150,25 @@ object WorkflowTestValidators {
         }
     }
 
-    private fun jsonSemanticallyEquals(actual: JsonElement, expected: JsonElement): Boolean = when {
-        actual is JsonObject && expected is JsonObject -> {
+    private fun jsonSemanticallyEquals(actual: JsonNode, expected: JsonNode): Boolean = when {
+        actual is ObjectNode && expected is ObjectNode -> {
             actual.keys == expected.keys &&
-                actual.all { (key, value) -> jsonSemanticallyEquals(value, expected.getValue(key)) }
+                actual.properties().all { (key, value) -> jsonSemanticallyEquals(value, expected.getValue(key)) }
         }
 
-        actual is JsonArray && expected is JsonArray -> {
+        actual is ArrayNode && expected is ArrayNode -> {
             actual.size == expected.size &&
                 actual.indices.all { index -> jsonSemanticallyEquals(actual[index], expected[index]) }
         }
 
-        actual is JsonPrimitive && expected is JsonPrimitive -> {
+        actual is ValueNode && expected is ValueNode -> {
             jsonPrimitivesSemanticallyEqual(actual, expected)
         }
 
         else -> actual == expected
     }
 
-    private fun jsonPrimitivesSemanticallyEqual(actual: JsonPrimitive, expected: JsonPrimitive): Boolean {
+    private fun jsonPrimitivesSemanticallyEqual(actual: JsonNode, expected: JsonNode): Boolean {
         if (actual.isString || expected.isString) {
             return actual.isString && expected.isString && actual.content == expected.content
         }
@@ -188,6 +188,6 @@ object WorkflowTestValidators {
         return actual.content == expected.content
     }
 
-    private fun JsonPrimitive.toBigDecimalOrNull(): BigDecimal? =
+    private fun JsonNode.toBigDecimalOrNull(): BigDecimal? =
         runCatching { BigDecimal(content) }.getOrNull()
 }

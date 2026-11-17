@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.random
 
+import com.lemline.common.json.*
 import com.lemline.common.random.nullableRandom
 import com.lemline.common.random.random
 import com.lemline.common.random.randomWorkflowName
@@ -33,7 +34,6 @@ import com.lemline.runner.waits.WaitModel
 import kotlin.random.Random
 import kotlin.time.Clock
 import kotlin.time.Instant
-import kotlinx.serialization.json.JsonElement
 
 private fun NodeStack.Companion.random(): NodeStack = NodeStack.fromFrames(
     listOf(
@@ -41,7 +41,7 @@ private fun NodeStack.Companion.random(): NodeStack = NodeStack.fromFrames(
             NodePosition.root, RootState(
                 startedAt = Clock.System.now(),
                 workflowId = WorkflowId.random(),
-                workflowInput = JsonElement.random()
+                workflowInput = randomJsonNode()
             )
         )
     )
@@ -61,19 +61,19 @@ fun randomWorkflowCommand() = when (Random.nextBoolean()) {
 fun randomResumeFromTaskCommand() = WorkflowCommand.ResumeFromTask(
     nodeStack = NodeStack.random(),
     nodePosition = NodePosition.random(),
-    rawInput = JsonElement.random(),
+    rawInput = randomJsonNode(),
     flowDirective = null
 )
 
 fun randomResumeWithCompletedTaskCommand() = WorkflowCommand.ResumeWithCompletedTask(
     nodeStack = NodeStack.random(),
-    rawOutput = JsonElement.random(),
+    rawOutput = randomJsonNode(),
 )
 
 fun randomWorkflowFailedEvent() = WorkflowEvent.WorkflowFaulted(
     nodeStack = NodeStack.random(),
-    rawInput = JsonElement.random(),
-    rawOutput = JsonElement.random(),
+    rawInput = randomJsonNode(),
+    rawOutput = randomJsonNode(),
     flowDirective = null,
     error = InternalException.Error(
         type = "TestError",
@@ -87,21 +87,21 @@ fun randomWorkflowFailedEvent() = WorkflowEvent.WorkflowFaulted(
 
 fun randomRunWorkflowStartedEvent() = WorkflowEvent.RunWorkflowStarted(
     nodeStack = NodeStack.random(),
-    rawInput = JsonElement.random(),
+    rawInput = randomJsonNode(),
     config = randomRunWorkflowConfig()
 )
 
 fun randomTaskRetryScheduledEvent() = WorkflowEvent.TaskRetryScheduled(
     nodeStack = NodeStack.random(),
     nodePosition = NodePosition.random(),
-    rawInput = JsonElement.random(),
+    rawInput = randomJsonNode(),
     flowDirective = null,
     retryAt = Clock.System.now()
 )
 
 fun randomWaitStartedEvent() = WorkflowEvent.WaitStarted(
     nodeStack = NodeStack.random(),
-    rawOutput = JsonElement.random(),
+    rawOutput = randomJsonNode(),
     config = randomWaitConfig()
 )
 

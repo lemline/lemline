@@ -4,6 +4,8 @@ package com.lemline.core.nodes
 import com.fasterxml.jackson.core.JsonPointer
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
+import com.fasterxml.jackson.databind.node.ObjectNode
+import com.lemline.common.json.*
 import com.lemline.common.json.LemlineJson
 import com.lemline.core.load
 import com.lemline.core.workflows.WorkflowCache
@@ -11,8 +13,6 @@ import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldStartWith
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.jsonObject
 
 class JsonPointerValidationTest : FunSpec({
 
@@ -145,7 +145,7 @@ class JsonPointerValidationTest : FunSpec({
     }
 })
 
-private fun loadWorkflowWithJson(resourcePath: String): Pair<Node<RootTask>, JsonObject> {
+private fun loadWorkflowWithJson(resourcePath: String): Pair<Node<RootTask>, ObjectNode> {
     val yamlContent = load(resourcePath)
     val workflow = WorkflowCache.parseYamlAndPut(yamlContent)
     val rootNode = WorkflowCache.getRootNode(workflow)
@@ -165,7 +165,7 @@ private fun collectAllNodes(rootNode: Node<*>): List<Node<*>> {
     return nodes
 }
 
-private fun JsonObject.toJacksonNode(objectMapper: ObjectMapper): JsonNode {
+private fun ObjectNode.toJacksonNode(objectMapper: ObjectMapper): JsonNode {
     val jsonString = LemlineJson.encodeToString(this)
     return objectMapper.readTree(jsonString)
 }

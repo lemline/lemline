@@ -1,19 +1,11 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.testcases
 
+import com.fasterxml.jackson.databind.node.ObjectNode
+import com.lemline.common.json.*
 import com.lemline.core.testcases.impl.WorkflowTestCase
 import com.lemline.core.testcases.impl.WorkflowTestValidators.expectErrorContaining
 import com.lemline.core.testcases.impl.WorkflowTestValidators.expectOutput
-
-import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.buildJsonArray
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.int
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
-import kotlinx.serialization.json.put
 
 /**
  * Test cases for ForkTask execution.
@@ -178,7 +170,7 @@ object ForkTaskTestCases {
                               set:
                                 executed: true
             """.trimIndent(),
-            input = JsonObject(mapOf("shouldRun" to JsonPrimitive(true))),
+            input = ObjectNode(mapOf("shouldRun" to jsonValue(true))),
             validate = expectOutput(
                 buildJsonArray {
                     add(buildJsonObject { put("executed", true) })
@@ -198,7 +190,7 @@ object ForkTaskTestCases {
                               set:
                                 executed: true
             """.trimIndent(),
-            input = JsonObject(mapOf("shouldRun" to JsonPrimitive(false))),
+            input = ObjectNode(mapOf("shouldRun" to jsonValue(false))),
             validate = expectOutput(buildJsonObject { put("shouldRun", false) })
         ),
 

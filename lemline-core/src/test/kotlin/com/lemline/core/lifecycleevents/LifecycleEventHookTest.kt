@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.lifecycleevents
 
+import com.fasterxml.jackson.databind.JsonNode
+import com.lemline.common.json.*
 import com.lemline.common.values.NodePosition
 import com.lemline.common.values.WorkflowId
 import com.lemline.common.values.WorkflowInfo
@@ -25,11 +27,6 @@ import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 import kotlin.time.toJavaInstant
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
 
 /**
  * Tests for lifecycle event hooks in StepByStepOrchestrator.
@@ -84,7 +81,7 @@ class LifecycleEventHookTest : FunSpec() {
         override suspend fun onWorkflowCompleted(
             workflowInfo: WorkflowInfo,
             nodeStack: NodeStack,
-            output: JsonElement,
+            output: JsonNode,
             completedAt: Instant,
         ) {
             val workflowId = nodeStack.rootState.workflowId
@@ -105,7 +102,7 @@ class LifecycleEventHookTest : FunSpec() {
             workflowInfo: WorkflowInfo,
             nodeStack: NodeStack,
             nodePosition: NodePosition,
-            input: JsonElement,
+            input: JsonNode,
             createdAt: Instant,
         ) {
             _events.add("task.created:${nodePosition.taskId()}")
@@ -115,7 +112,7 @@ class LifecycleEventHookTest : FunSpec() {
             workflowInfo: WorkflowInfo,
             nodeStack: NodeStack,
             nodePosition: NodePosition,
-            rawInput: JsonElement,
+            rawInput: JsonNode,
             startedAt: Instant,
         ) {
             _events.add("task.started:${nodePosition.taskId()}")
@@ -125,7 +122,7 @@ class LifecycleEventHookTest : FunSpec() {
             workflowInfo: WorkflowInfo,
             nodeStack: NodeStack,
             nodePosition: NodePosition,
-            output: JsonElement,
+            output: JsonNode,
             completedAt: Instant,
         ) {
             _events.add("task.completed:${nodePosition.taskId()}")
@@ -166,12 +163,12 @@ class LifecycleEventHookTest : FunSpec() {
 
     private suspend fun executeWorkflow(
         yaml: String,
-        input: JsonElement = buildJsonObject { },
+        input: JsonNode = buildJsonObject { },
         lifecycleHook: LifecycleEventHook,
         namespace: String = "default",
         name: String = "test",
         version: String = "0.1.0",
-    ): JsonElement {
+    ): JsonNode {
         val workflow = getWorkflowToTest(yaml, namespace, name, version)
         val workflowInfo = WorkflowInfo(
             WorkflowNamespace(namespace),
@@ -211,7 +208,7 @@ class LifecycleEventHookTest : FunSpec() {
         workflowId: WorkflowId,
         startedAt: Instant,
         emitter: CapturingEmitter,
-        input: JsonElement = buildJsonObject { },
+        input: JsonNode = buildJsonObject { },
         namespace: String = "default",
         name: String = "test",
         version: String = "0.1.0",
@@ -291,7 +288,7 @@ class LifecycleEventHookTest : FunSpec() {
                 val events = emitter.events
                 ids.add(events.map { it.id })
                 events.map { it.id }.distinct().size shouldBe events.size
-                fun task(event: CloudEvent) = Json.parseToJsonElement(String(event.data!!.toBytes())).jsonObject["task"]?.jsonPrimitive?.content
+                fun task(event: CloudEvent) = parseJson(String(event.data!!.toBytes())).jsonObject["task"]?.jsonPrimitive?.content
                 val started = events.filter { it.type.contains("task.started") }.mapNotNull(::task)
                 val closed = events.filter { it.type.contains("task.completed") }.mapNotNull(::task)
                 started.toSet() shouldBe closed.toSet()
@@ -830,7 +827,7 @@ class LifecycleEventHookTest : FunSpec() {
             val created = emitter.events.single { it.type == LifecycleEventType.WORKFLOW_CREATED.type }
             val started = emitter.events.single { it.type == LifecycleEventType.WORKFLOW_STARTED.type }
             val doStarted = emitter.events.first { it.type == LifecycleEventType.TASK_STARTED.type }
-            val startedAtInData = Json.parseToJsonElement(String(started.data!!.toBytes()))
+            val startedAtInData = parseJson(String(started.data!!.toBytes()))
                 .jsonObject.getValue("startedAt").jsonPrimitive.content
             val createdTime = requireNotNull(created.time)
             val startedTime = requireNotNull(started.time)

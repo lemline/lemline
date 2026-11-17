@@ -1,15 +1,16 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.schemas
 
+import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
+import com.lemline.common.json.*
 import com.sun.net.httpserver.HttpServer
 import io.serverlessworkflow.api.WorkflowFormat
 import io.serverlessworkflow.api.types.SchemaUnion
-import java.nio.file.Files
 import java.net.InetSocketAddress
+import java.nio.file.Files
 import java.util.concurrent.atomic.AtomicReference
 import kotlin.test.assertEquals
-import kotlinx.serialization.json.Json
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertDoesNotThrow
 import org.junit.jupiter.api.assertThrows
@@ -17,6 +18,52 @@ import org.junit.jupiter.api.assertThrows
 class SchemaValidatorTest {
 
     private val mapper = ObjectMapper()
+
+    @Test
+    fun `extreme decimal exponents are rejected before validator expansion`() {
+        val schema = parseJson("""{"enum":[0]}""")
+        for (value in listOf("1e1000000", "1e-1000000")) {
+            val file = Files.createTempFile("lemline-bounded-schema-", ".json")
+            try {
+                Files.writeString(file, "{\"enum\":[$value]}")
+                val reference = LemlineJson.yamlMapper.readValue("format: json\ndocument:\n  '\$ref': '${file.toUri()}'", SchemaUnion::class.java)
+                val rejected = assertThrows<Exception> { SchemaValidator.validate(parseJson("0"), reference) }
+                kotlin.test.assertTrue(rejected.stackTraceToString().contains("Decimal expansion exceeds"))
+            } finally {
+                Files.deleteIfExists(file)
+            }
+            val node = com.fasterxml.jackson.databind.node.DecimalNode.valueOf(value.toBigDecimal())
+            val failure = assertThrows<IllegalArgumentException> { SchemaValidator.validateJsonNode(node, schema) }
+            kotlin.test.assertTrue(failure.message!!.contains("Decimal expansion exceeds"))
+            assertThrows<IllegalArgumentException> {
+                SchemaValidator.validateJsonNode(parseJson("0"), mapper.createObjectNode().set<JsonNode>("enum", mapper.createArrayNode().add(node)))
+            }
+        }
+    }
+
+    @Test
+    fun `nested decimal const and enum match for inline and external schemas`() {
+        val data = parseJson("""{"amount":1.234567890123456789}""")
+        val different = parseJson("""{"amount":1.234567890123456788}""")
+        for (keyword in listOf("const", "enum")) {
+            val document = if (keyword == "const") "{\"const\":$data}" else "{\"enum\":[$data]}"
+            val inline = LemlineJson.yamlMapper.readValue("format: json\ndocument: $document", SchemaUnion::class.java)
+            assertDoesNotThrow { SchemaValidator.validate(data, inline) }
+            assertThrows<IllegalArgumentException> { SchemaValidator.validate(different, inline) }
+            val file = Files.createTempFile("lemline-decimal-schema-", ".json")
+            try {
+                Files.writeString(file, document)
+                val external = LemlineJson.yamlMapper.readValue("format: json\nresource:\n  endpoint: '${file.toUri()}'", SchemaUnion::class.java)
+                assertDoesNotThrow { SchemaValidator.validate(data, external) }
+                assertThrows<IllegalArgumentException> { SchemaValidator.validate(different, external) }
+                val reference = LemlineJson.yamlMapper.readValue("format: json\ndocument:\n  '\$ref': '${file.toUri()}'", SchemaUnion::class.java)
+                assertDoesNotThrow { SchemaValidator.validate(data, reference) }
+                assertThrows<IllegalArgumentException> { SchemaValidator.validate(different, reference) }
+            } finally {
+                Files.deleteIfExists(file)
+            }
+        }
+    }
 
     @Test
     fun `external GitHub raw schema URLs preserve their declared path and query`() {
@@ -82,11 +129,11 @@ class SchemaValidatorTest {
                 val schema = WorkflowFormat.YAML.mapper().readValue(
                     "format: json\nresource:\n  endpoint: 'http://127.0.0.1:${server.address.port}/redirect.json'\n", SchemaUnion::class.java,
                 )
-                val data = Json.parseToJsonElement("""{"old":true}""")
+                val data = parseJson("""{"old":true}""")
                 assertDoesNotThrow { SchemaValidator.validate(data, schema) }
                 content.set("""{"type":"object","required":["new"]}""")
                 assertThrows<IllegalArgumentException> { SchemaValidator.validate(data, schema) }
-                assertDoesNotThrow { SchemaValidator.validate(Json.parseToJsonElement("""{"new":true}"""), schema) }
+                assertDoesNotThrow { SchemaValidator.validate(parseJson("""{"new":true}"""), schema) }
             } finally {
                 server.stop(0)
             }
@@ -105,10 +152,10 @@ class SchemaValidatorTest {
                 val schema = WorkflowFormat.YAML.mapper().readValue(
                     "format: json\nresource:\n  endpoint: '${file.toUri()}'\n", SchemaUnion::class.java,
                 )
-                assertDoesNotThrow { SchemaValidator.validate(Json.parseToJsonElement("""{"name":"valid","on":true}"""), schema) }
-                assertThrows<IllegalArgumentException> { SchemaValidator.validate(Json.parseToJsonElement("""{"name":1,"on":true}"""), schema) }
-                assertThrows<IllegalArgumentException> { SchemaValidator.validate(Json.parseToJsonElement("""{"name":"valid"}"""), schema) }
-                assertThrows<IllegalArgumentException> { SchemaValidator.validate(Json.parseToJsonElement("""{"name":"valid","on":true,"extra":1}"""), schema) }
+                assertDoesNotThrow { SchemaValidator.validate(parseJson("""{"name":"valid","on":true}"""), schema) }
+                assertThrows<IllegalArgumentException> { SchemaValidator.validate(parseJson("""{"name":1,"on":true}"""), schema) }
+                assertThrows<IllegalArgumentException> { SchemaValidator.validate(parseJson("""{"name":"valid"}"""), schema) }
+                assertThrows<IllegalArgumentException> { SchemaValidator.validate(parseJson("""{"name":"valid","on":true,"extra":1}"""), schema) }
             } finally {
                 Files.deleteIfExists(file)
             }

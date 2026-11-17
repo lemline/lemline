@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.messaging.lifecycle
 
+import com.fasterxml.jackson.databind.JsonNode
+import com.lemline.common.json.*
 import com.lemline.common.values.NodePosition
 import com.lemline.common.values.WorkflowInfo
 import com.lemline.core.errors.InternalException
@@ -11,7 +13,6 @@ import com.lemline.core.states.NodeStack
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.enterprise.inject.Instance
 import kotlin.time.Instant
-import kotlinx.serialization.json.JsonElement
 
 /**
  * CDI wrapper for [CloudEventLifecycleHook].
@@ -53,7 +54,7 @@ class LifecycleEventHookImpl(
     override suspend fun onWorkflowCompleted(
         workflowInfo: WorkflowInfo,
         nodeStack: NodeStack,
-        output: JsonElement,
+        output: JsonNode,
         completedAt: Instant,
     ) = delegate.onWorkflowCompleted(workflowInfo, nodeStack, output, completedAt)
 
@@ -68,7 +69,7 @@ class LifecycleEventHookImpl(
         workflowInfo: WorkflowInfo,
         nodeStack: NodeStack,
         nodePosition: NodePosition,
-        input: JsonElement,
+        input: JsonNode,
         createdAt: Instant,
     ) = delegate.onTaskCreated(workflowInfo, nodeStack, nodePosition, input, createdAt)
 
@@ -76,7 +77,7 @@ class LifecycleEventHookImpl(
         workflowInfo: WorkflowInfo,
         nodeStack: NodeStack,
         nodePosition: NodePosition,
-        rawInput: JsonElement,
+        rawInput: JsonNode,
         startedAt: Instant,
     ) = delegate.onTaskStarted(workflowInfo, nodeStack, nodePosition, rawInput, startedAt)
 
@@ -84,7 +85,7 @@ class LifecycleEventHookImpl(
         workflowInfo: WorkflowInfo,
         nodeStack: NodeStack,
         nodePosition: NodePosition,
-        output: JsonElement,
+        output: JsonNode,
         completedAt: Instant,
     ) = delegate.onTaskCompleted(workflowInfo, nodeStack, nodePosition, output, completedAt)
 

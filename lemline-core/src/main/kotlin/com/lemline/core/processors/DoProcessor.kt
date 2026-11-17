@@ -1,13 +1,14 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.processors
 
+import com.fasterxml.jackson.databind.JsonNode
+import com.lemline.common.json.*
 import com.lemline.core.nodes.Node
 import com.lemline.core.processors.scope.Scope
 import com.lemline.core.states.DoState
 import com.lemline.core.workflows.doBlock
 import io.serverlessworkflow.api.types.DoTask
 import kotlin.time.Instant
-import kotlinx.serialization.json.JsonElement
 
 /**
  * Node instance for DoTask (sequential execution) - pure functional model.
@@ -43,14 +44,14 @@ class DoProcessor(
     node: Node<DoTask>
 ) : AbstractProcessor<DoTask, DoState>(node) {
 
-    override fun stateWhenEnteringFromParent(transformedInput: JsonElement, scope: Scope, startedAt: Instant): DoState = DoState(
+    override fun stateWhenEnteringFromParent(transformedInput: JsonNode, scope: Scope, startedAt: Instant): DoState = DoState(
         startedAt = startedAt,
         index = 0  // Start at first child
     )
 
     override fun stateWhenReEnteringFromChild(
         state: DoState,
-        output: JsonElement,
+        output: JsonNode,
         scope: Scope,
         nodeName: String?
     ): DoState = state.copy(
@@ -59,7 +60,7 @@ class DoProcessor(
 
     override fun getNextNode(
         state: DoState,
-        dataset: JsonElement,
+        dataset: JsonNode,
         scope: Scope,
     ): NextInfo {
         // state.index already points to the next child to execute

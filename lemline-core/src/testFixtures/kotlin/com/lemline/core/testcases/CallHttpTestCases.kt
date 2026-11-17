@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.testcases
 
+import com.lemline.common.json.*
 import com.lemline.core.activities.mock.HttpMockMatcher
 import com.lemline.core.activities.mock.HttpMockResponse
 import com.lemline.core.activities.mock.HttpMockRule
@@ -14,8 +15,6 @@ import com.lemline.core.testcases.impl.TestMocks.updatedPostResponse
 import com.lemline.core.testcases.impl.TestMocks.user1Response
 import com.lemline.core.testcases.impl.WorkflowTestCase
 import com.lemline.core.testcases.impl.WorkflowTestValidators.expectOutput
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.put
 
 /**
  * Test cases for HTTP call execution.

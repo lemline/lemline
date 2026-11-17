@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.forks
 
+import com.fasterxml.jackson.databind.JsonNode
+import com.fasterxml.jackson.databind.node.ArrayNode
+import com.lemline.common.json.*
 import com.lemline.common.json.LemlineJson
 import com.lemline.common.logger.logger
 import com.lemline.common.values.IDV7
@@ -19,8 +22,6 @@ import io.serverlessworkflow.api.types.ForkTask
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
 import kotlin.time.Clock
-import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonElement
 
 /**
  * Service for handling fork-related workflow events.
@@ -168,9 +169,9 @@ class ForkService {
                     !fork.compete && completedCount == branches.size -> {
                         val outputs = branches.map { b ->
                             val out = b.branchOutput ?: error("Branch '${b.branchPosition}' has no output")
-                            LemlineJson.decodeFromString<JsonElement>(out)
+                            LemlineJson.decodeFromString<JsonNode>(out)
                         }
-                        JsonArray(outputs)
+                        ArrayNode(outputs)
                     }
 
                     else -> null

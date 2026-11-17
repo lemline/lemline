@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.activities
 
+import com.fasterxml.jackson.databind.JsonNode
+import com.lemline.common.json.*
 import com.lemline.core.activities.ActivityExecutor
 import com.lemline.core.activities.mock.MockActivityExecutor
 import com.lemline.core.states.WorkflowEvent.ActivityStarted
@@ -8,7 +10,6 @@ import com.lemline.runner.common.activities.TestModeConfiguration
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.enterprise.inject.Produces
 import jakarta.inject.Inject
-import kotlinx.serialization.json.JsonElement
 
 @ApplicationScoped
 class ActivityExecutorProducer {
@@ -21,7 +22,7 @@ class ActivityExecutorProducer {
     @Produces
     @ApplicationScoped
     fun produce(): ActivityExecutor = object : ActivityExecutor {
-        override suspend fun execute(event: ActivityStarted): JsonElement {
+        override suspend fun execute(event: ActivityStarted): JsonNode {
             testModeConfiguration.mockConfiguration?.let {
                 return MockActivityExecutor(it).execute(event)
             }

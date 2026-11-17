@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.states.protobuf
 
+import com.fasterxml.jackson.databind.node.NullNode
+import com.lemline.common.json.*
 import com.lemline.common.values.NodePosition
 import com.lemline.common.values.WorkflowId
 import com.lemline.core.errors.InternalException
@@ -17,8 +19,6 @@ import com.lemline.core.states.TaskState
 import com.lemline.core.states.TryState
 import kotlin.test.assertEquals
 import kotlin.time.Instant
-import kotlinx.serialization.json.JsonNull
-import kotlinx.serialization.json.JsonPrimitive
 import org.junit.jupiter.api.Test
 
 class NodeStackProtobufMapperTest {
@@ -42,7 +42,7 @@ class NodeStackProtobufMapperTest {
                     state = RootState(
                         startedAt = Instant.fromEpochSeconds(1735732800),
                         workflowId = WorkflowId.random(),
-                        workflowInput = JsonPrimitive("input")
+                        workflowInput = jsonValue("input")
                     ),
                     counter = 0
                 ),
@@ -75,7 +75,7 @@ class NodeStackProtobufMapperTest {
             RootState(
                 startedAt = Instant.fromEpochSeconds(1735732800),
                 workflowId = WorkflowId.random(),
-                workflowInput = JsonPrimitive("input"),
+                workflowInput = jsonValue("input"),
                 hasWaitingParent = true
             ),
             DoState(
@@ -84,14 +84,14 @@ class NodeStackProtobufMapperTest {
             ),
             ForState(
                 startedAt = Instant.fromEpochSeconds(1735732802),
-                collection = listOf(JsonPrimitive(1), JsonPrimitive("value")),
+                collection = listOf(jsonValue(1), jsonValue("value")),
                 index = 2,
                 forEach = "item",
                 forAt = "index"
             ),
             ForeachState(
                 startedAt = Instant.fromEpochSeconds(1735732803),
-                item = JsonPrimitive("current"),
+                item = jsonValue("current"),
                 index = 3,
                 itemVar = "it",
                 indexVar = "idx"
@@ -105,7 +105,7 @@ class NodeStackProtobufMapperTest {
             ),
             TryState(
                 startedAt = Instant.fromEpochSeconds(1735732806),
-                transformedInput = JsonPrimitive("transformed"),
+                transformedInput = jsonValue("transformed"),
                 attemptIndex = 3,
                 runningCatch = true,
                 lastError = InternalException.Error(
@@ -129,7 +129,7 @@ class NodeStackProtobufMapperTest {
     fun `should preserve null try-state error`() {
         val state = TryState(
             startedAt = Instant.fromEpochSeconds(1735732807),
-            transformedInput = JsonPrimitive("input"),
+            transformedInput = jsonValue("input"),
             attemptIndex = 0,
             runningCatch = false,
             lastError = null,
@@ -144,7 +144,7 @@ class NodeStackProtobufMapperTest {
     fun `should preserve null foreach item`() {
         val state = ForeachState(
             startedAt = Instant.fromEpochSeconds(1735732808),
-            item = JsonNull,
+            item = NullNode.instance,
             index = 1,
             itemVar = "item",
             indexVar = "index"
@@ -157,7 +157,7 @@ class NodeStackProtobufMapperTest {
         val rootState = RootState(
             startedAt = Instant.fromEpochSeconds(1735732700),
             workflowId = WorkflowId.random(),
-            workflowInput = JsonPrimitive("root-input")
+            workflowInput = jsonValue("root-input")
         )
 
         val stack = when (state) {

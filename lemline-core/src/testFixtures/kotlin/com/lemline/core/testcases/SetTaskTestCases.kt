@@ -1,13 +1,10 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.testcases
 
+import com.fasterxml.jackson.databind.node.ArrayNode
+import com.lemline.common.json.*
 import com.lemline.core.testcases.impl.WorkflowTestCase
 import com.lemline.core.testcases.impl.WorkflowTestValidators.expectOutput
-import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.put
-import kotlinx.serialization.json.putJsonObject
 
 /**
  * Test cases for SetTask execution.
@@ -109,20 +106,20 @@ object SetTaskTestCases {
             validate = expectOutput(
                 buildJsonObject {
                     put(
-                        "numbers", JsonArray(
+                        "numbers", ArrayNode(
                             listOf(
-                                JsonPrimitive(1),
-                                JsonPrimitive(2),
-                                JsonPrimitive(3)
+                                jsonValue(1),
+                                jsonValue(2),
+                                jsonValue(3)
                             )
                         )
                     )
                     put(
-                        "strings", JsonArray(
+                        "strings", ArrayNode(
                             listOf(
-                                JsonPrimitive("a"),
-                                JsonPrimitive("b"),
-                                JsonPrimitive("c")
+                                jsonValue("a"),
+                                jsonValue("b"),
+                                jsonValue("c")
                             )
                         )
                     )

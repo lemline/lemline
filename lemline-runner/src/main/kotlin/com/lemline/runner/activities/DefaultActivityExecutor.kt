@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.activities
 
+import com.fasterxml.jackson.databind.JsonNode
+import com.lemline.common.json.*
 import com.lemline.common.json.LemlineJson
 import com.lemline.common.logger.logger
 import com.lemline.core.activities.ActivityExecutor
@@ -23,16 +25,13 @@ import io.ktor.client.call.*
 import io.ktor.client.engine.cio.*
 import io.ktor.client.plugins.*
 import io.ktor.client.plugins.contentnegotiation.*
+import io.ktor.serialization.kotlinx.json.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
-import io.ktor.serialization.kotlinx.json.*
 import io.serverlessworkflow.api.types.HTTPArguments.HTTPOutput
 import java.io.File
 import java.util.*
-import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.buildJsonObject
 
 /**
  * Default implementation of [ActivityExecutor] that performs real I/O operations.
@@ -73,7 +72,7 @@ class DefaultActivityExecutor(
         }
     }
 
-    override suspend fun execute(event: ActivityStarted): JsonElement = when (event) {
+    override suspend fun execute(event: ActivityStarted): JsonNode = when (event) {
         is EmitStarted -> executeEmit(event.config, event.input)
         is CallHttpStarted -> executeHttp(event.config)
         is RunScriptStarted -> executeScript(event.config, event.input)
@@ -84,7 +83,7 @@ class DefaultActivityExecutor(
     // Emit Execution
     // ========================================
 
-    private suspend fun executeEmit(config: EmitConfig, rawOutput: JsonElement): JsonElement {
+    private suspend fun executeEmit(config: EmitConfig, rawOutput: JsonNode): JsonNode {
         logger.debug { "Emitting CloudEvent: type=${config.type}, source=${config.source}" }
 
         val cloudEvent = CloudEventFactory.build(config)
@@ -100,7 +99,7 @@ class DefaultActivityExecutor(
     // HTTP Execution
     // ========================================
 
-    private suspend fun executeHttp(config: CallHttpConfig): JsonElement {
+    private suspend fun executeHttp(config: CallHttpConfig): JsonNode {
         val method = HttpMethod.parse(config.method)
 
         // Build URL with query parameters
@@ -141,7 +140,7 @@ class DefaultActivityExecutor(
             // Set body
             if (config.body != null && (method == HttpMethod.Post || method == HttpMethod.Put || method == HttpMethod.Patch)) {
                 contentType(ContentType.Application.Json)
-                setBody(config.body)
+                setBody(config.body.toString())
             }
         }
 
@@ -154,24 +153,24 @@ class DefaultActivityExecutor(
         }
 
         val result = when (config.output) {
-            HTTPOutput.RAW -> JsonPrimitive(Base64.getEncoder().encodeToString(response.body<ByteArray>()))
+            HTTPOutput.RAW -> jsonValue(Base64.getEncoder().encodeToString(response.body<ByteArray>()))
             HTTPOutput.CONTENT -> parseResponseContent(response)
             HTTPOutput.RESPONSE -> buildJsonObject {
                 // Include request details
                 put("request", buildJsonObject {
-                    put("method", JsonPrimitive(response.request.method.value.uppercase()))
-                    put("uri", JsonPrimitive(response.request.url.toString()))
+                    put("method", jsonValue(response.request.method.value.uppercase()))
+                    put("uri", jsonValue(response.request.url.toString()))
                     put("headers", buildJsonObject {
                         response.request.headers.names().forEach { name ->
-                            put(name, JsonPrimitive(response.request.headers[name] ?: ""))
+                            put(name, jsonValue(response.request.headers[name] ?: ""))
                         }
                     })
                 })
-                put("statusCode", JsonPrimitive(response.status.value))
+                put("statusCode", jsonValue(response.status.value))
                 // Convert headers to map manually since toMap() is internal
                 put("headers", buildJsonObject {
                     response.headers.names().forEach { name ->
-                        put(name, JsonPrimitive(response.headers[name] ?: ""))
+                        put(name, jsonValue(response.headers[name] ?: ""))
                     }
                 })
                 put("content", parseResponseContent(response))
@@ -181,14 +180,14 @@ class DefaultActivityExecutor(
         return result
     }
 
-    private suspend fun parseResponseContent(response: HttpResponse): JsonElement {
+    private suspend fun parseResponseContent(response: HttpResponse): JsonNode {
         val contentType = response.contentType()?.withoutParameters()?.toString()?.lowercase()
         val text = response.bodyAsText()
 
         return when {
-            contentType?.contains("json") == true -> LemlineJson.json.parseToJsonElement(text)
-            contentType?.contains("text") == true -> JsonPrimitive(text)
-            else -> JsonPrimitive(Base64.getEncoder().encodeToString(text.toByteArray()))
+            contentType?.contains("json") == true -> parseJson(text)
+            contentType?.contains("text") == true -> jsonValue(text)
+            else -> jsonValue(Base64.getEncoder().encodeToString(text.toByteArray()))
         }
     }
 
@@ -196,7 +195,7 @@ class DefaultActivityExecutor(
     // Script Execution
     // ========================================
 
-    private suspend fun executeScript(config: RunScriptConfig, rawOutput: JsonElement): JsonElement {
+    private suspend fun executeScript(config: RunScriptConfig, rawOutput: JsonNode): JsonNode {
         logger.debug { "Executing ${config.language} script" }
 
         val script = Script(
@@ -223,7 +222,7 @@ class DefaultActivityExecutor(
     // Shell Execution
     // ========================================
 
-    private suspend fun executeShell(config: RunShellConfig, rawOutput: JsonElement): JsonElement {
+    private suspend fun executeShell(config: RunShellConfig, rawOutput: JsonNode): JsonNode {
         logger.debug { "Executing shell command: ${config.command}" }
 
         val shell = Shell(

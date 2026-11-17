@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.cli.failures
 
+import com.lemline.common.json.*
 import com.lemline.common.values.IDV7
 import com.lemline.common.values.NodePosition
 import com.lemline.common.values.WorkflowId
@@ -37,7 +38,6 @@ import io.mockk.slot
 import java.io.ByteArrayOutputStream
 import java.io.PrintStream
 import kotlin.time.Instant
-import kotlinx.serialization.json.JsonPrimitive
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -112,7 +112,7 @@ class FailuresReplayCommandTest {
             state = RootState(
                 startedAt = now,
                 workflowId = WorkflowId.random(),
-                workflowInput = JsonPrimitive("input"),
+                workflowInput = jsonValue("input"),
             ),
             counter = 1,
         )
@@ -128,7 +128,7 @@ class FailuresReplayCommandTest {
         workflowInfo = workflowInfo,
         workflowState = WorkflowCommand.ResumeWithCompletedTask(
             nodeStack = nodeStack(),
-            rawOutput = JsonPrimitive("ok"),
+            rawOutput = jsonValue("ok"),
         ),
     )
 
@@ -136,7 +136,7 @@ class FailuresReplayCommandTest {
         workflowInfo = workflowInfo,
         workflowState = WorkflowEvent.WaitStarted(
             nodeStack = nodeStack(),
-            rawOutput = JsonPrimitive("wait"),
+            rawOutput = jsonValue("wait"),
             config = WaitConfig(waitUntil = now),
         ),
     )

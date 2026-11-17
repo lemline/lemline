@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.workflows
 
+import com.fasterxml.jackson.databind.JsonNode
+import com.fasterxml.jackson.databind.node.ObjectNode
+import com.lemline.common.json.*
 import com.lemline.common.json.LemlineJson
 import com.lemline.common.values.info
 import com.lemline.core.activities.ActivityExecutor
@@ -19,10 +22,6 @@ import kotlin.test.assertTrue
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.minutes
 import kotlinx.coroutines.test.runTest
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 
@@ -37,12 +36,13 @@ class SdkCompatibilityTest {
 
     private suspend fun run(
         body: String,
-        input: JsonElement = JsonObject(emptyMap()),
-        execute: suspend (WorkflowEvent.ActivityStarted) -> JsonElement = { error("Unexpected activity: $it") },
-    ): JsonElement = FullOrchestrator.start(
+        input: JsonNode = ObjectNode(emptyMap()),
+        serde: Boolean = true,
+        execute: suspend (WorkflowEvent.ActivityStarted) -> JsonNode = { error("Unexpected activity: $it") },
+    ): JsonNode = FullOrchestrator.start(
         workflow = WorkflowCache.parseYamlAndPut(source(body)),
         workflowInput = input,
-        serde = true,
+        serde = serde,
         activityExecutor = object : ActivityExecutor {
             override suspend fun execute(event: WorkflowEvent.ActivityStarted) = execute(event)
         },
@@ -50,6 +50,24 @@ class SdkCompatibilityTest {
         cloudEventHook = InMemoryCloudEventHook(),
         lifecycleHook = LifecycleEventHook.NOOP,
     )
+
+    @Test
+    fun `workflow input schemas retain precise decimal constants`() = runTest {
+        val body = """
+            input:
+              schema:
+                format: json
+                document:
+                  const: { amount: 1.234567890123456789 }
+            do:
+              - preserve:
+                  set: '§{ . }'
+        """
+        val input = parseJson("""{"amount":1.234567890123456789}""")
+        val workflow = WorkflowDefinitionReader.read(source(body), WorkflowFormat.YAML)
+        com.lemline.core.schemas.SchemaValidator.validate(input, workflow.input.schema)
+        assertEquals(input, run(body, input, serde = false))
+    }
 
     @Test
     fun `set expression and inline for collection execute through serialized resumes`() = runTest {
@@ -60,8 +78,8 @@ class SdkCompatibilityTest {
                   do:
                     - append:
                         set: '§{ . + [§item] }'
-        """, Json.parseToJsonElement("[]"))
-        assertEquals(Json.parseToJsonElement("[1,1,2]"), output)
+        """, parseJson("[]"))
+        assertEquals(parseJson("[1,1,2]"), output)
     }
 
     @Test
@@ -75,8 +93,8 @@ class SdkCompatibilityTest {
                   do:
                     - append:
                         set: '§{ .result += [§item] | .customer = "changed" }'
-        """, Json.parseToJsonElement("""{"customer":"Alice","result":[]}"""))
-        assertEquals(Json.parseToJsonElement("""{"customer":"changed","result":["literal",null,"Alice",{"nested":"Alice","missing":null,"values":[null]}]}"""), output)
+        """, parseJson("""{"customer":"Alice","result":[]}"""))
+        assertEquals(parseJson("""{"customer":"changed","result":["literal",null,"Alice",{"nested":"Alice","missing":null,"values":[null]}]}"""), output)
     }
 
     @Test
@@ -93,11 +111,11 @@ class SdkCompatibilityTest {
                         endpoint: https://example.com/search
                         headers: $headers
                         query: $query
-            """, Json.parseToJsonElement("""{"token":"secret","search":"hello world","headers":{"X-Token":"secret","X-Literal":"literal"},"query":{"q":"hello world","page":"2"}}""")) {
+            """, parseJson("""{"token":"secret","search":"hello world","headers":{"X-Token":"secret","X-Literal":"literal"},"query":{"q":"hello world","page":"2"}}""")) {
                 val config = assertIs<WorkflowEvent.CallHttpStarted>(it).config
                 assertEquals(mapOf("X-Token" to "secret", "X-Literal" to "literal"), config.headers)
                 assertEquals(mapOf("q" to "hello world", "page" to "2"), config.query)
-                JsonPrimitive("ok")
+                jsonValue("ok")
             }
         }
     }
@@ -112,11 +130,11 @@ class SdkCompatibilityTest {
                       command: cat
                       arguments: ['§{ .arg }', '', '§{ .arg }', 'two words']
                       stdin: '§{ .text }'
-        """, Json.parseToJsonElement("""{"arg":"repeated","text":"standard input"}""")) {
+        """, parseJson("""{"arg":"repeated","text":"standard input"}""")) {
             val config = assertIs<WorkflowEvent.RunShellStarted>(it).config
             assertEquals(listOf("repeated", "", "repeated", "two words"), config.arguments)
             assertEquals("standard input", config.stdin)
-            JsonPrimitive("ok")
+            jsonValue("ok")
         }
     }
 
@@ -141,8 +159,8 @@ class SdkCompatibilityTest {
                     do:
                       - recovered:
                           set: { caught: true }
-        """, Json.parseToJsonElement("""{"title":"invalid","detail":"explanation"}"""))
-        assertEquals(Json.parseToJsonElement("""{"caught":true}"""), output)
+        """, parseJson("""{"title":"invalid","detail":"explanation"}"""))
+        assertEquals(parseJson("""{"caught":true}"""), output)
     }
 
     @Test
@@ -167,13 +185,13 @@ class SdkCompatibilityTest {
                 for (mapper in listOf(LemlineJson.jacksonMapper, LemlineJson.yamlMapper)) {
                     WorkflowDefinitionReader.read(mapper.writeValueAsString(parsed), WorkflowFormat.YAML)
                 }
-                val output = run(body, Json.parseToJsonElement("""{"original":true}"""))
+                val output = run(body, parseJson("""{"original":true}"""))
                 val expected = when {
                     !fails -> """{"intermediate":true,"finished":true}"""
                     target == "end" -> """{"original":true}"""
                     else -> """{"original":true,"finished":true}"""
                 }
-                assertEquals(Json.parseToJsonElement(expected), output)
+                assertEquals(parseJson(expected), output)
             }
         }
     }
@@ -203,8 +221,8 @@ class SdkCompatibilityTest {
                     do:
                       - handled:
                           set: { caught: true }
-        """, Json.parseToJsonElement("""{"delay":"PT0S","limit":"PT1M","jitter":"PT0.001S"}"""))
-        assertEquals(Json.parseToJsonElement("""{"caught":true}"""), output)
+        """, parseJson("""{"delay":"PT0S","limit":"PT1M","jitter":"PT0.001S"}"""))
+        assertEquals(parseJson("""{"caught":true}"""), output)
     }
 
     @Test
@@ -219,7 +237,7 @@ class SdkCompatibilityTest {
         for (delay in listOf("PT1M", "invalid")) {
             val before = Clock.System.now()
             var event = StepByStepOrchestrator.runByTask(
-                workflow, StepByStepOrchestrator.initCmd(workflowInput = Json.parseToJsonElement("""{"delay":"$delay"}""")),
+                workflow, StepByStepOrchestrator.initCmd(workflowInput = parseJson("""{"delay":"$delay"}""")),
                 workflow.info, LifecycleEventHook.NOOP,
             )
             while (event is WorkflowEvent.TaskScheduled) {
@@ -276,7 +294,7 @@ class SdkCompatibilityTest {
                 assertEquals("first title line\nsecond title line", definition.title.literalErrorTitle)
                 assertEquals("first detail line\nsecond detail line", definition.detail.literalErrorDetails)
             }
-            assertEquals(Json.parseToJsonElement("""{"title":"first title line\nsecond title line","detail":"first detail line\nsecond detail line"}"""), run(body))
+            assertEquals(parseJson("""{"title":"first title line\nsecond title line","detail":"first detail line\nsecond detail line"}"""), run(body))
         }
     }
 

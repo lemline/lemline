@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.errors
+import com.lemline.common.json.buildJsonObject
 import com.lemline.common.values.NodePosition
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -36,6 +37,14 @@ data class InternalException(
         val title: String? = null,
         val details: String? = null,
     ) {
+        fun toJsonNode() = buildJsonObject {
+            put("type", type)
+            put("status", status)
+            put("instance", position)
+            title?.let { put("title", it) }
+            details?.let { put("details", it) }
+        }
+
         // Use this constructor for internal use
         constructor(
             errorType: WorkflowErrorType,

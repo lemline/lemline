@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.processors
 
+import com.fasterxml.jackson.databind.JsonNode
+import com.lemline.common.json.*
 import com.lemline.common.values.WorkflowName
 import com.lemline.common.values.WorkflowNamespace
 import com.lemline.common.values.WorkflowVersion
@@ -12,7 +14,6 @@ import com.lemline.core.states.WorkflowEvent
 import com.lemline.core.states.WorkflowEvent.RunWorkflowStarted
 import io.serverlessworkflow.api.types.RunTask
 import kotlin.time.Instant
-import kotlinx.serialization.json.JsonElement
 
 /**
  * Node processor for RunTask with Workflow configuration - pure functional model.
@@ -57,7 +58,7 @@ class RunWorkflowProcessor(
     node: Node<RunTask>,
 ) : AbstractProcessor<RunTask, RunState>(node) {
     override val isAsync = true
-    override fun stateWhenEnteringFromParent(transformedInput: JsonElement, scope: Scope, startedAt: Instant) = RunState(startedAt = startedAt)
+    override fun stateWhenEnteringFromParent(transformedInput: JsonNode, scope: Scope, startedAt: Instant) = RunState(startedAt = startedAt)
 
     /**
      * Prepares and handles the event for starting a sub-workflow.
@@ -74,7 +75,7 @@ class RunWorkflowProcessor(
      */
     override fun startedEvent(
         nodeStack: NodeStack,
-        transformedInput: JsonElement,
+        transformedInput: JsonNode,
         scope: Scope,
     ): WorkflowEvent {
         logger.debug { "Preparing sub-workflow: ${node.name}" }
@@ -120,6 +121,6 @@ data class RunWorkflowConfig(
     val namespace: WorkflowNamespace,
     val name: WorkflowName,
     val version: WorkflowVersion,
-    val input: JsonElement,
+    val input: JsonNode,
     val sync: Boolean
 )

@@ -25,8 +25,11 @@ internal object WorkflowDefinitionReader {
 
     fun read(definition: String, format: WorkflowFormat, validate: Boolean = true): Workflow {
         val mapper = format.mapper()
-        val document = mapper.readValue(definition, JsonNode::class.java) as? ObjectNode
+        val document = mapper.readerFor(JsonNode::class.java)
+            .with(com.fasterxml.jackson.databind.DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS)
+            .readValue<JsonNode>(definition) as? ObjectNode
             ?: throw IllegalArgumentException("Workflow definition must be an object")
+        com.lemline.common.json.validateDecimalBounds(document)
         val evaluate = document.get("evaluate")
         validateEvaluate(evaluate)
         if (validate) {

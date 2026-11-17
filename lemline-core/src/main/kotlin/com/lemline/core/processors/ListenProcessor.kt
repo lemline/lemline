@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.processors
 
+import com.fasterxml.jackson.databind.JsonNode
+import com.fasterxml.jackson.databind.node.ObjectNode
+import com.lemline.common.json.*
 import com.lemline.core.errors.WorkflowErrorType.CONFIGURATION
 import com.lemline.core.nodes.Node
 import com.lemline.core.processors.scope.Scope
@@ -16,8 +19,6 @@ import io.serverlessworkflow.api.types.Timeout
 import kotlin.time.Clock
 import kotlin.time.Duration
 import kotlin.time.Instant
-import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.buildJsonObject
 
 /**
  * Node processor for ListenTask - pure functional model.
@@ -62,7 +63,7 @@ class ListenProcessor(
 
     override val isAsync = true
 
-    override fun stateWhenEnteringFromParent(transformedInput: JsonElement, scope: Scope, startedAt: Instant) = ListenState(startedAt = startedAt)
+    override fun stateWhenEnteringFromParent(transformedInput: JsonNode, scope: Scope, startedAt: Instant) = ListenState(startedAt = startedAt)
 
     /**
      * Handles the "started" event for a listen task by creating a `ListenStarted` event
@@ -75,7 +76,7 @@ class ListenProcessor(
      */
     override fun startedEvent(
         nodeStack: NodeStack,
-        transformedInput: JsonElement,
+        transformedInput: JsonNode,
         scope: Scope,
     ): WorkflowEvent {
         val listenConfig = node.task.listen
@@ -136,7 +137,6 @@ class ListenProcessor(
         )
     }
 
-
     /**
      * Build the correlation context containing workflow data needed for `correlate.expect` evaluation.
      * This includes values like $input that expect expressions can reference.
@@ -146,7 +146,7 @@ class ListenProcessor(
     private fun buildCorrelationContext(
         filters: List<EventFilter>,
         scope: Scope
-    ): JsonElement? {
+    ): JsonNode? {
         // Check if any filter has correlations with expect expressions
         val hasExpectExpressions = filters.any { filter ->
             filter.correlations?.values?.any { it.expect != null } == true
@@ -155,7 +155,7 @@ class ListenProcessor(
         if (!hasExpectExpressions) return null
 
         // Build context object with scope variables
-        // Scope is a JsonObject, so we access keys directly
+        // Scope is a ObjectNode, so we access keys directly
         return buildJsonObject {
             // Include input for $input references
             scope["input"]?.let { put("input", it) }

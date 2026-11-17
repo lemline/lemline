@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.states
 
+import com.fasterxml.jackson.databind.node.ObjectNode
+import com.lemline.common.json.*
 import com.lemline.core.processors.scope.Scope
 import kotlin.time.Instant
-import kotlinx.serialization.json.JsonObject
 
 sealed class NodeState {
 
@@ -13,5 +14,5 @@ sealed class NodeState {
      */
     abstract val startedAt: Instant
 
-    open val scope: Scope = JsonObject(mapOf())
+    open val scope: Scope = ObjectNode(mapOf())
 }

@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.expressions
 
+import com.fasterxml.jackson.databind.JsonNode
+import com.fasterxml.jackson.databind.node.ObjectNode
+import com.lemline.common.json.*
 import com.lemline.common.json.LemlineJson
 import com.lemline.common.values.WorkflowId
 import com.lemline.core.expressions.scopes.RuntimeDescriptor
@@ -12,16 +15,13 @@ import io.kotest.matchers.shouldBe
 import io.serverlessworkflow.api.types.Workflow
 import io.serverlessworkflow.impl.expressions.DateTimeDescriptor
 import java.time.Instant
-import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
 
 class ScopeTest :
     StringSpec({
 
         val workflowPath = "/examples/do-single.yaml"
         val workflow = loadWorkflowFromYaml(workflowPath)
-        val testInput: JsonElement = JsonObject(mapOf("test" to JsonPrimitive("value")))
+        val testInput: JsonNode = ObjectNode(mapOf("test" to jsonValue("value")))
         val testStartedAt = DateTimeDescriptor.from(Instant.now())
         val testWorkflowDescriptor = WorkflowDescriptor(
             id = WorkflowId.random().toString(),
@@ -30,7 +30,7 @@ class ScopeTest :
             startedAt = LemlineJson.encodeToElement(testStartedAt),
         )
         LemlineJson.jsonObject.set("custom", "data")
-        mapOf("secretKey" to JsonPrimitive("secretValue"))
+        mapOf("secretKey" to jsonValue("secretValue"))
 
         "should serialize and deserialize Workflow" {
 

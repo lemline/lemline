@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.cli.instances
 
+import com.fasterxml.jackson.databind.JsonNode
+import com.fasterxml.jackson.databind.node.ObjectNode
+import com.lemline.common.json.*
 import com.lemline.common.values.WorkflowName
 import com.lemline.common.values.WorkflowNamespace
 import com.lemline.common.values.WorkflowVersion
@@ -29,12 +32,6 @@ import io.mockk.slot
 import io.mockk.spyk
 import java.io.ByteArrayOutputStream
 import java.io.PrintStream
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.addJsonObject
-import kotlinx.serialization.json.buildJsonArray
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.put
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -312,10 +309,10 @@ class InstanceStartCommandTest {
             )
 
         val expectedJson = buildJsonArray {
-            add(JsonPrimitive(1))
-            add(JsonPrimitive(2))
-            add(JsonPrimitive(3))
-            add(JsonPrimitive("four"))
+            add(jsonValue(1))
+            add(jsonValue(2))
+            add(jsonValue(3))
+            add(jsonValue("four"))
         }
 
         sentMessage.workflowState.rawInput shouldBe expectedJson
@@ -338,8 +335,8 @@ class InstanceStartCommandTest {
 
         val expectedJson = buildJsonObject {
             put("items", buildJsonArray {
-                add(JsonPrimitive(1))
-                add(JsonPrimitive(2))
+                add(jsonValue(1))
+                add(jsonValue(2))
                 addJsonObject {
                     put("name", "three")
                 }
@@ -349,18 +346,17 @@ class InstanceStartCommandTest {
         sentMessage.workflowState.rawInput shouldBe expectedJson
     }
 
-
     @Test
     fun `should use empty JSON object when no input is provided`() {
         // When & Then
         val sentMessage =
             executeCommandAndVerify(workflowNamespace.toString(), workflowName.toString(), workflowVersion.toString())
 
-        // Get the raw input as a JsonElement
+        // Get the raw input as a JsonNode
         val rawInput = sentMessage.workflowState.rawInput
 
         // When no input is provided, the command should use an empty JSON object
-        rawInput shouldBe JsonObject(emptyMap())
+        rawInput shouldBe ObjectNode(emptyMap())
     }
 
     @Test
@@ -378,7 +374,7 @@ class InstanceStartCommandTest {
                 inputJsonString
             )
 
-        sentMessage.workflowState.rawInput shouldBe JsonPrimitive("just a string")
+        sentMessage.workflowState.rawInput shouldBe jsonValue("just a string")
     }
 
     @Test
@@ -396,7 +392,7 @@ class InstanceStartCommandTest {
                 inputJsonString
             )
 
-        sentMessage.workflowState.rawInput shouldBe JsonPrimitive(42)
+        sentMessage.workflowState.rawInput shouldBe jsonValue(42)
     }
 
     @Test
@@ -414,7 +410,7 @@ class InstanceStartCommandTest {
                 inputJsonString
             )
 
-        sentMessage.workflowState.rawInput shouldBe JsonPrimitive("42")
+        sentMessage.workflowState.rawInput shouldBe jsonValue("42")
     }
 
     @Test
@@ -432,7 +428,7 @@ class InstanceStartCommandTest {
                 inputJsonString
             )
 
-        sentMessage.workflowState.rawInput shouldBe JsonPrimitive("42")
+        sentMessage.workflowState.rawInput shouldBe jsonValue("42")
     }
 
     @Test
@@ -450,7 +446,7 @@ class InstanceStartCommandTest {
                 inputJsonString
             )
 
-        sentMessage.workflowState.rawInput shouldBe JsonPrimitive(true)
+        sentMessage.workflowState.rawInput shouldBe jsonValue(true)
     }
 
     @Test
@@ -468,7 +464,7 @@ class InstanceStartCommandTest {
                 inputJsonString
             )
 
-        sentMessage.workflowState.rawInput shouldBe JsonPrimitive("true")
+        sentMessage.workflowState.rawInput shouldBe jsonValue("true")
     }
 
     @Test

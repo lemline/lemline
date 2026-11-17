@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.random
 
+import com.fasterxml.jackson.databind.JsonNode
+import com.fasterxml.jackson.databind.node.NullNode
+import com.lemline.common.json.*
 import com.lemline.common.random.random
 import com.lemline.common.random.randomWorkflowName
 import com.lemline.common.random.randomWorkflowNamespace
@@ -34,38 +37,33 @@ import kotlin.random.Random
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Instant
-import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonNull
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.buildJsonArray
-import kotlinx.serialization.json.buildJsonObject
 
-fun JsonElement.Companion.random(): JsonElement {
+fun randomJsonNode(): JsonNode {
     return when (Random.nextInt(5)) {
-        0 -> JsonPrimitive(Random.nextBoolean())
-        1 -> JsonPrimitive(Random.nextInt())
-        2 -> JsonPrimitive(Random.nextDouble())
-        3 -> JsonPrimitive(String.random())
+        0 -> jsonValue(Random.nextBoolean())
+        1 -> jsonValue(Random.nextInt())
+        2 -> jsonValue(Random.nextDouble())
+        3 -> jsonValue(String.random())
         else -> when (Random.nextBoolean()) {
             true -> buildJsonArray {
                 repeat(Random.nextInt(1, 4)) {
-                    add(JsonElement.random())
+                    add(randomJsonNode())
                 }
             }
 
             false -> buildJsonObject {
                 repeat(Random.nextInt(1, 4)) {
-                    put(String.random(), JsonElement.random())
+                    put(String.random(), randomJsonNode())
                 }
             }
         }
     }
 }
 
-fun JsonElement.Companion.nullableRandom(): JsonElement {
+fun nullableRandomJsonNode(): JsonNode {
     return when (Random.nextBoolean()) {
-        true -> JsonNull
-        false -> random()
+        true -> NullNode.instance
+        false -> randomJsonNode()
     }
 }
 
@@ -103,7 +101,7 @@ fun randomDoState() = DoState(
 
 fun randomForState() = ForState(
     startedAt = Instant.random(),
-    collection = listOf(JsonElement.random()),
+    collection = listOf(randomJsonNode()),
     index = Random.nextInt(),
     forEach = String.random(),
     forAt = String.random()
@@ -112,10 +110,10 @@ fun randomForState() = ForState(
 fun randomRootState() = RootState(
     startedAt = Instant.random(),
     workflowId = WorkflowId.random(),
-    workflowInput = JsonElement.random(),
+    workflowInput = randomJsonNode(),
     context = buildJsonObject {
         repeat(Random.nextInt(0, 4)) {
-            put(String.random(), JsonElement.random())
+            put(String.random(), randomJsonNode())
         }
     },
     hasWaitingParent = Random.nextBoolean()
@@ -123,7 +121,7 @@ fun randomRootState() = RootState(
 
 fun randomTryState() = TryState(
     startedAt = Instant.random(),
-    transformedInput = JsonElement.random(),
+    transformedInput = randomJsonNode(),
     attemptIndex = Random.nextInt(0, 10),
     runningCatch = Random.nextBoolean(),
     lastError = when (Random.nextBoolean()) {
@@ -160,7 +158,7 @@ fun randomRunWorkflowConfig() = RunWorkflowConfig(
     namespace = randomWorkflowNamespace(),
     name = randomWorkflowName(),
     version = randomWorkflowVersion(),
-    input = JsonElement.random(),
+    input = randomJsonNode(),
     sync = Random.nextBoolean()
 )
 
@@ -179,13 +177,13 @@ fun randomWorkflowCommand(): WorkflowCommand {
 fun randomResumeFromTaskCommand() = WorkflowCommand.ResumeFromTask(
     nodeStack = NodeStack.random(),
     nodePosition = NodePosition.random(),
-    rawInput = JsonElement.random(),
+    rawInput = randomJsonNode(),
     flowDirective = randomFlowDirective(),
 )
 
 fun randomResumeWithCompletedTaskCommand() = WorkflowCommand.ResumeWithCompletedTask(
     nodeStack = NodeStack.random(),
-    rawOutput = JsonElement.random(),
+    rawOutput = randomJsonNode(),
 )
 
 fun randomWorkflowEvent(): WorkflowEvent {
@@ -218,7 +216,7 @@ fun NodeStack.Companion.random(): NodeStack {
 }
 
 fun randomWorkflowCompletedEvent() = WorkflowEvent.WorkflowCompleted(
-    output = JsonElement.random(),
+    output = randomJsonNode(),
     completedAt = Clock.System.now(),
     nodeStack = NodeStack.random()
 )
@@ -226,11 +224,11 @@ fun randomWorkflowCompletedEvent() = WorkflowEvent.WorkflowCompleted(
 fun randomWorkflowFaultedEvent() = WorkflowEvent.WorkflowFaulted(
     nodeStack = NodeStack.random(),
     rawInput = when (Random.nextBoolean()) {
-        true -> JsonElement.random()
+        true -> randomJsonNode()
         false -> null
     },
     rawOutput = when (Random.nextBoolean()) {
-        true -> JsonElement.random()
+        true -> randomJsonNode()
         false -> null
     },
     flowDirective = when (Random.nextBoolean()) {
@@ -244,7 +242,7 @@ fun randomWorkflowFaultedEvent() = WorkflowEvent.WorkflowFaulted(
 fun randomTaskScheduledEvent() = WorkflowEvent.TaskScheduled(
     nodeStack = NodeStack.random(),
     nodePosition = NodePosition.random(),
-    rawInput = JsonElement.random(),
+    rawInput = randomJsonNode(),
     flowDirective = when (Random.nextBoolean()) {
         true -> randomFlowDirective()
         false -> null
@@ -257,14 +255,14 @@ fun randomWaitConfig() = WaitConfig(
 
 fun randomWaitStartedEvent() = WorkflowEvent.WaitStarted(
     nodeStack = NodeStack.random(),
-    rawOutput = JsonElement.random(),
+    rawOutput = randomJsonNode(),
     config = randomWaitConfig()
 )
 
 fun randomTaskRetryScheduledEvent() = WorkflowEvent.TaskRetryScheduled(
     nodeStack = NodeStack.random(),
     nodePosition = NodePosition.random(),
-    rawInput = JsonElement.random(),
+    rawInput = randomJsonNode(),
     flowDirective = when (Random.nextBoolean()) {
         true -> randomFlowDirective()
         false -> null
@@ -274,20 +272,20 @@ fun randomTaskRetryScheduledEvent() = WorkflowEvent.TaskRetryScheduled(
 
 fun randomRunWorkflowStartedEvent() = WorkflowEvent.RunWorkflowStarted(
     nodeStack = NodeStack.random(),
-    rawInput = JsonElement.random(),
+    rawInput = randomJsonNode(),
     config = randomRunWorkflowConfig()
 )
 
 fun randomForkStartedEvent() = WorkflowEvent.ForkStarted(
     nodeStack = NodeStack.random(),
-    rawInput = JsonElement.random(),
+    rawInput = randomJsonNode(),
 )
 
 fun randomForkBranchCompletedEvent() =
     WorkflowEvent.ForkBranchCompleted(
         nodeStack = NodeStack.random(),
         branchPosition = NodePosition.random(),
-        branchOutput = JsonElement.random(),
+        branchOutput = randomJsonNode(),
         completedAt = Clock.System.now(),
     )
 
@@ -363,8 +361,8 @@ fun randomListenConfig() = ListenConfig(
     },
     correlationContext = when (Random.nextBoolean()) {
         true -> buildJsonObject {
-            put("input", JsonElement.random())
-            put("context", buildJsonObject { put(String.random(), JsonElement.random()) })
+            put("input", randomJsonNode())
+            put("context", buildJsonObject { put(String.random(), randomJsonNode()) })
         }
 
         false -> null
@@ -373,6 +371,6 @@ fun randomListenConfig() = ListenConfig(
 
 fun randomListenStartedEvent() = WorkflowEvent.ListenStarted(
     nodeStack = NodeStack.random(),
-    rawOutput = JsonElement.random(),
+    rawOutput = randomJsonNode(),
     config = randomListenConfig()
 )

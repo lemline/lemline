@@ -1,10 +1,13 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.orchestrator.full
 
+import com.fasterxml.jackson.databind.JsonNode
+import com.fasterxml.jackson.databind.node.ArrayNode
+import com.lemline.common.json.*
 import com.lemline.common.logger.logger
 import com.lemline.common.values.NodePosition
 import com.lemline.core.cloudevents.CloudEventMatcher
-import com.lemline.core.cloudevents.CloudEventParser.toJsonElement
+import com.lemline.core.cloudevents.CloudEventParser.toJsonNode
 import com.lemline.core.errors.InternalException
 import com.lemline.core.nodes.ForeachTask
 import com.lemline.core.processors.EventFilter
@@ -25,18 +28,16 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.produceIn
-import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonElement
 
 internal sealed class CollectResult {
-    data class Success(val outputs: List<JsonElement>) : CollectResult()
+    data class Success(val outputs: List<JsonNode>) : CollectResult()
     data class Failure(val nodeStack: NodeStack, val error: InternalException) : CollectResult()
     data class EscapedToCompletion(val event: WorkflowEvent.WorkflowCompleted) : CollectResult()
 }
 
 internal class ForeachEscapedException(val event: WorkflowEvent.WorkflowCompleted) : Exception()
 
-internal typealias ForeachProcessor = suspend (NodeStack, JsonElement, Int) -> Pair<NodeStack, JsonElement>
+internal typealias ForeachProcessor = suspend (NodeStack, JsonNode, Int) -> Pair<NodeStack, JsonNode>
 
 internal object ListenEventCollector {
 
@@ -49,8 +50,8 @@ internal object ListenEventCollector {
     ): CollectResult {
         var currentStack = event.nodeStack
 
-        val processEvent: suspend (CloudEvent, Int) -> JsonElement = { cloudEvent, index ->
-            val eventJson = cloudEvent.toJsonElement(event.config.readAs)
+        val processEvent: suspend (CloudEvent, Int) -> JsonNode = { cloudEvent, index ->
+            val eventJson = cloudEvent.toJsonNode(event.config.readAs)
             if (foreachProcessor != null) {
                 val (updatedStack, output) = foreachProcessor(currentStack, eventJson, index)
                 currentStack = updatedStack
@@ -88,10 +89,10 @@ internal object ListenEventCollector {
     private suspend fun collectFirst(
         eventFlow: Flow<CloudEvent>,
         filters: List<EventFilter>,
-        correlationContext: JsonElement?,
+        correlationContext: JsonNode?,
         establishedCorrelations: MutableMap<String, String>,
-        processEvent: suspend (CloudEvent, Int) -> JsonElement,
-    ): List<JsonElement> {
+        processEvent: suspend (CloudEvent, Int) -> JsonNode,
+    ): List<JsonNode> {
         val cloudEvent = eventFlow
             .filter { CloudEventMatcher.matchesFilters(it, filters, correlationContext, establishedCorrelations) }
             .first()
@@ -101,10 +102,10 @@ internal object ListenEventCollector {
     private suspend fun collectAny(
         eventFlow: Flow<CloudEvent>,
         event: WorkflowEvent.ListenStarted,
-        correlationContext: JsonElement?,
+        correlationContext: JsonNode?,
         establishedCorrelations: MutableMap<String, String>,
-        processEvent: suspend (CloudEvent, Int) -> JsonElement,
-    ): List<JsonElement> = when (val until = event.config.until) {
+        processEvent: suspend (CloudEvent, Int) -> JsonNode,
+    ): List<JsonNode> = when (val until = event.config.until) {
         null -> collectFirst(
             eventFlow, event.config.filters, correlationContext, establishedCorrelations, processEvent
         )
@@ -128,11 +129,11 @@ internal object ListenEventCollector {
     private suspend fun collectAll(
         eventFlow: Flow<CloudEvent>,
         filters: List<EventFilter>,
-        correlationContext: JsonElement?,
+        correlationContext: JsonNode?,
         establishedCorrelations: MutableMap<String, String>,
-        processEvent: suspend (CloudEvent, Int) -> JsonElement,
-    ): List<JsonElement> {
-        data class MatchedEvent(val firstFilterIndex: Int, val result: JsonElement)
+        processEvent: suspend (CloudEvent, Int) -> JsonNode,
+    ): List<JsonNode> {
+        data class MatchedEvent(val firstFilterIndex: Int, val result: JsonNode)
 
         val matchedEvents = mutableListOf<MatchedEvent>()
         val unsatisfiedIndices = filters.indices.toMutableSet()
@@ -174,22 +175,22 @@ internal object ListenEventCollector {
         filters: List<EventFilter>,
         expression: String,
         readAs: ListenAndReadAs,
-        correlationContext: JsonElement?,
+        correlationContext: JsonNode?,
         establishedCorrelations: MutableMap<String, String>,
-        processEvent: suspend (CloudEvent, Int) -> JsonElement,
-    ): List<JsonElement> {
-        val rawEvents = mutableListOf<JsonElement>()
-        val outputs = mutableListOf<JsonElement>()
+        processEvent: suspend (CloudEvent, Int) -> JsonNode,
+    ): List<JsonNode> {
+        val rawEvents = mutableListOf<JsonNode>()
+        val outputs = mutableListOf<JsonNode>()
 
         val channel = eventFlow.filtered(filters, correlationContext, establishedCorrelations)
         try {
             for (cloudEvent in channel) {
-                rawEvents.add(cloudEvent.toJsonElement(readAs))
+                rawEvents.add(cloudEvent.toJsonNode(readAs))
                 outputs.add(processEvent(cloudEvent, outputs.size))
 
                 logger.debug { "Accumulated event (count=${rawEvents.size}): type=${cloudEvent.type}" }
 
-                if (CloudEventMatcher.evaluateExpressionAsBoolean(expression, JsonArray(rawEvents))) {
+                if (CloudEventMatcher.evaluateExpressionAsBoolean(expression, ArrayNode(rawEvents))) {
                     logger.debug { "Until expression evaluated to true after ${rawEvents.size} events" }
                     break
                 }
@@ -204,11 +205,11 @@ internal object ListenEventCollector {
         eventFlow: Flow<CloudEvent>,
         filters: List<EventFilter>,
         termination: CachedEventConsumption,
-        correlationContext: JsonElement?,
+        correlationContext: JsonNode?,
         establishedCorrelations: MutableMap<String, String>,
-        processEvent: suspend (CloudEvent, Int) -> JsonElement,
-    ): List<JsonElement> {
-        val outputs = mutableListOf<JsonElement>()
+        processEvent: suspend (CloudEvent, Int) -> JsonNode,
+    ): List<JsonNode> {
+        val outputs = mutableListOf<JsonNode>()
         val progress = EventConsumptionProgress()
 
         val channel = eventFlow.toChannel()
@@ -234,7 +235,7 @@ internal object ListenEventCollector {
 
     private suspend fun Flow<CloudEvent>.filtered(
         filters: List<EventFilter>,
-        correlationContext: JsonElement?,
+        correlationContext: JsonNode?,
         establishedCorrelations: MutableMap<String, String>
     ): ReceiveChannel<CloudEvent> {
         val scope = CoroutineScope(currentCoroutineContext())

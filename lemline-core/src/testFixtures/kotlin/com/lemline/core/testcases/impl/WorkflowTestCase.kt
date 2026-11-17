@@ -1,12 +1,13 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.testcases.impl
 
+import com.fasterxml.jackson.databind.JsonNode
+import com.fasterxml.jackson.databind.node.ObjectNode
+import com.lemline.common.json.*
 import com.lemline.core.activities.mock.MockConfiguration
 import io.cloudevents.CloudEvent
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
-import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonObject
 
 /**
  * Represents a workflow that the test depends on (e.g., a child workflow
@@ -45,7 +46,7 @@ data class WorkflowTestCase(
     val name: String,
     val description: String = name,
     val yaml: String,
-    val input: JsonElement = JsonObject(emptyMap()),
+    val input: JsonNode = ObjectNode(emptyMap()),
     val validate: (WorkflowTestResult) -> String? = { null },
     val tags: Set<String> = emptySet(),
     val dependencies: List<WorkflowDependency> = emptyList(),
@@ -67,7 +68,7 @@ sealed class WorkflowTestResult {
     /**
      * Workflow completed successfully with the given output.
      */
-    data class Success(val output: JsonElement) : WorkflowTestResult()
+    data class Success(val output: JsonNode) : WorkflowTestResult()
 
     /**
      * Workflow failed with an error.

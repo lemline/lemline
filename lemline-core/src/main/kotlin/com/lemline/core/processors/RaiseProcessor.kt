@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.processors
 
+import com.fasterxml.jackson.databind.JsonNode
+import com.lemline.common.json.*
 import com.lemline.core.errors.InternalException
 import com.lemline.core.errors.WorkflowErrorType.CONFIGURATION
 import com.lemline.core.errors.WorkflowErrorType.RUNTIME
@@ -10,7 +12,6 @@ import com.lemline.core.states.RaiseState
 import io.serverlessworkflow.api.types.RaiseTask
 import io.serverlessworkflow.api.types.RaiseTaskError
 import kotlin.time.Instant
-import kotlinx.serialization.json.JsonElement
 
 /**
  * Node processor for RaiseTask (raise errors) - throws ExecutionWorkflowException.
@@ -34,11 +35,11 @@ class RaiseProcessor(
     node: Node<RaiseTask>
 ) : AbstractProcessor<RaiseTask, RaiseState>(node) {
 
-    override fun stateWhenEnteringFromParent(transformedInput: JsonElement, scope: Scope, startedAt: Instant) = RaiseState(
+    override fun stateWhenEnteringFromParent(transformedInput: JsonNode, scope: Scope, startedAt: Instant) = RaiseState(
         startedAt = startedAt
     )
 
-    override suspend fun execute(transformedInput: JsonElement, scope: Scope, state: RaiseState): JsonElement {
+    override suspend fun execute(transformedInput: JsonNode, scope: Scope, state: RaiseState): JsonNode {
         val errorDef = node.task.raise.error.getErrorDef()
 
         // Create WorkflowError from error definition

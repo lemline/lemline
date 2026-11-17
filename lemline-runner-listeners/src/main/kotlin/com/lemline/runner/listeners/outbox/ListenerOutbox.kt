@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.listeners.outbox
 
+import com.fasterxml.jackson.databind.node.ArrayNode
+import com.lemline.common.json.*
 import com.lemline.core.states.WorkflowCommand
 import com.lemline.runner.common.config.DatabaseConfig
 import com.lemline.runner.common.config.OutboxConfig
@@ -20,8 +22,6 @@ import jakarta.inject.Inject
 import java.sql.Connection
 import kotlin.time.Clock
 import kotlin.time.Duration
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonArray
 
 /**
  * Outbox processor for listener completions.
@@ -127,9 +127,9 @@ class ListenerOutbox : AbstractOutbox<ListenerModel>() {
     }
 
     private suspend fun process(entity: ListenerModel, completedOutputs: List<String>) {
-        val outputArray = JsonArray(completedOutputs.map { output ->
+        val outputArray = ArrayNode(completedOutputs.map { output ->
             val parsed = if (entity.hasForeach) {
-                Json.parseToJsonElement(output)
+                parseJson(output)
             } else {
                 CloudEventService.parseStringAsData(output, entity.readAs)
             }

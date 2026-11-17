@@ -1,47 +1,45 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.cloudevents
 
+import com.fasterxml.jackson.databind.JsonNode
+import com.fasterxml.jackson.databind.node.NullNode
+import com.lemline.common.json.*
 import com.lemline.common.logger.logger
 import io.cloudevents.CloudEvent
 import io.serverlessworkflow.api.types.ListenTaskConfiguration.ListenAndReadAs
 import java.util.*
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonNull
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.buildJsonObject
 
 object CloudEventParser {
 
     private val logger = logger()
 
-    fun CloudEvent.parseData(): JsonElement =
-        data?.let { parseJsonOrNull(String(it.toBytes())) } ?: JsonNull
+    fun CloudEvent.parseData(): JsonNode =
+        data?.let { parseJsonOrNull(String(it.toBytes())) } ?: NullNode.instance
 
-    fun CloudEvent.toJsonElement(readAs: ListenAndReadAs): JsonElement = when (readAs) {
+    fun CloudEvent.toJsonNode(readAs: ListenAndReadAs): JsonNode = when (readAs) {
         ListenAndReadAs.DATA -> parseDataContent()
         ListenAndReadAs.ENVELOPE -> buildEnvelope()
-        ListenAndReadAs.RAW -> data?.let { JsonPrimitive(Base64.getEncoder().encodeToString(it.toBytes())) } ?: JsonNull
+        ListenAndReadAs.RAW -> data?.let { jsonValue(Base64.getEncoder().encodeToString(it.toBytes())) } ?: NullNode.instance
     }
 
     /**
      * Formats a CloudEvent as a human-readable string for logging.
      * Uses the envelope format with data rendered as JSON string.
      */
-    fun CloudEvent.toReadableString(): String = Json.encodeToString(buildEnvelope())
+    fun CloudEvent.toReadableString(): String = LemlineJson.encodeToString(buildEnvelope())
 
-    private fun CloudEvent.parseDataContent(): JsonElement =
-        data?.let { parseJsonOrPrimitive(String(it.toBytes())) } ?: JsonNull
+    private fun CloudEvent.parseDataContent(): JsonNode =
+        data?.let { parseJsonOrPrimitive(String(it.toBytes())) } ?: NullNode.instance
 
-    private fun CloudEvent.buildEnvelope(): JsonElement = buildJsonObject {
-        put("specversion", JsonPrimitive(specVersion.toString()))
-        put("id", JsonPrimitive(id))
-        put("source", JsonPrimitive(source.toString()))
-        put("type", JsonPrimitive(type))
-        time?.let { put("time", JsonPrimitive(it.toString())) }
-        subject?.let { put("subject", JsonPrimitive(it)) }
-        dataSchema?.let { put("dataschema", JsonPrimitive(it.toString())) }
-        dataContentType?.let { put("datacontenttype", JsonPrimitive(it)) }
+    private fun CloudEvent.buildEnvelope(): JsonNode = buildJsonObject {
+        put("specversion", jsonValue(specVersion.toString()))
+        put("id", jsonValue(id))
+        put("source", jsonValue(source.toString()))
+        put("type", jsonValue(type))
+        time?.let { put("time", jsonValue(it.toString())) }
+        subject?.let { put("subject", jsonValue(it)) }
+        dataSchema?.let { put("dataschema", jsonValue(it.toString())) }
+        dataContentType?.let { put("datacontenttype", jsonValue(it)) }
         data?.let { put("data", parseJsonOrPrimitive(String(it.toBytes()))) }
         // Include extension attributes
         extensionNames.forEach { name ->
@@ -51,18 +49,18 @@ object CloudEventParser {
         }
     }
 
-    private fun Any.toJsonPrimitive(): JsonPrimitive = when (this) {
-        is String -> JsonPrimitive(this)
-        is Number -> JsonPrimitive(this)
-        is Boolean -> JsonPrimitive(this)
-        else -> JsonPrimitive(toString())
+    private fun Any.toJsonPrimitive(): JsonNode = when (this) {
+        is String -> jsonValue(this)
+        is Number -> jsonValue(this)
+        is Boolean -> jsonValue(this)
+        else -> jsonValue(toString())
     }
 
-    private fun parseJsonOrNull(content: String): JsonElement =
-        runCatching { Json.parseToJsonElement(content) }
+    private fun parseJsonOrNull(content: String): JsonNode =
+        runCatching { parseJson(content) }
             .onFailure { e -> logger.warn(e) { "Failed to parse CloudEvent data as JSON" } }
-            .getOrDefault(JsonNull)
+            .getOrDefault(NullNode.instance)
 
-    private fun parseJsonOrPrimitive(content: String): JsonElement =
-        runCatching { Json.parseToJsonElement(content) }.getOrElse { JsonPrimitive(content) }
+    private fun parseJsonOrPrimitive(content: String): JsonNode =
+        runCatching { parseJson(content) }.getOrElse { jsonValue(content) }
 }

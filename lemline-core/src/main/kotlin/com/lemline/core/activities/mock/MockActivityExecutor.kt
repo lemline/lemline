@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.activities.mock
 
+import com.fasterxml.jackson.databind.JsonNode
+import com.fasterxml.jackson.databind.node.ObjectNode
+import com.lemline.common.json.*
 import com.lemline.common.logger.logger
 import com.lemline.core.activities.ActivityExecutor
 import com.lemline.core.cloudevents.CloudEventFactory
@@ -10,9 +13,6 @@ import com.lemline.core.states.WorkflowEvent.EmitStarted
 import com.lemline.core.states.WorkflowEvent.RunScriptStarted
 import com.lemline.core.states.WorkflowEvent.RunShellStarted
 import io.cloudevents.CloudEvent
-import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
 
 /**
  * Activity executor that returns mock responses from configuration.
@@ -60,7 +60,7 @@ class MockActivityExecutor(
 
     private val logger = logger()
 
-    override suspend fun execute(event: ActivityStarted): JsonElement = when (event) {
+    override suspend fun execute(event: ActivityStarted): JsonNode = when (event) {
         is CallHttpStarted -> executeHttp(event)
         is RunScriptStarted -> executeScript(event)
         is RunShellStarted -> executeShell(event)
@@ -70,7 +70,7 @@ class MockActivityExecutor(
     /**
      * Execute HTTP call using mock configuration.
      */
-    private fun executeHttp(event: CallHttpStarted): JsonElement {
+    private fun executeHttp(event: CallHttpStarted): JsonNode {
         val config = event.config
         val mock = mockConfig.findHttpMock(config.url, config.method, config.query)
             ?: throw MockNotFoundException("No HTTP mock found for ${config.method} ${config.url} query=${config.query}")
@@ -81,13 +81,13 @@ class MockActivityExecutor(
             throw MockedActivityException(mock.response.error)
         }
 
-        return mock.response.body ?: JsonObject(emptyMap())
+        return mock.response.body ?: ObjectNode(emptyMap())
     }
 
     /**
      * Execute script using mock configuration.
      */
-    private fun executeScript(event: RunScriptStarted): JsonElement {
+    private fun executeScript(event: RunScriptStarted): JsonNode {
         val config = event.config
         val mock = mockConfig.findScriptMock(config.language)
             ?: throw MockNotFoundException("No script mock found for language: ${config.language}")
@@ -98,13 +98,13 @@ class MockActivityExecutor(
             throw MockedActivityException("Script failed with exit code: ${mock.response.exitCode}")
         }
 
-        return mock.response.output ?: JsonObject(emptyMap())
+        return mock.response.output ?: ObjectNode(emptyMap())
     }
 
     /**
      * Execute shell command using mock configuration.
      */
-    private fun executeShell(event: RunShellStarted): JsonElement {
+    private fun executeShell(event: RunShellStarted): JsonNode {
         val config = event.config
         val mock = mockConfig.findShellMock(config.command)
             ?: throw MockNotFoundException("No shell mock found for command: ${config.command}")
@@ -115,7 +115,7 @@ class MockActivityExecutor(
             throw MockedActivityException("Shell command failed with exit code: ${mock.response.exitCode}")
         }
 
-        return JsonPrimitive(mock.response.stdout)
+        return jsonValue(mock.response.stdout)
     }
 
     /**
@@ -124,7 +124,7 @@ class MockActivityExecutor(
      * Builds and emits the CloudEvent via the callback if provided.
      * Mock configuration can override output or simulate errors.
      */
-    private suspend fun executeEmit(event: EmitStarted): JsonElement {
+    private suspend fun executeEmit(event: EmitStarted): JsonNode {
         val config = event.config
         val mock = mockConfig.findEmitMock(config.type, config.source)
 

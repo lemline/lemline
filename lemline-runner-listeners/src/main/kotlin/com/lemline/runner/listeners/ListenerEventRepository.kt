@@ -1,20 +1,21 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.listeners
 
+import com.lemline.common.json.*
 import com.lemline.common.values.IDV7
 import com.lemline.runner.common.config.DatabaseConfig
-import com.lemline.runner.common.namespaces.NamespaceScope
 import com.lemline.runner.common.config.DatabaseType
+import com.lemline.runner.common.namespaces.NamespaceScope
 import com.lemline.runner.common.repositories.helpers.ColumnBindings
 import com.lemline.runner.common.repositories.helpers.ColumnBindingsBuilder
 import com.lemline.runner.common.repositories.ops.CREATED_AT_COLUMN
-import com.lemline.runner.common.repositories.ops.WORKFLOW_NAMESPACE_COLUMN
 import com.lemline.runner.common.repositories.ops.CrudRepository
 import com.lemline.runner.common.repositories.ops.ID_COLUMN
 import com.lemline.runner.common.repositories.ops.OUTBOX_DELAYED_UNTIL_COLUMN
 import com.lemline.runner.common.repositories.ops.OUTBOX_SCHEDULED_FOR_COLUMN
 import com.lemline.runner.common.repositories.ops.OutboxRepository
 import com.lemline.runner.common.repositories.ops.UPDATED_AT_COLUMN
+import com.lemline.runner.common.repositories.ops.WORKFLOW_NAMESPACE_COLUMN
 import com.lemline.runner.common.repositories.ops.cleanupColumns
 import com.lemline.runner.common.repositories.ops.getInstant
 import com.lemline.runner.common.repositories.ops.nowTimestamp
@@ -29,9 +30,6 @@ import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
 import java.sql.Connection
 import java.sql.ResultSet
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
 
 const val LISTENER_EVENTS_TABLE = "lemline_listener_events"
 
@@ -96,7 +94,7 @@ class ListenerEventRepository : CrudRepository<ListenerEventModel>(),
     }
 
     private fun eventSource(event: String): String =
-        Json.parseToJsonElement(event).jsonObject["source"]?.jsonPrimitive?.content.orEmpty()
+        parseJson(event).jsonObject["source"]?.jsonPrimitive?.content.orEmpty()
 
     override val tableName = LISTENER_EVENTS_TABLE
 

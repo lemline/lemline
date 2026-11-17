@@ -1,12 +1,13 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.listeners
 
-import com.lemline.common.values.WorkflowNamespace
+import com.lemline.common.json.*
 import com.lemline.common.values.IDV7
 import com.lemline.common.values.NodePosition
 import com.lemline.common.values.WorkflowId
 import com.lemline.common.values.WorkflowInfo
 import com.lemline.common.values.WorkflowName
+import com.lemline.common.values.WorkflowNamespace
 import com.lemline.common.values.WorkflowVersion
 import com.lemline.core.activities.mock.MockFunctionResolver
 import com.lemline.core.functions.FunctionCache
@@ -46,7 +47,6 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.test.runTest
-import kotlinx.serialization.json.Json
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
@@ -1415,7 +1415,7 @@ abstract class ListenerRepositoryTestBase {
         private suspend fun start(source: String, choice: String, resolver: FunctionResolver = MockFunctionResolver()): InstanceMessage<WorkflowEvent.ListenStarted> {
             val workflow = WorkflowCache.parseYamlAndPut(source)
             var command: WorkflowCommand = StepByStepOrchestrator.initCmd(
-                workflowInput = Json.parseToJsonElement("""{"choice":"$choice"}""")
+                workflowInput = parseJson("""{"choice":"$choice"}""")
             )
             repeat(30) {
                 val event = StepByStepOrchestrator.runByTask(
@@ -1468,7 +1468,6 @@ abstract class ListenerRepositoryTestBase {
             restored.readAs shouldBe ListenAndReadAs.ENVELOPE
             restored.instanceMessage.workflowState.nodeStack.toList().any { it.extension != null } shouldBe true
         }
-
 
         @Test
         fun `remote function extension listener hydrates filters on a different events worker`() = runTest {

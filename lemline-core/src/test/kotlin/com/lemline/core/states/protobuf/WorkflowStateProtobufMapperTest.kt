@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.states.protobuf
 
+import com.lemline.common.json.*
 import com.lemline.common.values.NodePosition
 import com.lemline.common.values.WorkflowId
 import com.lemline.common.values.WorkflowName
@@ -35,9 +36,6 @@ import io.serverlessworkflow.api.types.ListenTaskConfiguration.ListenAndReadAs
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 import kotlin.time.Instant
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.put
 import org.junit.jupiter.api.Test
 
 class WorkflowStateProtobufMapperTest {
@@ -67,7 +65,7 @@ class WorkflowStateProtobufMapperTest {
 
     @Test
     fun `complete until strategy preserves extension values in protobuf`() {
-        val filter = CachedEventFilter(EventFilter(type = "stop"), mapOf("tenant" to JsonPrimitive("acme")))
+        val filter = CachedEventFilter(EventFilter(type = "stop"), mapOf("tenant" to jsonValue("acme")))
         val rule = CachedEventConsumption(ListenStrategy.ALL, listOf(filter, filter.copy(standard = EventFilter(type = "done"))))
         val original = eventListenStarted().let { it.copy(config = it.config.copy(until = UntilCondition.Event(rule))) }
         val encoded = WorkflowStateProtobufMapper.toProto(original)
@@ -120,7 +118,7 @@ class WorkflowStateProtobufMapperTest {
             WorkflowCommand.ResumeFromTask(
                 nodeStack = nodeStack(),
                 nodePosition = taskPosition,
-                rawInput = JsonPrimitive("raw-input"),
+                rawInput = jsonValue("raw-input"),
                 flowDirective = null
             ),
             WorkflowEvent.WorkflowFaulted(
@@ -161,14 +159,14 @@ class WorkflowStateProtobufMapperTest {
         WorkflowCommand.ResumeFromTask(
             nodeStack = nodeStack(),
             nodePosition = taskPosition,
-            rawInput = JsonPrimitive("raw-input"),
+            rawInput = jsonValue("raw-input"),
             flowDirective = FlowDirectiveGoto("next-task")
         )
 
     private fun commandResumeWithCompletedTask(): WorkflowCommand.ResumeWithCompletedTask =
         WorkflowCommand.ResumeWithCompletedTask(
             nodeStack = nodeStack(),
-            rawOutput = JsonPrimitive("raw-output")
+            rawOutput = jsonValue("raw-output")
         )
 
     private fun commandResumeWithFailedTask(): WorkflowCommand.ResumeWithFaultedTask =
@@ -179,7 +177,7 @@ class WorkflowStateProtobufMapperTest {
 
     private fun eventWorkflowCompleted(): WorkflowEvent.WorkflowCompleted =
         WorkflowEvent.WorkflowCompleted(
-            output = JsonPrimitive("ok"),
+            output = jsonValue("ok"),
             completedAt = now,
             nodeStack = nodeStack()
         )
@@ -187,8 +185,8 @@ class WorkflowStateProtobufMapperTest {
     private fun eventWorkflowFailed(): WorkflowEvent.WorkflowFaulted =
         WorkflowEvent.WorkflowFaulted(
             nodeStack = nodeStack(),
-            rawInput = JsonPrimitive("in"),
-            rawOutput = JsonPrimitive("out"),
+            rawInput = jsonValue("in"),
+            rawOutput = jsonValue("out"),
             flowDirective = FlowDirectiveEnum.End,
             error = sampleError(),
             faultedAt = now
@@ -198,7 +196,7 @@ class WorkflowStateProtobufMapperTest {
         WorkflowEvent.ForkBranchCompleted(
             nodeStack = nodeStack(),
             branchPosition = NodePosition("/do/0/fork/1/branch"),
-            branchOutput = JsonPrimitive("branch-output"),
+            branchOutput = jsonValue("branch-output"),
             completedAt = now
         )
 
@@ -213,21 +211,21 @@ class WorkflowStateProtobufMapperTest {
     private fun eventForEachCompleted(): WorkflowEvent.ForEachCompleted =
         WorkflowEvent.ForEachCompleted(
             nodeStack = nodeStack(),
-            output = JsonPrimitive("foreach-output"),
+            output = jsonValue("foreach-output"),
         )
 
     private fun eventTaskScheduled(): WorkflowEvent.TaskScheduled =
         WorkflowEvent.TaskScheduled(
             nodeStack = nodeStack(),
             nodePosition = taskPosition,
-            rawInput = JsonPrimitive("task-input"),
+            rawInput = jsonValue("task-input"),
             flowDirective = FlowDirectiveEnum.Continue
         )
 
     private fun eventWaitStarted(): WorkflowEvent.WaitStarted =
         WorkflowEvent.WaitStarted(
             nodeStack = nodeStack(),
-            rawOutput = JsonPrimitive("wait-output"),
+            rawOutput = jsonValue("wait-output"),
             config = WaitConfig(waitUntil = now)
         )
 
@@ -235,7 +233,7 @@ class WorkflowStateProtobufMapperTest {
         WorkflowEvent.TaskRetryScheduled(
             nodeStack = nodeStack(),
             nodePosition = taskPosition,
-            rawInput = JsonPrimitive("retry-input"),
+            rawInput = jsonValue("retry-input"),
             flowDirective = FlowDirectiveEnum.Exit,
             retryAt = now
         )
@@ -243,12 +241,12 @@ class WorkflowStateProtobufMapperTest {
     private fun eventRunWorkflowStarted(): WorkflowEvent.RunWorkflowStarted =
         WorkflowEvent.RunWorkflowStarted(
             nodeStack = nodeStack(),
-            rawInput = JsonPrimitive("child-input"),
+            rawInput = jsonValue("child-input"),
             config = RunWorkflowConfig(
                 namespace = WorkflowNamespace("ns"),
                 name = WorkflowName("child"),
                 version = WorkflowVersion("1.0.0"),
-                input = JsonPrimitive("input"),
+                input = jsonValue("input"),
                 sync = true
             )
         )
@@ -256,13 +254,13 @@ class WorkflowStateProtobufMapperTest {
     private fun eventForkStarted(): WorkflowEvent.ForkStarted =
         WorkflowEvent.ForkStarted(
             nodeStack = nodeStack(),
-            rawInput = JsonPrimitive("fork-input")
+            rawInput = jsonValue("fork-input")
         )
 
     private fun eventListenStarted(): WorkflowEvent.ListenStarted =
         WorkflowEvent.ListenStarted(
             nodeStack = nodeStack(),
-            rawOutput = JsonPrimitive("listen-output"),
+            rawOutput = jsonValue("listen-output"),
             config = ListenConfig(
                 strategy = ListenStrategy.ANY,
                 filters = listOf(
@@ -290,19 +288,19 @@ class WorkflowStateProtobufMapperTest {
     private fun eventEmitStarted(): WorkflowEvent.EmitStarted =
         WorkflowEvent.EmitStarted(
             nodeStack = nodeStack(),
-            input = JsonPrimitive("emit-input"),
+            input = jsonValue("emit-input"),
             config = EmitConfig(
                 id = "evt-id",
                 source = "urn:test",
                 type = "com.acme.created",
-                data = JsonPrimitive("payload")
+                data = jsonValue("payload")
             )
         )
 
     private fun eventCallHttpStarted(): WorkflowEvent.CallHttpStarted =
         WorkflowEvent.CallHttpStarted(
             nodeStack = nodeStack(),
-            input = JsonPrimitive("http-input"),
+            input = jsonValue("http-input"),
             config = CallHttpConfig(
                 method = "GET",
                 url = "https://example.org/health"
@@ -312,7 +310,7 @@ class WorkflowStateProtobufMapperTest {
     private fun eventRunScriptStarted(): WorkflowEvent.RunScriptStarted =
         WorkflowEvent.RunScriptStarted(
             nodeStack = nodeStack(),
-            input = JsonPrimitive("script-input"),
+            input = jsonValue("script-input"),
             config = RunScriptConfig(
                 language = "javascript",
                 code = "return 1;"
@@ -322,7 +320,7 @@ class WorkflowStateProtobufMapperTest {
     private fun eventRunShellStarted(): WorkflowEvent.RunShellStarted =
         WorkflowEvent.RunShellStarted(
             nodeStack = nodeStack(),
-            input = JsonPrimitive("shell-input"),
+            input = jsonValue("shell-input"),
             config = RunShellConfig(
                 command = "echo ok"
             )
@@ -334,7 +332,7 @@ class WorkflowStateProtobufMapperTest {
             state = RootState(
                 startedAt = now,
                 workflowId = WorkflowId.random(),
-                workflowInput = JsonPrimitive("workflow-input")
+                workflowInput = jsonValue("workflow-input")
             ),
             counter = 1
         )

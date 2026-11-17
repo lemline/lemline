@@ -1,19 +1,13 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.testcases
 
+import com.fasterxml.jackson.databind.node.ObjectNode
+import com.lemline.common.json.*
 import com.lemline.core.testcases.impl.WorkflowDependency
 import com.lemline.core.testcases.impl.WorkflowTestCase
 import com.lemline.core.testcases.impl.WorkflowTestValidators.expectErrorContaining
 import com.lemline.core.testcases.impl.WorkflowTestValidators.expectOutput
-import com.lemline.core.testcases.impl.WorkflowTestValidators.expectOutput
 import com.lemline.core.testcases.impl.WorkflowTestValidators.expectSuccess
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.buildJsonArray
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.int
-import kotlinx.serialization.json.jsonPrimitive
-import kotlinx.serialization.json.put
 
 /**
  * Test cases for RunWorkflow (sub-workflow) execution.
@@ -81,7 +75,7 @@ object RunWorkflowTestCases {
 
         WorkflowTestCase(
             name = "workflow can execute recursive factorial calculation",
-            input = JsonObject(mapOf("n" to JsonPrimitive(5))),
+            input = ObjectNode(mapOf("n" to jsonValue(5))),
             yaml = $$"""
                 do:
                   - checkBaseCase:
@@ -580,9 +574,9 @@ object RunWorkflowTestCases {
             validate = expectOutput(
                 buildJsonObject {
                     put("results", buildJsonArray {
-                        add(JsonPrimitive(10))
-                        add(JsonPrimitive(20))
-                        add(JsonPrimitive(30))
+                        add(jsonValue(10))
+                        add(jsonValue(20))
+                        add(jsonValue(30))
                     })
                 }
             )

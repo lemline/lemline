@@ -1,15 +1,16 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.processors
 
+import com.fasterxml.jackson.databind.JsonNode
+import com.fasterxml.jackson.databind.node.ArrayNode
+import com.lemline.common.json.*
+import com.lemline.common.json.LemlineJson.toJsonNode
 import com.lemline.core.nodes.Node
-import com.lemline.common.json.LemlineJson.toJsonElement
 import com.lemline.core.processors.scope.Scope
 import com.lemline.core.states.ForState
 import com.lemline.core.workflows.forBlock
 import io.serverlessworkflow.api.types.ForTask
 import kotlin.time.Instant
-import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonArray
 
 /**
  * Node instance for ForTask (iteration) - pure functional model.
@@ -57,7 +58,7 @@ class ForProcessor(
     node: Node<ForTask>
 ) : AbstractProcessor<ForTask, ForState>(node) {
 
-    override fun stateWhenEnteringFromParent(transformedInput: JsonElement, scope: Scope, startedAt: Instant) = ForState(
+    override fun stateWhenEnteringFromParent(transformedInput: JsonNode, scope: Scope, startedAt: Instant) = ForState(
         startedAt = startedAt,
         collection = evalForIn(transformedInput, scope),
         index = 0,  // Start at first iteration
@@ -67,7 +68,7 @@ class ForProcessor(
 
     override fun stateWhenReEnteringFromChild(
         state: ForState,
-        output: JsonElement,
+        output: JsonNode,
         scope: Scope,
         nodeName: String?
     ): ForState {
@@ -83,7 +84,7 @@ class ForProcessor(
 
     override fun getNextNode(
         state: ForState,
-        dataset: JsonElement,
+        dataset: JsonNode,
         scope: Scope,
     ): NextInfo {
         // state already reflects the current iteration to execute
@@ -101,18 +102,18 @@ class ForProcessor(
         }
     }
 
-    private fun shouldContinue(state: ForState, transformedInput: JsonElement, scope: Scope) =
+    private fun shouldContinue(state: ForState, transformedInput: JsonNode, scope: Scope) =
         state.collection.isNotEmpty() && evalWhile(transformedInput, scope)
 
-    private fun evalWhile(dataset: JsonElement, scope: Scope): Boolean {
+    private fun evalWhile(dataset: JsonNode, scope: Scope): Boolean {
         val whileCondition = node.task.`while` ?: return true
         return evalBoolean(dataset, whileCondition, "while", scope)
     }
 
-    private fun evalForIn(dataset: JsonElement, scope: Scope): List<JsonElement> {
+    private fun evalForIn(dataset: JsonNode, scope: Scope): List<JsonNode> {
         // For.in is evaluated during createState, before the full context exists
         val collection = node.task.`for`.`in`
-        return collection.forInInlineArray?.let { (eval(dataset, it.toJsonElement(), scope) as JsonArray).toList() }
+        return collection.forInInlineArray?.let { (eval(dataset, it.toJsonNode(), scope) as ArrayNode).toList() }
             ?: evalList(dataset, collection.forInExpression, "for.in", scope)
     }
 }

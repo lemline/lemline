@@ -1,6 +1,10 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.cloudevents
 
+import com.fasterxml.jackson.databind.node.NullNode
+import com.fasterxml.jackson.databind.node.ObjectNode
+import com.fasterxml.jackson.databind.node.ValueNode
+import com.lemline.common.json.*
 import com.lemline.core.processors.EmitConfig
 import java.net.URI
 import java.time.OffsetDateTime
@@ -8,11 +12,6 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
-import kotlinx.serialization.json.JsonNull
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.put
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
@@ -329,7 +328,7 @@ class CloudEventFactoryTest {
                 id = "test-id",
                 source = "https://example.com",
                 type = "test.event",
-                data = JsonPrimitive("test data")
+                data = jsonValue("test data")
             )
 
             // When
@@ -347,7 +346,7 @@ class CloudEventFactoryTest {
                 source = "https://example.com",
                 type = "test.event",
                 datacontenttype = "text/plain",
-                data = JsonPrimitive("plain text data")
+                data = jsonValue("plain text data")
             )
 
             // When
@@ -413,7 +412,7 @@ class CloudEventFactoryTest {
     @Nested
     inner class DataHandling {
         @Test
-        fun `should serialize JsonObject data`() {
+        fun `should serialize ObjectNode data`() {
             // Given
             val data = buildJsonObject {
                 put("orderId", "12345")
@@ -439,13 +438,13 @@ class CloudEventFactoryTest {
         }
 
         @Test
-        fun `should serialize JsonPrimitive string data`() {
+        fun `should serialize ValueNode string data`() {
             // Given
             val config = EmitConfig(
                 id = "test-id",
                 source = "https://example.com",
                 type = "test.event",
-                data = JsonPrimitive("simple string value")
+                data = jsonValue("simple string value")
             )
 
             // When
@@ -458,13 +457,13 @@ class CloudEventFactoryTest {
         }
 
         @Test
-        fun `should serialize JsonPrimitive number data`() {
+        fun `should serialize ValueNode number data`() {
             // Given
             val config = EmitConfig(
                 id = "test-id",
                 source = "https://example.com",
                 type = "test.event",
-                data = JsonPrimitive(42)
+                data = jsonValue(42)
             )
 
             // When
@@ -477,13 +476,13 @@ class CloudEventFactoryTest {
         }
 
         @Test
-        fun `should serialize JsonPrimitive boolean data`() {
+        fun `should serialize ValueNode boolean data`() {
             // Given
             val config = EmitConfig(
                 id = "test-id",
                 source = "https://example.com",
                 type = "test.event",
-                data = JsonPrimitive(true)
+                data = jsonValue(true)
             )
 
             // When
@@ -496,13 +495,13 @@ class CloudEventFactoryTest {
         }
 
         @Test
-        fun `should serialize JsonNull data`() {
+        fun `should serialize JSON null data`() {
             // Given
             val config = EmitConfig(
                 id = "test-id",
                 source = "https://example.com",
                 type = "test.event",
-                data = JsonNull
+                data = NullNode.instance
             )
 
             // When
@@ -515,7 +514,7 @@ class CloudEventFactoryTest {
         }
 
         @Test
-        fun `should handle nested JsonObject data`() {
+        fun `should handle nested ObjectNode data`() {
             // Given
             val data = buildJsonObject {
                 put("order", buildJsonObject {
@@ -561,13 +560,13 @@ class CloudEventFactoryTest {
         }
 
         @Test
-        fun `should handle empty JsonObject data`() {
+        fun `should handle empty ObjectNode data`() {
             // Given
             val config = EmitConfig(
                 id = "test-id",
                 source = "https://example.com",
                 type = "test.event",
-                data = JsonObject(emptyMap())
+                data = ObjectNode(emptyMap())
             )
 
             // When

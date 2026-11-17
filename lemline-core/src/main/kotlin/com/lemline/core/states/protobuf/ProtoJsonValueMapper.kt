@@ -1,71 +1,71 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.states.protobuf
 
-import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonNull
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.booleanOrNull
-import kotlinx.serialization.json.doubleOrNull
+import com.fasterxml.jackson.databind.JsonNode
+import com.fasterxml.jackson.databind.node.ArrayNode
+import com.fasterxml.jackson.databind.node.NullNode
+import com.fasterxml.jackson.databind.node.ObjectNode
+import com.fasterxml.jackson.databind.node.ValueNode
+import com.lemline.common.json.*
 
-internal fun JsonElement.toProtoJsonValue(): Any? =
+internal fun JsonNode.toProtoJsonValue(): Any? =
     when (this) {
-        JsonNull -> null
-        is JsonObject -> toProtoJsonStruct()
-        is JsonArray -> toProtoJsonListValue()
-        is JsonPrimitive -> toProtoJsonValue()
+        NullNode.instance -> null
+        is ObjectNode -> toProtoJsonStruct()
+        is ArrayNode -> toProtoJsonListValue()
+        is ValueNode -> toProtoJsonValue()
+        else -> error("Unsupported JSON node: $nodeType")
     }
 
-internal fun JsonObject.toProtoJsonStruct(): Map<String, *> =
+internal fun ObjectNode.toProtoJsonStruct(): Map<String, *> =
     mapValues { (_, value) -> value.toProtoJsonValue() }
 
-internal fun List<JsonElement>.toProtoJsonListValue(): List<*> =
+internal fun List<JsonNode>.toProtoJsonListValue(): List<*> =
     map { it.toProtoJsonValue() }
 
-internal fun JsonArray.toProtoJsonListValue(): List<*> = this.toList().toProtoJsonListValue()
+internal fun ArrayNode.toProtoJsonListValue(): List<*> = this.toList().toProtoJsonListValue()
 
-internal fun Any?.toKotlinJsonElement(): JsonElement = when (this) {
-    null -> JsonNull
-    is String -> JsonPrimitive(this)
-    is Boolean -> JsonPrimitive(this)
+internal fun Any?.toRuntimeJsonNode(): JsonNode = when (this) {
+    null -> NullNode.instance
+    is String -> jsonValue(this)
+    is Boolean -> jsonValue(this)
     is Number -> toJsonPrimitivePreferIntegralNumber()
-    is Map<*, *> -> toKotlinJsonObjectFromUntypedMap()
-    is List<*> -> JsonArray(map { it.toKotlinJsonElement() })
-    else -> JsonPrimitive(toString())
+    is Map<*, *> -> toRuntimeObjectNodeFromUntypedMap()
+    is List<*> -> ArrayNode(map { it.toRuntimeJsonNode() })
+    else -> jsonValue(toString())
 }
 
-internal fun Map<String, *>.toKotlinJsonObject(): JsonObject =
-    JsonObject(mapValues { (_, value) -> value.toKotlinJsonElement() })
+internal fun Map<String, *>.toRuntimeObjectNode(): ObjectNode =
+    ObjectNode(mapValues { (_, value) -> value.toRuntimeJsonNode() })
 
-internal fun List<*>.toKotlinJsonElementList(): List<JsonElement> =
-    map { it.toKotlinJsonElement() }
+internal fun List<*>.toRuntimeJsonNodeList(): List<JsonNode> =
+    map { it.toRuntimeJsonNode() }
 
-private fun JsonPrimitive.toProtoJsonValue(): Any? {
-    if (isString) {
-        return content
-    }
-    booleanOrNull?.let { return it }
-    doubleOrNull?.let { return it }
-    return content
+private fun ValueNode.toProtoJsonValue(): Any? = when {
+    isNull -> null
+    isTextual -> textValue()
+    isBinary -> asText()
+    isBoolean -> booleanValue()
+    isNumber -> doubleValue() // google.protobuf.Value numbers retain the existing double contract.
+    else -> error("Unsupported JSON scalar: $nodeType")
 }
 
-private fun Map<*, *>.toKotlinJsonObjectFromUntypedMap(): JsonObject =
-    JsonObject(
+private fun Map<*, *>.toRuntimeObjectNodeFromUntypedMap(): ObjectNode =
+    ObjectNode(
         entries.associate { (key, value) ->
             val stringKey = key as? String
                 ?: error("Expected struct key to be String but found ${key?.javaClass?.name ?: "null"}")
-            stringKey to value.toKotlinJsonElement()
+            stringKey to value.toRuntimeJsonNode()
         }
     )
 
-private fun Number.toJsonPrimitivePreferIntegralNumber(): JsonPrimitive {
+private fun Number.toJsonPrimitivePreferIntegralNumber(): JsonNode {
     val doubleValue = toDouble()
     if (doubleValue.isFinite() && doubleValue >= Long.MIN_VALUE.toDouble() && doubleValue <= Long.MAX_VALUE.toDouble()) {
         val longValue = doubleValue.toLong()
         if (doubleValue == longValue.toDouble()) {
-            return JsonPrimitive(longValue)
+            return jsonValue(longValue)
         }
     }
-    return JsonPrimitive(doubleValue)
+    return jsonValue(doubleValue)
 }

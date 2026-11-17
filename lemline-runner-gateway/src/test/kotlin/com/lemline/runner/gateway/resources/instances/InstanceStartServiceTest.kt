@@ -1,9 +1,12 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.gateway.resources.instances
 
+import com.fasterxml.jackson.databind.JsonNode
+import com.fasterxml.jackson.databind.node.NullNode
 import com.google.protobuf.NullValue
 import com.google.protobuf.Struct
 import com.google.protobuf.Value
+import com.lemline.common.json.*
 import com.lemline.common.values.IDV7
 import com.lemline.common.values.WorkflowId
 import com.lemline.common.values.WorkflowInfo
@@ -29,11 +32,11 @@ import com.lemline.runner.schedules.ScheduleRepository
 import com.lemline.runner.starters.Starter
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.shouldBe
+import io.mockk.Called
+import io.mockk.clearMocks
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.coVerifyOrder
-import io.mockk.Called
-import io.mockk.clearMocks
 import io.mockk.every
 import io.mockk.just
 import io.mockk.mockk
@@ -43,10 +46,6 @@ import io.mockk.verify
 import io.serverlessworkflow.api.types.Workflow
 import java.sql.Connection
 import kotlinx.coroutines.test.runTest
-import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonNull
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.put
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
@@ -187,7 +186,7 @@ class InstanceStartServiceTest {
         inserted.captured.workflowState.nodeStack.rootState.workflowInput shouldBe buildJsonObject {
             put("count", 3.0)
             put("enabled", true)
-            put("note", JsonNull)
+            put("note", NullNode.instance)
         }
     }
 
@@ -287,7 +286,7 @@ class InstanceStartServiceTest {
 
     private fun existingOutbox(
         workflowId: WorkflowId,
-        workflowInput: JsonElement,
+        workflowInput: JsonNode,
         version: WorkflowVersion,
     ): GatewayCommandModel =
         GatewayCommandModel(

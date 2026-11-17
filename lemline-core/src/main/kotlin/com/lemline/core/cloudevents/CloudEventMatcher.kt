@@ -1,6 +1,11 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.cloudevents
 
+import com.fasterxml.jackson.databind.JsonNode
+import com.fasterxml.jackson.databind.node.NullNode
+import com.fasterxml.jackson.databind.node.ObjectNode
+import com.fasterxml.jackson.databind.node.ValueNode
+import com.lemline.common.json.*
 import com.lemline.common.json.LemlineJson
 import com.lemline.common.logger.logger
 import com.lemline.core.cloudevents.CloudEventParser.parseData
@@ -11,11 +16,6 @@ import com.lemline.core.utils.compareTimestampsNormalized
 import io.cloudevents.CloudEvent
 import io.serverlessworkflow.impl.expressions.ExpressionUtils
 import java.time.OffsetDateTime
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonNull
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.booleanOrNull
 
 object CloudEventMatcher {
 
@@ -24,13 +24,13 @@ object CloudEventMatcher {
     fun matchesFilters(
         event: CloudEvent,
         filters: List<EventFilter>,
-        eventDataProvider: () -> JsonElement = { event.parseData() }
+        eventDataProvider: () -> JsonNode = { event.parseData() }
     ): Boolean = matchesFiltersInternal(event, filters, eventDataProvider, null, null)
 
     fun matchesFilters(
         event: CloudEvent,
         filters: List<EventFilter>,
-        correlationContext: JsonElement?,
+        correlationContext: JsonNode?,
         establishedCorrelations: MutableMap<String, String>?
     ): Boolean = matchesFiltersInternal(
         event, filters, { event.parseData() }, correlationContext, establishedCorrelations
@@ -39,8 +39,8 @@ object CloudEventMatcher {
     private fun matchesFiltersInternal(
         event: CloudEvent,
         filters: List<EventFilter>,
-        eventDataProvider: () -> JsonElement,
-        correlationContext: JsonElement?,
+        eventDataProvider: () -> JsonNode,
+        correlationContext: JsonNode?,
         establishedCorrelations: MutableMap<String, String>?
     ): Boolean {
         if (filters.isEmpty()) return true
@@ -62,8 +62,8 @@ object CloudEventMatcher {
 
     private fun matchesCorrelations(
         correlations: Map<String, CorrelationDef>?,
-        eventData: JsonElement,
-        correlationContext: JsonElement?,
+        eventData: JsonNode,
+        correlationContext: JsonNode?,
         establishedCorrelations: MutableMap<String, String>?
     ): Boolean {
         if (correlations.isNullOrEmpty()) return true
@@ -98,7 +98,7 @@ object CloudEventMatcher {
         key: String,
         expect: String,
         eventValue: String,
-        correlationContext: JsonElement?
+        correlationContext: JsonNode?
     ): Boolean {
         if (correlationContext == null) {
             logger.warn { "Correlation '$key' has expect but no correlationContext provided" }
@@ -134,19 +134,19 @@ object CloudEventMatcher {
         }
     }
 
-    fun evaluateFromExpression(expression: String, eventData: JsonElement): String? =
+    fun evaluateFromExpression(expression: String, eventData: JsonNode): String? =
         runCatching {
             val jqExpr = if (ExpressionUtils.isExpr(expression)) {
                 ExpressionUtils.trimExpr(expression)
             } else {
                 expression
             }
-            evaluateJQ(jqExpr, eventData).toStringOrNull()
+            evaluateJQ(jqExpr, eventData.toLegacyCorrelationNode()).toStringOrNull()
         }.onFailure { e ->
             logger.warn(e) { "Failed to evaluate from expression: $expression" }
         }.getOrNull()
 
-    fun extractCorrelationValues(filter: EventFilter, eventData: JsonElement): Map<String, String>? =
+    fun extractCorrelationValues(filter: EventFilter, eventData: JsonNode): Map<String, String>? =
         filter.correlations
             ?.takeIf { it.isNotEmpty() }
             ?.mapNotNull { (key, def) ->
@@ -155,14 +155,14 @@ object CloudEventMatcher {
             ?.toMap()
             ?.takeIf { it.isNotEmpty() }
 
-    private fun evaluateExpectExpression(expression: String, scopeContext: JsonElement): String? =
+    private fun evaluateExpectExpression(expression: String, scopeContext: JsonNode): String? =
         if (ExpressionUtils.isExpr(expression)) {
             runCatching {
                 val trimmedExpr = ExpressionUtils.trimExpr(expression)
                 with(LemlineJson) {
                     val inputNode = LemlineJson.jacksonMapper.createObjectNode()
-                    val scopeNode = scopeContext.toJsonNode() as com.fasterxml.jackson.databind.node.ObjectNode
-                    JQExpression.eval(inputNode, trimmedExpr, scopeNode).toJsonElement()
+                    val scopeNode = scopeContext.toLegacyCorrelationNode() as ObjectNode
+                    JQExpression.eval(inputNode, trimmedExpr, scopeNode)
                 }.toStringValue()
             }.onFailure { e ->
                 logger.warn(e) { "Failed to evaluate expect expression: $expression" }
@@ -177,7 +177,7 @@ object CloudEventMatcher {
     fun matchesExprField(filterValue: String?, eventValue: String?): Boolean = when {
         filterValue == null -> true
         eventValue == null -> false
-        ExpressionUtils.isExpr(filterValue) -> evaluateExpressionAsBoolean(filterValue, JsonPrimitive(eventValue))
+        ExpressionUtils.isExpr(filterValue) -> evaluateExpressionAsBoolean(filterValue, jsonValue(eventValue))
         else -> filterValue == eventValue
     }
 
@@ -186,19 +186,19 @@ object CloudEventMatcher {
         eventTime == null -> false
         ExpressionUtils.isExpr(filterValue) -> evaluateExpressionAsBoolean(
             filterValue,
-            JsonPrimitive(eventTime.toString())
+            jsonValue(eventTime.toString())
         )
 
         else -> compareTimestampsNormalized(filterValue, eventTime)
     }
 
-    private fun matchesDataFilter(dataFilter: String?, eventData: JsonElement): Boolean {
+    private fun matchesDataFilter(dataFilter: String?, eventData: JsonNode): Boolean {
         if (dataFilter == null) return true
-        if (eventData == JsonNull) return false
+        if (eventData == NullNode.instance) return false
 
         val trimmed = dataFilter.trim()
         return if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
-            runCatching { Json.parseToJsonElement(dataFilter) }
+            runCatching { parseJson(dataFilter) }
                 .onFailure { e -> logger.warn(e) { "Failed to parse data filter as JSON literal: $dataFilter" } }
                 .map { eventData == it }
                 .getOrDefault(false)
@@ -207,34 +207,27 @@ object CloudEventMatcher {
         }
     }
 
-    fun evaluateExpressionAsBoolean(expression: String, input: JsonElement): Boolean {
+    fun evaluateExpressionAsBoolean(expression: String, input: JsonNode): Boolean {
         val trimmedExpr = ExpressionUtils.trimExpr(expression)
         val result = evaluateJQOrNull(trimmedExpr, input) ?: return false
-        return (result as? JsonPrimitive)?.booleanOrNull == true
+        return (result as? ValueNode)?.booleanOrNull == true
     }
 
-    private fun evaluateJQ(jqExpression: String, input: JsonElement): JsonElement =
+    private fun evaluateJQ(jqExpression: String, input: JsonNode): JsonNode =
         with(LemlineJson) {
-            val inputNode = input.toJsonNode()
+            val inputNode = input
             val scope = LemlineJson.jacksonMapper.createObjectNode()
-            JQExpression.eval(inputNode, jqExpression, scope).toJsonElement()
+            JQExpression.eval(inputNode, jqExpression, scope)
         }
 
-    private fun evaluateJQOrNull(jqExpression: String, input: JsonElement): JsonElement? =
+    private fun evaluateJQOrNull(jqExpression: String, input: JsonNode): JsonNode? =
         with(LemlineJson) {
-            val inputNode = input.toJsonNode()
+            val inputNode = input
             val scope = LemlineJson.jacksonMapper.createObjectNode()
-            JQExpression.evalOrNull(inputNode, jqExpression, scope)?.toJsonElement()
+            JQExpression.evalOrNull(inputNode, jqExpression, scope)
         }
 
-    private fun JsonElement.toStringOrNull(): String? = when (this) {
-        is JsonNull -> null
-        is JsonPrimitive -> content
-        else -> toString()
-    }
+    private fun JsonNode.toStringOrNull(): String? = toCorrelationValue()
 
-    private fun JsonElement.toStringValue(): String = when (this) {
-        is JsonPrimitive -> content
-        else -> toString()
-    }
+    private fun JsonNode.toStringValue(): String = toCorrelationValue() ?: "null"
 }

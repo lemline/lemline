@@ -1,12 +1,13 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.activities
 
+import com.fasterxml.jackson.databind.JsonNode
+import com.lemline.common.json.*
 import com.lemline.common.logger.logger
 import com.lemline.core.activities.ActivityExecutor
 import com.lemline.core.states.WorkflowEvent.ActivityStarted
 import com.lemline.runner.messaging.cloudevents.CloudEventsEmitter
 import io.quarkus.arc.Arc
-import kotlinx.serialization.json.JsonElement
 
 /**
  * Runner-specific ActivityExecutor that integrates with the messaging infrastructure.
@@ -57,7 +58,7 @@ class RunnerActivityExecutor : ActivityExecutor {
      * @return The result of the activity execution
      * @throws Exception if the activity fails
      */
-    override suspend fun execute(event: ActivityStarted): JsonElement {
+    override suspend fun execute(event: ActivityStarted): JsonNode {
         return delegate.execute(event)
     }
 }

@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.states
 
+import com.fasterxml.jackson.databind.node.ObjectNode
+import com.lemline.common.json.*
 import com.lemline.common.values.IDV7
 import com.lemline.common.values.NodePosition
 import com.lemline.common.values.WorkflowId
 import com.lemline.core.processors.scope.Scope
 import com.lemline.core.processors.scope.merge
 import kotlin.time.Instant
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.buildJsonObject
 import org.jetbrains.annotations.TestOnly
 
 /**
@@ -99,10 +99,10 @@ class NodeStack internal constructor(
     fun withContext(newContext: Scope): NodeStack = withRootState(rootState.withContext(newContext))
 
     /** Attach the loaded definition for expression evaluation without serializing it into messages. */
-    fun withWorkflowDefinition(definition: JsonObject): NodeStack = withRootState(rootState.withDefinition(definition))
+    fun withWorkflowDefinition(definition: ObjectNode): NodeStack = withRootState(rootState.withDefinition(definition))
 
     /** Attach resolved secrets to expression scope without serializing them into messages. */
-    fun withSecrets(secrets: JsonObject): NodeStack = withRootState(rootState.withSecrets(secrets))
+    fun withSecrets(secrets: ObjectNode): NodeStack = withRootState(rootState.withSecrets(secrets))
 
     /** Push a new frame onto the stack.*/
     fun push(position: NodePosition, state: NodeState, executionIndex: Int = 0): NodeStack =

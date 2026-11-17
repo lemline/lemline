@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.processors
 
+import com.fasterxml.jackson.databind.JsonNode
+import com.fasterxml.jackson.databind.node.ValueNode
+import com.lemline.common.json.*
 import com.lemline.common.json.LemlineJson
 import com.lemline.core.errors.WorkflowErrorType.CONFIGURATION
 import com.lemline.core.errors.WorkflowErrorType.RUNTIME
@@ -20,8 +23,6 @@ import java.net.URI
 import java.time.OffsetDateTime
 import java.util.*
 import kotlin.time.Instant
-import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonPrimitive
 
 /**
  * Node processor for EmitTask (CloudEvents emission) - pure functional model.
@@ -66,7 +67,7 @@ class EmitProcessor(
 
     override val isAsync = true
 
-    override fun stateWhenEnteringFromParent(transformedInput: JsonElement, scope: Scope, startedAt: Instant) = EmitState(startedAt = startedAt)
+    override fun stateWhenEnteringFromParent(transformedInput: JsonNode, scope: Scope, startedAt: Instant) = EmitState(startedAt = startedAt)
 
     /**
      * Handles the event triggered when a workflow emit task is started.
@@ -82,7 +83,7 @@ class EmitProcessor(
      */
     override fun startedEvent(
         nodeStack: NodeStack,
-        transformedInput: JsonElement,
+        transformedInput: JsonNode,
         scope: Scope,
     ): WorkflowEvent {
         logger.debug { "Building emit config for task: ${node.name}" }
@@ -131,7 +132,7 @@ class EmitProcessor(
      */
     private fun resolveSource(
         source: EventSource?,
-        data: JsonElement,
+        data: JsonNode,
         scope: Scope
     ): String {
         if (source == null) {
@@ -151,7 +152,7 @@ class EmitProcessor(
      */
     private fun resolveType(
         type: String?,
-        data: JsonElement,
+        data: JsonNode,
         scope: Scope
     ): String {
         if (type == null) {
@@ -167,7 +168,7 @@ class EmitProcessor(
      */
     private fun resolveTime(
         time: EventTime?,
-        data: JsonElement,
+        data: JsonNode,
         scope: Scope
     ): String? {
         if (time == null) return null
@@ -184,7 +185,7 @@ class EmitProcessor(
      */
     private fun resolveString(
         value: String?,
-        data: JsonElement,
+        data: JsonNode,
         scope: Scope
     ): String? {
         if (value == null) return null
@@ -198,7 +199,7 @@ class EmitProcessor(
      */
     private fun resolveDataschema(
         dataschema: EventDataschema?,
-        data: JsonElement,
+        data: JsonNode,
         scope: Scope
     ): String? {
         if (dataschema == null) return null
@@ -216,17 +217,17 @@ class EmitProcessor(
      */
     private fun resolveData(
         eventData: EventData?,
-        data: JsonElement,
+        data: JsonNode,
         scope: Scope
-    ): JsonElement? {
+    ): JsonNode? {
         if (eventData == null) return null
 
         return when (val value = eventData.get()) {
-            is String -> eval(data, JsonPrimitive(value), scope, false)
+            is String -> eval(data, jsonValue(value), scope, false)
 
             else -> {
-                // Object - convert to JsonElement
-                with(LemlineJson) { value.toJsonElement() }
+                // Object - convert to JsonNode
+                with(LemlineJson) { value.toJsonNode() }
             }
         }
     }
@@ -236,7 +237,7 @@ class EmitProcessor(
      */
     private fun resolveUriTemplate(
         template: UriTemplate,
-        data: JsonElement,
+        data: JsonNode,
         scope: Scope
     ): String = when (val value = template.get()) {
         is URI -> value.toString()
@@ -249,10 +250,10 @@ class EmitProcessor(
      */
     private fun evaluateExpression(
         expression: String,
-        data: JsonElement,
+        data: JsonNode,
         scope: Scope
-    ): String = when (val result = eval(data, JsonPrimitive(expression), scope, false)) {
-            is JsonPrimitive -> result.content
+    ): String = when (val result = eval(data, jsonValue(expression), scope, false)) {
+            is ValueNode -> result.content
             else -> raiseError(RUNTIME, "Expression must evaluate to a string, but got: $result")
     }
 }

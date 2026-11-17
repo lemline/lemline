@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.orchestrator.full
 
+import com.fasterxml.jackson.databind.JsonNode
+import com.fasterxml.jackson.databind.node.ArrayNode
+import com.lemline.common.json.*
 import com.lemline.common.values.info
 import com.lemline.core.activities.ActivityExecutor
 import com.lemline.core.cloudevents.CloudEventHook
@@ -14,8 +17,6 @@ import com.lemline.core.utils.mapAwaitAllFailFast
 import com.lemline.core.utils.mapAwaitFirstFailSlow
 import io.serverlessworkflow.api.types.Workflow
 import kotlin.time.Clock
-import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonElement
 
 /**
  * Executes fork branches in compete or cooperative mode.
@@ -32,14 +33,14 @@ internal object ForkBranchExecutor {
         workflow: Workflow,
         nodeStack: NodeStack,
         branches: List<Node<*>>,
-        rawInput: JsonElement,
+        rawInput: JsonNode,
         serde: Boolean,
         activityExecutor: ActivityExecutor,
         functionResolver: FunctionResolver,
         cloudEventHook: CloudEventHook,
         lifecycleHook: LifecycleEventHook,
         resumeFn: suspend (Workflow, WorkflowCommand, Boolean, ActivityExecutor, FunctionResolver, CloudEventHook, LifecycleEventHook) -> WorkflowEvent.Outcome
-    ): JsonElement {
+    ): JsonNode {
         return branches.mapAwaitFirstFailSlow { branchNode ->
             lifecycleHook.onTaskCreated(
                 workflowInfo = workflow.info,
@@ -76,15 +77,15 @@ internal object ForkBranchExecutor {
         workflow: Workflow,
         nodeStack: NodeStack,
         branches: List<Node<*>>,
-        rawInput: JsonElement,
+        rawInput: JsonNode,
         serde: Boolean,
         activityExecutor: ActivityExecutor,
         functionResolver: FunctionResolver,
         cloudEventHook: CloudEventHook,
         lifecycleHook: LifecycleEventHook,
         resumeFn: suspend (Workflow, WorkflowCommand, Boolean, ActivityExecutor, FunctionResolver, CloudEventHook, LifecycleEventHook) -> WorkflowEvent.Outcome
-    ): JsonArray {
-        return JsonArray(
+    ): ArrayNode {
+        return ArrayNode(
             branches.mapAwaitAllFailFast { branchNode ->
                 lifecycleHook.onTaskCreated(
                     workflowInfo = workflow.info,

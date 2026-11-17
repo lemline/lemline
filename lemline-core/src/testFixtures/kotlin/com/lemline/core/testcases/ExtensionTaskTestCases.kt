@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.testcases
 
+import com.fasterxml.jackson.databind.node.ObjectNode
+import com.lemline.common.json.*
 import com.lemline.core.activities.mock.HttpMockMatcher
 import com.lemline.core.activities.mock.HttpMockResponse
 import com.lemline.core.activities.mock.HttpMockRule
@@ -11,15 +13,11 @@ import com.lemline.core.testcases.impl.WorkflowTestValidators.expectOutput
 import io.cloudevents.CloudEvent
 import io.cloudevents.core.builder.CloudEventBuilder
 import java.net.URI
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
 
 /** The same observable contract runs through FullOrchestrator and every runner transport. */
 object ExtensionTaskTestCases {
     private fun String.dsl() = trimIndent().replace('§', '$')
-    private fun json(value: String) = Json.parseToJsonElement(value)
+    private fun json(value: String) = parseJson(value)
     private fun http(url: String, output: String) = HttpMockRule(
         HttpMockMatcher(url = url), HttpMockResponse(body = json(output))
     )
@@ -36,7 +34,7 @@ object ExtensionTaskTestCases {
     }
 
     private class Trace(val events: List<CloudEvent>) {
-        fun data(event: CloudEvent): JsonObject = json(String(event.data!!.toBytes())).jsonObject
+        fun data(event: CloudEvent): ObjectNode = json(String(event.data!!.toBytes())).jsonObject
         fun matching(task: String, kind: String) = events.filter {
             it.type.endsWith(".task.$kind.v1") && data(it)["task"]?.jsonPrimitive?.content == task
         }
@@ -102,7 +100,7 @@ object ExtensionTaskTestCases {
             validateLifecycleEvents = trace {
                 owner("/do/0/owner")
                 closesAfter("/do/0/owner", "/do/0/owner/_ext/0/after/do/0/mark")
-                check(events.none { Regex("/_ext/.*?/_ext/").containsMatchIn(data(it)["task"].toString()) })
+                check(events.none { Regex("/_ext/.*?/_ext/").containsMatchIn(data(it)["task"]?.toString().orEmpty()) })
             }
         ),
         WorkflowTestCase(
@@ -156,7 +154,7 @@ object ExtensionTaskTestCases {
             validate = expectOutput(json("""{"count":2,"exports":1}""")),
             validateLifecycleEvents = trace {
                 owner("/do/0/owner")
-                check(events.none { data(it)["task"].toString().contains("forbidden") })
+                check(events.none { data(it)["task"]?.toString().orEmpty().contains("forbidden") })
             }
         ),
         WorkflowTestCase(

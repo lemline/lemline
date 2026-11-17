@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.states
 
+import com.lemline.common.json.*
 import com.lemline.common.values.NodePosition
 import com.lemline.common.values.Token
 import com.lemline.common.values.WorkflowId
@@ -9,10 +10,6 @@ import com.lemline.core.states.protobuf.NodeStackProtobufMapper
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 import kotlin.time.Clock
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.put
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 
@@ -68,7 +65,7 @@ class NodeStackTest {
                     root, RootState(
                         startedAt = Clock.System.now(),
                         workflowId = WorkflowId.random(),
-                        workflowInput = JsonPrimitive("test")
+                        workflowInput = jsonValue("test")
                     )
                 ),
                 StackFrame(doPos, DoState(startedAt = Clock.System.now(), index = 0)),
@@ -99,7 +96,7 @@ class NodeStackTest {
                     root, RootState(
                         startedAt = Clock.System.now(),
                         workflowId = WorkflowId.random(),
-                        workflowInput = JsonPrimitive("test")
+                        workflowInput = jsonValue("test")
                     )
                 ),
                 StackFrame(doPos, DoState(startedAt = Clock.System.now(), index = 0)),
@@ -127,7 +124,7 @@ class NodeStackTest {
                 position, RootState(
                     startedAt = Clock.System.now(),
                     workflowId = WorkflowId.random(),
-                    workflowInput = JsonPrimitive("test")
+                    workflowInput = jsonValue("test")
                 )
             )
         )
@@ -170,7 +167,7 @@ class NodeStackTest {
                     NodePosition.root, RootState(
                         startedAt = Clock.System.now(),
                         workflowId = WorkflowId.random(),
-                        workflowInput = JsonPrimitive("test")
+                        workflowInput = jsonValue("test")
                     )
                 )
             )
@@ -200,14 +197,14 @@ class NodeStackTest {
                     root, RootState(
                         startedAt = Clock.System.now(),
                         workflowId = WorkflowId.random(),
-                        workflowInput = JsonPrimitive("test")
+                        workflowInput = jsonValue("test")
                     )
                 ),
                 StackFrame(doPos, DoState(startedAt = Clock.System.now(), index = 0)),
                 StackFrame(
                     tryTaskPos, TryState(
                         startedAt = Clock.System.now(),
-                        transformedInput = JsonPrimitive("input"),
+                        transformedInput = jsonValue("input"),
                         attemptIndex = 0,
                         runningCatch = true,
                         lastError = null,
@@ -247,7 +244,7 @@ class NodeStackTest {
                         root, RootState(
                             startedAt = Clock.System.now(),
                             workflowId = WorkflowId.random(),
-                            workflowInput = JsonPrimitive("test")
+                            workflowInput = jsonValue("test")
                         )
                     ),
                     StackFrame(doPos, DoState(startedAt = Clock.System.now(), index = 0)),
@@ -276,7 +273,7 @@ class NodeStackTest {
                         root, RootState(
                             startedAt = Clock.System.now(),
                             workflowId = WorkflowId.random(),
-                            workflowInput = JsonPrimitive("test")
+                            workflowInput = jsonValue("test")
                         )
                     ),
                     StackFrame(doPos, DoState(startedAt = Clock.System.now(), index = 0)),
@@ -308,14 +305,14 @@ class NodeStackTest {
                         root, RootState(
                             startedAt = Clock.System.now(),
                             workflowId = WorkflowId.random(),
-                            workflowInput = JsonPrimitive("test")
+                            workflowInput = jsonValue("test")
                         )
                     ),
                     StackFrame(doPos, DoState(startedAt = Clock.System.now(), index = 0)),
                     StackFrame(
                         outerPos, TryState(
                             startedAt = Clock.System.now(),
-                            transformedInput = JsonPrimitive("input"),
+                            transformedInput = jsonValue("input"),
                             attemptIndex = 0,
                             runningCatch = false,
                             lastError = null,
@@ -351,7 +348,7 @@ class NodeStackTest {
                         root, RootState(
                             startedAt = Clock.System.now(),
                             workflowId = WorkflowId.random(),
-                            workflowInput = JsonPrimitive("test")
+                            workflowInput = jsonValue("test")
                         )
                     ),
                     StackFrame(doPos, DoState(startedAt = Clock.System.now(), index = 0)),
@@ -381,7 +378,7 @@ class NodeStackTest {
                         root, RootState(
                             startedAt = Clock.System.now(),
                             workflowId = WorkflowId.random(),
-                            workflowInput = JsonPrimitive("test")
+                            workflowInput = jsonValue("test")
                         )
                     ),
                     StackFrame(doPos, DoState(startedAt = Clock.System.now(), index = 2)),
@@ -413,14 +410,14 @@ class NodeStackTest {
                         root, RootState(
                             startedAt = Clock.System.now(),
                             workflowId = WorkflowId.random(),
-                            workflowInput = JsonPrimitive("test")
+                            workflowInput = jsonValue("test")
                         )
                     ),
                     StackFrame(doPos, DoState(startedAt = Clock.System.now(), index = 0)),
                     StackFrame(
                         forTaskPos, ForState(
                             startedAt = Clock.System.now(),
-                            collection = listOf(JsonPrimitive(1), JsonPrimitive(2)),
+                            collection = listOf(jsonValue(1), jsonValue(2)),
                             index = 0,
                             forEach = "item",
                             forAt = "index"
@@ -452,7 +449,7 @@ class NodeStackTest {
                         root, RootState(
                             startedAt = Clock.System.now(),
                             workflowId = WorkflowId.random(),
-                            workflowInput = JsonPrimitive("test")
+                            workflowInput = jsonValue("test")
                         )
                     ),
                     StackFrame(doPos, DoState(startedAt = Clock.System.now(), index = 0)),
@@ -487,7 +484,7 @@ class NodeStackTest {
                         root, RootState(
                             startedAt = Clock.System.now(),
                             workflowId = WorkflowId.random(),
-                            workflowInput = JsonPrimitive("test")
+                            workflowInput = jsonValue("test")
                         )
                     ),
                     StackFrame(doPos, DoState(startedAt = Clock.System.now(), index = 0)),

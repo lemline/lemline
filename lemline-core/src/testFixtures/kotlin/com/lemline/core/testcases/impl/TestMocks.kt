@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.testcases.impl
 
+import com.fasterxml.jackson.databind.JsonNode
+import com.lemline.common.json.*
 import com.lemline.core.activities.mock.EmitMockMatcher
 import com.lemline.core.activities.mock.EmitMockResponse
 import com.lemline.core.activities.mock.EmitMockRule
@@ -25,11 +27,6 @@ import io.cloudevents.core.builder.CloudEventBuilder
 import java.net.URI
 import java.time.OffsetDateTime
 import java.util.*
-import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.buildJsonArray
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.put
 
 /**
  * Shared mock configurations for test cases.
@@ -166,20 +163,20 @@ object TestMocks {
     // Script Mocks - JavaScript and Python
     // ─────────────────────────────────────────────────────────────────────────
 
-    /** Script mock rules - returns stdout as string (JsonPrimitive) */
+    /** Script mock rules - returns stdout as string (JsonNode) */
     val scriptMocks = listOf(
         // JavaScript - returns stdout string
         ScriptMockRule(
             match = ScriptMockMatcher(language = "javascript"),
             response = ScriptMockResponse(
-                output = JsonPrimitive("mocked js output"),
+                output = jsonValue("mocked js output"),
                 exitCode = 0
             )
         ),
         ScriptMockRule(
             match = ScriptMockMatcher(language = "js"),
             response = ScriptMockResponse(
-                output = JsonPrimitive("mocked js output"),
+                output = jsonValue("mocked js output"),
                 exitCode = 0
             )
         ),
@@ -187,7 +184,7 @@ object TestMocks {
         ScriptMockRule(
             match = ScriptMockMatcher(language = "python"),
             response = ScriptMockResponse(
-                output = JsonPrimitive("mocked python output"),
+                output = jsonValue("mocked python output"),
                 exitCode = 0
             )
         )
@@ -425,7 +422,7 @@ object TestMocks {
     /**
      * Helper to build a CloudEvent from type and JSON data.
      */
-    fun buildCloudEvent(type: String, data: JsonElement): CloudEvent {
+    fun buildCloudEvent(type: String, data: JsonNode): CloudEvent {
         return CloudEventBuilder.v1()
             .withId(UUID.randomUUID().toString())
             .withSource(URI.create("https://test.example.com"))
@@ -439,7 +436,7 @@ object TestMocks {
      */
     fun buildCloudEvent(
         type: String,
-        data: JsonElement,
+        data: JsonNode,
         id: String = UUID.randomUUID().toString(),
         source: URI = URI.create("https://test.example.com"),
         subject: String? = null,

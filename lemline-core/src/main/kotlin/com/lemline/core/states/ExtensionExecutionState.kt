@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.states
 
+import com.fasterxml.jackson.databind.JsonNode
+import com.lemline.common.json.*
 import com.lemline.common.values.NodePosition
 import com.lemline.core.tasks.FlowDirective
 import kotlin.time.Instant
-import kotlinx.serialization.json.JsonElement
 
 data class PendingTaskState(override val startedAt: Instant) : NodeState()
 
@@ -14,8 +15,8 @@ data class ExtensionExecutionState(
     val selectedExtensionIndices: List<Int>,
     val phase: ExtensionPhase,
     val activeExtensionIndex: Int?,
-    val rawInput: JsonElement,
-    val transformedInput: JsonElement,
+    val rawInput: JsonNode,
+    val transformedInput: JsonNode,
     val preparedResult: PreparedTaskResult? = null,
 ) {
     fun validate(state: NodeState) {
@@ -32,8 +33,8 @@ data class ExtensionExecutionState(
 }
 
 data class PreparedTaskResult(
-    val rawOutput: JsonElement,
-    val transformedOutput: JsonElement,
+    val rawOutput: JsonNode,
+    val transformedOutput: JsonNode,
     val pendingFlowDirective: FlowDirective?,
 )
 

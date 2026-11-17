@@ -1,17 +1,16 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.listeners
 
+import com.fasterxml.jackson.databind.JsonNode
+import com.fasterxml.jackson.databind.node.NullNode
+import com.fasterxml.jackson.databind.node.ObjectNode
+import com.fasterxml.jackson.databind.node.ValueNode
+import com.lemline.common.json.*
 import com.lemline.common.logger.logger
 import io.cloudevents.CloudEvent
 import io.cloudevents.jackson.JsonFormat
 import io.serverlessworkflow.api.types.ListenTaskConfiguration.ListenAndReadAs
 import java.util.*
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonNull
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.put
 
 /**
  * Service for CloudEvent serialization, deserialization, and transformation.
@@ -62,9 +61,9 @@ object CloudEventService {
      *
      * @param str The CloudEvent JSON string to parse
      * @param readAs The ListenAndReadAs mode for parsing
-     * @return The parsed CloudEvent data as JsonElement
+     * @return The parsed CloudEvent data as JsonNode
      */
-    fun parseStringAsData(str: String, readAs: ListenAndReadAs = ListenAndReadAs.DATA): JsonElement {
+    fun parseStringAsData(str: String, readAs: ListenAndReadAs = ListenAndReadAs.DATA): JsonNode {
         val cloudEvent = deserialize(str)
 
         return when (readAs) {
@@ -78,12 +77,12 @@ object CloudEventService {
     /** Parses the raw data of a CloudEvent as a base64-encoded string.
      *
      * @param event The CloudEvent from which to parse raw data
-     * @return The raw data as a base64-encoded JsonPrimitive, or JsonNull if no data
+     * @return The raw data as a base64-encoded ValueNode, or NullNode.instance if no data
      */
-    fun parseRaw(event: CloudEvent): JsonElement {
-        val data = event.data ?: return JsonNull
+    fun parseRaw(event: CloudEvent): JsonNode {
+        val data = event.data ?: return NullNode.instance
 
-        return JsonPrimitive(Base64.getEncoder().encodeToString(data.toBytes()))
+        return jsonValue(Base64.getEncoder().encodeToString(data.toBytes()))
     }
 
     /**
@@ -93,13 +92,13 @@ object CloudEventService {
      * If parsing fails, returns the raw data as a base64-encoded string.
      *
      * @param event The CloudEvent from which to parse data
-     * @return The parsed data as JsonElement, or JsonNull if no data
+     * @return The parsed data as JsonNode, or NullNode.instance if no data
      */
-    fun parseData(event: CloudEvent): JsonElement {
-        val data = event.data ?: return JsonNull
+    fun parseData(event: CloudEvent): JsonNode {
+        val data = event.data ?: return NullNode.instance
 
         return try {
-            Json.parseToJsonElement(String(data.toBytes(), Charsets.UTF_8))
+            parseJson(String(data.toBytes(), Charsets.UTF_8))
         } catch (e: Exception) {
             logger.warn { "Failed to parse CloudEvent data as JSON, returning as base64: id=${event.id}, type=${event.type}, source=${event.source}, contentType=${event.dataContentType}, error=${e.message}" }
             parseRaw(event)
@@ -107,15 +106,15 @@ object CloudEventService {
     }
 
     /**
-     * Parses the entire CloudEvent as a JsonObject envelope.
+     * Parses the entire CloudEvent as a ObjectNode envelope.
      *
-     * Constructs a JsonObject containing all standard CloudEvent attributes,
+     * Constructs a ObjectNode containing all standard CloudEvent attributes,
      * extension attributes, and the data field.
      *
      * @param cloudEvent The CloudEvent to parse
-     * @return The CloudEvent represented as a JsonObject
+     * @return The CloudEvent represented as a ObjectNode
      */
-    fun parseEnvelope(cloudEvent: CloudEvent): JsonElement = buildJsonObject {
+    fun parseEnvelope(cloudEvent: CloudEvent): JsonNode = buildJsonObject {
         // Required attributes
         put("specversion", cloudEvent.specVersion.toString())
         put("id", cloudEvent.id)

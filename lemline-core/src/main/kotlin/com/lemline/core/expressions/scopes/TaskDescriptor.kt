@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.expressions.scopes
-import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonObject
+
+import com.fasterxml.jackson.databind.JsonNode
+import com.fasterxml.jackson.databind.node.ObjectNode
+import com.lemline.common.json.*
 /**
  * Data class representing a task descriptor.
  *
@@ -17,8 +19,8 @@ import kotlinx.serialization.json.JsonObject
 data class TaskDescriptor(
     val name: String,
     val reference: String,
-    val definition: JsonObject,
-    val input: JsonElement?,
-    var output: JsonElement?,
-    val startedAt: JsonObject?,
+    val definition: ObjectNode,
+    val input: JsonNode?,
+    var output: JsonNode?,
+    val startedAt: ObjectNode?,
 )

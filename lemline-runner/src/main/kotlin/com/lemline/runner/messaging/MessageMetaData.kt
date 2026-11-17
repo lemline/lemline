@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.messaging
 
+import com.lemline.common.json.*
 import com.lemline.common.logger.logger
 import com.lemline.common.values.IDV7
 import com.lemline.runner.common.config.MessagingType
@@ -13,9 +14,6 @@ import io.smallrye.reactive.messaging.rabbitmq.IncomingRabbitMQMetadata
 import io.smallrye.reactive.messaging.rabbitmq.OutgoingRabbitMQMetadata
 import jakarta.enterprise.context.ApplicationScoped
 import kotlin.jvm.optionals.getOrNull
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
 import org.apache.kafka.common.header.internals.RecordHeaders
 import org.eclipse.microprofile.reactive.messaging.Message
 
@@ -74,7 +72,7 @@ class MessageMetaData(
             // Extract messageId from PGMQ headers JSON
             val messageId = md.headers?.let { headersJson ->
                 try {
-                    val headers = Json.parseToJsonElement(headersJson).jsonObject
+                    val headers = parseJson(headersJson).jsonObject
                     headers[MetaData.MESSAGE_ID]?.jsonPrimitive?.content?.let { IDV7.from(it) }
                 } catch (e: Exception) {
                     logger.warn(e) { "Failed to parse PGMQ headers: $headersJson" }

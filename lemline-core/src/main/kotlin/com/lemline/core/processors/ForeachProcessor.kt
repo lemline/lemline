@@ -1,19 +1,20 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.processors
 
+import com.fasterxml.jackson.databind.JsonNode
+import com.lemline.common.json.*
 import com.lemline.core.nodes.ForeachTask
 import com.lemline.core.nodes.Node
 import com.lemline.core.processors.scope.Scope
 import com.lemline.core.states.ForeachState
 import com.lemline.core.workflows.foreachDoBlock
 import kotlin.time.Instant
-import kotlinx.serialization.json.JsonElement
 
 class ForeachProcessor(
     node: Node<ForeachTask>
 ) : AbstractProcessor<ForeachTask, ForeachState>(node) {
 
-    override fun stateWhenEnteringFromParent(transformedInput: JsonElement, scope: Scope, startedAt: Instant): ForeachState =
+    override fun stateWhenEnteringFromParent(transformedInput: JsonNode, scope: Scope, startedAt: Instant): ForeachState =
         ForeachState(
             startedAt = startedAt,
             item = transformedInput,
@@ -27,7 +28,7 @@ class ForeachProcessor(
     // Leaving the foreach is handled by the orchestrator
     override fun getNextNode(
         state: ForeachState,
-        dataset: JsonElement,
+        dataset: JsonNode,
         scope: Scope,
     ): NextInfo = NextInfo(
         nextNode = node.foreachDoBlock,

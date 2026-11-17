@@ -19,8 +19,8 @@ dependencies {
     implementation(libs.serverlessworkflow.api)
     implementation(libs.serverlessworkflow.impl.core)
 
-    implementation(platform(libs.jackson.bom))
-    implementation("com.fasterxml.jackson.core:jackson-databind")
+    api(platform(libs.jackson.bom))
+    api("com.fasterxml.jackson.core:jackson-databind")
 
     // Add Kotlin Serialization
     implementation(libs.kotlinxSerializationJson)

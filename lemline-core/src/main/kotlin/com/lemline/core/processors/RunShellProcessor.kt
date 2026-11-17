@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.processors
 
+import com.fasterxml.jackson.databind.JsonNode
+import com.fasterxml.jackson.databind.node.ValueNode
+import com.lemline.common.json.*
 import com.lemline.core.errors.WorkflowErrorType
 import com.lemline.core.nodes.Node
 import com.lemline.core.processors.scope.Scope
@@ -11,8 +14,6 @@ import com.lemline.core.states.WorkflowEvent.RunShellStarted
 import io.serverlessworkflow.api.types.RunTask
 import io.serverlessworkflow.api.types.RunTaskConfiguration.ProcessReturnType
 import kotlin.time.Instant
-import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonPrimitive
 
 /**
  * Node processor for RunTask with Shell configuration - pure functional model.
@@ -61,7 +62,7 @@ class RunShellProcessor(
 
     override val isAsync = true
 
-    override fun stateWhenEnteringFromParent(transformedInput: JsonElement, scope: Scope, startedAt: Instant): RunState = RunState(startedAt = startedAt)
+    override fun stateWhenEnteringFromParent(transformedInput: JsonNode, scope: Scope, startedAt: Instant): RunState = RunState(startedAt = startedAt)
 
     /**
      * Build the shell command execution configuration.
@@ -76,7 +77,7 @@ class RunShellProcessor(
      */
     override fun startedEvent(
         nodeStack: NodeStack,
-        transformedInput: JsonElement,
+        transformedInput: JsonNode,
         scope: Scope,
     ): WorkflowEvent {
         logger.debug { "Building shell config for task: ${node.name}" }
@@ -124,13 +125,13 @@ class RunShellProcessor(
      * Otherwise, returns the string as-is.
      */
     private fun evaluateString(
-        data: JsonElement,
+        data: JsonNode,
         expression: String,
         name: String,
         scope: Scope
     ): String {
-        return when (val result = eval(data, JsonPrimitive(expression), scope, false)) {
-            is JsonPrimitive -> result.content
+        return when (val result = eval(data, jsonValue(expression), scope, false)) {
+            is ValueNode -> result.content
             else -> raiseError(
                 WorkflowErrorType.EXPRESSION,
                 "'$name' expression must evaluate to a string, but got: $result"

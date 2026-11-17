@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.listeners
 
-import kotlinx.serialization.json.JsonPrimitive
+import com.fasterxml.jackson.databind.node.ValueNode
+import com.lemline.common.json.*
 import com.lemline.common.values.IDV7
 import com.lemline.common.values.NodePosition
 import com.lemline.common.values.WorkflowInfo
@@ -53,8 +54,6 @@ import java.sql.Timestamp
 import java.sql.Types
 import kotlin.time.Instant
 import kotlin.time.toJavaInstant
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.jsonArray
 
 const val LISTENER_TABLE = "lemline_listeners"
 
@@ -604,10 +603,10 @@ class ListenerRepository : CrudRepository<ListenerModel>(),
             return emptyList()
         }
         return try {
-            val array = Json.parseToJsonElement(json).jsonArray
+            val array = parseJson(json).jsonArray
             // MySQL aggregates the TEXT event column as JSON strings; PostgreSQL/H2
             // aggregate parsed objects. Both must yield the original event envelope.
-            array.map { if (it is JsonPrimitive && it.isString) it.content else Json.encodeToString(it) }
+            array.map { if (it is ValueNode && it.isString) it.content else LemlineJson.encodeToString(it) }
         } catch (_: Exception) {
             emptyList()
         }

@@ -4,6 +4,7 @@ package com.lemline.core.schemas
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.dataformat.yaml.YAMLMapper
 import com.fasterxml.jackson.dataformat.yaml.YAMLParser
+import com.lemline.common.json.*
 import com.lemline.common.json.LemlineJson
 import com.networknt.schema.SchemaRegistry
 import com.networknt.schema.SchemaRegistryConfig
@@ -13,36 +14,49 @@ import io.serverlessworkflow.api.types.SchemaUnion
 import io.serverlessworkflow.impl.resources.DefaultResourceLoaderFactory
 import java.io.InputStream
 import java.net.URI
-import kotlinx.serialization.json.JsonElement
 
 object SchemaValidator {
     // Schema property names in arrays (for example required: [on]) are strings,
     // not YAML 1.1 boolean aliases. Actual true/false schema keywords stay booleans.
     private val yamlSchemaMapper = YAMLMapper.builder()
         .enable(YAMLParser.Feature.PARSE_BOOLEAN_LIKE_WORDS_AS_STRINGS)
+        .enable(com.fasterxml.jackson.databind.DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS)
         .build()
 
     internal fun readSchema(input: InputStream, format: WorkflowFormat): JsonNode =
-        (if (format == WorkflowFormat.YAML) yamlSchemaMapper else WorkflowFormat.JSON.mapper()).readTree(input)
+        (if (format == WorkflowFormat.YAML) yamlSchemaMapper else WorkflowFormat.JSON.mapper()).reader()
+            .with(com.fasterxml.jackson.databind.DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS)
+            .readTree(input).normalizeRuntimeTree()
+
+    private val schemaReader = com.networknt.schema.serialization.NodeReader.builder()
+        .jsonMapper(LemlineJson.jacksonMapper).yamlMapper(yamlSchemaMapper).build()
+    private val boundedSchemaReader = object : com.networknt.schema.serialization.NodeReader {
+        override fun readTree(content: String, inputFormat: com.networknt.schema.InputFormat): JsonNode =
+            schemaReader.readTree(content, inputFormat).also(::validateDecimalBounds)
+        override fun readTree(content: InputStream, inputFormat: com.networknt.schema.InputFormat): JsonNode =
+            schemaReader.readTree(content, inputFormat).also(::validateDecimalBounds)
+    }
 
     // Use JSON Schema Draft 2020-12 for modern standards compliance
     private val schemaRegistry = SchemaRegistry.withDefaultDialect(SpecificationVersion.DRAFT_2020_12) {
         it.schemaRegistryConfig(SchemaRegistryConfig.builder().formatAssertionsEnabled(true).build())
         // networknt 2 disables external references by default; retain 1.x behavior.
         it.schemaLoader { loader -> loader.fetchRemoteResources() }
+        it.nodeReader(boundedSchemaReader)
     }
 
-    fun validate(node: JsonElement, schemaUnion: SchemaUnion) =
-        validateSchema(with(LemlineJson) { node.toJsonNode() }, schemaUnionToSchema(schemaUnion))
+    fun validate(node: JsonNode, schemaUnion: SchemaUnion) =
+        validateSchema(node, schemaUnionToSchema(schemaUnion))
 
-    fun validateJsonNode(node: JsonNode, schema: JsonNode) = validateSchema(node, schema)
+    fun validateJsonNode(node: JsonNode, schema: JsonNode) =
+        validateSchema(node.deepCopy<JsonNode>().normalizeRuntimeTree(), schema.deepCopy<JsonNode>().normalizeRuntimeTree())
 
     internal fun schemaUnionToSchema(
         schemaUnion: SchemaUnion,
         openHttp: (URI) -> InputStream = { it.toURL().openStream() },
     ): JsonNode = when {
         schemaUnion.schemaInline != null ->
-            LemlineJson.jacksonMapper.valueToTree(schemaUnion.schemaInline.document)
+            LemlineJson.jacksonMapper.valueToTree<JsonNode>(schemaUnion.schemaInline.document).normalizeRuntimeTree()
 
         schemaUnion.schemaExternal != null -> {
             // Keep the previous per-validation freshness semantics. The SDK's cache
@@ -65,6 +79,8 @@ object SchemaValidator {
     }
 
     private fun validateSchema(node: JsonNode, schema: JsonNode) {
+        validateDecimalBounds(node)
+        validateDecimalBounds(schema)
         // Early check for simple 'required' fields to provide clearer error messages
         if (schema.has("required") && node.isObject) {
             val required = schema["required"].mapNotNull { it.asText(null) }

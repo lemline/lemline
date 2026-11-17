@@ -6,10 +6,10 @@ import com.lemline.core.processors.CorrelationDef
 import com.lemline.core.processors.EventFilter
 import io.serverlessworkflow.api.types.EventData
 import io.serverlessworkflow.api.types.EventDataschema
+import io.serverlessworkflow.api.types.EventFilter as SdkEventFilter
 import io.serverlessworkflow.api.types.EventSource
 import io.serverlessworkflow.api.types.EventTime
 import io.serverlessworkflow.api.types.UriTemplate
-import io.serverlessworkflow.api.types.EventFilter as SdkEventFilter
 import io.serverlessworkflow.impl.expressions.ExpressionUtils
 import java.net.URI
 import java.time.OffsetDateTime
@@ -94,7 +94,7 @@ fun resolveDataFilterValue(data: EventData?): String? {
 
         else -> {
             if (value != null) {
-                with(LemlineJson) { value.toJsonElement().toString() }
+                with(LemlineJson) { value.toJsonNode().toString() }
             } else {
                 null
             }

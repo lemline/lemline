@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.eventschedules
 
+import com.fasterxml.jackson.databind.node.ArrayNode
+import com.fasterxml.jackson.databind.node.ObjectNode
+import com.lemline.common.json.*
 import com.lemline.common.values.IDV7
 import com.lemline.common.values.WorkflowId
 import com.lemline.common.values.WorkflowNamespace
@@ -11,10 +14,12 @@ import com.lemline.runner.common.config.DatabaseConfig
 import com.lemline.runner.common.messaging.CommandEmitter
 import com.lemline.runner.common.messaging.InstanceMessage
 import com.lemline.runner.common.namespaces.NamespaceScope
+import com.lemline.runner.common.repositories.helpers.IdV7Helper
+import com.lemline.runner.definitions.DefinitionCacheSync
 import com.lemline.runner.definitions.DefinitionModel
 import com.lemline.runner.definitions.DefinitionRepository
 import com.lemline.runner.definitions.Definitions
-import com.lemline.runner.definitions.DefinitionCacheSync
+import com.lemline.runner.listeners.CloudEventService
 import com.lemline.runner.listeners.DefinitionListenService
 import com.lemline.runner.starters.Starter
 import io.cloudevents.core.builder.CloudEventBuilder
@@ -26,20 +31,13 @@ import io.mockk.coVerify
 import io.mockk.mockk
 import io.mockk.spyk
 import java.net.URI
+import java.security.MessageDigest
 import java.time.ZoneId
 import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.test.runTest
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonArray
-import com.lemline.runner.common.repositories.helpers.IdV7Helper
-import com.lemline.runner.listeners.CloudEventService
-import java.security.MessageDigest
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 
@@ -86,8 +84,25 @@ abstract class EventScheduleServiceTestBase {
             .withData("application/json", "{\"key\":\"$key\"}".toByteArray()).build()
 
     private suspend fun starts() = repository.listAll().filter { it.workflowInfo.namespace == namespace }
-    private fun EventScheduleModel.input() = instanceMessage.workflowState.nodeStack.rootState.workflowInput as JsonArray
+    private fun EventScheduleModel.input() = instanceMessage.workflowState.nodeStack.rootState.workflowInput as ArrayNode
     private fun EventScheduleModel.eventIds() = input().map { it.jsonObject.getValue("id").jsonPrimitive.content }
+
+    @Test
+    fun `numeric correlation keys join collections using the legacy string encoding`() = runTest {
+        define("""
+            all:
+              - with: { type: a }
+                correlate: { key: { from: '${'$'}{ .key }' } }
+              - with: { type: b }
+                correlate: { key: { from: '${'$'}{ .key }' } }
+        """.trimIndent())
+        fun numeric(type: String) = CloudEventBuilder.from(event(type))
+            .withData("application/json", """{"key":10000000.5}""".toByteArray()).build()
+        service().handleCloudEvent(numeric("a"), namespace) shouldBe 0
+        collections().single().correlations shouldBe mapOf("key" to "1.00000005E7")
+        service().handleCloudEvent(numeric("b"), namespace) shouldBe 1
+        starts().size shouldBe 1
+    }
 
     @Test
     fun `event triggers honor data envelope raw and default read modes`() = runTest {
@@ -97,7 +112,7 @@ abstract class EventScheduleServiceTestBase {
             val incoming = event(type)
             service().handleCloudEvent(incoming, namespace) shouldBe 1
             val input = starts().single { it.workflowInfo.name.toString() == type }.input()
-            input shouldBe JsonArray(listOf(when (read) {
+            input shouldBe ArrayNode(listOf(when (read) {
                 "envelope" -> CloudEventService.parseEnvelope(incoming)
                 "raw" -> CloudEventService.parseRaw(incoming)
                 else -> CloudEventService.parseData(incoming)
@@ -109,7 +124,7 @@ abstract class EventScheduleServiceTestBase {
     fun `event until expressions evaluate the selected data read mode`() = runTest {
         define("any:\n  - with: { type: a }\nuntil: '\${ .[0].key == \"ready\" }'", read = "data")
         service().handleCloudEvent(event(key = "ready"), namespace) shouldBe 1
-        starts().single().input() shouldBe Json.parseToJsonElement("""[{"key":"ready"}]""")
+        starts().single().input() shouldBe parseJson("""[{"key":"ready"}]""")
     }
 
     private suspend fun stateId(): IDV7 = db.withConnection { conn ->
@@ -136,7 +151,7 @@ abstract class EventScheduleServiceTestBase {
     }
 
     private suspend fun seedLegacy(definition: DefinitionModel, groups: List<LegacyEventScheduleGroup>, received: List<io.cloudevents.CloudEvent>): String {
-        val payload = Json.encodeToString(LegacyEventScheduleState(groups))
+        val payload = LemlineJson.encodeToString(LegacyEventScheduleState(groups))
         val hash = MessageDigest.getInstance("SHA-256").digest(definition.definition.toByteArray()).joinToString("") { "%02x".format(it) }
         db.withTransaction { conn ->
             val id = IDV7.random()
@@ -751,7 +766,7 @@ abstract class EventScheduleServiceTestBase {
         val starter = Starter().apply { definitions = lookup }
         val error = shouldThrow<IllegalArgumentException> {
             starter.prepareWorkflow(WorkflowId.random(), namespace, definition.name, definition.version,
-                JsonObject(emptyMap()), false, ZoneId.of("UTC")) { throw IllegalArgumentException(it) }
+                ObjectNode(emptyMap()), false, ZoneId.of("UTC")) { throw IllegalArgumentException(it) }
         }
         error.message!! shouldContain "starts automatically from matching CloudEvents"
         starts().size shouldBe 0

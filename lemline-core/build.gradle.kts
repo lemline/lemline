@@ -31,6 +31,15 @@ tasks.test {
     }
 }
 
+tasks.register<JavaExec>("jsonBenchmark") {
+    description = "Compare JSON expression and workflow execution time and allocations in three fresh JVMs"
+    group = "verification"
+    dependsOn(tasks.testClasses)
+    classpath = sourceSets.test.get().runtimeClasspath
+    mainClass.set("com.lemline.core.benchmarks.JsonRuntimeBenchmark")
+    jvmArgs("-Xms512m", "-Xmx512m")
+}
+
 dependencies {
     implementation(project(":lemline-common"))
     implementation(project(":lemline-messages-proto"))

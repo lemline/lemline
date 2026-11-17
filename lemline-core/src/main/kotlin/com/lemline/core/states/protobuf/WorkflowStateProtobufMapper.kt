@@ -155,7 +155,7 @@ object WorkflowStateProtobufMapper {
         nodeStack = node_stack?.let(NodeStackProtobufMapper::fromProto)
             ?: error("ResumeFromTaskCommand.node_stack is required"),
         nodePosition = NodePosition(node_position),
-        rawInput = input_json.toKotlinJsonElement(),
+        rawInput = input_json.toRuntimeJsonNode(),
         flowDirective = flow_directive?.toDomain(),
         extensionReturn = extension_return?.let(ExtensionProtobufMapper::fromProto)
     )
@@ -168,7 +168,7 @@ object WorkflowStateProtobufMapper {
     private fun ResumeWithCompletedTaskProto.toDomain() = WorkflowCommand.ResumeWithCompletedTask(
         nodeStack = node_stack?.let(NodeStackProtobufMapper::fromProto)
             ?: error("ResumeWithCompletedTaskCommand.node_stack is required"),
-        rawOutput = output_json.toKotlinJsonElement()
+        rawOutput = output_json.toRuntimeJsonNode()
     )
 
     private fun WorkflowCommand.ResumeWithFaultedTask.toProto() = ResumeWithFaultedTaskProto(
@@ -189,7 +189,7 @@ object WorkflowStateProtobufMapper {
     )
 
     private fun WorkflowCompletedProto.toDomain() = WorkflowEvent.WorkflowCompleted(
-        output = output_json.toKotlinJsonElement(),
+        output = output_json.toRuntimeJsonNode(),
         completedAt = completed_at.toKotlinInstantOrEpoch(),
         nodeStack = node_stack?.let(NodeStackProtobufMapper::fromProto)
             ?: error("WorkflowCompletedEvent.node_stack is required"),
@@ -207,8 +207,8 @@ object WorkflowStateProtobufMapper {
     private fun WorkflowFaultedProto.toDomain() = WorkflowEvent.WorkflowFaulted(
         nodeStack = node_stack?.let(NodeStackProtobufMapper::fromProto)
             ?: error("WorkflowFaultedEvent.node_stack is required"),
-        rawInput = input_json?.toKotlinJsonElement(),
-        rawOutput = output_json?.toKotlinJsonElement(),
+        rawInput = input_json?.toRuntimeJsonNode(),
+        rawOutput = output_json?.toRuntimeJsonNode(),
         flowDirective = flow_directive?.toDomain(),
         error = error?.toDomain() ?: error("WorkflowFaultedEvent.error is required"),
         faultedAt = faulted_at.toKotlinInstantOrEpoch(),
@@ -225,7 +225,7 @@ object WorkflowStateProtobufMapper {
         nodeStack = node_stack?.let(NodeStackProtobufMapper::fromProto)
             ?: error("ForkBranchCompletedEvent.node_stack is required"),
         branchPosition = NodePosition(branch_position),
-        branchOutput = branch_output_json.toKotlinJsonElement(),
+        branchOutput = branch_output_json.toRuntimeJsonNode(),
         completedAt = completed_at.toKotlinInstantOrEpoch(),
     )
 
@@ -252,7 +252,7 @@ object WorkflowStateProtobufMapper {
     private fun ForEachCompletedProto.toDomain() = WorkflowEvent.ForEachCompleted(
         nodeStack = node_stack?.let(NodeStackProtobufMapper::fromProto)
             ?: error("ForEachCompletedEvent.node_stack is required"),
-        output = output_json.toKotlinJsonElement(),
+        output = output_json.toRuntimeJsonNode(),
     )
 
     private fun WorkflowEvent.TaskScheduled.toProto() = TaskScheduledProto(
@@ -267,7 +267,7 @@ object WorkflowStateProtobufMapper {
         nodeStack = node_stack?.let(NodeStackProtobufMapper::fromProto)
             ?: error("TaskScheduledEvent.node_stack is required"),
         nodePosition = NodePosition(node_position),
-        rawInput = input_json.toKotlinJsonElement(),
+        rawInput = input_json.toRuntimeJsonNode(),
         flowDirective = flow_directive?.toDomain(),
         extensionReturn = extension_return?.let(ExtensionProtobufMapper::fromProto)
     )
@@ -281,7 +281,7 @@ object WorkflowStateProtobufMapper {
     private fun WaitStartedProto.toDomain() = WorkflowEvent.WaitStarted(
         nodeStack = node_stack?.let(NodeStackProtobufMapper::fromProto)
             ?: error("WaitStartedEvent.node_stack is required"),
-        rawOutput = output_json.toKotlinJsonElement(),
+        rawOutput = output_json.toRuntimeJsonNode(),
         config = config?.toDomain() ?: error("WaitStartedEvent.config is required"),
     )
 
@@ -297,7 +297,7 @@ object WorkflowStateProtobufMapper {
         nodeStack = node_stack?.let(NodeStackProtobufMapper::fromProto)
             ?: error("TaskRetryScheduledEvent.node_stack is required"),
         nodePosition = NodePosition(node_position),
-        rawInput = input_json.toKotlinJsonElement(),
+        rawInput = input_json.toRuntimeJsonNode(),
         flowDirective = flow_directive?.toDomain(),
         retryAt = retry_at.toKotlinInstantOrEpoch()
     )
@@ -311,7 +311,7 @@ object WorkflowStateProtobufMapper {
     private fun RunWorkflowStartedProto.toDomain() = WorkflowEvent.RunWorkflowStarted(
         nodeStack = node_stack?.let(NodeStackProtobufMapper::fromProto)
             ?: error("RunWorkflowStartedEvent.node_stack is required"),
-        rawInput = input_json.toKotlinJsonElement(),
+        rawInput = input_json.toRuntimeJsonNode(),
         config = config?.toDomain() ?: error("RunWorkflowStartedEvent.config is required")
     )
 
@@ -323,7 +323,7 @@ object WorkflowStateProtobufMapper {
     private fun ForkStartedProto.toDomain() = WorkflowEvent.ForkStarted(
         nodeStack = node_stack?.let(NodeStackProtobufMapper::fromProto)
             ?: error("ForkStartedEvent.node_stack is required"),
-        rawInput = input_json.toKotlinJsonElement(),
+        rawInput = input_json.toRuntimeJsonNode(),
     )
 
     private fun WorkflowEvent.ListenStarted.toProto() = ListenStartedProto(
@@ -335,7 +335,7 @@ object WorkflowStateProtobufMapper {
     private fun ListenStartedProto.toDomain() = WorkflowEvent.ListenStarted(
         nodeStack = node_stack?.let(NodeStackProtobufMapper::fromProto)
             ?: error("ListenStartedEvent.node_stack is required"),
-        rawOutput = output_json.toKotlinJsonElement(),
+        rawOutput = output_json.toRuntimeJsonNode(),
         config = config?.toDomain() ?: error("ListenStartedEvent.config is required")
     )
 
@@ -348,7 +348,7 @@ object WorkflowStateProtobufMapper {
     private fun EmitStartedProto.toDomain() = WorkflowEvent.EmitStarted(
         nodeStack = node_stack?.let(NodeStackProtobufMapper::fromProto)
             ?: error("EmitStartedEvent.node_stack is required"),
-        input = input_json.toKotlinJsonElement(),
+        input = input_json.toRuntimeJsonNode(),
         config = config?.toDomain() ?: error("EmitStartedEvent.config is required")
     )
 
@@ -361,7 +361,7 @@ object WorkflowStateProtobufMapper {
     private fun CallHttpStartedProto.toDomain() = WorkflowEvent.CallHttpStarted(
         nodeStack = node_stack?.let(NodeStackProtobufMapper::fromProto)
             ?: error("CallHttpStartedEvent.node_stack is required"),
-        input = input_json.toKotlinJsonElement(),
+        input = input_json.toRuntimeJsonNode(),
         config = config?.toDomain() ?: error("CallHttpStartedEvent.config is required")
     )
 
@@ -374,7 +374,7 @@ object WorkflowStateProtobufMapper {
     private fun RunScriptStartedProto.toDomain() = WorkflowEvent.RunScriptStarted(
         nodeStack = node_stack?.let(NodeStackProtobufMapper::fromProto)
             ?: error("RunScriptStartedEvent.node_stack is required"),
-        input = input_json.toKotlinJsonElement(),
+        input = input_json.toRuntimeJsonNode(),
         config = config?.toDomain() ?: error("RunScriptStartedEvent.config is required")
     )
 
@@ -387,7 +387,7 @@ object WorkflowStateProtobufMapper {
     private fun RunShellStartedProto.toDomain() = WorkflowEvent.RunShellStarted(
         nodeStack = node_stack?.let(NodeStackProtobufMapper::fromProto)
             ?: error("RunShellStartedEvent.node_stack is required"),
-        input = input_json.toKotlinJsonElement(),
+        input = input_json.toRuntimeJsonNode(),
         config = config?.toDomain() ?: error("RunShellStartedEvent.config is required")
     )
 
@@ -410,7 +410,7 @@ object WorkflowStateProtobufMapper {
         namespace = WorkflowNamespace(namespace),
         name = WorkflowName(name),
         version = WorkflowVersion(version),
-        input = input_json.toKotlinJsonElement(),
+        input = input_json.toRuntimeJsonNode(),
         sync = sync,
     )
 
@@ -429,7 +429,7 @@ object WorkflowStateProtobufMapper {
         until = until?.toDomain(),
         readAs = read_as.toDomain(),
         timeoutAt = timeout_at?.toKotlinInstant(),
-        correlationContext = correlation_context_json?.toKotlinJsonElement(),
+        correlationContext = correlation_context_json?.toRuntimeJsonNode(),
     )
 
     private fun EmitConfig.toProto() = EmitConfigProto(
@@ -452,7 +452,7 @@ object WorkflowStateProtobufMapper {
         subject = subject,
         dataschema = dataschema,
         datacontenttype = datacontenttype,
-        data = data_json?.toKotlinJsonElement(),
+        data = data_json?.toRuntimeJsonNode(),
         extensions = extensions?.toDomainStringMap(),
     )
 
@@ -472,7 +472,7 @@ object WorkflowStateProtobufMapper {
         url = url,
         headers = headers.toMap(),
         query = query.toMap(),
-        body = body_json?.toKotlinJsonElement(),
+        body = body_json?.toRuntimeJsonNode(),
         output = output.toDomain(),
         redirect = redirect,
         authentication = authentication?.toDomain(),
@@ -600,7 +600,7 @@ object WorkflowStateProtobufMapper {
         strategy = strategy.toDomain(),
         filters = filters.map { filter -> CachedEventFilter(
             standard = requireNotNull(filter.standard).toDomain(),
-            extensions = filter.extensions.mapValues { it.value.toKotlinJsonElement() },
+            extensions = filter.extensions.mapValues { it.value.toRuntimeJsonNode() },
         ) },
         untilExpression = until_expression,
         untilEvents = until_events?.toDomain(),

@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.parents
 
+import com.fasterxml.jackson.databind.JsonNode
+import com.lemline.common.json.*
 import com.lemline.common.logger.logger
 import com.lemline.common.values.WorkflowId
 import com.lemline.core.errors.InternalException
@@ -106,7 +108,7 @@ class ParentService {
      */
     suspend fun resumeParentOnChildCompletion(
         childWorkflowId: WorkflowId,
-        childOutput: kotlinx.serialization.json.JsonElement,
+        childOutput: com.fasterxml.jackson.databind.JsonNode,
         connection: Connection
     ): Boolean {
         val parent = parentRepository.findByChildId(childWorkflowId, connection)

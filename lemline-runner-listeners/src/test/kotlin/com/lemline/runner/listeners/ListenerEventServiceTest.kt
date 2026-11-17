@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.listeners
 
+import com.fasterxml.jackson.databind.node.ArrayNode
+import com.fasterxml.jackson.databind.node.NullNode
+import com.lemline.common.json.*
 import com.lemline.common.values.IDV7
 import com.lemline.common.values.NodePosition
 import com.lemline.common.values.WorkflowId
@@ -36,10 +39,6 @@ import io.serverlessworkflow.api.types.ListenTaskConfiguration.ListenAndReadAs
 import java.net.URI
 import kotlin.time.Clock
 import kotlinx.coroutines.test.runTest
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonNull
-import kotlinx.serialization.json.JsonPrimitive
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
@@ -126,7 +125,7 @@ class ListenerEventServiceTest {
                     NodePosition.root, RootState(
                         startedAt = now,
                         workflowId = workflowId,
-                        workflowInput = JsonNull
+                        workflowInput = NullNode.instance
                     )
                 ),
                 StackFrame(NodePosition("/do"), DoState(startedAt = now)),
@@ -149,7 +148,7 @@ class ListenerEventServiceTest {
 
         val listenStarted = WorkflowEvent.ListenStarted(
             nodeStack = nodeStack,
-            rawOutput = JsonNull,
+            rawOutput = NullNode.instance,
             config = config
         )
 
@@ -493,7 +492,7 @@ class ListenerEventServiceTest {
             service.handleCloudEvent(event, testNamespace)
 
             // Then
-            Json.parseToJsonElement(capturedEventJson.captured)
+            parseJson(capturedEventJson.captured)
             capturedEventJson.captured.contains("com.example.TestEvent") shouldBe true
         }
 
@@ -1159,11 +1158,11 @@ class ListenerEventServiceTest {
         @Test
         fun `should return true for valid expression that evaluates to true`() {
             // Given
-            val events = JsonArray(
+            val events = ArrayNode(
                 listOf(
-                    JsonPrimitive(1),
-                    JsonPrimitive(2),
-                    JsonPrimitive(3)
+                    jsonValue(1),
+                    jsonValue(2),
+                    jsonValue(3)
                 )
             )
 
@@ -1177,10 +1176,10 @@ class ListenerEventServiceTest {
         @Test
         fun `should return false for valid expression that evaluates to false`() {
             // Given
-            val events = JsonArray(
+            val events = ArrayNode(
                 listOf(
-                    JsonPrimitive(1),
-                    JsonPrimitive(2)
+                    jsonValue(1),
+                    jsonValue(2)
                 )
             )
 
@@ -1194,7 +1193,7 @@ class ListenerEventServiceTest {
         @Test
         fun `should return false for empty events array with length check`() {
             // Given
-            val events = JsonArray(emptyList())
+            val events = ArrayNode(emptyList())
 
             // When
             val result = service.evaluateUntilExpression("length > 0", events)
@@ -1206,7 +1205,7 @@ class ListenerEventServiceTest {
         @Test
         fun `should return true for empty events array with length equals zero`() {
             // Given
-            val events = JsonArray(emptyList())
+            val events = ArrayNode(emptyList())
 
             // When
             val result = service.evaluateUntilExpression("length == 0", events)
@@ -1218,7 +1217,7 @@ class ListenerEventServiceTest {
         @Test
         fun `should return false for invalid expression`() {
             // Given
-            val events = JsonArray(listOf(JsonPrimitive(1)))
+            val events = ArrayNode(listOf(jsonValue(1)))
 
             // When
             val result = service.evaluateUntilExpression("invalid$#@expression", events)
@@ -1230,10 +1229,10 @@ class ListenerEventServiceTest {
         @Test
         fun `should return false for expression that returns non-boolean`() {
             // Given
-            val events = JsonArray(
+            val events = ArrayNode(
                 listOf(
-                    JsonPrimitive(1),
-                    JsonPrimitive(2)
+                    jsonValue(1),
+                    jsonValue(2)
                 )
             )
 
@@ -1247,11 +1246,11 @@ class ListenerEventServiceTest {
         @Test
         fun `should evaluate complex JQ expressions`() {
             // Given
-            val events = JsonArray(
+            val events = ArrayNode(
                 listOf(
-                    Json.parseToJsonElement("""{"value":10}"""),
-                    Json.parseToJsonElement("""{"value":20}"""),
-                    Json.parseToJsonElement("""{"value":30}""")
+                    parseJson("""{"value":10}"""),
+                    parseJson("""{"value":20}"""),
+                    parseJson("""{"value":30}""")
                 )
             )
 
@@ -1265,10 +1264,10 @@ class ListenerEventServiceTest {
         @Test
         fun `should handle null in events array`() {
             // Given
-            val events = JsonArray(
+            val events = ArrayNode(
                 listOf(
-                    JsonNull,
-                    JsonPrimitive(1)
+                    NullNode.instance,
+                    jsonValue(1)
                 )
             )
 
@@ -1282,11 +1281,11 @@ class ListenerEventServiceTest {
         @Test
         fun `should evaluate expression with map and filter`() {
             // Given
-            val events = JsonArray(
+            val events = ArrayNode(
                 listOf(
-                    Json.parseToJsonElement("""{"status":"completed"}"""),
-                    Json.parseToJsonElement("""{"status":"pending"}"""),
-                    Json.parseToJsonElement("""{"status":"completed"}""")
+                    parseJson("""{"status":"completed"}"""),
+                    parseJson("""{"status":"pending"}"""),
+                    parseJson("""{"status":"completed"}""")
                 )
             )
 
@@ -1301,9 +1300,9 @@ class ListenerEventServiceTest {
         @Test
         fun `should handle deeply nested event data`() {
             // Given
-            val events = JsonArray(
+            val events = ArrayNode(
                 listOf(
-                    Json.parseToJsonElement("""{"data":{"nested":{"value":100}}}""")
+                    parseJson("""{"data":{"nested":{"value":100}}}""")
                 )
             )
 

@@ -1,12 +1,11 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.secrets
 
+import com.lemline.common.json.*
 import com.lemline.core.workflows.WorkflowCache
 import com.lemline.runner.system.System
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.jsonObject
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Test
 
@@ -40,8 +39,8 @@ class SecretsTest {
         System.setEnv("UNDECLARED", "hidden")
 
         val resolved = Secrets.getForWorkflow(workflow)
-        assertEquals(JsonPrimitive("first-value"), resolved["TEST_TOKEN"])
-        assertEquals(JsonPrimitive("value"), resolved.getValue("TEST_CONFIG").jsonObject["key"])
-        assertFalse("UNDECLARED" in resolved)
+        assertEquals(jsonValue("first-value"), resolved["TEST_TOKEN"])
+        assertEquals(jsonValue("value"), resolved.getValue("TEST_CONFIG").jsonObject["key"])
+        assertFalse(resolved.has("UNDECLARED"))
     }
 }

@@ -1,12 +1,11 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.secrets
 
+import com.fasterxml.jackson.databind.JsonNode
+import com.fasterxml.jackson.databind.node.ObjectNode
+import com.lemline.common.json.*
 import com.lemline.runner.system.System
 import io.serverlessworkflow.api.types.Workflow
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
 
 object Secrets {
 
@@ -17,14 +16,14 @@ object Secrets {
      * @param workflow The workflow definition containing secrets configuration
      * @return The currently available declared secrets; the orchestrator faults missing ones.
      */
-    fun getForWorkflow(workflow: Workflow): JsonObject = JsonObject(
+    fun getForWorkflow(workflow: Workflow): ObjectNode = ObjectNode(
         workflow.use?.secrets?.mapNotNull { secretName ->
             val value = System.getEnv(secretName) ?: return@mapNotNull null
             try {
-                secretName to Json.decodeFromString<JsonObject>(value)
+                secretName to LemlineJson.decodeFromString<ObjectNode>(value)
             } catch (_: Exception) {
-                secretName to JsonPrimitive(value)
+                secretName to jsonValue(value)
             }
-        }?.toMap() ?: emptyMap<String, JsonElement>()
+        }?.toMap() ?: emptyMap<String, JsonNode>()
     )
 }

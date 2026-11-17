@@ -11,8 +11,9 @@ import java.util.concurrent.Executors
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Test
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
+import com.lemline.common.json.jsonObject
+import com.lemline.common.json.jsonPrimitive
+import com.lemline.common.json.content
 
 class WorkflowDefinitionReaderTest {
     private val nestedWorkflow = """

@@ -1,13 +1,14 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.messaging.pgmq
 
+import com.lemline.common.json.*
 import com.lemline.common.logger.logger
 import com.lemline.runner.messaging.pgmq.config.PgmqConnectorConfig
 import io.smallrye.mutiny.Uni
 import io.smallrye.mutiny.coroutines.awaitSuspending
 import io.vertx.core.json.Json
-import io.vertx.core.json.JsonArray
-import io.vertx.core.json.JsonObject
+import io.vertx.core.json.JsonArray as VertxJsonArray
+import io.vertx.core.json.JsonObject as VertxJsonObject
 import io.vertx.mutiny.pgclient.PgBuilder
 import io.vertx.mutiny.sqlclient.Pool
 import io.vertx.mutiny.sqlclient.Row
@@ -18,8 +19,6 @@ import java.time.Instant
 import java.time.LocalDateTime
 import java.time.ZoneOffset
 import java.util.concurrent.ConcurrentHashMap
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.put
 
 /**
  * PGMQ (PostgreSQL Message Queue) client.
@@ -628,8 +627,8 @@ class PgmqClient(
         null -> null
         io.vertx.sqlclient.Tuple.JSON_NULL -> null
         is String -> value
-        is JsonObject -> value.encode()
-        is JsonArray -> value.encode()
+        is VertxJsonObject -> value.encode()
+        is VertxJsonArray -> value.encode()
         else -> Json.encode(value)
     }
 

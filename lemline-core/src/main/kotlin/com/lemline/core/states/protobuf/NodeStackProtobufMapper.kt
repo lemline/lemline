@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.states.protobuf
 
+import com.fasterxml.jackson.databind.node.NullNode
+import com.lemline.common.json.*
 import com.lemline.common.values.IDV7
 import com.lemline.common.values.NodePosition
 import com.lemline.common.values.WorkflowId
@@ -30,8 +32,6 @@ import com.lemline.messages.internal.v1.TaskStateProto
 import com.lemline.messages.internal.v1.TryStateProto
 import java.time.Instant as JavaInstant
 import kotlin.time.Instant
-import kotlinx.serialization.json.JsonNull
-import kotlinx.serialization.json.buildJsonObject
 
 object NodeStackProtobufMapper {
 
@@ -124,8 +124,8 @@ object NodeStackProtobufMapper {
     private fun RootStateProto.toDomain() = RootState(
         startedAt = started_at.toKotlinInstantOrEpoch(),
         workflowId = WorkflowId(IDV7.from(workflow_id)),
-        workflowInput = workflow_input_json?.toKotlinJsonElement() ?: buildJsonObject { },
-        context = context_json?.toKotlinJsonObject() ?: buildJsonObject { },
+        workflowInput = workflow_input_json?.toRuntimeJsonNode() ?: buildJsonObject { },
+        context = context_json?.toRuntimeObjectNode() ?: buildJsonObject { },
         hasWaitingParent = has_waiting_parent
     )
 
@@ -149,7 +149,7 @@ object NodeStackProtobufMapper {
 
     private fun ForStateProto.toDomain() = ForState(
         startedAt = started_at.toKotlinInstantOrEpoch(),
-        collection = collection_json?.toKotlinJsonElementList() ?: emptyList(),
+        collection = collection_json?.toRuntimeJsonNodeList() ?: emptyList(),
         index = index,
         forEach = for_each,
         forAt = for_at
@@ -165,7 +165,7 @@ object NodeStackProtobufMapper {
 
     private fun ForeachStateProto.toDomain() = ForeachState(
         startedAt = started_at.toKotlinInstantOrEpoch(),
-        item = item_json?.toKotlinJsonElement() ?: JsonNull,
+        item = item_json?.toRuntimeJsonNode() ?: NullNode.instance,
         index = index,
         itemVar = item_var,
         indexVar = index_var
@@ -197,7 +197,7 @@ object NodeStackProtobufMapper {
 
     private fun TryStateProto.toDomain() = TryState(
         startedAt = started_at.toKotlinInstantOrEpoch(),
-        transformedInput = transformed_input_json?.toKotlinJsonElement() ?: buildJsonObject { },
+        transformedInput = transformed_input_json?.toRuntimeJsonNode() ?: buildJsonObject { },
         attemptIndex = attempt_index,
         runningCatch = running_catch,
         lastError = last_error?.toDomain(),
