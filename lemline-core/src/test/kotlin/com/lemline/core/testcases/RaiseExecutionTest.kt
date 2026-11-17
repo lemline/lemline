@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.testcases
 
+import com.lemline.common.json.*
 import com.lemline.common.values.info
 import com.lemline.core.errors.InternalException
 import com.lemline.core.lifecycleevents.CloudEventLifecycleHook
@@ -12,11 +13,6 @@ import io.cloudevents.CloudEvent
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.shouldBe
 import kotlin.time.Clock
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
-import kotlinx.serialization.json.put
 
 class RaiseExecutionTest : FunSpec({
     test("named error raises its declared fields and evaluates expressions") {
@@ -92,7 +88,7 @@ class RaiseExecutionTest : FunSpec({
 
         hook.onWorkflowFaulted(workflow.info, nodeStack, error, Clock.System.now())
 
-        val payload = Json.parseToJsonElement(emitted.data!!.toBytes().toString(Charsets.UTF_8))
+        val payload = parseJson(emitted.data!!.toBytes().toString(Charsets.UTF_8))
         val eventError = payload.jsonObject.getValue("error").jsonObject
         eventError.getValue("type").jsonPrimitive.content shouldBe error.type
         eventError.getValue("status").jsonPrimitive.content shouldBe "400"

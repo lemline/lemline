@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.node.ArrayNode
 import com.fasterxml.jackson.databind.node.ObjectNode
 import com.lemline.common.json.LemlineJson
+import com.lemline.common.json.normalizeRuntimeTree
 import net.thisptr.jackson.jq.BuiltinFunctionLoader
 import net.thisptr.jackson.jq.Output
 import net.thisptr.jackson.jq.Scope as JQScope
@@ -38,8 +39,8 @@ object JQExpression : ExpressionEvaluator {
      */
     override fun eval(input: JsonNode, expr: String, scope: ObjectNode): JsonNode = try {
         val output = JsonNodeOutput()
-        ExpressionParser.compile(expr, jqVersion).apply(scope.toJQScope(), input, output)
-        output.result!!
+        ExpressionParser.compile(expr, jqVersion).apply(scope.toJQScope(), input.deepCopy(), output)
+        output.result!!.normalizeRuntimeTree()
     } catch (e: JsonQueryException) {
         throw IllegalArgumentException("Unable to evaluate content $input using expr $expr", e)
     }
@@ -58,8 +59,8 @@ object JQExpression : ExpressionEvaluator {
      */
     fun evalOrNull(input: JsonNode, expr: String, scope: ObjectNode): JsonNode? = try {
         val output = JsonNodeOutput()
-        ExpressionParser.compile(expr, jqVersion).apply(scope.toJQScope(), input, output)
-        output.result
+        ExpressionParser.compile(expr, jqVersion).apply(scope.toJQScope(), input.deepCopy(), output)
+        output.result?.normalizeRuntimeTree()
     } catch (_: JsonQueryException) {
         null
     }
@@ -72,6 +73,7 @@ object JQExpression : ExpressionEvaluator {
 
         // The result of the JQ expression evaluation.
         var result: JsonNode? = null
+        private var multiple = false
 
         /**
          * Captures the output of the JQ expression evaluation.
@@ -81,8 +83,10 @@ object JQExpression : ExpressionEvaluator {
         override fun emit(out: JsonNode) {
             result = when (result) {
                 null -> out
-                is ArrayNode -> (result as ArrayNode).add(out)
-                else -> mapper.createArrayNode().add(result).add(out)
+                else -> if (multiple) (result as ArrayNode).add(out) else {
+                    multiple = true
+                    mapper.createArrayNode().add(result).add(out)
+                }
             }
         }
     }
@@ -93,6 +97,8 @@ object JQExpression : ExpressionEvaluator {
      * modifying the shared root scope.
      */
     private fun ObjectNode.toJQScope(): JQScope = JQScope.newChildScope(rootScope).apply {
-        properties().forEach { field -> setValue(field.key, field.value) }
+        // Expressions can update values. Never expose cached definitions or another
+        // branch's state to the evaluator as mutable nodes.
+        properties().forEach { field -> setValue(field.key, field.value.deepCopy<JsonNode>()) }
     }
 }

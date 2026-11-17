@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.lifecycleevents
 
+import com.fasterxml.jackson.databind.JsonNode
 import com.lemline.common.ids.IdGenerator
+import com.lemline.common.json.*
 import com.lemline.common.values.IDV7
 import com.lemline.common.values.NodePosition
 import com.lemline.common.values.WorkflowId
@@ -16,7 +18,6 @@ import java.time.ZoneOffset
 import kotlin.time.Instant
 import kotlin.time.toJavaInstant
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonElement
 
 /**
  * Default implementation of [LifecycleEventHook] that builds CloudEvents.
@@ -99,7 +100,7 @@ class CloudEventLifecycleHook(
     override suspend fun onWorkflowCompleted(
         workflowInfo: WorkflowInfo,
         nodeStack: NodeStack,
-        output: JsonElement,
+        output: JsonNode,
         completedAt: Instant,
     ) {
         val data = LifecycleEventData.WorkflowCompletedData(
@@ -154,7 +155,7 @@ class CloudEventLifecycleHook(
         workflowInfo: WorkflowInfo,
         nodeStack: NodeStack,
         nodePosition: NodePosition,
-        input: JsonElement,
+        input: JsonNode,
         createdAt: Instant,
     ) {
         val data = LifecycleEventData.TaskCreatedData(
@@ -181,7 +182,7 @@ class CloudEventLifecycleHook(
         workflowInfo: WorkflowInfo,
         nodeStack: NodeStack,
         nodePosition: NodePosition,
-        rawInput: JsonElement,
+        rawInput: JsonNode,
         startedAt: Instant,
     ) {
         val data = LifecycleEventData.TaskStartedData(
@@ -207,7 +208,7 @@ class CloudEventLifecycleHook(
         workflowInfo: WorkflowInfo,
         nodeStack: NodeStack,
         nodePosition: NodePosition,
-        output: JsonElement,
+        output: JsonNode,
         completedAt: Instant,
     ) {
         val data = LifecycleEventData.TaskCompletedData(

@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.forks
 
+import com.fasterxml.jackson.databind.JsonNode
+import com.lemline.common.json.*
 import com.lemline.common.json.LemlineJson
 import com.lemline.common.values.IDV7
 import com.lemline.common.values.NodePosition
@@ -29,8 +31,6 @@ import kotlin.time.Instant
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.test.runTest
-import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonPrimitive
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
@@ -143,7 +143,7 @@ abstract class ForkRepositoryTestBase {
         repository.insertForkWithBranches(fork, branches)
 
         val updatedFork = fork.copy(
-            output = LemlineJson.encodeToString<JsonElement>(JsonPrimitive("final-result")),
+            output = LemlineJson.encodeToString<JsonNode>(jsonValue("final-result")),
         ).apply {
             completedAt = Clock.System.now()
         }
@@ -358,12 +358,12 @@ abstract class ForkRepositoryTestBase {
                             NodePosition.root, RootState(
                                 startedAt = Clock.System.now(),
                                 workflowId = testWorkflowId,
-                                workflowInput = JsonPrimitive("test-input")
+                                workflowInput = jsonValue("test-input")
                             )
                         )
                     )
                 ),
-                rawInput = JsonPrimitive("test-input")
+                rawInput = jsonValue("test-input")
             ),
         )
 

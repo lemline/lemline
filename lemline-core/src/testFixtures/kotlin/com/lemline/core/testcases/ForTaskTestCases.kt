@@ -1,17 +1,11 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.testcases
 
+import com.fasterxml.jackson.databind.node.ArrayNode
+import com.lemline.common.json.*
 import com.lemline.core.testcases.impl.WorkflowTestCase
 import com.lemline.core.testcases.impl.WorkflowTestValidators.expectErrorContaining
 import com.lemline.core.testcases.impl.WorkflowTestValidators.expectOutput
-
-import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.buildJsonArray
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.jsonArray
-import kotlinx.serialization.json.put
 
 /**
  * Test cases for ForTask execution.
@@ -34,11 +28,11 @@ object ForTaskTestCases {
                               seen: ${ .seen + [$item] }
             """.trimIndent(),
             input = buildJsonObject {
-                put("items", buildJsonArray { add(JsonPrimitive(1)); add(JsonPrimitive(2)) })
+                put("items", buildJsonArray { add(jsonValue(1)); add(jsonValue(2)) })
                 put("seen", buildJsonArray { })
             },
             validate = expectOutput(buildJsonObject {
-                put("seen", buildJsonArray { add(JsonPrimitive(1)); add(JsonPrimitive(2)) })
+                put("seen", buildJsonArray { add(jsonValue(1)); add(jsonValue(2)) })
             })
         ),
 
@@ -54,7 +48,7 @@ object ForTaskTestCases {
                             set:
                               seen: ${ .seen + [$item] }
             """.trimIndent(),
-            input = buildJsonObject { put("items", buildJsonArray { add(JsonPrimitive(1)) }) },
+            input = buildJsonObject { put("items", buildJsonArray { add(jsonValue(1)) }) },
             validate = expectErrorContaining("'.for.in' expression must be an array")
         ),
 
@@ -72,7 +66,7 @@ object ForTaskTestCases {
                               seen: ${ .seen + [$item] }
             """.trimIndent(),
             input = buildJsonObject {
-                put("items", buildJsonArray { add(JsonPrimitive(1)) })
+                put("items", buildJsonArray { add(jsonValue(1)) })
                 put("continue", true)
             },
             validate = expectErrorContaining("'.while' expression must be a boolean")
@@ -146,7 +140,7 @@ object ForTaskTestCases {
             """.trimIndent(),
             validate = expectOutput(
                 buildJsonObject {
-                    put("evens", JsonArray(listOf(JsonPrimitive(2), JsonPrimitive(4), JsonPrimitive(6))))
+                    put("evens", ArrayNode(listOf(jsonValue(2), jsonValue(4), jsonValue(6))))
                 }
             )
         ),
@@ -192,7 +186,7 @@ object ForTaskTestCases {
             """.trimIndent(),
             validate = expectOutput(
                 buildJsonObject {
-                    put("doubled", JsonArray(listOf(JsonPrimitive(2), JsonPrimitive(4), JsonPrimitive(6))))
+                    put("doubled", ArrayNode(listOf(jsonValue(2), jsonValue(4), jsonValue(6))))
                 }
             )
         ),
@@ -254,7 +248,7 @@ object ForTaskTestCases {
             """.trimIndent(),
             validate = expectOutput(
                 buildJsonObject {
-                    put("names", JsonArray(listOf(JsonPrimitive("Alice"), JsonPrimitive("Bob"))))
+                    put("names", ArrayNode(listOf(jsonValue("Alice"), jsonValue("Bob"))))
                 }
             )
         ),
@@ -278,7 +272,7 @@ object ForTaskTestCases {
             """.trimIndent(),
             validate = expectOutput(
                 buildJsonObject {
-                    put("taskNames", JsonArray(listOf(JsonPrimitive("capture"), JsonPrimitive("capture"))))
+                    put("taskNames", ArrayNode(listOf(jsonValue("capture"), jsonValue("capture"))))
                 }
             )
         ),
@@ -299,11 +293,11 @@ object ForTaskTestCases {
                               seen: .seen + [$item]
             """.trimIndent(),
             input = buildJsonObject {
-                put("items", buildJsonArray { add(JsonPrimitive(1)); add(JsonPrimitive(2)) })
+                put("items", buildJsonArray { add(jsonValue(1)); add(jsonValue(2)) })
                 put("seen", buildJsonArray { })
             },
             validate = expectOutput(buildJsonObject {
-                put("seen", buildJsonArray { add(JsonPrimitive(1)); add(JsonPrimitive(2)) })
+                put("seen", buildJsonArray { add(jsonValue(1)); add(jsonValue(2)) })
             })
         ),
 
@@ -321,7 +315,7 @@ object ForTaskTestCases {
                             set:
                               seen: ${ .seen + [$item] }
             """.trimIndent(),
-            input = buildJsonObject { put("items", buildJsonArray { add(JsonPrimitive(1)) }) },
+            input = buildJsonObject { put("items", buildJsonArray { add(jsonValue(1)) }) },
             validate = expectErrorContaining("'.for.in' expression must be an array")
         )
     )

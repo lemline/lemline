@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.common.starters
 
+import com.fasterxml.jackson.databind.JsonNode
+import com.lemline.common.json.*
 import com.lemline.common.values.WorkflowId
 import com.lemline.common.values.WorkflowName
 import com.lemline.common.values.WorkflowNamespace
@@ -9,7 +11,6 @@ import com.lemline.core.lifecycleevents.LifecycleEventHook
 import com.lemline.core.states.WorkflowCommand
 import com.lemline.runner.common.messaging.InstanceMessage
 import java.time.ZoneId
-import kotlinx.serialization.json.JsonElement
 
 /**
  * A prepared workflow ready to be dispatched.
@@ -62,7 +63,7 @@ interface WorkflowStarter<S> {
         workflowNamespace: WorkflowNamespace,
         workflowName: WorkflowName,
         optionalVersion: WorkflowVersion?,
-        workflowInput: JsonElement,
+        workflowInput: JsonNode,
         hasWaitingParent: Boolean,
         zoneId: ZoneId?,
         onError: (String) -> Nothing,

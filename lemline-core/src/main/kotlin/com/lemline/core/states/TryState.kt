@@ -1,13 +1,11 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.states
 
+import com.fasterxml.jackson.databind.JsonNode
+import com.lemline.common.json.*
 import com.lemline.core.errors.InternalException
 import com.lemline.core.processors.scope.Scope
 import kotlin.time.Instant
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.encodeToJsonElement
 
 /**
  * State for TryTask execution.
@@ -40,7 +38,7 @@ import kotlinx.serialization.json.encodeToJsonElement
  */
 data class TryState(
     override val startedAt: Instant,
-    val transformedInput: JsonElement,
+    val transformedInput: JsonNode,
     val attemptIndex: Int,
     val runningCatch: Boolean,
     val lastError: InternalException.Error? = null,
@@ -53,9 +51,8 @@ data class TryState(
      */
     override val scope: Scope by lazy {
         buildJsonObject {
-            lastError?.let { put(errorAs, Json.encodeToJsonElement(it)) }
+            lastError?.let { put(errorAs, it.toJsonNode()) }
         }
     }
-
 
 }

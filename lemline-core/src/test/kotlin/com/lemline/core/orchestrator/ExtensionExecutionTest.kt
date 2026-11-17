@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.orchestrator
 
+import com.fasterxml.jackson.databind.JsonNode
+import com.fasterxml.jackson.databind.node.NullNode
+import com.lemline.common.json.*
 import com.lemline.common.values.*
 import com.lemline.core.activities.ActivityExecutor
 import com.lemline.core.activities.mock.MockFunctionResolver
@@ -14,11 +17,10 @@ import com.lemline.core.workflows.WorkflowCache
 import com.lemline.messages.internal.v1.WorkflowStateProto
 import io.cloudevents.CloudEvent
 import io.serverlessworkflow.api.types.Workflow
+import kotlin.test.*
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.runBlocking
-import kotlinx.serialization.json.*
 import org.junit.jupiter.api.Test
-import kotlin.test.*
 
 class ExtensionExecutionTest {
     private fun source(body: String) = """
@@ -34,7 +36,7 @@ class ExtensionExecutionTest {
         val events = mutableListOf<CloudEvent>()
         override suspend fun emit(cloudEvent: CloudEvent) { events.add(cloudEvent) }
         val hook = CloudEventLifecycleHook(this)
-        fun task(event: CloudEvent) = Json.parseToJsonElement(String(event.data!!.toBytes())).jsonObject["task"]?.jsonPrimitive?.content
+        fun task(event: CloudEvent) = parseJson(String(event.data!!.toBytes())).jsonObject["task"]?.jsonPrimitive?.content
         fun matching(position: String, type: String) = events.filter { task(it) == position && it.type.contains(".task.$type") }
     }
     private val transport = object : CloudEventHook {
@@ -44,7 +46,7 @@ class ExtensionExecutionTest {
     private fun serde(state: WorkflowState): WorkflowState = WorkflowStateProtobufMapper.fromProto(
         WorkflowStateProto.ADAPTER.decode(WorkflowStateProtobufMapper.toProto(state).encode())
     )
-    private suspend fun run(workflow: Workflow, capture: Capture = Capture(), execute: suspend (WorkflowEvent.ActivityStarted) -> JsonElement = { error("Unexpected activity $it") }): JsonElement =
+    private suspend fun run(workflow: Workflow, capture: Capture = Capture(), execute: suspend (WorkflowEvent.ActivityStarted) -> JsonNode = { error("Unexpected activity $it") }): JsonNode =
         FullOrchestrator.start(workflow, serde = true, activityExecutor = object : ActivityExecutor {
             override suspend fun execute(event: WorkflowEvent.ActivityStarted) = execute(event)
         }, functionResolver = MockFunctionResolver(), cloudEventHook = transport, lifecycleHook = capture.hook)
@@ -73,7 +75,7 @@ class ExtensionExecutionTest {
         """
         var workflow = parse(body)
         val capture = Capture()
-        var command: WorkflowCommand = StepByStepOrchestrator.initCmd(workflowInput = Json.parseToJsonElement("""{"keep":"input"}"""))
+        var command: WorkflowCommand = StepByStepOrchestrator.initCmd(workflowInput = parseJson("""{"keep":"input"}"""))
         var suspended = false
         repeat(100) {
             val event = serde(StepByStepOrchestrator.runByTask(workflow, serde(command) as WorkflowCommand, workflow.info, capture.hook)) as WorkflowEvent
@@ -90,7 +92,7 @@ class ExtensionExecutionTest {
                 }
                 is WorkflowEvent.WorkflowCompleted -> {
                     assertTrue(suspended)
-                    assertEquals(Json.parseToJsonElement("""{"seen":2,"keep":"input","owner":"/do/0/iterate"}"""), event.output)
+                    assertEquals(parseJson("""{"seen":2,"keep":"input","owner":"/do/0/iterate"}"""), event.output)
                     assertEquals(1, capture.matching("/do/0/iterate", "started").size)
                     assertEquals(1, capture.matching("/do/0/iterate", "completed").size)
                     assertEquals(2, capture.matching("/do/0/iterate/do/0/remember", "completed").size)
@@ -126,7 +128,7 @@ class ExtensionExecutionTest {
                   export: { as: '§{ {exports: ((§context.exports // 0) + 1), count: .count} }' }
               - check: { set: { exports: '§{ §context.exports }', count: '§{ §context.count }' } }
         """)
-        assertEquals(Json.parseToJsonElement("""{"exports":1,"count":2}"""), run(workflow))
+        assertEquals(parseJson("""{"exports":1,"count":2}"""), run(workflow))
     }
 
     @Test
@@ -170,16 +172,16 @@ class ExtensionExecutionTest {
             val result = run(workflow, capture) { event ->
                 if (event.nodePosition.toString().endsWith("/charge")) {
                     payments++
-                    Json.parseToJsonElement("""{"paymentId":"p-$payments"}""")
+                    parseJson("""{"paymentId":"p-$payments"}""")
                 } else {
                     audits++
                     if (audits == 1) throw InternalException(InternalException.Error("test", 503, event.nodePosition.toString(), "Audit unavailable"))
-                    Json.parseToJsonElement("""{"logged":true}""")
+                    parseJson("""{"logged":true}""")
                 }
             }
             assertEquals(if (local) 1 else 2, payments)
             assertEquals(2, audits)
-            assertEquals(Json.parseToJsonElement("""{"paymentId":"p-$payments"}"""), result)
+            assertEquals(parseJson("""{"paymentId":"p-$payments"}"""), result)
             val owner = "/do/0/guarded/try/0/charge"
             assertEquals(1, capture.matching(owner, "completed").size)
             assertEquals(if (local) 0 else 1, capture.matching(owner, "faulted").size)
@@ -219,7 +221,7 @@ class ExtensionExecutionTest {
                   export: { as: '§{ {log: (§context.log + ["body"])} }' }
         """)
         val capture = Capture()
-        assertEquals(Json.parseToJsonElement("""{"answer":42}"""), run(workflow, capture))
+        assertEquals(parseJson("""{"answer":42}"""), run(workflow, capture))
         val started = capture.events.filter { it.type.contains(".task.started") }.mapNotNull(capture::task)
         assertEquals(listOf("/do", "/do/0/owner", "/do/0/owner/_ext/0/before/do", "/do/0/owner/_ext/0/before/do/0/a", "/do/0/owner/_ext/1/before/do", "/do/0/owner/_ext/1/before/do/0/b", "/do/0/owner/_ext/1/after/do", "/do/0/owner/_ext/1/after/do/0/b", "/do/0/owner/_ext/0/after/do", "/do/0/owner/_ext/0/after/do/0/a"), started)
     }
@@ -274,7 +276,7 @@ class ExtensionExecutionTest {
               - charge: { set: { paid: true } }
         """)
         val capture = Capture()
-        assertEquals(Json.parseToJsonElement("""{"paid":true}"""), run(workflow, capture))
+        assertEquals(parseJson("""{"paid":true}"""), run(workflow, capture))
         val fail = "/do/0/charge/_ext/0/after/do/0/guarded/try/0/fail"
         assertEquals(2, capture.matching(fail, "faulted").size)
         assertEquals(1, capture.matching("/do/0/charge/_ext/0/after/do/0/guarded/catch/0/recovered", "completed").size)
@@ -305,10 +307,10 @@ class ExtensionExecutionTest {
                   if: '§{ false }'
         """)
         val capture = Capture()
-        assertEquals(Json.parseToJsonElement("""{"value":42}"""), run(workflow, capture))
+        assertEquals(parseJson("""{"value":42}"""), run(workflow, capture))
         val extensionStep = "/do/0/invoke/_fn/do/0/child/_ext/0/before/do/0/invoke/_fn/do/0/verify"
         assertEquals(1, capture.matching(extensionStep, "completed").size)
-        val data = Json.parseToJsonElement(String(capture.matching(extensionStep, "completed").single().data!!.toBytes())).jsonObject
+        val data = parseJson(String(capture.matching(extensionStep, "completed").single().data!!.toBytes())).jsonObject
         assertEquals("/do/0/invoke/_fn/do/0/child", data["output"]!!.jsonObject["owner"]!!.jsonPrimitive.content)
     }
 
@@ -329,7 +331,7 @@ class ExtensionExecutionTest {
         val first = StepByStepOrchestrator.runByTask(workflow, start, workflow.info, capture.hook) as WorkflowEvent.TaskScheduled
         val pending = StepByStepOrchestrator.runByTask(workflow, first.resume(), workflow.info, capture.hook) as WorkflowEvent.TaskScheduled
         val owner = pending.nodeStack.currentPosition
-        val invalid = WorkflowCommand.ResumeFromTask(pending.nodeStack, owner, JsonNull, extensionReturn = ExtensionReturn(NodePosition("/wrong"), ExtensionReturnKind.COMPLETE))
+        val invalid = WorkflowCommand.ResumeFromTask(pending.nodeStack, owner, NullNode.instance, extensionReturn = ExtensionReturn(NodePosition("/wrong"), ExtensionReturnKind.COMPLETE))
         assertIs<WorkflowEvent.WorkflowFaulted>(StepByStepOrchestrator.runByTask(workflow, invalid, workflow.info, capture.hook))
         assertFailsWith<IllegalArgumentException> { serde(invalid.copy(nodeStack = pending.nodeStack.withExtension(null))) }
     }
@@ -352,7 +354,7 @@ class ExtensionExecutionTest {
                   - owner: { set: { body: true } }
                   - last: { set: { last: true } }
             """)
-            assertEquals(Json.parseToJsonElement(if (directive == "end") """{"stopped":true}""" else """{"last":true}"""), run(workflow))
+            assertEquals(parseJson(if (directive == "end") """{"stopped":true}""" else """{"last":true}"""), run(workflow))
         }
     }
 
@@ -407,13 +409,13 @@ class ExtensionExecutionTest {
         var workflow = parse(body)
         val capture = Capture()
         var calls = 0
-        var command: WorkflowCommand = StepByStepOrchestrator.initCmd(workflowInput = Json.parseToJsonElement("""{"seed":7}"""))
+        var command: WorkflowCommand = StepByStepOrchestrator.initCmd(workflowInput = parseJson("""{"seed":7}"""))
         repeat(100) {
             when (val event = serde(StepByStepOrchestrator.runByTask(workflow, serde(command) as WorkflowCommand, workflow.info, capture.hook)) as WorkflowEvent) {
                 is WorkflowEvent.TaskScheduled -> command = event.resume()
                 is WorkflowEvent.CallHttpStarted -> {
                     calls++
-                    command = WorkflowCommand.ResumeWithCompletedTask(event.nodeStack, Json.parseToJsonElement("""{"count":1}"""))
+                    command = WorkflowCommand.ResumeWithCompletedTask(event.nodeStack, parseJson("""{"count":1}"""))
                 }
                 is WorkflowEvent.WaitStarted -> {
                     assertEquals(0, capture.matching("/do/0/owner", "completed").size)
@@ -423,7 +425,7 @@ class ExtensionExecutionTest {
                 }
                 is WorkflowEvent.WorkflowCompleted -> {
                     assertEquals(1, calls)
-                    assertEquals(Json.parseToJsonElement("""{"count":2,"context":{"exports":1,"observation":{"raw":1,"input":7,"output":2}}}"""), event.output)
+                    assertEquals(parseJson("""{"count":2,"context":{"exports":1,"observation":{"raw":1,"input":7,"output":2}}}"""), event.output)
                     assertEquals(1, capture.matching("/do/0/owner", "started").size)
                     assertEquals(1, capture.matching("/do/0/owner", "completed").size)
                     return@runBlocking
@@ -456,7 +458,7 @@ class ExtensionExecutionTest {
               - forbidden: { raise: { error: { type: 'https://example.com/error', status: 500 } } }
               - done: { set: { value: '§{ .value }', changed: '§{ §context.changed }' } }
         """)
-        assertEquals(Json.parseToJsonElement("""{"value":42,"changed":true}"""), run(workflow))
+        assertEquals(parseJson("""{"value":42,"changed":true}"""), run(workflow))
     }
 
     @Test
@@ -476,9 +478,9 @@ class ExtensionExecutionTest {
                   - result: { set: { marker: '§{ §context.marker }' } }
             """)
             val output = FullOrchestrator.start(workflow, serde = true, activityExecutor = object : ActivityExecutor {
-                override suspend fun execute(event: WorkflowEvent.ActivityStarted): JsonElement = error("Unexpected activity")
+                override suspend fun execute(event: WorkflowEvent.ActivityStarted): JsonNode = error("Unexpected activity")
             }, functionResolver = resolver, cloudEventHook = transport, lifecycleHook = LifecycleEventHook.NOOP)
-            assertEquals(Json.parseToJsonElement("""{"marker":"$marker"}"""), output)
+            assertEquals(parseJson("""{"marker":"$marker"}"""), output)
         }
     }
 
@@ -522,7 +524,7 @@ class ExtensionExecutionTest {
             }
             val capture = Capture()
             FullOrchestrator.start(workflow, serde = true, activityExecutor = object : ActivityExecutor {
-                override suspend fun execute(event: WorkflowEvent.ActivityStarted): JsonElement = error("Unexpected activity")
+                override suspend fun execute(event: WorkflowEvent.ActivityStarted): JsonNode = error("Unexpected activity")
             }, functionResolver = MockFunctionResolver(), cloudEventHook = hook, lifecycleHook = capture.hook)
             val positions = capture.events.filter { it.type.contains(".task.completed") }.mapNotNull(capture::task)
             assertTrue(positions.indexOf("/do/0/owner/_ext/0/after/do/0/recorded") < positions.indexOf("/do/0/owner"))
@@ -556,7 +558,7 @@ class ExtensionExecutionTest {
             """)
             var payments = 0
             val capture = Capture()
-            val result = run(workflow, capture) { payments++; JsonPrimitive("paid") }
+            val result = run(workflow, capture) { payments++; jsonValue("paid") }
             assertEquals(if (phase == "before") 0 else 1, payments)
             assertEquals(origin, result.jsonObject["origin"]!!.jsonPrimitive.content)
             assertEquals(503, result.jsonObject["status"]!!.jsonPrimitive.int)
@@ -590,7 +592,7 @@ class ExtensionExecutionTest {
                     do:
                       - recovered: { set: { caught: outer } }
         """)
-        assertEquals(Json.parseToJsonElement("""{"caught":"outer"}"""), run(workflow))
+        assertEquals(parseJson("""{"caught":"outer"}"""), run(workflow))
     }
 
     @Test
@@ -611,7 +613,7 @@ class ExtensionExecutionTest {
               - owner: { set: { value: 42 } }
         """)
         val capture = Capture()
-        assertEquals(Json.parseToJsonElement("""{"value":42}"""), run(workflow, capture))
+        assertEquals(parseJson("""{"value":42}"""), run(workflow, capture))
         assertEquals(0, capture.matching("/do/0/owner", "faulted").size)
         assertEquals(1, capture.matching("/do/0/owner", "completed").size)
         assertEquals(1, capture.matching("/do/0/owner/_ext/0/after/do/0/guarded/try/0/unavailable", "faulted").size)
@@ -642,7 +644,7 @@ class ExtensionExecutionTest {
                           - recovered: { set: { caught: true } }
             """)
             val capture = Capture()
-            assertEquals(Json.parseToJsonElement("""{"caught":true}"""), run(workflow, capture))
+            assertEquals(parseJson("""{"caught":true}"""), run(workflow, capture))
             val owner = "/do/0/guarded/try/0/forked"
             assertEquals(1, capture.matching(owner, "faulted").size)
             assertEquals(0, capture.matching(owner, "completed").size)
@@ -668,10 +670,10 @@ class ExtensionExecutionTest {
         val scheduled = StepByStepOrchestrator.runByTask(workflow, StepByStepOrchestrator.initCmd(), workflow.info, capture.hook) as WorkflowEvent.TaskScheduled
         val legacy = scheduled.nodeStack.push(scheduled.nodePosition, TaskState(kotlin.time.Clock.System.now()))
         val result = FullOrchestrator.resume(workflow,
-            WorkflowCommand.ResumeWithCompletedTask(legacy, JsonPrimitive("legacy")), serde = true,
+            WorkflowCommand.ResumeWithCompletedTask(legacy, jsonValue("legacy")), serde = true,
             activityExecutor = com.lemline.core.activities.mock.MockActivityExecutor.empty(),
             functionResolver = MockFunctionResolver(), cloudEventHook = transport, lifecycleHook = capture.hook)
-        assertEquals(JsonPrimitive("legacy"), result.value())
+        assertEquals(jsonValue("legacy"), result.value())
         assertFalse(capture.events.any { capture.task(it)?.contains("/_ext/") == true })
     }
 

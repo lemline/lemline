@@ -1,8 +1,13 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.cloudevents
 
+import com.fasterxml.jackson.databind.node.ArrayNode
+import com.fasterxml.jackson.databind.node.NullNode
+import com.fasterxml.jackson.databind.node.ObjectNode
+import com.fasterxml.jackson.databind.node.ValueNode
+import com.lemline.common.json.*
 import com.lemline.core.cloudevents.CloudEventParser.parseData
-import com.lemline.core.cloudevents.CloudEventParser.toJsonElement
+import com.lemline.core.cloudevents.CloudEventParser.toJsonNode
 import io.cloudevents.CloudEvent
 import io.cloudevents.core.builder.CloudEventBuilder
 import io.serverlessworkflow.api.types.ListenTaskConfiguration.ListenAndReadAs
@@ -10,17 +15,6 @@ import java.net.URI
 import java.time.OffsetDateTime
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
-import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonNull
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.boolean
-import kotlinx.serialization.json.contentOrNull
-import kotlinx.serialization.json.double
-import kotlinx.serialization.json.int
-import kotlinx.serialization.json.jsonArray
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 
@@ -58,7 +52,7 @@ class CloudEventParserTest {
 
             val result = event.parseData()
 
-            assertTrue(result is JsonObject)
+            assertTrue(result is ObjectNode)
             assertEquals("value", result.jsonObject["key"]?.jsonPrimitive?.content)
         }
 
@@ -68,7 +62,7 @@ class CloudEventParserTest {
 
             val result = event.parseData()
 
-            assertTrue(result is JsonObject)
+            assertTrue(result is ObjectNode)
             assertEquals("value", result.jsonObject["outer"]?.jsonObject?.get("inner")?.jsonPrimitive?.content)
         }
 
@@ -78,7 +72,7 @@ class CloudEventParserTest {
 
             val result = event.parseData()
 
-            assertTrue(result is JsonObject)
+            assertTrue(result is ObjectNode)
             assertEquals("John", result.jsonObject["name"]?.jsonPrimitive?.content)
             assertEquals(30, result.jsonObject["age"]?.jsonPrimitive?.int)
             assertEquals(true, result.jsonObject["active"]?.jsonPrimitive?.boolean)
@@ -90,7 +84,7 @@ class CloudEventParserTest {
 
             val result = event.parseData()
 
-            assertTrue(result is JsonObject)
+            assertTrue(result is ObjectNode)
             assertTrue(result.jsonObject.isEmpty())
         }
     }
@@ -103,7 +97,7 @@ class CloudEventParserTest {
 
             val result = event.parseData()
 
-            assertTrue(result is JsonArray)
+            assertTrue(result is ArrayNode)
             assertEquals(3, result.jsonArray.size)
             assertEquals(1, result.jsonArray[0].jsonPrimitive.int)
         }
@@ -114,7 +108,7 @@ class CloudEventParserTest {
 
             val result = event.parseData()
 
-            assertTrue(result is JsonArray)
+            assertTrue(result is ArrayNode)
             assertEquals(2, result.jsonArray.size)
             assertEquals(1, result.jsonArray[0].jsonObject["id"]?.jsonPrimitive?.int)
         }
@@ -125,7 +119,7 @@ class CloudEventParserTest {
 
             val result = event.parseData()
 
-            assertTrue(result is JsonArray)
+            assertTrue(result is ArrayNode)
             assertTrue(result.jsonArray.isEmpty())
         }
 
@@ -135,9 +129,9 @@ class CloudEventParserTest {
 
             val result = event.parseData()
 
-            assertTrue(result is JsonArray)
+            assertTrue(result is ArrayNode)
             assertEquals(2, result.jsonArray.size)
-            assertTrue(result.jsonArray[0] is JsonArray)
+            assertTrue(result.jsonArray[0] is ArrayNode)
         }
     }
 
@@ -149,7 +143,7 @@ class CloudEventParserTest {
 
             val result = event.parseData()
 
-            assertTrue(result is JsonPrimitive)
+            assertTrue(result is ValueNode)
             assertEquals("hello world", result.jsonPrimitive.content)
         }
 
@@ -159,7 +153,7 @@ class CloudEventParserTest {
 
             val result = event.parseData()
 
-            assertTrue(result is JsonPrimitive)
+            assertTrue(result is ValueNode)
             assertEquals(42, result.jsonPrimitive.int)
         }
 
@@ -169,7 +163,7 @@ class CloudEventParserTest {
 
             val result = event.parseData()
 
-            assertTrue(result is JsonPrimitive)
+            assertTrue(result is ValueNode)
             assertEquals(3.14159, result.jsonPrimitive.double, 0.00001)
         }
 
@@ -179,7 +173,7 @@ class CloudEventParserTest {
 
             val result = event.parseData()
 
-            assertTrue(result is JsonPrimitive)
+            assertTrue(result is ValueNode)
             assertEquals(true, result.jsonPrimitive.boolean)
         }
 
@@ -189,7 +183,7 @@ class CloudEventParserTest {
 
             val result = event.parseData()
 
-            assertTrue(result is JsonPrimitive)
+            assertTrue(result is ValueNode)
             assertEquals(false, result.jsonPrimitive.boolean)
         }
 
@@ -199,85 +193,85 @@ class CloudEventParserTest {
 
             val result = event.parseData()
 
-            assertEquals(JsonNull, result)
+            assertEquals(NullNode.instance, result)
         }
     }
 
     @Nested
     inner class ParseDataWithInvalidJson {
         @Test
-        fun `should return JsonNull for plain text`() {
+        fun `should return JSON null for plain text`() {
             val event = buildEvent(data = "not valid json")
 
             val result = event.parseData()
 
-            assertEquals(JsonNull, result)
+            assertEquals(NullNode.instance, result)
         }
 
         @Test
-        fun `should return JsonNull for malformed JSON object`() {
+        fun `should return JSON null for malformed JSON object`() {
             val event = buildEvent(data = """{key: "value"}""")
 
             val result = event.parseData()
 
-            assertEquals(JsonNull, result)
+            assertEquals(NullNode.instance, result)
         }
 
         @Test
-        fun `should return JsonNull for unclosed JSON object`() {
+        fun `should return JSON null for unclosed JSON object`() {
             val event = buildEvent(data = """{"key":"value"""")
 
             val result = event.parseData()
 
-            assertEquals(JsonNull, result)
+            assertEquals(NullNode.instance, result)
         }
 
         @Test
-        fun `should return JsonNull for unclosed JSON array`() {
+        fun `should return JSON null for unclosed JSON array`() {
             val event = buildEvent(data = """[1,2,3""")
 
             val result = event.parseData()
 
-            assertEquals(JsonNull, result)
+            assertEquals(NullNode.instance, result)
         }
 
         @Test
-        fun `should return JsonNull for trailing comma`() {
+        fun `should return JSON null for trailing comma`() {
             val event = buildEvent(data = """{"key":"value",}""")
 
             val result = event.parseData()
 
-            assertEquals(JsonNull, result)
+            assertEquals(NullNode.instance, result)
         }
     }
 
     @Nested
     inner class ParseDataWithNullOrEmpty {
         @Test
-        fun `should return JsonNull when data is null`() {
+        fun `should return JSON null when data is null`() {
             val event = buildEvent(data = null)
 
             val result = event.parseData()
 
-            assertEquals(JsonNull, result)
+            assertEquals(NullNode.instance, result)
         }
 
         @Test
-        fun `should return JsonNull for empty string`() {
+        fun `should return JSON null for empty string`() {
             val event = buildEvent(data = "")
 
             val result = event.parseData()
 
-            assertEquals(JsonNull, result)
+            assertEquals(NullNode.instance, result)
         }
 
         @Test
-        fun `should return JsonNull for whitespace only`() {
+        fun `should return JSON null for whitespace only`() {
             val event = buildEvent(data = "   ")
 
             val result = event.parseData()
 
-            assertEquals(JsonNull, result)
+            assertEquals(NullNode.instance, result)
         }
     }
 
@@ -287,9 +281,9 @@ class CloudEventParserTest {
         fun `should parse valid JSON object`() {
             val event = buildEvent(data = """{"orderId":"ORD-123"}""")
 
-            val result = event.toJsonElement(ListenAndReadAs.DATA)
+            val result = event.toJsonNode(ListenAndReadAs.DATA)
 
-            assertTrue(result is JsonObject)
+            assertTrue(result is ObjectNode)
             assertEquals("ORD-123", result.jsonObject["orderId"]?.jsonPrimitive?.content)
         }
 
@@ -297,9 +291,9 @@ class CloudEventParserTest {
         fun `should parse valid JSON array`() {
             val event = buildEvent(data = """[1,2,3]""")
 
-            val result = event.toJsonElement(ListenAndReadAs.DATA)
+            val result = event.toJsonNode(ListenAndReadAs.DATA)
 
-            assertTrue(result is JsonArray)
+            assertTrue(result is ArrayNode)
             assertEquals(3, result.jsonArray.size)
         }
 
@@ -307,9 +301,9 @@ class CloudEventParserTest {
         fun `should return primitive string for invalid JSON`() {
             val event = buildEvent(data = "plain text content")
 
-            val result = event.toJsonElement(ListenAndReadAs.DATA)
+            val result = event.toJsonNode(ListenAndReadAs.DATA)
 
-            assertTrue(result is JsonPrimitive)
+            assertTrue(result is ValueNode)
             assertEquals("plain text content", result.jsonPrimitive.content)
         }
 
@@ -320,28 +314,28 @@ class CloudEventParserTest {
                 dataContentType = "application/xml"
             )
 
-            val result = event.toJsonElement(ListenAndReadAs.DATA)
+            val result = event.toJsonNode(ListenAndReadAs.DATA)
 
-            assertTrue(result is JsonPrimitive)
+            assertTrue(result is ValueNode)
             assertEquals("<root><item>value</item></root>", result.jsonPrimitive.content)
         }
 
         @Test
-        fun `should return JsonNull when data is null`() {
+        fun `should return JSON null when data is null`() {
             val event = buildEvent(data = null)
 
-            val result = event.toJsonElement(ListenAndReadAs.DATA)
+            val result = event.toJsonNode(ListenAndReadAs.DATA)
 
-            assertEquals(JsonNull, result)
+            assertEquals(NullNode.instance, result)
         }
 
         @Test
         fun `should return primitive for empty string data`() {
             val event = buildEvent(data = "")
 
-            val result = event.toJsonElement(ListenAndReadAs.DATA)
+            val result = event.toJsonNode(ListenAndReadAs.DATA)
 
-            assertTrue(result is JsonPrimitive)
+            assertTrue(result is ValueNode)
             assertEquals("", result.jsonPrimitive.content)
         }
 
@@ -349,9 +343,9 @@ class CloudEventParserTest {
         fun `should return primitive for whitespace only data`() {
             val event = buildEvent(data = "   ")
 
-            val result = event.toJsonElement(ListenAndReadAs.DATA)
+            val result = event.toJsonNode(ListenAndReadAs.DATA)
 
-            assertTrue(result is JsonPrimitive)
+            assertTrue(result is ValueNode)
             assertEquals("   ", result.jsonPrimitive.content)
         }
 
@@ -359,9 +353,9 @@ class CloudEventParserTest {
         fun `should parse JSON string primitive`() {
             val event = buildEvent(data = """"hello"""")
 
-            val result = event.toJsonElement(ListenAndReadAs.DATA)
+            val result = event.toJsonNode(ListenAndReadAs.DATA)
 
-            assertTrue(result is JsonPrimitive)
+            assertTrue(result is ValueNode)
             assertEquals("hello", result.jsonPrimitive.content)
         }
 
@@ -369,9 +363,9 @@ class CloudEventParserTest {
         fun `should parse JSON number primitive`() {
             val event = buildEvent(data = "42")
 
-            val result = event.toJsonElement(ListenAndReadAs.DATA)
+            val result = event.toJsonNode(ListenAndReadAs.DATA)
 
-            assertTrue(result is JsonPrimitive)
+            assertTrue(result is ValueNode)
             assertEquals(42, result.jsonPrimitive.int)
         }
 
@@ -379,9 +373,9 @@ class CloudEventParserTest {
         fun `should parse JSON boolean primitive`() {
             val event = buildEvent(data = "true")
 
-            val result = event.toJsonElement(ListenAndReadAs.DATA)
+            val result = event.toJsonNode(ListenAndReadAs.DATA)
 
-            assertTrue(result is JsonPrimitive)
+            assertTrue(result is ValueNode)
             assertEquals(true, result.jsonPrimitive.boolean)
         }
 
@@ -389,9 +383,9 @@ class CloudEventParserTest {
         fun `should parse JSON null`() {
             val event = buildEvent(data = "null")
 
-            val result = event.toJsonElement(ListenAndReadAs.DATA)
+            val result = event.toJsonNode(ListenAndReadAs.DATA)
 
-            assertEquals(JsonNull, result)
+            assertEquals(NullNode.instance, result)
         }
     }
 
@@ -405,9 +399,9 @@ class CloudEventParserTest {
                 type = "com.example.event.created"
             )
 
-            val result = event.toJsonElement(ListenAndReadAs.ENVELOPE)
+            val result = event.toJsonNode(ListenAndReadAs.ENVELOPE)
 
-            assertTrue(result is JsonObject)
+            assertTrue(result is ObjectNode)
             assertEquals("1.0", result.jsonObject["specversion"]?.jsonPrimitive?.content)
             assertEquals("evt-001", result.jsonObject["id"]?.jsonPrimitive?.content)
             assertEquals("https://source.example.com", result.jsonObject["source"]?.jsonPrimitive?.content)
@@ -419,9 +413,9 @@ class CloudEventParserTest {
             val eventTime = OffsetDateTime.parse("2024-06-15T12:30:45Z")
             val event = buildEvent(time = eventTime)
 
-            val result = event.toJsonElement(ListenAndReadAs.ENVELOPE)
+            val result = event.toJsonNode(ListenAndReadAs.ENVELOPE)
 
-            assertTrue(result is JsonObject)
+            assertTrue(result is ObjectNode)
             assertEquals("2024-06-15T12:30:45Z", result.jsonObject["time"]?.jsonPrimitive?.content)
         }
 
@@ -429,9 +423,9 @@ class CloudEventParserTest {
         fun `should include optional subject attribute when present`() {
             val event = buildEvent(subject = "/orders/12345")
 
-            val result = event.toJsonElement(ListenAndReadAs.ENVELOPE)
+            val result = event.toJsonNode(ListenAndReadAs.ENVELOPE)
 
-            assertTrue(result is JsonObject)
+            assertTrue(result is ObjectNode)
             assertEquals("/orders/12345", result.jsonObject["subject"]?.jsonPrimitive?.content)
         }
 
@@ -439,9 +433,9 @@ class CloudEventParserTest {
         fun `should include optional dataschema attribute when present`() {
             val event = buildEvent(dataSchema = "https://schemas.example.com/order.json")
 
-            val result = event.toJsonElement(ListenAndReadAs.ENVELOPE)
+            val result = event.toJsonNode(ListenAndReadAs.ENVELOPE)
 
-            assertTrue(result is JsonObject)
+            assertTrue(result is ObjectNode)
             assertEquals(
                 "https://schemas.example.com/order.json",
                 result.jsonObject["dataschema"]?.jsonPrimitive?.content
@@ -452,9 +446,9 @@ class CloudEventParserTest {
         fun `should include optional datacontenttype attribute when present`() {
             val event = buildEvent(dataContentType = "application/json")
 
-            val result = event.toJsonElement(ListenAndReadAs.ENVELOPE)
+            val result = event.toJsonNode(ListenAndReadAs.ENVELOPE)
 
-            assertTrue(result is JsonObject)
+            assertTrue(result is ObjectNode)
             assertEquals("application/json", result.jsonObject["datacontenttype"]?.jsonPrimitive?.content)
         }
 
@@ -462,11 +456,11 @@ class CloudEventParserTest {
         fun `should include parsed data as JSON object`() {
             val event = buildEvent(data = """{"orderId":"ORD-123","amount":99.99}""")
 
-            val result = event.toJsonElement(ListenAndReadAs.ENVELOPE)
+            val result = event.toJsonNode(ListenAndReadAs.ENVELOPE)
 
-            assertTrue(result is JsonObject)
+            assertTrue(result is ObjectNode)
             val data = result.jsonObject["data"]
-            assertTrue(data is JsonObject)
+            assertTrue(data is ObjectNode)
             assertEquals("ORD-123", data.jsonObject["orderId"]?.jsonPrimitive?.content)
             assertEquals(99.99, data.jsonObject["amount"]?.jsonPrimitive?.double)
         }
@@ -475,11 +469,11 @@ class CloudEventParserTest {
         fun `should include invalid JSON data as primitive string`() {
             val event = buildEvent(data = "plain text data")
 
-            val result = event.toJsonElement(ListenAndReadAs.ENVELOPE)
+            val result = event.toJsonNode(ListenAndReadAs.ENVELOPE)
 
-            assertTrue(result is JsonObject)
+            assertTrue(result is ObjectNode)
             val data = result.jsonObject["data"]
-            assertTrue(data is JsonPrimitive)
+            assertTrue(data is ValueNode)
             assertEquals("plain text data", data.jsonPrimitive.content)
         }
 
@@ -487,9 +481,9 @@ class CloudEventParserTest {
         fun `should not include data field when data is null`() {
             val event = buildEvent(data = null)
 
-            val result = event.toJsonElement(ListenAndReadAs.ENVELOPE)
+            val result = event.toJsonNode(ListenAndReadAs.ENVELOPE)
 
-            assertTrue(result is JsonObject)
+            assertTrue(result is ObjectNode)
             assertTrue(result.jsonObject["data"] == null)
         }
 
@@ -497,9 +491,9 @@ class CloudEventParserTest {
         fun `should not include optional attributes when null`() {
             val event = buildEvent()
 
-            val result = event.toJsonElement(ListenAndReadAs.ENVELOPE)
+            val result = event.toJsonNode(ListenAndReadAs.ENVELOPE)
 
-            assertTrue(result is JsonObject)
+            assertTrue(result is ObjectNode)
             assertTrue(result.jsonObject["time"] == null)
             assertTrue(result.jsonObject["subject"] == null)
             assertTrue(result.jsonObject["dataschema"] == null)
@@ -520,9 +514,9 @@ class CloudEventParserTest {
                 data = """{"orderId":"ORD-12345","status":"created"}"""
             )
 
-            val result = event.toJsonElement(ListenAndReadAs.ENVELOPE)
+            val result = event.toJsonNode(ListenAndReadAs.ENVELOPE)
 
-            assertTrue(result is JsonObject)
+            assertTrue(result is ObjectNode)
             assertEquals("1.0", result.jsonObject["specversion"]?.jsonPrimitive?.content)
             assertEquals("evt-complete-001", result.jsonObject["id"]?.jsonPrimitive?.content)
             assertEquals("https://orders.example.com/api", result.jsonObject["source"]?.jsonPrimitive?.content)
@@ -536,7 +530,7 @@ class CloudEventParserTest {
             assertEquals("application/json", result.jsonObject["datacontenttype"]?.jsonPrimitive?.content)
 
             val data = result.jsonObject["data"]
-            assertTrue(data is JsonObject)
+            assertTrue(data is ObjectNode)
             assertEquals("ORD-12345", data.jsonObject["orderId"]?.jsonPrimitive?.content)
         }
 
@@ -544,11 +538,11 @@ class CloudEventParserTest {
         fun `should include JSON array data in envelope`() {
             val event = buildEvent(data = """[1,2,3]""")
 
-            val result = event.toJsonElement(ListenAndReadAs.ENVELOPE)
+            val result = event.toJsonNode(ListenAndReadAs.ENVELOPE)
 
-            assertTrue(result is JsonObject)
+            assertTrue(result is ObjectNode)
             val data = result.jsonObject["data"]
-            assertTrue(data is JsonArray)
+            assertTrue(data is ArrayNode)
             assertEquals(3, data.jsonArray.size)
         }
 
@@ -556,11 +550,11 @@ class CloudEventParserTest {
         fun `should include JSON number primitive data in envelope`() {
             val event = buildEvent(data = "42")
 
-            val result = event.toJsonElement(ListenAndReadAs.ENVELOPE)
+            val result = event.toJsonNode(ListenAndReadAs.ENVELOPE)
 
-            assertTrue(result is JsonObject)
+            assertTrue(result is ObjectNode)
             val data = result.jsonObject["data"]
-            assertTrue(data is JsonPrimitive)
+            assertTrue(data is ValueNode)
             assertEquals(42, data.jsonPrimitive.int)
         }
 
@@ -568,11 +562,11 @@ class CloudEventParserTest {
         fun `should include JSON boolean data in envelope`() {
             val event = buildEvent(data = "true")
 
-            val result = event.toJsonElement(ListenAndReadAs.ENVELOPE)
+            val result = event.toJsonNode(ListenAndReadAs.ENVELOPE)
 
-            assertTrue(result is JsonObject)
+            assertTrue(result is ObjectNode)
             val data = result.jsonObject["data"]
-            assertTrue(data is JsonPrimitive)
+            assertTrue(data is ValueNode)
             assertEquals(true, data.jsonPrimitive.boolean)
         }
 
@@ -580,11 +574,11 @@ class CloudEventParserTest {
         fun `should include JSON string primitive data in envelope`() {
             val event = buildEvent(data = """"hello world"""")
 
-            val result = event.toJsonElement(ListenAndReadAs.ENVELOPE)
+            val result = event.toJsonNode(ListenAndReadAs.ENVELOPE)
 
-            assertTrue(result is JsonObject)
+            assertTrue(result is ObjectNode)
             val data = result.jsonObject["data"]
-            assertTrue(data is JsonPrimitive)
+            assertTrue(data is ValueNode)
             assertEquals("hello world", data.jsonPrimitive.content)
         }
 
@@ -592,11 +586,11 @@ class CloudEventParserTest {
         fun `should include empty string data as primitive in envelope`() {
             val event = buildEvent(data = "")
 
-            val result = event.toJsonElement(ListenAndReadAs.ENVELOPE)
+            val result = event.toJsonNode(ListenAndReadAs.ENVELOPE)
 
-            assertTrue(result is JsonObject)
+            assertTrue(result is ObjectNode)
             val data = result.jsonObject["data"]
-            assertTrue(data is JsonPrimitive)
+            assertTrue(data is ValueNode)
             assertEquals("", data.jsonPrimitive.content)
         }
     }
@@ -607,9 +601,9 @@ class CloudEventParserTest {
         fun `should return data as base64-encoded string`() {
             val event = buildEvent(data = """{"orderId":"ORD-123"}""")
 
-            val result = event.toJsonElement(ListenAndReadAs.RAW)
+            val result = event.toJsonNode(ListenAndReadAs.RAW)
 
-            assertTrue(result is JsonPrimitive)
+            assertTrue(result is ValueNode)
             val decoded = String(java.util.Base64.getDecoder().decode(result.jsonPrimitive.content))
             assertEquals("""{"orderId":"ORD-123"}""", decoded)
         }
@@ -618,9 +612,9 @@ class CloudEventParserTest {
         fun `should return plain text as base64-encoded string`() {
             val event = buildEvent(data = "plain text content")
 
-            val result = event.toJsonElement(ListenAndReadAs.RAW)
+            val result = event.toJsonNode(ListenAndReadAs.RAW)
 
-            assertTrue(result is JsonPrimitive)
+            assertTrue(result is ValueNode)
             val decoded = String(java.util.Base64.getDecoder().decode(result.jsonPrimitive.content))
             assertEquals("plain text content", decoded)
         }
@@ -632,20 +626,20 @@ class CloudEventParserTest {
                 dataContentType = "application/xml"
             )
 
-            val result = event.toJsonElement(ListenAndReadAs.RAW)
+            val result = event.toJsonNode(ListenAndReadAs.RAW)
 
-            assertTrue(result is JsonPrimitive)
+            assertTrue(result is ValueNode)
             val decoded = String(java.util.Base64.getDecoder().decode(result.jsonPrimitive.content))
             assertEquals("<root><item>value</item></root>", decoded)
         }
 
         @Test
-        fun `should return JsonNull when data is null`() {
+        fun `should return JSON null when data is null`() {
             val event = buildEvent(data = null)
 
-            val result = event.toJsonElement(ListenAndReadAs.RAW)
+            val result = event.toJsonNode(ListenAndReadAs.RAW)
 
-            assertEquals(JsonNull, result)
+            assertEquals(NullNode.instance, result)
         }
 
         @Test
@@ -658,9 +652,9 @@ class CloudEventParserTest {
 }"""
             val event = buildEvent(data = prettyJson)
 
-            val result = event.toJsonElement(ListenAndReadAs.RAW)
+            val result = event.toJsonNode(ListenAndReadAs.RAW)
 
-            assertTrue(result is JsonPrimitive)
+            assertTrue(result is ValueNode)
             val decoded = String(java.util.Base64.getDecoder().decode(result.jsonPrimitive.content))
             assertEquals(prettyJson, decoded)
         }
@@ -669,9 +663,9 @@ class CloudEventParserTest {
         fun `should return empty string as base64-encoded empty`() {
             val event = buildEvent(data = "")
 
-            val result = event.toJsonElement(ListenAndReadAs.RAW)
+            val result = event.toJsonNode(ListenAndReadAs.RAW)
 
-            assertTrue(result is JsonPrimitive)
+            assertTrue(result is ValueNode)
             val decoded = String(java.util.Base64.getDecoder().decode(result.jsonPrimitive.content))
             assertEquals("", decoded)
         }
@@ -680,9 +674,9 @@ class CloudEventParserTest {
         fun `should return whitespace as base64-encoded`() {
             val event = buildEvent(data = "   ")
 
-            val result = event.toJsonElement(ListenAndReadAs.RAW)
+            val result = event.toJsonNode(ListenAndReadAs.RAW)
 
-            assertTrue(result is JsonPrimitive)
+            assertTrue(result is ValueNode)
             val decoded = String(java.util.Base64.getDecoder().decode(result.jsonPrimitive.content))
             assertEquals("   ", decoded)
         }
@@ -691,9 +685,9 @@ class CloudEventParserTest {
         fun `should return newlines as base64-encoded`() {
             val event = buildEvent(data = "line1\nline2\nline3")
 
-            val result = event.toJsonElement(ListenAndReadAs.RAW)
+            val result = event.toJsonNode(ListenAndReadAs.RAW)
 
-            assertTrue(result is JsonPrimitive)
+            assertTrue(result is ValueNode)
             val decoded = String(java.util.Base64.getDecoder().decode(result.jsonPrimitive.content))
             assertEquals("line1\nline2\nline3", decoded)
         }
@@ -707,7 +701,7 @@ class CloudEventParserTest {
 
             val result = event.parseData()
 
-            assertTrue(result is JsonObject)
+            assertTrue(result is ObjectNode)
             val message = result.jsonObject["message"]?.jsonPrimitive?.content
             assertTrue(message?.contains("\u4e16\u754c") == true)
         }
@@ -718,7 +712,7 @@ class CloudEventParserTest {
 
             val result = event.parseData()
 
-            assertTrue(result is JsonObject)
+            assertTrue(result is ObjectNode)
             assertEquals("C:\\Users\\test", result.jsonObject["path"]?.jsonPrimitive?.content)
             assertEquals("He said \"hello\"", result.jsonObject["quote"]?.jsonPrimitive?.content)
         }
@@ -730,7 +724,7 @@ class CloudEventParserTest {
 
             val result = event.parseData()
 
-            assertTrue(result is JsonArray)
+            assertTrue(result is ArrayNode)
             assertEquals(1000, result.jsonArray.size)
         }
 
@@ -741,7 +735,7 @@ class CloudEventParserTest {
 
             val result = event.parseData()
 
-            assertTrue(result is JsonObject)
+            assertTrue(result is ObjectNode)
             val value = result.jsonObject["l1"]
                 ?.jsonObject?.get("l2")
                 ?.jsonObject?.get("l3")
@@ -758,7 +752,7 @@ class CloudEventParserTest {
 
             val result = event.parseData()
 
-            assertTrue(result is JsonObject)
+            assertTrue(result is ObjectNode)
             assertEquals(1.23e10, result.jsonObject["sci"]?.jsonPrimitive?.double)
             assertEquals(-456, result.jsonObject["neg"]?.jsonPrimitive?.int)
             assertEquals(0, result.jsonObject["zero"]?.jsonPrimitive?.int)
@@ -777,7 +771,7 @@ class CloudEventParserTest {
 
             val result = event.parseData()
 
-            assertTrue(result is JsonObject)
+            assertTrue(result is ObjectNode)
             assertEquals("value", result.jsonObject["key"]?.jsonPrimitive?.content)
         }
 
@@ -785,9 +779,9 @@ class CloudEventParserTest {
         fun `should handle URN style source in envelope`() {
             val event = buildEvent(source = "urn:lemline:workflow:order-processor")
 
-            val result = event.toJsonElement(ListenAndReadAs.ENVELOPE)
+            val result = event.toJsonNode(ListenAndReadAs.ENVELOPE)
 
-            assertTrue(result is JsonObject)
+            assertTrue(result is ObjectNode)
             assertEquals("urn:lemline:workflow:order-processor", result.jsonObject["source"]?.jsonPrimitive?.content)
         }
 
@@ -795,9 +789,9 @@ class CloudEventParserTest {
         fun `should handle relative URI source in envelope`() {
             val event = buildEvent(source = "/workflows/my-workflow")
 
-            val result = event.toJsonElement(ListenAndReadAs.ENVELOPE)
+            val result = event.toJsonNode(ListenAndReadAs.ENVELOPE)
 
-            assertTrue(result is JsonObject)
+            assertTrue(result is ObjectNode)
             assertEquals("/workflows/my-workflow", result.jsonObject["source"]?.jsonPrimitive?.content)
         }
 
@@ -805,9 +799,9 @@ class CloudEventParserTest {
         fun `should handle empty JSON object in data mode`() {
             val event = buildEvent(data = "{}")
 
-            val result = event.toJsonElement(ListenAndReadAs.DATA)
+            val result = event.toJsonNode(ListenAndReadAs.DATA)
 
-            assertTrue(result is JsonObject)
+            assertTrue(result is ObjectNode)
             assertTrue(result.jsonObject.isEmpty())
         }
 
@@ -815,9 +809,9 @@ class CloudEventParserTest {
         fun `should handle empty JSON array in data mode`() {
             val event = buildEvent(data = "[]")
 
-            val result = event.toJsonElement(ListenAndReadAs.DATA)
+            val result = event.toJsonNode(ListenAndReadAs.DATA)
 
-            assertTrue(result is JsonArray)
+            assertTrue(result is ArrayNode)
             assertTrue(result.jsonArray.isEmpty())
         }
 
@@ -827,8 +821,8 @@ class CloudEventParserTest {
 
             val result = event.parseData()
 
-            assertTrue(result is JsonObject)
-            assertEquals(JsonNull, result.jsonObject["key"])
+            assertTrue(result is ObjectNode)
+            assertEquals(NullNode.instance, result.jsonObject["key"])
             assertEquals("value", result.jsonObject["other"]?.jsonPrimitive?.content)
         }
 
@@ -838,35 +832,35 @@ class CloudEventParserTest {
 
             val result = event.parseData()
 
-            assertTrue(result is JsonArray)
+            assertTrue(result is ArrayNode)
             assertEquals(6, result.jsonArray.size)
             assertEquals(1, result.jsonArray[0].jsonPrimitive.int)
             assertEquals("two", result.jsonArray[1].jsonPrimitive.content)
             assertEquals(true, result.jsonArray[2].jsonPrimitive.boolean)
-            assertEquals(JsonNull, result.jsonArray[3])
-            assertTrue(result.jsonArray[4] is JsonObject)
-            assertTrue(result.jsonArray[5] is JsonArray)
+            assertEquals(NullNode.instance, result.jsonArray[3])
+            assertTrue(result.jsonArray[4] is ObjectNode)
+            assertTrue(result.jsonArray[5] is ArrayNode)
         }
     }
 
     @Nested
     inner class DifferencesBetweenParseDataAndDataMode {
         @Test
-        fun `parseData returns JsonNull for invalid JSON`() {
+        fun `parseData returns JSON null for invalid JSON`() {
             val event = buildEvent(data = "not valid json")
 
             val result = event.parseData()
 
-            assertEquals(JsonNull, result)
+            assertEquals(NullNode.instance, result)
         }
 
         @Test
         fun `DATA mode returns primitive string for invalid JSON`() {
             val event = buildEvent(data = "not valid json")
 
-            val result = event.toJsonElement(ListenAndReadAs.DATA)
+            val result = event.toJsonNode(ListenAndReadAs.DATA)
 
-            assertTrue(result is JsonPrimitive)
+            assertTrue(result is ValueNode)
             assertEquals("not valid json", result.jsonPrimitive.content)
         }
 
@@ -875,20 +869,20 @@ class CloudEventParserTest {
             val event = buildEvent(data = """{"key":"value"}""")
 
             val parseDataResult = event.parseData()
-            val dataModeResult = event.toJsonElement(ListenAndReadAs.DATA)
+            val dataModeResult = event.toJsonNode(ListenAndReadAs.DATA)
 
             assertEquals(parseDataResult, dataModeResult)
         }
 
         @Test
-        fun `both return JsonNull for null data`() {
+        fun `both return JSON null for null data`() {
             val event = buildEvent(data = null)
 
             val parseDataResult = event.parseData()
-            val dataModeResult = event.toJsonElement(ListenAndReadAs.DATA)
+            val dataModeResult = event.toJsonNode(ListenAndReadAs.DATA)
 
-            assertEquals(JsonNull, parseDataResult)
-            assertEquals(JsonNull, dataModeResult)
+            assertEquals(NullNode.instance, parseDataResult)
+            assertEquals(NullNode.instance, dataModeResult)
         }
     }
 }

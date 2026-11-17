@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core
 
+import com.fasterxml.jackson.databind.node.ObjectNode
+import com.lemline.common.json.*
 import com.lemline.common.json.LemlineJson
 import com.lemline.core.nodes.Node
 import com.lemline.core.nodes.RootTask
@@ -8,10 +10,9 @@ import com.lemline.core.workflows.WorkflowCache
 import io.serverlessworkflow.api.WorkflowFormat
 import io.serverlessworkflow.api.WorkflowReader.validation
 import io.serverlessworkflow.api.types.Workflow
-import kotlinx.serialization.json.JsonObject
 
-inline fun <reified T> JsonObject.set(key: String, value: T) =
-    JsonObject(toMutableMap().apply { set(key, LemlineJson.encodeToElement(value)) })
+inline fun <reified T> ObjectNode.set(key: String, value: T) =
+    ObjectNode(toMap().toMutableMap().apply { set(key, LemlineJson.encodeToElement(value)) })
 
 internal fun load(resourcePath: String): String {
     val inputStream = WorkflowCache::class.java.getResourceAsStream(resourcePath)

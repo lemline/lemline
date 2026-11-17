@@ -6,6 +6,8 @@ import com.cronutils.model.CronType
 import com.cronutils.model.definition.CronDefinitionBuilder
 import com.cronutils.model.time.ExecutionTime
 import com.cronutils.parser.CronParser
+import com.fasterxml.jackson.databind.JsonNode
+import com.lemline.common.json.*
 import com.lemline.common.values.IDV7
 import com.lemline.common.values.WorkflowId
 import com.lemline.common.values.WorkflowInfo
@@ -27,7 +29,6 @@ import kotlin.time.Duration
 import kotlin.time.Instant
 import kotlin.time.toJavaInstant
 import kotlin.time.toKotlinInstant
-import kotlinx.serialization.json.JsonElement
 
 data class ScheduleModel(
     /** Unique identifier for this scheduled workflow execution */
@@ -137,7 +138,7 @@ data class ScheduleModel(
             workflowNamespace: WorkflowNamespace,
             workflowName: WorkflowName,
             workflowVersion: WorkflowVersion,
-            workflowInput: JsonElement,
+            workflowInput: JsonNode,
             schedule: Schedule,
             zoneId: ZoneId?
         ): ScheduleModel {

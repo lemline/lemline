@@ -1,16 +1,15 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.states
 
+import com.fasterxml.jackson.databind.JsonNode
+import com.lemline.common.json.*
 import com.lemline.core.processors.scope.Scope
 import kotlin.time.Clock
 import kotlin.time.Instant
-import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.buildJsonObject
 
 data class ForState(
     override val startedAt: Instant = Clock.System.now(),
-    val collection: List<JsonElement>,
+    val collection: List<JsonNode>,
     val index: Int = -1,
     val forEach: String,
     val forAt: String
@@ -21,7 +20,7 @@ data class ForState(
             // the first element of the collection is removed at each iteration
             if (collection.isNotEmpty()) {
                 put(forEach, collection[0])
-                put(forAt, JsonPrimitive(index))
+                put(forAt, jsonValue(index))
             }
         }
 }

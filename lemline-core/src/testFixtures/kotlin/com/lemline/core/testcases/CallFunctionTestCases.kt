@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.testcases
 
+import com.lemline.common.json.*
 import com.lemline.core.activities.mock.MockConfiguration
 import com.lemline.core.testcases.impl.TestMocks
 import com.lemline.core.testcases.impl.WorkflowTestCase
@@ -9,9 +10,6 @@ import io.serverlessworkflow.api.types.SetTask
 import io.serverlessworkflow.api.types.SetTaskConfiguration
 import io.serverlessworkflow.api.types.Task
 import java.net.URI
-import kotlinx.serialization.json.buildJsonArray
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.put
 
 /**
  * Test cases for function call execution.
@@ -707,8 +705,8 @@ object CallFunctionTestCases {
             validate = expectOutput(
                 buildJsonObject {
                     put("results", buildJsonArray {
-                        add(kotlinx.serialization.json.JsonPrimitive("branch1-result"))
-                        add(kotlinx.serialization.json.JsonPrimitive("branch2-result"))
+                        add(jsonValue("branch1-result"))
+                        add(jsonValue("branch2-result"))
                     })
                 }
             )
@@ -814,9 +812,9 @@ object CallFunctionTestCases {
             validate = expectOutput(
                 buildJsonObject {
                     put("results", buildJsonArray {
-                        add(kotlinx.serialization.json.JsonPrimitive(20))
-                        add(kotlinx.serialization.json.JsonPrimitive(40))
-                        add(kotlinx.serialization.json.JsonPrimitive(60))
+                        add(jsonValue(20))
+                        add(jsonValue(40))
+                        add(jsonValue(60))
                     })
                 }
             )

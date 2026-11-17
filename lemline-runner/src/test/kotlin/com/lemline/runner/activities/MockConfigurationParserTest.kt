@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.activities
 
+import com.lemline.common.json.*
 import com.lemline.core.activities.mock.HttpMockMatcher
 import com.lemline.core.activities.mock.HttpMockResponse
 import com.lemline.core.activities.mock.HttpMockRule
@@ -16,8 +17,6 @@ import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.collections.shouldHaveSize
 import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
 
 /**
  * Unit tests for [MockConfigurationParser].

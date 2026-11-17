@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.processors
 
+import com.fasterxml.jackson.databind.JsonNode
+import com.lemline.common.json.*
 import com.lemline.core.nodes.Node
 import com.lemline.core.processors.scope.Scope
 import com.lemline.core.states.NodeStack
@@ -13,7 +15,6 @@ import kotlin.time.Clock
 import kotlin.time.Duration
 import kotlin.time.Instant
 import kotlinx.serialization.Contextual
-import kotlinx.serialization.json.JsonElement
 
 /**
  * Node processor for WaitTask - pure functional model.
@@ -46,7 +47,7 @@ class WaitProcessor(
     node: Node<WaitTask>,
 ) : AbstractProcessor<WaitTask, WaitState>(node) {
     override val isAsync = true
-    override fun stateWhenEnteringFromParent(transformedInput: JsonElement, scope: Scope, startedAt: Instant) = WaitState(startedAt = startedAt)
+    override fun stateWhenEnteringFromParent(transformedInput: JsonNode, scope: Scope, startedAt: Instant) = WaitState(startedAt = startedAt)
 
     /**
      * Handles the "started" event for a workflow by creating a `WaitStarted` event with
@@ -59,7 +60,7 @@ class WaitProcessor(
      */
     override fun startedEvent(
         nodeStack: NodeStack,
-        transformedInput: JsonElement,
+        transformedInput: JsonNode,
         scope: Scope,
     ): WorkflowEvent {
         val config = WaitConfig(waitUntil = Clock.System.now() + getDelay(transformedInput, scope))
@@ -79,7 +80,7 @@ class WaitProcessor(
      * @return Duration to wait, parsed from the task's wait property
      * @throws IllegalArgumentException if the wait duration is invalid
      */
-    private fun getDelay(input: JsonElement, scope: Scope): Duration {
+    private fun getDelay(input: JsonNode, scope: Scope): Duration {
         return try {
             val duration = node.task.wait.toDuration { evalString(input, it, "wait", scope) }
             logger.debug { "Wait task delay: $duration for task: ${node.name}" }

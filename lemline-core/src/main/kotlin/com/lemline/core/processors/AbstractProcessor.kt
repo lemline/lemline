@@ -1,8 +1,13 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.processors
 
+import com.fasterxml.jackson.databind.JsonNode
+import com.fasterxml.jackson.databind.node.ArrayNode
+import com.fasterxml.jackson.databind.node.ObjectNode
+import com.fasterxml.jackson.databind.node.ValueNode
+import com.lemline.common.json.*
 import com.lemline.common.json.LemlineJson
-import com.lemline.common.json.LemlineJson.toJsonElement
+import com.lemline.common.json.LemlineJson.toJsonNode
 import com.lemline.common.logger.logger
 import com.lemline.common.values.NodePosition
 import com.lemline.common.values.WorkflowInfo
@@ -27,10 +32,10 @@ import com.lemline.core.schemas.SchemaValidator
 import com.lemline.core.states.ExtensionPhase
 import com.lemline.core.states.ExtensionReturn
 import com.lemline.core.states.ExtensionReturnKind
-import com.lemline.core.states.PendingTaskState
-import com.lemline.core.states.PreparedTaskResult
 import com.lemline.core.states.NodeStack
 import com.lemline.core.states.NodeState
+import com.lemline.core.states.PendingTaskState
+import com.lemline.core.states.PreparedTaskResult
 import com.lemline.core.states.WorkflowEvent
 import com.lemline.core.states.WorkflowEvent.ForEachCompleted
 import com.lemline.core.states.WorkflowEvent.ForkBranchCompleted
@@ -51,12 +56,6 @@ import io.serverlessworkflow.api.types.TaskBase
 import io.serverlessworkflow.api.types.Use
 import kotlin.time.Clock
 import kotlin.time.Instant
-import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.boolean
-import kotlinx.serialization.json.booleanOrNull
 
 abstract class AbstractProcessor<T : TaskBase, S : NodeState>(
     val node: Node<T>
@@ -71,21 +70,21 @@ abstract class AbstractProcessor<T : TaskBase, S : NodeState>(
      * Create the initial state for this node.
      * Subclasses override to create their specific state type.
      */
-    abstract fun stateWhenEnteringFromParent(transformedInput: JsonElement, scope: Scope, startedAt: Instant = Clock.System.now()): S
+    abstract fun stateWhenEnteringFromParent(transformedInput: JsonNode, scope: Scope, startedAt: Instant = Clock.System.now()): S
 
     /** Execute node action (for activity tasks).*/
     open suspend fun execute(
-        transformedInput: JsonElement,
+        transformedInput: JsonNode,
         scope: Scope,
         state: S,
-    ): JsonElement = transformedInput
+    ): JsonNode = transformedInput
 
     open val isAsync: Boolean = false
 
     /** return started event for activities*/
     open fun startedEvent(
         nodeStack: NodeStack,
-        transformedInput: JsonElement,
+        transformedInput: JsonNode,
         scope: Scope,
     ): WorkflowEvent = error("startedEvent should not be called for $node")
 
@@ -103,7 +102,7 @@ abstract class AbstractProcessor<T : TaskBase, S : NodeState>(
     /** Update state when re-entering from child.*/
     open fun stateWhenReEnteringFromChild(
         state: S,
-        output: JsonElement,
+        output: JsonNode,
         scope: Scope,
         nodeName: String? = null
     ): S {
@@ -117,7 +116,7 @@ abstract class AbstractProcessor<T : TaskBase, S : NodeState>(
      */
     open fun getNextNode(
         state: S,
-        dataset: JsonElement,
+        dataset: JsonNode,
         scope: Scope,
     ) = NextInfo(
         nextNode = node.parent,
@@ -131,7 +130,7 @@ abstract class AbstractProcessor<T : TaskBase, S : NodeState>(
     suspend fun enterFromParent(
         nodeStack: NodeStack,
         workflowInfo: WorkflowInfo,
-        rawInput: JsonElement,
+        rawInput: JsonNode,
         lifecycleHook: LifecycleEventHook,
     ): WorkflowEvent {
         logger.debug { "Entering Down  node=${node.position} - ${node.task::class.simpleName}(input=$rawInput)" }
@@ -207,7 +206,7 @@ abstract class AbstractProcessor<T : TaskBase, S : NodeState>(
     internal suspend fun reEnterFromChild(
         nodeStack: NodeStack,
         workflowInfo: WorkflowInfo,
-        output: JsonElement,
+        output: JsonNode,
         flowDirective: FlowDirective?,
         lifecycleHook: LifecycleEventHook,
         extensionReturn: ExtensionReturn? = null,
@@ -288,7 +287,7 @@ abstract class AbstractProcessor<T : TaskBase, S : NodeState>(
         } }
     }
 
-    private suspend fun returnExtensionBlock(stack: NodeStack, output: JsonElement, kind: ExtensionReturnKind, info: WorkflowInfo, hook: LifecycleEventHook): TaskScheduled {
+    private suspend fun returnExtensionBlock(stack: NodeStack, output: JsonNode, kind: ExtensionReturnKind, info: WorkflowInfo, hook: LifecycleEventHook): TaskScheduled {
         hook.onTaskCompleted(info, stack, node.position, output, Clock.System.now())
         return TaskScheduled(
             nodeStack = stack.pop().incrementTopCounter(),
@@ -328,7 +327,7 @@ abstract class AbstractProcessor<T : TaskBase, S : NodeState>(
     private suspend fun continueTo(
         nodeStack: NodeStack,
         workflowInfo: WorkflowInfo,
-        transformedInput: JsonElement,
+        transformedInput: JsonNode,
         scope: Scope,
         lifecycleHook: LifecycleEventHook,
     ): WorkflowEvent {
@@ -366,7 +365,7 @@ abstract class AbstractProcessor<T : TaskBase, S : NodeState>(
 
     private fun continueToChild(
         childNode: Node<*>?,
-        childRawInput: JsonElement,
+        childRawInput: JsonNode,
         nodeStack: NodeStack
     ) = getNextEvent(
         nodeStack = nodeStack,
@@ -381,7 +380,7 @@ abstract class AbstractProcessor<T : TaskBase, S : NodeState>(
     private suspend fun continueToParent(
         nodeStack: NodeStack,
         workflowInfo: WorkflowInfo,
-        transformedInput: JsonElement,
+        transformedInput: JsonNode,
         currentFlowDirective: FlowDirective?,
         scope: Scope,
         lifecycleHook: LifecycleEventHook,
@@ -406,7 +405,7 @@ abstract class AbstractProcessor<T : TaskBase, S : NodeState>(
      * complete tasks that were executed externally (e.g., child workflows).
      */
     internal suspend fun completeTask(
-        rawOutput: JsonElement,
+        rawOutput: JsonNode,
         currentFlowDirective: FlowDirective?,
         currentScope: Scope,
         nodeStack: NodeStack,
@@ -442,7 +441,7 @@ abstract class AbstractProcessor<T : TaskBase, S : NodeState>(
     }
 
     private suspend fun finalizeTask(
-        transformedOutput: JsonElement,
+        transformedOutput: JsonNode,
         currentFlowDirective: FlowDirective?,
         nodeStack: NodeStack,
         workflowInfo: WorkflowInfo,
@@ -479,7 +478,7 @@ abstract class AbstractProcessor<T : TaskBase, S : NodeState>(
     private suspend fun continueToEnd(
         nodeStack: NodeStack,
         workflowInfo: WorkflowInfo,
-        output: JsonElement,
+        output: JsonNode,
         lifecycleHook: LifecycleEventHook
     ): WorkflowEvent {
 
@@ -510,7 +509,7 @@ abstract class AbstractProcessor<T : TaskBase, S : NodeState>(
     private fun getNextEvent(
         nodeStack: NodeStack,
         nextNode: Node<*>?,
-        nextInput: JsonElement,
+        nextInput: JsonNode,
         nextDirective: FlowDirective? = null,
     ): WorkflowEvent {
         // Workflow completed
@@ -547,7 +546,7 @@ abstract class AbstractProcessor<T : TaskBase, S : NodeState>(
     private fun forkBranchCompleted(
         nodeStack: NodeStack,
         nextNode: Node<*>,
-        nextInput: JsonElement,
+        nextInput: JsonNode,
     ): ForkBranchCompleted? {
         val nextFrame = nodeStack[nextNode.position]
 
@@ -576,7 +575,7 @@ abstract class AbstractProcessor<T : TaskBase, S : NodeState>(
     private fun forEachCompleted(
         nodeStack: NodeStack,
         nextNode: Node<*>,
-        nextInput: JsonElement,
+        nextInput: JsonNode,
     ): ForEachCompleted? {
         val nextFrame = nodeStack[nextNode.position]
 
@@ -596,7 +595,7 @@ abstract class AbstractProcessor<T : TaskBase, S : NodeState>(
     /**
      * Check if condition for conditional execution.
      */
-    private fun checkIf(rawInput: JsonElement, scope: Scope): Boolean {
+    private fun checkIf(rawInput: JsonNode, scope: Scope): Boolean {
         val ifCondition = node.task.`if` ?: return true
         return evalBoolean(rawInput, ifCondition, "if", scope)
     }
@@ -604,7 +603,7 @@ abstract class AbstractProcessor<T : TaskBase, S : NodeState>(
     /**
      * Validate input against schema.
      */
-    private fun validateInput(rawInput: JsonElement) {
+    private fun validateInput(rawInput: JsonNode) {
         node.task.input?.schema?.let { schema ->
             validate(rawInput, schema)
         }
@@ -613,21 +612,21 @@ abstract class AbstractProcessor<T : TaskBase, S : NodeState>(
     /**
      * Transform input using input.from expression.
      */
-    private fun transformInput(rawInput: JsonElement, scope: Scope): JsonElement {
+    private fun transformInput(rawInput: JsonNode, scope: Scope): JsonNode {
         return inputFrom(rawInput, node.task.input?.from, scope)
     }
 
     /**
      * Transforms the output dataset using the task's `output.as` expression.
      */
-    private fun transformOutput(rawOutput: JsonElement, scope: Scope): JsonElement {
+    private fun transformOutput(rawOutput: JsonNode, scope: Scope): JsonNode {
         return outputAs(rawOutput, node.task.output?.`as`, scope)
     }
 
     /**
      * Exports data to workflow context using the task's `export.as` expression.
      */
-    private fun exportToContext(transformedOutput: JsonElement, scope: Scope): JsonObject? {
+    private fun exportToContext(transformedOutput: JsonNode, scope: Scope): ObjectNode? {
         val exportDef = node.task.export ?: return null
 
         // Evaluate export.as expression with transformed output as input
@@ -644,7 +643,7 @@ abstract class AbstractProcessor<T : TaskBase, S : NodeState>(
     /**
      * Validate output against schema.
      */
-    private fun validateOutput(transformedOutput: JsonElement) {
+    private fun validateOutput(transformedOutput: JsonNode) {
         node.task.output?.schema?.let { schema ->
             validate(transformedOutput, schema)
         }
@@ -661,7 +660,7 @@ abstract class AbstractProcessor<T : TaskBase, S : NodeState>(
     // Validation helper
     // ========================================
 
-    private fun validate(data: JsonElement, schemaUnion: SchemaUnion) = try {
+    private fun validate(data: JsonNode, schemaUnion: SchemaUnion) = try {
         SchemaValidator.validate(data, schemaUnion)
     } catch (e: Exception) {
         raiseError(VALIDATION, e.message, e.stackTraceToString())
@@ -671,70 +670,69 @@ abstract class AbstractProcessor<T : TaskBase, S : NodeState>(
     // Expression Evaluation Helpers
     // ========================================
 
-    private fun inputFrom(data: JsonElement, inputFrom: InputFrom?, scope: JsonObject): JsonElement =
+    private fun inputFrom(data: JsonNode, inputFrom: InputFrom?, scope: ObjectNode): JsonNode =
         inputFrom?.let { eval(data, LemlineJson.encodeToElement(it), scope, true) } ?: data
 
-    private fun outputAs(data: JsonElement, outputAs: OutputAs?, scope: JsonObject): JsonElement =
+    private fun outputAs(data: JsonNode, outputAs: OutputAs?, scope: ObjectNode): JsonNode =
         outputAs?.let { eval(data, LemlineJson.encodeToElement(it), scope, true) } ?: data
 
-    private fun exportAs(data: JsonElement, exportAs: ExportAs?, scope: JsonObject): JsonObject =
+    private fun exportAs(data: JsonNode, exportAs: ExportAs?, scope: ObjectNode): ObjectNode =
         (exportAs?.let { eval(data, LemlineJson.encodeToElement(it), scope, true) } ?: data).let {
-            when (it is JsonObject) {
+            when (it is ObjectNode) {
                 true -> it
                 false -> raiseError(EXPRESSION, "'.export.as' expression must be an object, but is '$it'")
             }
         }
 
-    internal fun runWorkflowInput(data: JsonElement, subFlowInput: SubflowInput?, scope: JsonObject): JsonElement =
-        subFlowInput?.let { eval(data, it.additionalProperties.toJsonElement(), scope, false) } ?: data
+    internal fun runWorkflowInput(data: JsonNode, subFlowInput: SubflowInput?, scope: ObjectNode): JsonNode =
+        subFlowInput?.let { eval(data, it.additionalProperties.toJsonNode(), scope, false) } ?: data
 
     internal fun evalBoolean(
-        data: JsonElement,
+        data: JsonNode,
         expr: String,
         name: String,
-        scope: JsonObject
+        scope: ObjectNode
     ): Boolean = eval(data, expr, scope).let {
-        when (it is JsonPrimitive && it.booleanOrNull != null) {
+        when (it is ValueNode && it.booleanOrNull != null) {
             true -> it.boolean
             false -> raiseError(EXPRESSION, "'.$name' expression must be a boolean, but is '$it'")
         }
     }
 
     internal fun evalString(
-        data: JsonElement,
+        data: JsonNode,
         expr: String,
         name: String,
-        scope: JsonObject
+        scope: ObjectNode
     ): String = eval(data, expr, scope).let {
-        when (it is JsonPrimitive) {
+        when (it is ValueNode) {
             true -> it.content
             false -> raiseError(EXPRESSION, "'.$name' expression must be a String, but is '$it'")
         }
     }
 
     internal fun evalList(
-        data: JsonElement,
+        data: JsonNode,
         expr: String,
         name: String,
-        scope: JsonObject
+        scope: ObjectNode
     ) = eval(data, expr, scope).let {
-        when (it is JsonArray) {
+        when (it is ArrayNode) {
             true -> it.toList()
             false -> raiseError(EXPRESSION, "'.$name' expression must be an array, but is '$it'")
         }
     }
 
-
-    private fun eval(data: JsonElement, expr: String, scope: JsonObject): JsonElement = try {
-        JQExpression.eval(data, JsonPrimitive(expr), scope, false, node.evaluationMode)
+    private fun eval(data: JsonNode, expr: String, scope: ObjectNode): JsonNode = try {
+        JQExpression.eval(data, jsonValue(expr), scope, false, node.evaluationMode)
     } catch (e: Exception) {
         raiseError(EXPRESSION, e.message, e.stackTraceToString())
     }
 
     protected fun eval(
-        data: JsonElement,
-        expr: JsonElement,
-        scope: JsonObject,
+        data: JsonNode,
+        expr: JsonNode,
+        scope: ObjectNode,
         force: Boolean = false
     ) = try {
         JQExpression.eval(data, expr, scope, force, node.evaluationMode)
@@ -769,11 +767,11 @@ abstract class AbstractProcessor<T : TaskBase, S : NodeState>(
  * Components:
  * - A `Node<*>?`: The next node to navigate to, null indicates navigation ends
  * - A `FlowDirective?`: Directives influencing the parent execution flow (if any)
- * - A `JsonElement?`: Optional input for the next node (overrides default transformedInput)
+ * - A `JsonNode?`: Optional input for the next node (overrides default transformedInput)
  *   Used by CallFunction to pass evaluated `with` arguments to the function.
  */
 data class NextInfo(
     val nextNode: Node<*>?,
     val nextDirective: FlowDirective?,
-    val nextInput: JsonElement? = null
+    val nextInput: JsonNode? = null
 )

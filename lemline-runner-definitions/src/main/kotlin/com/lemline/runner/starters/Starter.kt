@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.starters
 
+import com.fasterxml.jackson.databind.JsonNode
+import com.lemline.common.json.*
 import com.lemline.common.values.WorkflowId
 import com.lemline.common.values.WorkflowInfo
 import com.lemline.common.values.WorkflowName
@@ -17,7 +19,6 @@ import com.lemline.runner.schedules.ScheduleModel
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
 import java.time.ZoneId
-import kotlinx.serialization.json.JsonElement
 
 @ApplicationScoped
 class Starter : WorkflowStarter<ScheduleModel> {
@@ -42,7 +43,7 @@ class Starter : WorkflowStarter<ScheduleModel> {
         workflowNamespace: WorkflowNamespace,
         workflowName: WorkflowName,
         optionalVersion: WorkflowVersion?,
-        workflowInput: JsonElement,
+        workflowInput: JsonNode,
         hasWaitingParent: Boolean,
         zoneId: ZoneId?,
         onError: (String) -> Nothing,
@@ -98,7 +99,7 @@ class Starter : WorkflowStarter<ScheduleModel> {
     }
 
     private fun validateInput(
-        workflowInput: JsonElement,
+        workflowInput: JsonNode,
         workflow: io.serverlessworkflow.api.types.Workflow,
         onError: (String) -> Nothing,
     ) {

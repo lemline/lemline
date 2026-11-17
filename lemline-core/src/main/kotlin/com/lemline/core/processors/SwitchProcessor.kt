@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.processors
 
+import com.fasterxml.jackson.databind.JsonNode
+import com.lemline.common.json.*
 import com.lemline.core.errors.WorkflowErrorType
 import com.lemline.core.nodes.Node
 import com.lemline.core.processors.scope.Scope
@@ -9,7 +11,6 @@ import io.serverlessworkflow.api.types.FlowDirective
 import io.serverlessworkflow.api.types.SwitchItem
 import io.serverlessworkflow.api.types.SwitchTask
 import kotlin.time.Instant
-import kotlinx.serialization.json.JsonElement
 
 /**
  * Node instance for SwitchTask (conditional branching) - pure functional model.
@@ -59,14 +60,14 @@ class SwitchProcessor(
     node: Node<SwitchTask>,
 ) : AbstractProcessor<SwitchTask, SwitchState>(node) {
 
-    override fun stateWhenEnteringFromParent(transformedInput: JsonElement, scope: Scope, startedAt: Instant) = SwitchState(startedAt = startedAt)
+    override fun stateWhenEnteringFromParent(transformedInput: JsonNode, scope: Scope, startedAt: Instant) = SwitchState(startedAt = startedAt)
 
     // SwitchProcessor doesn't need updateState - it's a leaf node that evaluates once
     // The default implementation (returning state unchanged) is sufficient
 
     override fun getNextNode(
         state: SwitchState,
-        dataset: JsonElement,
+        dataset: JsonNode,
         scope: Scope,
     ): NextInfo {
 

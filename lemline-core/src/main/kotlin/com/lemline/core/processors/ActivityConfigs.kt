@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.processors
 
+import com.fasterxml.jackson.databind.JsonNode
+import com.lemline.common.json.*
 import com.lemline.core.workflows.CachedEventConsumption
 import com.lemline.core.workflows.CachedEventFilter
 import io.serverlessworkflow.api.types.HTTPArguments.HTTPOutput
@@ -8,7 +10,6 @@ import io.serverlessworkflow.api.types.ListenTaskConfiguration.ListenAndReadAs
 import io.serverlessworkflow.api.types.RunTaskConfiguration.ProcessReturnType
 import kotlin.time.Instant
 import kotlinx.serialization.Contextual
-import kotlinx.serialization.json.JsonElement
 
 /**
  * Configuration for emitting a CloudEvent.
@@ -24,7 +25,7 @@ data class EmitConfig(
     val subject: String? = null,
     val dataschema: String? = null,
     val datacontenttype: String? = null,
-    val data: JsonElement? = null,
+    val data: JsonNode? = null,
     val extensions: Map<String, String>? = null
 )
 
@@ -39,7 +40,7 @@ data class CallHttpConfig(
     val url: String,
     val headers: Map<String, String> = emptyMap(),
     val query: Map<String, String> = emptyMap(),
-    val body: JsonElement? = null,
+    val body: JsonNode? = null,
     val output: HTTPOutput = HTTPOutput.CONTENT,
     val redirect: Boolean = true,
     val authentication: HttpAuthentication? = null
@@ -176,5 +177,5 @@ data class ListenConfig(
     val until: UntilCondition? = null,
     val readAs: ListenAndReadAs = ListenAndReadAs.DATA,
     @Contextual val timeoutAt: Instant? = null,
-    val correlationContext: JsonElement? = null
+    val correlationContext: JsonNode? = null
 )

@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.cli.instances
 
+import com.fasterxml.jackson.databind.JsonNode
+import com.lemline.common.json.*
 import com.lemline.common.json.LemlineJson
 import com.lemline.common.values.WorkflowId
 import com.lemline.common.values.WorkflowName
@@ -16,7 +18,6 @@ import io.quarkus.arc.Unremovable
 import jakarta.inject.Inject
 import java.time.ZoneId
 import kotlinx.coroutines.runBlocking
-import kotlinx.serialization.json.JsonElement
 import picocli.CommandLine.Command
 import picocli.CommandLine.Mixin
 import picocli.CommandLine.Option
@@ -125,11 +126,11 @@ class InstanceStartCommand : Runnable {
     }
 
     // Parse the input string as JSON
-    private fun getInput(input: String?): JsonElement = input?.let {
+    private fun getInput(input: String?): JsonNode = input?.let {
         try {
             // Use Jackson first to support single quotes, unquoted field names, and comments, then normalize to JSON
             val normalized = LemlineJson.jacksonMapper.readTree(it).toString()
-            LemlineJson.json.parseToJsonElement(normalized)
+            parseJson(normalized)
         } catch (e: Exception) {
             cliError("Invalid JSON input: ${e.message}")
         }

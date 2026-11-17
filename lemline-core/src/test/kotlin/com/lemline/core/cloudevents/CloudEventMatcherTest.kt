@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.cloudevents
 
+import com.fasterxml.jackson.databind.node.NullNode
+import com.lemline.common.json.*
 import com.lemline.core.processors.CorrelationDef
 import com.lemline.core.processors.EventFilter
 import io.cloudevents.CloudEvent
@@ -12,10 +14,6 @@ import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
-import kotlinx.serialization.json.JsonNull
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.put
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 
@@ -192,33 +190,33 @@ class CloudEventMatcherTest {
     inner class EvaluateExpressionAsBoolean {
         @Test
         fun `should return true for true expression`() {
-            val input = JsonPrimitive("test")
+            val input = jsonValue("test")
             assertTrue(CloudEventMatcher.evaluateExpressionAsBoolean($$"${true}", input))
         }
 
         @Test
         fun `should return false for false expression`() {
-            val input = JsonPrimitive("test")
+            val input = jsonValue("test")
             assertFalse(CloudEventMatcher.evaluateExpressionAsBoolean($$"${false}", input))
         }
 
         @Test
         fun `should evaluate comparison expressions`() {
-            val input = JsonPrimitive(42)
+            val input = jsonValue(42)
             assertTrue(CloudEventMatcher.evaluateExpressionAsBoolean($$"${. > 10}", input))
             assertFalse(CloudEventMatcher.evaluateExpressionAsBoolean($$"${. > 100}", input))
         }
 
         @Test
         fun `should return false for non-boolean results`() {
-            val input = JsonPrimitive("test")
+            val input = jsonValue("test")
             // Expression returns string, not boolean
             assertFalse(CloudEventMatcher.evaluateExpressionAsBoolean($$"${.}", input))
         }
 
         @Test
         fun `should return false for malformed expressions`() {
-            val input = JsonPrimitive("test")
+            val input = jsonValue("test")
             assertFalse(CloudEventMatcher.evaluateExpressionAsBoolean($$"${.[[[invalid}", input))
         }
     }
@@ -307,9 +305,9 @@ class CloudEventMatcherTest {
         @Test
         fun `should serialize array result to JSON string`() {
             val eventData = buildJsonObject {
-                put("items", kotlinx.serialization.json.buildJsonArray {
-                    add(JsonPrimitive("a"))
-                    add(JsonPrimitive("b"))
+                put("items", com.lemline.common.json.buildJsonArray {
+                    add(jsonValue("a"))
+                    add(jsonValue("b"))
                 })
             }
             val result = CloudEventMatcher.evaluateFromExpression(".items", eventData)
@@ -705,7 +703,7 @@ class CloudEventMatcherTest {
                 CloudEventMatcher.matchesFilters(
                     event,
                     listOf(EventFilter(dataFilter = ".status == \"completed\""))
-                ) { JsonNull }
+                ) { NullNode.instance }
             )
         }
 
@@ -1197,7 +1195,7 @@ class CloudEventMatcherTest {
                 listOf(EventFilter(type = "different.event"))
             ) {
                 dataProviderCalled = true
-                JsonNull
+                NullNode.instance
             }
 
             assertFalse(dataProviderCalled)

@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.testcases.impl
 
+import com.fasterxml.jackson.databind.JsonNode
+import com.lemline.common.json.*
 import com.lemline.common.values.WorkflowId
 import com.lemline.core.activities.mock.MockActivityExecutor
 import com.lemline.core.activities.mock.MockConfiguration
@@ -19,7 +21,6 @@ import io.cloudevents.CloudEvent
 import io.serverlessworkflow.api.types.Workflow
 import kotlin.time.Clock
 import kotlinx.coroutines.flow.onStart
-import kotlinx.serialization.json.JsonElement
 
 /**
  * WorkflowTestExecutor implementation that uses FullOrchestrator.
@@ -41,7 +42,7 @@ class FullOrchestratorTestExecutor : WorkflowTestExecutor {
 
     override suspend fun execute(
         yaml: String,
-        input: JsonElement,
+        input: JsonNode,
         namespace: String,
         name: String,
         version: String,

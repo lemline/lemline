@@ -1,13 +1,10 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.testcases
 
+import com.lemline.common.json.*
 import com.lemline.core.testcases.impl.TestMocks
 import com.lemline.core.testcases.impl.WorkflowTestCase
 import com.lemline.core.testcases.impl.WorkflowTestValidators.expectOutput
-import com.lemline.core.testcases.impl.WorkflowTestValidators.expectOutput
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.put
 
 /**
  * Test cases for Shell execution.
@@ -30,7 +27,7 @@ object RunShellTestCases {
                           command: echo Hello World
             """.trimIndent(),
             tags = setOf("shell"),
-            validate = expectOutput(JsonPrimitive("Hello World"))
+            validate = expectOutput(jsonValue("Hello World"))
         ),
 
         WorkflowTestCase(
@@ -47,7 +44,7 @@ object RunShellTestCases {
                             - World
             """.trimIndent(),
             tags = setOf("shell"),
-            validate = expectOutput(JsonPrimitive("Hello World"))
+            validate = expectOutput(jsonValue("Hello World"))
         ),
 
         WorkflowTestCase(
@@ -66,7 +63,7 @@ object RunShellTestCases {
                             MY_VAR: TestValue
             """.trimIndent(),
             tags = setOf("shell"),
-            validate = expectOutput(JsonPrimitive("mocked output"))
+            validate = expectOutput(jsonValue("mocked output"))
         ),
 
         WorkflowTestCase(
@@ -81,7 +78,7 @@ object RunShellTestCases {
                         return: stdout
             """.trimIndent(),
             tags = setOf("shell"),
-            validate = expectOutput(JsonPrimitive("Hello World"))
+            validate = expectOutput(jsonValue("Hello World"))
         ),
 
         WorkflowTestCase(
@@ -99,7 +96,7 @@ object RunShellTestCases {
                           command: ${ "echo " + .greeting + " " + .name }
             """.trimIndent(),
             tags = setOf("shell"),
-            validate = expectOutput(JsonPrimitive("Hello World"))
+            validate = expectOutput(jsonValue("Hello World"))
         ),
 
         WorkflowTestCase(
@@ -119,7 +116,7 @@ object RunShellTestCases {
                             - ${ .name }
             """.trimIndent(),
             tags = setOf("shell"),
-            validate = expectOutput(JsonPrimitive("Hello World"))
+            validate = expectOutput(jsonValue("Hello World"))
         ),
 
         WorkflowTestCase(
@@ -141,7 +138,7 @@ object RunShellTestCases {
                             MY_VAR: ${ .varValue }
             """.trimIndent(),
             tags = setOf("shell"),
-            validate = expectOutput(JsonPrimitive("mocked output"))
+            validate = expectOutput(jsonValue("mocked output"))
         ),
 
         WorkflowTestCase(
@@ -217,7 +214,7 @@ object RunShellTestCases {
                             - /tmp
             """.trimIndent(),
             tags = setOf("shell"),
-            validate = expectOutput(JsonPrimitive("file1.txt\nfile2.txt\ndir1"))
+            validate = expectOutput(jsonValue("file1.txt\nfile2.txt\ndir1"))
         )
     )
 }

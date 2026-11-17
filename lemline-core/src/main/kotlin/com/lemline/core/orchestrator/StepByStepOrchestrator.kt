@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.orchestrator
 
+import com.fasterxml.jackson.databind.JsonNode
+import com.fasterxml.jackson.databind.node.ObjectNode
+import com.lemline.common.json.*
 import com.lemline.common.values.NodePosition
 import com.lemline.common.values.WorkflowId
 import com.lemline.common.values.WorkflowInfo
@@ -48,9 +51,6 @@ import io.serverlessworkflow.api.types.Workflow
 import kotlin.time.Clock
 import kotlin.time.Instant
 import kotlinx.coroutines.CancellationException
-import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.buildJsonObject
 
 /**
  * The StepByStepOrchestrator object handles the orchestration of workflow execution,
@@ -69,7 +69,7 @@ object StepByStepOrchestrator {
      */
     fun initCmd(
         workflowId: WorkflowId = WorkflowId.random(),
-        workflowInput: JsonElement = buildJsonObject { },
+        workflowInput: JsonNode = buildJsonObject { },
         hasWaitingParent: Boolean = false,
         startedAt: Instant = Clock.System.now(),
     ): WorkflowCommand.ResumeFromTask {
@@ -104,15 +104,15 @@ object StepByStepOrchestrator {
         workflowInfo: WorkflowInfo,
         lifecycleHook: LifecycleEventHook,
         functionResolver: suspend (String) -> Task = { error("Function resolver not configured") },
-        secrets: JsonObject = buildJsonObject {},
+        secrets: ObjectNode = buildJsonObject {},
     ): WorkflowEvent {
         // RootStateProto omits the definition; restore it from the loaded workflow before evaluating scope.
         val declaredSecrets = workflow.use?.secrets.orEmpty()
-        val visibleSecrets = JsonObject(secrets.filterKeys { it in declaredSecrets })
+        val visibleSecrets = ObjectNode(secrets.filterKeys { it in declaredSecrets })
         val nodeStack = command.nodeStack
             .withWorkflowDefinition(WorkflowCache.getDefinitionJson(workflow))
             .withSecrets(visibleSecrets)
-        declaredSecrets.firstOrNull { it !in visibleSecrets }?.let { missing ->
+        declaredSecrets.firstOrNull { !visibleSecrets.has(it) }?.let { missing ->
             val event = WorkflowFaulted(
                 nodeStack = nodeStack,
                 rawInput = null,
@@ -259,7 +259,7 @@ object StepByStepOrchestrator {
         workflowInfo: WorkflowInfo,
         lifecycleHook: LifecycleEventHook,
         functionResolver: suspend (String) -> Task = { error("Function resolver not configured") },
-        secrets: JsonObject = buildJsonObject {},
+        secrets: ObjectNode = buildJsonObject {},
     ): WorkflowEvent {
 
         return when (val event = runByTask(workflow, command, workflowInfo, lifecycleHook, functionResolver, secrets)) {
@@ -284,8 +284,8 @@ object StepByStepOrchestrator {
     private suspend fun resumeWithHandler(
         nodeStack: NodeStack,
         node: Node<*>,
-        rawInput: JsonElement?,
-        rawOutput: JsonElement?,
+        rawInput: JsonNode?,
+        rawOutput: JsonNode?,
         flowDirective: FlowDirective?,
         workflowInfo: WorkflowInfo,
         lifecycleHook: LifecycleEventHook,
@@ -323,7 +323,7 @@ object StepByStepOrchestrator {
     internal suspend fun resumeFromTask(
         nodeStack: NodeStack,
         node: Node<*>,
-        rawInput: JsonElement,
+        rawInput: JsonNode,
         flowDirective: FlowDirective? = null,
         extensionReturn: ExtensionReturn? = null,
         workflowInfo: WorkflowInfo,
@@ -349,7 +349,7 @@ object StepByStepOrchestrator {
     internal suspend fun resumeFromCompletedTask(
         nodeStack: NodeStack,
         node: Node<*>,
-        rawOutput: JsonElement,
+        rawOutput: JsonNode,
         workflowInfo: WorkflowInfo,
         lifecycleHook: LifecycleEventHook,
     ): WorkflowEvent = resumeWithHandler(
@@ -481,7 +481,7 @@ object StepByStepOrchestrator {
     private suspend fun startTask(
         nodeStack: NodeStack,
         node: Node<*>,
-        rawInput: JsonElement,
+        rawInput: JsonNode,
         flowDirective: FlowDirective?,
         workflowInfo: WorkflowInfo,
         lifecycleHook: LifecycleEventHook,
@@ -516,7 +516,7 @@ object StepByStepOrchestrator {
     private suspend fun emitTaskEntryEvents(
         nodeStack: NodeStack,
         node: Node<*>,
-        rawInput: JsonElement,
+        rawInput: JsonNode,
         workflowInfo: WorkflowInfo,
         lifecycleHook: LifecycleEventHook,
     ) {
@@ -558,7 +558,7 @@ object StepByStepOrchestrator {
     internal suspend fun completeTask(
         nodeStack: NodeStack,
         node: Node<*>,
-        rawOutput: JsonElement,
+        rawOutput: JsonNode,
         workflowInfo: WorkflowInfo,
         lifecycleHook: LifecycleEventHook,
     ): WorkflowEvent {

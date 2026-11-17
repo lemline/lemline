@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.processors
 
-import com.lemline.common.json.LemlineJson
+import com.fasterxml.jackson.databind.JsonNode
+import com.lemline.common.json.*
 import com.lemline.core.errors.InternalException
 import com.lemline.core.nodes.Node
 import com.lemline.core.processors.scope.Scope
@@ -29,8 +30,6 @@ import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.DurationUnit
 import kotlin.time.Instant
-import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.buildJsonObject
 
 /**
  * Node processor for TryTask (error handling) - pure functional model.
@@ -77,7 +76,7 @@ class TryProcessor(
     /**
      * This state is initialized when entering the TryTask node for the first time
      */
-    override fun stateWhenEnteringFromParent(transformedInput: JsonElement, scope: Scope, startedAt: Instant): TryState = TryState(
+    override fun stateWhenEnteringFromParent(transformedInput: JsonNode, scope: Scope, startedAt: Instant): TryState = TryState(
         startedAt = startedAt,
         transformedInput = transformedInput,  // Store for retries/catch
         attemptIndex = 0,  // Ready for first attempt
@@ -90,7 +89,7 @@ class TryProcessor(
      */
     override fun stateWhenReEnteringFromChild(
         state: TryState,
-        output: JsonElement,
+        output: JsonNode,
         scope: Scope,
         nodeName: String?
     ): TryState = state.copy(
@@ -109,7 +108,7 @@ class TryProcessor(
      */
     override fun getNextNode(
         state: TryState,
-        dataset: JsonElement,
+        dataset: JsonNode,
         scope: Scope,
     ): NextInfo = when (state.hasStarted) {
         // First attempt - go to try block
@@ -150,12 +149,11 @@ class TryProcessor(
             if (filter.detail != null && filter.detail != error.details) return false
         }
 
-
         // get transient scope with error
         val filterScope by lazy {
             buildJsonObject {
-                scope.forEach { (key, value) -> put(key, value) }
-                put(errorAs, LemlineJson.encodeToElement(error))
+                scope.properties().forEach { (key, value) -> put(key, value) }
+                put(errorAs, error.toJsonNode())
             }
         }
 
@@ -186,8 +184,8 @@ class TryProcessor(
     ): WorkflowEvent {
 
         val retryScope = buildJsonObject {
-            filterScope(state, nodeStack).withTransformedInput(state.transformedInput).forEach { (key, value) -> put(key, value) }
-            put(errorAs, LemlineJson.encodeToElement(error))
+            filterScope(state, nodeStack).withTransformedInput(state.transformedInput).properties().forEach { (key, value) -> put(key, value) }
+            put(errorAs, error.toJsonNode())
         }
         // Retry expressions share the caught error's scope.
         val shouldRetry = shouldRetry(state, retryScope)
@@ -300,7 +298,7 @@ class TryProcessor(
      * Calculates the delay duration before the next retry attempt based on the retry policy and the current attempt index.
      * The method considers factors such as base delay, backoff strategy, and jitter to compute the final retry delay.
      */
-    private fun RetryPolicy.getRetryDelay(attemptIndex: Int, input: JsonElement, scope: Scope): Duration {
+    private fun RetryPolicy.getRetryDelay(attemptIndex: Int, input: JsonNode, scope: Scope): Duration {
 
         // Max attempt duration before a task attempt timeout
         val attemptDurationLimit: Duration? = limit?.attempt?.duration?.toDuration { evalString(input, it, "retry.limit.attempt.duration", scope) }

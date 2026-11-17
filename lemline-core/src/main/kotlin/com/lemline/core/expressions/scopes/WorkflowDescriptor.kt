@@ -1,8 +1,16 @@
 // SPDX-License-Identifier: BUSL-1.1
+@file:kotlinx.serialization.UseSerializers(
+    com.lemline.common.json.JsonNodeSerializer::class,
+    com.lemline.common.json.ObjectNodeSerializer::class,
+    com.lemline.common.json.ArrayNodeSerializer::class,
+)
+
 package com.lemline.core.expressions.scopes
+
+import com.fasterxml.jackson.databind.JsonNode
+import com.fasterxml.jackson.databind.node.ObjectNode
+import com.lemline.common.json.*
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonObject
 /**
  * Data class representing a workflow descriptor.
  *
@@ -16,7 +24,7 @@ import kotlinx.serialization.json.JsonObject
 @Serializable
 data class WorkflowDescriptor(
     val id: String,
-    val definition: JsonObject,
-    val input: JsonElement,
-    private val startedAt: JsonObject,
+    val definition: ObjectNode,
+    val input: JsonNode,
+    private val startedAt: ObjectNode,
 )

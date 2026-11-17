@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.listeners
 
+import com.fasterxml.jackson.databind.node.NullNode
+import com.lemline.common.json.*
 import com.lemline.common.values.IDV7
 import com.lemline.common.values.NodePosition
 import com.lemline.common.values.WorkflowId
@@ -33,7 +35,6 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.test.runTest
-import kotlinx.serialization.json.JsonNull
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 
@@ -106,7 +107,7 @@ abstract class ListenerEventRepositoryTestBase {
                     NodePosition.root, RootState(
                         startedAt = now,
                         workflowId = workflowId,
-                        workflowInput = JsonNull
+                        workflowInput = NullNode.instance
                     )
                 ),
                 StackFrame(NodePosition("/do"), DoState(startedAt = now)),
@@ -125,7 +126,7 @@ abstract class ListenerEventRepositoryTestBase {
 
         val listenStarted = WorkflowEvent.ListenStarted(
             nodeStack = nodeStack,
-            rawOutput = JsonNull,
+            rawOutput = NullNode.instance,
             config = config
         )
 
@@ -176,7 +177,7 @@ abstract class ListenerEventRepositoryTestBase {
                     NodePosition.root, RootState(
                         startedAt = now,
                         workflowId = workflowId,
-                        workflowInput = JsonNull
+                        workflowInput = NullNode.instance
                     )
                 ),
                 StackFrame(NodePosition("/do"), DoState(startedAt = now)),
@@ -198,7 +199,7 @@ abstract class ListenerEventRepositoryTestBase {
 
         val listenStarted = WorkflowEvent.ListenStarted(
             nodeStack = nodeStack,
-            rawOutput = JsonNull,
+            rawOutput = NullNode.instance,
             config = config
         )
 
@@ -1008,7 +1009,7 @@ abstract class ListenerEventRepositoryTestBase {
                     NodePosition.root, RootState(
                         startedAt = now,
                         workflowId = workflowId,
-                        workflowInput = JsonNull
+                        workflowInput = NullNode.instance
                     )
                 ),
                 StackFrame(NodePosition("/do"), DoState(startedAt = now)),
@@ -1031,7 +1032,7 @@ abstract class ListenerEventRepositoryTestBase {
 
         val listenStarted = WorkflowEvent.ListenStarted(
             nodeStack = nodeStack,
-            rawOutput = JsonNull,
+            rawOutput = NullNode.instance,
             config = config
         )
 

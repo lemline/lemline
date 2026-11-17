@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.messaging.pgmq.connector
 
+import com.lemline.common.json.*
 import com.lemline.runner.common.test.RequiresDocker
 import com.lemline.runner.messaging.pgmq.DlqMessage
 import com.lemline.runner.messaging.pgmq.PgmqClient
@@ -22,7 +23,6 @@ import java.util.concurrent.Flow
 import java.util.concurrent.SubmissionPublisher
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.delay
-import kotlinx.serialization.json.Json
 import org.eclipse.microprofile.config.Config
 import org.eclipse.microprofile.reactive.messaging.Message
 import org.eclipse.microprofile.reactive.messaging.Metadata
@@ -263,7 +263,7 @@ class PgmqMultiQueueIntegrationTest : FunSpec({
             val dlqMessage = awaitMessage(helper, "dlq-q-a.dlq")
             dlqMessage.shouldNotBeNull()
 
-            val dlqPayload = Json.decodeFromString<DlqMessage>(dlqMessage.message)
+            val dlqPayload = LemlineJson.decodeFromString<DlqMessage>(dlqMessage.message)
             dlqPayload.originalQueue shouldBe "dlq-q-a"
             dlqPayload.payload shouldBe """{"poison":true}"""
             dlqPayload.error shouldContain "simulated processing failure"
@@ -331,7 +331,7 @@ class PgmqMultiQueueIntegrationTest : FunSpec({
 
             val dlqMessage = awaitMessage(helper, "poison_single_dlq")
             dlqMessage.shouldNotBeNull()
-            val dlqPayload = Json.decodeFromString<DlqMessage>(dlqMessage.message)
+            val dlqPayload = LemlineJson.decodeFromString<DlqMessage>(dlqMessage.message)
             dlqPayload.originalQueue shouldBe "poison_single_q"
             dlqPayload.error shouldContain "Unreadable message"
 
@@ -398,7 +398,7 @@ class PgmqMultiQueueIntegrationTest : FunSpec({
 
             val dlqMessage = awaitMessage(helper, "poison_mq_a.dlq")
             dlqMessage.shouldNotBeNull()
-            Json.decodeFromString<DlqMessage>(dlqMessage.message).originalQueue shouldBe "poison_mq_a"
+            LemlineJson.decodeFromString<DlqMessage>(dlqMessage.message).originalQueue shouldBe "poison_mq_a"
 
             subscriber.cancel()
         } finally {

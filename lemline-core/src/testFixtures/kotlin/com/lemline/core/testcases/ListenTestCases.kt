@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.testcases
 
-import com.lemline.core.cloudevents.CloudEventParser.toJsonElement
+import com.fasterxml.jackson.databind.node.ArrayNode
+import com.lemline.common.json.*
+import com.lemline.core.cloudevents.CloudEventParser.toJsonNode
 import com.lemline.core.testcases.impl.TestMocks.buildCloudEvent
 import com.lemline.core.testcases.impl.TestMocks.criticalAlertEvent
 import com.lemline.core.testcases.impl.TestMocks.eventWithDataSchema
@@ -34,9 +36,6 @@ import com.lemline.core.testcases.impl.WorkflowTestCase
 import com.lemline.core.testcases.impl.WorkflowTestValidators.expectErrorContaining
 import com.lemline.core.testcases.impl.WorkflowTestValidators.expectOutput
 import io.serverlessworkflow.api.types.ListenTaskConfiguration.ListenAndReadAs
-import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.put
 
 /**
  * Test cases for listen task execution.
@@ -52,7 +51,7 @@ object ListenTestCases {
                 until.prependIndent("            ") +
                 if (foreach) "\n      foreach:\n        item: item\n        do:\n          - identity:\n              set:\n                type: ${'$'}{ .type }" else "",
             tags = setOf("listen", "until", "complete-strategy"),
-            validate = expectOutput(JsonArray(expected.map { buildJsonObject { put("type", it) } })),
+            validate = expectOutput(ArrayNode(expected.map { buildJsonObject { put("type", it) } })),
         )
 
     private val terminationCases = listOf(
@@ -82,7 +81,7 @@ object ListenTestCases {
                               type: order.created
             """.trimIndent(),
             tags = setOf("listen", "cloudevents"),
-            validate = expectOutput(JsonArray(listOf(orderCreatedData)))
+            validate = expectOutput(ArrayNode(listOf(orderCreatedData)))
         ),
 
         // ─────────────────────────────────────────────────────────────────────────
@@ -158,7 +157,7 @@ object ListenTestCases {
                               type: user.registered
             """.trimIndent(),
             tags = setOf("listen", "cloudevents"),
-            validate = expectOutput(JsonArray(listOf(userRegisteredData)))
+            validate = expectOutput(ArrayNode(listOf(userRegisteredData)))
         ),
 
         // ─────────────────────────────────────────────────────────────────────────
@@ -178,7 +177,7 @@ object ListenTestCases {
                               id: specific-event-id-12345
             """.trimIndent(),
             tags = setOf("listen", "filter", "id"),
-            validate = expectOutput(JsonArray(listOf(buildJsonObject { put("message", "test") })))
+            validate = expectOutput(ArrayNode(listOf(buildJsonObject { put("message", "test") })))
         ),
 
         // ─────────────────────────────────────────────────────────────────────────
@@ -198,7 +197,7 @@ object ListenTestCases {
                               source: https://orders.example.com/api
             """.trimIndent(),
             tags = setOf("listen", "filter", "source"),
-            validate = expectOutput(JsonArray(listOf(buildJsonObject { put("message", "from-orders") })))
+            validate = expectOutput(ArrayNode(listOf(buildJsonObject { put("message", "from-orders") })))
         ),
 
         WorkflowTestCase(
@@ -214,7 +213,7 @@ object ListenTestCases {
                               source: '${ .[0:14] == "https://orders" }'
             """.trimIndent(),
             tags = setOf("listen", "filter", "source", "expression"),
-            validate = expectOutput(JsonArray(listOf(buildJsonObject { put("message", "from-orders") })))
+            validate = expectOutput(ArrayNode(listOf(buildJsonObject { put("message", "from-orders") })))
         ),
 
         // ─────────────────────────────────────────────────────────────────────────
@@ -235,7 +234,7 @@ object ListenTestCases {
             """.trimIndent(),
             tags = setOf("listen", "filter", "subject"),
             validate = expectOutput(
-                JsonArray(listOf(buildJsonObject {
+                ArrayNode(listOf(buildJsonObject {
                     put("orderId", "ORD-999")
                     put("carrier", "FedEx")
                 }))
@@ -259,7 +258,7 @@ object ListenTestCases {
                               time: "2024-06-15T14:30:00Z"
             """.trimIndent(),
             tags = setOf("listen", "filter", "time"),
-            validate = expectOutput(JsonArray(listOf(buildJsonObject { put("taskId", "TASK-001") })))
+            validate = expectOutput(ArrayNode(listOf(buildJsonObject { put("taskId", "TASK-001") })))
         ),
 
         WorkflowTestCase(
@@ -281,9 +280,8 @@ object ListenTestCases {
             // with "2 are valid" because format:date-time doesn't actually reject runtime
             // expressions.
             validateDefinition = false,
-            validate = expectOutput(JsonArray(listOf(buildJsonObject { put("taskId", "TASK-001") })))
+            validate = expectOutput(ArrayNode(listOf(buildJsonObject { put("taskId", "TASK-001") })))
         ),
-
 
         // ─────────────────────────────────────────────────────────────────────────
         // Filter by DataContentType (exact string match)
@@ -302,7 +300,7 @@ object ListenTestCases {
                               datacontenttype: application/json
             """.trimIndent(),
             tags = setOf("listen", "filter", "datacontenttype"),
-            validate = expectOutput(JsonArray(listOf(orderCreatedData)))
+            validate = expectOutput(ArrayNode(listOf(orderCreatedData)))
         ),
 
         WorkflowTestCase(
@@ -318,7 +316,7 @@ object ListenTestCases {
                               datacontenttype: application/xml
             """.trimIndent(),
             tags = setOf("listen", "filter", "datacontenttype"),
-            validate = expectOutput(JsonArray(listOf(buildJsonObject { put("format", "xml") })))
+            validate = expectOutput(ArrayNode(listOf(buildJsonObject { put("format", "xml") })))
         ),
 
         // ─────────────────────────────────────────────────────────────────────────
@@ -339,7 +337,7 @@ object ListenTestCases {
             """.trimIndent(),
             tags = setOf("listen", "filter", "dataschema"),
             validate = expectOutput(
-                JsonArray(listOf(buildJsonObject {
+                ArrayNode(listOf(buildJsonObject {
                     put("name", "John")
                     put("age", 30)
                 }))
@@ -360,7 +358,7 @@ object ListenTestCases {
             """.trimIndent(),
             tags = setOf("listen", "filter", "dataschema", "expression"),
             validate = expectOutput(
-                JsonArray(listOf(buildJsonObject {
+                ArrayNode(listOf(buildJsonObject {
                     put("name", "John")
                     put("age", 30)
                 }))
@@ -384,7 +382,7 @@ object ListenTestCases {
                               data: '${ .severity == "critical" or .severity == "high" }'
             """.trimIndent(),
             tags = setOf("listen", "filter", "data", "expression"),
-            validate = expectOutput(JsonArray(listOf(criticalAlertEvent.toJsonElement(ListenAndReadAs.DATA))))
+            validate = expectOutput(ArrayNode(listOf(criticalAlertEvent.toJsonNode(ListenAndReadAs.DATA))))
         ),
 
         WorkflowTestCase(
@@ -400,7 +398,7 @@ object ListenTestCases {
                               data: '${ .total > 50 and .currency == "USD" }'
             """.trimIndent(),
             tags = setOf("listen", "filter", "data", "expression"),
-            validate = expectOutput(JsonArray(listOf(orderCreatedData)))
+            validate = expectOutput(ArrayNode(listOf(orderCreatedData)))
         ),
 
         WorkflowTestCase(
@@ -418,7 +416,7 @@ object ListenTestCases {
                               data: '${ .temperature > 10 and .temperature < 30 }'
             """.trimIndent(),
             tags = setOf("listen", "filter", "combined"),
-            validate = expectOutput(JsonArray(listOf(lowTemperatureEvent.toJsonElement(ListenAndReadAs.DATA))))
+            validate = expectOutput(ArrayNode(listOf(lowTemperatureEvent.toJsonNode(ListenAndReadAs.DATA))))
         ),
 
         WorkflowTestCase(
@@ -436,7 +434,7 @@ object ListenTestCases {
                               data: '${ .temperature > 40 }'
             """.trimIndent(),
             tags = setOf("listen", "filter", "combined"),
-            validate = expectOutput(JsonArray(listOf(highTemperatureEvent.toJsonElement(ListenAndReadAs.DATA))))
+            validate = expectOutput(ArrayNode(listOf(highTemperatureEvent.toJsonNode(ListenAndReadAs.DATA))))
         ),
 
         // ─────────────────────────────────────────────────────────────────────────
@@ -457,7 +455,7 @@ object ListenTestCases {
                               source: '${ .[0:14] == "https://orders" }'
             """.trimIndent(),
             tags = setOf("listen", "filter", "combined"),
-            validate = expectOutput(JsonArray(listOf(buildJsonObject { put("message", "from-orders") })))
+            validate = expectOutput(ArrayNode(listOf(buildJsonObject { put("message", "from-orders") })))
         ),
 
         WorkflowTestCase(
@@ -475,7 +473,7 @@ object ListenTestCases {
                               data: '${ .temperature > 40 }'
             """.trimIndent(),
             tags = setOf("listen", "filter", "combined"),
-            validate = expectOutput(JsonArray(listOf(highTemperatureEvent.toJsonElement(ListenAndReadAs.DATA))))
+            validate = expectOutput(ArrayNode(listOf(highTemperatureEvent.toJsonNode(ListenAndReadAs.DATA))))
         ),
 
         // ─────────────────────────────────────────────────────────────────────────
@@ -499,7 +497,7 @@ object ListenTestCases {
             """.trimIndent(),
             tags = setOf("listen", "until", "expression"),
             validate = expectOutput(
-                JsonArray(
+                ArrayNode(
                     listOf(
                         buildJsonObject { put("readingId", 1); put("value", 10) },
                         buildJsonObject { put("readingId", 2); put("value", 25) },
@@ -544,7 +542,7 @@ object ListenTestCases {
             """.trimIndent(),
             tags = setOf("listen", "until", "expression"),
             validate = expectOutput(
-                JsonArray(
+                ArrayNode(
                     listOf(
                         buildJsonObject { put("readingId", 1); put("value", 10) },
                         buildJsonObject { put("readingId", 2); put("value", 25) }
@@ -576,7 +574,7 @@ object ListenTestCases {
             """.trimIndent(),
             tags = setOf("listen", "until", "event"),
             validate = expectOutput(
-                JsonArray(
+                ArrayNode(
                     listOf(
                         buildJsonObject { put("readingId", 1); put("value", 10) },
                         buildJsonObject { put("readingId", 2); put("value", 25) }
@@ -604,7 +602,7 @@ object ListenTestCases {
                                 type: monitoring.stopped
             """.trimIndent(),
             tags = setOf("listen", "until", "event"),
-            validate = expectOutput(JsonArray(emptyList()))
+            validate = expectOutput(ArrayNode(emptyList()))
         ),
 
         // ─────────────────────────────────────────────────────────────────────────
@@ -628,7 +626,7 @@ object ListenTestCases {
                                 data: '${ .severity == "critical" }'
             """.trimIndent(),
             tags = setOf("listen", "any", "multiple-filters"),
-            validate = expectOutput(JsonArray(listOf(highTemperatureEvent.toJsonElement(ListenAndReadAs.DATA))))
+            validate = expectOutput(ArrayNode(listOf(highTemperatureEvent.toJsonNode(ListenAndReadAs.DATA))))
         ),
 
         WorkflowTestCase(
@@ -648,7 +646,7 @@ object ListenTestCases {
                                 data: ${ .severity == "critical" }
             """.trimIndent(),
             tags = setOf("listen", "any", "multiple-filters"),
-            validate = expectOutput(JsonArray(listOf(criticalAlertEvent.toJsonElement(ListenAndReadAs.DATA))))
+            validate = expectOutput(ArrayNode(listOf(criticalAlertEvent.toJsonNode(ListenAndReadAs.DATA))))
         ),
 
         WorkflowTestCase(
@@ -662,7 +660,7 @@ object ListenTestCases {
                           any: []
             """.trimIndent(),
             tags = setOf("listen", "any", "multiple-filters"),
-            validate = expectOutput(JsonArray(listOf(orderCreatedCloudEvent.toJsonElement(ListenAndReadAs.DATA)))),
+            validate = expectOutput(ArrayNode(listOf(orderCreatedCloudEvent.toJsonNode(ListenAndReadAs.DATA)))),
             // NOTE: Test for "any: []" (empty filter array) has validateDefinition = false because the
             // validation has an issue with this syntax. The test still verifies runtime behavior.
             validateDefinition = false
@@ -691,7 +689,7 @@ object ListenTestCases {
                                 data:  ${ .temperature > 30 }
             """.trimIndent(),
             tags = setOf("listen", "all"),
-            validate = expectOutput(JsonArray(listOf(orderCreatedData, highTemperatureData)))
+            validate = expectOutput(ArrayNode(listOf(orderCreatedData, highTemperatureData)))
         ),
 
         WorkflowTestCase(
@@ -714,7 +712,7 @@ object ListenTestCases {
                                 data:  ${ .temperature > 30 }
             """.trimIndent(),
             tags = setOf("listen", "all"),
-            validate = expectOutput(JsonArray(listOf(orderCreatedData, highTemperatureData)))
+            validate = expectOutput(ArrayNode(listOf(orderCreatedData, highTemperatureData)))
         ),
 
         WorkflowTestCase(
@@ -735,7 +733,7 @@ object ListenTestCases {
                                 data:  ${ .temperature > 30 }
             """.trimIndent(),
             tags = setOf("listen", "all"),
-            validate = expectOutput(JsonArray(listOf(highTemperatureData, orderCreatedData)))
+            validate = expectOutput(ArrayNode(listOf(highTemperatureData, orderCreatedData)))
         ),
 
         WorkflowTestCase(
@@ -758,7 +756,7 @@ object ListenTestCases {
                                 type: payment.completed
             """.trimIndent(),
             tags = setOf("listen", "all"),
-            validate = expectOutput(JsonArray(listOf(orderCreatedData, paymentCompletedData)))
+            validate = expectOutput(ArrayNode(listOf(orderCreatedData, paymentCompletedData)))
         ),
 
         WorkflowTestCase(
@@ -783,7 +781,7 @@ object ListenTestCases {
                                 data:  ${ .temperature > 10 }
             """.trimIndent(),
             tags = setOf("listen", "all"),
-            validate = expectOutput(JsonArray(listOf(lowTemperatureData, orderCreatedData, paymentCompletedData)))
+            validate = expectOutput(ArrayNode(listOf(lowTemperatureData, orderCreatedData, paymentCompletedData)))
         ),
 
         // ─────────────────────────────────────────────────────────────────────────
@@ -804,7 +802,7 @@ object ListenTestCases {
                         read: envelope
             """.trimIndent(),
             tags = setOf("listen", "read", "envelope"),
-            validate = expectOutput(JsonArray(listOf(eventWithSubject.toJsonElement(ListenAndReadAs.ENVELOPE))))
+            validate = expectOutput(ArrayNode(listOf(eventWithSubject.toJsonNode(ListenAndReadAs.ENVELOPE))))
         ),
 
         WorkflowTestCase(
@@ -821,7 +819,7 @@ object ListenTestCases {
                         read: data
             """.trimIndent(),
             tags = setOf("listen", "read", "data"),
-            validate = expectOutput(JsonArray(listOf(orderCreatedData)))
+            validate = expectOutput(ArrayNode(listOf(orderCreatedData)))
         ),
 
         // ─────────────────────────────────────────────────────────────────────────
@@ -844,11 +842,11 @@ object ListenTestCases {
             """.trimIndent(),
             tags = setOf("listen", "any", "until", "read", "envelope", "expression"),
             validate = expectOutput(
-                JsonArray(
+                ArrayNode(
                     listOf(
-                        readingFloor1Event.toJsonElement(ListenAndReadAs.ENVELOPE),
-                        readingFloor2Event.toJsonElement(ListenAndReadAs.ENVELOPE),
-                        readingRoofEvent.toJsonElement(ListenAndReadAs.ENVELOPE)
+                        readingFloor1Event.toJsonNode(ListenAndReadAs.ENVELOPE),
+                        readingFloor2Event.toJsonNode(ListenAndReadAs.ENVELOPE),
+                        readingRoofEvent.toJsonNode(ListenAndReadAs.ENVELOPE)
                     )
                 )
             )
@@ -869,11 +867,11 @@ object ListenTestCases {
             tags = setOf("listen", "any", "until", "read", "envelope", "expression"),
             validateDefinition = false,
             validate = expectOutput(
-                JsonArray(
+                ArrayNode(
                     listOf(
-                        reading1Event.toJsonElement(ListenAndReadAs.ENVELOPE),
-                        reading2Event.toJsonElement(ListenAndReadAs.ENVELOPE),
-                        stopMonitoringEvent.toJsonElement(ListenAndReadAs.ENVELOPE)
+                        reading1Event.toJsonNode(ListenAndReadAs.ENVELOPE),
+                        reading2Event.toJsonNode(ListenAndReadAs.ENVELOPE),
+                        stopMonitoringEvent.toJsonNode(ListenAndReadAs.ENVELOPE)
                     )
                 )
             )
@@ -895,11 +893,11 @@ object ListenTestCases {
             """.trimIndent(),
             tags = setOf("listen", "any", "until", "read", "envelope", "expression"),
             validate = expectOutput(
-                JsonArray(
+                ArrayNode(
                     listOf(
-                        readingFloor1Event.toJsonElement(ListenAndReadAs.ENVELOPE),
-                        readingFloor2Event.toJsonElement(ListenAndReadAs.ENVELOPE),
-                        readingRoofEvent.toJsonElement(ListenAndReadAs.ENVELOPE)
+                        readingFloor1Event.toJsonNode(ListenAndReadAs.ENVELOPE),
+                        readingFloor2Event.toJsonNode(ListenAndReadAs.ENVELOPE),
+                        readingRoofEvent.toJsonNode(ListenAndReadAs.ENVELOPE)
                     )
                 )
             )
@@ -929,7 +927,7 @@ object ListenTestCases {
             """.trimIndent(),
             tags = setOf("listen", "foreach", "one"),
             validate = expectOutput(
-                JsonArray(listOf(buildJsonObject {
+                ArrayNode(listOf(buildJsonObject {
                     put("processed", true)
                     put("orderId", "ORD-12345")
                 }))
@@ -957,7 +955,7 @@ object ListenTestCases {
             """.trimIndent(),
             tags = setOf("listen", "foreach", "any"),
             validate = expectOutput(
-                JsonArray(listOf(buildJsonObject {
+                ArrayNode(listOf(buildJsonObject {
                     put("logged", true)
                     put("sensorId", "SENSOR-001")
                     put("temperature", 23.5)
@@ -994,7 +992,7 @@ object ListenTestCases {
             """.trimIndent(),
             tags = setOf("listen", "foreach", "until", "expression"),
             validate = expectOutput(
-                JsonArray(
+                ArrayNode(
                     listOf(
                         buildJsonObject { put("processed", true); put("readingId", 1); put("value", 10) },
                         buildJsonObject { put("processed", true); put("readingId", 2); put("value", 25) },
@@ -1032,7 +1030,7 @@ object ListenTestCases {
             """.trimIndent(),
             tags = setOf("listen", "foreach", "until", "event"),
             validate = expectOutput(
-                JsonArray(
+                ArrayNode(
                     listOf(
                         buildJsonObject { put("processed", true); put("readingId", 1); put("value", 10) },
                         buildJsonObject { put("processed", true); put("readingId", 2); put("value", 25) },
@@ -1063,7 +1061,7 @@ object ListenTestCases {
                                 stored: true
             """.trimIndent(),
             tags = setOf("listen", "foreach", "until", "event", "empty"),
-            validate = expectOutput(JsonArray(emptyList()))
+            validate = expectOutput(ArrayNode(emptyList()))
         ),
 
         WorkflowTestCase(
@@ -1092,7 +1090,7 @@ object ListenTestCases {
             """.trimIndent(),
             tags = setOf("listen", "foreach", "all"),
             validate = expectOutput(
-                JsonArray(
+                ArrayNode(
                     listOf(
                         buildJsonObject { put("processed", true); put("eventType", "order.created") },
                         buildJsonObject { put("processed", true); put("eventType", "payment.completed") }
@@ -1141,7 +1139,7 @@ object ListenTestCases {
             """.trimIndent(),
             tags = setOf("listen", "foreach", "sequential"),
             validate = expectOutput(
-                JsonArray(
+                ArrayNode(
                     listOf(
                         buildJsonObject { put("value", 1) },
                         buildJsonObject { put("value", 2) },
@@ -1197,7 +1195,7 @@ object ListenTestCases {
             """.trimIndent(),
             tags = setOf("listen", "foreach", "error", "try-catch"),
             validate = expectOutput(
-                JsonArray(
+                ArrayNode(
                     listOf(
                         buildJsonObject { put("processed", true); put("readingId", 1) },
                         buildJsonObject {
@@ -1291,8 +1289,8 @@ object ListenTestCases {
             // NOTE: 'raw' mode is implementation-specific. This test documents the expected behavior.
             // The actual output format depends on the runtime implementation.
             validate = expectOutput(
-                JsonArray(
-                    listOf(orderCreatedCloudEvent.toJsonElement(ListenAndReadAs.RAW))
+                ArrayNode(
+                    listOf(orderCreatedCloudEvent.toJsonNode(ListenAndReadAs.RAW))
                 )
             )
         ),
@@ -1323,7 +1321,7 @@ object ListenTestCases {
             """.trimIndent(),
             tags = setOf("listen", "foreach", "item"),
             validate = expectOutput(
-                JsonArray(listOf(buildJsonObject {
+                ArrayNode(listOf(buildJsonObject {
                     put("processed", true)
                     put("orderId", "ORD-12345")
                     put("customerId", "CUST-001")
@@ -1363,7 +1361,7 @@ object ListenTestCases {
             """.trimIndent(),
             tags = setOf("listen", "foreach", "at", "index"),
             validate = expectOutput(
-                JsonArray(
+                ArrayNode(
                     listOf(
                         buildJsonObject { put("index", 0); put("readingId", 1); put("value", 10) },
                         buildJsonObject { put("index", 1); put("readingId", 2); put("value", 25) },
@@ -1399,7 +1397,7 @@ object ListenTestCases {
             """.trimIndent(),
             tags = setOf("listen", "foreach", "item", "at", "all"),
             validate = expectOutput(
-                JsonArray(
+                ArrayNode(
                     listOf(
                         buildJsonObject { put("position", 0); put("orderId", "ORD-12345") },
                         buildJsonObject { put("position", 1); put("orderId", "ORD-12345") }
@@ -1428,7 +1426,7 @@ object ListenTestCases {
                                 expect: ORD-54321
             """.trimIndent(),
             tags = setOf("listen", "correlate"),
-            validate = expectOutput(JsonArray(listOf(orderCreatedData2)))
+            validate = expectOutput(ArrayNode(listOf(orderCreatedData2)))
         ),
 
         WorkflowTestCase(
@@ -1451,7 +1449,7 @@ object ListenTestCases {
                                 expect: CUST-002
             """.trimIndent(),
             tags = setOf("listen", "correlate"),
-            validate = expectOutput(JsonArray(listOf(orderCreatedData2)))
+            validate = expectOutput(ArrayNode(listOf(orderCreatedData2)))
         ),
 
         WorkflowTestCase(
@@ -1501,7 +1499,7 @@ object ListenTestCases {
             """.trimIndent(),
             tags = setOf("listen", "correlate", "auto-correlation"),
             validate = expectOutput(
-                JsonArray(
+                ArrayNode(
                     listOf(
                         buildJsonObject {
                             put("orderId", "ORD-AUTO-123")

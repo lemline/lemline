@@ -1,6 +1,10 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.states
 
+import com.fasterxml.jackson.databind.JsonNode
+import com.fasterxml.jackson.databind.node.ArrayNode
+import com.fasterxml.jackson.databind.node.ObjectNode
+import com.lemline.common.json.*
 import com.lemline.common.values.NodePosition
 import com.lemline.common.values.WorkflowId
 import com.lemline.core.cloudevents.CloudEventHook
@@ -16,9 +20,6 @@ import com.lemline.core.processors.WaitConfig
 import com.lemline.core.tasks.FlowDirective
 import kotlin.time.Clock
 import kotlin.time.Instant
-import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonObject
 
 /**
  * Result types returned by WorkflowOrchestrator when it detects a stopping point
@@ -31,7 +32,6 @@ import kotlinx.serialization.json.JsonObject
 sealed class WorkflowState {
     abstract val nodeStack: NodeStack
     abstract val nodePosition: NodePosition
-
 
     val workflowId: WorkflowId get() = nodeStack.rootState.workflowId
 
@@ -48,7 +48,7 @@ sealed class WorkflowCommand : WorkflowState() {
     data class ResumeFromTask(
         override val nodeStack: NodeStack,
         override val nodePosition: NodePosition,
-        val rawInput: JsonElement,
+        val rawInput: JsonNode,
         val flowDirective: FlowDirective? = null,
         val extensionReturn: ExtensionReturn? = null,
     ) : WorkflowCommand() {
@@ -60,7 +60,6 @@ sealed class WorkflowCommand : WorkflowState() {
             ", stack=$nodeStack" +
             ")"
 
-
         fun duplicate(workflowId: WorkflowId, startedAt: Instant): ResumeFromTask {
             return copy(nodeStack = nodeStack.duplicate(workflowId = workflowId, startedAt = startedAt))
         }
@@ -71,7 +70,7 @@ sealed class WorkflowCommand : WorkflowState() {
      */
     data class ResumeWithCompletedTask(
         override val nodeStack: NodeStack,
-        val rawOutput: JsonElement,
+        val rawOutput: JsonNode,
     ) : WorkflowCommand() {
 
         override val nodePosition = nodeStack.currentPosition
@@ -103,7 +102,6 @@ sealed class WorkflowCommand : WorkflowState() {
 
 sealed class WorkflowEvent : WorkflowState() {
 
-
     // ========================================
     // Outcome Events
     // ========================================
@@ -116,7 +114,7 @@ sealed class WorkflowEvent : WorkflowState() {
         /**
          * Extracts the associated value from the [WorkflowEvent.Outcome] based on its type.
          */
-        fun value(): JsonElement = when (this) {
+        fun value(): JsonNode = when (this) {
             is WorkflowCompleted -> output
             is ForkBranchCompleted -> branchOutput
             is ForEachCompleted -> output
@@ -129,7 +127,7 @@ sealed class WorkflowEvent : WorkflowState() {
      * Event emitted when a workflow completes.
      */
     data class WorkflowCompleted(
-        val output: JsonElement,
+        val output: JsonNode,
         val completedAt: Instant,
         override val nodeStack: NodeStack,
     ) : Outcome() {
@@ -149,8 +147,8 @@ sealed class WorkflowEvent : WorkflowState() {
      */
     data class WorkflowFaulted(
         override val nodeStack: NodeStack,
-        val rawInput: JsonElement?,
-        val rawOutput: JsonElement?,
+        val rawInput: JsonNode?,
+        val rawOutput: JsonNode?,
         val flowDirective: FlowDirective?,
         val error: InternalException.Error,
         val faultedAt: Instant,
@@ -163,8 +161,8 @@ sealed class WorkflowEvent : WorkflowState() {
         constructor(
             nodeStack: NodeStack,
             nodePosition: NodePosition,
-            rawInput: JsonElement?,
-            rawOutput: JsonElement?,
+            rawInput: JsonNode?,
+            rawOutput: JsonNode?,
             flowDirective: FlowDirective?,
             exception: Exception,
             faultedAt: Instant = Clock.System.now(),
@@ -193,7 +191,7 @@ sealed class WorkflowEvent : WorkflowState() {
     data class ForkBranchCompleted(
         override val nodeStack: NodeStack,
         val branchPosition: NodePosition,
-        val branchOutput: JsonElement,
+        val branchOutput: JsonNode,
         val completedAt: Instant,
     ) : Outcome() {
 
@@ -245,9 +243,9 @@ sealed class WorkflowEvent : WorkflowState() {
      */
     sealed class ActivityStarted : WorkflowEvent() {
         /** Pass-through output for resume (usually equals transformedInput) */
-        abstract val input: JsonElement
+        abstract val input: JsonNode
 
-        fun resumeCompleted(output: JsonElement) = WorkflowCommand.ResumeWithCompletedTask(
+        fun resumeCompleted(output: JsonNode) = WorkflowCommand.ResumeWithCompletedTask(
             nodeStack = nodeStack,
             rawOutput = output,
         )
@@ -270,7 +268,7 @@ sealed class WorkflowEvent : WorkflowState() {
     data class TaskScheduled(
         override val nodeStack: NodeStack,
         override val nodePosition: NodePosition,
-        val rawInput: JsonElement,
+        val rawInput: JsonNode,
         val flowDirective: FlowDirective?,
         val extensionReturn: ExtensionReturn? = null,
     ) : Suspension() {
@@ -296,7 +294,7 @@ sealed class WorkflowEvent : WorkflowState() {
      */
     data class WaitStarted(
         override val nodeStack: NodeStack,
-        val rawOutput: JsonElement,
+        val rawOutput: JsonNode,
         val config: WaitConfig
     ) : Suspension() {
 
@@ -321,7 +319,7 @@ sealed class WorkflowEvent : WorkflowState() {
     data class TaskRetryScheduled(
         override val nodeStack: NodeStack,
         override val nodePosition: NodePosition,
-        val rawInput: JsonElement,
+        val rawInput: JsonNode,
         val flowDirective: FlowDirective?,
         val retryAt: Instant
     ) : Suspension() {
@@ -342,13 +340,12 @@ sealed class WorkflowEvent : WorkflowState() {
         )
     }
 
-
     /**
      * Event emitted when a child workflow is scheduled.
      */
     data class RunWorkflowStarted(
         override val nodeStack: NodeStack,
-        val rawInput: JsonElement,
+        val rawInput: JsonNode,
         val config: RunWorkflowConfig,
     ) : Suspension() {
 
@@ -361,7 +358,7 @@ sealed class WorkflowEvent : WorkflowState() {
             ", stack=$nodeStack" +
             ")"
 
-        fun resumeAsCompleted(rawOutput: JsonElement) = WorkflowCommand.ResumeWithCompletedTask(
+        fun resumeAsCompleted(rawOutput: JsonNode) = WorkflowCommand.ResumeWithCompletedTask(
             nodeStack = nodeStack,
             rawOutput = rawOutput,
         )
@@ -383,7 +380,7 @@ sealed class WorkflowEvent : WorkflowState() {
      */
     data class ForkStarted(
         override val nodeStack: NodeStack,
-        val rawInput: JsonElement,
+        val rawInput: JsonNode,
     ) : Suspension() {
 
         override val nodePosition = nodeStack.currentPosition // Fork position
@@ -394,7 +391,7 @@ sealed class WorkflowEvent : WorkflowState() {
             ", stack=$nodeStack" +
             ")"
 
-        fun resume(rawOutput: JsonElement) = WorkflowCommand.ResumeWithCompletedTask(
+        fun resume(rawOutput: JsonNode) = WorkflowCommand.ResumeWithCompletedTask(
             nodeStack = nodeStack,
             rawOutput = rawOutput,
         )
@@ -415,7 +412,7 @@ sealed class WorkflowEvent : WorkflowState() {
      */
     data class ListenStarted(
         override val nodeStack: NodeStack,
-        val rawOutput: JsonElement,
+        val rawOutput: JsonNode,
         val config: ListenConfig
     ) : Suspension() {
 
@@ -428,7 +425,7 @@ sealed class WorkflowEvent : WorkflowState() {
             ", stack=$nodeStack" +
             ")"
 
-        fun resumeCompleted(events: JsonArray) = WorkflowCommand.ResumeWithCompletedTask(
+        fun resumeCompleted(events: ArrayNode) = WorkflowCommand.ResumeWithCompletedTask(
             nodeStack = nodeStack,
             rawOutput = events,
         )
@@ -438,7 +435,7 @@ sealed class WorkflowEvent : WorkflowState() {
             error = error,
         )
 
-        fun withContext(context: JsonObject): ListenStarted {
+        fun withContext(context: ObjectNode): ListenStarted {
             return this.copy(nodeStack = nodeStack.withContext(context))
         }
     }
@@ -455,7 +452,7 @@ sealed class WorkflowEvent : WorkflowState() {
      */
     data class ForEachCompleted(
         override val nodeStack: NodeStack,
-        val output: JsonElement,
+        val output: JsonNode,
     ) : Outcome() {
 
         override val nodePosition by lazy { nodeStack.currentPosition }
@@ -478,7 +475,7 @@ sealed class WorkflowEvent : WorkflowState() {
      */
     data class EmitStarted(
         override val nodeStack: NodeStack,
-        override val input: JsonElement,   // Pass-through: output = input for emit task
+        override val input: JsonNode,   // Pass-through: output = input for emit task
         val config: EmitConfig
     ) : ActivityStarted() {
 
@@ -509,7 +506,7 @@ sealed class WorkflowEvent : WorkflowState() {
      */
     data class CallHttpStarted(
         override val nodeStack: NodeStack,
-        override val input: JsonElement,
+        override val input: JsonNode,
         val config: CallHttpConfig
     ) : ActivityStarted() {
 
@@ -534,7 +531,7 @@ sealed class WorkflowEvent : WorkflowState() {
      */
     data class RunScriptStarted(
         override val nodeStack: NodeStack,
-        override val input: JsonElement,
+        override val input: JsonNode,
         val config: RunScriptConfig
     ) : ActivityStarted() {
 
@@ -556,7 +553,7 @@ sealed class WorkflowEvent : WorkflowState() {
      */
     data class RunShellStarted(
         override val nodeStack: NodeStack,
-        override val input: JsonElement,
+        override val input: JsonNode,
         val config: RunShellConfig
     ) : ActivityStarted() {
 

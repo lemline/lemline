@@ -1,14 +1,15 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.processors
 
+import com.fasterxml.jackson.databind.JsonNode
+import com.lemline.common.json.*
 import com.lemline.common.json.LemlineJson
+import com.lemline.common.json.LemlineJson.toJsonNode
 import com.lemline.core.nodes.Node
 import com.lemline.core.processors.scope.Scope
 import com.lemline.core.states.SetState
 import io.serverlessworkflow.api.types.SetTask
-import com.lemline.common.json.LemlineJson.toJsonElement
 import kotlin.time.Instant
-import kotlinx.serialization.json.JsonElement
 
 /**
  * Node instance for SetTask (data manipulation) - pure functional model.
@@ -49,7 +50,7 @@ class SetProcessor(
     node: Node<SetTask>,
 ) : AbstractProcessor<SetTask, SetState>(node) {
 
-    override fun stateWhenEnteringFromParent(transformedInput: JsonElement, scope: Scope, startedAt: Instant) = SetState(startedAt = startedAt)
+    override fun stateWhenEnteringFromParent(transformedInput: JsonNode, scope: Scope, startedAt: Instant) = SetState(startedAt = startedAt)
 
     /**
      * Execute SetTask action.
@@ -62,14 +63,14 @@ class SetProcessor(
      * @return Input with set values merged
      */
     override suspend fun execute(
-        transformedInput: JsonElement,
+        transformedInput: JsonNode,
         scope: Scope,
         state: SetState,
-    ): JsonElement {
+    ): JsonNode {
 
         val set = node.task.set ?: throw NoSuchElementException("SetTask has no set")
         val value = set.setTaskConfiguration?.let { LemlineJson.encodeToElement(it) }
-            ?: set.string.toJsonElement()
+            ?: set.string.toJsonNode()
         return eval(transformedInput, value, scope)
     }
 

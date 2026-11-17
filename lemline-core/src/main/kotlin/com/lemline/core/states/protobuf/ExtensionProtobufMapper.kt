@@ -47,12 +47,12 @@ internal object ExtensionProtobufMapper {
             ExtensionPhaseProto.EXTENSION_PHASE_PROTO_UNSPECIFIED, is ExtensionPhaseProto.Unrecognized -> error("Invalid extension phase: ${state.phase}")
         },
         activeExtensionIndex = state.active_extension_index,
-        rawInput = requireNotNull(state.raw_input_json) { "Extension raw input is required" }.value_.toKotlinJsonElement(),
-        transformedInput = requireNotNull(state.transformed_input_json) { "Extension transformed input is required" }.value_.toKotlinJsonElement(),
+        rawInput = requireNotNull(state.raw_input_json) { "Extension raw input is required" }.value_.toRuntimeJsonNode(),
+        transformedInput = requireNotNull(state.transformed_input_json) { "Extension transformed input is required" }.value_.toRuntimeJsonNode(),
         preparedResult = state.prepared_result?.let {
             PreparedTaskResult(
-                requireNotNull(it.raw_output_json) { "Extension raw output is required" }.value_.toKotlinJsonElement(),
-                requireNotNull(it.transformed_output_json) { "Extension transformed output is required" }.value_.toKotlinJsonElement(),
+                requireNotNull(it.raw_output_json) { "Extension raw output is required" }.value_.toRuntimeJsonNode(),
+                requireNotNull(it.transformed_output_json) { "Extension transformed output is required" }.value_.toRuntimeJsonNode(),
                 it.pending_flow_directive?.toDomain(),
             )
         },

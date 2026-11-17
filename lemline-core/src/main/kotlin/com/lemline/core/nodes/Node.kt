@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.nodes
 
+import com.fasterxml.jackson.databind.node.ObjectNode
+import com.lemline.common.json.*
 import com.lemline.common.json.LemlineJson
 import com.lemline.common.values.NodePosition
 import com.lemline.core.expressions.EvaluationMode
@@ -23,7 +25,6 @@ import io.serverlessworkflow.api.types.SwitchTask
 import io.serverlessworkflow.api.types.TaskBase
 import io.serverlessworkflow.api.types.TryTask
 import io.serverlessworkflow.api.types.WaitTask
-import kotlinx.serialization.json.JsonObject
 
 /**
  * Represents a node in the tree defining a workflow.
@@ -52,7 +53,7 @@ data class Node<T : TaskBase>(
         }
     }
 
-    val definition: JsonObject by lazy { LemlineJson.encodeToElement(task) }
+    val definition: ObjectNode by lazy { LemlineJson.encodeToElement(task) }
 
     val processor by lazy { NodeProcessors.createProcessor(this) }
 

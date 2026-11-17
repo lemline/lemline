@@ -1,10 +1,17 @@
 // SPDX-License-Identifier: BUSL-1.1
+@file:kotlinx.serialization.UseSerializers(
+    com.lemline.common.json.JsonNodeSerializer::class,
+    com.lemline.common.json.ObjectNodeSerializer::class,
+    com.lemline.common.json.ArrayNodeSerializer::class,
+)
+
 package com.lemline.core.activities.mock
 
+import com.fasterxml.jackson.databind.JsonNode
+import com.lemline.common.json.*
 import io.serverlessworkflow.api.types.Task
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.JsonElement
 
 /**
  * Mock configuration for activity execution in test mode.
@@ -153,7 +160,7 @@ data class EmitMockMatcher(
 
 @Serializable
 data class EmitMockResponse(
-    val output: JsonElement? = null,
+    val output: JsonNode? = null,
     val error: String? = null
 )
 // ─────────────────────────────────────────────────────────────────────────────
@@ -181,7 +188,7 @@ data class ListenMockMatcher(
 @Serializable
 data class ListenMockResponse(
     /** The CloudEvent data to return as the listen result */
-    val data: JsonElement? = null,
+    val data: JsonNode? = null,
     val error: String? = null
 )
 // ─────────────────────────────────────────────────────────────────────────────
@@ -220,7 +227,7 @@ data class HttpMockMatcher(
 @Serializable
 data class HttpMockResponse(
     val status: Int = 200,
-    val body: JsonElement? = null,
+    val body: JsonNode? = null,
     val headers: Map<String, String> = emptyMap(),
     val error: String? = null
 )
@@ -248,7 +255,7 @@ data class ScriptMockMatcher(
 
 @Serializable
 data class ScriptMockResponse(
-    val output: JsonElement? = null,
+    val output: JsonNode? = null,
     val exitCode: Int = 0
 )
 // ─────────────────────────────────────────────────────────────────────────────
@@ -303,7 +310,7 @@ data class FunctionMockMatcher(
 
 @Serializable
 data class FunctionMockResponse(
-    val output: JsonElement? = null,
+    val output: JsonNode? = null,
     val error: String? = null
 )
 // ─────────────────────────────────────────────────────────────────────────────

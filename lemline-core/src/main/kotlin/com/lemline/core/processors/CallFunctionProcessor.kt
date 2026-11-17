@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.processors
 
-import com.lemline.common.json.LemlineJson.toJsonElement
+import com.fasterxml.jackson.databind.JsonNode
+import com.lemline.common.json.*
+import com.lemline.common.json.LemlineJson.toJsonNode
 import com.lemline.common.values.NodePosition
 import com.lemline.common.values.Token
 import com.lemline.core.nodes.Node
@@ -9,7 +11,6 @@ import com.lemline.core.processors.scope.Scope
 import com.lemline.core.states.CallFunctionState
 import io.serverlessworkflow.api.types.CallFunction
 import kotlin.time.Instant
-import kotlinx.serialization.json.JsonElement
 
 /**
  * Node processor for CallFunction (function call task) - control-flow model.
@@ -68,14 +69,14 @@ class CallFunctionProcessor(
 
     override val isAsync = false  // Control-flow, not async
 
-    override fun stateWhenEnteringFromParent(transformedInput: JsonElement, scope: Scope, startedAt: Instant) = CallFunctionState(
+    override fun stateWhenEnteringFromParent(transformedInput: JsonNode, scope: Scope, startedAt: Instant) = CallFunctionState(
         startedAt = startedAt,
         entered = false
     )
 
     override fun stateWhenReEnteringFromChild(
         state: CallFunctionState,
-        output: JsonElement,
+        output: JsonNode,
         scope: Scope,
         nodeName: String?
     ): CallFunctionState = state.copy(entered = true)
@@ -92,7 +93,7 @@ class CallFunctionProcessor(
      */
     override fun getNextNode(
         state: CallFunctionState,
-        dataset: JsonElement,
+        dataset: JsonNode,
         scope: Scope,
     ): NextInfo {
         return when (state.entered) {
@@ -136,11 +137,11 @@ class CallFunctionProcessor(
      * @param scope The current execution scope
      * @return The evaluated input for the function
      */
-    private fun evaluateWithArgs(dataset: JsonElement, scope: Scope): JsonElement {
+    private fun evaluateWithArgs(dataset: JsonNode, scope: Scope): JsonNode {
         val withArgs = node.task.with ?: return dataset
 
-        // Convert the with arguments to JsonElement and evaluate any expressions
-        val withJson = withArgs.additionalProperties.toJsonElement()
+        // Convert the with arguments to JsonNode and evaluate any expressions
+        val withJson = withArgs.additionalProperties.toJsonNode()
         return eval(dataset, withJson, scope, false)
     }
 

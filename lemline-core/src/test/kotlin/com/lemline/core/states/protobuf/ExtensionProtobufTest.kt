@@ -1,25 +1,26 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.states.protobuf
 
+import com.fasterxml.jackson.databind.node.NullNode
+import com.lemline.common.json.*
 import com.lemline.common.values.NodePosition
 import com.lemline.core.orchestrator.StepByStepOrchestrator
 import com.lemline.core.states.*
 import com.lemline.core.tasks.FlowDirectiveEnum
 import com.lemline.messages.internal.v1.*
-import kotlinx.serialization.json.JsonNull
-import org.junit.jupiter.api.Test
 import kotlin.test.*
 import kotlin.time.Instant
+import org.junit.jupiter.api.Test
 
 class ExtensionProtobufTest {
     private val position = NodePosition("/do/0/owner")
     private val started = Instant.fromEpochSeconds(100)
     private fun stack(phase: ExtensionPhase): NodeStack {
         val pending = phase == ExtensionPhase.BEFORE || phase == ExtensionPhase.READY
-        val result = if (phase == ExtensionPhase.AFTER || phase == ExtensionPhase.READY) PreparedTaskResult(JsonNull, JsonNull, FlowDirectiveEnum.Exit) else null
+        val result = if (phase == ExtensionPhase.AFTER || phase == ExtensionPhase.READY) PreparedTaskResult(NullNode.instance, NullNode.instance, FlowDirectiveEnum.Exit) else null
         return StepByStepOrchestrator.initCmd().nodeStack
             .push(position, if (pending) PendingTaskState(started) else TaskState(started))
-            .withExtension(ExtensionExecutionState(listOf(0), phase, if (phase == ExtensionPhase.BEFORE || phase == ExtensionPhase.AFTER) 0 else null, JsonNull, JsonNull, result))
+            .withExtension(ExtensionExecutionState(listOf(0), phase, if (phase == ExtensionPhase.BEFORE || phase == ExtensionPhase.AFTER) 0 else null, NullNode.instance, NullNode.instance, result))
     }
 
     @Test fun `all phases round trip preserving null and active zero`() {
@@ -33,7 +34,7 @@ class ExtensionProtobufTest {
 
     @Test fun `extension return survives scheduling conversion and both message mappings`() {
         for (kind in ExtensionReturnKind.entries) {
-            val event = WorkflowEvent.TaskScheduled(stack(ExtensionPhase.BEFORE), position, JsonNull, null,
+            val event = WorkflowEvent.TaskScheduled(stack(ExtensionPhase.BEFORE), position, NullNode.instance, null,
                 ExtensionReturn(NodePosition("$position/_ext/0/before/do"), kind))
             val decoded = WorkflowStateProtobufMapper.fromProto(WorkflowStateProto.ADAPTER.decode(WorkflowStateProtobufMapper.toProto(event).encode())) as WorkflowEvent.TaskScheduled
             assertEquals(event.extensionReturn, decoded.resume().extensionReturn)
@@ -67,9 +68,9 @@ class ExtensionProtobufTest {
         val bytes = java.util.Base64.getDecoder().decode("CgEAEAMYACIECgIIAConCiUqIwohCgRkYXRhEhkyFwoCCAAKCREAAAAAAAAAAAoCIAAKAhoAMgwKBAoCCAASBAoCCAA=")
         val decoded = ExtensionProtobufMapper.fromProto(ExtensionExecutionStateProto.ADAPTER.decode(bytes))
         assertEquals(0, decoded.activeExtensionIndex)
-        assertEquals(JsonNull, decoded.rawInput)
-        assertEquals(kotlinx.serialization.json.Json.parseToJsonElement("""{"data":[null,0,false,""]}"""), decoded.transformedInput)
-        assertEquals(JsonNull, decoded.preparedResult!!.rawOutput)
+        assertEquals(NullNode.instance, decoded.rawInput)
+        assertEquals(parseJson("""{"data":[null,0,false,""]}"""), decoded.transformedInput)
+        assertEquals(NullNode.instance, decoded.preparedResult!!.rawOutput)
         assertEquals(decoded, ExtensionProtobufMapper.fromProto(ExtensionExecutionStateProto.ADAPTER.decode(ExtensionProtobufMapper.toProto(decoded).encode())))
     }
 }

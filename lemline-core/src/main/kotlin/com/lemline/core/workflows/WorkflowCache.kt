@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.workflows
 
+import com.fasterxml.jackson.databind.node.ObjectNode
+import com.lemline.common.json.*
 import com.lemline.common.json.LemlineJson
 import com.lemline.common.values.NodePosition
 import com.lemline.common.values.Token
@@ -26,7 +28,6 @@ import io.serverlessworkflow.api.types.Task
 import io.serverlessworkflow.api.types.Workflow
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.runBlocking
-import kotlinx.serialization.json.JsonObject
 import org.jetbrains.annotations.TestOnly
 
 /**
@@ -66,7 +67,7 @@ object WorkflowCache {
         val namedFunctionNodes by lazy {
             workflow.useFunctions.orEmpty().mapValues { (_, task) -> FunctionCache.buildFunctionNodesMap(task, workflow.use) }
         }
-        val definitionJson: JsonObject by lazy { LemlineJson.encodeToElement(workflow) }
+        val definitionJson: ObjectNode by lazy { LemlineJson.encodeToElement(workflow) }
     }
 
     class Snapshot internal constructor(internal val entries: Map<WorkflowInfo, Entry>)
@@ -205,7 +206,7 @@ object WorkflowCache {
     }
 
     /** Reuse the parsed JSON for the cached instance; avoid a stale entry with the same identity. */
-    fun getDefinitionJson(workflow: Workflow): JsonObject {
+    fun getDefinitionJson(workflow: Workflow): ObjectNode {
         val entry = current.entries[workflow.info]
         return if (entry?.workflow === workflow) entry.definitionJson else LemlineJson.encodeToElement(workflow)
     }
@@ -259,7 +260,6 @@ object WorkflowCache {
         workflow: Workflow
     ): Map<NodePosition, Node<*>> = current.entries[workflow.info]?.takeIf { it.workflow === workflow }?.nodes
         ?: throw IllegalStateException("Workflow not found in cache for ${workflow.info}")
-
 
     internal fun functionNodes(workflow: Workflow, task: Task, reference: String, suppressed: Boolean): Map<NodePosition, Node<*>> {
         val entry = current.entries[workflow.info]?.takeIf { it.workflow === workflow }

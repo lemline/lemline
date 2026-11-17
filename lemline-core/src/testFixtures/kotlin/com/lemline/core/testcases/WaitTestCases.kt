@@ -1,12 +1,10 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.testcases
 
+import com.fasterxml.jackson.databind.node.ArrayNode
+import com.lemline.common.json.*
 import com.lemline.core.testcases.impl.WorkflowTestCase
 import com.lemline.core.testcases.impl.WorkflowTestValidators.expectOutput
-import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.put
 
 /**
  * Test cases for WaitTask execution.
@@ -112,11 +110,11 @@ object WaitTestCases {
             validate = expectOutput(
                 buildJsonObject {
                     put(
-                        "results", JsonArray(
+                        "results", ArrayNode(
                             listOf(
-                                JsonPrimitive(10),
-                                JsonPrimitive(20),
-                                JsonPrimitive(30)
+                                jsonValue(10),
+                                jsonValue(20),
+                                jsonValue(30)
                             )
                         )
                     )

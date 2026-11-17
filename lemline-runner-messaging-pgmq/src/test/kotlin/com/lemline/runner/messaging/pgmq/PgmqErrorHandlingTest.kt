@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.messaging.pgmq
 
+import com.lemline.common.json.*
 import com.lemline.runner.messaging.pgmq.config.PgmqConnectorConfig
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.shouldBe
@@ -11,7 +12,6 @@ import java.time.Instant
 import java.util.*
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
-import kotlinx.serialization.json.Json
 import org.eclipse.microprofile.config.Config
 
 class PgmqErrorHandlingTest : FunSpec({
@@ -114,7 +114,7 @@ class PgmqErrorHandlingTest : FunSpec({
                 timestamp = "2024-01-15T10:30:00Z"
             )
 
-            val json = Json.encodeToString(dlqMessage)
+            val json = LemlineJson.encodeToString(dlqMessage)
 
             json shouldContain "123"
             json shouldContain "test-queue"
@@ -126,7 +126,7 @@ class PgmqErrorHandlingTest : FunSpec({
             val json =
                 """{"originalMessageId":456,"originalQueue":"q1","payload":"test","error":"err","timestamp":"2024-01-01T00:00:00Z"}"""
 
-            val dlqMessage = Json.decodeFromString<DlqMessage>(json)
+            val dlqMessage = LemlineJson.decodeFromString<DlqMessage>(json)
 
             dlqMessage.originalMessageId shouldBe 456L
             dlqMessage.originalQueue shouldBe "q1"
@@ -145,8 +145,8 @@ here""",
                 timestamp = "2024-01-01T00:00:00Z"
             )
 
-            val json = Json.encodeToString(dlqMessage)
-            val decoded = Json.decodeFromString<DlqMessage>(json)
+            val json = LemlineJson.encodeToString(dlqMessage)
+            val decoded = LemlineJson.decodeFromString<DlqMessage>(json)
 
             decoded.error shouldBe dlqMessage.error
         }
@@ -161,8 +161,8 @@ here""",
                 timestamp = "2024-01-01T00:00:00Z"
             )
 
-            val json = Json.encodeToString(dlqMessage)
-            val decoded = Json.decodeFromString<DlqMessage>(json)
+            val json = LemlineJson.encodeToString(dlqMessage)
+            val decoded = LemlineJson.decodeFromString<DlqMessage>(json)
 
             decoded.payload shouldBe nestedPayload
         }

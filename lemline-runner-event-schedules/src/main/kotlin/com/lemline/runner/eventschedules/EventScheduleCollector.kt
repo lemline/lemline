@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.eventschedules
 
+import com.fasterxml.jackson.databind.node.ArrayNode
+import com.lemline.common.json.*
 import com.lemline.common.values.IDV7
 import com.lemline.core.cloudevents.CloudEventMatcher
 import com.lemline.core.processors.ListenStrategy
@@ -8,7 +10,6 @@ import com.lemline.core.workflows.CachedEventConsumption
 import io.cloudevents.CloudEvent
 import io.serverlessworkflow.api.types.ListenTaskConfiguration.ListenAndReadAs
 import java.sql.Connection
-import kotlinx.serialization.json.JsonArray
 
 /** Mutates only affected collections; the caller owns the definition lock and transaction. */
 class EventScheduleCollector(private val repository: EventScheduleRepository, private val readAs: ListenAndReadAs) {
@@ -30,14 +31,14 @@ class EventScheduleCollector(private val repository: EventScheduleRepository, pr
         // Candidate filtering can omit the newest collection; allocate against all rows under the lock.
         var nextIndex = repository.nextCollectionIndex(stateId, conn)
         val dirty = mutableSetOf<IDV7>()
-        val completed = mutableListOf<JsonArray>()
+        val completed = mutableListOf<ArrayNode>()
         var matchedEvent = false
 
         suspend fun add(group: EventScheduleCollection) {
             repository.insertCollection(stateId, group, conn)
             groups.add(group)
         }
-        suspend fun complete(group: EventScheduleCollection, input: JsonArray? = null) {
+        suspend fun complete(group: EventScheduleCollection, input: ArrayNode? = null) {
             completed.add(input ?: repository.collectionInput(group.id, conn, readAs))
             repository.deleteCollection(group.id, conn)
             groups.remove(group)
@@ -59,7 +60,7 @@ class EventScheduleCollector(private val repository: EventScheduleRepository, pr
             repository.appendEvent(group.id, group.eventCount, event, conn)
             group.eventCount++
             dirty.add(group.id)
-            var input: JsonArray? = null
+            var input: ArrayNode? = null
             val untilExpression = strategy.untilExpression
             val ready = when {
                 strategy.strategy == ListenStrategy.ALL -> group.matched.size == strategy.filters.size
@@ -103,4 +104,4 @@ class EventScheduleCollector(private val repository: EventScheduleRepository, pr
     }
 }
 
-data class EventScheduleConsumption(val matched: Boolean, val inputs: List<JsonArray>)
+data class EventScheduleConsumption(val matched: Boolean, val inputs: List<ArrayNode>)

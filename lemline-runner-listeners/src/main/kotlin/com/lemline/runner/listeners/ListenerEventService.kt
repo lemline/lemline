@@ -1,7 +1,11 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.listeners
 
+import com.fasterxml.jackson.databind.JsonNode
+import com.fasterxml.jackson.databind.node.ArrayNode
 import com.fasterxml.jackson.databind.node.ObjectNode
+import com.fasterxml.jackson.databind.node.ValueNode
+import com.lemline.common.json.*
 import com.lemline.common.json.LemlineJson
 import com.lemline.common.logger.logger
 import com.lemline.common.values.WorkflowNamespace
@@ -18,12 +22,6 @@ import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
 import java.sql.Connection
 import kotlin.time.Clock
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.booleanOrNull
 
 /**
  * Service for processing incoming CloudEvents and matching them to listeners.
@@ -82,10 +80,10 @@ class ListenerEventService {
         // STEP 1: Match event against workflow definitions (in-memory, no database)
         // ═══════════════════════════════════════════════════════════════════════════════
 
-        var eventData: JsonElement? = null
+        var eventData: JsonNode? = null
 
         // use a lazy provider to parse data only if needed, and only once
-        val eventDataProvider: () -> JsonElement = {
+        val eventDataProvider: () -> JsonNode = {
             eventData ?: CloudEventService.parseData(event).also { eventData = it }
         }
 
@@ -225,10 +223,10 @@ class ListenerEventService {
         for (listener in listeners) {
             val config = listener.instanceMessage.workflowState.config
             val termination = (config.until as? UntilCondition.Event)?.consumption ?: continue
-            val progress = listener.untilProgress?.let { Json.decodeFromString<EventConsumptionProgress>(it) }
+            val progress = listener.untilProgress?.let { LemlineJson.decodeFromString<EventConsumptionProgress>(it) }
                 ?: EventConsumptionProgress()
             val ready = progress.consume(termination, event, config.correlationContext)
-            listener.untilProgress = Json.encodeToString(progress)
+            listener.untilProgress = LemlineJson.encodeToString(progress)
             if (ready) {
                 listener.closedAt = Clock.System.now()
                 completed++
@@ -265,7 +263,7 @@ class ListenerEventService {
             val listenersToComplete = listenersWithEvents.mapNotNull { (listener, accumulatedEvents) ->
                 val untilExpr = listener.untilExpression ?: return@mapNotNull null
 
-                val eventsArray = JsonArray(accumulatedEvents.map {
+                val eventsArray = ArrayNode(accumulatedEvents.map {
                     CloudEventService.parseStringAsData(it, listener.readAs)
                 })
 
@@ -291,13 +289,13 @@ class ListenerEventService {
         }
     }
 
-    internal fun evaluateUntilExpression(expression: String, events: JsonArray): Boolean {
+    internal fun evaluateUntilExpression(expression: String, events: ArrayNode): Boolean {
         with(LemlineJson) {
-            val inputNode = events.toJsonNode()
-            val scope = JsonObject(emptyMap()).toJsonNode() as ObjectNode
-            val result = JQExpression.evalOrNull(inputNode, expression, scope)?.toJsonElement()
+            val inputNode = events
+            val scope = ObjectNode(emptyMap()) as ObjectNode
+            val result = JQExpression.evalOrNull(inputNode, expression, scope)?.toJsonNode()
                 ?: return false
-            return (result as? JsonPrimitive)?.booleanOrNull == true
+            return (result as? ValueNode)?.booleanOrNull == true
         }
     }
 

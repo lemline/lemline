@@ -2,6 +2,7 @@
 package com.lemline.runner.testcases.pgmq
 
 import com.lemline.common.coroutines.ApplicationClassLoaderContext
+import com.lemline.common.json.*
 import com.lemline.common.values.IDV7
 import com.lemline.core.testcases.impl.WorkflowTestResult
 import com.lemline.core.workflows.WorkflowCache
@@ -23,8 +24,6 @@ import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.buildJsonObject
 import org.junit.jupiter.api.Test
 
 @RequiresDocker
@@ -82,7 +81,7 @@ internal class PgmqEventScheduleExecutionTest {
                         found
                     }
                     val result = assertIs<WorkflowTestResult.Success>(results.awaitWorkflowResult(row.workflowId, 30.seconds))
-                    assertEquals(buildJsonObject { put("received", JsonPrimitive(value)) }, result.output)
+                    assertEquals(buildJsonObject { put("received", jsonValue(value)) }, result.output)
                 }
                 assertEquals(2, schedules.listAll().count { it.workflowName == definition.name })
             } finally {

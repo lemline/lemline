@@ -1,13 +1,9 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.testcases
 
+import com.lemline.common.json.*
 import com.lemline.core.testcases.impl.WorkflowTestCase
 import com.lemline.core.testcases.impl.WorkflowTestValidators.expectOutput
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.buildJsonArray
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.put
-import kotlinx.serialization.json.putJsonObject
 
 /**
  * Test cases for DoTask execution with complete workflows.
@@ -57,8 +53,8 @@ object DoTaskTestCases {
             validate = expectOutput(
                 buildJsonObject {
                     put("items", buildJsonArray {
-                        add(JsonPrimitive("first"))
-                        add(JsonPrimitive("second"))
+                        add(jsonValue("first"))
+                        add(jsonValue("second"))
                     })
                     put("counter", 2)
                 }
@@ -74,7 +70,7 @@ object DoTaskTestCases {
                         taskName: ${ $task.name }
                         taskRef: ${ $task.reference }
             """.trimIndent(),
-            input = JsonPrimitive(42),
+            input = jsonValue(42),
             validate = expectOutput(
                 buildJsonObject {
                     put("taskName", "taskWithMetadata")
@@ -93,7 +89,7 @@ object DoTaskTestCases {
                       set:
                         result: ${ $input }
             """.trimIndent(),
-            input = JsonPrimitive(5),
+            input = jsonValue(5),
             validate = expectOutput(buildJsonObject { put("result", 50) })
         ),
 
@@ -175,7 +171,7 @@ object DoTaskTestCases {
                         hasWorkflowId: ${ $workflow.id != null }
                         hasWorkflowInput: ${ $workflow.input != null }
             """.trimIndent(),
-            input = JsonPrimitive(42),
+            input = jsonValue(42),
             validate = expectOutput(
                 buildJsonObject {
                     put("hasWorkflowId", true)

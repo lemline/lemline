@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.listeners
 
+import com.lemline.common.json.*
 import com.lemline.common.values.WorkflowNamespace
-import com.lemline.common.values.WorkflowName
 import com.lemline.common.values.info
 import com.lemline.core.workflows.WorkflowCache
 import io.cloudevents.CloudEvent
@@ -12,8 +12,6 @@ import io.kotest.matchers.collections.shouldHaveSize
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
 import java.net.URI
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.jsonObject
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
@@ -1895,7 +1893,7 @@ class DefinitionListenServiceTest {
             var dataProviderCalled = false
             val lazyDataProvider = {
                 dataProviderCalled = true
-                Json.parseToJsonElement("{}")
+                parseJson("{}")
             }
 
             // When
@@ -1931,7 +1929,7 @@ class DefinitionListenServiceTest {
             var dataProviderCalled = false
             val lazyDataProvider = {
                 dataProviderCalled = true
-                Json.parseToJsonElement("""{"status": "active"}""")
+                parseJson("""{"status": "active"}""")
             }
 
             // When
@@ -1969,7 +1967,7 @@ class DefinitionListenServiceTest {
             var dataProviderCalled = false
             val lazyDataProvider = {
                 dataProviderCalled = true
-                Json.parseToJsonElement("""{"userId": "USER-123"}""")
+                parseJson("""{"userId": "USER-123"}""")
             }
 
             // When
@@ -2315,7 +2313,7 @@ class DefinitionListenServiceTest {
             val queryKey = matches[0].toQueryKey()
             queryKey.correlationValuesJson shouldNotBe null
 
-            val correlationJson = Json.parseToJsonElement(queryKey.correlationValuesJson!!)
+            val correlationJson = parseJson(queryKey.correlationValuesJson!!)
             val orderId = correlationJson.jsonObject["orderId"]?.toString()?.trim('"')
             val customerId = correlationJson.jsonObject["customerId"]?.toString()?.trim('"')
             orderId shouldBe "ORD-123"

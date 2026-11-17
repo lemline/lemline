@@ -1,12 +1,13 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.processors
 
+import com.fasterxml.jackson.databind.JsonNode
+import com.lemline.common.json.*
 import com.lemline.core.nodes.Node
 import com.lemline.core.nodes.RootTask
 import com.lemline.core.processors.scope.Scope
 import com.lemline.core.states.RootState
 import kotlin.time.Instant
-import kotlinx.serialization.json.JsonElement
 
 /**
  * Node processor for RootTask (workflow root) - pure functional model.
@@ -45,7 +46,7 @@ class RootProcessor(
 
     // the RootProcessor should not create the root state
     override fun stateWhenEnteringFromParent(
-        transformedInput: JsonElement,
+        transformedInput: JsonNode,
         scope: Scope,
         startedAt: Instant
     ): RootState = throw IllegalStateException("RootProcessor does not create state")
@@ -55,7 +56,7 @@ class RootProcessor(
 
     override fun getNextNode(
         state: RootState,
-        dataset: JsonElement,
+        dataset: JsonNode,
         scope: Scope,
     ): NextInfo = NextInfo(
         nextNode = null,

@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.common.messaging
 
+import com.fasterxml.jackson.databind.node.NullNode
+import com.lemline.common.json.*
 import com.lemline.common.values.NodePosition
 import com.lemline.common.values.WorkflowId
 import com.lemline.common.values.WorkflowInfo
@@ -27,9 +29,6 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 import kotlin.time.Instant
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.put
 import org.junit.jupiter.api.Test
 
 class InstanceMessageCodecTest {
@@ -132,21 +131,20 @@ class InstanceMessageCodecTest {
         assertEquals(state, decoded)
     }
 
-
     @Test
     fun `extension continuation and return survive transport and durable storage`() {
         val extension = com.lemline.core.states.ExtensionExecutionState(
             selectedExtensionIndices = listOf(0),
             phase = com.lemline.core.states.ExtensionPhase.AFTER,
             activeExtensionIndex = 0,
-            rawInput = kotlinx.serialization.json.JsonNull,
-            transformedInput = JsonPrimitive("input"),
+            rawInput = com.fasterxml.jackson.databind.node.NullNode.instance,
+            transformedInput = jsonValue("input"),
             preparedResult = com.lemline.core.states.PreparedTaskResult(
-                kotlinx.serialization.json.JsonNull, JsonPrimitive("prepared"), com.lemline.core.tasks.FlowDirectiveGoto("nextTask")),
+                com.fasterxml.jackson.databind.node.NullNode.instance, jsonValue("prepared"), com.lemline.core.tasks.FlowDirectiveGoto("nextTask")),
         )
         val event = WorkflowEvent.TaskScheduled(
             nodeStack = nodeStack().withExtension(extension), nodePosition = taskPosition,
-            rawInput = kotlinx.serialization.json.JsonNull, flowDirective = null,
+            rawInput = com.fasterxml.jackson.databind.node.NullNode.instance, flowDirective = null,
             extensionReturn = com.lemline.core.states.ExtensionReturn(
                 NodePosition("$taskPosition/_ext/0/after/do"), com.lemline.core.states.ExtensionReturnKind.COMPLETE),
         )
@@ -164,7 +162,7 @@ class InstanceMessageCodecTest {
             workflowInfo = workflowInfo,
             workflowState = WorkflowCommand.ResumeWithCompletedTask(
                 nodeStack = nodeStack(),
-                rawOutput = JsonPrimitive("ok")
+                rawOutput = jsonValue("ok")
             )
         )
 
@@ -173,7 +171,7 @@ class InstanceMessageCodecTest {
             workflowInfo = workflowInfo,
             workflowState = WorkflowEvent.WaitStarted(
                 nodeStack = nodeStack(),
-                rawOutput = JsonPrimitive("wait"),
+                rawOutput = jsonValue("wait"),
                 config = WaitConfig(waitUntil = now)
             )
         )
@@ -183,12 +181,12 @@ class InstanceMessageCodecTest {
             workflowInfo = workflowInfo,
             workflowState = WorkflowEvent.RunWorkflowStarted(
                 nodeStack = nodeStack(),
-                rawInput = JsonPrimitive("child-input"),
+                rawInput = jsonValue("child-input"),
                 config = RunWorkflowConfig(
                     namespace = WorkflowNamespace("child-ns"),
                     name = WorkflowName("child-workflow"),
                     version = WorkflowVersion("2.1.0"),
-                    input = JsonPrimitive("payload"),
+                    input = jsonValue("payload"),
                     sync = true
                 )
             )
@@ -199,7 +197,7 @@ class InstanceMessageCodecTest {
             workflowInfo = workflowInfo,
             workflowState = WorkflowEvent.ListenStarted(
                 nodeStack = nodeStack(),
-                rawOutput = JsonPrimitive("listen"),
+                rawOutput = jsonValue("listen"),
                 config = ListenConfig(
                     strategy = ListenStrategy.ONE,
                     filters = listOf(
@@ -227,7 +225,7 @@ class InstanceMessageCodecTest {
             state = RootState(
                 startedAt = now,
                 workflowId = WorkflowId.random(),
-                workflowInput = JsonPrimitive("input")
+                workflowInput = jsonValue("input")
             ),
             counter = 1
         )

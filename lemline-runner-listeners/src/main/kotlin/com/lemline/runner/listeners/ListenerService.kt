@@ -2,6 +2,8 @@
 package com.lemline.runner.listeners
 
 import com.fasterxml.jackson.databind.node.ObjectNode
+import com.fasterxml.jackson.databind.node.ValueNode
+import com.lemline.common.json.*
 import com.lemline.common.json.LemlineJson
 import com.lemline.common.logger.logger
 import com.lemline.common.values.IDV7
@@ -18,12 +20,6 @@ import com.lemline.runner.common.messaging.InstanceMessage
 import io.serverlessworkflow.impl.expressions.ExpressionUtils
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.contentOrNull
-import kotlinx.serialization.json.put
 
 /**
  * Service for handling listener lifecycle operations.
@@ -102,9 +98,9 @@ class ListenerService {
      * @param config The listen configuration containing filters and correlation context
      * @return JSON string of correlation values, or null if no correlations
      */
-    private fun calculateCorrelationValues(config: ListenConfig): String? {
+    internal fun calculateCorrelationValues(config: ListenConfig): String? {
         val correlationContext = config.correlationContext ?: return null
-        if (correlationContext !is JsonObject) return null
+        if (correlationContext !is ObjectNode) return null
 
         // Collect all correlation expect expressions from all filters
         val expectExpressions = mutableMapOf<String, String>()
@@ -129,15 +125,12 @@ class ListenerService {
                 val trimmedExpr = ExpressionUtils.trimExpr(expectExpr)
 
                 val result = with(LemlineJson) {
-                    val inputNode = correlationContext.toJsonNode()
-                    val scope = JsonObject(emptyMap()).toJsonNode() as ObjectNode
-                    JQExpression.eval(inputNode, trimmedExpr, scope).toJsonElement()
+                    val inputNode = correlationContext.toLegacyCorrelationNode()
+                    val scope = ObjectNode(emptyMap()) as ObjectNode
+                    JQExpression.eval(inputNode, trimmedExpr, scope).toJsonNode()
                 }
 
-                val value = when (result) {
-                    is JsonPrimitive -> result.contentOrNull
-                    else -> result.toString()
-                }
+                val value = result.toCorrelationValue()
 
                 if (value != null) {
                     evaluatedValues[key] = value
@@ -149,13 +142,8 @@ class ListenerService {
 
         if (evaluatedValues.isEmpty()) return null
 
-        // Serialize with sorted keys for consistent database comparison
-        val sortedEntries = evaluatedValues.entries.sortedBy { it.key }
-        return buildJsonObject {
-            for ((key, value) in sortedEntries) {
-                put(key, value)
-            }
-        }.let { Json.encodeToString(it) }
+        // Both expected and incoming keys must use the historical string-map codec.
+        return LemlineJson.encodeToString(evaluatedValues.toSortedMap().toMap())
     }
 }
 

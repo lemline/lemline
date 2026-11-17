@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.listeners
 
+import com.fasterxml.jackson.databind.JsonNode
+import com.lemline.common.json.*
 import com.lemline.common.logger.logger
 import com.lemline.common.values.NodePosition
 import com.lemline.common.values.WorkflowInfo
@@ -18,8 +20,6 @@ import io.serverlessworkflow.api.types.ListenTaskConfiguration
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
 import kotlin.coroutines.cancellation.CancellationException
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonElement
 
 /**
  * Represents a workflow definition that may listen to an event.
@@ -153,12 +153,12 @@ class DefinitionListenService {
      * event data for filter evaluation, and returns a list of tasks with matching filters.
      *
      * @param event The incoming CloudEvent to evaluate against the filters of listen tasks.
-     * @param eventDataProvider A provider function that, when invoked, supplies the CloudEvent data as a JsonElement.
+     * @param eventDataProvider A provider function that, when invoked, supplies the CloudEvent data as a JsonNode.
      * @return A list of MatchingListenTask objects representing the listen tasks that match the event and its data.
      */
     fun findMatchingListenTasks(
         event: CloudEvent,
-        eventDataProvider: () -> JsonElement = { CloudEventService.parseData(event) }
+        eventDataProvider: () -> JsonNode = { CloudEventService.parseData(event) }
     ): List<MatchingListenTask> {
         logger.trace { "Finding matching listen tasks for CloudEvent: $event" }
 
@@ -213,10 +213,9 @@ class DefinitionListenService {
         }
     }
 
-    private fun extractCorrelationJson(filter: EventFilter, eventData: JsonElement): String? =
+    private fun extractCorrelationJson(filter: EventFilter, eventData: JsonNode): String? =
         CloudEventMatcher.extractCorrelationValues(filter, eventData)
             ?.toSortedMap()
-            ?.let { Json.encodeToString(it.toMap()) }
-
+            ?.let { LemlineJson.encodeToString(it.toMap()) }
 
 }

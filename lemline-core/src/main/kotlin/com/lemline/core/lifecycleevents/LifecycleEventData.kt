@@ -1,11 +1,18 @@
 // SPDX-License-Identifier: BUSL-1.1
+@file:kotlinx.serialization.UseSerializers(
+    com.lemline.common.json.JsonNodeSerializer::class,
+    com.lemline.common.json.ObjectNodeSerializer::class,
+    com.lemline.common.json.ArrayNodeSerializer::class,
+)
+
 package com.lemline.core.lifecycleevents
 
+import com.fasterxml.jackson.databind.JsonNode
+import com.lemline.common.json.*
 import com.lemline.common.values.WorkflowInfo
 import kotlin.time.Instant
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.JsonElement
 
 /**
  * Data payloads for Open Workflow lifecycle events.
@@ -38,7 +45,7 @@ sealed class LifecycleEventData {
     @SerialName("workflowCreated")
     data class WorkflowCreatedData(
         val name: String,
-        val input: JsonElement,
+        val input: JsonNode,
         val createdAt: Instant,
         val definition: WorkflowDefinitionData,
     ) : LifecycleEventData()
@@ -69,7 +76,7 @@ sealed class LifecycleEventData {
     @SerialName("workflowCompleted")
     data class WorkflowCompletedData(
         val name: String,
-        val output: JsonElement,
+        val output: JsonNode,
         val completedAt: Instant,
     ) : LifecycleEventData()
 
@@ -108,7 +115,7 @@ sealed class LifecycleEventData {
     data class TaskCreatedData(
         val workflow: String,
         val task: String,
-        val input: JsonElement,
+        val input: JsonNode,
         val createdAt: Instant,
     ) : LifecycleEventData()
 
@@ -140,7 +147,7 @@ sealed class LifecycleEventData {
     data class TaskCompletedData(
         val workflow: String,
         val task: String,
-        val output: JsonElement,
+        val output: JsonNode,
         val completedAt: Instant,
     ) : LifecycleEventData()
 

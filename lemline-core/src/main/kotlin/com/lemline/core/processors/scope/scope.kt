@@ -1,17 +1,15 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.processors.scope
 
+import com.fasterxml.jackson.databind.JsonNode
+import com.fasterxml.jackson.databind.node.NullNode
+import com.fasterxml.jackson.databind.node.ObjectNode
+import com.lemline.common.json.*
 import com.lemline.core.nodes.Node
 import com.lemline.core.states.NodeStack
 import kotlin.time.Instant
-import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonNull
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.jsonObject
 
-typealias Scope = JsonObject
+typealias Scope = ObjectNode
 
 /**
  * Merges the current `Scope` map with another `Scope` map.
@@ -22,8 +20,8 @@ typealias Scope = JsonObject
  */
 internal fun Scope.merge(other: Scope?): Scope =
     buildJsonObject {
-        this@merge.forEach { put(it.key, it.value) }  // Put base scope first
-        other?.forEach { put(it.key, it.value) }      // Then overwrite with another scope
+        this@merge.properties().forEach { put(it.key, it.value) }  // Put base scope first
+        other?.properties()?.forEach { put(it.key, it.value) }      // Then overwrite with another scope
     }
 
 /**
@@ -32,60 +30,60 @@ internal fun Scope.merge(other: Scope?): Scope =
 fun Scope.withTask(
     node: Node<*>,
     startedAt: Instant,
-    rawInput: JsonElement = JsonNull
+    rawInput: JsonNode = NullNode.instance
 ): Scope {
     val task = buildJsonObject {
-        put("name", JsonPrimitive(node.name))
+        put("name", jsonValue(node.name))
         // TODO Current implementation does not follow spec
-        put("reference", JsonPrimitive(node.position.toString()))
+        put("reference", jsonValue(node.position.toString()))
         put("definition", node.definition)
         put(
             "startedAt", buildJsonObject {
-                put("iso8601", JsonPrimitive(startedAt.toString()))
+                put("iso8601", jsonValue(startedAt.toString()))
                 put("epoch", buildJsonObject {
-                    put("seconds", JsonPrimitive(startedAt.epochSeconds))
-                    put("milliseconds", JsonPrimitive(startedAt.toEpochMilliseconds()))
+                    put("seconds", jsonValue(startedAt.epochSeconds))
+                    put("milliseconds", jsonValue(startedAt.toEpochMilliseconds()))
                 })
             }
         )
         put("input", rawInput)
     }
 
-    return JsonObject(this + ("task" to task))
+    return ObjectNode(this + ("task" to task))
 }
 
 /**
  * Creates a new Scope with the given transformed input.
  */
 fun Scope.withTransformedInput(
-    transformedInput: JsonElement
-) = JsonObject(this + ("input" to transformedInput))
+    transformedInput: JsonNode
+) = ObjectNode(this + ("input" to transformedInput))
 
 /**
  * Creates a new Scope with the given raw output.
  */
 fun Scope.withRawOutput(
-    rawOutput: JsonElement
+    rawOutput: JsonNode
 ): Scope {
-    if (get("_extensionTaskScope") == JsonPrimitive(true)) return this
+    if (get("_extensionTaskScope") == jsonValue(true)) return this
     val task = get("task")?.jsonObject ?: error("Scope missing 'task' key")
-    return JsonObject(this + ("task" to JsonObject(task + ("output" to rawOutput))))
+    return ObjectNode(this + ("task" to ObjectNode(task + ("output" to rawOutput))))
 }
 
 /**
  * Creates a new Scope with the given transformed output.
  */
 fun Scope.withTransformedOutput(
-    transformedOutput: JsonElement
-) = JsonObject(this + ("output" to transformedOutput))
+    transformedOutput: JsonNode
+) = ObjectNode(this + ("output" to transformedOutput))
 
 /** Reconstructs $task from durable data while keeping local scope variables. */
-fun NodeStack.taskScope(node: Node<*>, startedAt: Instant = currentState.startedAt, rawInput: JsonElement = JsonNull): Scope {
+fun NodeStack.taskScope(node: Node<*>, startedAt: Instant = currentState.startedAt, rawInput: JsonNode = NullNode.instance): Scope {
     val owner = node.extensionOwner ?: node
     val frame = this[owner.position]
     val extension = frame?.extension
     var scope = stateScope.withTask(owner, frame?.state?.startedAt ?: startedAt, extension?.rawInput ?: rawInput)
     extension?.preparedResult?.let { scope = scope.withRawOutput(it.rawOutput) }
-    if (node.extensionOwner != null) scope = JsonObject(scope + ("_extensionTaskScope" to JsonPrimitive(true)))
+    if (node.extensionOwner != null) scope = ObjectNode(scope + ("_extensionTaskScope" to jsonValue(true)))
     return scope
 }

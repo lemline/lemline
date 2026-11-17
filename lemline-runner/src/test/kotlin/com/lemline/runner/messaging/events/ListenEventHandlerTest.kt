@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.messaging.events
 
+import com.fasterxml.jackson.databind.node.NullNode
+import com.lemline.common.json.*
 import com.lemline.common.values.IDV7
 import com.lemline.common.values.NodePosition
 import com.lemline.common.values.WorkflowId
@@ -30,7 +32,6 @@ import kotlin.time.Clock
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Instant
 import kotlinx.coroutines.test.runTest
-import kotlinx.serialization.json.JsonNull
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.TestInstance
@@ -176,7 +177,7 @@ internal class ListenEventHandlerTest {
                     RootState(
                         startedAt = now,
                         workflowId = workflowId,
-                        workflowInput = JsonNull
+                        workflowInput = NullNode.instance
                     )
                 ),
                 StackFrame(NodePosition("/do"), DoState(startedAt = now)),
@@ -193,7 +194,7 @@ internal class ListenEventHandlerTest {
 
         val listenStarted = WorkflowEvent.ListenStarted(
             nodeStack = nodeStack,
-            rawOutput = JsonNull,
+            rawOutput = NullNode.instance,
             config = config
         )
 

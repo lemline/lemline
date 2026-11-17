@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.messaging.base
 
+import com.lemline.common.json.*
 import com.lemline.common.values.WorkflowInfo
 import com.lemline.common.values.WorkflowName
 import com.lemline.common.values.WorkflowNamespace
@@ -25,7 +26,6 @@ import java.util.concurrent.ExecutionException
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.TimeUnit.SECONDS
 import kotlinx.coroutines.test.runTest
-import kotlinx.serialization.json.JsonPrimitive
 import org.eclipse.microprofile.reactive.messaging.Message
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
@@ -197,7 +197,7 @@ internal abstract class WorkflowConsumerTest {
         // Given
         val commandsMessage = InstanceMessage(
             workflowInfo = workflowInfo,
-            workflowState = StepByStepOrchestrator.initCmd(workflowInput = JsonPrimitive("task")),
+            workflowState = StepByStepOrchestrator.initCmd(workflowInput = jsonValue("task")),
         )
 
         // When
@@ -262,7 +262,7 @@ internal abstract class WorkflowConsumerTest {
         // Given
         val commandsMessage = InstanceMessage(
             workflowInfo = workflowInfo,
-            workflowState = StepByStepOrchestrator.initCmd(workflowInput = JsonPrimitive("retry")),
+            workflowState = StepByStepOrchestrator.initCmd(workflowInput = jsonValue("retry")),
         )
 
         // When
@@ -301,7 +301,7 @@ internal abstract class WorkflowConsumerTest {
         // Given
         val commandsMessage = InstanceMessage(
             workflowInfo = workflowInfo,
-            workflowState = StepByStepOrchestrator.initCmd(workflowInput = JsonPrimitive("wait")),
+            workflowState = StepByStepOrchestrator.initCmd(workflowInput = jsonValue("wait")),
         )
 
         // When
@@ -341,7 +341,7 @@ internal abstract class WorkflowConsumerTest {
         // Given
         val commandsMessage = InstanceMessage(
             workflowInfo = workflowInfo,
-            workflowState = StepByStepOrchestrator.initCmd(workflowInput = JsonPrimitive("completed")),
+            workflowState = StepByStepOrchestrator.initCmd(workflowInput = jsonValue("completed")),
         )
 
         // When

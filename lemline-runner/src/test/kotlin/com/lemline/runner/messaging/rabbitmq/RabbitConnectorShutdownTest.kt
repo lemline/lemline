@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.messaging.rabbitmq
 
+import com.lemline.common.json.*
 import com.lemline.runner.common.test.RequiresDocker
 import com.lemline.runner.config.LemlineConfiguration
 import com.lemline.runner.testcases.rabbitmq.RabbitMQTestCaseProfile
@@ -18,10 +19,6 @@ import kotlin.test.assertEquals
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeoutOrNull
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.jsonArray
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
 import org.eclipse.microprofile.config.inject.ConfigProperty
 import org.junit.jupiter.api.Test
 
@@ -111,7 +108,7 @@ class RabbitConnectorShutdownTest {
         return try {
             assertEquals(200, connection.responseCode, "RabbitMQ management API must be available")
             val body = connection.inputStream.bufferedReader().use { it.readText() }
-            Json.parseToJsonElement(body).jsonArray.mapNotNull {
+            parseJson(body).jsonArray.mapNotNull {
                 it.jsonObject["channel_details"]?.jsonObject?.get("connection_name")?.jsonPrimitive?.content
             }
         } finally {
@@ -124,7 +121,7 @@ class RabbitConnectorShutdownTest {
         return try {
             assertEquals(200, connection.responseCode, "RabbitMQ management API must be available")
             val body = connection.inputStream.bufferedReader().use { it.readText() }
-            Json.parseToJsonElement(body).jsonArray.map {
+            parseJson(body).jsonArray.map {
                 val entry = it.jsonObject
                 val name = entry.getValue("name").jsonPrimitive.content
                 val client = entry["client_properties"]?.jsonObject?.get("connection_name")?.jsonPrimitive?.content

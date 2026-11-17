@@ -1,51 +1,44 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.states
 
+import com.fasterxml.jackson.databind.JsonNode
+import com.fasterxml.jackson.databind.node.ObjectNode
+import com.lemline.common.json.*
 import com.lemline.common.json.LemlineJson
 import com.lemline.common.values.WorkflowId
-import com.lemline.core.expressions.scopes.RuntimeDescriptor
-import com.lemline.core.expressions.scopes.WorkflowDescriptor
 import com.lemline.core.processors.scope.Scope
 import com.lemline.core.processors.scope.merge
 import io.serverlessworkflow.impl.expressions.DateTimeDescriptor
 import kotlin.time.Instant
 import kotlin.time.toJavaInstant
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.encodeToJsonElement
 
 data class RootState(
     override val startedAt: Instant,
     val workflowId: WorkflowId,
-    val workflowInput: JsonElement = buildJsonObject {},
+    val workflowInput: JsonNode = buildJsonObject {},
     val context: Scope = buildJsonObject {},
     val hasWaitingParent: Boolean = false,
 ) : NodeState() {
 
     // Resolved per command; never included in RootStateProto.
-    private var secrets: JsonObject = buildJsonObject {}
+    private var secrets: ObjectNode = buildJsonObject {}
 
     // Rehydrated from the loaded workflow on each command; intentionally absent from RootStateProto.
-    private lateinit var definition: JsonObject
-
-    private val workflowDescriptor
-        get() = WorkflowDescriptor(
-            id = workflowId.toString(),
-            definition = definition,
-            input = workflowInput,
-            startedAt = LemlineJson.encodeToElement(
-                DateTimeDescriptor.from(startedAt.toJavaInstant())
-            ),
-        )
+    private lateinit var definition: ObjectNode
 
     override val scope: Scope by lazy {
         buildJsonObject {
             put("context", context)
-            put("runtime", Json.encodeToJsonElement(RuntimeDescriptor))
+            // The former Kotlin singleton serializer emitted an empty object.
+            // Preserve that scope representation during this JSON migration.
+            put("runtime", buildJsonObject {})
             put("secrets", secrets)
-            put("workflow", Json.encodeToJsonElement(workflowDescriptor))
+            put("workflow", buildJsonObject {
+                put("id", workflowId.toString())
+                put("definition", definition)
+                put("input", workflowInput)
+                put("startedAt", LemlineJson.encodeToElement(DateTimeDescriptor.from(startedAt.toJavaInstant())))
+            })
         }
     }
 
@@ -63,11 +56,11 @@ data class RootState(
     fun withIdentity(workflowId: WorkflowId, startedAt: Instant): RootState =
         copyRuntimeFieldsTo(copy(workflowId = workflowId, startedAt = startedAt))
 
-    fun withDefinition(definition: JsonObject): RootState = copyRuntimeFieldsTo(copy()).also {
+    fun withDefinition(definition: ObjectNode): RootState = copyRuntimeFieldsTo(copy()).also {
         it.definition = definition
     }
 
-    fun withSecrets(secrets: JsonObject): RootState = copyRuntimeFieldsTo(copy()).also {
+    fun withSecrets(secrets: ObjectNode): RootState = copyRuntimeFieldsTo(copy()).also {
         it.secrets = secrets
     }
 

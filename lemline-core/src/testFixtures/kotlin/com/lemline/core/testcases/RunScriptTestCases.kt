@@ -1,13 +1,10 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.testcases
 
+import com.lemline.common.json.*
 import com.lemline.core.testcases.impl.TestMocks
 import com.lemline.core.testcases.impl.WorkflowTestCase
 import com.lemline.core.testcases.impl.WorkflowTestValidators.expectOutput
-import com.lemline.core.testcases.impl.WorkflowTestValidators.expectOutput
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.put
 
 /**
  * Test cases for Script execution.
@@ -32,7 +29,7 @@ object RunScriptTestCases {
                             console.log('Hello from JavaScript');
             """.trimIndent(),
             tags = setOf("script", "js"),
-            validate = expectOutput(JsonPrimitive("mocked js output"))
+            validate = expectOutput(jsonValue("mocked js output"))
         ),
 
         WorkflowTestCase(
@@ -48,7 +45,7 @@ object RunScriptTestCases {
                             print('Hello from Python')
             """.trimIndent(),
             tags = setOf("script", "python"),
-            validate = expectOutput(JsonPrimitive("mocked python output"))
+            validate = expectOutput(jsonValue("mocked python output"))
         ),
 
         WorkflowTestCase(
@@ -73,7 +70,7 @@ object RunScriptTestCases {
                             "--name": Alice
             """.trimIndent(),
             tags = setOf("script", "js"),
-            validate = expectOutput(JsonPrimitive("mocked js output"))
+            validate = expectOutput(jsonValue("mocked js output"))
         ),
 
         WorkflowTestCase(
@@ -97,7 +94,7 @@ object RunScriptTestCases {
                             "--name": Bob
             """.trimIndent(),
             tags = setOf("script", "python"),
-            validate = expectOutput(JsonPrimitive("mocked python output"))
+            validate = expectOutput(jsonValue("mocked python output"))
         ),
 
         WorkflowTestCase(
@@ -115,7 +112,7 @@ object RunScriptTestCases {
                             MY_VAR: TestValue
             """.trimIndent(),
             tags = setOf("script", "js"),
-            validate = expectOutput(JsonPrimitive("mocked js output"))
+            validate = expectOutput(jsonValue("mocked js output"))
         ),
 
         WorkflowTestCase(
@@ -134,7 +131,7 @@ object RunScriptTestCases {
                             MY_VAR: PythonValue
             """.trimIndent(),
             tags = setOf("script", "python"),
-            validate = expectOutput(JsonPrimitive("mocked python output"))
+            validate = expectOutput(jsonValue("mocked python output"))
         ),
 
         WorkflowTestCase(
@@ -151,7 +148,7 @@ object RunScriptTestCases {
                         return: stdout
             """.trimIndent(),
             tags = setOf("script", "js"),
-            validate = expectOutput(JsonPrimitive("mocked js output"))
+            validate = expectOutput(jsonValue("mocked js output"))
         ),
 
         WorkflowTestCase(
@@ -236,7 +233,7 @@ object RunScriptTestCases {
                             console.log(result);
             """.trimIndent(),
             tags = setOf("script", "js"),
-            validate = expectOutput(JsonPrimitive("mocked js output"))
+            validate = expectOutput(jsonValue("mocked js output"))
         ),
 
         WorkflowTestCase(
@@ -253,7 +250,7 @@ object RunScriptTestCases {
                             print(result)
             """.trimIndent(),
             tags = setOf("script", "python"),
-            validate = expectOutput(JsonPrimitive("mocked python output"))
+            validate = expectOutput(jsonValue("mocked python output"))
         ),
 
         WorkflowTestCase(
@@ -271,7 +268,7 @@ object RunScriptTestCases {
                             console.log('Line 3');
             """.trimIndent(),
             tags = setOf("script", "js"),
-            validate = expectOutput(JsonPrimitive("mocked js output"))
+            validate = expectOutput(jsonValue("mocked js output"))
         ),
 
         WorkflowTestCase(
@@ -289,7 +286,7 @@ object RunScriptTestCases {
                             print('Line 3')
             """.trimIndent(),
             tags = setOf("script", "python"),
-            validate = expectOutput(JsonPrimitive("mocked python output"))
+            validate = expectOutput(jsonValue("mocked python output"))
         )
     )
 }

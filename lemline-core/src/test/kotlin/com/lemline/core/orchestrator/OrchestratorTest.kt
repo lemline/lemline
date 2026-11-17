@@ -1,6 +1,12 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.orchestrator
 
+import com.fasterxml.jackson.databind.JsonNode
+import com.fasterxml.jackson.databind.node.ArrayNode
+import com.fasterxml.jackson.databind.node.NullNode
+import com.fasterxml.jackson.databind.node.ObjectNode
+import com.fasterxml.jackson.databind.node.ValueNode
+import com.lemline.common.json.*
 import com.lemline.common.values.WorkflowId
 import com.lemline.common.values.WorkflowInfo
 import com.lemline.core.activities.ActivityExecutor
@@ -15,9 +21,9 @@ import com.lemline.core.activities.mock.ShellMockResponse
 import com.lemline.core.activities.mock.ShellMockRule
 import com.lemline.core.cloudevents.CloudEventHook
 import com.lemline.core.cloudevents.InMemoryCloudEventHook
+import com.lemline.core.errors.InternalException
 import com.lemline.core.getWorkflowToTest
 import com.lemline.core.lifecycleevents.LifecycleEventHook
-import com.lemline.core.errors.InternalException
 import com.lemline.core.states.NodeStack
 import com.lemline.core.states.WorkflowEvent
 import com.lemline.core.workflows.WorkflowCache
@@ -30,17 +36,6 @@ import kotlin.time.Instant
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withTimeout
-import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonNull
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.boolean
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.int
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
-import kotlinx.serialization.json.put
 
 /**
  * Abstract base class providing shared test scenarios for workflow orchestrators.
@@ -68,7 +63,7 @@ import kotlinx.serialization.json.put
  *
  * ```kotlin
  * class CompleteOrchestratorTest : AbstractOrchestratorTest() {
- *     override suspend fun executeWorkflow(...): JsonElement {
+ *     override suspend fun executeWorkflow(...): JsonNode {
  *         val node = getWorkflowNode(yaml, namespace, name, version)
  *         return CompleteOrchestrator.run(node, input)
  *     }
@@ -79,15 +74,15 @@ class OrchestratorTest : FunSpec() {
 
     internal suspend fun executeWorkflow(
         yaml: String,
-        input: JsonElement = buildJsonObject { },
+        input: JsonNode = buildJsonObject { },
         namespace: String = "default",
         name: String = "test",
         version: String = "0.1.0",
         activityExecutor: ActivityExecutor? = null,
         cloudEventHook: CloudEventHook = InMemoryCloudEventHook(),
-        secrets: JsonObject = buildJsonObject {},
+        secrets: ObjectNode = buildJsonObject {},
         lifecycleHook: LifecycleEventHook = LifecycleEventHook.NOOP,
-    ): JsonElement {
+    ): JsonNode {
         val workflow = getWorkflowToTest(yaml, namespace, name, version)
 
         // Create executor with emit wired to the cloudEventHook
@@ -109,7 +104,7 @@ class OrchestratorTest : FunSpec() {
             cloudEventHook = cloudEventHook,
             lifecycleHook = lifecycleHook,
             secretsForWorkflow = { definition ->
-                JsonObject(secrets.filterKeys { it in definition.use?.secrets.orEmpty() })
+                ObjectNode(secrets.filterKeys { it in definition.use?.secrets.orEmpty() })
             },
         )
 
@@ -181,7 +176,7 @@ class OrchestratorTest : FunSpec() {
                       set:
                         result: ${ .value * 10 }
             """
-            val output = executeWorkflow(yaml, JsonObject(emptyMap())) as JsonObject
+            val output = executeWorkflow(yaml, ObjectNode(emptyMap())) as ObjectNode
 
             assertEquals(10, output["result"]?.jsonPrimitive?.int)
         }
@@ -203,7 +198,7 @@ class OrchestratorTest : FunSpec() {
                       output:
                         as: ${ . }
             """
-            val output = executeWorkflow(yaml, JsonObject(emptyMap())) as JsonObject
+            val output = executeWorkflow(yaml, ObjectNode(emptyMap())) as ObjectNode
 
             assertEquals(15, output["sum"]?.jsonPrimitive?.int)
         }
@@ -235,7 +230,7 @@ class OrchestratorTest : FunSpec() {
                         method: GET
                         endpoint: https://jsonplaceholder.typicode.com/posts/1
             """
-            val output = executeWorkflow(yaml, JsonObject(emptyMap()), activityExecutor = mockExecutor) as JsonObject
+            val output = executeWorkflow(yaml, ObjectNode(emptyMap()), activityExecutor = mockExecutor) as ObjectNode
 
             // Should complete the HTTP call and return the mocked result
             assertEquals(1, output["id"]?.jsonPrimitive?.int)
@@ -261,10 +256,10 @@ class OrchestratorTest : FunSpec() {
                         shell:
                           command: echo "Hello World"
             """
-            val output = executeWorkflow(yaml, JsonObject(emptyMap()), activityExecutor = mockExecutor)
+            val output = executeWorkflow(yaml, ObjectNode(emptyMap()), activityExecutor = mockExecutor)
 
-            // Should complete the shell command and return stdout as JsonPrimitive
-            assertEquals("Hello World", (output as JsonPrimitive).content)
+            // Should complete the shell command and return stdout as ValueNode
+            assertEquals("Hello World", (output as ValueNode).content)
         }
 
         test("should execute multiple activities in sequence") {
@@ -295,7 +290,7 @@ class OrchestratorTest : FunSpec() {
                         method: GET
                         endpoint: https://jsonplaceholder.typicode.com/posts/2
             """
-            val output = executeWorkflow(yaml, JsonObject(emptyMap()), activityExecutor = mockExecutor) as JsonObject
+            val output = executeWorkflow(yaml, ObjectNode(emptyMap()), activityExecutor = mockExecutor) as ObjectNode
 
             // Should complete both HTTP calls (last one wins as output)
             assertEquals(2, output["id"]?.jsonPrimitive?.int)
@@ -318,11 +313,11 @@ class OrchestratorTest : FunSpec() {
                       set:
                         after: true
             """
-            val output = executeWorkflow(yaml, JsonObject(emptyMap())) as JsonObject
+            val output = executeWorkflow(yaml, ObjectNode(emptyMap())) as ObjectNode
 
             // Should execute tasks before and after wait
             assertNull(output["before"])
-            assertEquals(JsonPrimitive(true), output["after"])
+            assertEquals(jsonValue(true), output["after"])
         }
 
         // ========================================
@@ -362,7 +357,7 @@ class OrchestratorTest : FunSpec() {
             }).jsonObject
 
             assertEquals("child-value", output.getValue("childValue").jsonPrimitive.content)
-            assertEquals(JsonNull, output["parentSecretVisible"])
+            assertEquals(NullNode.instance, output["parentSecretVisible"])
         }
 
         test("supplies declared secrets to an asynchronous child workflow") {
@@ -376,12 +371,12 @@ class OrchestratorTest : FunSpec() {
                         childValue: ${ $secrets.CHILD_TOKEN }
             """.trimIndent(), namespace = "test", name = "secret-child", version = "0.1.0")
 
-            val childOutcome = CompletableDeferred<JsonElement>()
+            val childOutcome = CompletableDeferred<JsonNode>()
             val hook = object : LifecycleEventHook by LifecycleEventHook.NOOP {
                 override suspend fun onWorkflowCompleted(
                     workflowInfo: WorkflowInfo,
                     nodeStack: NodeStack,
-                    output: JsonElement,
+                    output: JsonNode,
                     completedAt: Instant,
                 ) {
                     if (workflowInfo.name.toString() == "secret-child") childOutcome.complete(output)
@@ -432,7 +427,7 @@ class OrchestratorTest : FunSpec() {
                           input:
                             value: 5
             """
-            val output = executeWorkflow(parentYaml, JsonObject(emptyMap())) as JsonObject
+            val output = executeWorkflow(parentYaml, ObjectNode(emptyMap())) as ObjectNode
 
             // Should complete child workflow and return result to parent
             assertEquals(10, output["result"]?.jsonPrimitive?.int)
@@ -465,11 +460,11 @@ class OrchestratorTest : FunSpec() {
                           input:
                             value: ${ .data }
             """
-            val output = executeWorkflow(parentYaml, JsonObject(emptyMap())) as JsonObject
+            val output = executeWorkflow(parentYaml, ObjectNode(emptyMap())) as ObjectNode
 
             // Parent should complete immediately without waiting for child
             assertNull(output["value"])
-            assertEquals(JsonPrimitive("test"), output["data"])
+            assertEquals(jsonValue("test"), output["data"])
         }
 
         test("should execute nested sub-workflows recursively") {
@@ -510,7 +505,7 @@ class OrchestratorTest : FunSpec() {
                       set:
                         level: 1
             """
-            val output = executeWorkflow(parentYaml, JsonObject(emptyMap())) as JsonObject
+            val output = executeWorkflow(parentYaml, ObjectNode(emptyMap())) as ObjectNode
 
             // Should complete all nested workflows
             assertEquals(1, output["level"]?.jsonPrimitive?.int)
@@ -535,7 +530,7 @@ class OrchestratorTest : FunSpec() {
                       set:
                         result: "condition was false"
             """
-            val output = executeWorkflow(yaml, JsonObject(emptyMap())) as JsonObject
+            val output = executeWorkflow(yaml, ObjectNode(emptyMap())) as ObjectNode
 
             assertEquals("condition was true", output["result"]?.jsonPrimitive?.content)
         }
@@ -557,7 +552,7 @@ class OrchestratorTest : FunSpec() {
                       output:
                         as: ${ . }
             """
-            val output = executeWorkflow(yaml, JsonObject(emptyMap())) as JsonObject
+            val output = executeWorkflow(yaml, ObjectNode(emptyMap())) as ObjectNode
 
             assertEquals(6, output["sum"]?.jsonPrimitive?.int)
         }
@@ -580,10 +575,10 @@ class OrchestratorTest : FunSpec() {
                               set:
                                 result: "B"
             """
-            val output = executeWorkflow(yaml, JsonObject(emptyMap()))
+            val output = executeWorkflow(yaml, ObjectNode(emptyMap()))
 
             // Cooperative mode returns an array with all branch results
-            val arr = output as JsonArray
+            val arr = output as ArrayNode
             assertEquals(2, arr.size)
             assertEquals("A", arr[0].jsonObject["result"]?.jsonPrimitive?.content)
             assertEquals("B", arr[1].jsonObject["result"]?.jsonPrimitive?.content)
@@ -608,7 +603,7 @@ class OrchestratorTest : FunSpec() {
                               set:
                                 winner: "fast"
             """
-            val output = executeWorkflow(yaml, JsonObject(emptyMap())) as JsonObject
+            val output = executeWorkflow(yaml, ObjectNode(emptyMap())) as ObjectNode
 
             // Compete mode returns only the first completed branch result
             assertEquals("fast", output["winner"]?.jsonPrimitive?.content)
@@ -636,7 +631,7 @@ class OrchestratorTest : FunSpec() {
                               set:
                                 errorHandled: true
             """
-            val output = executeWorkflow(yaml, JsonObject(emptyMap())) as JsonObject
+            val output = executeWorkflow(yaml, ObjectNode(emptyMap())) as ObjectNode
 
             assertEquals(true, output["errorHandled"]?.jsonPrimitive?.boolean)
         }
@@ -657,12 +652,12 @@ class OrchestratorTest : FunSpec() {
                         a: ${ .a }
                         c: ${ .a + .b }
             """
-            val output = executeWorkflow(yaml, JsonObject(emptyMap())) as JsonObject
+            val output = executeWorkflow(yaml, ObjectNode(emptyMap())) as ObjectNode
 
             // Should accumulate state through execution and produce correct output
-            assertEquals(JsonPrimitive(1), output["a"])
+            assertEquals(jsonValue(1), output["a"])
             assertNull(output["b"])
-            assertEquals(JsonPrimitive(3), output["c"])
+            assertEquals(jsonValue(3), output["c"])
         }
 
         test("should handle exported context correctly") {
@@ -678,9 +673,9 @@ class OrchestratorTest : FunSpec() {
                       set:
                         result: ${ .myData + $context.myData }
             """
-            val output = executeWorkflow(yaml, JsonObject(emptyMap())) as JsonObject
+            val output = executeWorkflow(yaml, ObjectNode(emptyMap())) as ObjectNode
 
-            assertEquals(JsonPrimitive(3), output["result"])
+            assertEquals(jsonValue(3), output["result"])
         }
 
         // ========================================
@@ -718,10 +713,10 @@ class OrchestratorTest : FunSpec() {
                         status: "failure"
                         sum: ${ .sum }
             """
-            val output = executeWorkflow(yaml, JsonObject(emptyMap())) as JsonObject
+            val output = executeWorkflow(yaml, ObjectNode(emptyMap())) as ObjectNode
 
             assertEquals("success", output["status"]?.jsonPrimitive?.content)
-            assertEquals(JsonPrimitive(60), output["sum"])
+            assertEquals(jsonValue(60), output["sum"])
         }
 
         // ========================================
@@ -748,7 +743,7 @@ class OrchestratorTest : FunSpec() {
                         status: "order_emitted"
                         orderId: ${ .orderId }
             """
-            val output = executeWorkflow(yaml, JsonObject(emptyMap()), cloudEventHook = cloudEventHook) as JsonObject
+            val output = executeWorkflow(yaml, ObjectNode(emptyMap()), cloudEventHook = cloudEventHook) as ObjectNode
 
             // Should continue execution after emit task (fire-and-forget)
             assertEquals("order_emitted", output["status"]?.jsonPrimitive?.content)
@@ -774,7 +769,7 @@ class OrchestratorTest : FunSpec() {
                       set:
                         completed: true
             """
-            val output = executeWorkflow(yaml, JsonObject(emptyMap()), cloudEventHook = cloudEventHook) as JsonObject
+            val output = executeWorkflow(yaml, ObjectNode(emptyMap()), cloudEventHook = cloudEventHook) as ObjectNode
 
             // Should complete after emitting
             assertEquals(true, output["completed"]?.jsonPrimitive?.boolean)
@@ -806,7 +801,7 @@ class OrchestratorTest : FunSpec() {
                       set:
                         eventCount: 2
             """
-            val output = executeWorkflow(yaml, JsonObject(emptyMap()), cloudEventHook = cloudEventHook) as JsonObject
+            val output = executeWorkflow(yaml, ObjectNode(emptyMap()), cloudEventHook = cloudEventHook) as ObjectNode
 
             // Both emit tasks should complete
             assertEquals(2, output["eventCount"]?.jsonPrimitive?.int)
@@ -843,7 +838,7 @@ class OrchestratorTest : FunSpec() {
                       output:
                         as: ${ . }
             """
-            val output = executeWorkflow(yaml, JsonObject(emptyMap()), cloudEventHook = cloudEventHook) as JsonObject
+            val output = executeWorkflow(yaml, ObjectNode(emptyMap()), cloudEventHook = cloudEventHook) as ObjectNode
 
             // Should emit for each item
             assertEquals(3, output["count"]?.jsonPrimitive?.int)

@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.expressions
 
-import com.lemline.common.json.toJsonElement
+import com.fasterxml.jackson.databind.node.ObjectNode
+import com.lemline.common.json.*
+import com.lemline.common.json.toJsonNode
 import kotlin.test.assertEquals
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
 import org.junit.jupiter.api.Test
 
 /**
@@ -15,9 +15,9 @@ class ExpressionEvaluatorTest {
 
     private fun evaluateExpression(input: String, filter: String, scope: String = "{}") =
         JQExpression.eval(
-            input.toJsonElement(),
-            JsonPrimitive(filter),
-            scope.toJsonElement() as JsonObject,
+            input.toJsonNode(),
+            jsonValue(filter),
+            scope.toJsonNode() as ObjectNode,
             true
         )
 
@@ -28,7 +28,7 @@ class ExpressionEvaluatorTest {
 
         val result = evaluateExpression(input, filter)
 
-        assertEquals(JsonPrimitive("Hello, World!"), result)
+        assertEquals(jsonValue("Hello, World!"), result)
     }
 
     @Test
@@ -38,7 +38,7 @@ class ExpressionEvaluatorTest {
 
         val result = evaluateExpression(input, filter)
 
-        assertEquals(JsonPrimitive("Hello, Alice! You are 30 years old."), result)
+        assertEquals(jsonValue("Hello, Alice! You are 30 years old."), result)
     }
 
     @Test
@@ -48,7 +48,7 @@ class ExpressionEvaluatorTest {
 
         val result = evaluateExpression(input, filter)
 
-        assertEquals(JsonPrimitive("echo \"Hello, World!\""), result)
+        assertEquals(jsonValue("echo \"Hello, World!\""), result)
     }
 
     @Test
@@ -58,7 +58,7 @@ class ExpressionEvaluatorTest {
 
         val result = evaluateExpression(input, filter)
 
-        assertEquals(JsonPrimitive("First item: first, Last item: third"), result)
+        assertEquals(jsonValue("First item: first, Last item: third"), result)
     }
 
     @Test
@@ -68,7 +68,7 @@ class ExpressionEvaluatorTest {
 
         val result = evaluateExpression(input, filter)
 
-        assertEquals(JsonPrimitive("grep 'error' /tmp/data.txt"), result)
+        assertEquals(jsonValue("grep 'error' /tmp/data.txt"), result)
     }
 
     @Test
@@ -78,7 +78,7 @@ class ExpressionEvaluatorTest {
 
         val result = evaluateExpression(input, filter)
 
-        assertEquals(JsonPrimitive("User: john doe, Count: 10"), result)
+        assertEquals(jsonValue("User: john doe, Count: 10"), result)
     }
 
     @Test
@@ -89,7 +89,7 @@ class ExpressionEvaluatorTest {
 
         val result = evaluateExpression(input, filter)
 
-        assertEquals(JsonPrimitive("Service service is running"), result)
+        assertEquals(jsonValue("Service service is running"), result)
     }
 
     @Test
@@ -99,7 +99,7 @@ class ExpressionEvaluatorTest {
 
         val result = evaluateExpression(input, filter)
 
-        assertEquals(JsonPrimitive("Existing: value, Missing: null, Null: null"), result)
+        assertEquals(jsonValue("Existing: value, Missing: null, Null: null"), result)
     }
 
     @Test
@@ -111,7 +111,7 @@ class ExpressionEvaluatorTest {
         val result = evaluateExpression(input, filter)
 
         assertEquals(
-            JsonPrimitive("echo 'Hello \"quoted\" string with 'single quotes'' > \"/path/with spaces/file.txt\""),
+            jsonValue("echo 'Hello \"quoted\" string with 'single quotes'' > \"/path/with spaces/file.txt\""),
             result
         )
     }
@@ -123,7 +123,7 @@ class ExpressionEvaluatorTest {
 
         val result = evaluateExpression(input, filter)
 
-        assertEquals(JsonPrimitive("Result: 15, Product: 50, Division: 2"), result)
+        assertEquals(jsonValue("Result: 15, Product: 50, Division: 2"), result)
     }
 
     @Test
@@ -133,7 +133,7 @@ class ExpressionEvaluatorTest {
 
         val result = evaluateExpression(input, filter)
 
-        assertEquals(JsonPrimitive("Hello World!"), result)
+        assertEquals(jsonValue("Hello World!"), result)
     }
 
     @Test
@@ -144,7 +144,7 @@ class ExpressionEvaluatorTest {
 
         val result = evaluateExpression(input, filter)
 
-        assertEquals(JsonPrimitive("Config value: prod-value"), result)
+        assertEquals(jsonValue("Config value: prod-value"), result)
     }
 
     @Test
@@ -155,7 +155,7 @@ class ExpressionEvaluatorTest {
 
         val result = evaluateExpression(input, filter)
 
-        assertEquals(JsonPrimitive("First user: Alice, Active: true"), result)
+        assertEquals(jsonValue("First user: Alice, Active: true"), result)
     }
 
     @Test
@@ -166,7 +166,7 @@ class ExpressionEvaluatorTest {
 
         val result = evaluateExpression(input, filter, scope)
 
-        assertEquals(JsonPrimitive("Greeting: Hello, Dr. Alice!"), result)
+        assertEquals(jsonValue("Greeting: Hello, Dr. Alice!"), result)
     }
 
     @Test
@@ -176,7 +176,7 @@ class ExpressionEvaluatorTest {
 
         val result = evaluateExpression(input, filter)
 
-        assertEquals(JsonPrimitive("export PATH=/usr/bin:/bin:/home/user/bin && echo \"Welcome alice\""), result)
+        assertEquals(jsonValue("export PATH=/usr/bin:/bin:/home/user/bin && echo \"Welcome alice\""), result)
     }
 
     @Test
@@ -186,7 +186,7 @@ class ExpressionEvaluatorTest {
 
         val result = evaluateExpression(input, filter)
 
-        assertEquals(JsonPrimitive("Number: 42, Boolean: true, First array item: 1"), result)
+        assertEquals(jsonValue("Number: 42, Boolean: true, First array item: 1"), result)
     }
 
     @Test
@@ -211,7 +211,7 @@ class ExpressionEvaluatorTest {
 
         val result = evaluateExpression(input, filter)
 
-        assertEquals(JsonPrimitive("postgresql://localhost:5432/myapp"), result)
+        assertEquals(jsonValue("postgresql://localhost:5432/myapp"), result)
     }
 
     @Test
@@ -221,7 +221,7 @@ class ExpressionEvaluatorTest {
 
         val result = evaluateExpression(input, filter)
 
-        assertEquals(JsonPrimitive("grep -n 'error message' '/var/log/app.log' | head -10"), result)
+        assertEquals(jsonValue("grep -n 'error message' '/var/log/app.log' | head -10"), result)
     }
 
     @Test
@@ -231,7 +231,7 @@ class ExpressionEvaluatorTest {
 
         val result = evaluateExpression(input, filter)
 
-        assertEquals(JsonPrimitive("World"), result)
+        assertEquals(jsonValue("World"), result)
     }
 
     @Test
@@ -241,7 +241,7 @@ class ExpressionEvaluatorTest {
 
         val result = evaluateExpression(input, filter)
 
-        assertEquals(JsonPrimitive("find '/source' -name '*.log' -exec cp {} '/target/{}' \\;"), result)
+        assertEquals(jsonValue("find '/source' -name '*.log' -exec cp {} '/target/{}' \\;"), result)
     }
 
     @Test
@@ -251,7 +251,7 @@ class ExpressionEvaluatorTest {
 
         val result = evaluateExpression(input, filter)
 
-        assertEquals(JsonPrimitive("ls -la"), result)
+        assertEquals(jsonValue("ls -la"), result)
     }
 
     @Test
@@ -261,7 +261,7 @@ class ExpressionEvaluatorTest {
 
         val result = evaluateExpression(input, filter)
 
-        assertEquals(JsonPrimitive("ls -l -a --color=auto"), result)
+        assertEquals(jsonValue("ls -l -a --color=auto"), result)
     }
 
     @Test
@@ -272,7 +272,7 @@ class ExpressionEvaluatorTest {
 
         val result = evaluateExpression(input, filter)
 
-        assertEquals(JsonPrimitive("https://api.example.com:443/v1/users/123"), result)
+        assertEquals(jsonValue("https://api.example.com:443/v1/users/123"), result)
     }
 
     @Test
@@ -282,6 +282,6 @@ class ExpressionEvaluatorTest {
 
         val result = evaluateExpression(input, filter)
 
-        assertEquals(JsonPrimitive("{\"name\":\"test\",\"value\":42,\"enabled\":true}"), result)
+        assertEquals(jsonValue("{\"name\":\"test\",\"value\":42,\"enabled\":true}"), result)
     }
 }

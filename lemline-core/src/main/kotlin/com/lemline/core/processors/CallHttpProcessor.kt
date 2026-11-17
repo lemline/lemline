@@ -1,11 +1,15 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.processors
 
+import com.fasterxml.jackson.databind.JsonNode
+import com.fasterxml.jackson.databind.node.ObjectNode
+import com.fasterxml.jackson.databind.node.ValueNode
+import com.lemline.common.json.*
 import com.lemline.common.json.LemlineJson
+import com.lemline.common.json.LemlineJson.toJsonNode
 import com.lemline.common.json.LemlineJson.toJsonPrimitive
-import com.lemline.common.json.LemlineJson.toJsonElement
-import com.lemline.core.errors.WorkflowErrorType.EXPRESSION
 import com.lemline.core.errors.WorkflowErrorType.CONFIGURATION
+import com.lemline.core.errors.WorkflowErrorType.EXPRESSION
 import com.lemline.core.errors.WorkflowErrorType.RUNTIME
 import com.lemline.core.nodes.Node
 import com.lemline.core.processors.scope.Scope
@@ -30,9 +34,6 @@ import io.serverlessworkflow.api.types.UriTemplate
 import io.serverlessworkflow.impl.expressions.ExpressionUtils
 import java.net.URI
 import kotlin.time.Instant
-import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
 
 /**
  * Node processor for CallHTTP (HTTP call task) - pure functional model.
@@ -81,7 +82,7 @@ class CallHttpProcessor(
 
     override val isAsync = true
 
-    override fun stateWhenEnteringFromParent(transformedInput: JsonElement, scope: Scope, startedAt: Instant) = CallState(startedAt = startedAt)
+    override fun stateWhenEnteringFromParent(transformedInput: JsonNode, scope: Scope, startedAt: Instant) = CallState(startedAt = startedAt)
 
     /**
      * Build the HTTP call configuration.
@@ -96,7 +97,7 @@ class CallHttpProcessor(
      */
     override fun startedEvent(
         nodeStack: NodeStack,
-        transformedInput: JsonElement,
+        transformedInput: JsonNode,
         scope: Scope,
     ): WorkflowEvent {
         logger.debug { "Building HTTP call config for task: ${node.name}" }
@@ -124,8 +125,8 @@ class CallHttpProcessor(
         )
 
         // Extract body
-        val body: JsonElement? = httpArgs.body?.let {
-            with(LemlineJson) { it.toJsonElement() }
+        val body: JsonNode? = httpArgs.body?.let {
+            with(LemlineJson) { it.toJsonNode() }
         }
 
         // Extract output format
@@ -156,12 +157,12 @@ class CallHttpProcessor(
         values: Map<String, Any?>?,
         expression: String?,
         name: String,
-        input: JsonElement,
+        input: JsonNode,
         scope: Scope,
     ): Map<String, String> {
         if (values == null && expression == null) return emptyMap()
-        val resolved = eval(input, expression?.toJsonElement() ?: values.toJsonElement(), scope)
-        if (resolved !is JsonObject) raiseError(EXPRESSION, "HTTP $name must evaluate to an object")
+        val resolved = eval(input, expression?.toJsonNode() ?: values.toJsonNode(), scope)
+        if (resolved !is ObjectNode) raiseError(EXPRESSION, "HTTP $name must evaluate to an object")
         return resolved.mapValues { (_, value) -> value.toJsonPrimitive().content }
     }
 
@@ -221,7 +222,7 @@ class CallHttpProcessor(
      */
     private fun toUrl(
         endpointUnion: Endpoint,
-        data: JsonElement,
+        data: JsonNode,
         scope: Scope
     ): String {
         return when (val endpoint = endpointUnion.get()) {
@@ -245,7 +246,7 @@ class CallHttpProcessor(
      */
     private fun uriTemplateToUrl(
         uriTemplate: UriTemplate,
-        data: JsonElement,
+        data: JsonNode,
         scope: Scope
     ): String = when (val templateValue = uriTemplate.get()) {
         is URI -> templateValue.toString()
@@ -258,13 +259,13 @@ class CallHttpProcessor(
      */
     private fun evaluateUrlExpression(
         expression: String,
-        data: JsonElement,
+        data: JsonNode,
         scope: Scope
     ): String = when (ExpressionUtils.isExpr(expression)) {
         true -> {
             val trimmed = ExpressionUtils.trimExpr(expression)
-            when (val result = eval(data, JsonPrimitive(trimmed), scope, false)) {
-                is JsonPrimitive -> result.content
+            when (val result = eval(data, jsonValue(trimmed), scope, false)) {
+                is ValueNode -> result.content
                 else -> raiseError(RUNTIME, "URL expression must evaluate to a string, but got: $result")
             }
         }

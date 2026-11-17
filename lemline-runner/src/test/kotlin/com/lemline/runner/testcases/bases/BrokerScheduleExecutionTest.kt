@@ -2,6 +2,7 @@
 package com.lemline.runner.testcases.bases
 
 import com.lemline.common.coroutines.ApplicationClassLoaderContext
+import com.lemline.common.json.*
 import com.lemline.common.values.IDV7
 import com.lemline.common.values.WorkflowId
 import com.lemline.common.values.WorkflowName
@@ -38,8 +39,6 @@ import kotlin.time.toKotlinInstant
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.buildJsonObject
 import org.junit.jupiter.api.Test
 
 /**
@@ -204,7 +203,7 @@ internal abstract class BrokerScheduleExecutionTest {
                     if (id in completed) continue
                     val result = results.findWorkflowResult(id) ?: continue
                     val success = assertIs<WorkflowTestResult.Success>(result, "Workflow $id failed: $result")
-                    assertEquals(buildJsonObject { put("result", JsonPrimitive(name)) }, success.output)
+                    assertEquals(buildJsonObject { put("result", jsonValue(name)) }, success.output)
                     completed += id
                     if (completed.size == count) break
                 }

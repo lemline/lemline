@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.testcases.bases
 
+import com.fasterxml.jackson.databind.JsonNode
+import com.lemline.common.json.*
 import com.lemline.common.logger.logger
 import com.lemline.common.values.WorkflowId
 import com.lemline.common.values.WorkflowName
@@ -29,7 +31,6 @@ import jakarta.inject.Inject
 import java.util.concurrent.TimeoutException
 import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.delay
-import kotlinx.serialization.json.JsonElement
 
 /**
  * Abstract base class for workflow test executors providing common execution logic.
@@ -131,7 +132,7 @@ internal abstract class AbstractWorkflowTestExecutor : WorkflowTestExecutor {
 
     override suspend fun execute(
         yaml: String,
-        input: JsonElement,
+        input: JsonNode,
         namespace: String,
         name: String,
         version: String,
@@ -179,7 +180,7 @@ internal abstract class AbstractWorkflowTestExecutor : WorkflowTestExecutor {
         namespace: String,
         name: String,
         version: String,
-        input: JsonElement
+        input: JsonNode
     ): InstanceMessage<out WorkflowCommand> {
         val prepared = starter.prepareWorkflow(
             workflowId = workflowId,

@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.activities
 
+import com.fasterxml.jackson.databind.node.ObjectNode
+import com.lemline.common.json.*
 import com.lemline.core.activities.mock.HttpMockMatcher
 import com.lemline.core.activities.mock.HttpMockResponse
 import com.lemline.core.activities.mock.HttpMockRule
@@ -26,10 +28,6 @@ import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.jsonPrimitive
-import kotlinx.serialization.json.put
 
 /**
  * Unit tests for [MockActivityExecutor].
@@ -40,7 +38,7 @@ import kotlinx.serialization.json.put
 class MockActivityExecutorTest : FunSpec({
 
     val testNodeStack = NodeStack.random()
-    val emptyInput = JsonObject(emptyMap())
+    val emptyInput = ObjectNode(emptyMap())
 
     context("HTTP activity execution") {
 
@@ -142,7 +140,7 @@ class MockActivityExecutorTest : FunSpec({
             )
 
             val result = executor.execute(event)
-            result shouldBe JsonObject(emptyMap())
+            result shouldBe ObjectNode(emptyMap())
         }
     }
 

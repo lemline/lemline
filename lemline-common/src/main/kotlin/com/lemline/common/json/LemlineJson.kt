@@ -6,6 +6,9 @@ import com.fasterxml.jackson.core.JsonParser
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.module.SimpleModule
+import com.fasterxml.jackson.databind.node.ArrayNode
+import com.fasterxml.jackson.databind.node.NullNode
+import com.fasterxml.jackson.databind.node.ObjectNode
 import com.fasterxml.jackson.dataformat.yaml.YAMLMapper
 import io.serverlessworkflow.api.types.ErrorDetails
 import io.serverlessworkflow.api.types.ErrorTitle
@@ -21,12 +24,6 @@ import io.serverlessworkflow.api.types.jackson.JacksonMixInModule
 import io.serverlessworkflow.impl.expressions.DateTimeDescriptor
 import io.serverlessworkflow.serialization.BeanDeserializerModifierWithValidation
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonNull
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.decodeFromJsonElement
 import kotlinx.serialization.json.encodeToJsonElement
 import kotlinx.serialization.modules.SerializersModule
@@ -36,6 +33,7 @@ object LemlineJson {
 
     // Expose Jackson ObjectMapper - configure as needed
     val jacksonMapper = ObjectMapper().apply {
+        enable(com.fasterxml.jackson.databind.DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS)
         registerModule(JacksonMixInModule())
         // SDK union deserialization relies on bean validation to distinguish
         // named function calls from built-in protocol calls.
@@ -54,6 +52,7 @@ object LemlineJson {
 
     // Expose Jackson YAMLMapper
     val yamlMapper = YAMLMapper().apply {
+        enable(com.fasterxml.jackson.databind.DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS)
         registerModule(JacksonMixInModule())
         registerModule(SimpleModule().setDeserializerModifier(BeanDeserializerModifierWithValidation()))
         addMixIn(Schedule::class.java, ScheduleMixIn::class.java)
@@ -67,8 +66,8 @@ object LemlineJson {
     @JsonInclude(JsonInclude.Include.NON_DEFAULT)
     private abstract class ScheduleMixIn
 
-    // simply create a new JsonObject
-    val jsonObject: JsonObject get() = JsonObject(emptyMap())
+    // simply create a new ObjectNode
+    val jsonObject: ObjectNode get() = ObjectNode(emptyMap())
 
     // Define the serializers module
     private val module = SerializersModule {
@@ -96,57 +95,57 @@ object LemlineJson {
     /**
      * Converts an object to its JSON string representation using the configured 'json' instance.
      */
-    inline fun <reified T> encodeToString(value: T): String = json.encodeToString(value)
+    inline fun <reified T> encodeToString(value: T): String = if (value is JsonNode) value.toString() else json.encodeToString(value)
 
     /**
      * Converts an object to its pretty JSON string representation using the configured 'jsonPretty' instance.
      */
-    inline fun <reified T> encodeToPrettyString(value: T): String = jsonPretty.encodeToString(value)
+    inline fun <reified T> encodeToPrettyString(value: T): String = if (value is JsonNode) jacksonMapper.writerWithDefaultPrettyPrinter().writeValueAsString(value) else jsonPretty.encodeToString(value)
 
     /**
      * Converts an object to a JSON element using the configured 'json' instance.
      */
-    inline fun <reified T> encodeToElement(value: T): JsonElement = json.encodeToJsonElement(value)
+    inline fun <reified T> encodeToElement(value: T): JsonNode = if (value is JsonNode) value else json.encodeToJsonElement(value).toJacksonNode()
 
     /**
      * Creates an object from its JSON string representation using the configured 'json' instance.
      */
-    inline fun <reified T> decodeFromString(jsonString: String): T = json.decodeFromString(jsonString)
+    inline fun <reified T> decodeFromString(jsonString: String): T = if (JsonNode::class.java.isAssignableFrom(T::class.java)) jacksonMapper.readTree(jsonString).also(::validateDecimalBounds) as T else json.decodeFromString(jsonString)
 
     /**
      * Creates an object from its JSON element representation using the configured 'json' instance.
      */
-    inline fun <reified T> decodeFromElement(jsonElement: JsonElement): T = json.decodeFromJsonElement(jsonElement)
+    inline fun <reified T> decodeFromElement(jsonElement: JsonNode): T = if (JsonNode::class.java.isAssignableFrom(T::class.java)) jsonElement as T else json.decodeFromJsonElement(jsonElement.toKotlinTree())
 
     /**
-     * Encodes a `TaskBase` object into a `JsonObject`.
+     * Encodes a `TaskBase` object into a `ObjectNode`.
      */
-    fun encodeToElement(task: TaskBase) = decodeFromString(jacksonMapper.writeValueAsString(task)) as JsonObject
+    fun encodeToElement(task: TaskBase) = (jacksonMapper.valueToTree<ObjectNode>(task).normalizeRuntimeTree() as ObjectNode)
 
     /**
-     * Encodes a `Workflow` object into a `JsonObject`.
+     * Encodes a `Workflow` object into a `ObjectNode`.
      */
-    fun encodeToElement(workflow: Workflow) = decodeFromString(jacksonMapper.writeValueAsString(workflow)) as JsonObject
+    fun encodeToElement(workflow: Workflow) = (jacksonMapper.valueToTree<ObjectNode>(workflow).normalizeRuntimeTree() as ObjectNode)
 
     /**
-     * Encodes a `SetTaskConfiguration` object into a `JsonElement`.
+     * Encodes a `SetTaskConfiguration` object into a `JsonNode`.
      */
-    fun encodeToElement(set: SetTaskConfiguration) = set.additionalProperties.toJsonElement()
+    fun encodeToElement(set: SetTaskConfiguration) = set.additionalProperties.toJsonNode()
 
     /**
-     * Encodes an `ExportAs` object into a `JsonElement`.
+     * Encodes an `ExportAs` object into a `JsonNode`.
      */
-    fun encodeToElement(exportAs: ExportAs) = exportAs.get().toJsonElement()
+    fun encodeToElement(exportAs: ExportAs) = exportAs.get().toJsonNode()
 
     /**
-     * Encodes an `InputFrom` object into a `JsonElement`.
+     * Encodes an `InputFrom` object into a `JsonNode`.
      */
-    fun encodeToElement(inputFrom: InputFrom) = inputFrom.get().toJsonElement()
+    fun encodeToElement(inputFrom: InputFrom) = inputFrom.get().toJsonNode()
 
     /**
-     * Encodes an `OutputAs` object into a `JsonElement`.
+     * Encodes an `OutputAs` object into a `JsonNode`.
      */
-    fun encodeToElement(outputAs: OutputAs) = outputAs.get().toJsonElement()
+    fun encodeToElement(outputAs: OutputAs) = outputAs.get().toJsonNode()
 
     /**
      * Encodes an `HTTPHeaders` object into a `Map<String, String>`.
@@ -156,43 +155,33 @@ object LemlineJson {
     } ?: emptyMap()
 
     /**
-     * Encodes a `DateTimeDescriptor` object into a `JsonObject`.
+     * Encodes a `DateTimeDescriptor` object into a `ObjectNode`.
      */
-    fun encodeToElement(dateTimeDescriptor: DateTimeDescriptor) = dateTimeDescriptor.toJsonElement() as JsonObject
+    fun encodeToElement(dateTimeDescriptor: DateTimeDescriptor) = dateTimeDescriptor.toJsonNode() as ObjectNode
 
-    /**
-     * Converts a `JsonElement` to a `JsonNode` using Jackson.
-     */
-    fun JsonElement.toJsonNode(): JsonNode = jacksonMapper.readTree(toString())
-
-    /**
-     * Converts a `JsonNode` to a `JsonElement` using kotlinx.serialization.
-     */
-    fun JsonNode.toJsonElement(): JsonElement = decodeFromString(toString())
-
-    fun Any?.toJsonElement(): JsonElement = when (this) {
-        null -> JsonNull
-        is JsonElement -> this
-        is Number -> JsonPrimitive(this)
-        is String -> JsonPrimitive(this)
-        is Boolean -> JsonPrimitive(this)
+    fun Any?.toJsonNode(): JsonNode = when (this) {
+        null -> NullNode.instance
+        is JsonNode -> this
+        is Number -> jsonValue(this)
+        is String -> jsonValue(this)
+        is Boolean -> jsonValue(this)
         is Map<*, *> -> buildJsonObject {
-            this@toJsonElement.forEach { (key, value) -> put(key as String, value.toJsonElement()) }
+            this@toJsonNode.forEach { (key, value) -> put(key as String, value.toJsonNode()) }
         }
 
-        is Collection<*> -> JsonArray(this.map { it.toJsonElement() })
-        is DateTimeDescriptor -> decodeFromString(jacksonMapper.writeValueAsString(this))
+        is Collection<*> -> ArrayNode(this.map { it.toJsonNode() })
+        is DateTimeDescriptor -> jacksonMapper.valueToTree<ObjectNode>(this).normalizeRuntimeTree()
 
         else -> throw IllegalArgumentException("Unsupported type: ${this::class}")
     }
 
-    fun Any?.toJsonPrimitive(): JsonPrimitive = when (val element = this.toJsonElement()) {
-        is JsonPrimitive -> element
-        else -> JsonPrimitive(element.toString())
+    fun Any?.toJsonPrimitive(): JsonNode = when (val element = this.toJsonNode()) {
+        is com.fasterxml.jackson.databind.node.ValueNode -> element
+        else -> jsonValue(element.toString())
     }
 }
 
 /**
- * Extension function to parse a JSON string into a JsonElement.
+ * Extension function to parse a JSON string into a JsonNode.
  */
-fun String.toJsonElement(): JsonElement = LemlineJson.json.parseToJsonElement(this)
+fun String.toJsonNode(): JsonNode = parseJson(this)
