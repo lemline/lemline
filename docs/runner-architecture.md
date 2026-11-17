@@ -72,7 +72,7 @@ Lemline uses **two distinct message channels** with different characteristics:
 ### 2. State Carried in Messages
 
 Per
-the [Serverless Workflow specification's stateless execution model](https://github.com/serverlessworkflow/specification/blob/main/dsl.md),
+the [Open Workflow Specification's stateless execution model](https://github.com/open-workflow-specification/specification/blob/main/dsl.md),
 workflow state is externalized:
 
 **InstanceMessage** structure:
@@ -673,7 +673,7 @@ do:
                 uri: https://api.example.com/data
       errors:
         with:
-          - https://serverlessworkflow.io/spec/1.0.0/errors/communication
+          - https://open-workflow-specification.org/spec/1.0.0/errors/communication
         retry:
           strategy: exponential
           limit:

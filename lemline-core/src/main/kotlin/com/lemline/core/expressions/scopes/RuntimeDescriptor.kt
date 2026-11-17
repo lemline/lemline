@@ -12,7 +12,7 @@ import kotlinx.serialization.Serializable
  * @property version The version of the runtime.
  * @property metadata A map containing metadata associated with the runtime.
  *
- * @see <a href="https://github.com/serverlessworkflow/specification/blob/main/dsl.md#runtime-descriptor">Runtime Descriptor</a>
+ * @see <a href="https://github.com/open-workflow-specification/specification/blob/main/dsl.md#runtime-descriptor">Runtime Descriptor</a>
  */
 @Suppress("MayBeConstant")
 @Serializable

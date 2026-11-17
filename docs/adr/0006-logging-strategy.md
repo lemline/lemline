@@ -6,7 +6,7 @@ Accepted
 
 ## Context
 
-The Lemline project implements a runtime for the Serverless Workflow DSL, which requires a comprehensive logging strategy to facilitate debugging, monitoring, and troubleshooting. We needed to decide on a logging approach that would be consistent, informative, and aligned with the project's requirements.
+The Lemline project implements a runtime for the Open Workflow DSL, which requires a comprehensive logging strategy to facilitate debugging, monitoring, and troubleshooting. We needed to decide on a logging approach that would be consistent, informative, and aligned with the project's requirements.
 
 ## Decision
 

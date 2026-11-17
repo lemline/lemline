@@ -2,7 +2,7 @@
 
 ## Purpose
 
-The `lemline-core` module implements the Serverless Workflow DSL v1.0 specification. It provides a pure, stateless execution engine that can be embedded in any runtime.
+The `lemline-core` module implements the Open Workflow DSL v1.0 specification. It provides a pure, stateless execution engine that can be embedded in any runtime.
 
 ## Package Structure
 
@@ -71,7 +71,7 @@ object DefinitionCache {
 1. Try YAML parsing (using `yamlMapper`)
 2. Fall back to JSON if YAML fails
 3. Map to `Workflow` using Jackson
-4. Validate with Serverless Workflow SDK
+4. Validate with Open Workflow SDK
 5. Build immutable node tree recursively
 6. Cache by `WorkflowIndex(namespace, name, version)`
 

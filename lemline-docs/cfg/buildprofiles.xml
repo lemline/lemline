@@ -8,8 +8,8 @@
             <!-- Theme settings to use system preference -->
             <primary-color>amethyst</primary-color>
             <!-- Logo settings -->
-            <header-logo>sw-logo.png</header-logo>
-            <custom-favicons>favicon.ico</custom-favicons>
+            <header-logo>lemly.png</header-logo>
+            <custom-favicons>lemly.png</custom-favicons>
             <custom-css>custom.css</custom-css>
             <noindex-content>true</noindex-content>
         </variables>
@@ -23,8 +23,8 @@
         <variables>
             <noindex-content>true</noindex-content>
             <primary-color>purple</primary-color>
-            <header-logo>sw-logo.png</header-logo>
-            <custom-favicons>favicon.ico</custom-favicons>
+            <header-logo>lemly.png</header-logo>
+            <custom-favicons>lemly.png</custom-favicons>
         </variables>
         <llms-txt single-file="true"/>
     </build-profile>

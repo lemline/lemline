@@ -20,7 +20,7 @@ dependencies {
     implementation("io.quarkus:quarkus-arc")
     implementation("io.quarkus:quarkus-scheduler")
 
-    // Serverless Workflow SDK (for Schedule type)
+    // Open Workflow SDK (for Schedule type)
     implementation(libs.serverlessworkflow.api)
 
     // Cron utilities

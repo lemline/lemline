@@ -4,7 +4,7 @@ This document provides examples of error handling and resilience patterns in Lem
 
 ## Basic Try-Catch Pattern
 
-The fundamental error handling mechanism in Serverless Workflow DSL is the try-catch block, which allows workflows to catch and handle exceptions.
+The fundamental error handling mechanism in Open Workflow DSL is the try-catch block, which allows workflows to catch and handle exceptions.
 
 ### Simple Try-Catch Example
 
@@ -25,7 +25,7 @@ do:
       catch:
         errors:
           with:
-            type: https://serverlessworkflow.io/spec/1.0.0/errors/communication
+            type: https://open-workflow-specification.org/spec/1.0.0/errors/communication
             status: 404
 ```
 
@@ -62,7 +62,7 @@ do:
       catch:
         errors:
           with:
-            type: https://serverlessworkflow.io/spec/1.0.0/errors/communication
+            type: https://open-workflow-specification.org/spec/1.0.0/errors/communication
             status: 404
         as: error
         do:
@@ -117,7 +117,7 @@ do:
       catch:
         errors:
           with:
-            type: https://serverlessworkflow.io/spec/1.0.0/errors/communication
+            type: https://open-workflow-specification.org/spec/1.0.0/errors/communication
             status: 503
         retry:
           delay:
@@ -171,7 +171,7 @@ do:
       catch:
         errors:
           with:
-            type: https://serverlessworkflow.io/spec/1.0.0/errors/communication
+            type: https://open-workflow-specification.org/spec/1.0.0/errors/communication
             status: 503
         retry: default
 ```
@@ -205,7 +205,7 @@ do:
       catch:
         errors:
           with:
-            type: https://serverlessworkflow.io/spec/1.0.0/errors/communication
+            type: https://open-workflow-specification.org/spec/1.0.0/errors/communication
         as: paymentError
         retry:
           when: "${ $paymentError.status >= 500 or $paymentError.status == 429 }"
@@ -375,7 +375,7 @@ do:
       catch:
         errors:
           with:
-            type: https://serverlessworkflow.io/spec/1.0.0/errors/communication
+            type: https://open-workflow-specification.org/spec/1.0.0/errors/communication
         retry: circuitBreaker
 ```
 
@@ -411,7 +411,7 @@ do:
       catch:
         errors:
           with:
-            type: https://serverlessworkflow.io/spec/1.0.0/errors/timeout
+            type: https://open-workflow-specification.org/spec/1.0.0/errors/timeout
         as: timeoutError
         do:
           - handleTimeout:
@@ -491,7 +491,7 @@ do:
       catch:
         - errors:
             with:
-              type: https://serverlessworkflow.io/spec/1.0.0/errors/validation
+              type: https://open-workflow-specification.org/spec/1.0.0/errors/validation
           as: validationError
           do:
             - handleValidationError:
@@ -501,7 +501,7 @@ do:
                 then: exit
         - errors:
             with:
-              type: https://serverlessworkflow.io/spec/1.0.0/errors/timeout
+              type: https://open-workflow-specification.org/spec/1.0.0/errors/timeout
           as: timeoutError
           do:
             - logTimeout:
@@ -536,7 +536,7 @@ do:
             then: exit
         - errors:
             with:
-              type: https://serverlessworkflow.io/spec/1.0.0/errors/communication
+              type: https://open-workflow-specification.org/spec/1.0.0/errors/communication
           as: communicationError
           retry: transientFailure
 ```

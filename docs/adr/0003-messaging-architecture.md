@@ -6,10 +6,10 @@ Accepted
 
 ## Context
 
-The Lemline project implements a runtime for the Serverless Workflow DSL, which requires a robust messaging architecture
+The Lemline project implements a runtime for the Open Workflow DSL, which requires a robust messaging architecture
 to handle communication between workflow components, external systems, and to support event-driven workflow execution.
-We needed to decide on a messaging architecture that would be reliable, scalable, and aligned with the Serverless
-Workflow specification.
+We needed to decide on a messaging architecture that would be reliable, scalable, and aligned with the Open Workflow
+Specification.
 
 ## Decision
 

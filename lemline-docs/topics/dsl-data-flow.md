@@ -4,7 +4,7 @@
 
 ## Purpose
 
-Effective data flow management is crucial for building robust and maintainable workflows. The Serverless Workflow DSL
+Effective data flow management is crucial for building robust and maintainable workflows. The Open Workflow DSL
 provides specific constructs (`input`, `output`, `export`) at both the workflow and individual task levels to control
 how data is validated, transformed, and passed between steps and into the workflow's shared context.
 
@@ -284,7 +284,7 @@ Several types of errors can occur during data flow processing:
 1. **Schema Validation Errors (`ValidationError`)**:
     * **When**: Occurs if data fails validation against any schema (`input.schema`, `output.schema`, or `export.schema`)
       at either workflow or task level
-    * **Type**: `https://serverlessworkflow.io/spec/1.0.0/errors/validation`
+    * **Type**: `https://open-workflow-specification.org/spec/1.0.0/errors/validation`
     * **Status**: `400` (Bad Request)
     * **Effect**: The workflow faults immediately unless handled by a `Try` task
 
@@ -294,7 +294,7 @@ Several types of errors can occur during data flow processing:
       - Syntax errors in the expression
       - References to missing data
       - Type mismatches during evaluation
-    * **Type**: `https://serverlessworkflow.io/spec/1.0.0/errors/expression`
+    * **Type**: `https://open-workflow-specification.org/spec/1.0.0/errors/expression`
     * **Status**: `400` (Bad Request)
     * **Effect**: The workflow faults immediately unless handled by a `Try` task
 

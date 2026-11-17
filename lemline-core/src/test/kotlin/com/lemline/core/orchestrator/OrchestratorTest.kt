@@ -628,7 +628,7 @@ class OrchestratorTest : FunSpec() {
                         - raiseError:
                             raise:
                               error:
-                                type: https://serverlessworkflow.io/spec/1.0.0/errors/runtime
+                                type: https://open-workflow-specification.org/spec/1.0.0/errors/runtime
                                 status: 500
                       catch:
                         do:

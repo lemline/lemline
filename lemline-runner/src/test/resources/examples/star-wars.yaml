@@ -14,7 +14,7 @@ do:
       catch:
         errors:
           with:
-            type: https://serverlessworkflow.io/spec/1.0.0/errors/communication
+            type: https://open-workflow-specification.org/spec/1.0.0/errors/communication
         retry:
           delay:
             seconds: 1
@@ -38,7 +38,7 @@ do:
             catch:
               errors:
                 with:
-                  type: https://serverlessworkflow.io/spec/1.0.0/errors/communication
+                  type: https://open-workflow-specification.org/spec/1.0.0/errors/communication
               as: hwError
               retry:
                 when: "${ $hwError.status >= 500 or $hwError.status == 429 }"

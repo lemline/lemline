@@ -4,15 +4,15 @@
 
 ## Purpose
 
-This module implements the `listen` task from Serverless Workflow DSL:
+This module implements the `listen` task from Open Workflow DSL:
 - **Wait for CloudEvents** matching specified filters
 - **Multiple strategies**: ONE, ANY, ALL, with optional `until` conditions
 - **Correlation** matching events to the correct workflow instance
 - **Foreach processing** for iterative event handling
 
-## Serverless Workflow DSL Reference
+## Open Workflow DSL Reference
 
-See [Listen Task](https://serverlessworkflow.io/spec/latest/dsl-reference/#listen) in the Serverless Workflow specification:
+See [Listen Task](https://github.com/open-workflow-specification/specification/blob/v1.0.0/dsl-reference.md#listen) in the Open Workflow Specification:
 
 ```yaml
 do:

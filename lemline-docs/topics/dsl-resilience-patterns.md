@@ -146,7 +146,7 @@ try:
     catch:
         -   error:
                 with:
-                    type: "https://serverlessworkflow.io/spec/1.0.0/errors/timeout"
+                    type: "https://open-workflow-specification.org/spec/1.0.0/errors/timeout"
             do:
                 -   fallback:
                         set:
@@ -289,7 +289,7 @@ These patterns are most effective when combined. Common combinations include:
             # Fallback strategy
             -   error:
                     with:
-                        type: "https://serverlessworkflow.io/spec/1.0.0/errors/communication"
+                        type: "https://open-workflow-specification.org/spec/1.0.0/errors/communication"
                 do:
                     -   queueForLater:
                             emit:

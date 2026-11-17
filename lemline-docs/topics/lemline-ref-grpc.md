@@ -345,7 +345,7 @@ gRPC errors raise a `communication` error with status details:
       catch:
         - error:
             with:
-              type: "https://serverlessworkflow.io/spec/1.0.0/errors/communication"
+              type: "https://open-workflow-specification.org/spec/1.0.0/errors/communication"
             as: "grpcError"
           do:
             - handleError:

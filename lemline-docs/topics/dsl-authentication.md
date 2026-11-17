@@ -7,7 +7,7 @@ title: Authentication
 
 ## Purpose
 
-Authentication definitions in Serverless Workflow specify the methods and credentials required for a workflow to
+Authentication definitions in Open Workflow specify the methods and credentials required for a workflow to
 securely access protected external resources or services. This allows workflows to interact with APIs, databases,
 message brokers, or other systems that require identity verification.
 

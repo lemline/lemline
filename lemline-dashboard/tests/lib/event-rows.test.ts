@@ -10,7 +10,7 @@ describe("toEventRows", () => {
     const events: TimelineEventView[] = pointers.flatMap((taskPointer, index) =>
       ["created", "started", "completed"].map((kind) => ({
         sequence: `${index}-${kind}`,
-        eventType: `io.serverlessworkflow.task.${kind}.v1`,
+        eventType: `org.open-workflow-specification.task.${kind}.v1`,
         eventTime: "2026-11-16T09:15:19.643Z",
         category: "TASK",
         taskPointer,
@@ -27,13 +27,27 @@ describe("toEventRows", () => {
       "eachItem / do", "eachItem / do", "eachItem / do",
     ]);
     expect(rows[4].what).toBe("eachItem / do started");
+    expect(rows[4].shortType).toBe("task.started.v1");
+  });
+
+  it("shortens deprecated lifecycle event types while displaying stored events", () => {
+    const event: TimelineEventView = {
+      sequence: "1",
+      eventType: "io.serverlessworkflow.task.started.v1",
+      eventTime: "2026-11-16T09:15:19.643Z",
+      category: "TASK",
+      taskPointer: "/do",
+      payloadJson: "{}",
+    };
+
+    expect(toEventRows([event], Date.parse(event.eventTime))[0].shortType).toBe("task.started.v1");
   });
 
   it("keeps the name of a declared do task", () => {
     const { root } = parseWorkflowSource("do:\n  - group:\n      do: []");
     const event: TimelineEventView = {
       sequence: "1",
-      eventType: "io.serverlessworkflow.task.started.v1",
+      eventType: "org.open-workflow-specification.task.started.v1",
       eventTime: "2026-11-16T09:15:19.643Z",
       category: "TASK",
       taskPointer: "/do/0/group/do",
@@ -45,7 +59,7 @@ describe("toEventRows", () => {
   it("labels a root do-block failure as a task event", () => {
     const event: TimelineEventView = {
       sequence: 219n,
-      eventType: "io.serverlessworkflow.task.faulted.v1",
+      eventType: "org.open-workflow-specification.task.faulted.v1",
       eventTime: "2026-11-16T00:34:30.592Z",
       category: "TASK",
       taskPointer: "/do",

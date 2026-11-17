@@ -41,7 +41,7 @@ dependencies {
     // Micrometer (for MessageSubscriberMetrics)
     implementation("io.quarkus:quarkus-micrometer")
 
-    // Serverless Workflow SDK (for InstanceMessage state types)
+    // Open Workflow SDK (for InstanceMessage state types)
     implementation(libs.serverlessworkflow.api)
 
     // Testing

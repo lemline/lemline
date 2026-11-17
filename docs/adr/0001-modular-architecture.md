@@ -6,7 +6,7 @@ Accepted
 
 ## Context
 
-The Lemline project implements a runtime for the Serverless Workflow DSL, which requires handling various aspects such
+The Lemline project implements a runtime for the Open Workflow DSL, which requires handling various aspects such
 as workflow definition, execution, persistence, and messaging. We needed to decide on an architectural approach that
 would allow for separation of concerns, maintainability, and extensibility.
 
@@ -14,11 +14,11 @@ would allow for separation of concerns, maintainability, and extensibility.
 
 We have decided to adopt a modular architecture with the following main modules:
 
-1. **lemline-core**: Implements the Serverless Workflow DSL itself, including workflow definitions, execution logic, and
+1. **lemline-core**: Implements the Open Workflow DSL itself, including workflow definitions, execution logic, and
    state management.
-2. **lemline-runner**: Implements the runtime for the Serverless Workflow DSL, handling messaging, persistence, and
+2. **lemline-runner**: Implements the runtime for the Open Workflow DSL, handling messaging, persistence, and
    integration with external systems.
-3. **lemline-docs**: Contains the documentation for the Serverless Workflow DSL.
+3. **lemline-docs**: Contains the documentation for the Open Workflow DSL.
 4. **lemline-common**: Contains shared utilities and common functionality used across other modules.
 
 Each module has a clear responsibility and well-defined interfaces for interaction with other modules.
@@ -64,5 +64,5 @@ approach was rejected because:
 
 ## References
 
-- [Serverless Workflow Specification](https://serverlessworkflow.io/)
+- [Open Workflow Specification](https://open-workflow-specification.org/)
 - [Quarkus Architecture](https://quarkus.io/guides/architecture)

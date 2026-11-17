@@ -12,13 +12,13 @@ et une base de données paient deux fois.
 
 ## Ce qu'on construit
 
-Un runtime d'exécution de la spec Serverless Workflow DSL v1.0 qui tourne **sur l'infra existante de
+Un runtime d'exécution de l'Open Workflow DSL v1.0 qui tourne **sur l'infra existante de
 l'utilisateur** : workers stateless, état porté dans les messages, base de données utilisée seulement quand
 c'est indispensable (timers, retries, jointures parallèles). Autour du runner : une gateway gRPC d'ingress,
 un sink analytics et un dashboard d'observabilité.
 
 **Test d'appartenance au périmètre** — une fonctionnalité est dans le périmètre si et seulement si :
-(a) elle est requise par la spec Serverless Workflow, ou
+(a) elle est requise par l'Open Workflow Specification, ou
 (b) elle rend l'exécution plus fiable, observable ou opérable.
 Tout le reste est hors périmètre par défaut, jusqu'à besoin démontré par un utilisateur réel.
 
@@ -40,7 +40,7 @@ qu'elle n'opérait pas déjà ? » Si une décision produit rend la réponse « 
    doit justifier pourquoi le message ne suffit pas.
 4. **Pas d'abstraction spéculative.** Pas d'interface, de SPI ou de mécanisme de plugin sans au moins
    deux implémentations concrètes existantes ou immédiatement planifiées.
-5. **La spec nomme.** Le vocabulaire de la spec Serverless Workflow (workflow, task, instance, listen,
+5. **La spec nomme.** Le vocabulaire de l'Open Workflow Specification (workflow, task, instance, listen,
    fork…) prime sur tout vocabulaire inventé, dans le code comme dans les APIs.
 
 ## Non-goals explicites

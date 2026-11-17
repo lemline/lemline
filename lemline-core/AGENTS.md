@@ -3,7 +3,7 @@
 
 # lemline-core
 
-Stateless workflow execution engine implementing Serverless Workflow DSL v1.0.
+Stateless workflow execution engine implementing Open Workflow DSL v1.0.
 
 ## Before Working Here
 

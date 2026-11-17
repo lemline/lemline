@@ -372,4 +372,4 @@ Add a `forkId` field to `RootState` that gets derived for each branch.
 - [ADR-0003: Messaging Architecture](0003-messaging-architecture.md) - Dual-channel design
 - [ADR-0004: Database Storage Strategy](0004-database-storage-strategy.md) - Outbox pattern
 - `IdGenerator.deriveUuidV7FromV7()` - Deterministic UUID derivation using SHA-256
-- Serverless Workflow DSL: https://serverlessworkflow.io/
+- Open Workflow DSL: https://open-workflow-specification.org/

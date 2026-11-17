@@ -276,7 +276,7 @@ object ListenTestCases {
             """.trimIndent(),
             tags = setOf("listen", "filter", "time", "expression"),
             // NOTE: Time expression tests (e.g., time: '${ contains("2024") }') are not supported
-            // because the Serverless Workflow SDK uses JSON Schema Draft 2020-12 where format
+            // because the Open Workflow SDK uses JSON Schema Draft 2020-12 where format
             // validation is annotation-only by default. This causes oneOf validation to fail
             // with "2 are valid" because format:date-time doesn't actually reject runtime
             // expressions.
@@ -1178,7 +1178,7 @@ object ListenTestCases {
                                     if: ${ .readingId == 2 }
                                     raise:
                                       error:
-                                        type: https://serverlessworkflow.io/errors/processing
+                                        type: https://open-workflow-specification.org/errors/processing
                                         status: 400
                                         title: Processing failed
                                         detail: Failed to process reading with id 2
@@ -1202,7 +1202,7 @@ object ListenTestCases {
                         buildJsonObject { put("processed", true); put("readingId", 1) },
                         buildJsonObject {
                             put("caught", true)
-                            put("errorType", "https://serverlessworkflow.io/errors/processing")
+                            put("errorType", "https://open-workflow-specification.org/errors/processing")
                             put("errorStatus", 400)
                         },
                         buildJsonObject { put("processed", true); put("readingId", 3) }
@@ -1243,7 +1243,7 @@ object ListenTestCases {
                                     if: ${ .readingId == 2 }
                                     raise:
                                       error:
-                                        type: https://serverlessworkflow.io/errors/processing
+                                        type: https://open-workflow-specification.org/errors/processing
                                         status: 400
                                         title: Processing failed
                                 - incrementCount:
@@ -1264,7 +1264,7 @@ object ListenTestCases {
             validate = expectOutput(
                 buildJsonObject {
                     put("failed", true)
-                    put("errorType", "https://serverlessworkflow.io/errors/processing")
+                    put("errorType", "https://open-workflow-specification.org/errors/processing")
                     put("processedBeforeError", 1)
                 }
             )

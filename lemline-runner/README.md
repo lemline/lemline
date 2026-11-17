@@ -333,7 +333,7 @@ Refer to the `build.gradle.kts` and test configuration files for the exact profi
 
 ## 🔗 Dependencies
 
-* **`lemline-core`:** Provides the Serverless Workflow DSL models and core logic used by the runner.
+* **`lemline-core`:** Provides the Open Workflow DSL models and core logic used by the runner.
 * **Quarkus:** The runtime framework.
 * **SmallRye Reactive Messaging:** For Kafka/RabbitMQ integration.
 * **Flyway:** For database migrations.

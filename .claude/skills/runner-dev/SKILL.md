@@ -628,7 +628,7 @@ CREATE INDEX idx_lemline_myfeature_cleanup
 - **CLAUDE.md** - Project-wide guidelines and architecture overview
 - **AGENTS.md** - Build, test, and lint commands
 - **core-dev skill** - lemline-core module (DSL, orchestrators, processors)
-- **Serverless Workflow DSL** - https://serverlessworkflow.io/
+- **Open Workflow DSL** - https://open-workflow-specification.org/
 
 ---
 

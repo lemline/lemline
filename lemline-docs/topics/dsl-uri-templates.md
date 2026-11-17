@@ -6,7 +6,7 @@ title: URI Templates
 
 ## Purpose
 
-URI Templates provide a limited mechanism for creating dynamic URIs within the Serverless Workflow DSL, based on
+URI Templates provide a limited mechanism for creating dynamic URIs within the Open Workflow DSL, based on
 variable substitution. They are primarily used in places where a URI needs to be constructed based on available data,
 such as defining the endpoint for an HTTP `call`.
 
@@ -64,5 +64,5 @@ construction or access to workflow context, use standard Runtime Expressions.
 If a variable referenced within a URI Template resolves to an unsupported type (like an object or array), the workflow *
 *must** fault with an error:
 
-* **`type`**: `https://serverlessworkflow.io/spec/1.0.0/errors/expression`
+* **`type`**: `https://open-workflow-specification.org/spec/1.0.0/errors/expression`
 * **`status`**: `400` (Bad Request) 

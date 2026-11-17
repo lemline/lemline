@@ -10,9 +10,9 @@ This module handles persistent storage of workflow definitions in the database:
 - **Listen task extraction** for CloudEvent-triggered workflows
 - **Event schedules** are handled by [lemline-runner-event-schedules](../lemline-runner-event-schedules/README.md)
 
-## Serverless Workflow DSL Reference
+## Open Workflow DSL Reference
 
-Workflow definitions follow the [Serverless Workflow DSL v1.0](https://serverlessworkflow.io/):
+Workflow definitions follow the [Open Workflow DSL v1.0](https://open-workflow-specification.org/):
 - `document.namespace` - Workflow namespace
 - `document.name` - Workflow name
 - `document.version` - Workflow version (semver)

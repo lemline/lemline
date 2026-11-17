@@ -1,6 +1,6 @@
 # Lemline Basic Workflow Patterns
 
-This document provides examples of fundamental workflow patterns implemented in the Serverless Workflow DSL as supported by Lemline. These basic patterns serve as building blocks for creating more complex workflows.
+This document provides examples of fundamental workflow patterns implemented in the Open Workflow DSL as supported by Lemline. These basic patterns serve as building blocks for creating more complex workflows.
 
 ## Sequential Task Execution
 
@@ -214,7 +214,7 @@ schedule:
   on:
     one:
       with:
-        type: io.serverlessworkflow.samples.events.trigger.v1
+        type: com.lemline.samples.events.trigger.v1
 do: 
   - initialize:
       set:

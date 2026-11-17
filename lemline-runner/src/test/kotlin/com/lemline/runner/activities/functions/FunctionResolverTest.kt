@@ -97,7 +97,7 @@ class FunctionResolverTest : FunSpec({
 
             // Verify default catalog is configured
             FunctionResolver.defaultCatalogUrls["global"] shouldBe
-                "https://raw.githubusercontent.com/serverlessworkflow/catalog/main/functions"
+                "https://raw.githubusercontent.com/open-workflow-specification/catalog/main/functions"
         }
 
         test("resolves catalog URL format correctly") {
@@ -105,7 +105,7 @@ class FunctionResolverTest : FunSpec({
 
             // Verify the URL format for global catalog
             val url = resolver.resolveCatalogUrl("log:1.0.0@global")
-            url shouldBe "https://raw.githubusercontent.com/serverlessworkflow/catalog/main/functions/log/1.0.0/function.yaml"
+            url shouldBe "https://raw.githubusercontent.com/open-workflow-specification/catalog/main/functions/log/1.0.0/function.yaml"
         }
     }
 

@@ -12,7 +12,8 @@ kotlinxCoroutines = "1.11.0"
 # mp.messaging.*.connector properties. Fixed in 3.30.6.
 quarkus = "3.40.1.2"
 smallryeReactiveMessagingInMemory = "4.37.1"
-# Keep the DSL contract until Lemline supports the newer SDK's workflow format.
+# The pinned SDK still publishes io.serverlessworkflow artifacts. Keep its DSL contract
+# until Lemline supports the newer SDK's workflow format.
 serverlessworkflow = "7.0.0.Final"
 uuidCreator = "6.1.1"
 javaSemver = "0.10.2"

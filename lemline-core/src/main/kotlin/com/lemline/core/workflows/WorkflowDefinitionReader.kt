@@ -14,7 +14,7 @@ import io.serverlessworkflow.api.types.Workflow
 internal object WorkflowDefinitionReader {
     private val schema by lazy {
         val resource = Thread.currentThread().contextClassLoader.getResourceAsStream("schema/workflow.yaml")
-        requireNotNull(resource) { "Serverless Workflow schema/workflow.yaml is missing" }
+        requireNotNull(resource) { "Open Workflow schema/workflow.yaml is missing" }
         resource.use {
             JsonSchemaFactory.getInstance(VersionFlag.V7).getSchema(
                 it,

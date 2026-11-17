@@ -4,7 +4,7 @@ title: Control Flow
 
 # Flow Tasks
 
-Flow tasks are fundamental components that control the execution path of your serverless workflows. They determine the
+Flow tasks are fundamental components that control the execution path of your open workflows. They determine the
 order in which tasks run, manage conditional branching, handle iterations, and orchestrate parallel execution paths.
 
 ## Flow Task Types

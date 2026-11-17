@@ -47,7 +47,7 @@ import java.util.concurrent.ConcurrentHashMap
  * - `catalog`: Catalog name, resolved to a URL via [catalogUrls]
  *
  * Default catalog URLs:
- * - `global` → `https://raw.githubusercontent.com/serverlessworkflow/catalog/main/functions`
+ * - `global` → `https://raw.githubusercontent.com/open-workflow-specification/catalog/main/functions`
  */
 @ApplicationScoped
 class FunctionResolver : CoreFunctionResolver {
@@ -212,7 +212,7 @@ class FunctionResolver : CoreFunctionResolver {
 
         /** Default catalog URL mappings */
         val defaultCatalogUrls = mapOf(
-            "global" to "https://raw.githubusercontent.com/serverlessworkflow/catalog/main/functions"
+            "global" to "https://raw.githubusercontent.com/open-workflow-specification/catalog/main/functions"
         )
     }
 }

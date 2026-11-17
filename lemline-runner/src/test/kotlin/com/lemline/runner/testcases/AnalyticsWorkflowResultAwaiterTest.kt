@@ -17,9 +17,9 @@ import org.junit.jupiter.api.Test
 class AnalyticsWorkflowResultAwaiterTest {
     private fun row(index: Int) = WorkflowAnalyticsEventRow(
         cursor = index.toLong(),
-        eventType = "io.serverlessworkflow.task.completed.v1",
+        eventType = "org.open-workflow-specification.task.completed.v1",
         cloudEventJson = String(JsonFormat().serialize(CloudEventBuilder.v1()
-            .withId(index.toString()).withType("io.serverlessworkflow.task.completed.v1")
+            .withId(index.toString()).withType("org.open-workflow-specification.task.completed.v1")
             .withSource(URI("https://tests.example.com"))
             .withData("application/json", "{}".toByteArray()).build()))
     )

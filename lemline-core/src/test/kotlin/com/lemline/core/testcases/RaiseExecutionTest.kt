@@ -25,7 +25,7 @@ class RaiseExecutionTest : FunSpec({
                 use:
                   errors:
                     notImplemented:
-                      type: https://serverlessworkflow.io/errors/not-implemented
+                      type: https://open-workflow-specification.org/errors/not-implemented
                       status: 501
                       title: ${ "Not implemented for \(.reason)" }
                       detail: ${ "Workflow '\($workflow.definition.document.name):\($workflow.definition.document.version)' cannot run \(.reason)" }
@@ -39,7 +39,7 @@ class RaiseExecutionTest : FunSpec({
         )
 
         val error = (result as WorkflowTestResult.Failure).exception as InternalException
-        error.error.type shouldBe "https://serverlessworkflow.io/errors/not-implemented"
+        error.error.type shouldBe "https://open-workflow-specification.org/errors/not-implemented"
         error.error.status shouldBe 501
         error.error.title shouldBe "Not implemented for yet"
         error.error.details shouldBe "Workflow 'raise-reusable:0.1.0' cannot run yet"
@@ -52,7 +52,7 @@ class RaiseExecutionTest : FunSpec({
                   - raiseError:
                       raise:
                         error:
-                          type: https://serverlessworkflow.io/errors/inline
+                          type: https://open-workflow-specification.org/errors/inline
                           status: 400
                           detail: '${ "Bad value: \(.value)" }'
             """.trimIndent(),
@@ -60,7 +60,7 @@ class RaiseExecutionTest : FunSpec({
         )
 
         val error = (result as WorkflowTestResult.Failure).exception as InternalException
-        error.error.type shouldBe "https://serverlessworkflow.io/errors/inline"
+        error.error.type shouldBe "https://open-workflow-specification.org/errors/inline"
         error.error.details shouldBe "Bad value: x"
     }
 
@@ -71,13 +71,13 @@ class RaiseExecutionTest : FunSpec({
                   - raiseError:
                       raise:
                         error:
-                          type: https://serverlessworkflow.io/errors/inline
+                          type: https://open-workflow-specification.org/errors/inline
                           status: 400
             """.trimIndent()
         )
         val nodeStack = StepByStepOrchestrator.initCmd().nodeStack
         val error = InternalException.Error(
-            type = "https://serverlessworkflow.io/errors/inline",
+            type = "https://open-workflow-specification.org/errors/inline",
             status = 400,
             position = "/do/0/raiseError",
             title = "Bad input",

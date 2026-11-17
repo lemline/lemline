@@ -55,7 +55,7 @@ export function toEventRows(events: TimelineEventView[], startMs: number, root?:
       key: `${String(event.sequence)}-${index}`,
       clock: formatEventClock(event.eventTime),
       type: event.eventType,
-      shortType: event.eventType.replace(/^io\.serverlessworkflow\./, ""),
+      shortType: event.eventType.replace(/^(?:org\.open-workflow-specification|io\.serverlessworkflow)\./, ""),
       task,
       what,
       isError: isError || event.eventType.includes("faulted"),

@@ -6,7 +6,7 @@ Accepted
 
 ## Context
 
-The Lemline project implements a runtime for the Serverless Workflow DSL, which requires persistent storage for workflow
+The Lemline project implements a runtime for the Open Workflow DSL, which requires persistent storage for workflow
 definitions, instances, and related data. We needed to decide on a database storage strategy that would be efficient,
 maintainable, and aligned with the project's requirements.
 

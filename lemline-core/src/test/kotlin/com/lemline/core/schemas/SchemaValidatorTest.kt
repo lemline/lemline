@@ -72,7 +72,7 @@ class SchemaValidatorTest {
     @Test
     fun `test oneOf with date-time format - valid date-time`() {
         // This tests the oneOf validation bug fix
-        // Schema exactly matching Serverless Workflow time field schema
+        // Schema exactly matching Open Workflow time field schema
         val schema = mapper.readTree(
             """
             {

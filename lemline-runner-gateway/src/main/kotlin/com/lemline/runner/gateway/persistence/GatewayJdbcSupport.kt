@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.gateway.persistence
 
+import com.lemline.core.lifecycleevents.LifecycleEventType
 import com.lemline.runner.common.config.AnalyticsType
 import java.sql.PreparedStatement
 import java.sql.ResultSet
@@ -40,6 +41,9 @@ internal object GatewayJdbcSupport {
         return "\"$validatedValue\""
     }
 }
+
+internal fun lifecycleTypeSqlList(vararg types: LifecycleEventType): String =
+    types.flatMap { it.acceptedTypes }.joinToString(", ") { "'$it'" }
 
 internal fun ResultSet.getInstantOrNull(column: String): Instant? {
     val raw = getObject(column) ?: return null

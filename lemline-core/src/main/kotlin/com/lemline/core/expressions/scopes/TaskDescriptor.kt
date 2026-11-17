@@ -12,7 +12,7 @@ import kotlinx.serialization.json.JsonObject
  * @property output The output JSON node for the task.
  * @property startedAt The date and time when the task started.
  *
- * @see <a href="https://github.com/serverlessworkflow/specification/blob/main/dsl.md#task-descriptor">Task Descriptor</a>
+ * @see <a href="https://github.com/open-workflow-specification/specification/blob/main/dsl.md#task-descriptor">Task Descriptor</a>
  */
 data class TaskDescriptor(
     val name: String,

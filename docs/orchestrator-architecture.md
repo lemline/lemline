@@ -1,6 +1,6 @@
 # Lemline Core: Workflow Orchestrator Architecture
 
-This document describes how the `WorkflowOrchestrator` in `lemline-core` implements the [Serverless Workflow DSL v1.0](https://github.com/serverlessworkflow/specification) specification.
+This document describes how the `WorkflowOrchestrator` in `lemline-core` implements the [Open Workflow DSL v1.0](https://github.com/open-workflow-specification/specification) specification.
 
 ## Table of Contents
 
@@ -15,7 +15,7 @@ This document describes how the `WorkflowOrchestrator` in `lemline-core` impleme
 
 ## Overview
 
-The `WorkflowOrchestrator` is the execution engine for Serverless Workflow definitions. It interprets workflow definitions, manages state transitions, executes tasks, and handles data transformations according to the specification.
+The `WorkflowOrchestrator` is the execution engine for Open Workflow definitions. It interprets workflow definitions, manages state transitions, executes tasks, and handles data transformations according to the specification.
 
 **Implementation Approach**:
 - **Pure functional model** - State is external and immutable; execution steps return new state
@@ -24,10 +24,10 @@ The `WorkflowOrchestrator` is the execution engine for Serverless Workflow defin
 - **Pausable execution** - Support for both synchronous (testing) and asynchronous (distributed) modes
 
 **Specification Alignment**:
-- Implements all [12 official task types](https://github.com/serverlessworkflow/specification/blob/main/dsl-reference.md#task)
-- Follows the [data flow pipeline](https://github.com/serverlessworkflow/specification/blob/main/dsl.md#data-flow)
-- Supports [runtime expressions](https://github.com/serverlessworkflow/specification/blob/main/dsl.md#runtime-expressions) with standard arguments
-- Complies with [error handling](https://github.com/serverlessworkflow/specification/blob/main/dsl-reference.md#error-handling) semantics
+- Implements all [12 official task types](https://github.com/open-workflow-specification/specification/blob/main/dsl-reference.md#task)
+- Follows the [data flow pipeline](https://github.com/open-workflow-specification/specification/blob/main/dsl.md#data-flow)
+- Supports [runtime expressions](https://github.com/open-workflow-specification/specification/blob/main/dsl.md#runtime-expressions) with standard arguments
+- Complies with [error handling](https://github.com/open-workflow-specification/specification/blob/main/dsl-reference.md#error) semantics
 
 **Main Entry Point**:
 
@@ -67,7 +67,7 @@ states = applyDelta(states, stepResult.stateUpdates)
 
 ### 2. Dataset Flow
 
-Aligned with the specification's [data flow model](https://github.com/serverlessworkflow/specification/blob/main/dsl.md#data-flow):
+Aligned with the specification's [data flow model](https://github.com/open-workflow-specification/specification/blob/main/dsl.md#data-flow):
 
 - Dataset flows as a parameter through the execution chain
 - Not stored in state - passed between tasks functionally
@@ -86,7 +86,7 @@ This pattern separates workflow logic (orchestrator) from infrastructure concern
 
 ## Task Flow
 
-Per the [specification's task flow model](https://github.com/serverlessworkflow/specification/blob/main/dsl.md#task-flow), each task completes with one of three outcomes: **continue**, **fault**, or **end**.
+Per the [specification's task flow model](https://github.com/open-workflow-specification/specification/blob/main/dsl.md#task-flow), each task completes with one of three outcomes: **continue**, **fault**, or **end**.
 
 ### Task Execution Outcomes
 
@@ -165,7 +165,7 @@ Controls when orchestrator pauses:
 
 ## Data Flow
 
-Lemline implements the specification's [data transformation pipeline](https://github.com/serverlessworkflow/specification/blob/main/dsl.md#data-flow), which defines a structured flow for data validation and transformation at workflow and task boundaries.
+Lemline implements the specification's [data transformation pipeline](https://github.com/open-workflow-specification/specification/blob/main/dsl.md#data-flow), which defines a structured flow for data validation and transformation at workflow and task boundaries.
 
 ### Transformation Pipeline
 
@@ -306,7 +306,7 @@ processItems:
 
 ## Runtime Expressions
 
-Lemline implements the specification's [runtime expression model](https://github.com/serverlessworkflow/specification/blob/main/dsl.md#runtime-expressions) using JQ as the expression language.
+Lemline implements the specification's [runtime expression model](https://github.com/open-workflow-specification/specification/blob/main/dsl.md#runtime-expressions) using JQ as the expression language.
 
 ### Expression Language
 
@@ -327,7 +327,7 @@ value: ${ .items | map(.price) | add }
 
 ### Standard Arguments
 
-Per the [specification's runtime expression arguments](https://github.com/serverlessworkflow/specification/blob/main/dsl.md#runtime-expressions):
+Per the [specification's runtime expression arguments](https://github.com/open-workflow-specification/specification/blob/main/dsl.md#runtime-expressions):
 
 **Scope Variables** (available in expressions):
 
@@ -414,15 +414,15 @@ data class TaskDescriptor(
 
 ## Error Handling
 
-Lemline implements the specification's [error handling model](https://github.com/serverlessworkflow/specification/blob/main/dsl-reference.md#error-handling) with structured errors, retry strategies, and catch blocks.
+Lemline implements the specification's [error handling model](https://github.com/open-workflow-specification/specification/blob/main/dsl-reference.md#error) with structured errors, retry strategies, and catch blocks.
 
 ### Error Structure
 
-Per the [specification](https://github.com/serverlessworkflow/specification/blob/main/dsl-reference.md#error-handling):
+Per the [specification](https://github.com/open-workflow-specification/specification/blob/main/dsl-reference.md#error):
 
 ```kotlin
 data class Error(
-    val type: String,        // URI: "https://serverlessworkflow.io/spec/1.0.0/errors/communication"
+    val type: String,        // URI: "https://open-workflow-specification.org/spec/1.0.0/errors/communication"
     val status: Int,         // HTTP-style status code
     val instance: String,    // JSON pointer to failed node
     val title: String?,
@@ -479,7 +479,7 @@ TryProcessor evaluates error filters per spec:
 ```yaml
 errors:
   with:                               # Error type URIs
-    - https://serverlessworkflow.io/spec/1.0.0/errors/communication
+    - https://open-workflow-specification.org/spec/1.0.0/errors/communication
   when: .status >= 500                # JQ expression (must be truthy)
   exceptWhen: .status == 503          # JQ expression (must be falsy)
 ```
@@ -492,7 +492,7 @@ errors:
 
 ### Retry Strategies
 
-Per the [retry specification](https://github.com/serverlessworkflow/specification/blob/main/dsl-reference.md#retry):
+Per the [retry specification](https://github.com/open-workflow-specification/specification/blob/main/dsl-reference.md#retry):
 
 **TryTaskState** tracks retry attempts:
 ```kotlin
@@ -758,7 +758,7 @@ lemline-core/src/main/kotlin/com/lemline/core/
 
 ## Summary
 
-The Lemline `WorkflowOrchestrator` implements the Serverless Workflow DSL specification with:
+The Lemline `WorkflowOrchestrator` implements the Open Workflow DSL specification with:
 
 **Task Flow**:
 - Three task outcomes: continue, fault, end

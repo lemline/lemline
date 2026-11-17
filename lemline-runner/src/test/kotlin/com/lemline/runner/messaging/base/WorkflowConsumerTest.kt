@@ -133,7 +133,7 @@ internal abstract class WorkflowConsumerTest {
                       - raiseError:
                           raise:
                             error:
-                              type: https://serverlessworkflow.io/errors/not-implemented
+                              type: https://open-workflow-specification.org/errors/not-implemented
                               status: 500
                     catch:
                       retry:

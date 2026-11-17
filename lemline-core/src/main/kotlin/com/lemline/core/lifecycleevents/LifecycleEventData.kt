@@ -8,10 +8,10 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
 
 /**
- * Data payloads for Serverless Workflow lifecycle events.
+ * Data payloads for Open Workflow lifecycle events.
  *
  * These classes represent the `data` field of CloudEvents emitted for workflow
- * and task lifecycle transitions. The structure follows the Serverless Workflow
+ * and task lifecycle transitions. The structure follows the Open Workflow
  * lifecycle events specification.
  *
  * @see LifecycleEventHook for event emission hook points

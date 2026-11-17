@@ -9,9 +9,9 @@ This module implements parent-child workflow relationships from the `run` task:
 - **Parent state preservation** while child executes
 - **Result propagation** from child to parent on completion/failure
 
-## Serverless Workflow DSL Reference
+## Open Workflow DSL Reference
 
-See [Run Task](https://serverlessworkflow.io/spec/latest/dsl-reference/#run) in the Serverless Workflow specification:
+See [Run Task](https://github.com/open-workflow-specification/specification/blob/v1.0.0/dsl-reference.md#run) in the Open Workflow Specification:
 
 ```yaml
 do:

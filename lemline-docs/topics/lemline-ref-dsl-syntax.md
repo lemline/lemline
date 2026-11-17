@@ -1,10 +1,10 @@
 # DSL Syntax Reference
 
-This page provides a comprehensive reference for the Serverless Workflow DSL syntax as implemented in Lemline.
+This page provides a comprehensive reference for the Open Workflow DSL syntax as implemented in Lemline.
 
 ## Format and Structure
 
-Lemline implements the Serverless Workflow specification, which supports both YAML and JSON formats. YAML is recommended for human readability. The basic structure of a workflow definition includes:
+Lemline implements the Open Workflow Specification, which supports both YAML and JSON formats. YAML is recommended for human readability. The basic structure of a workflow definition includes:
 
 ```yaml
 # Basic workflow structure
@@ -279,7 +279,7 @@ use:
       catch:
         - error:
             with:
-              type: "https://serverlessworkflow.io/spec/1.0.0/errors/timeout"
+              type: "https://open-workflow-specification.org/spec/1.0.0/errors/timeout"
             as: "timeoutError"
           do:
             - handleTimeout:
@@ -544,7 +544,7 @@ do:
         catch:
           - error:
               with:
-                type: "https://serverlessworkflow.io/spec/1.0.0/errors/communication"
+                type: "https://open-workflow-specification.org/spec/1.0.0/errors/communication"
               as: "comError"
             do:
               - logError:

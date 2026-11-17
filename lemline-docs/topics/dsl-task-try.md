@@ -38,7 +38,7 @@ do:
         errors:
           # Catch specific error types (optional)
           with:
-            type: https://serverlessworkflow.io/spec/1.0.0/errors/communication
+            type: https://open-workflow-specification.org/spec/1.0.0/errors/communication
         as: "apiError" # Store the caught error details in $apiError variable (default is $error)
         do:
           # Tasks to execute ONLY if an error matching the filter is caught
@@ -138,7 +138,7 @@ The `catch` block can contain the following properties:
               errors:
                 with: 
                   # Only catch errors of this specific type AND status
-                  type: "https://serverlessworkflow.io/spec/1.0.0/errors/communication"
+                  type: "https://open-workflow-specification.org/spec/1.0.0/errors/communication"
                   status: 503 
                   # instance: /do/0/callApi # Optionally match instance too
               # ... other catch properties (as, when, retry, do) ...

@@ -319,4 +319,4 @@ fun `DoProcessor should iterate children`() {
 
 - **CLAUDE.md** - Project-wide guidelines and architecture overview
 - **runner-dev skill** - lemline-runner module (messaging, persistence, CLI)
-- **Serverless Workflow DSL** - https://serverlessworkflow.io/
+- **Open Workflow DSL** - https://open-workflow-specification.org/

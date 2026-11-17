@@ -6,7 +6,7 @@ Accepted
 
 ## Context
 
-The `listen` task in Serverless Workflow DSL enables workflows to wait for CloudEvents before continuing execution. CloudEvent processing operates **independently** from workflow instance execution, using a separate messaging channel and processing pipeline.
+The `listen` task in Open Workflow DSL enables workflows to wait for CloudEvents before continuing execution. CloudEvent processing operates **independently** from workflow instance execution, using a separate messaging channel and processing pipeline.
 
 When a CloudEvent arrives, the system must:
 
@@ -905,6 +905,6 @@ Route CloudEvents through commands-in channel.
 
 **Documentation:**
 - [Listen Task Documentation](../listen-task.md)
-- [Serverless Workflow Specification - Listen Task](https://serverlessworkflow.io)
+- [Open Workflow Specification - Listen Task](https://open-workflow-specification.org)
 - [ADR-0003 Messaging Architecture](./0003-messaging-architecture.md)
 - [lemline-runner-listeners README](../../lemline-runner-listeners/README.md)

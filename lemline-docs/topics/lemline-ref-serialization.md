@@ -593,7 +593,7 @@ Handle serialization errors:
       catch:
         - error:
             with:
-              type: "https://serverlessworkflow.io/spec/1.0.0/errors/expression"
+              type: "https://open-workflow-specification.org/spec/1.0.0/errors/expression"
             as: "serializationError"
           do:
             - handleError:
@@ -617,7 +617,7 @@ Handle schema validation errors:
       catch:
         - error:
             with:
-              type: "https://serverlessworkflow.io/spec/1.0.0/errors/validation"
+              type: "https://open-workflow-specification.org/spec/1.0.0/errors/validation"
             as: "validationError"
           do:
             - handleValidationError:

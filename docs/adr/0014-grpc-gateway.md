@@ -59,8 +59,8 @@ For replay and tail:
 3. Reserve `clickhouse` as a future backend without changing the public gRPC contract.
 4. Stream events ordered by analytics sequence (`id ASC`).
 5. End stream on workflow terminal lifecycle event:
-   - `io.serverlessworkflow.workflow.completed.v1`
-   - `io.serverlessworkflow.workflow.faulted.v1`
+   - `org.open-workflow-specification.workflow.completed.v1`
+   - `org.open-workflow-specification.workflow.faulted.v1`
 
 ### Configuration Strategy
 

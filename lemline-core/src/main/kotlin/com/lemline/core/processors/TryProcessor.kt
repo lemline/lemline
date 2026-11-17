@@ -60,7 +60,7 @@ import kotlinx.serialization.json.buildJsonObject
  *         delay: PT1S
  *       errors:
  *         with:
- *           type: https://serverlessworkflow.io/spec/1.0.0/errors/communication
+ *           type: https://open-workflow-specification.org/spec/1.0.0/errors/communication
  *       do:
  *         - logError:
  *             set:

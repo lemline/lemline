@@ -12,7 +12,7 @@ import kotlinx.serialization.encoding.Encoder
  * @property type The string representation of the error type.
  * @property defaultStatus The default HTTP status code associated with the error type.
  *
- * cf. https://github.com/serverlessworkflow/specification/blob/main/dsl-reference.md#standard-error-types
+ * cf. https://github.com/open-workflow-specification/specification/blob/main/dsl-reference.md#standard-error-types
  */
 enum class WorkflowErrorType(val type: String, val defaultStatus: Int) {
     CONFIGURATION("configuration", 400),

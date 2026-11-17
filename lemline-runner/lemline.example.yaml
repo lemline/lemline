@@ -135,8 +135,8 @@ lemline:
 
     # --- Lifecycle Events Configuration (Optional) ---
     # Enable publishing of workflow and task lifecycle events as CloudEvents.
-    # Events are published to a dedicated topic/queue and follow the Serverless Workflow lifecycle spec.
-    # See: https://serverlessworkflow.io/
+    # Events are published to a dedicated topic/queue and follow the Open Workflow lifecycle spec.
+    # See: https://open-workflow-specification.org/
     #
     # Events published:
     # - workflow.started, workflow.completed, workflow.faulted

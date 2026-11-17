@@ -24,7 +24,7 @@ import kotlinx.serialization.json.JsonElement
  * - raiseError:
  *     raise:
  *       error:
- *         type: https://serverlessworkflow.io/spec/1.0.0/errors/validation
+ *         type: https://open-workflow-specification.org/spec/1.0.0/errors/validation
  *         status: 400
  * ```
  *

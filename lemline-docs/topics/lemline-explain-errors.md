@@ -18,7 +18,7 @@ Lemline implements the RFC 7807 Problem Details specification for consistent err
 
 ```json
 {
-  "type": "https://serverlessworkflow.io/spec/1.0.0/errors/validation",
+  "type": "https://open-workflow-specification.org/spec/1.0.0/errors/validation",
   "status": 400,
   "instance": "/do/0/validateInput",
   "title": "Input Validation Failed",
@@ -59,7 +59,7 @@ WorkflowError
 ```
 
 Each error type has:
-- A unique URI identifier (e.g., `https://serverlessworkflow.io/spec/1.0.0/errors/timeout`)
+- A unique URI identifier (e.g., `https://open-workflow-specification.org/spec/1.0.0/errors/timeout`)
 - A default status code
 - Specific handling semantics
 
@@ -166,7 +166,7 @@ The primary error handling mechanism:
       catch:
         - error:
             with:
-              type: "https://serverlessworkflow.io/spec/1.0.0/errors/communication"
+              type: "https://open-workflow-specification.org/spec/1.0.0/errors/communication"
               status: 503
             as: "paymentError"
           do:

@@ -22,7 +22,7 @@ dependencies {
     implementation(enforcedPlatform(libs.quarkus.bom))
     implementation("io.quarkus:quarkus-arc")
 
-    // Serverless Workflow SDK (for Workflow type)
+    // Open Workflow SDK (for Workflow type)
     implementation(libs.serverlessworkflow.api)
     implementation(libs.serverlessworkflow.impl.core)
 

@@ -1,10 +1,10 @@
 ---
-title: Introduction to the Serverless Workflow DSL
+title: Introduction to the Open Workflow DSL
 ---
 
-# Introduction to Serverless Workflow DSL
+# Introduction to Open Workflow DSL
 
-The Serverless Workflow DSL (Domain Specific Language) provides a powerful and flexible way to define workflows in a
+The Open Workflow DSL (Domain Specific Language) provides a powerful and flexible way to define workflows in a
 declarative manner. This documentation will guide you through the key concepts and components of the DSL.
 
 ## Documentation Structure
@@ -38,9 +38,9 @@ This documentation is organized into several main sections:
     - [Retries](dsl-task-try.md)
     - [Secrets](dsl-secrets.md)
 
-## What is the Serverless Workflow DSL?
+## What is the Open Workflow DSL?
 
-The Serverless Workflow DSL allows you to define workflows using a structured, human-readable format (typically YAML).
+The Open Workflow DSL allows you to define workflows using a structured, human-readable format (typically YAML).
 Instead of writing imperative code to manage state, handle retries, coordinate tasks, and react to events, you *declare*
 the desired flow and behaviour. A compliant workflow engine then interprets this definition and executes the process
 reliably.
@@ -64,11 +64,11 @@ This documentation is intended for:
 * **Developers:** Building applications that require orchestration or automation of processes.
 * **Architects:** Designing distributed systems and event-driven architectures.
 * **Operations Engineers:** Automating infrastructure tasks and operational procedures.
-* Anyone interested in learning and applying the Serverless Workflow standard.
+* Anyone interested in learning and applying the Open Workflow Specification.
 
 ## Getting Started
 
-To get started with the Serverless Workflow DSL:
+To get started with the Open Workflow DSL:
 
 1. Read this **Introduction** page thoroughly.
 2. Explore the **Core Concepts** section, paying particular attention to [Data Flow](dsl-data-flow.md)
@@ -79,9 +79,9 @@ To get started with the Serverless Workflow DSL:
 
 ## Additional Resources
 
-- [Serverless Workflow Specification](https://serverlessworkflow.io/)
-- [Serverless Workflow Examples](https://github.com/serverlessworkflow/specification/tree/main/examples)
-- [Serverless Workflow Tools](https://serverlessworkflow.io/tools/)
+- [Open Workflow Specification](https://open-workflow-specification.org/)
+- [Open Workflow Examples](https://github.com/open-workflow-specification/specification/tree/main/examples)
+- [Open Workflow Tools](https://github.com/open-workflow-specification)
 
-We hope this documentation helps you effectively leverage the power and flexibility of the Serverless Workflow DSL.
-Happy orchestrating! 
+We hope this documentation helps you effectively leverage the power and flexibility of the Open Workflow DSL.
+Happy orchestrating!

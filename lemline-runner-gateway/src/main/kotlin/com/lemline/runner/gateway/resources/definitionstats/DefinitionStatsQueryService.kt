@@ -9,6 +9,7 @@ import com.lemline.runner.config.analyticsSchemaResolved
 import com.lemline.runner.config.analyticsTypeResolved
 import com.lemline.runner.gateway.analytics.AnalyticsDataSourceProvider
 import com.lemline.runner.gateway.persistence.GatewayJdbcSupport
+import com.lemline.runner.gateway.persistence.lifecycleTypeSqlList
 import com.lemline.runner.gateway.persistence.SqlQuery
 import com.lemline.runner.gateway.persistence.normalizePageSize
 import com.lemline.runner.gateway.persistence.placeholders
@@ -192,7 +193,7 @@ class DefinitionStatsQueryService(
         where += "id <= ?"
         whereParams += snapshotSequence
         where += "lemline_workflow_id IS NOT NULL"
-        where += "type IN ('${LifecycleEventType.WORKFLOW_STARTED.type}', '${LifecycleEventType.WORKFLOW_COMPLETED.type}', '${LifecycleEventType.WORKFLOW_FAULTED.type}')"
+        where += "type IN (${lifecycleTypeSqlList(LifecycleEventType.WORKFLOW_STARTED, LifecycleEventType.WORKFLOW_COMPLETED, LifecycleEventType.WORKFLOW_FAULTED)})"
 
         filter.namespace?.trim()?.takeIf { it.isNotBlank() }?.let {
             where += "lemline_workflow_namespace = ?"
@@ -230,15 +231,15 @@ class DefinitionStatsQueryService(
                 MAX(lemline_workflow_name) AS lemline_workflow_name,
                 MAX(lemline_workflow_version) AS lemline_workflow_version,
                 MIN(CASE
-                      WHEN type = '${LifecycleEventType.WORKFLOW_STARTED.type}'${beforeTimeTo("event_time")}
+                      WHEN type IN (${lifecycleTypeSqlList(LifecycleEventType.WORKFLOW_STARTED)})${beforeTimeTo("event_time")}
                       THEN event_time
                     END) AS started_at,
                 MAX(CASE
-                      WHEN type = '${LifecycleEventType.WORKFLOW_COMPLETED.type}'${beforeTimeTo("event_time")}
+                      WHEN type IN (${lifecycleTypeSqlList(LifecycleEventType.WORKFLOW_COMPLETED)})${beforeTimeTo("event_time")}
                       THEN event_time
                     END) AS completed_at,
                 MAX(CASE
-                      WHEN type = '${LifecycleEventType.WORKFLOW_FAULTED.type}'${beforeTimeTo("event_time")}
+                      WHEN type IN (${lifecycleTypeSqlList(LifecycleEventType.WORKFLOW_FAULTED)})${beforeTimeTo("event_time")}
                       THEN event_time
                     END) AS faulted_at
               FROM $analyticsQualifiedTable

@@ -101,8 +101,8 @@ class InstanceEventWatchServiceTest {
     @Test
     fun `watch preserves mixed extension paths and fault origins`() = runTest {
         val pointer = "/do/0/invoke/_fn/do/0/charge/_ext/1/after/do/0/audit";
-        val payload = """{"id":"extension-fault","type":"io.serverlessworkflow.task.faulted.v1","data":{"task":"$pointer","error":{"status":503,"instance":"$pointer"}}}"""
-        val expected = eventRow(42L, "io.serverlessworkflow.task.faulted.v1").copy(cloudEventJson = payload)
+        val payload = """{"id":"extension-fault","type":"org.open-workflow-specification.task.faulted.v1","data":{"task":"$pointer","error":{"status":503,"instance":"$pointer"}}}"""
+        val expected = eventRow(42L, "org.open-workflow-specification.task.faulted.v1").copy(cloudEventJson = payload)
         coEvery { instanceEventQueryService.listEvents(any()) } returns InstanceEventListResult(
             events = listOf(expected), nextCursor = null, latestCursor = 42L)
         val received = mutableListOf<InstanceEventRow>()

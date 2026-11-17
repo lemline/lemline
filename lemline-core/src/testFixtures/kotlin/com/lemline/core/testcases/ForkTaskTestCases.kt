@@ -284,7 +284,7 @@ object ForkTaskTestCases {
                           - fastFailing:
                               raise:
                                   error:
-                                    type: https://serverlessworkflow.io/spec/1.0.0/errors/communication
+                                    type: https://open-workflow-specification.org/spec/1.0.0/errors/communication
                                     status: 500
             """.trimIndent(),
             validate = expectOutput(buildJsonObject { put("winner", "success") })
@@ -306,12 +306,12 @@ object ForkTaskTestCases {
                                 - failing:
                                     raise:
                                         error:
-                                          type: https://serverlessworkflow.io/spec/1.0.0/errors/Error1
+                                          type: https://open-workflow-specification.org/spec/1.0.0/errors/Error1
                                           status: 400
                           - branch2:
                               raise:
                                 error:
-                                  type: https://serverlessworkflow.io/spec/1.0.0/errors/Error2
+                                  type: https://open-workflow-specification.org/spec/1.0.0/errors/Error2
                                   status: 500
             """.trimIndent(),
             validate = expectErrorContaining("Error1")
@@ -336,7 +336,7 @@ object ForkTaskTestCases {
                                 - failing:
                                     raise:
                                         error:
-                                          type: https://serverlessworkflow.io/spec/1.0.0/errors/first
+                                          type: https://open-workflow-specification.org/spec/1.0.0/errors/first
                                           status: 400
             """.trimIndent(),
             validate = expectErrorContaining("first")
@@ -355,7 +355,7 @@ object ForkTaskTestCases {
                                   - branch1:
                                       raise:
                                         error:
-                                          type: https://serverlessworkflow.io/spec/1.0.0/errors/catchableError
+                                          type: https://open-workflow-specification.org/spec/1.0.0/errors/catchableError
                                           status: 400
                                   - branch2:
                                       set:
@@ -371,7 +371,7 @@ object ForkTaskTestCases {
             validate = expectOutput(
                 buildJsonObject {
                     put("caught", true)
-                    put("errorType", "https://serverlessworkflow.io/spec/1.0.0/errors/catchableError")
+                    put("errorType", "https://open-workflow-specification.org/spec/1.0.0/errors/catchableError")
                 }
             )
         ),

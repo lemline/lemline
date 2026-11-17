@@ -9,7 +9,7 @@ title: Event Correlation
 
 ## Purpose
 
-Event Correlation is a mechanism within the Serverless Workflow DSL used to filter and match incoming events based on **dynamic data values**, rather than just static attributes like event `type` or `source`. It allows a workflow instance to wait for or react to events that are specifically related to its current context or the data it is processing.
+Event Correlation is a mechanism within the Open Workflow DSL used to filter and match incoming events based on **dynamic data values**, rather than just static attributes like event `type` or `source`. It allows a workflow instance to wait for or react to events that are specifically related to its current context or the data it is processing.
 
 This is essential for scenarios such as:
 

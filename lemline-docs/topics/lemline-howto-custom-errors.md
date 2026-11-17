@@ -150,7 +150,7 @@ Map external system errors to your custom errors:
       catch:
         - error:
             with:
-              type: "https://serverlessworkflow.io/spec/1.0.0/errors/communication"
+              type: "https://open-workflow-specification.org/spec/1.0.0/errors/communication"
             as: "apiError"
           do:
             - mapError:

@@ -6,7 +6,7 @@ title: Workflow Definition Structure
 
 ## Introduction
 
-This page describes the top-level structure and properties of a Serverless Workflow definition file, typically written
+This page describes the top-level structure and properties of an Open Workflow definition file, typically written
 in YAML. Understanding this overall structure is the first step in creating your own workflows.
 
 A workflow definition file acts as the blueprint for your automated process, defining metadata, reusable resources,
@@ -14,9 +14,9 @@ scheduling information (if any), and the core execution logic.
 
 ## Top-Level Properties
 
-A Serverless Workflow definition document consists of the following top-level properties:
+An Open Workflow definition document consists of the following top-level properties:
 
-* **`dsl`** (String, Required): Specifies the version of the Serverless Workflow DSL specification the document conforms
+* **`dsl`** (String, Required): Specifies the version of the Open Workflow DSL specification the document conforms
   to (e.g., `'1.0.0'`). This ensures the workflow engine interprets the syntax correctly.
 
 * **`namespace`** (String, Required): Provides a logical grouping for the workflow, often used for organization,

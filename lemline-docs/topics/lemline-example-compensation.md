@@ -84,7 +84,7 @@ do:
         
         - errors:
             with:
-              type: https://serverlessworkflow.io/spec/1.0.0/errors/communication
+              type: https://open-workflow-specification.org/spec/1.0.0/errors/communication
           as: communicationError
           do:
             - cancelReservation:
@@ -166,7 +166,7 @@ do:
       catch:
         errors:
           with:
-            type: https://serverlessworkflow.io/spec/1.0.0/errors/communication
+            type: https://open-workflow-specification.org/spec/1.0.0/errors/communication
         then: compensateSaga
 
   - step2_ReserveInventory:
@@ -185,7 +185,7 @@ do:
       catch:
         errors:
           with:
-            type: https://serverlessworkflow.io/spec/1.0.0/errors/communication
+            type: https://open-workflow-specification.org/spec/1.0.0/errors/communication
         then: compensateSaga
 
   - step3_ProcessPayment:
@@ -206,7 +206,7 @@ do:
       catch:
         errors:
           with:
-            type: https://serverlessworkflow.io/spec/1.0.0/errors/communication
+            type: https://open-workflow-specification.org/spec/1.0.0/errors/communication
         then: compensateSaga
 
   - step4_ScheduleShipping:
@@ -226,7 +226,7 @@ do:
       catch:
         errors:
           with:
-            type: https://serverlessworkflow.io/spec/1.0.0/errors/communication
+            type: https://open-workflow-specification.org/spec/1.0.0/errors/communication
         then: compensateSaga
 
   - step5_NotifyCustomer:
@@ -249,7 +249,7 @@ do:
       catch:
         errors:
           with:
-            type: https://serverlessworkflow.io/spec/1.0.0/errors/communication
+            type: https://open-workflow-specification.org/spec/1.0.0/errors/communication
         as: notificationError
         do:
           - logNotificationFailure:
@@ -402,7 +402,7 @@ do:
             catch:
               errors:
                 with:
-                  type: https://serverlessworkflow.io/spec/1.0.0/errors/communication
+                  type: https://open-workflow-specification.org/spec/1.0.0/errors/communication
               retry: transientFailure
               as: reservationError
               do:
@@ -473,7 +473,7 @@ do:
               
               - errors:
                   with:
-                    type: https://serverlessworkflow.io/spec/1.0.0/errors/communication
+                    type: https://open-workflow-specification.org/spec/1.0.0/errors/communication
                 retry: transientFailure
                 as: communicationError
                 do:
@@ -497,7 +497,7 @@ do:
       catch:
         errors:
           with:
-            type: https://serverlessworkflow.io/spec/1.0.0/errors
+            type: https://open-workflow-specification.org/spec/1.0.0/errors
         as: unexpectedError
         do:
           - performEmergencyCleanup:
@@ -514,7 +514,7 @@ do:
               catch:
                 errors:
                   with:
-                    type: https://serverlessworkflow.io/spec/1.0.0/errors/communication
+                    type: https://open-workflow-specification.org/spec/1.0.0/errors/communication
                 do:
                   - logCleanupFailure:
                       call: http
@@ -560,7 +560,7 @@ do:
       catch:
         errors:
           with:
-            type: https://serverlessworkflow.io/spec/1.0.0/errors/communication
+            type: https://open-workflow-specification.org/spec/1.0.0/errors/communication
         retry: transientFailure
         as: finalizationError
         do:
@@ -635,7 +635,7 @@ do:
       catch:
         errors:
           with:
-            type: https://serverlessworkflow.io/spec/1.0.0/errors/communication
+            type: https://open-workflow-specification.org/spec/1.0.0/errors/communication
         then: compensateResources
 
   - step2_SendToMessageQueue:
@@ -657,7 +657,7 @@ do:
       catch:
         errors:
           with:
-            type: https://serverlessworkflow.io/spec/1.0.0/errors/communication
+            type: https://open-workflow-specification.org/spec/1.0.0/errors/communication
         then: compensateResources
 
   - step3_CreateFileResource:
@@ -677,7 +677,7 @@ do:
       catch:
         errors:
           with:
-            type: https://serverlessworkflow.io/spec/1.0.0/errors/communication
+            type: https://open-workflow-specification.org/spec/1.0.0/errors/communication
         then: compensateResources
 
   - step4_AllocateApiResource:
@@ -697,7 +697,7 @@ do:
       catch:
         errors:
           with:
-            type: https://serverlessworkflow.io/spec/1.0.0/errors/communication
+            type: https://open-workflow-specification.org/spec/1.0.0/errors/communication
         then: compensateResources
 
   - finalizeWorkflow:
@@ -820,7 +820,7 @@ do:
       catch:
         errors:
           with:
-            type: https://serverlessworkflow.io/spec/1.0.0/errors/communication
+            type: https://open-workflow-specification.org/spec/1.0.0/errors/communication
         as: startError
         do:
           - handleStartupFailure:
@@ -847,7 +847,7 @@ do:
       catch:
         errors:
           with:
-            type: https://serverlessworkflow.io/spec/1.0.0/errors/timeout
+            type: https://open-workflow-specification.org/spec/1.0.0/errors/timeout
         do:
           - initiateAsyncCleanup:
               call: http
@@ -871,7 +871,7 @@ do:
               catch:
                 errors:
                   with:
-                    type: https://serverlessworkflow.io/spec/1.0.0/errors/timeout
+                    type: https://open-workflow-specification.org/spec/1.0.0/errors/timeout
                 do:
                   - escalateCancellation:
                       call: http

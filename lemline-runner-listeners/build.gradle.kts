@@ -21,7 +21,7 @@ dependencies {
     implementation("io.quarkus:quarkus-arc")
     implementation("io.quarkus:quarkus-scheduler")
 
-    // Serverless Workflow SDK (for ListenAndReadAs, ExpressionUtils)
+    // Open Workflow SDK (for ListenAndReadAs, ExpressionUtils)
     implementation(libs.serverlessworkflow.api)
     implementation(libs.serverlessworkflow.impl.core)
 

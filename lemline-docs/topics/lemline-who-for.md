@@ -46,7 +46,7 @@ where you fit in these personas can help you navigate our documentation more eff
 - Database-optional design reduces infrastructure requirements
 - Event-driven architecture aligns with modern system design
 - Flexible deployment options from single instance to clustered
-- Standards-based approach with the Serverless Workflow DSL
+- Standards-based approach with the Open Workflow DSL
 
 ### Documentation Path
 

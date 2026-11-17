@@ -21,8 +21,8 @@ do:
                   emit:
                     event:
                       with:
-                        source: https://serverlessworkflow.io/samples
-                        type: io.serverlessworkflow.samples.asyncapi.message.consumed.v1
+                        source: https://open-workflow-specification.org/samples
+                        type: com.lemline.samples.asyncapi.message.consumed.v1
                         data:
                           message: '${ $message }'
                         

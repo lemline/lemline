@@ -1,10 +1,10 @@
-# Serverless Workflow DSL Supported Features
+# Open Workflow DSL Supported Features
 
-This reference documents which features of the [Serverless Workflow DSL 1.0 specification](https://serverlessworkflow.io/spec/1.0/) are currently supported in Lemline, and any implementation-specific details or limitations.
+This reference documents which features of the [Open Workflow DSL v1.0](https://github.com/open-workflow-specification/specification/tree/v1.0.0) are currently supported in Lemline, and any implementation-specific details or limitations.
 
 ## Implementation Status Overview
 
-Lemline implements a subset of the Serverless Workflow DSL 1.0 specification, with more features being added in each release. This document provides a comprehensive view of what's currently supported and what's planned for future releases.
+Lemline implements a subset of the Open Workflow DSL 1.0 specification, with more features being added in each release. This document provides a comprehensive view of what's currently supported and what's planned for future releases.
 
 ## Core Features Support
 
@@ -95,7 +95,7 @@ Lemline implements a subset of the Serverless Workflow DSL 1.0 specification, wi
 
 ## Specification Deviations
 
-In some areas, Lemline introduces minor deviations from the Serverless Workflow specification to enhance usability or performance:
+In some areas, Lemline introduces minor deviations from the Open Workflow Specification to enhance usability or performance:
 
 1. **Enhanced JQ Support**: Extended JQ features for more powerful expressions
 2. **Simplified Control Flow**: More intuitive control flow constructs
@@ -107,7 +107,7 @@ These deviations maintain compatibility with the core specification while provid
 
 ## Version Support
 
-Lemline currently supports these versions of the Serverless Workflow specification:
+Lemline currently supports these versions of the Open Workflow Specification:
 
 - 1.0 (partial support)
 - 0.8 (better coverage)
@@ -117,7 +117,7 @@ Lemline currently supports these versions of the Serverless Workflow specificati
 
 Features planned for upcoming releases:
 
-1. **Complete 1.0 Support**: Full Serverless Workflow 1.0 specification coverage
+1. **Complete 1.0 Support**: Full Open Workflow 1.0 specification coverage
 2. **Enhanced GraphQL Support**: Native GraphQL integration
 3. **Advanced Container Orchestration**: More sophisticated container execution options
 4. **Additional Authentication Methods**: Expand authentication options
@@ -126,7 +126,7 @@ Features planned for upcoming releases:
 
 ## Compatibility Notes
 
-When migrating from other Serverless Workflow implementations to Lemline, consider:
+When migrating from other Open Workflow implementations to Lemline, consider:
 
 1. **Expression Evaluation**: Verify JQ expressions for compatibility
 2. **Error Handling Logic**: Test error handling behavior
@@ -151,4 +151,4 @@ lemline validate -f my-workflow.yaml --strict
 - [DSL Syntax Reference](lemline-ref-dsl-syntax.md)
 - [Task Types Reference](lemline-ref-task-types.md)
 - [Configuration Reference](lemline-ref-config.md)
-- [Serverless Workflow DSL Specification](https://serverlessworkflow.io/spec/1.0/)
+- [Open Workflow Specification v1.0](https://github.com/open-workflow-specification/specification/tree/v1.0.0)

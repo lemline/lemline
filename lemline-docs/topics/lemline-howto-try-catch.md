@@ -19,7 +19,7 @@ The Try-Catch mechanism allows you to handle errors that occur during workflow e
       catch:
         - error:
             with:
-              type: "https://serverlessworkflow.io/spec/1.0.0/errors/communication"
+              type: "https://open-workflow-specification.org/spec/1.0.0/errors/communication"
           do:
             - handleError:
                 set:
@@ -40,12 +40,12 @@ You can catch specific error types using the `with` property:
 catch:
   - error:
       with:
-        type: "https://serverlessworkflow.io/spec/1.0.0/errors/timeout"
+        type: "https://open-workflow-specification.org/spec/1.0.0/errors/timeout"
     do:
       # Handle timeout errors
   - error:
       with:
-        type: "https://serverlessworkflow.io/spec/1.0.0/errors/validation"
+        type: "https://open-workflow-specification.org/spec/1.0.0/errors/validation"
     do:
       # Handle validation errors
   - error:
@@ -70,7 +70,7 @@ Access error details using the `as` property:
       catch:
         - error:
             with:
-              type: "https://serverlessworkflow.io/spec/1.0.0/errors/validation"
+              type: "https://open-workflow-specification.org/spec/1.0.0/errors/validation"
             as: "validationError"
           do:
             - logValidationError:
@@ -89,13 +89,13 @@ Use the `when` property to conditionally handle errors based on their properties
 catch:
   - error:
       with:
-        type: "https://serverlessworkflow.io/spec/1.0.0/errors/communication"
+        type: "https://open-workflow-specification.org/spec/1.0.0/errors/communication"
       when: "${ .status == 429 }"
     do:
       # Handle rate limiting errors
   - error:
       with:
-        type: "https://serverlessworkflow.io/spec/1.0.0/errors/communication"
+        type: "https://open-workflow-specification.org/spec/1.0.0/errors/communication"
       when: "${ .status == 503 }"
     do:
       # Handle service unavailable errors
@@ -117,7 +117,7 @@ If an error isn't caught by any catch block, it propagates up the workflow hiera
               catch:
                 - error:
                     with:
-                      type: "https://serverlessworkflow.io/spec/1.0.0/errors/timeout"
+                      type: "https://open-workflow-specification.org/spec/1.0.0/errors/timeout"
                   do:
                     # ...
       catch:

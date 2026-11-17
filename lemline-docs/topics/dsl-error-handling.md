@@ -4,7 +4,7 @@
 
 ## Purpose
 
-Failures and exceptional conditions are inevitable in any complex system. The Serverless Workflow DSL provides robust
+Failures and exceptional conditions are inevitable in any complex system. The Open Workflow DSL provides robust
 mechanisms to define, raise, identify, and handle errors gracefully.
 
 This ensures workflows can:
@@ -16,7 +16,7 @@ This ensures workflows can:
 
 ## Error Definition (Problem Details)
 
-Errors in Serverless Workflow are structured based on
+Errors in Open Workflow are structured based on
 the [RFC 7807 Problem Details for HTTP APIs](https://datatracker.ietf.org/doc/html/rfc7807). This provides a
 standardized way to communicate error information.
 
@@ -29,7 +29,7 @@ The core fields of a workflow error object are:
 * **`title`** (String, Optional): A short, human-readable summary of the error
 * **`detail`** (String, Optional): A human-readable explanation specific to this occurrence of the error
 * **`instance`** (String, Required): A URI reference that identifies the specific occurrence of the problem. In
-  Serverless Workflow, this is typically a [JSON Pointer](https://datatracker.ietf.org/doc/html/rfc6901) indicating the
+  Open Workflow, this is typically a [JSON Pointer](https://datatracker.ietf.org/doc/html/rfc6901) indicating the
   specific task or component within the workflow definition where the error originated (e.g., `/do/1/callApi`)
 
 See `com.lemline.core.errors.WorkflowError.kt` for the corresponding data class.
@@ -39,7 +39,7 @@ See `com.lemline.core.errors.WorkflowError.kt` for the corresponding data class.
 The specification defines standard error `type` URIs for common issues. Runtimes **must** use these types when
 applicable to ensure consistent behavior. Authors should use these when defining custom errors for similar conditions.
 
-Base URI: `https://serverlessworkflow.io/spec/1.0.0/errors/`
+Base URI: `https://open-workflow-specification.org/spec/1.0.0/errors/`
 
 | Type Suffix      | Default Status | Description                                                                  | Implementation (`WorkflowErrorType`) |
 |:-----------------|:---------------|:-----------------------------------------------------------------------------|:-------------------------------------|
