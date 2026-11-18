@@ -1,5 +1,8 @@
 # Understanding the Open Workflow DSL
 
+> **Runtime support:** this page describes the DSL. The Lemline runtime does not execute `call: openapi`, `call: asyncapi`, `call: grpc` or OAuth 2.0 / OpenID Connect authentication yet. See [Supported Features](lemline-ref-supported-features.md).
+
+
 This document explains the Open Workflow Domain Specific Language (DSL), its design principles, and how Lemline implements it.
 
 ## What is Open Workflow DSL?

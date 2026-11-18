@@ -32,7 +32,7 @@ The core fields of a workflow error object are:
   Open Workflow, this is typically a [JSON Pointer](https://datatracker.ietf.org/doc/html/rfc6901) indicating the
   specific task or component within the workflow definition where the error originated (e.g., `/do/1/callApi`)
 
-See `com.lemline.core.errors.WorkflowError.kt` for the corresponding data class.
+See `InternalException.Error` in `com.lemline.core.errors.WorkflowException.kt` for the corresponding data class.
 
 ## Standard Error Types
 

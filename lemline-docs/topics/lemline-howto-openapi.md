@@ -4,6 +4,9 @@ title: How to use OpenAPI-defined services
 
 # How to use OpenAPI-defined services
 
+> **Not supported by the Lemline runtime yet.** Workflows that use `call: openapi` are accepted, but the task fails when it runs. Call the operation directly with `call: http` instead (see [HTTP Reference](lemline-ref-http.md)).
+
+
 This guide explains how to integrate with OpenAPI-defined services in your Lemline workflows. You'll learn how to reference OpenAPI definitions, make API calls, handle responses, and implement error handling.
 
 ## Understanding OpenAPI Integration

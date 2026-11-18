@@ -5,6 +5,9 @@ title: gRPC Call
 
 # gRPC Call Task (`call: grpc`)
 
+> **Lemline runtime:** `call: grpc` is not executed by Lemline yet.
+
+
 ## Purpose
 
 The gRPC Call task enables workflows to interact with external systems using the high-performance [gRPC](https://grpc.io/) protocol.

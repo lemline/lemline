@@ -1,5 +1,8 @@
 # DSL Syntax Reference
 
+> **Runtime support:** this page describes the DSL syntax. The Lemline runtime does not execute `call: openapi`, `call: asyncapi`, `call: grpc` or OAuth 2.0 / OpenID Connect authentication yet. See [Supported Features](lemline-ref-supported-features.md).
+
+
 This page provides a comprehensive reference for the Open Workflow DSL syntax as implemented in Lemline.
 
 ## Format and Structure

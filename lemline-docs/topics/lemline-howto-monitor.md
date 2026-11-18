@@ -8,146 +8,35 @@ This guide explains how to monitor the execution of Lemline workflows, track the
 
 ## Understanding Workflow States
 
-Before diving into monitoring, it's important to understand the possible states of a workflow instance:
+A workflow instance is in one of these states:
 
 | State | Description |
 |-------|-------------|
-| `PENDING` | The workflow instance is created but execution hasn't started |
-| `RUNNING` | The workflow is actively executing |
-| `WAITING` | The workflow is paused, waiting for an event or timer |
-| `COMPLETED` | The workflow has successfully finished execution |
-| `FAULTED` | The workflow encountered an unhandled error |
-| `SUSPENDED` | The workflow was manually suspended |
-| `CANCELLED` | The workflow was manually cancelled |
+| `PENDING` | The instance is created but no runner has started it yet |
+| `RUNNING` | The instance is executing, or waiting for an event or a timer |
+| `COMPLETED` | The instance finished successfully |
+| `FAULTED` | The instance ended with an unhandled error |
 
 ## Basic Monitoring Techniques
 
-### Using the CLI
+### Using the Dashboard and the gRPC Gateway
 
-The Lemline CLI provides several commands for monitoring workflows:
+Instances are observed through the gRPC gateway (`lemline gateway start`) and the dashboard built on it. The gateway lets clients:
 
-#### Check Instance Status
+- get one instance, or list instances filtered by namespace, workflow and status (`GetInstance`, `ListInstances`)
+- follow instance changes live (`WatchInstances`)
+- list and follow the lifecycle events of an instance (`ListInstanceEvents`, `WatchInstanceEvents`)
+- read per-definition counters (`ListDefinitionStats`, `WatchDefinitionStats`)
 
-```bash
-lemline instance get <instance-id>
-```
+See [gRPC Gateway Reference](lemline-ref-gateway.md).
 
-This returns details about the specified instance, including:
-- Current state
-- Start and end times (if applicable)
-- Current position in the workflow
-- Error information (if faulted)
-
-#### List All Instances
-
-To see all workflow instances:
-
-```bash
-lemline instance list
-```
-
-You can filter the list by workflow ID:
-
-```bash
-lemline instance list --workflow-id my-workflow
-```
-
-Or by status:
-
-```bash
-lemline instance list --status RUNNING
-```
-
-#### View Instance History
-
-To see the execution history of an instance:
-
-```bash
-lemline instance history <instance-id>
-```
-
-This shows all state transitions the workflow has gone through, including:
-- Task transitions
-- Wait events
-- Error occurrences
-- Manual interventions
-
-### Using the REST API
-
-Lemline provides a REST API for programmatic monitoring:
-
-#### Get Instance Status
-
-```bash
-curl -X GET http://localhost:8080/api/v1/instances/<instance-id>
-```
-
-Response:
-```json
-{
-  "instanceId": "8f7e6d5c-4b3a-2c1d-0b9a-8f7e6d5c4b3a",
-  "workflowId": "my-workflow",
-  "version": "1.0",
-  "status": "RUNNING",
-  "startedAt": "2023-09-10T14:30:00Z",
-  "currentPosition": "/do/0/callHttp",
-  "variables": {
-    "orderStatus": "processing",
-    "customerId": "CUST-123"
-  }
-}
-```
-
-#### List Instances
-
-```bash
-curl -X GET http://localhost:8080/api/v1/instances?workflowId=my-workflow&status=RUNNING
-```
-
-#### Get Instance History
-
-```bash
-curl -X GET http://localhost:8080/api/v1/instances/<instance-id>/history
-```
+The CLI has no command to list or inspect instances. `lemline instance start` prints the id of the instance it starts, which you can then look up in the dashboard.
 
 ## Advanced Monitoring
 
 ### Listening to Lifecycle Events
 
-Lemline emits events for significant workflow lifecycle events. You can listen to these events to build real-time monitoring dashboards or trigger additional processes.
-
-To start listening for workflow events:
-
-```bash
-lemline listen events
-```
-
-This command connects to the configured message broker and displays workflow lifecycle events as they occur:
-
-```
-Listening for events...
-🐘 Connected to message broker
-
-Event received:
-  Type: WORKFLOW_STARTED
-  Workflow: order-processing (1.0)
-  Instance: 8f7e6d5c-4b3a-2c1d-0b9a-8f7e6d5c4b3a
-  Timestamp: 2023-09-10T14:30:00Z
-
-Event received:
-  Type: TASK_COMPLETED
-  Workflow: order-processing (1.0)
-  Instance: 8f7e6d5c-4b3a-2c1d-0b9a-8f7e6d5c4b3a
-  Task: ValidateOrder
-  Position: /do/0/validateOrder
-  Timestamp: 2023-09-10T14:30:02Z
-```
-
-You can filter events by type:
-
-```bash
-lemline listen events --type WORKFLOW_COMPLETED
-```
+Lemline emits lifecycle CloudEvents (`org.open-workflow-specification.workflow.started.v1`, `...task.completed.v1`, and so on) on the lifecycle events channel of your broker. Any consumer of that topic or queue can use them to build real-time monitoring or trigger other processes. With lifecycle analytics enabled, they are also stored in a database table; see [Lifecycle Analytics Reference](lemline-ref-analytics.md).
 
 ### Collecting and Analyzing Metrics
 
@@ -157,15 +46,15 @@ Lemline exposes metrics via Micrometer that can be scraped by Prometheus or simi
 curl http://localhost:8080/q/metrics
 ```
 
-Key workflow metrics include:
+Lemline metrics describe message processing per channel, with the prefixes `lemline_messaging_commands`, `lemline_messaging_events`, `lemline_messaging_cloudevents` and `lemline_analytics`. For example:
 
-- `lemline_workflows_active`: Number of currently active workflow instances
-- `lemline_workflows_completed`: Count of completed workflow instances
-- `lemline_workflows_faulted`: Count of faulted workflow instances
-- `lemline_task_execution_time`: Histogram of task execution times
-- `lemline_workflow_execution_time`: Histogram of end-to-end workflow execution times
-- `lemline_database_operations`: Count of database operations performed
-- `lemline_message_operations`: Count of message operations performed
+- `lemline_messaging_commands_active`: messages currently being processed
+- `lemline_messaging_commands_received_total`: messages received
+- `lemline_messaging_commands_processing_completed_total` and `..._processing_failed_total`: messages processed, successfully or not, tagged by workflow name and version
+- `lemline_messaging_commands_processing_duration_seconds`: processing time
+- `lemline_messaging_commands_foreign_namespace_total`: messages received for a namespace the runner does not serve
+
+JVM, HTTP server and database pool metrics are exposed as well.
 
 These metrics can be visualized in dashboards using tools like Grafana.
 
@@ -185,48 +74,17 @@ For production environments, set up a comprehensive monitoring solution:
 
 ### Enabling Debug Logging
 
-To enable detailed logging for workflow execution:
+Start the runner with `--debug`, or set the log level in your configuration file:
 
 ```yaml
-# In application.properties
-quarkus.log.category."com.lemline".level=DEBUG
+quarkus:
+  log:
+    category:
+      "com.lemline":
+        level: DEBUG
 ```
 
-This provides detailed logs of:
-- Task transitions
-- Expression evaluations
-- Input/output transformations
-- Error details
-
-### Inspecting Node States
-
-To understand why a workflow behaved in a certain way, inspect the node states:
-
-```bash
-lemline instance states <instance-id>
-```
-
-This shows the state of each node in the workflow, including:
-- Input and output data
-- Variables
-- Transformation results
-- Error details
-
-### Tracing Workflow Execution
-
-For complex workflows, enable distributed tracing:
-
-```yaml
-# In application.properties
-quarkus.opentelemetry.enabled=true
-quarkus.opentelemetry.tracer.exporter.otlp.endpoint=http://jaeger:4317
-```
-
-This integrates with systems like Jaeger or Zipkin to provide end-to-end tracing of workflow execution, including:
-- Task durations
-- External service calls
-- Database operations
-- Message broker interactions
+At `DEBUG` level, the runner logs each task it enters with its input, and errors with their details. Every log line carries the workflow namespace, name, version and instance id.
 
 ## Monitoring Best Practices
 
@@ -248,10 +106,7 @@ This integrates with systems like Jaeger or Zipkin to provide end-to-end tracing
    - Include correlation IDs for distributed tracing
    - Mask sensitive information in logs
 
-4. **Audit Trail**: Maintain an audit trail of workflow actions:
-   - All manual interventions (cancellations, suspensions)
-   - All automatic recovery actions
-   - Changes to workflow definitions
+4. **Audit Trail**: Keep the lifecycle events of your instances (for example with lifecycle analytics) and track changes to workflow definitions
 
 5. **Performance Monitoring**: Track and optimize:
    - Database operation counts and durations
@@ -275,17 +130,15 @@ scrape_configs:
 ```
 
 2. Create a Grafana dashboard with these panels:
-   - Workflow instance counts by status
-   - Average workflow execution time
-   - Error rates
-   - Database and message broker operations
+   - Messages processed and failed per channel
+   - Message processing time
+   - Messages currently in progress
    - System resource utilization
 
 3. Set up alerts for critical conditions:
-   - Workflows in FAULTED state
-   - Workflows stuck in RUNNING for > 1 hour
-   - Error rate exceeding threshold
-   - Database connection issues
+   - Processing failures increasing
+   - Messages received for a foreign namespace
+   - Health checks failing at `/q/health/ready`
 
 ## Next Steps
 

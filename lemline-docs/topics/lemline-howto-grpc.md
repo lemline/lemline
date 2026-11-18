@@ -4,6 +4,9 @@ title: How to call gRPC functions
 
 # How to call gRPC functions
 
+> **Not supported by the Lemline runtime yet.** Workflows that use `call: grpc` are accepted, but the task fails when it runs. If the service also exposes an HTTP or JSON interface, call it with `call: http`.
+
+
 This guide explains how to integrate gRPC service calls into your Lemline workflows. You'll learn how to define gRPC functions, make unary and streaming calls, handle responses, and implement error handling.
 
 ## Understanding gRPC in Lemline

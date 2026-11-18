@@ -209,29 +209,7 @@ When an error occurs:
 3. If retries remain, the system waits according to the backoff strategy
 4. The entire `do` block is re-executed
 
-### 3. Circuit Breakers
-
-Protection against cascading failures for external services:
-
-```yaml
-- fetchUserData:
-    extension:
-      circuitBreaker:
-        failureRatio: 0.5
-        requestVolumeThreshold: 10
-        delay: PT1M
-    callHTTP:
-      url: "https://users.example.com/api/user/${ .userId }"
-```
-
-The circuit breaker:
-1. Tracks failures for the service
-2. "Opens" when the failure ratio exceeds the threshold
-3. Automatically fails calls during the open period
-4. "Half-opens" after the delay to test recovery
-5. "Closes" when successful calls resume
-
-### 4. Fallback Patterns
+### 3. Fallback Patterns
 
 Define explicit fallback behavior:
 
@@ -256,24 +234,9 @@ Define explicit fallback behavior:
 
 This pattern allows graceful degradation when preferred data sources fail.
 
-### 5. Dead Letter Queues
+### 4. Dead Letter Queues
 
-For asynchronous processing, unprocessable messages are sent to dead letter queues:
-
-```yaml
-- processMessage:
-    extension:
-      deadLetterQueue: "failed-messages"
-    listen:
-      to: "any"
-      events:
-        - event: "NewOrder"
-```
-
-Failed messages are:
-1. Moved to the dead letter queue
-2. Preserved for later analysis or replay
-3. Monitored for systemic issues
+Dead letter queues are a runner feature, not a workflow setting. When a runner cannot process a message from the broker, the message goes to a dead-letter destination (for Kafka, `<source-topic>.dlq`; for RabbitMQ and PGMQ, the configured or derived DLQ queue). Messages received for a namespace that no runner serves are parked in the failures table and can be re-sent with `lemline failures replay`.
 
 ## Designing Error-Resilient Workflows
 
@@ -390,35 +353,19 @@ Lemline provides tools for error analysis:
 
 Detailed contextual logging:
 
+Every runner log line is prefixed with the workflow namespace, name, version and instance id, for example:
+
 ```
-2023-06-15 14:32:45.123 ERROR [com.lemline.core.execution] (executor-thread-0) 
-Workflow execution failed: workflow=order-processing, instance=123e4567-e89b-12d3-a456-426614174000, 
-position=/do/2/processPayment, error=WorkflowError(type=communication, 
-title=Payment Service Unavailable, status=503, details=Gateway Timeout)
+2023-06-15 14:32:45.123 ERROR [acme/order-processing:1.0.0] [123e4567-e89b-12d3-a456-426614174000] [c.l.c.p.AbstractProcessor] ...
 ```
 
 ### Error Metrics
 
-Key error metrics:
-
-- **Error counts by type**: Monitor frequency of different error types
-- **Error rates**: Track percentage of failed executions
-- **Retry statistics**: Observe retry patterns and recovery rates
-- **Circuit breaker status**: Monitor service health
+Runners expose processing metrics at `/q/metrics`, including failure counters per channel such as `lemline_messaging_commands_processing_failed_total`, tagged by reason, workflow name and version. Faulted instances and retried tasks are visible through the `workflow.faulted`, `task.faulted` and `task.retried` lifecycle events.
 
 ### Error Tracing
 
-Contextual error history:
-
-```bash
-lemline instances errors get 123e4567-e89b-12d3-a456-426614174000
-```
-
-This provides:
-- Full error details
-- Position in workflow
-- Context data at time of error
-- Related errors (parent/child)
+The `workflow.faulted` and `task.faulted` lifecycle events of an instance carry the full error (`type`, `status`, `title`, `instance`, `detail`), where `instance` is the position of the failing task in the workflow. They are visible in the dashboard and, with lifecycle analytics enabled, stored in the analytics database.
 
 ## Related Resources
 

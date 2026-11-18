@@ -184,20 +184,15 @@ When using the HTTP API, error responses follow this format:
 
 ## Java Exception Hierarchy
 
-For developers extending Lemline, the Java exception hierarchy is:
+For developers working on Lemline, workflow errors are carried by a single exception type:
 
 ```
-java.lang.Exception
-└── com.lemline.core.errors.WorkflowException
-    ├── com.lemline.core.errors.ConfigurationException
-    ├── com.lemline.core.errors.ValidationException
-    ├── com.lemline.core.errors.ExpressionException
-    ├── com.lemline.core.errors.AuthenticationException
-    ├── com.lemline.core.errors.AuthorizationException
-    ├── com.lemline.core.errors.TimeoutException
-    ├── com.lemline.core.errors.CommunicationException
-    └── com.lemline.core.errors.RuntimeException
+java.lang.RuntimeException
+└── com.lemline.core.errors.WorkflowException (sealed)
+    └── com.lemline.core.errors.InternalException
 ```
+
+`InternalException` holds an `InternalException.Error` with the standard error fields (`type`, `status`, `instance`, `title`, `details`). The error type is one of the values of `com.lemline.core.errors.WorkflowErrorType` (`configuration`, `validation`, `expression`, `authentication`, `authorization`, `timeout`, `communication`, `runtime`).
 
 ## Defining Custom Errors
 
@@ -277,18 +272,10 @@ try:
 
 ## Error Debugging 
 
-When debugging errors, you can use these CLI commands:
+When debugging errors:
 
-```bash
-# View detailed error information for a workflow instance
-lemline instances errors get <instance-id>
-
-# View workflow execution history with error details
-lemline instances history <instance-id>
-
-# View detailed logs related to errors
-lemline logs --level ERROR --workflow <workflow-id>
-```
+- Read the `workflow.faulted` and `task.faulted` lifecycle events of the instance in the dashboard; they carry the error `type`, `status`, `title`, `instance` (position in the workflow) and `detail`.
+- Run the runner with `--debug` to log the input of each task. Every log line carries the workflow namespace, name, version and instance id, so you can filter on the instance.
 
 ## Error Handling Best Practices
 

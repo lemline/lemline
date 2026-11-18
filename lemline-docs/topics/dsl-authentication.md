@@ -5,6 +5,9 @@ title: Authentication
 
 # Authentication
 
+> **Lemline runtime:** only `basic` and `bearer` policies are applied, on `call: http`. OAuth 2.0, OpenID Connect, digest and certificate policies are not executed yet.
+
+
 ## Purpose
 
 Authentication definitions in Open Workflow specify the methods and credentials required for a workflow to

@@ -56,7 +56,7 @@ lemline:
     postgresql:
       host: localhost
       port: 5432
-      name: lemline
+      database: lemline
       username: postgres
       password: postgres
 
@@ -64,10 +64,6 @@ lemline:
     type: kafka
     kafka:
       brokers: localhost:9092
-      commands:
-        topic: lemline-commands
-      events:
-        topic: lemline-events
 ```
 
 Start the infrastructure:
@@ -111,7 +107,7 @@ lemline:
     postgresql:
       host: localhost
       port: 5432
-      name: lemline
+      database: lemline
       username: postgres
       password: postgres
 
@@ -122,11 +118,9 @@ lemline:
       port: 5672
       username: guest
       password: guest
-      commands:
-        queue: lemline-commands
-      events:
-        queue: lemline-events
 ```
+
+Lemline names topics and queues after the namespace (for example `lemline-default-commands`); you do not need to configure them.
 
 ## Next Steps
 

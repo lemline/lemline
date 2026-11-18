@@ -1,5 +1,8 @@
 # Lemline Real-World Examples
 
+> **Runtime support:** some examples on this page use `call: openapi`, `call: asyncapi`, `call: grpc` or OAuth 2.0 authentication. The Lemline runtime does not execute these yet: such a task fails when it runs. Write those calls with `call: http` and `basic` or `bearer` authentication to run them on Lemline.
+
+
 This document presents comprehensive real-world examples that demonstrate how to build complex, practical workflows using the Open Workflow DSL with Lemline. These examples combine multiple workflow patterns, integration methods, and error handling strategies to address realistic business scenarios.
 
 ## E-Commerce Order Processing

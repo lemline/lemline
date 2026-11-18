@@ -1,5 +1,8 @@
 # IoT Workflow Examples
 
+> **Runtime support:** some examples on this page use `call: openapi`, `call: asyncapi`, `call: grpc` or OAuth 2.0 authentication. The Lemline runtime does not execute these yet: such a task fails when it runs. Write those calls with `call: http` and `basic` or `bearer` authentication to run them on Lemline.
+
+
 This document provides practical examples of workflows for Internet of Things (IoT) applications using Lemline. These examples demonstrate how to implement common IoT patterns such as device provisioning, telemetry processing, firmware updates, and event-based monitoring.
 
 ## Device Provisioning Workflow
