@@ -76,7 +76,11 @@ lemline:
             database: lemline
             username: postgres
             password: postgres
+
+    namespaces: default, examples, tutorial
 ```
+
+A runner only executes workflows of the namespaces listed in `namespaces` (only `default` when unset). This list covers the namespaces used by the getting-started guide and the tutorials; add your own namespaces to it.
 
 ## 3. Download Lemline
 

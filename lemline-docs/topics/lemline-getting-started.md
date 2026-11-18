@@ -108,7 +108,7 @@ This simple workflow sets a `message` value, which becomes the workflow output, 
 
 ## Running Your Workflow
 
-Running a workflow takes three steps: register the definition, start a runner, and start an instance. The runner and the CLI must share a database and a message broker, so first set up the local environment described in [Setting Up A Local Environment](lemline-tutorial-setup.md).
+Running a workflow takes three steps: register the definition, start a runner, and start an instance. The runner and the CLI must share a database and a message broker, so first set up the local environment described in [Setting Up A Local Environment](lemline-tutorial-setup.md). Its configuration file also makes the runner serve the `examples` namespace used here.
 
 ```bash
 # Register the definition
