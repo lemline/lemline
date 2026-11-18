@@ -58,7 +58,8 @@ A schedule involves three distinct moments:
    carries no creation time.
 2. **Deadline** (`outbox_scheduled_for`): the earliest time the occurrence may run.
 3. **Acceptance**: the relay claims the due occurrence. Its creation time is frozen and
-   **committed before the command is published**, in a separate transaction. A failed
+   **committed before the command is published**, in a separate transaction run before each
+   publication batch; only accepted occurrences are published. A failed
    publication, a relay retry, or a crash after publication reuses that value; it is never
    recomputed.
 

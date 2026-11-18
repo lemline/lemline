@@ -170,6 +170,32 @@ class ScheduleOutboxH2Test {
         repository.findById(schedule.id)!!.outboxCompletedAt shouldNotBe null
     }
 
+    @Test
+    fun `every batch of a catch-up pass is published only after its creation time is committed`() = runTest {
+        // More due occurrences than one batch, so the pass drains several batches.
+        val schedules = List(5) { cronOccurrence() }
+        schedules.forEach { repository.insert(it) }
+        // Candidate rows: the registered occurrences and their overdue successors.
+        val candidates = schedules.flatMap { s -> generateSequence(s.id) { it.derive("-next") }.take(4).toList() }
+
+        val publishedBeforeCommit = mutableListOf<IDV7>()
+        val checkingEmitter = object : CommandEmitter {
+            override suspend fun send(message: InstanceMessage<out WorkflowCommand>, idempotentKey: IDV7?) {
+                // Read outside the publishing transaction: only committed state is visible.
+                val committed = candidates.firstNotNullOfOrNull { id -> repository.findById(id)?.takeIf { it.messageId == idempotentKey } }
+                val createdAt = (message.workflowState as WorkflowCommand.ResumeFromTask).createdAt
+                if (committed?.instanceMessage?.workflowState?.createdAt != createdAt) publishedBeforeCommit += idempotentKey!!
+                sent += message
+            }
+        }
+        outbox().apply { inject("commandEmitter", checkingEmitter) }
+            .processEntities(batchSize = 2, maxAttempts = 3, retryDelay = 1.seconds)
+
+        (sent.size >= schedules.size) shouldBe true
+        publishedBeforeCommit.shouldBeEmpty()
+        sent.forEach { (it.workflowState as WorkflowCommand.ResumeFromTask).createdAt shouldNotBe null }
+    }
+
     companion object {
         private val testDb = H2TestDatabaseConfig()
 

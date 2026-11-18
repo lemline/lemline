@@ -60,17 +60,17 @@ class ScheduleOutbox : AbstractOutbox<ScheduleModel>() {
     override val outboxConfig: OutboxConfig by lazy { scheduleConfig.outbox }
 
     /**
-     * Two transactions per pass: due occurrences are first accepted (creation time frozen and
-     * committed), then published. A publication retry or a crash after publishing therefore never
-     * recomputes an occurrence's creation time.
+     * Two transactions per batch: due occurrences are first accepted (creation time frozen and
+     * committed), then published. Only accepted occurrences are published, so a publication retry
+     * or a crash after publishing never recomputes an occurrence's creation time. If acceptance
+     * fails, the pass ends and nothing more is published until the next run.
      */
-    override suspend fun processEntities(batchSize: Int, maxAttempts: Int, retryDelay: Duration) {
+    override suspend fun beforeEachBatch(batchSize: Int, maxAttempts: Int) {
         acceptDueOccurrences(batchSize, maxAttempts)
-        super.processEntities(batchSize, maxAttempts, retryDelay)
     }
 
     @VisibleForTesting
-    internal suspend fun acceptDueOccurrences(batchSize: Int, maxAttempts: Int) = try {
+    internal suspend fun acceptDueOccurrences(batchSize: Int, maxAttempts: Int) {
         databaseConfig.withTransaction { conn ->
             val due = scheduleRepository.findEntitiesToProcess(maxAttempts, batchSize, conn).filter { !it.isAccepted }
             if (due.isNotEmpty()) {
@@ -79,9 +79,6 @@ class ScheduleOutbox : AbstractOutbox<ScheduleModel>() {
                 scheduleRepository.update(due, conn)
             }
         }
-    } catch (e: Exception) {
-        // Publication still accepts them inline; only the "frozen before publication" guarantee is lost.
-        logger.error(e) { "Error while accepting due schedule occurrences" }
     }
 
     /**
@@ -97,8 +94,10 @@ class ScheduleOutbox : AbstractOutbox<ScheduleModel>() {
         retryDelay: Duration,
         conn: Connection
     ): Int {
-        val processed = super.processBatch(entities, maxAttempts, retryDelay, conn)
-        for (entity in entities.filter { it.outboxCompletedAt != null }) {
+        // Occurrences not yet accepted (locked elsewhere during acceptance) wait for the next batch.
+        val accepted = entities.filter { it.isAccepted }
+        val processed = super.processBatch(accepted, maxAttempts, retryDelay, conn)
+        for (entity in accepted.filter { it.outboxCompletedAt != null }) {
             creationEventEnqueuer.enqueueCreation(entity.instanceMessage, conn)
             if (entity.scheduleAfter == null) {
                 entity.nextScheduled()?.let { scheduleRepository.insert(it, conn) }
@@ -110,8 +109,7 @@ class ScheduleOutbox : AbstractOutbox<ScheduleModel>() {
     }
 
     override suspend fun process(entity: ScheduleModel) {
-        // Normally accepted by acceptDueOccurrences(); a no-op then.
-        entity.prepareExecution(clock.now())
+        check(entity.isAccepted) { "Schedule occurrence ${entity.id} published before acceptance" }
         commandEmitter.send(entity.instanceMessage, entity.messageId)
     }
 }
