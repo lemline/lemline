@@ -772,6 +772,37 @@ abstract class EventScheduleServiceTestBase {
     }
 
     @Test
+    fun `a pre-upgrade row without creation time still publishes its creation events`() = runTest {
+        define("one:\n  with: { type: a }")
+        service().handleCloudEvent(event(), namespace) shouldBe 1
+        val current = starts().single()
+        // A row written by an older runtime: no createdAt, no creation events enqueued with it.
+        val legacyStartedAt = kotlin.time.Instant.parse("2026-03-04T05:06:07.123456Z")
+        val legacyState = current.instanceMessage.workflowState.duplicate(WorkflowId.random(), legacyStartedAt, createdAt = null)
+        val legacy = current.copy(id = IDV7.random(), instanceMessage = current.instanceMessage.copy(workflowState = legacyState))
+        repository.deleteById(current.id) shouldBe 1
+        repository.insert(legacy)
+        val legacyWorkflowId = legacy.workflowId
+        creationEventRepository.findByWorkflowId(legacyWorkflowId).size shouldBe 0
+
+        val sent = mutableListOf<InstanceMessage<out WorkflowCommand>>()
+        EventScheduleOutbox().apply {
+            databaseConfig = db
+            repository = this@EventScheduleServiceTestBase.repository
+            commandEmitter = object : CommandEmitter {
+                override suspend fun send(message: InstanceMessage<out WorkflowCommand>, idempotentKey: IDV7?) { sent.add(message) }
+            }
+            creationEventEnqueuer = service().creationEventEnqueuer
+        }.processEntities(100, 3, 0.seconds)
+
+        // The command is dispatched unchanged; its creation events are stamped as older runtimes did.
+        sent.single() shouldBe legacy.instanceMessage
+        val created = creationEventRepository.findByWorkflowId(legacyWorkflowId)
+        created.map { it.eventType }.toSet() shouldBe setOf(LifecycleEventType.WORKFLOW_CREATED.type, LifecycleEventType.TASK_CREATED.type)
+        created.forEach { it.eventTime shouldBe legacyStartedAt }
+    }
+
+    @Test
     fun `manual start uses the caller validation error instead of invalid schedule model`() = runTest {
         val definition = define("one:\n  with: { type: a }")
         val workflow = WorkflowCache.parseYaml(definition.definition)

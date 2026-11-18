@@ -164,6 +164,10 @@ outbox is disabled.
   does not collapse to zero. Its event ID matches the one the new acceptance path derives.
 - Schedule rows written before the change have no creation time: they are accepted at their
   next relay pass.
+- Event-triggered start rows written before the change have no creation time and no enqueued
+  creation events. When their command is published, the relay enqueues their `workflow.created`
+  and `/do` `task.created` in the same transaction, stamped with `RootState.startedAt` as older
+  runtimes did.
 - Migration `V907__Create_lemline_creation_event_outbox_table` (PostgreSQL, MySQL, H2) adds the
   table. No data migration is needed. It must be applied before an upgraded gateway, CLI, or
   runner accepts starts: their accepting transaction writes to this table.
