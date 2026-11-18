@@ -89,13 +89,33 @@ data class ScheduleModel(
     val executionId: WorkflowId get() = WorkflowId(id.derive("-wf-${outboxScheduledFor?.atDatabasePrecision()}"))
     val messageId: IDV7 get() = id.derive("-msg-${outboxScheduledFor?.atDatabasePrecision()}")
 
-    /** Prepare this occurrence without advancing its deadline or resetting its retry state. */
-    fun prepareExecution() {
+    /**
+     * Whether this occurrence has been accepted: its initial command carries its creation time.
+     * Occurrences are persisted unaccepted (registration and successors) until they are due.
+     */
+    val isAccepted: Boolean get() = instanceMessage.workflowState.createdAt != null
+
+    /**
+     * Accept this due occurrence: give it its own instance and freeze its creation time.
+     *
+     * The creation time (the `workflow.created` time) is set once, when the relay first claims
+     * the due occurrence, and persisted before the command is published: relay retries and
+     * redeliveries reuse it. It is distinct from the schedule's registration and from the
+     * occurrence's deadline ([outboxScheduledFor]): the time between the deadline and acceptance
+     * is scheduler lag, outside the created → started interval.
+     *
+     * `$workflow.startedAt` (RootState) keeps its meaning: set at the first execution attempt.
+     * Does nothing for an occurrence already accepted, so it never advances its deadline, resets
+     * its retry state, or recomputes its creation time.
+     */
+    fun prepareExecution(now: Instant = Clock.System.now()) {
+        if (isAccepted) return
         instanceMessage = instanceMessage.copy(
             workflowState = instanceMessage.workflowState.duplicate(
                 workflowId = executionId,
-                startedAt = if (outboxAttemptCount <= 1) Clock.System.now()
+                startedAt = if (outboxAttemptCount <= 1) now
                 else instanceMessage.workflowState.nodeStack.rootState.startedAt,
+                createdAt = now,
             )
         )
     }
@@ -124,6 +144,8 @@ data class ScheduleModel(
                     workflowState = instanceMessage.workflowState.duplicate(
                         workflowId = next.executionId,
                         startedAt = scheduledFor.atDatabasePrecision(),
+                        // Not accepted until due: prepareExecution() sets its creation time.
+                        createdAt = null,
                     )
                 )
             )
@@ -161,7 +183,8 @@ data class ScheduleModel(
                 id = IDV7.random(),
                 instanceMessage = InstanceMessage(
                     workflowInfo = WorkflowInfo(workflowNamespace, workflowName, workflowVersion),
-                    workflowState = StepByStepOrchestrator.initCmd(workflowId, workflowInput, false)
+                    // Registration is not creation: the occurrence is accepted when it is due.
+                    workflowState = StepByStepOrchestrator.initCmd(workflowId, workflowInput, false).copy(createdAt = null)
                 ),
                 scheduleEvery = scheduleEvery,
                 scheduleAfter = scheduleAfter,

@@ -72,6 +72,9 @@ message TaskScheduledProto {
     google.protobuf.Value input_json = 3;
     FlowDirectiveProto flow_directive = 4;
     ExtensionReturnProto extension_return = 5;
+    // When the scheduled task became eligible for execution; carried to the resulting
+    // ResumeFromTaskProto.created_at. Absent on events written before this field existed.
+    google.protobuf.Timestamp created_at = 6;
 }
 
 message WaitStartedProto {

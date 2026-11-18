@@ -33,6 +33,7 @@ dependencies {
     testImplementation(testFixtures(project(":lemline-core")))
     testImplementation(testFixtures(project(":lemline-runner-forks")))
     testImplementation(testFixtures(project(":lemline-runner-common")))
+    testImplementation(libs.cloudevents.core)
 
     // Test Fixtures
     testFixturesImplementation(libs.bundles.kotlinxEcosystem)

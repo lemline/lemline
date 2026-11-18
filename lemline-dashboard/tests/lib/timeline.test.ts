@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { buildWorkflowProjection, type TimelineEventView } from "../../src/hooks/use-watch-workflow-projection";
-import { buildTimeline, instanceSummary } from "../../src/lib/timeline";
+import { buildTimeline, instanceSummary, workflowBounds } from "../../src/lib/timeline";
 import { parseWorkflowSource } from "../../src/lib/workflow-source";
 
 const T0 = Date.parse("2026-11-15T09:14:00.000Z");
@@ -59,7 +59,8 @@ describe("buildTimeline", () => {
         task: "/do/1/chargePayment",
         error: { type: "https://open-workflow-specification.org/spec/1.0.0/errors/communication", status: 503, title: "Service Unavailable" },
       }),
-      event("task.retried", 2_500, { task: "/do/1/chargePayment", retryCount: 1 }),
+      // Stamped with the planned retry time, as the runtime emits it.
+      event("task.retried", 10_000, { task: "/do/1/chargePayment", retryCount: 1 }),
       event("task.started", 10_500, { task: "/do/1/chargePayment" }),
       event("task.completed", 14_500, { task: "/do/1/chargePayment", output: { paymentId: "pay_1" } }),
       event("workflow.completed", 15_000, { output: { ok: true } }),
@@ -70,7 +71,10 @@ describe("buildTimeline", () => {
 
     expect(model.rows.map((row) => row.label)).toEqual(["validateOrder", "chargePayment"]);
     expect(charge?.typeLabel).toBe("call http · 2 attempts");
-    expect(charge?.segments.map((segment) => segment.kind)).toEqual(["failed", "backoff", "ran"]);
+    // Intentional delay until the planned retry, then waiting for a worker, then the attempt.
+    expect(charge?.segments.map((segment) => segment.kind)).toEqual(["failed", "backoff", "scheduled", "ran"]);
+    expect(charge?.segments[1]).toMatchObject({ start: T0 + 2_500, end: T0 + 10_000 });
+    expect(charge?.segments[2]).toMatchObject({ start: T0 + 10_000, end: T0 + 10_500 });
     expect(charge?.note).toBe("503 → retry in 8 s → ok");
     expect(charge?.state).toBe("completed");
     expect(model.rows[0].output).toEqual({ valid: true });
@@ -112,6 +116,84 @@ do:
     // The wait runs from the failure to now, not from the planned retry time.
     expect(row?.segments[1]).toMatchObject({ start: T0 + 2_000, end: T0 + 5_000 });
     expect(instanceSummary(model.rows, "RUNNING", undefined).title).toBe("Retrying callPayments");
+  });
+
+  it("keeps the wait to start of a queued task once it has started and completed", () => {
+    const events = [
+      event("workflow.created", 0),
+      // The initial /do waited 4 s in the queue before a worker picked it up.
+      event("task.created", 0, { task: "/do" }),
+      event("workflow.started", 4_000),
+      event("task.started", 4_000, { task: "/do" }),
+      event("task.created", 4_000, { task: "/do/0/validateOrder" }),
+      event("task.started", 4_000, { task: "/do/0/validateOrder" }),
+      event("task.completed", 4_200, { task: "/do/0/validateOrder" }),
+      event("task.created", 4_200, { task: "/do/1/chargePayment" }),
+      event("task.started", 6_200, { task: "/do/1/chargePayment" }),
+      event("task.completed", 7_000, { task: "/do/1/chargePayment" }),
+      event("task.completed", 7_000, { task: "/do" }),
+      event("workflow.completed", 7_000),
+    ];
+
+    const model = buildTimeline(events, "COMPLETED", root, T0 + 60_000);
+    const validate = model.rows.find((row) => row.label === "validateOrder");
+    const charge = model.rows.find((row) => row.label === "chargePayment");
+    const flow = model.rows.find((row) => row.pointer === "/do");
+
+    // Inline: created and started at the same instant, no wait drawn, a known zero wait.
+    expect(validate?.segments.map((segment) => segment.kind)).toEqual(["ran"]);
+    expect(validate?.waitedToStart).toBe(0);
+    // Queued: the 2 s wait stays visible after the task ran; durations exclude it.
+    expect(charge?.segments).toEqual([
+      { start: T0 + 4_200, end: T0 + 6_200, kind: "scheduled" },
+      { start: T0 + 6_200, end: T0 + 7_000, kind: "ran" },
+    ]);
+    expect(charge?.waitedToStart).toBe(2_000);
+    expect(charge?.start).toBe(T0 + 6_200);
+    expect(charge?.note).toBe("800 ms");
+    // The instance's own wait (workflow.created → workflow.started) is reported with its bounds.
+    expect(flow).toBeUndefined();
+    expect(workflowBounds(events, "COMPLETED", T0 + 60_000)).toMatchObject({ waitedToStart: 4_000, startedAt: T0 + 4_000 });
+    expect(workflowBounds(events.slice(0, 2), "PENDING", T0 + 9_000)).toMatchObject({ waitedToStart: undefined, waitingToStart: true });
+    expect(workflowBounds(events.slice(2), "RUNNING", T0 + 9_000).waitedToStart).toBeUndefined();
+  });
+
+  it("does not invent a wait when the creation event is missing or arrives late", () => {
+    const base = [
+      event("workflow.started", 0),
+      event("task.started", 1_000, { task: "/do/1/chargePayment" }),
+      event("task.completed", 1_500, { task: "/do/1/chargePayment" }),
+    ];
+    const missing = buildTimeline(base, "RUNNING", root, T0 + 3_000).rows.find((row) => row.label === "chargePayment");
+    expect(missing?.waitedToStart).toBeUndefined();
+    expect(missing?.segments.map((segment) => segment.kind)).toEqual(["ran"]);
+
+    // Creation events are relayed separately and often arrive after the start: same result.
+    const late = [...base, event("task.created", 200, { task: "/do/1/chargePayment" })];
+    const arrived = buildTimeline(late, "RUNNING", root, T0 + 3_000).rows.find((row) => row.label === "chargePayment");
+    expect(arrived?.waitedToStart).toBe(800);
+    expect(arrived?.segments.map((segment) => segment.kind)).toEqual(["scheduled", "ran"]);
+
+    // A creation stamped after the start by a skewed clock is a zero wait, never negative.
+    const skewed = [...base, event("task.created", 1_010, { task: "/do/1/chargePayment" })];
+    const clamped = buildTimeline(skewed, "RUNNING", root, T0 + 3_000).rows.filter((row) => row.label === "chargePayment");
+    expect(clamped).toHaveLength(1);
+    expect(clamped[0].segments.every((segment) => segment.end >= segment.start)).toBe(true);
+  });
+
+  it("shows a retry past its planned time as waiting to start, not as backoff", () => {
+    const events = [
+      event("workflow.started", 0),
+      event("task.started", 0, { task: "/do/1/chargePayment" }),
+      event("task.faulted", 1_000, { task: "/do/1/chargePayment", error: { status: 503 } }),
+      event("task.retried", 3_000, { task: "/do/1/chargePayment", retryCount: 1 }),
+    ];
+    const row = buildTimeline(events, "RUNNING", root, T0 + 5_000).rows.find((item) => item.label === "chargePayment");
+    expect(row?.state).toBe("retrying");
+    expect(row?.segments.slice(1)).toEqual([
+      { start: T0 + 1_000, end: T0 + 3_000, kind: "backoff" },
+      { start: T0 + 3_000, end: T0 + 5_000, kind: "scheduled" },
+    ]);
   });
 
   it("keeps a task announced but not started yet as waiting to start", () => {
@@ -163,8 +245,10 @@ do:
       expect(rows).toHaveLength(1);
       expect(rows[0].attempts).toHaveLength(2);
       expect(rows[0].state).toBe("completed");
-      expect(rows[0].segments.map((segment) => segment.kind)).toEqual(["failed", "backoff", "ran"]);
+      expect(rows[0].segments.map((segment) => segment.kind)).toEqual(["failed", "backoff", "scheduled", "ran"]);
+      // The backoff ends at the creation stamped before the planned time; the wait follows it.
       expect(rows[0].segments[1]).toMatchObject({ start: T0 + 2_000, end: T0 + 9_900 });
+      expect(rows[0].segments[2]).toMatchObject({ start: T0 + 9_900, end: T0 + 9_950 });
     }
   });
 
@@ -213,8 +297,12 @@ do:
 
     expect(rows).toHaveLength(1);
     expect(rows[0].attempts.map((attempt) => attempt.outcome)).toEqual(["failed", "failed", "failed"]);
-    expect(rows[0].segments.map((segment) => segment.kind)).toEqual(["failed", "backoff", "failed", "backoff", "failed"]);
-    expect(rows[0].segments[1]).toMatchObject({ start: T0 + 90, end: T0 + 9_554 });
+    expect(rows[0].segments.map((segment) => segment.kind)).toEqual([
+      "scheduled", "failed", "backoff", "scheduled", "failed", "backoff", "scheduled", "failed",
+    ]);
+    // Backoff until the planned retry (4 093), then 5.4 s waiting for a worker to run the attempt.
+    expect(rows[0].segments[2]).toMatchObject({ start: T0 + 90, end: T0 + 4_093 });
+    expect(rows[0].segments[3]).toMatchObject({ start: T0 + 4_093, end: T0 + 9_557 });
   });
 
   it("draws each run of a loop on its own row, the next one waiting to start", () => {

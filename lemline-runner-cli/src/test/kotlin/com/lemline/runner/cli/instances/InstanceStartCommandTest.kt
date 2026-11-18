@@ -7,7 +7,13 @@ import com.lemline.common.json.*
 import com.lemline.common.values.WorkflowName
 import com.lemline.common.values.WorkflowNamespace
 import com.lemline.common.values.WorkflowVersion
-import com.lemline.core.lifecycleevents.LifecycleEventHook
+import com.lemline.common.values.IDV7
+import com.lemline.runner.common.config.DatabaseConfig
+import com.lemline.runner.common.config.DatabaseType
+import com.lemline.runner.common.lifecycle.CreationEventEnqueuer
+import com.lemline.runner.common.lifecycle.CreationEventOutbox
+import io.mockk.coVerifyOrder
+import java.sql.Connection
 import com.lemline.core.states.WorkflowCommand
 import com.lemline.core.workflows.WorkflowCache
 import com.lemline.runner.cli.GlobalMixin
@@ -43,7 +49,16 @@ class InstanceStartCommandTest {
     private lateinit var definitions: Definitions
     private lateinit var definitionRepository: DefinitionRepository
     private lateinit var commandEmitter: CommandEmitter
-    private lateinit var lifecycleHook: LifecycleEventHook
+    private lateinit var creationEventEnqueuer: CreationEventEnqueuer
+    private lateinit var creationEventOutbox: CreationEventOutbox
+    private val creationEventIds = listOf(IDV7.random(), IDV7.random())
+    private val transactionalDb = object : DatabaseConfig {
+        override val dbType: DatabaseType = DatabaseType.H2
+        override suspend fun <R> withConnection(connection: Connection?, block: suspend (Connection) -> R): R =
+            block(connection ?: mockk(relaxed = true))
+        override suspend fun <R> withTransaction(connection: Connection?, block: suspend (Connection) -> R): R =
+            block(connection ?: mockk(relaxed = true))
+    }
     private lateinit var scheduleRepository: ScheduleRepository
 
     private var workflowNamespace = WorkflowNamespace("test")
@@ -113,8 +128,9 @@ class InstanceStartCommandTest {
         commandEmitter = mockk()
         coEvery { commandEmitter.send(any()) } returns Unit
 
-        // Lifecycle hook mock (relaxed - all methods are no-ops)
-        lifecycleHook = mockk(relaxed = true)
+        creationEventEnqueuer = mockk()
+        coEvery { creationEventEnqueuer.enqueueCreation(any(), any()) } returns creationEventIds
+        creationEventOutbox = mockk(relaxed = true)
 
         // Schedule repository mock (relaxed)
         scheduleRepository = mockk(relaxed = true)
@@ -146,7 +162,9 @@ class InstanceStartCommandTest {
         command = InstanceStartCommand().apply {
             this.starter = starter
             this.commandEmitter = this@InstanceStartCommandTest.commandEmitter
-            this.lifecycleHook = this@InstanceStartCommandTest.lifecycleHook
+            this.databaseConfig = this@InstanceStartCommandTest.transactionalDb
+            this.creationEventEnqueuer = this@InstanceStartCommandTest.creationEventEnqueuer
+            this.creationEventOutbox = this@InstanceStartCommandTest.creationEventOutbox
             this.scheduleRepository = this@InstanceStartCommandTest.scheduleRepository
             this.mixin = GlobalMixin()
         }
@@ -194,6 +212,22 @@ class InstanceStartCommandTest {
         sentInstanceMessage.workflowInfo.version shouldBe workflowVersion
 
         return sentInstanceMessage
+    }
+
+    @Test
+    fun `creation events are written with the accepted command, then published at once`() {
+        val before = kotlin.time.Clock.System.now()
+        val sent = executeCommandAndVerify("test", workflowName.toString(), workflowVersion.toString())
+
+        val createdAt = requireNotNull(sent.workflowState.createdAt)
+        (createdAt >= before) shouldBe true
+        coVerifyOrder {
+            // Inside one transaction: the events, then the command (a failed send rolls the events back).
+            creationEventEnqueuer.enqueueCreation(sent, any())
+            commandEmitter.send(sent)
+            // After the commit: publish now, the scheduled relay of any process being the fallback.
+            creationEventOutbox.relayNow(creationEventIds)
+        }
     }
 
     @Test

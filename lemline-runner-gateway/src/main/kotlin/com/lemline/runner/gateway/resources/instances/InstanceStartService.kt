@@ -13,9 +13,10 @@ import com.lemline.common.values.WorkflowInfo
 import com.lemline.common.values.WorkflowName
 import com.lemline.common.values.WorkflowNamespace
 import com.lemline.common.values.WorkflowVersion
-import com.lemline.core.lifecycleevents.LifecycleEventHook
 import com.lemline.gateway.v1.StartInstanceRequest
 import com.lemline.runner.common.config.DatabaseConfig
+import com.lemline.runner.common.lifecycle.CreationEventEnqueuer
+import com.lemline.runner.common.lifecycle.CreationEventOutbox
 import com.lemline.runner.gateway.auth.GatewayAuthorizer
 import com.lemline.runner.gateway.auth.GatewayPrincipal
 import com.lemline.runner.gateway.errors.GatewayBadRequestException
@@ -66,7 +67,13 @@ class InstanceStartService {
     lateinit var gatewayCommandOutbox: GatewayCommandOutbox
 
     @Inject
-    lateinit var lifecycleHook: LifecycleEventHook
+    lateinit var creationEventEnqueuer: CreationEventEnqueuer
+
+    @Inject
+    lateinit var creationEventOutbox: CreationEventOutbox
+
+    /** Clock used for the acceptance (creation) time of started instances. */
+    var clock: Clock = Clock.System
 
     @Inject
     lateinit var authorizer: GatewayAuthorizer
@@ -105,13 +112,18 @@ class InstanceStartService {
             ?: error("Prepared workflow must contain workflow info")
 
         var newCommandId: IDV7? = null
+        var creationEvents: List<IDV7> = emptyList()
         var nextRunAt = preparedWorkflow.scheduleModel?.outboxScheduledFor
         val existingResult = databaseConfig.withTransaction { conn ->
-            val outboxResult = preparedWorkflow.instanceMessage?.let { message ->
+            val outboxResult = preparedWorkflow.instanceMessage?.let { prepared ->
+                // Acceptance time, read just before the accepting insert: it is the instance's
+                // workflow.created time and the initial /do task.created time.
+                val acceptedAt = clock.now()
+                val message = prepared.copy(workflowState = prepared.workflowState.copy(createdAt = acceptedAt))
                 val outboxEntry = GatewayCommandModel(
                     id = IDV7.random(),
                     instanceMessage = message,
-                    outboxScheduledFor = Clock.System.now(),
+                    outboxScheduledFor = acceptedAt,
                 )
                 insertOrDetectConflict(
                     inserted = gatewayCommandRepository.insert(outboxEntry, conn),
@@ -119,7 +131,13 @@ class InstanceStartService {
                     workflowInfo = resolvedWorkflowInfo,
                     workflowInput = workflowInput,
                     loadExisting = { gatewayCommandRepository.findByWorkflowId(instanceId) },
-                ).also { if (it == null) newCommandId = outboxEntry.id }
+                ).also {
+                    if (it == null) {
+                        newCommandId = outboxEntry.id
+                        // Same transaction as the command: both exist, or neither does.
+                        creationEvents = creationEventEnqueuer.enqueueCreation(message, conn)
+                    }
+                }
             }
 
             outboxResult ?: preparedWorkflow.scheduleModel?.let { scheduleModel ->
@@ -136,7 +154,8 @@ class InstanceStartService {
         }
 
         val outcome = existingResult ?: run {
-            preparedWorkflow.onWorkflowCreated(lifecycleHook)
+            // Both relays run independently: neither waits for the other's channel.
+            creationEventOutbox.processNow(creationEvents)
             newCommandId?.let { gatewayCommandOutbox.processNow(it) }
             // Loud first-contact signal: WARN + counter when the namespace shows no runner activity
             namespaceActivityMonitor.onInstanceAccepted(resolvedWorkflowInfo.namespace.toString())

@@ -23,6 +23,7 @@ All tables are prefixed with `lemline_` and created via Flyway migrations.
 | `lemline_failures`      | Permanent failure audit log     | Direct storage   | **Never**      |
 | `lemline_forks`         | Fork (parallel branch) metadata | Pessimistic lock | Auto cleanup   |
 | `lemline_fork_branches` | Individual branch status        | Part of fork     | Cascade delete |
+| `lemline_creation_event_outbox` | Durable creation lifecycle events (`workflow.created`, initial and fork-branch `task.created`) | Outbox | Auto cleanup |
 
 ---
 
@@ -229,6 +230,17 @@ Parent reaches RunWorkflow → RunWorkflowStarted event
 | **Cooperative** (`false`) | All branches complete  | JSON array of all outputs | First branch fails |
 
 ---
+
+## `lemline_creation_event_outbox`
+
+Creation lifecycle events written in the transaction that accepts a command: gateway, CLI,
+event-triggered, child-workflow, and schedule-occurrence starts (`workflow.created` and the
+initial `/do` `task.created`), plus production fork branches (`task.created`). Each row holds
+one fully serialized CloudEvent. Its primary key is the deterministic CloudEvent ID, so
+duplicate enqueues are ignored. `CreationEventOutbox` publishes rows and waits for the broker's
+acknowledgment, retrying on failure. It runs even where scheduled jobs are disabled, and only
+when the lifecycle events producer is enabled. Configuration: `lemline.outbox.creation-events`.
+See [docs/lifecycle-timestamps.md](../../docs/lifecycle-timestamps.md).
 
 ## Outbox Pattern
 

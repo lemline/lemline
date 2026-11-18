@@ -4,7 +4,7 @@ package com.lemline.runner.schedules
 import com.lemline.common.json.*
 import com.lemline.common.values.IDV7
 import com.lemline.common.values.WorkflowId
-import com.lemline.core.lifecycleevents.LifecycleEventHook
+import com.lemline.runner.common.lifecycle.CreationEventEnqueuer
 import com.lemline.core.orchestrator.StepByStepOrchestrator
 import com.lemline.core.random.randomWorkflowInfo
 import com.lemline.core.states.WorkflowCommand
@@ -47,17 +47,18 @@ abstract class ScheduleRecurrenceTestBase {
         }
     }
 
-    private fun outbox(repo: ScheduleRepository = repository(), hook: LifecycleEventHook = mockk(relaxed = true)) =
+    private fun outbox(repo: ScheduleRepository = repository(), enqueuer: CreationEventEnqueuer = mockk(relaxed = true)) =
         ScheduleOutbox().apply {
             ScheduleOutbox::class.java.getDeclaredField("commandEmitter").apply { isAccessible = true }.set(this, emitter)
             ScheduleOutbox::class.java.getDeclaredField("databaseConfig").apply { isAccessible = true }.set(this, database())
             scheduleRepository = repo
-            lifecycleHook = hook
+            creationEventEnqueuer = enqueuer
         }
 
     private fun occurrence(after: Boolean = false, cron: Boolean = false) = ScheduleModel(
         id = IDV7.random(),
-        instanceMessage = InstanceMessage(randomWorkflowInfo(), StepByStepOrchestrator.initCmd()),
+        // Registered, not yet accepted: no creation time until due.
+        instanceMessage = InstanceMessage(randomWorkflowInfo(), StepByStepOrchestrator.initCmd().copy(createdAt = null)),
         outboxScheduledFor = Instant.fromEpochMilliseconds(Clock.System.now().toEpochMilliseconds()) - 10.minutes,
         scheduleAfter = if (after) "PT1M" else null,
         scheduleEvery = if (!after && !cron) "PT1M" else null,
@@ -125,6 +126,59 @@ abstract class ScheduleRecurrenceTestBase {
         }
     }
 
+    private fun capturingEnqueuer(into: MutableList<InstanceMessage<WorkflowCommand.ResumeFromTask>>) =
+        mockk<CreationEventEnqueuer>().also {
+            coEvery { it.enqueueCreation(capture(into), any()) } returns emptyList()
+        }
+
+    private fun assertAcceptedAsSent(created: InstanceMessage<WorkflowCommand.ResumeFromTask>) {
+        val sentCommand = sent.last().first.workflowState as WorkflowCommand.ResumeFromTask
+        assertNotNull(created.workflowState.createdAt)
+        assertEquals(sentCommand.createdAt, created.workflowState.createdAt)
+        assertEquals(sentCommand.workflowId, created.workflowState.workflowId)
+    }
+
+    @Test
+    fun `every occurrence gets its own creation events with the time its command carries`() = runTest {
+        val first = occurrence()
+        repository().insert(first)
+        val created = mutableListOf<InstanceMessage<WorkflowCommand.ResumeFromTask>>()
+        tick(outbox(enqueuer = capturingEnqueuer(created)))
+        assertEquals(1, created.size)
+        assertAcceptedAsSent(created.single())
+
+        // The successor is registered unaccepted, then accepted when due.
+        val next = repository().findById(first.nextOccurrenceId)!!
+        assertEquals(false, next.isAccepted)
+        next.outboxDelayedUntil = Clock.System.now() - 1.seconds
+        repository().update(next)
+        tick(outbox(enqueuer = capturingEnqueuer(created)))
+        assertEquals(2, created.size)
+        assertAcceptedAsSent(created.last())
+        assertNotEquals(created[0].workflowState.workflowId, created[1].workflowState.workflowId)
+    }
+
+    @Test
+    fun `after occurrence is accepted only once due, after the previous run completed`() = runTest {
+        val first = occurrence(after = true)
+        repository().insert(first)
+        val created = mutableListOf<InstanceMessage<WorkflowCommand.ResumeFromTask>>()
+        tick(outbox(enqueuer = capturingEnqueuer(created)))
+        assertEquals(1, created.size)
+        assertAcceptedAsSent(created.single())
+
+        val service = ScheduleService().apply { scheduleRepository = repository() }
+        val published = repository().findById(first.id)!!
+        database().withTransaction { conn -> assertTrue(service.scheduleAfterCompletion(published.workflowId, conn)) }
+        val next = repository().findById(first.nextOccurrenceId)!!
+        assertEquals(false, next.isAccepted)
+        next.outboxDelayedUntil = Clock.System.now() - 1.seconds
+        repository().update(next)
+        tick(outbox(enqueuer = capturingEnqueuer(created)))
+        assertEquals(2, created.size)
+        assertAcceptedAsSent(created.last())
+    }
+
     @Test
     fun `every creates a distinct row for each occurrence`() = runTest { assertRecurrence(false) }
 
@@ -159,11 +213,11 @@ abstract class ScheduleRecurrenceTestBase {
         val first = occurrence()
         repository().insert(first)
         var failHook = true
-        val hook = mockk<LifecycleEventHook>()
-        coEvery { hook.onWorkflowCreated(any(), any()) } answers {
-            if (failHook) error("Simulated lifecycle failure")
+        val enqueuer = mockk<CreationEventEnqueuer>()
+        coEvery { enqueuer.enqueueCreation(any(), any()) } answers {
+            if (failHook) error("Simulated lifecycle failure") else emptyList()
         }
-        val box = outbox(hook = hook)
+        val box = outbox(enqueuer = enqueuer)
         tick(box)
         assertEquals(1, repository().countAll())
         val pending = repository().findById(first.id)!!

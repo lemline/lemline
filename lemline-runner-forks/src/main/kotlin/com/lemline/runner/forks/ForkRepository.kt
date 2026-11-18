@@ -143,7 +143,9 @@ class ForkRepository : CrudRepository<ForkModel>(),
      */
     suspend fun insertForkWithBranches(
         fork: ForkModel,
-        branches: List<ForkBranchModel>
+        branches: List<ForkBranchModel>,
+        /** Runs in the same transaction, only when the fork row is new (e.g. to enqueue lifecycle events). */
+        onInserted: suspend (Connection) -> Unit = {},
     ): Int = databaseConfig.withTransaction { conn ->
         // 1. Insert fork metadata (idempotent via base Repository)
         val forkRowsInserted = insert(fork, conn)
@@ -152,6 +154,8 @@ class ForkRepository : CrudRepository<ForkModel>(),
         if (branches.isNotEmpty()) {
             forkBranchRepository.insert(branches, conn)
         }
+
+        if (forkRowsInserted > 0) onInserted(conn)
 
         log.debug { "Inserted fork ${fork.id} at ${fork.position} with ${branches.size} branches" }
 

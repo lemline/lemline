@@ -30,6 +30,7 @@ dependencies {
     testImplementation(libs.mockk)
     testImplementation(testFixtures(project(":lemline-runner-parents")))
     testImplementation(testFixtures(project(":lemline-runner-common")))
+    testImplementation(libs.serverlessworkflow.api)
 
     // Test Fixtures
     testFixturesImplementation(libs.bundles.kotlinxEcosystem)

@@ -48,13 +48,14 @@ class CloudEventLifecycleHook(
     override suspend fun onWorkflowCreated(
         workflowInfo: WorkflowInfo,
         nodeStack: NodeStack,
+        createdAt: Instant,
     ) {
         val rootState = nodeStack.rootState
 
         val data = LifecycleEventData.WorkflowCreatedData(
             name = workflowInfo.qualifiedName,
             input = rootState.workflowInput,
-            createdAt = rootState.startedAt,
+            createdAt = createdAt,
             definition = WorkflowDefinitionData.from(workflowInfo),
         )
 
@@ -64,7 +65,7 @@ class CloudEventLifecycleHook(
             workflowId = rootState.workflowId,
             nodeStack = nodeStack,
             data = data,
-            timestamp = rootState.startedAt,
+            timestamp = createdAt,
             idSuffix = "workflow-created",
         )
 

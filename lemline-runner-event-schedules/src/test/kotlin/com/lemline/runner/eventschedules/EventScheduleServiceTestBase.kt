@@ -7,7 +7,10 @@ import com.lemline.common.json.*
 import com.lemline.common.values.IDV7
 import com.lemline.common.values.WorkflowId
 import com.lemline.common.values.WorkflowNamespace
-import com.lemline.core.lifecycleevents.LifecycleEventHook
+import com.lemline.core.lifecycleevents.LifecycleEventType
+import com.lemline.runner.common.lifecycle.CreationEventEnqueuer
+import com.lemline.runner.common.lifecycle.LifecycleEventPublisher
+import com.lemline.runner.common.lifecycle.CreationEventRepository
 import com.lemline.core.states.WorkflowCommand
 import com.lemline.core.workflows.WorkflowCache
 import com.lemline.runner.common.config.DatabaseConfig
@@ -49,11 +52,19 @@ abstract class EventScheduleServiceTestBase {
         databaseConfig = db
         namespaceScope = object : NamespaceScope { override val configured = setOf(namespace.toString()) }
     }
+    private val creationEventRepository get() = CreationEventRepository().apply { databaseConfig = db }
     private fun service(repo: EventScheduleRepository = repository, definitionRepo: DefinitionRepository = definitions) = EventScheduleService().apply {
         databaseConfig = db
         definitions = definitionRepo
         repository = repo
         definitionListenService = DefinitionListenService()
+        creationEventEnqueuer = CreationEventEnqueuer().also {
+            it.repository = creationEventRepository
+            it.publisher = object : LifecycleEventPublisher {
+                override val enabled = true
+                override suspend fun publish(payload: String) = Unit
+            }
+        }
     }
 
     @BeforeEach
@@ -735,12 +746,14 @@ abstract class EventScheduleServiceTestBase {
                 check(brokerAvailable) { "broker down" }
             }
         }
-        val hook = mockk<LifecycleEventHook>(relaxed = true)
+        // Creation events were written when the event was accepted, before any dispatch attempt.
+        val created = creationEventRepository.findByWorkflowId(original.workflowId)
+        created.map { it.eventType }.toSet() shouldBe setOf(LifecycleEventType.WORKFLOW_CREATED.type, LifecycleEventType.TASK_CREATED.type)
+        created.forEach { it.eventTime shouldBe original.instanceMessage.workflowState.createdAt!!.atMicros() }
         val outbox = EventScheduleOutbox().apply {
             databaseConfig = db
             repository = this@EventScheduleServiceTestBase.repository
             commandEmitter = emitter
-            lifecycleHook = hook
         }
         outbox.processEntities(100, 3, 0.seconds)
         repository.findById(original.id)!!.outboxAttemptCount shouldBe 1
@@ -751,7 +764,8 @@ abstract class EventScheduleServiceTestBase {
         outbox.processEntities(100, 3, 0.seconds)
         sentIds shouldBe listOf(original.id, original.id)
         sentMessages shouldBe listOf(original.instanceMessage, original.instanceMessage)
-        coVerify(exactly = 1) { hook.onWorkflowCreated(any(), any()) }
+        // Dispatch retries never add or alter creation events.
+        creationEventRepository.findByWorkflowId(original.workflowId) shouldBe created
         repository.deleteById(original.id) shouldBe 1
         service().handleCloudEvent(event, namespace) shouldBe 0
         starts().size shouldBe 0
@@ -772,3 +786,6 @@ abstract class EventScheduleServiceTestBase {
         starts().size shouldBe 0
     }
 }
+
+private fun kotlin.time.Instant.atMicros() =
+    kotlin.time.Instant.fromEpochSeconds(epochSeconds, nanosecondsOfSecond / 1_000 * 1_000)

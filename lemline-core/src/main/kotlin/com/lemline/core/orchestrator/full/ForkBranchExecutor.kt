@@ -42,12 +42,13 @@ internal object ForkBranchExecutor {
         resumeFn: suspend (Workflow, WorkflowCommand, Boolean, ActivityExecutor, FunctionResolver, CloudEventHook, LifecycleEventHook) -> WorkflowEvent.Outcome
     ): JsonNode {
         return branches.mapAwaitFirstFailSlow { branchNode ->
+            val createdAt = Clock.System.now()
             lifecycleHook.onTaskCreated(
                 workflowInfo = workflow.info,
                 nodeStack = nodeStack,
                 nodePosition = branchNode.position,
                 input = rawInput,
-                createdAt = Clock.System.now(),
+                createdAt = createdAt,
             )
 
             resumeFn(
@@ -56,7 +57,8 @@ internal object ForkBranchExecutor {
                     nodeStack = nodeStack,
                     nodePosition = branchNode.position,
                     rawInput = rawInput,
-                    flowDirective = null
+                    flowDirective = null,
+                    createdAt = createdAt,
                 ),
                 serde,
                 activityExecutor,
@@ -87,12 +89,13 @@ internal object ForkBranchExecutor {
     ): ArrayNode {
         return ArrayNode(
             branches.mapAwaitAllFailFast { branchNode ->
+                val createdAt = Clock.System.now()
                 lifecycleHook.onTaskCreated(
                     workflowInfo = workflow.info,
                     nodeStack = nodeStack,
                     nodePosition = branchNode.position,
                     input = rawInput,
-                    createdAt = Clock.System.now(),
+                    createdAt = createdAt,
                 )
 
                 resumeFn(
@@ -101,7 +104,8 @@ internal object ForkBranchExecutor {
                         nodeStack = nodeStack,
                         nodePosition = branchNode.position,
                         rawInput = rawInput,
-                        flowDirective = null
+                        flowDirective = null,
+                        createdAt = createdAt,
                     ),
                     serde,
                     activityExecutor,

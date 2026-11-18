@@ -66,12 +66,18 @@ object StepByStepOrchestrator {
 
     /**
      * Provides a `WorkflowCommand` starting a workflow.
+     *
+     * @param startedAt the instance's `$workflow.startedAt` (RootState); its meaning is unchanged.
+     * @param createdAt when the initial command becomes eligible for dispatch, i.e. the
+     *        `workflow.created` and `/do` `task.created` time. Defaults to [startedAt]; an
+     *        accepting path that persists the command overrides it with its acceptance time.
      */
     fun initCmd(
         workflowId: WorkflowId = WorkflowId.random(),
         workflowInput: JsonNode = buildJsonObject { },
         hasWaitingParent: Boolean = false,
         startedAt: Instant = Clock.System.now(),
+        createdAt: Instant = startedAt,
     ): WorkflowCommand.ResumeFromTask {
         val rootState = RootState(
             startedAt = startedAt,
@@ -86,7 +92,27 @@ object StepByStepOrchestrator {
             rawInput = workflowInput,
             nodeStack = nodeStack,
             flowDirective = null,
+            createdAt = createdAt,
         )
+    }
+
+    /**
+     * Emits `workflow.created` and the initial `/do` `task.created` of an initial command.
+     *
+     * Both carry [WorkflowCommand.ResumeFromTask.createdAt], and both are built from the initial
+     * node stack, so their deterministic event IDs are the ones a worker would derive. Accepting
+     * paths call this (through a capturing hook) to persist the events atomically with the
+     * command; workers no longer emit the `/do` `task.created` when they enter it.
+     */
+    suspend fun emitCreationEvents(
+        workflowInfo: WorkflowInfo,
+        command: WorkflowCommand.ResumeFromTask,
+        lifecycleHook: LifecycleEventHook,
+    ) {
+        require(command.nodePosition == NodePosition.doRoot) { "Not an initial command: ${command.nodePosition}" }
+        val createdAt = requireNotNull(command.createdAt) { "Initial command has no creation time" }
+        lifecycleHook.onWorkflowCreated(workflowInfo, command.nodeStack, createdAt)
+        lifecycleHook.onTaskCreated(workflowInfo, command.nodeStack, command.nodePosition, command.rawInput, createdAt)
     }
 
     /**
@@ -140,6 +166,7 @@ object StepByStepOrchestrator {
                     extensionReturn = command.extensionReturn,
                     workflowInfo = workflowInfo,
                     lifecycleHook = lifecycleHook,
+                    commandCreatedAt = command.createdAt,
                 )
 
                 is WorkflowCommand.ResumeWithCompletedTask -> resumeFromCompletedTask(
@@ -185,7 +212,8 @@ object StepByStepOrchestrator {
      * Event mapping:
      * - [WorkflowCompleted] → workflow.completed
      * - [WorkflowFaulted] → workflow.faulted
-     * - [TaskScheduled] → task.created (only when scheduling a child, not returning to parent)
+     * - [TaskScheduled] → task.created (only when scheduling a child, not returning to parent),
+     *   stamped with [TaskScheduled.createdAt], the same instant its command carries
      */
     private suspend fun emitLifecycleEventsForEvent(
         workflowEvent: WorkflowEvent,
@@ -232,7 +260,9 @@ object StepByStepOrchestrator {
                         nodeStack = workflowEvent.nodeStack,
                         nodePosition = workflowEvent.nodePosition,
                         input = workflowEvent.rawInput,
-                        createdAt = Clock.System.now()
+                        // Processors stamp createdAt; a null value can only come from an event
+                        // built by an older runtime, and this transition is happening now.
+                        createdAt = workflowEvent.createdAt ?: Clock.System.now(),
                     )
                 }
             }
@@ -328,6 +358,7 @@ object StepByStepOrchestrator {
         extensionReturn: ExtensionReturn? = null,
         workflowInfo: WorkflowInfo,
         lifecycleHook: LifecycleEventHook,
+        commandCreatedAt: Instant? = null,
     ): WorkflowEvent = resumeWithHandler(
         nodeStack = nodeStack,
         node = node,
@@ -337,7 +368,7 @@ object StepByStepOrchestrator {
         workflowInfo = workflowInfo,
         lifecycleHook = lifecycleHook
     ) {
-        startTask(nodeStack, node, rawInput, flowDirective, workflowInfo, lifecycleHook, extensionReturn)
+        startTask(nodeStack, node, rawInput, flowDirective, workflowInfo, lifecycleHook, extensionReturn, commandCreatedAt)
     }
 
     /**
@@ -486,13 +517,14 @@ object StepByStepOrchestrator {
         workflowInfo: WorkflowInfo,
         lifecycleHook: LifecycleEventHook,
         extensionReturn: ExtensionReturn? = null,
+        commandCreatedAt: Instant? = null,
     ): WorkflowEvent {
         val isFirstEntry = nodeStack[node.position] == null
 
         require(!isFirstEntry || extensionReturn == null) { "Extension return has no owner frame at ${node.position}" }
-        // Emit entry events (workflow.started, task.created, task.started)
+        // Emit entry events (workflow.started, task.started)
         if (isFirstEntry) {
-            emitTaskEntryEvents(nodeStack, node, rawInput, workflowInfo, lifecycleHook)
+            emitTaskEntryEvents(nodeStack, node, rawInput, workflowInfo, lifecycleHook, commandCreatedAt)
         }
 
         // Execute the task
@@ -510,8 +542,14 @@ object StepByStepOrchestrator {
      *
      * Events emitted:
      * - `workflow.started` when entering `/do` (first task after root)
-     * - `task.created` for `/do` (since it's not scheduled via TaskScheduled)
      * - `task.started` for all tasks
+     *
+     * The `/do` `task.created` is not emitted here: the accepting path persists it with the
+     * initial command ([emitCreationEvents]), so it is observable before any worker runs. Only an
+     * initial command written by an older runtime (no [commandCreatedAt]) still gets it here, so
+     * its instance keeps a complete event set. It is then stamped with `RootState.startedAt`,
+     * the very value older runtimes used for `workflow.created`, never with the worker clock:
+     * that would fabricate a zero wait.
      */
     private suspend fun emitTaskEntryEvents(
         nodeStack: NodeStack,
@@ -519,6 +557,7 @@ object StepByStepOrchestrator {
         rawInput: JsonNode,
         workflowInfo: WorkflowInfo,
         lifecycleHook: LifecycleEventHook,
+        commandCreatedAt: Instant?,
     ) {
         val now = Clock.System.now()
 
@@ -529,15 +568,15 @@ object StepByStepOrchestrator {
                 nodeStack = nodeStack,
                 startedAt = now,
             )
-            // Also emit task.created for /do since it's the first task
-            // (not scheduled via TaskScheduled event)
-            lifecycleHook.onTaskCreated(
-                workflowInfo = workflowInfo,
-                nodeStack = nodeStack,
-                nodePosition = node.position,
-                input = rawInput,
-                createdAt = now,
-            )
+            if (commandCreatedAt == null) {
+                lifecycleHook.onTaskCreated(
+                    workflowInfo = workflowInfo,
+                    nodeStack = nodeStack,
+                    nodePosition = node.position,
+                    input = rawInput,
+                    createdAt = nodeStack.rootState.startedAt,
+                )
+            }
         }
 
         // Emit task.started for all nodes (including /do)

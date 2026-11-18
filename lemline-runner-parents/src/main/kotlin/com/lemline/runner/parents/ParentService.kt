@@ -6,9 +6,10 @@ import com.lemline.common.json.*
 import com.lemline.common.logger.logger
 import com.lemline.common.values.WorkflowId
 import com.lemline.core.errors.InternalException
-import com.lemline.core.lifecycleevents.LifecycleEventHook
 import com.lemline.core.states.WorkflowEvent
 import com.lemline.runner.common.config.DatabaseConfig
+import com.lemline.runner.common.lifecycle.CreationEventEnqueuer
+import com.lemline.runner.common.lifecycle.CreationEventOutbox
 import com.lemline.runner.common.messaging.CommandEmitter
 import com.lemline.runner.common.messaging.InstanceMessage
 import com.lemline.runner.schedules.ScheduleRepository
@@ -44,7 +45,13 @@ class ParentService {
     lateinit var databaseConfig: DatabaseConfig
 
     @Inject
-    lateinit var lifecycleHook: LifecycleEventHook
+    lateinit var creationEventEnqueuer: CreationEventEnqueuer
+
+    @Inject
+    lateinit var creationEventOutbox: CreationEventOutbox
+
+    /** Clock used for the child's acceptance (creation) time. */
+    var clock: Clock = Clock.System
 
     private val logger = logger()
 
@@ -62,7 +69,7 @@ class ParentService {
         // Derive parent model
         val parent = ParentModel(instanceMessage = instance)
 
-        return databaseConfig.withTransaction { conn ->
+        val creationEvents = databaseConfig.withTransaction { conn ->
 
             // Insert parent with child_id
             val rowsInserted = parentRepository.insert(
@@ -71,10 +78,10 @@ class ParentService {
             )
             if (rowsInserted == 0) {
                 logger.warn { "Parent model already exists (idempotent insert): $parent" }
-                return@withTransaction
+                return@withTransaction emptyList()
             }
 
-            // Create the child + optional schedule
+            // Create the child + optional schedule, accepted in this transaction
             val preparedWorkflow = starter.prepareWorkflow(
                 workflowId = parent.childId,
                 workflowNamespace = instance.workflowState.config.namespace,
@@ -83,19 +90,21 @@ class ParentService {
                 workflowInput = instance.workflowState.config.input,
                 hasWaitingParent = instance.workflowState.config.sync, // <= true only for sync child
                 zoneId = null
-            ) { error(it) }
+            ) { error(it) }.withCreatedAt(clock.now())
 
             // Insert schedule if present
             preparedWorkflow.scheduleModel?.let { scheduleRepository.insert(it, conn) }
 
-            // Emit child to the workflow channel with idempotent message ID
             preparedWorkflow.instanceMessage?.let { child ->
+                // Creation events commit with the parent row: a redelivered RunWorkflowStarted
+                // finds the parent and re-enqueues nothing.
+                val ids = creationEventEnqueuer.enqueueCreation(child, conn)
+                // Emit child to the workflow channel with idempotent message ID
                 commandEmitter.send(child, parent.childId.value)
-
-                // Emit workflow.created lifecycle event for the child workflow
-                preparedWorkflow.onWorkflowCreated(lifecycleHook)
-            }
+                ids
+            } ?: emptyList()
         }
+        creationEventOutbox.processNow(creationEvents)
     }
 
     /**

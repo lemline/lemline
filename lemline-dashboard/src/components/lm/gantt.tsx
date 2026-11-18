@@ -215,6 +215,14 @@ function TaskDrawer({ row, t0, nowMs, onClose }: { row: StepRow; t0: number; now
               <dd className="m-0 tabular-nums">+{formatSpan(Math.max(0, row.start - t0))} after the instance started</dd>
               <dt className="text-lm-muted">Duration</dt>
               <dd className="m-0 tabular-nums">{duration}</dd>
+              <dt className="text-lm-muted">Waited to start</dt>
+              <dd className="m-0 tabular-nums">
+                {row.waitedToStart !== undefined
+                  ? formatSpan(row.waitedToStart)
+                  : row.state === "scheduled"
+                    ? "Still waiting"
+                    : "Not recorded"}
+              </dd>
             </dl>
             {row.attempts.length > 1 && (
               <section className="flex flex-col gap-2.5">

@@ -51,17 +51,32 @@ sealed class WorkflowCommand : WorkflowState() {
         val rawInput: JsonNode,
         val flowDirective: FlowDirective? = null,
         val extensionReturn: ExtensionReturn? = null,
+        /**
+         * When this command became eligible for execution: the `task.created` time of the task
+         * it starts (the workflow creation time for an initial `/do` command), or the planned
+         * `retryAt` of a retry attempt. Frozen when the command is built and carried unchanged
+         * through serialization, persistence, publication retries and redelivery.
+         *
+         * `null` only for commands written before this field existed: it means "unknown",
+         * never "now" (see docs/lifecycle-timestamps.md).
+         */
+        val createdAt: Instant? = null,
     ) : WorkflowCommand() {
 
         override fun toString() = "${this::class.simpleName}(" +
             "nodePosition=$nodePosition" +
             ", rawInput=$rawInput" +
             ", flowDirective=$flowDirective" +
+            ", createdAt=$createdAt" +
             ", stack=$nodeStack" +
             ")"
 
-        fun duplicate(workflowId: WorkflowId, startedAt: Instant): ResumeFromTask {
-            return copy(nodeStack = nodeStack.duplicate(workflowId = workflowId, startedAt = startedAt))
+        /** A new instance of the same workflow, created at [createdAt] (unchanged when null). */
+        fun duplicate(workflowId: WorkflowId, startedAt: Instant, createdAt: Instant? = this.createdAt): ResumeFromTask {
+            return copy(
+                nodeStack = nodeStack.duplicate(workflowId = workflowId, startedAt = startedAt),
+                createdAt = createdAt,
+            )
         }
     }
 
@@ -271,12 +286,20 @@ sealed class WorkflowEvent : WorkflowState() {
         val rawInput: JsonNode,
         val flowDirective: FlowDirective?,
         val extensionReturn: ExtensionReturn? = null,
+        /**
+         * When the scheduled task became eligible for execution (the transition that produced
+         * this event). It is the `task.created` time of a new task, and it is carried to the
+         * resulting command. Processors stamp it when they build the event; `null` only for
+         * events written before this field existed.
+         */
+        val createdAt: Instant? = null,
     ) : Suspension() {
 
         override fun toString() = "${this::class.simpleName}(" +
             "nodePosition=$nodePosition" +
             ", rawInput=$rawInput" +
             ", flowDirective=$flowDirective" +
+            ", createdAt=$createdAt" +
             ", stack=$nodeStack" +
             ")"
 
@@ -286,6 +309,7 @@ sealed class WorkflowEvent : WorkflowState() {
             rawInput = rawInput,
             flowDirective = flowDirective,
             extensionReturn = extensionReturn,
+            createdAt = createdAt,
         )
     }
 
@@ -332,11 +356,17 @@ sealed class WorkflowEvent : WorkflowState() {
             ", stack=$nodeStack" +
             ")"
 
+        /**
+         * The retry attempt becomes eligible at [retryAt]: the time before it is intentional
+         * backoff, the time after it is waiting for execution. No new `task.created` is emitted
+         * for a retry attempt; `task.retried` (stamped with [retryAt]) is its boundary.
+         */
         fun resume() = WorkflowCommand.ResumeFromTask(
             nodeStack = nodeStack,
             nodePosition = nodePosition,
             rawInput = rawInput,
             flowDirective = flowDirective,
+            createdAt = retryAt,
         )
     }
 

@@ -60,6 +60,8 @@ dependencies {
     testImplementation(testFixtures(project(":lemline-runner-common")))
     testImplementation(testFixtures(project(":lemline-common")))
     testImplementation(testFixtures(project(":lemline-core")))
+    testImplementation(libs.cloudevents.core)
+    testImplementation(libs.cloudevents.json.jackson)
 }
 
 val compileKotlin: KotlinCompile by tasks

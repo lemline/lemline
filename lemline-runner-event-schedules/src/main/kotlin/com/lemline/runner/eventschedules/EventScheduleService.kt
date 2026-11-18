@@ -10,12 +10,14 @@ import com.lemline.core.schemas.SchemaValidator
 import com.lemline.core.workflows.WorkflowCache
 import com.lemline.runner.listeners.DefinitionListenService
 import com.lemline.runner.common.config.DatabaseConfig
+import com.lemline.runner.common.lifecycle.CreationEventEnqueuer
 import com.lemline.runner.common.messaging.InstanceMessage
 import com.lemline.runner.definitions.DefinitionRepository
 import io.cloudevents.CloudEvent
 import io.serverlessworkflow.api.types.ListenTaskConfiguration.ListenAndReadAs
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
+import kotlin.time.Clock
 
 @ApplicationScoped
 class EventScheduleService {
@@ -24,6 +26,10 @@ class EventScheduleService {
     @Inject lateinit var definitions: DefinitionRepository
     @Inject lateinit var definitionListenService: DefinitionListenService
     @Inject lateinit var repository: EventScheduleRepository
+    @Inject lateinit var creationEventEnqueuer: CreationEventEnqueuer
+
+    /** Clock used for the acceptance (creation) time of event-triggered instances. */
+    var clock: Clock = Clock.System
 
     suspend fun handleCloudEvent(event: CloudEvent, namespace: WorkflowNamespace): Int {
         var started = 0
@@ -42,7 +48,7 @@ class EventScheduleService {
                 // otherwise a redelivery could contribute to the next collection after rearming.
                 if (!consumed.matched) return@withTransaction 0
                 repository.recordEvent(stateId, event, conn)
-                var accepted = 0
+                var acceptedCount = 0
                 for (input in consumed.inputs) {
                     try {
                         workflow.input?.schema?.let { SchemaValidator.validate(input, it) }
@@ -52,15 +58,18 @@ class EventScheduleService {
                         logger.warn { "Rejected event schedule input for ${workflow.info}: ${e.message}" }
                         continue
                     }
-                    repository.insert(
-                        EventScheduleModel(instanceMessage = InstanceMessage(
-                            workflowInfo = workflow.info,
-                            workflowState = StepByStepOrchestrator.initCmd(WorkflowId.random(), input, false),
-                        )), conn
-                    )
-                    accepted++
+                    // Accepted now, in this transaction: the command and its creation events
+                    // (workflow.created, /do task.created) commit together.
+                    val start = EventScheduleModel(instanceMessage = InstanceMessage(
+                        workflowInfo = workflow.info,
+                        workflowState = StepByStepOrchestrator.initCmd(WorkflowId.random(), input, false, createdAt = clock.now()),
+                    ))
+                    if (repository.insert(start, conn) > 0) {
+                        creationEventEnqueuer.enqueueCreation(start.instanceMessage, conn)
+                    }
+                    acceptedCount++
                 }
-                accepted
+                acceptedCount
             }
         }
         return started

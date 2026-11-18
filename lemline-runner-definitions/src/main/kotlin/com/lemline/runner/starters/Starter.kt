@@ -8,7 +8,6 @@ import com.lemline.common.values.WorkflowInfo
 import com.lemline.common.values.WorkflowName
 import com.lemline.common.values.WorkflowNamespace
 import com.lemline.common.values.WorkflowVersion
-import com.lemline.core.lifecycleevents.LifecycleEventHook
 import com.lemline.core.orchestrator.StepByStepOrchestrator
 import com.lemline.core.schemas.SchemaValidator
 import com.lemline.runner.common.messaging.InstanceMessage
@@ -27,7 +26,7 @@ class Starter : WorkflowStarter<ScheduleModel> {
     lateinit var definitions: Definitions
 
     /**
-     * Returns [PreparedWorkflow] containing the instance message, schedule model, and lifecycle hook lambda.
+     * Returns [PreparedWorkflow] containing the instance message and schedule model.
      *
      * Depending on the schedule of the workflow, different messages are needed:
      *      - no schedule -> a single instanceMessage
@@ -35,8 +34,7 @@ class Starter : WorkflowStarter<ScheduleModel> {
      *      - schedule cron -> a single scheduleOutboxModel
      *      For the two last cases, we sent an IngestionMessage (first database ingestion, then only after starting the instance)
      *
-     * The [PreparedWorkflow.onWorkflowCreated] lambda should be called by the caller after successfully
-     * sending the message to emit the workflow.created lifecycle event.
+     * The caller enqueues the creation lifecycle events when it accepts the instance message.
      */
     override suspend fun prepareWorkflow(
         workflowId: WorkflowId,
@@ -85,17 +83,7 @@ class Starter : WorkflowStarter<ScheduleModel> {
             )
         }
 
-        // Create the lambda to trigger the workflow.created lifecycle event
-        // Caller invokes this after successfully sending the message
-        // Note: For cron-scheduled workflows (no instanceMessage), the lambda is a no-op
-        val workflowInfo = WorkflowInfo(workflowNamespace, workflowName, workflowVersion)
-        val onWorkflowCreated: suspend (LifecycleEventHook) -> Unit = { hook ->
-            instanceMessage?.let { msg ->
-                hook.onWorkflowCreated(workflowInfo, msg.workflowState.nodeStack)
-            }
-        }
-
-        return PreparedWorkflow(instanceMessage, scheduleModel, onWorkflowCreated)
+        return PreparedWorkflow(instanceMessage, scheduleModel)
     }
 
     private fun validateInput(

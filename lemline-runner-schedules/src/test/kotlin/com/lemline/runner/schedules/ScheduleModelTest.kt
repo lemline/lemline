@@ -60,6 +60,29 @@ class ScheduleModelTest {
     }
 
     @Test
+    fun `acceptance freezes the creation time once, distinct from registration and deadline`() {
+        val deadline = Instant.parse("2023-01-01T00:00:00Z")
+        val model = createModel(scheduleCron = "* * * * *", outboxScheduledFor = deadline)
+        model.instanceMessage = model.instanceMessage.copy(workflowState = model.instanceMessage.workflowState.copy(createdAt = null))
+        assertEquals(false, model.isAccepted)
+
+        val acceptedAt = Instant.parse("2023-01-01T00:00:07Z")
+        model.prepareExecution(acceptedAt)
+        val accepted = model.instanceMessage.workflowState
+        assertEquals(acceptedAt, accepted.createdAt)
+        assertEquals(acceptedAt, accepted.nodeStack.rootState.startedAt)
+        assertEquals(deadline, model.outboxScheduledFor)
+
+        // Relay retries never recompute it.
+        model.outboxAttemptCount = 2
+        model.prepareExecution(acceptedAt + kotlin.time.Duration.parse("1h"))
+        assertEquals(accepted, model.instanceMessage.workflowState)
+
+        // The successor is not accepted until it is due.
+        assertEquals(null, model.nextScheduled()!!.instanceMessage.workflowState.createdAt)
+    }
+
+    @Test
     fun `should fail when badly defined`() {
         val model = createModel()
         assertFails { model.nextScheduled() }
