@@ -81,7 +81,9 @@ ORDER BY faulted DESC;
 
 Runners expose Prometheus metrics at `/q/metrics`. They count and time message processing per channel (for example `lemline_messaging_commands_processing_completed_total`, `lemline_messaging_commands_processing_failed_total` and `lemline_messaging_commands_processing_duration_seconds`), tagged by workflow name and version. Lemline does not publish per-instance or per-task duration metrics; derive those from the lifecycle events.
 
-Example Prometheus alert on processing failures:
+These counters track message handling. A workflow that faults (an HTTP call returning 500, a `raise`…) is processed successfully from the runner's point of view and does not increase `processing_failed_total`: alert on faulted workflows with the `workflow.faulted` lifecycle events instead.
+
+Example Prometheus alert on message-processing failures (broker, database or infrastructure problems):
 
 ```yaml
 groups:
@@ -99,7 +101,7 @@ groups:
 ## Best Practices for Workflow Lifecycle Observability
 
 1. **Enable lifecycle analytics** in environments where you need an instance history
-2. **Alert on faulted workflows** using the `workflow.faulted` events or processing failure metrics
+2. **Alert on faulted workflows** using the `workflow.faulted` events; use processing failure metrics for message-handling and infrastructure failures
 3. **Correlate logs with instances**: every runner log line carries the workflow namespace, name, version and instance id
 4. **Define a retention policy** for the analytics table
 

@@ -50,13 +50,16 @@ Each channel processes up to 64 messages in parallel. Raise the limit when steps
 ```yaml
 lemline:
   messaging:
-    commands:
-      consumer:
-        concurrency: 128
-    events:
-      consumer:
-        concurrency: 32
+    kafka:          # or rabbitmq, pgmq
+      commands:
+        consumer:
+          concurrency: 128
+      events:
+        consumer:
+          concurrency: 32
 ```
+
+Set the limit under the broker you use (`lemline.messaging.<broker>.<channel>.consumer.concurrency`). The broker-independent `lemline.messaging.<channel>.consumer.concurrency` only applies to in-memory messaging: with Kafka, RabbitMQ or PGMQ it is overwritten by the broker setting.
 
 ## Tune Background Processing
 

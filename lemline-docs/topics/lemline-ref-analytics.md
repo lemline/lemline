@@ -58,7 +58,7 @@ lemline:
 | Property | Default | Description |
 |----------|---------|-------------|
 | `lemline.messaging.lifecycleevents.consumer.enabled` | `false` | Enables lifecycle events consumer used for analytics ingestion |
-| `lemline.messaging.lifecycleevents.consumer.concurrency` | `64` | Max concurrent lifecycle analytics message handling |
+| `lemline.messaging.<broker>.lifecycleevents.consumer.concurrency` | `64` | Max concurrent lifecycle analytics message handling (`lemline.messaging.lifecycleevents.consumer.concurrency` with in-memory messaging) |
 | `lemline.analytics.type` | `h2` | Analytics backend: `h2` (in-memory) or `postgresql` |
 | `lemline.analytics.migrate-at-start` | `true` | Runs analytics Flyway migration on startup |
 | `lemline.analytics.baseline-on-migrate` | `false` | Enables Flyway baseline behavior for analytics DB |

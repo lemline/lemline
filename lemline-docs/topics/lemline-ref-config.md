@@ -104,7 +104,7 @@ For each `<channel>` above:
 |----------|------|---------|-------------|
 | `lemline.messaging.<channel>.producer.enabled` | Boolean | `false` | Publish on this channel. Usually set by the command. |
 | `lemline.messaging.<channel>.consumer.enabled` | Boolean | `false` | Consume from this channel. Usually set by the command. |
-| `lemline.messaging.<channel>.consumer.concurrency` | Integer | `64` | Maximum number of messages processed in parallel |
+| `lemline.messaging.<channel>.consumer.concurrency` | Integer | `64` | Maximum number of messages processed in parallel with in-memory messaging. With Kafka, RabbitMQ or PGMQ it is overwritten by `lemline.messaging.<broker>.<channel>.consumer.concurrency`. |
 
 ### Kafka
 

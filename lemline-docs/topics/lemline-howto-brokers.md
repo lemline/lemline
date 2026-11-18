@@ -96,17 +96,18 @@ A message that cannot be processed is moved to a dead-letter destination named a
 
 ## Consumer Concurrency
 
-Each runner processes up to 64 messages in parallel per channel. Change it per channel:
+Each runner processes up to 64 messages in parallel per channel. Change it per channel, under the broker you use:
 
 ```yaml
 lemline:
   messaging:
-    commands:
-      consumer:
-        concurrency: 32
+    kafka:          # or rabbitmq, pgmq
+      commands:
+        consumer:
+          concurrency: 32
 ```
 
-Kafka, RabbitMQ and PGMQ also accept the broker-specific `lemline.messaging.<broker>.<channel>.consumer.concurrency`. To process more messages, start more runners: they share the work.
+The broker-independent `lemline.messaging.<channel>.consumer.concurrency` only applies to in-memory messaging; with a broker it is overwritten by `lemline.messaging.<broker>.<channel>.consumer.concurrency`. To process more messages, start more runners: they share the work.
 
 ## Implementing Event-Driven Workflows
 
@@ -181,7 +182,7 @@ Messages only travel inside one process and are lost when it stops. Use it for l
 ### Processing is slow
 
 - Start more runners.
-- Increase `consumer.concurrency` if runners have spare CPU.
+- Increase `lemline.messaging.<broker>.<channel>.consumer.concurrency` if runners have spare CPU.
 
 ## Best Practices
 

@@ -32,7 +32,7 @@ Runners consume four channels: `commands`, `events`, `cloudevents` and `lifecycl
 
 ### Parallelism inside a runner
 
-Each channel processes up to `lemline.messaging.<channel>.consumer.concurrency` messages at the same time (default `64`). Raise it when runners wait mostly on remote calls; lower it when they run out of memory or CPU.
+Each channel processes up to `lemline.messaging.<broker>.<channel>.consumer.concurrency` messages at the same time (default `64`). Raise it when runners wait mostly on remote calls; lower it when they run out of memory or CPU.
 
 ### Database work
 

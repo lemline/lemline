@@ -63,7 +63,7 @@ max by (workflow_name) (lemline_messaging_commands_processing_duration_seconds_m
 ### In the deployment
 
 - Add runners, and with Kafka add partitions.
-- Tune `lemline.messaging.<channel>.consumer.concurrency` (default 64).
+- Tune `lemline.messaging.<broker>.<channel>.consumer.concurrency` (default 64).
 - Keep `lemline.orchestrator.mode` at `action` (default): `all` sends one message per task, including control-flow tasks, and is meant for testing.
 - Place runners close to the broker, the database and the services they call.
 

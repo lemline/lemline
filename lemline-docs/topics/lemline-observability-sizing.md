@@ -19,7 +19,7 @@ All Lemline metrics are listed in the [Metrics Reference](lemline-ref-metrics.md
 
 | Question | Signal |
 |----------|--------|
-| Is a runner saturated? | `lemline_messaging_commands_active` close to `lemline.messaging.commands.consumer.concurrency` (default 64); high `process_cpu_usage` |
+| Is a runner saturated? | `lemline_messaging_commands_active` close to `lemline.messaging.<broker>.commands.consumer.concurrency` (default 64); high `process_cpu_usage` |
 | Are runners keeping up? | Broker consumer lag (Kafka) or queue depth (RabbitMQ, PGMQ), from the broker's own monitoring |
 | Are steps getting slower? | `lemline_messaging_commands_processing_duration_seconds` |
 | Is memory sufficient? | `jvm_memory_used_bytes` against the container limit; garbage collection time |
@@ -32,7 +32,7 @@ The database and the broker are shared by every runner: watch them with their ow
 
 - Start with two runners for availability, then add runners while lag grows.
 - With Kafka, create topics with at least as many partitions as the maximum number of runners.
-- Raise `lemline.messaging.<channel>.consumer.concurrency` when runners mostly wait on remote calls and CPU stays low; lower it when memory runs short.
+- Raise `lemline.messaging.<broker>.<channel>.consumer.concurrency` when runners mostly wait on remote calls and CPU stays low; lower it when memory runs short.
 - Size the database for the number of runners and gateways connected to it, and for the background processing (waits, retries, schedules) that every runner performs.
 
 ## Scaling
