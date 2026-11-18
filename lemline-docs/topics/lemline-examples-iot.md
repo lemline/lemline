@@ -152,6 +152,8 @@ do:
           lastPing: ${ .activationResult.timestamp }
 ```
 
+> **Lemline runtime:** only `listen` task timeouts are enforced. Workflow-level timeouts and timeouts on other tasks are accepted but ignored for now.
+
 ## Telemetry Processing Workflow
 
 This example shows how to implement real-time telemetry processing from IoT devices, including data validation, transformation, and anomaly detection.

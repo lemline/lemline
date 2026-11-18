@@ -205,6 +205,8 @@ use:
         category: "api"
 ```
 
+> **Lemline runtime:** only `listen` task timeouts are enforced. Workflow-level timeouts and timeouts on other tasks are accepted but ignored for now.
+
 ### Flow Control Tasks
 
 #### Do Task

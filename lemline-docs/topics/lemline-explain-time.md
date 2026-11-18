@@ -193,6 +193,8 @@ Timeouts prevent operations from blocking indefinitely:
       timeout: PT30S  # 30-second timeout for HTTP call
 ```
 
+> **Lemline runtime:** only `listen` task timeouts are enforced. Workflow-level timeouts and timeouts on other tasks are accepted but ignored for now.
+
 #### Workflow Timeouts
 
 ```yaml

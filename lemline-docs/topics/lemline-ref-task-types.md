@@ -545,6 +545,8 @@ All tasks support these common properties:
         category: "api"
 ```
 
+> **Lemline runtime:** only `listen` task timeouts are enforced. Workflow-level timeouts and timeouts on other tasks are accepted but ignored for now.
+
 - **if**: Conditional expression for task execution
 - **timeout**: Task-specific timeout (ISO 8601 duration)
 - **metadata**: Task metadata (description, labels, etc.)

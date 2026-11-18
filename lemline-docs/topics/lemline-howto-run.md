@@ -443,6 +443,8 @@ Set timeouts for scripts or containers:
   next: Recovery
 ```
 
+> **Lemline runtime:** only `listen` task timeouts are enforced. Workflow-level timeouts and timeouts on other tasks are accepted but ignored for now.
+
 ### Custom Working Directory
 
 Set a custom working directory:

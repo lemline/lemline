@@ -261,6 +261,8 @@ You can set a timeout for the entire parallel execution:
   next: Fallback
 ```
 
+> **Lemline runtime:** only `listen` task timeouts are enforced. Workflow-level timeouts and timeouts on other tasks are accepted but ignored for now.
+
 If any branch takes longer than the specified timeout, the entire fork is cancelled and execution continues to the `timeoutNext` task.
 
 ## Dynamic Branching

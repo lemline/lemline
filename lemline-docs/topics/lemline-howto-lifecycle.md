@@ -44,23 +44,24 @@ do:
 
 Send the cancellation as a CloudEvent on the CloudEvents channel of the workflow's namespace. See [How to emit and listen for events](lemline-howto-events.md).
 
-## Bounding How Long a Workflow Runs
+## Bounding How Long a Workflow Waits
 
-Use a timeout so an instance cannot run forever:
+Lemline does not enforce workflow-level timeouts yet: a top-level `timeout` is accepted but ignored. To keep an instance from waiting forever for an external signal, put a timeout on the `listen` task:
 
 ```yaml
-timeout:
-  after:
-    hours: 24
 do:
-  - processOrder:
-      call: http
-      with:
-        method: post
-        endpoint: https://api.example.com/orders
+  - waitForPayment:
+      listen:
+        to:
+          one:
+            with:
+              type: com.example.payment.received
+      timeout:
+        after:
+          hours: 24
 ```
 
-When the timeout expires, the workflow faults with a `timeout` error. See [Timeouts](dsl-timeouts.md).
+When the timeout expires, the task faults with a `timeout` error, which a `try` task can catch. See [Timeouts](dsl-timeouts.md).
 
 ## Pausing Until an External Signal
 

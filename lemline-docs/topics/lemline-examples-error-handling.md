@@ -421,6 +421,8 @@ do:
               then: exit
 ```
 
+> **Lemline runtime:** only `listen` task timeouts are enforced. Workflow-level timeouts and timeouts on other tasks are accepted but ignored for now.
+
 This example demonstrates:
 - Setting a timeout for an HTTP call
 - Catching the specific timeout error type

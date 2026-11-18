@@ -261,6 +261,8 @@ do:
             error: "${ $error }"
 ```
 
+> **Lemline runtime:** only `listen` task timeouts are enforced. Workflow-level timeouts and timeouts on other tasks are accepted but ignored for now.
+
 ## Example 4: Time-based Scheduled Workflow
 
 This example shows a simple maintenance workflow that runs on a time-based schedule using cron syntax. It executes a cleanup container and then sends a report of the operation.

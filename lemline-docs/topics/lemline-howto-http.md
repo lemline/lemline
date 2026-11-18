@@ -394,6 +394,8 @@ You can set custom timeouts for HTTP calls:
   next: ProcessResponse
 ```
 
+> **Lemline runtime:** only `listen` task timeouts are enforced. Workflow-level timeouts and timeouts on other tasks are accepted but ignored for now.
+
 ### Following Redirects
 
 Control redirect behavior:

@@ -102,6 +102,8 @@ The Lemline runtime automatically generates errors for common failure scenarios:
     # If wait exceeds 1 minute, TimeoutError is raised
   ```
 
+  > **Lemline runtime:** only `listen` task timeouts are enforced. Workflow-level timeouts and timeouts on other tasks are accepted but ignored for now.
+
 ### 2. Explicitly Raised Errors
 
 Workflows can explicitly raise errors using the `raise` task:

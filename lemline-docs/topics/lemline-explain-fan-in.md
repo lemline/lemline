@@ -287,6 +287,8 @@ Fan-out with timeout-aware aggregation:
       minSuccess: 2  # Require at least 2 successful branches
 ```
 
+> **Lemline runtime:** only `listen` task timeouts are enforced. Workflow-level timeouts and timeouts on other tasks are accepted but ignored for now.
+
 ## Performance Considerations
 
 ### Optimizing Fan-Out
