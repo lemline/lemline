@@ -73,18 +73,26 @@ do:
       with:
         method: post
         endpoint: https://db-proxy.example.com/sessions
-        headers:
-          X-Db-User: ${ $secrets.DB_CREDENTIALS.username }
-          X-Db-Password: ${ $secrets.DB_CREDENTIALS.password }
+        body:
+          user: ${ $secrets.DB_CREDENTIALS.username }
+          password: ${ $secrets.DB_CREDENTIALS.password }
 ```
 
 Any other value (including a JSON array or number) is passed as a plain string.
 
 ## Using Secrets in HTTP Calls
 
-Reference secrets in `headers`, `query`, or the `endpoint` URL: these fields evaluate expressions. The request `body` is sent exactly as written and does not evaluate expressions, so `${ $secrets... }` placed there is sent as literal text.
+Every part of an HTTP call evaluates expressions: `endpoint`, `headers`, `query`, `body`, and the fields of `endpoint.authentication`. Instead of building the `Authorization` header yourself, you can use an authentication policy:
 
-The fields of `endpoint.authentication` (`basic`, `bearer`) are used literally too, so `$secrets` cannot be referenced there either. Put the credential in a header expression, as shown above.
+```yaml
+endpoint:
+  uri: https://payments.example.com/v1/charges
+  authentication:
+    bearer:
+      token: ${ $secrets.PAYMENT_API_KEY }
+```
+
+Basic authentication works the same way, with `username` and `password` expressions.
 
 ## When a Secret Is Missing
 

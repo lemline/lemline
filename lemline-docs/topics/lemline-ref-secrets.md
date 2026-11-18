@@ -34,13 +34,14 @@ use:
 
 ## Where Secrets Can Be Used
 
-`$secrets` is available in every runtime expression of the workflow: HTTP `endpoint`, `headers` and `query`, shell `command` and `arguments`, `if`, `set`, `export`, `output`, and so on.
-
-It cannot be used in fields that Lemline sends as written, without evaluating expressions: the HTTP `body` and `endpoint.authentication` policies (`basic`, `bearer`). Pass credentials in a header instead:
+`$secrets` is available in every runtime expression of the workflow: HTTP `endpoint`, `headers`, `query`, `body` and authentication policies (`basic`, `bearer`), shell `command` and `arguments`, `if`, `set`, `export`, `output`, and so on.
 
 ```yaml
-headers:
-  Authorization: '${ "Bearer " + $secrets.PAYMENT_API_KEY }'
+endpoint:
+  uri: https://payments.example.com/v1/charges
+  authentication:
+    bearer:
+      token: ${ $secrets.PAYMENT_API_KEY }
 ```
 
 Lemline does not provide its own secret store, file source, or vault integration. Use your platform to inject environment variables (Kubernetes Secrets, Docker secrets mapped to variables, your deployment tool…).

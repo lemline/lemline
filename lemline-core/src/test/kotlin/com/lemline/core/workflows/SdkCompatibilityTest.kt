@@ -12,6 +12,7 @@ import com.lemline.core.cloudevents.InMemoryCloudEventHook
 import com.lemline.core.lifecycleevents.LifecycleEventHook
 import com.lemline.core.orchestrator.FullOrchestrator
 import com.lemline.core.orchestrator.StepByStepOrchestrator
+import com.lemline.core.processors.HttpAuthentication
 import com.lemline.core.states.WorkflowEvent
 import io.serverlessworkflow.api.WorkflowFormat
 import io.serverlessworkflow.api.types.Task
@@ -115,6 +116,63 @@ class SdkCompatibilityTest {
                 val config = assertIs<WorkflowEvent.CallHttpStarted>(it).config
                 assertEquals(mapOf("X-Token" to "secret", "X-Literal" to "literal"), config.headers)
                 assertEquals(mapOf("q" to "hello world", "page" to "2"), config.query)
+                jsonValue("ok")
+            }
+        }
+    }
+
+    @Test
+    fun `HTTP body evaluates nested and whole body expressions`() = runTest {
+        val input = parseJson("""{"name":"Alice","items":[1,2]}""")
+        val bodies = mapOf(
+            "{ user: { name: '§{ .name }' }, items: '§{ .items }', literal: plain, missing: null }" to
+                parseJson("""{"user":{"name":"Alice"},"items":[1,2],"literal":"plain","missing":null}"""),
+            "'§{ { user: .name, count: (.items | length) } }'" to
+                parseJson("""{"user":"Alice","count":2}"""),
+        )
+        for ((body, expected) in bodies) {
+            run("""
+                do:
+                  - request:
+                      call: http
+                      with:
+                        method: post
+                        endpoint: https://example.com/users
+                        body: $body
+            """, input) {
+                assertEquals(expected, assertIs<WorkflowEvent.CallHttpStarted>(it).config.body)
+                jsonValue("ok")
+            }
+        }
+    }
+
+    @Test
+    fun `HTTP authentication properties evaluate expressions`() = runTest {
+        val input = parseJson("""{"user":"alice","password":"pa55","token":"tok"}""")
+        val cases = listOf(
+            "" to "authentication: { basic: { username: '§{ .user }', password: '§{ .password }' } }" to
+                HttpAuthentication.Basic("alice", "pa55"),
+            "" to "authentication: { bearer: { token: '§{ .token }' } }" to
+                HttpAuthentication.Bearer("tok"),
+            "use: { authentications: { api: { bearer: { token: '§{ .token }' } } } }" to
+                "authentication: { use: api }" to HttpAuthentication.Bearer("tok"),
+            "" to "authentication: { bearer: { token: literal-token } }" to
+                HttpAuthentication.Bearer("literal-token"),
+        )
+        for ((yaml, expected) in cases) {
+            val (use, authentication) = yaml
+            run("""
+                $use
+                do:
+                  - request:
+                      call: http
+                      with:
+                        method: get
+                        endpoint:
+                          uri: https://example.com/data
+                          $authentication
+            """, input) {
+                assertEquals(expected, assertIs<WorkflowEvent.CallHttpStarted>(it).config.authentication)
                 jsonValue("ok")
             }
         }
