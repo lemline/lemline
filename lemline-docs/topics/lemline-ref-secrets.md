@@ -34,9 +34,9 @@ use:
 
 ## Where Secrets Can Be Used
 
-`$secrets` is available in every runtime expression of the workflow: task arguments (HTTP headers, query, body, shell arguments…), `if`, `set`, `export`, `output`, and so on.
+`$secrets` is available in every runtime expression of the workflow: HTTP `endpoint`, `headers` and `query`, shell `command` and `arguments`, `if`, `set`, `export`, `output`, and so on.
 
-It cannot be used in `endpoint.authentication` policies (`basic`, `bearer`), whose fields are not evaluated as expressions. Pass credentials in a header instead:
+It cannot be used in fields that Lemline sends as written, without evaluating expressions: the HTTP `body` and `endpoint.authentication` policies (`basic`, `bearer`). Pass credentials in a header instead:
 
 ```yaml
 headers:

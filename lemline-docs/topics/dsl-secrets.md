@@ -67,12 +67,12 @@ do:
       with:
         method: post
         endpoint: https://db-proxy.example.com/sessions
-        body:
-          user: ${ $secrets.DB_CREDENTIALS.username }
-          password: ${ $secrets.DB_CREDENTIALS.password }
+        headers:
+          X-Db-User: ${ $secrets.DB_CREDENTIALS.username }
+          X-Db-Password: ${ $secrets.DB_CREDENTIALS.password }
 ```
 
-> In Lemline, the fields of `endpoint.authentication` policies are used literally and do not evaluate expressions. Pass secret credentials in a header, as in the first example.
+> In Lemline, the HTTP `body` and the fields of `endpoint.authentication` policies are used literally and do not evaluate expressions. Pass secret values in `headers`, `query`, or the `endpoint` URL, as in the examples above.
 
 ## Security Considerations and Best Practices
 

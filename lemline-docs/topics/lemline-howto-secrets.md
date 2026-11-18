@@ -29,8 +29,6 @@ do:
         endpoint: https://payments.example.com/v1/charges
         headers:
           Authorization: '${ "Bearer " + $secrets.PAYMENT_API_KEY }'
-        body:
-          amount: ${ .amount }
 ```
 
 A workflow only sees the secrets it declares. A secret that is set on the runner but not listed in `use.secrets` is not visible to expressions.
@@ -75,16 +73,18 @@ do:
       with:
         method: post
         endpoint: https://db-proxy.example.com/sessions
-        body:
-          user: ${ $secrets.DB_CREDENTIALS.username }
-          password: ${ $secrets.DB_CREDENTIALS.password }
+        headers:
+          X-Db-User: ${ $secrets.DB_CREDENTIALS.username }
+          X-Db-Password: ${ $secrets.DB_CREDENTIALS.password }
 ```
 
 Any other value (including a JSON array or number) is passed as a plain string.
 
-## Using Secrets for HTTP Authentication
+## Using Secrets in HTTP Calls
 
-Put the secret in a header expression, as shown above. The fields of `endpoint.authentication` (`basic`, `bearer`) are used literally and do not evaluate expressions, so `$secrets` cannot be referenced there.
+Reference secrets in `headers`, `query`, or the `endpoint` URL: these fields evaluate expressions. The request `body` is sent exactly as written and does not evaluate expressions, so `${ $secrets... }` placed there is sent as literal text.
+
+The fields of `endpoint.authentication` (`basic`, `bearer`) are used literally too, so `$secrets` cannot be referenced there either. Put the credential in a header expression, as shown above.
 
 ## When a Secret Is Missing
 
