@@ -1,5 +1,8 @@
 # Lemline Integration Examples
 
+> **Runtime support:** some examples on this page use `call: openapi`, `call: asyncapi`, `call: grpc` or OAuth 2.0 authentication. The Lemline runtime does not execute these yet: such a task fails when it runs. Write those calls with `call: http` and `basic` or `bearer` authentication to run them on Lemline. URI template placeholders such as `{petId}` are not expanded either: build the URI with a runtime expression, for example `${ "https://petstore.swagger.io/v2/pet/" + (.petId | tostring) }`.
+
+
 This document provides examples of integrating Lemline workflows with external services using various protocols and standards. These integration patterns enable workflows to interact with APIs, services, and messaging systems.
 
 ## HTTP/REST API Integration

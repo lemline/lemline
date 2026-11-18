@@ -174,7 +174,7 @@ Prints the configuration Lemline will use, after merging the file, environment v
 lemline config create -m <broker> -d <database> [-o <path>] [--force] [--dry-run]
 ```
 
-Generates a configuration file. In a terminal, missing choices are asked interactively.
+Generates a configuration file. In a terminal, missing choices are asked interactively. The default output name `lemline.yaml` is not searched automatically: pass it with `--config`, or write `-o .lemline.yaml`.
 
 | Option | Description | Default |
 |--------|-------------|---------|

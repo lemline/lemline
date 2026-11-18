@@ -4,6 +4,9 @@ title: URI Templates
 
 # URI Templates
 
+> **Lemline runtime:** placeholders such as `{userId}` are not expanded by Lemline yet; the URI is used as written. Build dynamic URIs with a runtime expression, e.g. `${ "https://api.example.com/users/" + .userId }`.
+
+
 ## Purpose
 
 URI Templates provide a limited mechanism for creating dynamic URIs within the Open Workflow DSL, based on

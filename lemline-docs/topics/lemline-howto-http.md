@@ -4,6 +4,9 @@ title: How to make an HTTP call
 
 # How to make an HTTP call
 
+> **Runtime support:** the Lemline runtime supports only `basic` and `bearer` authentication on HTTP calls (OAuth 2.0 fails with a `configuration` error), and does not expand URI template placeholders such as `{userId}`: build dynamic URIs with a runtime expression instead. See [HTTP Reference](lemline-ref-http.md).
+
+
 This guide explains how to integrate HTTP/HTTPS API calls into your Lemline workflows. You'll learn how to define HTTP functions, make different types of requests, handle responses, and implement error handling.
 
 ## Understanding HTTP Calls in Lemline

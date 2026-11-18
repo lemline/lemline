@@ -5,6 +5,9 @@ title: OpenAPI Call
 
 # OpenAPI Call Task (`call: openapi`)
 
+> **Lemline runtime:** `call: openapi` is not executed by Lemline yet; use `call: http`.
+
+
 ## Purpose
 
 The OpenAPI Call task enables workflows to interact with external RESTful APIs that are described by

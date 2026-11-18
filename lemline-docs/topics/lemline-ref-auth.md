@@ -1,5 +1,8 @@
 # Authentication Reference
 
+> **Not supported by the Lemline runtime yet.** OAuth 2.0 and OpenID Connect authentication policies are accepted in definitions, but a `call: http` that uses them fails with a `configuration` error. Only `basic` and `bearer` authentication work today. Workaround: request the token with a `call: http` task to the token endpoint, then pass it with `bearer` authentication.
+
+
 This reference documents all authentication methods supported by Lemline for securing API calls and service interactions.
 
 ## Authentication Overview

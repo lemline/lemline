@@ -5,6 +5,9 @@ title: AsyncAPI Call
 
 # AsyncAPI Call Task (`call: asyncapi`)
 
+> **Lemline runtime:** `call: asyncapi` is not executed by Lemline yet; use `emit` and `listen` tasks.
+
+
 ## Purpose
 
 The AsyncAPI Call task enables workflows to interact with message brokers and event-driven services described by an [AsyncAPI](https://www.asyncapi.com/) specification document.
