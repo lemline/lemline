@@ -191,8 +191,8 @@ do:
 
 ```markdown
 ```bash
-$ lemline instance start -n examples.hello-world -v 0.1.0
-Instance started: 1234-5678-90ab-cdef
+$ lemline instance start examples hello-world 0.1.0
+Instance 0190a5d2-7c3e-7b4a-9f0e-3d2c1b0a9f8e started successfully (name: hello-world, version: 0.1.0, input: {})
 ```
 ```
 

@@ -84,7 +84,7 @@ cd lemline
 # Build with Gradle
 ./gradlew :lemline-runner:build -x test
 
-# The runner JAR will be in lemline-runner/build/libs/
+# Run it with: java -jar lemline-runner/build/quarkus-app/quarkus-run.jar --help
 ```
 
 ## Creating Your First Workflow
@@ -102,29 +102,26 @@ do:
   - greeting:
       set:
         message: "Hello, Lemline!"
-  - logMessage:
-      call: log
-      with:
-        message: ${ .message }
 ```
 
-This simple workflow:
-
-1. Sets a message variable
-2. Logs the message to the console
-3. Ends the workflow
+This simple workflow sets a `message` value, which becomes the workflow output, and ends.
 
 ## Running Your Workflow
 
-```bash
-# Run the workflow using the Lemline runner
-java -jar lemline-runner.jar workflow run hello.yaml
+Running a workflow takes three steps: register the definition, start a runner, and start an instance. The runner and the CLI must share a database and a message broker, so first set up the local environment described in [Setting Up A Local Environment](lemline-tutorial-setup.md).
 
-# Or if you have the Lemline CLI installed:
-lemline workflow run hello.yaml
+```bash
+# Register the definition
+lemline definition post -f hello.yaml
+
+# In a separate terminal: start a runner and leave it running
+lemline listen --debug
+
+# Start an instance
+lemline instance start examples hello-workflow
 ```
 
-You should see output including your "Hello, Lemline!" message.
+`instance start` prints the id of the new instance. With `--debug`, the runner logs the workflow output, including your "Hello, Lemline!" message.
 
 ## Exploring Next Steps
 
@@ -155,22 +152,11 @@ do:
       with:
         method: GET
         endpoint: https://jsonplaceholder.typicode.com/todos/1
-  - displayResult:
-      set:
-        result: ${ $workflow.makeRequest.result }
 ```
 
 ## Try a Ready-to-Run Sample Project
 
-Lemline comes with several example workflows that demonstrate different features:
-
-```bash
-# List available examples
-java -jar lemline-runner.jar examples list
-
-# Run a specific example
-java -jar lemline-runner.jar examples run star-wars
-```
+The repository's `examples/` directory contains Docker Compose setups and configuration files for Kafka, RabbitMQ, PostgreSQL and MySQL. See `examples/README.md` in the repository.
 
 ## What's Next?
 

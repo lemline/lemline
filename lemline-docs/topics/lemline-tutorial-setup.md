@@ -57,7 +57,7 @@ You should see the `postgres` container running.
 
 ## 2. Create the Configuration File
 
-Create a `lemline.yaml` configuration file in your project directory:
+Create a `.lemline.yaml` configuration file in your project directory. Lemline reads `./.lemline.yaml` automatically, so every command you run from this directory uses it (you can also point to another file with `--config <path>` or the `LEMLINE_CONFIG` environment variable):
 
 ```yaml
 lemline:
@@ -143,28 +143,28 @@ Lemline requires database tables for workflow state persistence. Run the migrati
 <tab id="macos-migrate" title="macOS (ARM64)" group-key="macos">
 
 ```bash
-bin/lemline migrate --config=lemline.yaml
+bin/lemline migrate
 ```
 
 </tab>
 <tab id="linux-migrate" title="Linux (x86_64)" group-key="linux">
 
 ```bash
-bin/lemline migrate --config=lemline.yaml
+bin/lemline migrate
 ```
 
 </tab>
 <tab id="windows-migrate" title="Windows (x86_64)" group-key="windows">
 
 ```powershell
-bin\lemline.exe migrate --config=lemline.yaml
+bin\lemline.exe migrate
 ```
 
 </tab>
 <tab id="java-migrate" title="Java (Any OS)" group-key="java">
 
 ```bash
-java -jar lemline.jar migrate --config=lemline.yaml
+java -jar lemline.jar migrate
 ```
 
 </tab>

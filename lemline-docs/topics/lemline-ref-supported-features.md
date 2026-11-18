@@ -75,12 +75,13 @@ Lemline implements a subset of the Open Workflow DSL 1.0 specification, with mor
 
 | Feature | Status | Notes |
 |---------|--------|-------|
-| Basic Auth | ✅ Supported | For HTTP calls |
-| Bearer Token | ✅ Supported | For HTTP calls |
-| OAuth2 | ✅ Supported | Various grant types |
-| API Keys | ✅ Supported | Header and query parameter options |
-| mTLS | ⚠️ Planned | On roadmap for future release |
-| OIDC | ✅ Supported | OpenID Connect integration |
+| Basic Auth | ✅ Supported | For `call: http` |
+| Bearer Token | ✅ Supported | For `call: http` |
+| OAuth2 | ❌ Not yet supported | A call using it fails with a `configuration` error |
+| API Keys | ⚠️ No dedicated policy | Pass the key in `headers` or `query`, read from `$secrets` |
+| mTLS | ❌ Not supported | |
+| OIDC | ❌ Not supported | |
+| Digest | ❌ Not supported | |
 
 ## Extension and Integration Support
 
@@ -136,15 +137,7 @@ When migrating from other Open Workflow implementations to Lemline, consider:
 
 ## Testing Specification Conformance
 
-To verify specification conformance for your workflows:
-
-```bash
-# Validate workflow against specification
-lemline validate -f my-workflow.yaml --spec-version 1.0
-
-# Check for unsupported features
-lemline validate -f my-workflow.yaml --strict
-```
+Lemline has no standalone validation command. `lemline definition post` parses each definition file and reports the files it cannot read; run the workflow in a test environment (for example with `lemline listen --mock-config <file>`) to check its behavior.
 
 ## Related Information
 

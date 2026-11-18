@@ -235,14 +235,14 @@ To run any of these examples using the Lemline CLI:
 # Install workflow definition
 lemline definition post -f path/to/example.yaml
 
-# Start workflow instance
-lemline instance start -n namespace.workflow-name -v version
+# Start workflow instance (a runner started with `lemline listen` must be running)
+lemline instance start <namespace> <name> [<version>]
 ```
 
 For examples that require input, provide JSON input:
 
 ```bash
-lemline instance start -n namespace.workflow-name -v version -i '{"key": "value"}'
+lemline instance start <namespace> <name> <version> -i '{"key": "value"}'
 ```
 
 ## Conclusion
