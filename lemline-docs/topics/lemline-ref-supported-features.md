@@ -38,9 +38,9 @@ Lemline implements a subset of the Open Workflow DSL 1.0 specification, with mor
 | Task Type | Status | Notes |
 |-----------|--------|-------|
 | HTTP Calls | ✅ Supported | Full REST API support |
-| OpenAPI Calls | ✅ Supported | Including schema validation |
-| AsyncAPI Calls | ✅ Supported | Publish and subscribe operations |
-| gRPC Calls | ✅ Supported | Proto-based service calls |
+| OpenAPI Calls | ❌ Not supported | Parsed, but no runtime executor; use `call: http` |
+| AsyncAPI Calls | ❌ Not supported | Parsed, but no runtime executor; use `emit` and `listen` |
+| gRPC Calls | ❌ Not supported | Parsed, but no runtime executor |
 | GraphQL | ⚠️ Planned | On roadmap for future release |
 | Expression Evaluation | ✅ Supported | Via `set` construct |
 | Container Execution | ⚠️ Partial | Basic support via `run` construct |
