@@ -46,7 +46,7 @@ Send the cancellation as a CloudEvent on the CloudEvents channel of the workflow
 
 ## Bounding How Long a Workflow Waits
 
-Lemline does not enforce workflow-level timeouts yet: a top-level `timeout` is accepted but ignored. To keep an instance from waiting forever for an external signal, put a timeout on the `listen` task:
+Lemline does not enforce workflow-level timeouts yet, nor timeouts on tasks other than `listen`: they are accepted but ignored. To keep an instance from waiting forever for an external signal, put a timeout on the `listen` task:
 
 ```yaml
 do:

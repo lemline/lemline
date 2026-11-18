@@ -55,7 +55,7 @@ At `DEBUG`, task inputs are logged: keep it off in production.
 
 I/O behavior is controlled in the workflow definition:
 
-- `timeout` on a task limits how long a remote call may take.
+- HTTP calls use fixed client limits: 15 seconds to connect and 30 seconds per request. A task-level `timeout` does not shorten them; Lemline only enforces timeouts on `listen` tasks.
 - `try` with a `retry` policy retries failed calls with a delay and backoff; retries are scheduled through the database, so a waiting retry holds no runner resources.
 - `fork` runs independent calls in parallel.
 - `output.as` and `export.as` keep workflow data small, which reduces the size of every message.

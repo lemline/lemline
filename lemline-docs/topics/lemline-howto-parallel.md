@@ -261,7 +261,7 @@ You can set a timeout for the entire parallel execution:
   next: Fallback
 ```
 
-> **Lemline runtime:** only `listen` task timeouts are enforced. Workflow-level timeouts and timeouts on other tasks are accepted but ignored for now.
+> **Lemline runtime:** only `listen` task timeouts are enforced. Workflow-level timeouts and timeouts on other tasks are accepted but ignored for now. HTTP calls use fixed client limits instead: 15 seconds to connect, 30 seconds per request.
 
 If any branch takes longer than the specified timeout, the entire fork is cancelled and execution continues to the `timeoutNext` task.
 
