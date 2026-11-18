@@ -290,15 +290,11 @@ There are no `lemline.security.*` settings. Workflow secrets are read from envir
 
 ## Logging
 
-Logging uses the standard Quarkus properties, for example:
+Logging uses the standard Quarkus properties. They are not read from the Lemline configuration file, which only accepts `lemline.*` settings: set them as environment variables or `-D` system properties, for example:
 
-```yaml
-quarkus:
-  log:
-    level: INFO
-    category:
-      "com.lemline":
-        level: DEBUG
+```bash
+export QUARKUS_LOG_LEVEL=INFO
+export QUARKUS_LOG_CATEGORY__COM_LEMLINE__LEVEL=DEBUG
 ```
 
 From the command line, `--debug`, `--info`, `--warn` and `--error` set the log level, and `--json` switches to JSON logs. The default level is `ERROR`.

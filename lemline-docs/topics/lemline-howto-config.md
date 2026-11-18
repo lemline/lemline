@@ -11,7 +11,15 @@ Lemline reads its configuration from, in order of decreasing priority:
 3. **A YAML configuration file**
 4. **Built-in defaults**
 
-Without any configuration, Lemline runs with an in-memory database and in-memory messaging, which is enough to try it on one machine.
+Every command except `lemline config create` needs a configuration file, and stops with an error when none is found. To try Lemline on one machine, a file that selects the in-memory database and messaging is enough:
+
+```yaml
+lemline:
+  database:
+    type: in-memory
+  messaging:
+    type: in-memory
+```
 
 ## Create a Configuration File
 
@@ -171,15 +179,11 @@ lemline:
 
 ### Logging
 
-Use the command-line options `--debug`, `--info`, `--warn` or `--error` to set the log level, and `--json` for JSON logs. For finer control, use the Quarkus properties in the configuration file:
+Use the command-line options `--debug`, `--info`, `--warn` or `--error` to set the log level, and `--json` for JSON logs. Quarkus log properties are not read from the Lemline configuration file, which only accepts `lemline.*` settings. Set them as environment variables instead (or as `-D` system properties):
 
-```yaml
-quarkus:
-  log:
-    level: INFO
-    category:
-      "com.lemline":
-        level: DEBUG
+```bash
+export QUARKUS_LOG_LEVEL=INFO
+export QUARKUS_LOG_CATEGORY__COM_LEMLINE__LEVEL=DEBUG
 ```
 
 ### Secret Management

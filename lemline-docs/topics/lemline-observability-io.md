@@ -39,14 +39,10 @@ Runner logs carry the workflow namespace, name, version and instance id. Raise t
 lemline listen --debug
 ```
 
-Or, for Lemline packages only, in the configuration file:
+Or, for Lemline packages only, with an environment variable (Quarkus log properties are not read from the configuration file):
 
-```yaml
-quarkus:
-  log:
-    category:
-      "com.lemline":
-        level: DEBUG
+```bash
+export QUARKUS_LOG_CATEGORY__COM_LEMLINE__LEVEL=DEBUG
 ```
 
 At `DEBUG`, task inputs are logged: keep it off in production.

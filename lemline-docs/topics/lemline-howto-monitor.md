@@ -74,14 +74,10 @@ For production environments, set up a comprehensive monitoring solution:
 
 ### Enabling Debug Logging
 
-Start the runner with `--debug`, or set the log level in your configuration file:
+Start the runner with `--debug`, or set the level of Lemline packages with an environment variable (Quarkus log properties are not read from the configuration file):
 
-```yaml
-quarkus:
-  log:
-    category:
-      "com.lemline":
-        level: DEBUG
+```bash
+export QUARKUS_LOG_CATEGORY__COM_LEMLINE__LEVEL=DEBUG
 ```
 
 At `DEBUG` level, the runner logs each task it enters with its input, and errors with their details. Every log line carries the workflow namespace, name, version and instance id.

@@ -22,21 +22,12 @@ lemline listen --debug
 
 The `--debug`, `--info`, `--warn` and `--error` options work with every command; the default level is `ERROR`. At `DEBUG` level, the runner logs each task it enters with its input, and the workflow output.
 
-For finer control, set Quarkus log categories in your configuration file:
+Quarkus log properties are not read from the Lemline configuration file, which only accepts `lemline.*` settings. Set them as environment variables instead (or as `-D` system properties):
 
-```yaml
-quarkus:
-  log:
-    level: INFO
-    category:
-      "com.lemline.core":
-        level: DEBUG
-      "com.lemline.core.expressions":
-        level: TRACE
-      "com.lemline.runner.common.outbox":
-        level: DEBUG
-      "com.lemline.runner.messaging":
-        level: DEBUG
+```bash
+export QUARKUS_LOG_LEVEL=INFO
+export QUARKUS_LOG_CATEGORY__COM_LEMLINE_CORE__LEVEL=DEBUG
+export QUARKUS_LOG_CATEGORY__COM_LEMLINE_CORE_EXPRESSIONS__LEVEL=TRACE
 ```
 
 Log levels include:

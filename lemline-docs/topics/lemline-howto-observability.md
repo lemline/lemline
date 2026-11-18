@@ -88,17 +88,12 @@ At `DEBUG` level, the runner logs each task it enters with its input, and the wo
 
 ### Log Categories
 
-For finer control, set Quarkus log properties in the configuration file:
+Quarkus log properties are not read from the Lemline configuration file, which only accepts `lemline.*` settings. Set them as environment variables instead (or as `-D` system properties):
 
-```yaml
-quarkus:
-  log:
-    level: INFO
-    category:
-      "com.lemline":
-        level: INFO
-      "com.lemline.core.processors":
-        level: DEBUG
+```bash
+export QUARKUS_LOG_LEVEL=INFO
+export QUARKUS_LOG_CATEGORY__COM_LEMLINE__LEVEL=INFO
+export QUARKUS_LOG_CATEGORY__COM_LEMLINE_CORE_PROCESSORS__LEVEL=DEBUG
 ```
 
 ### Structured Logging
@@ -134,7 +129,7 @@ The dashboard reads definitions, instances, lifecycle events and per-definition 
 ### Log Volume Problems
 
 - Keep production runners at `INFO` or above; `DEBUG` logs task inputs.
-- Raise the level of noisy categories only, using `quarkus.log.category`.
+- Raise the level of noisy categories only, with `QUARKUS_LOG_CATEGORY__<CATEGORY>__LEVEL` environment variables.
 
 ## Best Practices
 
