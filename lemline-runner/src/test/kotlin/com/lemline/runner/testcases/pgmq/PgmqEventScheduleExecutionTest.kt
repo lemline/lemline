@@ -50,6 +50,7 @@ internal class PgmqEventScheduleExecutionTest {
                     one:
                       with:
                         type: $name
+                  read: envelope
                 do:
                   - finish:
                       set:

@@ -63,56 +63,14 @@ Reference authentication configurations in tasks:
 
 ## Secret Management
 
-### Secret Sources
+Workflows declare the secrets they need in `use.secrets` and read them in expressions through `$secrets.<name>`. The runner reads each declared name from the environment variable with exactly the same name, before each step it executes.
 
-Secrets can be stored and retrieved from:
+- **Never persisted**: resolved values are not part of broker messages or stored workflow state.
+- **Scoped**: a workflow only sees the secrets it declares; a child workflow resolves its own.
+- **Rotation**: update the variable and restart the runners; instances in progress use the new value from their next step.
+- **Missing value**: the workflow faults with an `authorization` error.
 
-| Source | Description | Pros | Cons |
-|--------|-------------|------|------|
-| Environment Variables | OS environment variables | Simple, universal | Limited features, not centralized |
-| Properties Files | Encrypted properties files | Simple, portable | Manual management, limited features |
-| HashiCorp Vault | Dedicated secret management | Comprehensive, enterprise-ready | Requires infrastructure |
-| AWS Secrets Manager | AWS-native secret management | Cloud-native, managed | AWS-specific |
-| Azure Key Vault | Azure-native secret management | Cloud-native, managed | Azure-specific |
-| Kubernetes Secrets | Kubernetes-native secrets | Container-native | Kubernetes-specific |
-
-### Secret References
-
-Reference secrets in workflows without embedding them:
-
-```yaml
-- authenticatedCall:
-    callHTTP:
-      url: "https://api.example.com/data"
-      headers:
-        X-API-Key:
-          secret: "api.key"  # References the secret named "api.key"
-```
-
-### Secret Rotation
-
-Lemline supports secret rotation strategies:
-
-1. **Scheduled Rotation**: Periodically refresh secrets
-2. **On-Demand Rotation**: Manually trigger rotation
-3. **Version-Specific Secrets**: Refer to specific secret versions
-4. **Dual-Read Rotation**: Read from both old and new secrets during transition
-
-Configure secret refresh:
-
-```properties
-# Enable periodic secret refresh
-lemline.secrets.refresh.enabled=true
-lemline.secrets.refresh.interval=PT15M  # Refresh every 15 minutes
-```
-
-### Secret Scope
-
-Secrets can have different scopes:
-
-1. **Global Secrets**: Available to all workflows
-2. **Namespace Secrets**: Available to workflows in a specific namespace
-3. **Workflow Secrets**: Available only to specific workflows
+Lemline has no built-in secret store: expose Vault, cloud secret managers or Kubernetes Secrets to the runners as environment variables. See [Managing Secrets in Lemline](lemline-howto-secrets.md).
 
 ## Transport Security
 

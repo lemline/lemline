@@ -29,20 +29,20 @@ use:
 
 ## Secret Resolution
 
-The actual secret values are never stored within workflow definitions. Instead, the workflow runtime is responsible for retrieving secret values at execution time from a secure storage service or vault. Common secret storage solutions include:
+The actual secret values are never stored within workflow definitions. The workflow runtime retrieves them at execution time.
 
-- Kubernetes Secrets
-- HashiCorp Vault
-- Cloud provider secret managers (AWS Secrets Manager, Azure Key Vault, Google Secret Manager)
-- Environment variables (for development environments only)
+**In Lemline**, each declared name is read from the runner environment variable with exactly the same name (for example `use.secrets: [PAYMENT_API_KEY]` reads `PAYMENT_API_KEY`). Inject these variables with your platform: Kubernetes Secrets, Docker secrets, or your deployment tool. See [Managing Secrets in Lemline](lemline-howto-secrets.md).
 
 ## Accessing Secrets in Workflows
 
-Secrets can be referenced within workflow tasks using the `$SECRETS` context variable. This approach ensures that sensitive values never appear in the workflow definition itself.
+Secrets are available in runtime expressions through the `$secrets` argument. A workflow only sees the secrets it declares.
 
 ### Example: Using a Secret in an HTTP Call
 
 ```yaml
+use:
+  secrets:
+    - API_KEY
 do:
   - callProtectedAPI:
       call: http
@@ -50,24 +50,29 @@ do:
         method: post
         endpoint: https://api.example.com/data
         headers:
-          Authorization: "Bearer $SECRETS.api-key-secret"
+          Authorization: '${ "Bearer " + $secrets.API_KEY }'
 ```
 
-### Example: Authentication with Secrets
+### Example: Structured Secret
+
+When a secret value is a JSON object, its fields can be read directly:
 
 ```yaml
 use:
-  authentications:
-    customerApiAuth:
-      oauth2:
-        authority: https://auth.example.com
-        grant: client_credentials
-        client:
-          id: "client-id"
-          secret: "$SECRETS.oauth-client-secret"
   secrets:
-    - oauth-client-secret
+    - DB_CREDENTIALS   # e.g. {"username": "app", "password": "s3cr3t"}
+do:
+  - openSession:
+      call: http
+      with:
+        method: post
+        endpoint: https://db-proxy.example.com/sessions
+        body:
+          user: ${ $secrets.DB_CREDENTIALS.username }
+          password: ${ $secrets.DB_CREDENTIALS.password }
 ```
+
+> In Lemline, the fields of `endpoint.authentication` policies are used literally and do not evaluate expressions. Pass secret credentials in a header, as in the first example.
 
 ## Security Considerations and Best Practices
 
@@ -85,43 +90,17 @@ use:
 
 ## Error Handling
 
-If a workflow attempts to access a secret that doesn't exist or to which it doesn't have access, the workflow runtime will raise an error:
+If a declared secret is not available, the workflow faults with an authorization error:
 
 ```
 https://open-workflow-specification.org/spec/1.0.0/errors/authorization
 ```
 
-This error should be handled appropriately using error handling mechanisms like the `Try` task:
-
-```yaml
-do:
-  - accessProtectedResource:
-      try:
-        do:
-          - callWithSecret:
-              call: http
-              with:
-                method: get
-                endpoint: https://api.example.com/protected
-                headers:
-                  Authorization: "Bearer $SECRETS.api-key-secret"
-        catch:
-          - error: https://open-workflow-specification.org/spec/1.0.0/errors/authorization
-            as: secretError
-            handle:
-              - logSecretError:
-                  call: function
-                  with:
-                    function: logError
-                    arguments:
-                      message: "Missing or unauthorized secret access"
-```
+In Lemline, this check runs before each step, outside of any task: the workflow faults directly with the title `Required secret '<name>' is unavailable` (status 403), and a `try` task cannot catch it. Make the secret available on the runners, then start a new instance.
 
 ## Integration with External Secret Management Systems
 
-Workflow runtimes typically integrate with organization-wide secret management systems. The specific configuration of these integrations is typically handled outside the workflow definition itself, often in the runtime configuration.
-
-The workflow simply references secrets by name, and the runtime handles resolving those references securely at execution time.
+The workflow simply references secrets by name; the runtime resolves them at execution time. Lemline reads them from environment variables and has no built-in connector to a secret manager: use your platform to expose secrets from Vault, a cloud secret manager or Kubernetes as environment variables of the runners.
 
 ## Conclusion
 

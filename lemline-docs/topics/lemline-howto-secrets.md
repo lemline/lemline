@@ -1,174 +1,117 @@
 # Managing Secrets in Lemline
 
-This guide explains how to securely handle sensitive information like API keys, passwords, and tokens in your Lemline workflows.
+This guide explains how to give your workflows access to API keys, passwords, and tokens without writing them in workflow definitions.
 
-## Introduction to Secrets Management
+## How It Works
 
-Secrets management is a critical aspect of secure workflow development. Lemline provides a structured approach to managing sensitive information without embedding it directly in your workflow definitions.
+1. The workflow **declares** the names of the secrets it needs in `use.secrets`.
+2. The runner **reads** each declared name from an environment variable with exactly the same name.
+3. Expressions **access** the values through `$secrets.<name>`.
 
-## Secrets Configuration
+Secret values are resolved on the runner each time it executes a step. They are never written to broker messages or to the database as part of the workflow state.
 
-Lemline secrets are configured at the system level, separate from workflow definitions:
-
-1. **System Secrets Store**: Secrets are stored in a secure storage system.
-2. **Reference Mechanism**: Workflows reference secrets by name, not by value.
-3. **Runtime Resolution**: Secret values are resolved at runtime, never stored in the workflow definition.
-
-## Defining Secrets in Lemline
-
-There are several ways to define secrets in Lemline:
-
-### 1. Using Configuration Files
-
-Create a `secrets.properties` file:
-
-```properties
-# API credentials
-api.key=your-api-key
-database.password=your-db-password
-oauth.client_secret=your-oauth-secret
-```
-
-Reference this file in your Lemline configuration:
-
-```properties
-lemline.secrets.source=file
-lemline.secrets.file.path=/path/to/secrets.properties
-```
-
-### 2. Using Environment Variables
-
-Define secrets as environment variables:
-
-```bash
-export LEMLINE_SECRET_API_KEY=your-api-key
-export LEMLINE_SECRET_DB_PASSWORD=your-db-password
-export LEMLINE_SECRET_OAUTH_CLIENT_SECRET=your-oauth-secret
-```
-
-Configure Lemline to use environment variables:
-
-```properties
-lemline.secrets.source=env
-lemline.secrets.env.prefix=LEMLINE_SECRET_
-```
-
-### 3. Using a Vault Integration
-
-For production environments, configure Lemline to use HashiCorp Vault:
-
-```properties
-lemline.secrets.source=vault
-lemline.secrets.vault.url=https://vault.example.com:8200
-lemline.secrets.vault.token=your-vault-token
-lemline.secrets.vault.path=secret/lemline
-```
-
-## Using Secrets in Workflows
-
-Once secrets are configured, reference them in your workflow:
+## Step 1: Declare the Secrets
 
 ```yaml
-- authenticatedCall:
-    callHTTP:
-      url: "https://api.example.com/data"
-      headers:
-        Authorization:
-          secret: "api.key"  # References the secret named "api.key"
+document:
+  dsl: '1.0.0'
+  namespace: billing
+  name: charge-customer
+  version: '1.0.0'
+use:
+  secrets:
+    - PAYMENT_API_KEY
+do:
+  - charge:
+      call: http
+      with:
+        method: post
+        endpoint: https://payments.example.com/v1/charges
+        headers:
+          Authorization: '${ "Bearer " + $secrets.PAYMENT_API_KEY }'
+        body:
+          amount: ${ .amount }
 ```
 
-### Authentication Configurations
+A workflow only sees the secrets it declares. A secret that is set on the runner but not listed in `use.secrets` is not visible to expressions.
 
-Secrets are commonly used in authentication configurations:
+## Step 2: Provide the Values to the Runner
+
+Set an environment variable named after each declared secret on **every runner** that may execute the workflow:
+
+```bash
+export PAYMENT_API_KEY='sk_live_51H...'
+lemline listen
+```
+
+With Kubernetes, map a Kubernetes Secret to the same variable name:
+
+```yaml
+env:
+  - name: PAYMENT_API_KEY
+    valueFrom:
+      secretKeyRef:
+        name: payments
+        key: api-key
+```
+
+There is no prefix and no name conversion: `use.secrets: [PAYMENT_API_KEY]` reads the variable `PAYMENT_API_KEY`. Prefer names made of letters, digits, and underscores so they can be set from any shell.
+
+## Structured Secrets
+
+If the value is a JSON object, Lemline parses it, and expressions can read its fields:
+
+```bash
+export DB_CREDENTIALS='{"username": "app", "password": "s3cr3t"}'
+```
 
 ```yaml
 use:
-  authentications:
-    - name: "serviceAuth"
-      oauth2:
-        grantType: "client_credentials"
-        tokenUrl: "https://auth.example.com/oauth/token"
-        clientId: "service-client"
-        clientSecret:
-          secret: "oauth.client_secret"  # References a secret
+  secrets:
+    - DB_CREDENTIALS
+do:
+  - connect:
+      call: http
+      with:
+        method: post
+        endpoint: https://db-proxy.example.com/sessions
+        body:
+          user: ${ $secrets.DB_CREDENTIALS.username }
+          password: ${ $secrets.DB_CREDENTIALS.password }
 ```
 
-### Database Credentials
+Any other value (including a JSON array or number) is passed as a plain string.
 
-When workflows interact with databases:
+## Using Secrets for HTTP Authentication
 
-```yaml
-- databaseOperation:
-    extension:
-      database:
-        connection:
-          url: "jdbc:postgresql://db.example.com:5432/mydb"
-          username: "app_user"
-          password:
-            secret: "database.password"  # References a secret
-```
+Put the secret in a header expression, as shown above. The fields of `endpoint.authentication` (`basic`, `bearer`) are used literally and do not evaluate expressions, so `$secrets` cannot be referenced there.
 
-### Dynamic Secret Resolution
+## When a Secret Is Missing
 
-In some cases, you may need to dynamically determine which secret to use:
+If a declared secret is not set on the runner that executes a step, the workflow **faults** with an `authorization` error (status 403) and the title `Required secret '<name>' is unavailable`. The check runs before the step, so a `try`/`catch` in the workflow cannot handle it.
 
-```yaml
-- dynamicSecretAccess:
-    callHTTP:
-      url: "https://api.example.com/data"
-      headers:
-        Authorization:
-          secret: "${ .environment + '.api.key' }"  # Resolves to "dev.api.key" or "prod.api.key"
-```
+To fix it, set the variable on the runner and start a new instance.
 
-## Secret Rotation and Management
+## Child Workflows
 
-Lemline supports secret rotation strategies:
+A child workflow started with `run: workflow` resolves its own `use.secrets`. It does not inherit secrets from its parent, and it can use a secret its parent does not declare.
 
-1. **Automatic Secret Refresh**: Lemline periodically refreshes secrets from the secret store.
-   ```properties
-   lemline.secrets.refresh.enabled=true
-   lemline.secrets.refresh.interval=PT15M  # Refresh every 15 minutes
-   ```
+## Rotating a Secret
 
-2. **Version-specific Secrets**: Access specific versions of a secret.
-   ```yaml
-   secret: "api.key#2"  # Access version 2 of the api.key secret
-   ```
+Environment variables are read from the runner process. To rotate a secret:
 
-3. **Environment-specific Secrets**: Use different secrets for different environments.
-   ```yaml
-   secret: "${.env}.database.password"  # Resolves to dev.database.password or prod.database.password
-   ```
+1. Update the value where your runners get it (Kubernetes Secret, deployment configuration…).
+2. Restart the runners.
 
-## Security Best Practices
+Because values are never stored with the workflow, instances already in progress use the new value from their next step on.
 
-1. **Never hardcode secrets**: Always use the secret reference mechanism.
-2. **Limit secret access**: Configure least-privilege access to the secret store.
-3. **Rotate secrets regularly**: Implement a secret rotation policy.
-4. **Audit secret usage**: Monitor and log secret access.
-5. **Encrypt secrets at rest**: Ensure secrets are encrypted in storage.
-6. **Use different secrets per environment**: Don't share secrets across environments.
-7. **Avoid logging secrets**: Ensure secrets don't appear in logs.
+## Good Practices
 
-## Troubleshooting Secret Resolution
-
-If you encounter issues with secret resolution:
-
-1. **Check permissions**: Ensure Lemline has access to the secret store.
-2. **Verify secret names**: Confirm that the secret name in the workflow matches the name in the store.
-3. **Enable debug logging**: Temporarily enable secret resolution debugging.
-   ```properties
-   lemline.secrets.debug=true  # WARNING: Don't enable in production!
-   ```
-4. **Check secret cache**: Secret values may be cached. Force a refresh if needed.
-   ```bash
-   lemline admin refresh-secrets
-   ```
+- **Declare only what the workflow needs.** Each workflow only sees its own declared secrets.
+- **Limit where you reference secrets.** An expression can still copy a secret into task output, a log, or a request body. Lemline does not mask it there.
+- **Use different values per environment.** Runners of different namespaces or environments can receive different values for the same name.
 
 ## Related Resources
 
-- [OAuth 2.0 Authentication](lemline-howto-oauth2.md)
-- [API Key Authentication](lemline-howto-api-keys.md)
-- [TLS Configuration](lemline-howto-tls.md)
-- [Security Overview](lemline-explain-security.md)
+- [Secrets Reference](lemline-ref-secrets.md)
+- [Secrets in the Open Workflow DSL](dsl-secrets.md)

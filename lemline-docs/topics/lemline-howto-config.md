@@ -229,15 +229,7 @@ quarkus.log.file.rotation.max-backup-index=5
 
 ### Secret Management
 
-```properties
-# Secret source (file, env, vault)
-lemline.secrets.source=file
-lemline.secrets.file.path=/etc/lemline/secrets.properties
-
-# Secret caching
-lemline.secrets.cache.enabled=true
-lemline.secrets.cache.ttl=PT15M
-```
+Lemline has no secret settings. Each secret a workflow declares in `use.secrets` is read from the runner environment variable with exactly the same name. See [Managing Secrets in Lemline](lemline-howto-secrets.md).
 
 ### Performance Tuning
 

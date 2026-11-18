@@ -175,14 +175,6 @@ Lemline's configuration is organized into these main categories:
 
 | Property | Type | Default | Description |
 |----------|------|---------|-------------|
-| `lemline.security.secrets.source` | String | "env" | Secrets source: "env", "file", "vault" |
-| `lemline.security.secrets.env.prefix` | String | "LEMLINE_SECRET_" | Environment variable prefix for secrets |
-| `lemline.security.secrets.file.path` | String | "./secrets.properties" | Path to secrets file |
-| `lemline.security.secrets.vault.url` | String | | HashiCorp Vault URL |
-| `lemline.security.secrets.vault.token` | String | | HashiCorp Vault token |
-| `lemline.security.secrets.vault.path` | String | "secret/lemline" | HashiCorp Vault secrets path |
-| `lemline.security.secrets.refresh.enabled` | Boolean | false | Enable periodic secrets refresh |
-| `lemline.security.secrets.refresh.interval` | Duration | PT15M | Secrets refresh interval |
 | `lemline.security.tls.enabled` | Boolean | true | Enable TLS for HTTP client |
 | `lemline.security.tls.truststore.path` | String | | Path to truststore |
 | `lemline.security.tls.truststore.password` | String | | Truststore password |

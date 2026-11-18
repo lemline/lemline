@@ -167,14 +167,6 @@ Lemline configuration properties can be set via environment variables using a st
 
 | Environment Variable | Default | Description |
 |---------------------|---------|-------------|
-| `LEMLINE_SECURITY_SECRETS_SOURCE` | "env" | Secrets source: "env", "file", "vault" |
-| `LEMLINE_SECURITY_SECRETS_ENV_PREFIX` | "LEMLINE_SECRET_" | Environment variable prefix for secrets |
-| `LEMLINE_SECURITY_SECRETS_FILE_PATH` | "./secrets.properties" | Path to secrets file |
-| `LEMLINE_SECURITY_SECRETS_VAULT_URL` | | HashiCorp Vault URL |
-| `LEMLINE_SECURITY_SECRETS_VAULT_TOKEN` | | HashiCorp Vault token |
-| `LEMLINE_SECURITY_SECRETS_VAULT_PATH` | "secret/lemline" | HashiCorp Vault secrets path |
-| `LEMLINE_SECURITY_SECRETS_REFRESH_ENABLED` | "false" | Enable periodic secrets refresh |
-| `LEMLINE_SECURITY_SECRETS_REFRESH_INTERVAL` | "PT15M" | Secrets refresh interval |
 | `LEMLINE_SECURITY_TLS_ENABLED` | "true" | Enable TLS for HTTP client |
 | `LEMLINE_SECURITY_TLS_TRUSTSTORE_PATH` | | Path to truststore |
 | `LEMLINE_SECURITY_TLS_TRUSTSTORE_PASSWORD` | | Truststore password |
@@ -255,15 +247,14 @@ Lemline configuration properties can be set via environment variables using a st
 
 ## Secrets Environment Variables
 
-When using the environment variable secrets source (`LEMLINE_SECURITY_SECRETS_SOURCE=env`), secrets are read from environment variables with the prefix defined by `LEMLINE_SECURITY_SECRETS_ENV_PREFIX` (default: `LEMLINE_SECRET_`).
+Workflow secrets are read from environment variables named exactly like the secrets the workflow declares in `use.secrets`: no prefix and no name conversion.
 
-Examples:
+| Declared secret | Environment variable read by the runner |
+|-----------------|-----------------------------------------|
+| `PAYMENT_API_KEY` | `PAYMENT_API_KEY` |
+| `DB_CREDENTIALS` | `DB_CREDENTIALS` (a JSON object value is parsed) |
 
-| Environment Variable | Description |
-|---------------------|-------------|
-| `LEMLINE_SECRET_API_KEY` | Secret named "api.key" |
-| `LEMLINE_SECRET_DB_PASSWORD` | Secret named "db.password" |
-| `LEMLINE_SECRET_OAUTH_CLIENT_SECRET` | Secret named "oauth.client.secret" |
+See [Secrets Reference](lemline-ref-secrets.md).
 
 ## Profile Environment Variables
 
@@ -327,9 +318,8 @@ export QUARKUS_LOG_CONSOLE_JSON="true"
 # Set active profile
 export QUARKUS_PROFILE="prod"
 
-# Secrets
-export LEMLINE_SECRET_API_KEY="your-api-key"
-export LEMLINE_SECRET_OAUTH_CLIENT_SECRET="oauth-client-secret"
+# Workflow secrets (named exactly like the entries of use.secrets)
+export PAYMENT_API_KEY="your-api-key"
 ```
 
 ## Related Resources
