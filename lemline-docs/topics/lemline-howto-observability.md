@@ -113,7 +113,7 @@ Runners publish a CloudEvent for each workflow and task transition (`org.open-wo
 
 ## Lifecycle Analytics
 
-To keep a queryable history, enable lifecycle analytics: a runner consumes the lifecycle events and stores them in a PostgreSQL (or in-memory H2) table. The dashboard uses this data. See [Lifecycle Analytics Reference](lemline-ref-analytics.md).
+To keep a queryable history, enable lifecycle analytics: a runner consumes the lifecycle events and stores them in a PostgreSQL table (the in-memory H2 store only exists in Lemline's test suite). The dashboard uses this data. See [Lifecycle Analytics Reference](lemline-ref-analytics.md).
 
 ## Dashboard
 

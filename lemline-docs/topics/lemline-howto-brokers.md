@@ -163,7 +163,7 @@ lemline:
     type: in-memory
 ```
 
-Messages only travel inside one process and are lost when it stops. Use it for local tests only.
+Messages only travel inside one process and are lost when it stops, so a separate `lemline instance start` cannot reach a `lemline listen` runner through it. Use it for tests that run everything in one process only.
 
 ## Common Issues and Solutions
 

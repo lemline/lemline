@@ -11,15 +11,9 @@ Lemline reads its configuration from, in order of decreasing priority:
 3. **A YAML configuration file**
 4. **Built-in defaults**
 
-Every command except `lemline config create` needs a configuration file, and stops with an error when none is found. To try Lemline on one machine, a file that selects the in-memory database and messaging is enough:
+Every command except `lemline config create` needs a configuration file, and stops with an error when none is found. To try Lemline on one machine, use PostgreSQL for everything (database, PGMQ messaging and lifecycle analytics), as described in [Setting Up A Local Environment](lemline-tutorial-setup.md).
 
-```yaml
-lemline:
-  database:
-    type: in-memory
-  messaging:
-    type: in-memory
-```
+The in-memory database and the in-memory H2 analytics store are only available in Lemline's own test suite: the released binaries and jar do not include them, so `database.type: in-memory` and the default `analytics.type: h2` cannot start a runner.
 
 ## Create a Configuration File
 
