@@ -45,11 +45,13 @@ lemline:
     postgresql:
       host: localhost
       port: 5432
-      database: lemline
+      database: lemline_analytics
       username: postgres
       password: postgres
       schema: lemline
 ```
+
+Use a database dedicated to analytics. Its Flyway history is separate from the workflow database's, so pointing analytics at the workflow database and schema makes its first migration find a non-empty schema and stop the runner at startup (unless `baseline-on-migrate` is enabled).
 
 `lemline listen` turns on both the lifecycle events producer and consumer by itself; set them explicitly only for other processes.
 
@@ -64,7 +66,7 @@ lemline:
 | `lemline.analytics.baseline-on-migrate` | `false` | Enables Flyway baseline behavior for analytics DB |
 | `lemline.analytics.postgresql.host` | `localhost` | Analytics PostgreSQL host |
 | `lemline.analytics.postgresql.port` | `5432` | Analytics PostgreSQL port |
-| `lemline.analytics.postgresql.database` | `lemline` | Analytics PostgreSQL database name |
+| `lemline.analytics.postgresql.database` | `lemline` | Analytics PostgreSQL database name; use a database separate from the workflow database |
 | `lemline.analytics.postgresql.username` | `postgres` | Analytics PostgreSQL username |
 | `lemline.analytics.postgresql.password` | `postgres` | Analytics PostgreSQL password |
 | `lemline.analytics.postgresql.schema` | `lemline` | Target schema for lifecycle analytics table |
