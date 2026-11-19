@@ -7,7 +7,7 @@ This document explains which security controls Lemline provides today: how workf
 Lemline has three places where security matters:
 
 1. **Outgoing calls made by workflows**: authentication is declared in the workflow definition.
-2. **Secrets used by workflows**: values come from the runner environment and are never written to messages or the database.
+2. **Secrets used by workflows**: values come from the runner environment; `$secrets` itself is never written to messages or the database, but data derived from it can be (see below).
 3. **The gRPC gateway**: the entry point used by clients and the dashboard, protected by TLS and JWT.
 
 Runners themselves expose no API: they only consume from the message broker and the database, so their protection is the protection of those systems (network access, credentials, TLS settings of the broker and database).
@@ -72,7 +72,7 @@ A reference to an unknown name fails with a `configuration` error.
 
 Workflows declare the secrets they need in `use.secrets` and read them in expressions through `$secrets.<name>`. The runner reads each declared name from the environment variable with exactly the same name, before each step it executes.
 
-- **Never persisted**: resolved values are not part of broker messages or stored workflow state.
+- **Not persisted by themselves**: the `$secrets` values are resolved on the runner for each step and are not part of broker messages or stored workflow state. Any value derived from them that ends up in task output, context or workflow output is stored like other workflow data. With `output: response`, an HTTP task's output includes the headers of the request it sent, including `Authorization`: filter them out (for example with `output.as`) before they become workflow data.
 - **Scoped**: a workflow only sees the secrets it declares; a child workflow resolves its own.
 - **Rotation**: update the variable and restart the runners; instances in progress use the new value from their next step.
 - **Missing value**: the workflow faults with an `authorization` error.

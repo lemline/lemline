@@ -11,7 +11,7 @@ This page summarizes how Lemline resolves workflow secrets. For a step-by-step g
 | Access in expressions | `$secrets.<name>` |
 | Visibility | Only the names declared by the current workflow |
 | Resolution time | On the runner, before each step it executes |
-| Storage | Never included in broker messages or persisted workflow state |
+| Storage | `$secrets` is not included in broker messages or persisted workflow state; values copied into task output (including request headers returned by `output: response`) are |
 | Missing value | The workflow faults with an `authorization` error (status 403) |
 | Child workflows | Resolve their own declared secrets; nothing is inherited from the parent |
 | Rotation | Update the variable and restart the runners |
@@ -62,4 +62,5 @@ This error faults the workflow directly; it cannot be caught by a `try` task.
 
 - Resolved values are kept in memory only while a step runs.
 - An expression that copies a secret into output, context, or a request sends that value onward; Lemline does not mask it.
+- With `output: response`, an HTTP task's output includes the headers of the request it sent, including `Authorization`: filter them out (for example with `output.as`) before they become workflow data.
 - Every runner that may execute a workflow needs the variables it declares, including runners of other pools that execute its child workflows.

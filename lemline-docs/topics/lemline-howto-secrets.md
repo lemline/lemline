@@ -8,7 +8,7 @@ This guide explains how to give your workflows access to API keys, passwords, an
 2. The runner **reads** each declared name from an environment variable with exactly the same name.
 3. Expressions **access** the values through `$secrets.<name>`.
 
-Secret values are resolved on the runner each time it executes a step. They are never written to broker messages or to the database as part of the workflow state.
+Secret values are resolved on the runner each time it executes a step. `$secrets` is not written to broker messages or to the database as part of the workflow state; a value copied from it into task output is, like any other workflow data.
 
 ## Step 1: Declare the Secrets
 
@@ -111,11 +111,12 @@ Environment variables are read from the runner process. To rotate a secret:
 1. Update the value where your runners get it (Kubernetes Secret, deployment configuration…).
 2. Restart the runners.
 
-Because values are never stored with the workflow, instances already in progress use the new value from their next step on.
+Because `$secrets` is resolved again for each step, instances already in progress use the new value from their next step on.
 
 ## Good Practices
 
 - **Declare only what the workflow needs.** Each workflow only sees its own declared secrets.
+- **Filter request headers from `output: response`.** An HTTP task's output includes the headers of the request it sent, including `Authorization`; keep only what you need with `output.as`.
 - **Limit where you reference secrets.** An expression can still copy a secret into task output, a log, or a request body. Lemline does not mask it there.
 - **Use different values per environment.** Runners of different namespaces or environments can receive different values for the same name.
 
