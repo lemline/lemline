@@ -57,20 +57,20 @@ See [gRPC Gateway Reference](lemline-ref-gateway.md).
 
 ## Storing Lifecycle Events
 
-With lifecycle analytics enabled, a runner consumes the lifecycle events and stores each one in the `lemline_lifecycle_events` table, with the full CloudEvent in the `payload` column and the workflow id, namespace, name and version in dedicated columns. See [Lifecycle Analytics Reference](lemline-ref-analytics.md) for how to enable it.
+With lifecycle analytics enabled, a runner consumes the lifecycle events and stores each one in the `lemline_lifecycle_events` table of the `lemline` schema (set by `lemline.analytics.postgresql.schema`; replace it in the queries below if you changed it), with the full CloudEvent in the `payload` column and the workflow id, namespace, name and version in dedicated columns. See [Lifecycle Analytics Reference](lemline-ref-analytics.md) for how to enable it.
 
 Example queries on PostgreSQL:
 
 ```sql
 -- Complete lifecycle of one instance
 SELECT type, event_time, payload
-FROM lemline_lifecycle_events
+FROM lemline.lemline_lifecycle_events
 WHERE lemline_workflow_id = '01890a5d-ac96-774b-bcce-b302099a8057'
 ORDER BY event_time;
 
 -- Faulted instances per workflow over the last day
 SELECT lemline_workflow_name, lemline_workflow_version, COUNT(*) AS faulted
-FROM lemline_lifecycle_events
+FROM lemline.lemline_lifecycle_events
 WHERE type = 'org.open-workflow-specification.workflow.faulted.v1'
   AND event_time > NOW() - INTERVAL '1 day'
 GROUP BY lemline_workflow_name, lemline_workflow_version
