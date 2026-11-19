@@ -26,8 +26,8 @@ Quarkus log properties are not read from the Lemline configuration file, which o
 
 ```bash
 export QUARKUS_LOG_LEVEL=INFO
+export QUARKUS_LOG_CONSOLE_LEVEL=DEBUG   # the console only shows ERROR by default
 export QUARKUS_LOG_CATEGORY__COM_LEMLINE_CORE__LEVEL=DEBUG
-export QUARKUS_LOG_CATEGORY__COM_LEMLINE_CORE_EXPRESSIONS__LEVEL=TRACE
 ```
 
 Log levels include:
@@ -36,7 +36,7 @@ Log levels include:
 - **WARN**: Issues that don't prevent execution but might cause incorrect behavior
 - **INFO**: Normal workflow execution events
 - **DEBUG**: Detailed information for diagnosing problems
-- **TRACE**: Very detailed information, including expression evaluation steps
+- **TRACE**: not available in the released binaries, which are built with `DEBUG` as the lowest level
 
 ## Inspecting Workflow Definitions
 

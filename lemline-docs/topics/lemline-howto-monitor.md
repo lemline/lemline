@@ -77,6 +77,7 @@ For production environments, set up a comprehensive monitoring solution:
 Start the runner with `--debug`, or set the level of Lemline packages with an environment variable (Quarkus log properties are not read from the configuration file):
 
 ```bash
+export QUARKUS_LOG_CONSOLE_LEVEL=DEBUG   # the console only shows ERROR by default
 export QUARKUS_LOG_CATEGORY__COM_LEMLINE__LEVEL=DEBUG
 ```
 

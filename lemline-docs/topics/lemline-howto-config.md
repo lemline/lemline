@@ -183,6 +183,7 @@ Use the command-line options `--debug`, `--info`, `--warn` or `--error` to set t
 
 ```bash
 export QUARKUS_LOG_LEVEL=INFO
+export QUARKUS_LOG_CONSOLE_LEVEL=DEBUG   # the console only shows ERROR by default
 export QUARKUS_LOG_CATEGORY__COM_LEMLINE__LEVEL=DEBUG
 ```
 

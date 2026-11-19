@@ -42,6 +42,7 @@ lemline listen --debug
 Or, for Lemline packages only, with an environment variable (Quarkus log properties are not read from the configuration file):
 
 ```bash
+export QUARKUS_LOG_CONSOLE_LEVEL=DEBUG   # the console only shows ERROR by default
 export QUARKUS_LOG_CATEGORY__COM_LEMLINE__LEVEL=DEBUG
 ```
 

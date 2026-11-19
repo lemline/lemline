@@ -294,6 +294,7 @@ Logging uses the standard Quarkus properties. They are not read from the Lemline
 
 ```bash
 export QUARKUS_LOG_LEVEL=INFO
+export QUARKUS_LOG_CONSOLE_LEVEL=DEBUG   # the console only shows ERROR by default
 export QUARKUS_LOG_CATEGORY__COM_LEMLINE__LEVEL=DEBUG
 ```
 
