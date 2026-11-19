@@ -4,6 +4,9 @@ title: How to call gRPC functions
 
 # How to call gRPC functions
 
+> **Not supported by the Lemline runtime yet.** Workflows that use `call: grpc` are accepted, but the task fails when it runs. If the service also exposes an HTTP or JSON interface, call it with `call: http`.
+
+
 This guide explains how to integrate gRPC service calls into your Lemline workflows. You'll learn how to define gRPC functions, make unary and streaming calls, handle responses, and implement error handling.
 
 ## Understanding gRPC in Lemline
@@ -673,7 +676,7 @@ This workflow uses gRPC services to process an order from validation to shipment
 1. **Define Clear Proto Files**: Use well-structured Protocol Buffer definitions
 2. **Version Your APIs**: Include versioning in your service and proto definitions
 3. **Implement Proper Error Handling**: Use try/catch blocks with specific error types
-4. **Set Reasonable Timeouts**: Configure timeouts appropriate for the expected response time
+4. **Set Reasonable Timeouts**: Configure timeouts appropriate for the expected response time (Lemline only enforces timeouts on `listen` tasks; HTTP calls use fixed limits of 15 s to connect and 30 s per request)
 5. **Use TLS for Security**: Always enable TLS for production environments
 6. **Manage Connection Lifecycle**: Consider connection pooling for high-volume workflows
 7. **Handle Streaming Appropriately**: Set proper timeouts and collection strategies for streaming calls

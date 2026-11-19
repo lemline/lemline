@@ -4,289 +4,102 @@ title: How to cancel, resume, or suspend a workflow
 
 # How to cancel, resume, or suspend a workflow
 
-This guide explains how to manage the lifecycle of workflow instances in Lemline, including cancelling, suspending, and resuming workflows.
+This guide explains what you can do today to stop, pause or recover a running workflow instance in Lemline.
 
-## Understanding Workflow Lifecycle Operations
+## Current Status
 
-Lemline provides several operations to control workflow instances:
+Lemline does not yet provide operator commands to act on a running instance. There is no CLI command, gRPC gateway call or dashboard action to cancel, suspend, resume or retry an instance.
 
-| Operation | Description | When to Use |
-|-----------|-------------|------------|
-| Cancel | Permanently stops a workflow | When the workflow is no longer needed or should be aborted |
-| Suspend | Temporarily pauses a workflow | When you need to temporarily halt execution |
-| Resume | Continues execution of a suspended workflow | When you're ready to continue a suspended workflow |
-| Retry | Re-attempts execution from a failed state | When a workflow has faulted but should be recovered |
+| Operation | Available as an operator action | What to do instead |
+|-----------|----------------------------------|--------------------|
+| Cancel | No | Design the workflow to stop on a cancellation event or a timeout |
+| Suspend / Resume | No | Design the workflow to wait for an event before continuing |
+| Retry a faulted instance | No | Use `retry` on the failing task, or start a new instance |
 
-## Cancelling a Workflow Instance
+The rest of this guide shows how to build these behaviors into the workflow itself.
 
-### When to Cancel Workflows
+## Stopping a Workflow on Request
 
-You should cancel a workflow when:
-- The business process it represents is no longer needed
-- An error condition makes continued execution meaningless
-- The workflow is stuck and cannot be recovered
-- A duplicate workflow was started accidentally
-
-### Using the CLI
-
-To cancel a workflow instance:
-
-```bash
-lemline instance cancel <instance-id> --reason "Order was revoked by customer"
-```
-
-The `--reason` parameter is optional but recommended for audit purposes.
-
-### Using the REST API
-
-```bash
-curl -X POST \
-  http://localhost:8080/api/v1/instances/<instance-id>/cancel \
-  -H "Content-Type: application/json" \
-  -d '{"reason": "Order was revoked by customer"}'
-```
-
-### What Happens When a Workflow is Cancelled
-
-When you cancel a workflow:
-
-1. Execution stops immediately
-2. The workflow state changes to `CANCELLED`
-3. No further tasks are executed
-4. Resources associated with the workflow are released
-5. A cancellation event is emitted to the message broker
-6. The cancellation is logged with the provided reason
-
-### Cancelling Multiple Workflows
-
-You can cancel multiple workflows matching specific criteria:
-
-```bash
-lemline instance cancel-bulk --workflow-id order-processing --status RUNNING
-```
-
-This is useful for batch operations, such as cancelling all instances of a specific workflow version when deploying an update.
-
-## Suspending a Workflow Instance
-
-### When to Suspend Workflows
-
-You should suspend a workflow when:
-- You need to temporarily halt execution for business reasons
-- A dependent system is unavailable but will return
-- You need to modify related data before continuing
-- You're performing a system upgrade
-
-### Using the CLI
-
-To suspend a workflow instance:
-
-```bash
-lemline instance suspend <instance-id> --reason "Payment system maintenance" --duration PT1H
-```
-
-The `--duration` parameter specifies an optional automatic resume time using ISO-8601 duration format.
-
-### Using the REST API
-
-```bash
-curl -X POST \
-  http://localhost:8080/api/v1/instances/<instance-id>/suspend \
-  -H "Content-Type: application/json" \
-  -d '{
-    "reason": "Payment system maintenance", 
-    "resumeAfter": "PT1H"
-  }'
-```
-
-### What Happens When a Workflow is Suspended
-
-When you suspend a workflow:
-
-1. Execution pauses at the current task
-2. The workflow state changes to `SUSPENDED`
-3. Current task state is preserved
-4. A suspension event is emitted
-5. If a duration is specified, a resume timer is created
-
-## Resuming a Workflow Instance
-
-### When to Resume Workflows
-
-You should resume a workflow when:
-- The reason for suspension no longer applies
-- Required systems are back online
-- Necessary data modifications are complete
-- System maintenance is finished
-
-### Using the CLI
-
-To resume a suspended workflow:
-
-```bash
-lemline instance resume <instance-id> --reason "Payment system is back online"
-```
-
-### Using the REST API
-
-```bash
-curl -X POST \
-  http://localhost:8080/api/v1/instances/<instance-id>/resume \
-  -H "Content-Type: application/json" \
-  -d '{"reason": "Payment system is back online"}'
-```
-
-### What Happens When a Workflow is Resumed
-
-When you resume a workflow:
-
-1. The workflow state changes back to `RUNNING`
-2. Execution continues from the point where it was suspended
-3. A resume event is emitted
-4. The resumption is logged with the provided reason
-
-## Retrying a Faulted Workflow
-
-### When to Retry Workflows
-
-You should retry a workflow when:
-- It has faulted due to a temporary issue
-- The underlying problem has been resolved
-- The workflow needs to complete despite the previous failure
-
-### Using the CLI
-
-To retry a faulted workflow:
-
-```bash
-lemline instance retry <instance-id> --reason "Database connectivity restored"
-```
-
-### Using the REST API
-
-```bash
-curl -X POST \
-  http://localhost:8080/api/v1/instances/<instance-id>/retry \
-  -H "Content-Type: application/json" \
-  -d '{"reason": "Database connectivity restored"}'
-```
-
-### What Happens When a Workflow is Retried
-
-When you retry a workflow:
-
-1. The workflow state changes from `FAULTED` to `RUNNING`
-2. Execution resumes from the task that failed
-3. Error information is cleared
-4. A retry event is emitted
-5. The retry is logged with the provided reason
-
-## Advanced Lifecycle Management
-
-### Setting Up Automatic Retry Policies
-
-For production environments, you may want to configure automatic retry policies for faulted workflows:
+Let the workflow listen for a cancellation event while it waits, and end when it arrives:
 
 ```yaml
-# In lemline.yaml
-lemline:
-  workflows:
-    retry:
-      enabled: true
-      max-attempts: 3
-      delay: PT5M
-      exclude-errors:
-        - VALIDATION
-        - AUTHORIZATION
+do:
+  - waitForPaymentOrCancellation:
+      listen:
+        to:
+          any:
+            - with:
+                type: com.example.payment.received
+            - with:
+                type: com.example.order.cancelled
+        read: envelope
+  - checkCancellation:
+      switch:
+        - cancelled:
+            when: ${ .[0].type == "com.example.order.cancelled" }
+            then: end
+        - default:
+            then: continue
 ```
 
-This configuration will automatically retry faulted workflows up to 3 times with a 5-minute delay between attempts, except for validation and authorization errors.
+Send the cancellation as a CloudEvent on the CloudEvents channel of the workflow's namespace. See [How to emit and listen for events](lemline-howto-events.md).
 
-### Implementing Compensation Actions on Cancellation
+## Bounding How Long a Workflow Waits
 
-When cancelling workflows that have already performed external actions, you may need to implement compensation:
+Lemline does not enforce workflow-level timeouts yet, nor timeouts on tasks other than `listen`: they are accepted but ignored. To keep an instance from waiting forever for an external signal, put a timeout on the `listen` task:
 
-1. Create a compensation workflow that reverses the effects
-2. When cancelling the original workflow, trigger the compensation workflow:
-
-```bash
-lemline instance cancel <instance-id> --reason "Order revoked" \
-  --compensation-workflow order-compensation \
-  --compensation-input '{"orderId": "ORD-123", "action": "CANCEL"}'
+```yaml
+do:
+  - waitForPayment:
+      listen:
+        to:
+          one:
+            with:
+              type: com.example.payment.received
+      timeout:
+        after:
+          hours: 24
 ```
 
-### Scheduling Future Lifecycle Operations
+When the timeout expires, the task faults with a `timeout` error, which a `try` task can catch. See [Timeouts](dsl-timeouts.md).
 
-You can schedule lifecycle operations for a future time:
+## Pausing Until an External Signal
 
-```bash
-lemline instance schedule-suspend <instance-id> \
-  --at "2023-12-24T23:59:59Z" \
-  --reason "Christmas shutdown"
+A `listen` task pauses the instance until a matching event arrives; a `wait` task pauses it for a fixed duration. Neither uses runner resources while waiting.
+
+```yaml
+do:
+  - waitForApproval:
+      listen:
+        to:
+          one:
+            with:
+              type: com.example.order.approved
 ```
 
-This is useful for planned maintenance or business hours restrictions.
+## Recovering from Failures
 
-## Lifecycle Events for External Systems
+- **Inside the workflow**: wrap fragile tasks in `try` with a `retry` policy, so temporary errors are retried automatically. See [Implementing Retry Mechanisms](lemline-howto-retry.md).
+- **After a fault**: a faulted instance stays faulted. Fix the cause, then start a new instance with `lemline instance start`.
+- **Messages parked by a runner**: messages received for a namespace that no runner served are kept in the failures table. Re-send them with `lemline failures replay`.
 
-Lemline emits events for all lifecycle operations, which external systems can consume:
+## Observing Lifecycle Changes
 
-| Event Type | Description |
-|------------|-------------|
-| `WORKFLOW_CANCELLED` | Emitted when a workflow is cancelled |
-| `WORKFLOW_SUSPENDED` | Emitted when a workflow is suspended |
-| `WORKFLOW_RESUMED` | Emitted when a workflow is resumed |
-| `WORKFLOW_RETRIED` | Emitted when a workflow is retried |
+Lemline emits lifecycle CloudEvents that external systems can consume:
 
-To listen for these events:
+| Event type | Emitted when |
+|------------|--------------|
+| `org.open-workflow-specification.workflow.created.v1` | An instance is created |
+| `org.open-workflow-specification.workflow.started.v1` | An instance starts |
+| `org.open-workflow-specification.workflow.completed.v1` | An instance completes |
+| `org.open-workflow-specification.workflow.faulted.v1` | An instance faults |
+| `org.open-workflow-specification.task.created.v1` | A task is created |
+| `org.open-workflow-specification.task.started.v1` | A task starts |
+| `org.open-workflow-specification.task.completed.v1` | A task completes |
+| `org.open-workflow-specification.task.faulted.v1` | A task faults |
+| `org.open-workflow-specification.task.retried.v1` | A task is retried |
 
-```bash
-lemline listen events --type WORKFLOW_CANCELLED,WORKFLOW_SUSPENDED
-```
-
-## Lifecycle Management Best Practices
-
-1. **Always provide a reason**: Document why lifecycle operations are performed for audit and troubleshooting
-2. **Implement proper authorization**: Restrict who can perform lifecycle operations
-3. **Consider compensation**: Define compensation strategies for cancelled workflows
-4. **Monitor lifecycle operations**: Set up alerts for unusual patterns of cancellations or suspensions
-5. **Use timeouts**: When suspending workflows, specify a maximum suspension duration
-6. **Document lifecycle procedures**: Create clear procedures for operations teams
-7. **Automate when possible**: Use the API to automate lifecycle management for common scenarios
-
-## Common Troubleshooting Scenarios
-
-### Workflow Won't Cancel
-
-If a workflow doesn't properly cancel:
-
-1. Check if the instance is in a transition state
-2. Verify that the instance actually exists
-3. Use the `--force` option for stuck instances:
-   ```bash
-   lemline instance cancel <instance-id> --force
-   ```
-
-### Workflow Won't Resume
-
-If a suspended workflow can't be resumed:
-
-1. Check if the workflow is actually in `SUSPENDED` state
-2. Look for errors in the logs related to the instance
-3. Verify that the database connection is working properly
-4. Try stopping and restarting the Lemline runner
-
-### Stuck Workflows
-
-For workflows that appear stuck:
-
-1. Check the current node position:
-   ```bash
-   lemline instance get <instance-id> --details
-   ```
-2. Determine if it's waiting for an event or timer
-3. Verify if external systems are responsive
-4. Consider cancelling and restarting if necessary
+They are published on the lifecycle events channel and shown in the dashboard. See [Lifecycle Events](dsl-lifecycle-events.md).
 
 ## Next Steps
 

@@ -18,7 +18,7 @@ This reference documents the current public `lemline-runner-gateway` API: RPC su
 The gateway is not started as a standalone module. It is loaded by `lemline-runner` and started with:
 
 ```bash
-gateway start
+lemline gateway start
 ```
 
 It shares the same `.lemline.yaml` configuration model as the runner and depends on:
@@ -55,6 +55,7 @@ Service: `lemline.gateway.v1.GatewayService`
 | `WatchInstances` | `WatchInstancesRequest` | `stream WatchInstancesResponse` | Delta stream of `UPSERT` and `REMOVED` changes to the filtered instance set. If `after_cursor` is omitted, the stream starts from "now" and emits only future changes. |
 | `ListInstanceEvents` | `ListInstanceEventsRequest` | `ListInstanceEventsResponse` | Returns finite ordered history for one instance, in ascending event-cursor order. |
 | `WatchInstanceEvents` | `WatchInstanceEventsRequest` | `stream WatchInstanceEventsResponse` | Streams one instance timeline. If `after_cursor` is omitted, the server replays from the first event and then tails live events. |
+| `GetGatewayConfig` | `GetGatewayConfigRequest` | `GetGatewayConfigResponse` | Returns the configuration the gateway runs with, where each value comes from, and the configuration file as read at startup. Secret values are never returned. |
 
 ### StartInstance Request and Response
 
@@ -157,10 +158,11 @@ Current scope requirements:
 - `lemline.watch` for `WatchDefinitionStats`
 - `lemline.watch` for `WatchInstances`
 - `lemline.watch` for `WatchInstanceEvents`
+- `lemline.config` for `GetGatewayConfig`
 
 Current namespace rules:
 
-- non-streaming read RPCs do not require a scope
+- other non-streaming read RPCs do not require a scope
 - namespace authorization is still enforced for read RPCs when authentication is enabled
 - `List*` calls without an explicit namespace are automatically limited to the caller's allowed namespaces
 - `*` in the namespaces claim allows access to all namespaces
@@ -226,7 +228,7 @@ Gateway startup uses the same config resolution order as `lemline-runner`:
 
 Notes:
 
-1. `gateway start` sets `lemline.gateway.enabled=true` automatically; keeping it in config is still fine.
+1. `lemline gateway start` sets `lemline.gateway.enabled=true` automatically; keeping it in config is still fine.
 2. Authentication cannot be enabled on plaintext transport.
 
 ### Analytics Keys for Read APIs

@@ -1,5 +1,8 @@
 # IoT Workflow Examples
 
+> **Runtime support:** some examples on this page use `call: openapi`, `call: asyncapi`, `call: grpc` or OAuth 2.0 authentication. The Lemline runtime does not execute these yet: such a task fails when it runs. Write those calls with `call: http` and `basic` or `bearer` authentication to run them on Lemline.
+
+
 This document provides practical examples of workflows for Internet of Things (IoT) applications using Lemline. These examples demonstrate how to implement common IoT patterns such as device provisioning, telemetry processing, firmware updates, and event-based monitoring.
 
 ## Device Provisioning Workflow
@@ -148,6 +151,8 @@ do:
           status: "active"
           lastPing: ${ .activationResult.timestamp }
 ```
+
+> **Lemline runtime:** only `listen` task timeouts are enforced. Workflow-level timeouts and timeouts on other tasks are accepted but ignored for now. HTTP calls use fixed client limits instead: 15 seconds to connect, 30 seconds per request.
 
 ## Telemetry Processing Workflow
 
@@ -619,7 +624,7 @@ When implementing IoT workflows with Lemline, consider these best practices:
 2. **Batch Processing**: Process telemetry data in batches for efficiency
 3. **Error Handling**: Use robust error handling and retry mechanisms for device communications
 4. **Correlation**: Properly correlate events from the same device across different workflows
-5. **Timeouts**: Set appropriate timeouts for device communication, which may be unstable
+5. **Timeouts**: Set appropriate timeouts for device communication, which may be unstable (Lemline only enforces timeouts on `listen` tasks; HTTP calls use fixed limits of 15 s to connect and 30 s per request)
 6. **Stateful Workflows**: Use workflow context for maintaining state about devices
 7. **Digital Twins**: Update digital twin representations with the latest device state
 8. **Progressive Deployment**: Implement batched or phased deployments for firmware updates

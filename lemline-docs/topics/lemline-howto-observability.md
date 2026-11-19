@@ -1,788 +1,149 @@
 # How to Configure Observability
 
-This guide explains how to configure and implement observability in Lemline to monitor, trace, and analyze workflow execution, performance, and behavior.
+This guide explains how to observe Lemline in operation: metrics, health checks, logs, lifecycle events and the dashboard.
 
 ## When to Configure Observability
 
-Set up observability in Lemline when:
+Set up observability when you:
 
-- Monitoring workflow execution in production
-- Troubleshooting workflow failures
-- Analyzing workflow performance
-- Tracking resource utilization
-- Setting up alerts for anomalies
-- Creating dashboards for operational insight
-- Implementing distributed tracing across systems
-- Maintaining audit trails for compliance
+- run Lemline in a shared or production environment
+- need to know whether runners are healthy and keeping up
+- investigate failed or slow workflows
+- keep a history of workflow instances
 
 ## Observability Components
 
-Lemline's observability consists of four main components:
+| Component | Where | Configuration |
+|-----------|-------|---------------|
+| Metrics | `http://<host>:8080/q/metrics` (Prometheus format) | `lemline.metrics.port`, `lemline.metrics.path` |
+| Health checks | `/q/health`, `/q/health/live`, `/q/health/ready` on the same port | none |
+| Logs | standard output | `--debug`/`--info`/`--warn`/`--error`, `--json`, Quarkus log properties |
+| Lifecycle events | lifecycle events topic or queue | messaging configuration |
+| Lifecycle analytics | analytics database table | `lemline.analytics.*` |
+| Dashboard | through the gRPC gateway | `lemline.gateway.*` |
 
-1. **Metrics** - Numerical data about workflow execution, performance, and resources
-2. **Logging** - Detailed contextual information about workflow execution
-3. **Tracing** - Distributed tracing for workflow execution across services
-4. **Events** - Structured data about workflow lifecycle events
+Lemline does not include distributed tracing (OpenTelemetry) or alerting; use your monitoring stack for alerts.
 
-## Basic Observability Configuration
+## Metrics
 
-### Enabling Observability
-
-Enable observability in your `application.yaml`:
-
-```yaml
-lemline:
-  observability:
-    enabled: true
-    metrics:
-      enabled: true
-    logging:
-      enabled: true
-    tracing:
-      enabled: true
-    events:
-      enabled: true
-```
-
-### Metrics Configuration
-
-Configure metrics collection and export:
+`lemline listen` and `lemline gateway start` serve Prometheus metrics. Change the port with `lemline.metrics.port` or `--metrics-port`, and the path with `lemline.metrics.path`:
 
 ```yaml
 lemline:
-  observability:
-    metrics:
-      collection-interval: 15s
-      enabled-categories:
-        - workflow
-        - node
-        - resource
-        - io
-      export:
-        prometheus:
-          enabled: true
-          port: 9090
-          path: /metrics
-        jmx:
-          enabled: true
-        otlp:
-          enabled: true
-          endpoint: https://otlp.example.com:4317
-          protocol: grpc
+  metrics:
+    port: 9090
+    path: /q/metrics
 ```
 
-### Logging Configuration
+Lemline metrics describe message processing per channel, with the prefixes `lemline_messaging_commands`, `lemline_messaging_events`, `lemline_messaging_cloudevents` and `lemline_analytics`:
 
-Configure logging format and destinations:
+| Metric (suffix) | Type | Description |
+|-----------------|------|-------------|
+| `_active` | Gauge | Messages currently being processed |
+| `_received_total` | Counter | Messages received |
+| `_deserialization_completed_total`, `_deserialization_failed_total` | Counter | Messages decoded, or rejected |
+| `_deserialization_duration_seconds` | Timer | Decoding time |
+| `_processing_completed_total`, `_processing_failed_total` | Counter | Messages processed, or failed (tagged with `reason`) |
+| `_processing_duration_seconds` | Timer | Processing time |
+| `_serialization_completed_total`, `_serialization_failed_total` | Counter | Outgoing messages encoded, or failed |
+| `_serialization_duration_seconds` | Timer | Encoding time |
+| `_ack_completed_total`, `_ack_failed_total`, `_nack_completed_total`, `_nack_failed_total` | Counter | Broker acknowledgements |
+| `_foreign_namespace_total` | Counter | Messages received for a namespace the runner does not serve |
 
-```yaml
-lemline:
-  observability:
-    logging:
-      format: json  # Options: json, text
-      level:
-        root: INFO
-        com.lemline: INFO
-        com.lemline.core.execution: DEBUG
-      include:
-        input-data: false  # Caution: may contain sensitive data
-        output-data: false
-        context-data: false
-      masking:
-        enabled: true
-        patterns:
-          - path: $.password
-          - path: $.creditCard
-          - path: $.*.token
-      destination:
-        console:
-          enabled: true
-        file:
-          enabled: true
-          path: /var/log/lemline/workflow.log
-          max-size: 100MB
-          max-files: 10
-```
-
-### Tracing Configuration
-
-Configure distributed tracing:
-
-```yaml
-lemline:
-  observability:
-    tracing:
-      service-name: lemline-workflow-engine
-      sample-ratio: 0.1  # Sample 10% of traces
-      propagation:
-        b3: true
-        w3c: true
-      export:
-        otlp:
-          enabled: true
-          endpoint: https://jaeger.example.com:4317
-          protocol: grpc  # Options: grpc, http/protobuf, http/json
-        zipkin:
-          enabled: false
-          endpoint: https://zipkin.example.com:9411/api/v2/spans
-```
-
-### Events Configuration
-
-Configure workflow events export:
-
-```yaml
-lemline:
-  observability:
-    events:
-      include-categories:
-        - workflow.definition
-        - workflow.instance
-        - workflow.node
-        - system
-      exclude-events: []  # List specific events to exclude
-      export:
-        internal:  # Internal event processing
-          enabled: true
-        webhook:
-          enabled: true
-          endpoint: https://events.example.com/ingest
-          retry:
-            enabled: true
-            max-attempts: 3
-        message-broker:
-          enabled: true
-          broker: ${lemline.messaging.type}
-          topic: lemline-events
-```
-
-## Setting Up Workflow Monitoring
-
-### Essential Workflow Metrics
-
-Configure essential workflow metrics:
-
-```yaml
-lemline:
-  observability:
-    metrics:
-      workflow:
-        duration:
-          enabled: true
-          percentiles: [0.5, 0.75, 0.95, 0.99]
-        counts:
-          started: true
-          completed: true
-          failed: true
-        states:
-          active: true
-          suspended: true
-          waiting: true
-```
-
-### Node Execution Metrics
-
-Track execution metrics at the node level:
-
-```yaml
-lemline:
-  observability:
-    metrics:
-      node:
-        execution:
-          duration: true
-          counts: true
-        categories:
-          - http
-          - database
-          - messaging
-          - expression
-        sampling:
-          strategy: fixed-rate
-          rate: 0.1  # Sample 10% of node executions
-```
-
-### Resource Utilization Metrics
-
-Monitor resource utilization:
-
-```yaml
-lemline:
-  observability:
-    metrics:
-      resources:
-        memory: true
-        cpu: true
-        threads: true
-        connections:
-          database: true
-          http: true
-```
-
-## Setting Up Distributed Tracing
-
-### Workflow Span Configuration
-
-Configure workflow-level spans:
-
-```yaml
-lemline:
-  observability:
-    tracing:
-      workflow:
-        create-root-span: true
-        include-attributes:
-          namespace: true
-          name: true
-          version: true
-          input: false  # Caution: may contain sensitive data
-      node:
-        create-spans: true
-        include-attributes:
-          position: true
-          type: true
-```
-
-### External System Tracing
-
-Configure tracing for external system calls:
-
-```yaml
-lemline:
-  observability:
-    tracing:
-      external:
-        http:
-          enabled: true
-          include-headers: true
-          include-body: false
-        database:
-          enabled: true
-          include-query: true
-          include-parameters: false
-        messaging:
-          enabled: true
-          include-message: false
-```
-
-### Trace Context Propagation
-
-Configure trace context propagation:
-
-```yaml
-lemline:
-  observability:
-    tracing:
-      propagation:
-        outbound:
-          http:
-            enabled: true
-            header-format: b3  # Options: b3, w3c, jaeger
-          messaging:
-            enabled: true
-            property-name: traceContext
-```
-
-## Setting Up Structured Logging
-
-### Log Enrichment
-
-Enrich logs with contextual information:
-
-```yaml
-lemline:
-  observability:
-    logging:
-      enrichment:
-        workflow:
-          instance-id: true
-          namespace: true
-          name: true
-          version: true
-        trace:
-          trace-id: true
-          span-id: true
-        node:
-          position: true
-          type: true
-        system:
-          instance-id: true
-          environment: ${lemline.environment}
-```
-
-### Log Correlation
-
-Enable log correlation across systems:
-
-```yaml
-lemline:
-  observability:
-    logging:
-      correlation:
-        enabled: true
-        id-field: correlation_id
-        propagation:
-          http:
-            enabled: true
-            header-name: X-Correlation-ID
-          messaging:
-            enabled: true
-            property-name: correlationId
-```
-
-### Structured Log Format
-
-Configure structured log format:
-
-```yaml
-lemline:
-  observability:
-    logging:
-      json:
-        include-stacktrace: true
-        timestamp-format: ISO_OFFSET_DATE_TIME
-        include-thread-name: true
-        include-logger-name: true
-```
-
-## Setting Up Event Export
-
-### Event Filtering
-
-Configure event filtering:
-
-```yaml
-lemline:
-  observability:
-    events:
-      filters:
-        - type: include
-          pattern: workflow.instance.*
-        - type: exclude
-          pattern: workflow.node.executing
-```
-
-### Event Transformation
-
-Configure event transformation:
-
-```yaml
-lemline:
-  observability:
-    events:
-      transform:
-        include-context: true
-        flatten-nested: false
-        include-timestamp: true
-        schemas:
-          enabled: true
-          source: inline  # Options: inline, registry
-```
-
-### Event Batching
-
-Configure event batching for export:
-
-```yaml
-lemline:
-  observability:
-    events:
-      export:
-        webhook:
-          batching:
-            enabled: true
-            size: 100
-            interval: 5s
-            max-size: 1MB
-```
-
-## Integration with Monitoring Systems
+Most counters are tagged with `workflow_name` and `workflow_version`. The gateway adds `lemline_gateway_start_inactive_namespace_total`, counted when an instance is started in a namespace with no recent runner activity. JVM, HTTP server and connection pool metrics from Quarkus are exposed as well.
 
 ### Prometheus Integration
 
-Configure Prometheus integration:
-
 ```yaml
-lemline:
-  observability:
-    metrics:
-      export:
-        prometheus:
-          enabled: true
-          port: 9090
-          authentication:
-            enabled: false
-          tls:
-            enabled: false
-          pushgateway:
-            enabled: false
-            endpoint: http://pushgateway:9091
-            job-name: lemline
-            push-interval: 10s
+# prometheus.yml
+scrape_configs:
+  - job_name: 'lemline'
+    metrics_path: '/q/metrics'
+    static_configs:
+      - targets: ['lemline-runner:8080']
 ```
 
-### Elasticsearch Integration
+## Health Checks
 
-Configure logging to Elasticsearch:
+Runners expose SmallRye Health endpoints on the metrics port:
 
-```yaml
-lemline:
-  observability:
-    logging:
-      elasticsearch:
-        enabled: true
-        hosts:
-          - https://elasticsearch.example.com:9200
-        index: lemline-logs-%date{yyyy.MM.dd}
-        authentication:
-          username: ${ES_USERNAME}
-          password: ${ES_PASSWORD}
+- `/q/health/live`: liveness (`worker-liveness`)
+- `/q/health/ready`: readiness (`worker-readiness`)
+- `/q/health`: both
+
+Use them as Kubernetes liveness and readiness probes.
+
+## Logging
+
+### Log Levels
+
+The default level is `ERROR`. Set another level for any command:
+
+```bash
+lemline listen --info
+lemline listen --debug
 ```
 
-### Jaeger Integration
+At `DEBUG` level, the runner logs each task it enters with its input, and the workflow output.
 
-Configure Jaeger tracing:
+### Log Categories
 
-```yaml
-lemline:
-  observability:
-    tracing:
-      export:
-        jaeger:
-          enabled: true
-          endpoint: https://jaeger.example.com:14250
-          protocol: grpc
-          authentication:
-            enabled: false
+Quarkus log properties are not read from the Lemline configuration file, which only accepts `lemline.*` settings. Set them as environment variables instead (or as `-D` system properties):
+
+```bash
+export QUARKUS_LOG_LEVEL=INFO
+export QUARKUS_LOG_CONSOLE_LEVEL=DEBUG   # the console only shows ERROR by default
+export QUARKUS_LOG_CATEGORY__COM_LEMLINE__LEVEL=INFO
+export QUARKUS_LOG_CATEGORY__COM_LEMLINE_CORE_PROCESSORS__LEVEL=DEBUG
 ```
 
-### Grafana Cloud Integration
+### Structured Logging
 
-Configure integration with Grafana Cloud:
+Use `--json` to write logs as JSON, for ingestion by Loki, Elasticsearch or similar tools:
 
-```yaml
-lemline:
-  observability:
-    integration:
-      grafana-cloud:
-        enabled: true
-        metrics:
-          endpoint: ${GRAFANA_METRICS_URL}
-          username: ${GRAFANA_USERNAME}
-          password: ${GRAFANA_API_KEY}
-        logs:
-          endpoint: ${GRAFANA_LOGS_URL}
-          username: ${GRAFANA_USERNAME}
-          password: ${GRAFANA_API_KEY}
-        traces:
-          endpoint: ${GRAFANA_TRACES_URL}
-          username: ${GRAFANA_USERNAME}
-          password: ${GRAFANA_API_KEY}
+```bash
+lemline listen --info --json
 ```
 
-## Setting Up Alerts
+Every log line carries the workflow namespace, name, version and instance id, so you can filter the logs of one instance.
 
-### Basic Alert Configuration
+## Lifecycle Events
 
-Configure basic alerting:
+Runners publish a CloudEvent for each workflow and task transition (`org.open-workflow-specification.workflow.started.v1`, `...task.completed.v1`, `...workflow.faulted.v1`, and so on) on the lifecycle events channel. Any consumer can read them from the broker. See [Workflow Lifecycle Observability](lemline-observability-lifecycle.md).
 
-```yaml
-lemline:
-  observability:
-    alerts:
-      enabled: true
-      destinations:
-        - type: webhook
-          url: https://alerts.example.com/webhook
-        - type: email
-          to: alerts@example.com
-```
+## Lifecycle Analytics
 
-### Alert Rules
+To keep a queryable history, enable lifecycle analytics: a runner consumes the lifecycle events and stores them in a PostgreSQL table (the in-memory H2 store only exists in Lemline's test suite). The dashboard uses this data. See [Lifecycle Analytics Reference](lemline-ref-analytics.md).
 
-Configure alert rules:
+## Dashboard
 
-```yaml
-lemline:
-  observability:
-    alerts:
-      rules:
-        - name: high-error-rate
-          description: "High workflow error rate"
-          condition: "rate(lemline_workflow_failed_total[5m]) / rate(lemline_workflow_started_total[5m]) > 0.05"
-          duration: 2m
-          severity: warning
-          annotations:
-            summary: "High workflow error rate detected"
-            description: "Error rate is above 5% for the last 5 minutes"
-        - name: long-workflow-duration
-          description: "Unusually long workflow duration"
-          condition: "histogram_quantile(0.95, sum(rate(lemline_workflow_duration_seconds_bucket[10m])) by (le, namespace, name)) > 300"
-          duration: 5m
-          severity: warning
-          annotations:
-            summary: "Long workflow execution detected"
-            description: "95th percentile of workflow duration is above 5 minutes"
-```
-
-### Alert Notification Templates
-
-Configure alert notification templates:
-
-```yaml
-lemline:
-  observability:
-    alerts:
-      templates:
-        email:
-          subject: "[{{ .Status | toUpper }}] {{ .Labels.alertname }}"
-          body: |
-            Alert: {{ .Labels.alertname }}
-            Status: {{ .Status }}
-            Severity: {{ .Labels.severity }}
-            Description: {{ .Annotations.description }}
-            Start: {{ .StartsAt }}
-            End: {{ .EndsAt }}
-```
-
-## Setting Up Dashboards
-
-### Predefined Dashboards
-
-Configure predefined dashboards:
-
-```yaml
-lemline:
-  observability:
-    dashboards:
-      enabled: true
-      providers:
-        - type: grafana
-          url: https://grafana.example.com
-          api-key: ${GRAFANA_API_KEY}
-          folder: Lemline
-      deploy:
-        enabled: true
-        on-startup: true
-```
-
-### Custom Dashboard Creation
-
-Configure custom dashboard creation:
-
-```yaml
-lemline:
-  observability:
-    dashboards:
-      custom:
-        - name: workflow-overview
-          description: "Overview of workflow executions"
-          source: file:/dashboards/workflow-overview.json
-        - name: resource-utilization
-          description: "Resource utilization metrics"
-          source: file:/dashboards/resource-utilization.json
-```
-
-## Working with Audit Logs
-
-### Audit Log Configuration
-
-Configure audit logging:
-
-```yaml
-lemline:
-  observability:
-    audit:
-      enabled: true
-      include:
-        workflow:
-          definition:
-            create: true
-            update: true
-            delete: true
-          instance:
-            start: true
-            complete: true
-            fail: true
-            cancel: true
-        user:
-          login: true
-          logout: true
-          actions: true
-      storage:
-        type: database  # Options: database, file, external
-        retention:
-          enabled: true
-          days: 90
-      format: json
-```
-
-### External Audit Log Export
-
-Configure audit log export:
-
-```yaml
-lemline:
-  observability:
-    audit:
-      export:
-        enabled: true
-        destination:
-          type: webhook
-          url: https://audit.example.com/logs
-          authentication:
-            type: bearer
-            token: ${AUDIT_TOKEN}
-```
-
-## Working with Log Levels
-
-### Dynamic Log Level Configuration
-
-Configure dynamic log level adjustment:
-
-```yaml
-lemline:
-  observability:
-    logging:
-      dynamic-levels:
-        enabled: true
-        endpoint: /actuator/loggers
-        authentication:
-          enabled: true
-          role: ADMIN
-      default-levels:
-        com.lemline: INFO
-        com.lemline.core.execution: INFO
-        com.lemline.runner: INFO
-        org.apache.kafka: WARN
-```
-
-### Contextual Logging
-
-Configure contextual logging:
-
-```yaml
-lemline:
-  observability:
-    logging:
-      contextual:
-        enabled: true
-        workflow:
-          namespace.pattern: com.example.*
-          level: DEBUG
-        node:
-          type: http
-          level: DEBUG
-```
-
-## Advanced Observability Features
-
-### Health Checks
-
-Configure health checks:
-
-```yaml
-lemline:
-  observability:
-    health:
-      enabled: true
-      endpoint: /health
-      include:
-        database: true
-        messaging: true
-        workflow-engine: true
-      probes:
-        liveness:
-          path: /health/liveness
-        readiness:
-          path: /health/readiness
-```
-
-### Sampling Strategies
-
-Configure metric and trace sampling:
-
-```yaml
-lemline:
-  observability:
-    sampling:
-      metrics:
-        strategy: adaptive
-        base-rate: 0.1
-        burst:
-          trigger: "system_cpu_usage > 0.8"
-          rate: 0.5
-      tracing:
-        strategy: rate-limiting
-        rate: 100  # traces per second
-```
-
-### Performance Profiling
-
-Configure performance profiling:
-
-```yaml
-lemline:
-  observability:
-    profiling:
-      enabled: true
-      endpoint: /actuator/profiling
-      authentication:
-        enabled: true
-        role: ADMIN
-      storage:
-        directory: /tmp/lemline/profiles
-        retention:
-          count: 10
-```
+The dashboard reads definitions, instances, lifecycle events and per-definition counters through the gRPC gateway. Start the gateway with `lemline gateway start`; see [gRPC Gateway Reference](lemline-ref-gateway.md).
 
 ## Common Issues and Solutions
 
 ### Missing Metrics
 
-**Issue**: Metrics not appearing in monitoring system  
-**Solution**: 
-- Verify metrics export configuration
-- Check connectivity to metrics system
-- Ensure correct port and endpoint configuration
-- Check for firewall or network issues
-
-### Trace Correlation Issues
-
-**Issue**: Distributed traces not connecting  
-**Solution**:
-- Verify propagation headers configuration
-- Check trace sampling configuration
-- Ensure service names are consistent
-- Check trace exporter configuration
+- Metrics are served only by long-running commands (`listen`, `gateway start`); other commands disable the endpoint.
+- Check the port: `lemline.metrics.port` (default `8080`) or `--metrics-port`.
+- Per-workflow counters appear only after the runner has processed a message for that workflow.
 
 ### Log Volume Problems
 
-**Issue**: Excessive log volume  
-**Solution**:
-- Adjust log levels appropriately
-- Configure sampling for high-volume logs
-- Use contextual logging
-- Implement log filtering
+- Keep production runners at `INFO` or above; `DEBUG` logs task inputs.
+- Raise the level of noisy categories only, with `QUARKUS_LOG_CATEGORY__<CATEGORY>__LEVEL` environment variables.
 
 ## Best Practices
 
-1. **Start Simple** - Begin with basic metrics, then add complexity
-2. **Consider Performance Impact** - Monitor the overhead of your observability solution
-3. **Protect Sensitive Data** - Configure data masking for logs and traces
-4. **Use Structured Logging** - Makes logs more searchable and analyzable
-5. **Implement Correlation IDs** - For tracking requests across services
-6. **Set Appropriate Retention** - Based on compliance and debugging needs
-7. **Monitor the Monitors** - Set up alerts for observability system failures
-8. **Document Metrics** - Maintain a catalog of metrics and their meaning
-9. **Standardize Naming** - Use consistent naming conventions
-10. **Test Observability** - Verify observability during chaos testing
+1. **Scrape every runner and gateway** with Prometheus
+2. **Use the health endpoints** as liveness and readiness probes
+3. **Use JSON logs** in production, and filter by instance id when investigating
+4. **Alert on `_processing_failed_total` and `_foreign_namespace_total`**
+5. **Enable lifecycle analytics** where you need an instance history
+6. **Do not log sensitive data**: avoid `DEBUG` level in production
 
 ## Related Information
 
 - [Performance Monitoring](lemline-observability-performance.md)
 - [Workflow Lifecycle Observability](lemline-observability-lifecycle.md)
 - [I/O Observability](lemline-observability-io.md)
-- [Scaling Configuration](lemline-howto-scaling.md)
-- [Message Broker Configuration](lemline-howto-brokers.md)
+- [Runner Configuration Reference](lemline-ref-config.md)

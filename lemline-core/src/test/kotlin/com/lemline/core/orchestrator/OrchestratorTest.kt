@@ -134,6 +134,36 @@ class OrchestratorTest : FunSpec() {
             assertEquals("private-value", output.jsonObject.getValue("value").jsonPrimitive.content)
         }
 
+        test("resolves declared secrets in HTTP body and authentication") {
+            val yaml = $$"""
+                use:
+                  secrets:
+                    - API_TOKEN
+                do:
+                  - request:
+                      call: http
+                      with:
+                        method: post
+                        endpoint:
+                          uri: https://example.com/data
+                          authentication:
+                            bearer:
+                              token: ${ $secrets.API_TOKEN }
+                        body:
+                          token: ${ $secrets.API_TOKEN }
+            """.trimIndent()
+            var config: com.lemline.core.processors.CallHttpConfig? = null
+            val executor = object : ActivityExecutor {
+                override suspend fun execute(event: WorkflowEvent.ActivityStarted): JsonNode {
+                    config = (event as WorkflowEvent.CallHttpStarted).config
+                    return buildJsonObject { }
+                }
+            }
+            executeWorkflow(yaml, activityExecutor = executor, secrets = buildJsonObject { put("API_TOKEN", "private-value") })
+            assertEquals(com.lemline.core.processors.HttpAuthentication.Bearer("private-value"), config?.authentication)
+            assertEquals(buildJsonObject { put("token", "private-value") }, config?.body)
+        }
+
         test("faults with authorization when a declared secret is unavailable") {
             val workflow = getWorkflowToTest($$"""
                 use:

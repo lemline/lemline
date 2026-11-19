@@ -125,6 +125,39 @@ This displays all registered workflows with their namespace, name, and version.
 
 ## 3. Running Your Workflow
 
+Workflows are executed by a runner. In a separate terminal, from the same directory, start one and leave it running:
+
+<tabs group="platform">
+<tab id="macos-listen" title="macOS (ARM64)" group-key="macos">
+
+```bash
+bin/lemline listen --info
+```
+
+</tab>
+<tab id="linux-listen" title="Linux (x86_64)" group-key="linux">
+
+```bash
+bin/lemline listen --info
+```
+
+</tab>
+<tab id="windows-listen" title="Windows (x86_64)" group-key="windows">
+
+```powershell
+bin\lemline.exe listen --info
+```
+
+</tab>
+<tab id="java-listen" title="Java (Any OS)" group-key="java">
+
+```bash
+java -jar lemline.jar listen --info
+```
+
+</tab>
+</tabs>
+
 Now, let's start an instance of the workflow. You need to specify the namespace and name from your workflow definition:
 
 <tabs group="platform">

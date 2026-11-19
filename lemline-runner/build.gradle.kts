@@ -12,7 +12,7 @@ plugins {
 }
 
 group = "com.lemline"
-val baseVersion = "0.6.3"
+val baseVersion = "0.7.0"
 
 // Determine the version dynamically: use Git tag if present (CI), otherwise nightly suffix for main branch builds
 val envRef = System.getenv("GITHUB_REF") ?: ""
@@ -181,6 +181,22 @@ dependencies {
     testFixturesImplementation(project(":lemline-runner-parents"))
     testFixturesImplementation(project(":lemline-runner-forks"))
     testFixturesImplementation(project(":lemline-runner-listeners"))
+}
+
+// Tests of the packaged artifact live in src/integrationTest. They run on demand only (`check` and
+// `build` skip them), against a PostgreSQL container (Docker required):
+//   ./gradlew :lemline-runner:testNative      builds the native binary, then runs them against it
+//   ./gradlew :lemline-runner:quarkusIntTest  builds the jar, then runs them against it
+// testNative alone would build (and test) the jar: request the native build whenever it is invoked.
+if (gradle.startParameter.taskNames.any { it == "testNative" || it.endsWith(":testNative") }) {
+    quarkus {
+        set("native.enabled", "true")
+        set("package.jar.enabled", "false")
+    }
+}
+// Gradle does not track the built artifact as an input of these tests: always run them when asked.
+tasks.matching { it.name == "testNative" || it.name == "quarkusIntTest" }.configureEach {
+    outputs.upToDateWhen { false }
 }
 
 // ────────────────────────────────────────────────────────────────────────────

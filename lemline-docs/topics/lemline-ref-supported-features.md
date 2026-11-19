@@ -18,7 +18,7 @@ Lemline implements a subset of the Open Workflow DSL 1.0 specification, with mor
 | Expression Language | ✅ Supported | JQ expressions fully supported |
 | Workflow Variables | ✅ Supported | Context and scope variables |
 | Error Handling | ✅ Supported | Try/catch and retry mechanisms |
-| Workflow Timeouts | ✅ Supported | Global and operation-specific timeouts |
+| Workflow Timeouts | ⚠️ Partial | Only `listen` task timeouts are enforced; workflow-level timeouts and timeouts on other tasks are ignored. HTTP calls use fixed limits (15 s connect, 30 s per request) |
 
 ## Control Flow Support
 
@@ -38,9 +38,9 @@ Lemline implements a subset of the Open Workflow DSL 1.0 specification, with mor
 | Task Type | Status | Notes |
 |-----------|--------|-------|
 | HTTP Calls | ✅ Supported | Full REST API support |
-| OpenAPI Calls | ✅ Supported | Including schema validation |
-| AsyncAPI Calls | ✅ Supported | Publish and subscribe operations |
-| gRPC Calls | ✅ Supported | Proto-based service calls |
+| OpenAPI Calls | ❌ Not supported | Parsed, but no runtime executor; use `call: http` |
+| AsyncAPI Calls | ❌ Not supported | Parsed, but no runtime executor; use `emit` and `listen` |
+| gRPC Calls | ❌ Not supported | Parsed, but no runtime executor |
 | GraphQL | ⚠️ Planned | On roadmap for future release |
 | Expression Evaluation | ✅ Supported | Via `set` construct |
 | Container Execution | ⚠️ Partial | Basic support via `run` construct |
@@ -75,12 +75,13 @@ Lemline implements a subset of the Open Workflow DSL 1.0 specification, with mor
 
 | Feature | Status | Notes |
 |---------|--------|-------|
-| Basic Auth | ✅ Supported | For HTTP calls |
-| Bearer Token | ✅ Supported | For HTTP calls |
-| OAuth2 | ✅ Supported | Various grant types |
-| API Keys | ✅ Supported | Header and query parameter options |
-| mTLS | ⚠️ Planned | On roadmap for future release |
-| OIDC | ✅ Supported | OpenID Connect integration |
+| Basic Auth | ✅ Supported | For `call: http` |
+| Bearer Token | ✅ Supported | For `call: http` |
+| OAuth2 | ❌ Not yet supported | A call using it fails with a `configuration` error |
+| API Keys | ⚠️ No dedicated policy | Pass the key in `headers` or `query`, read from `$secrets` |
+| mTLS | ❌ Not supported | |
+| OIDC | ❌ Not supported | |
+| Digest | ❌ Not supported | |
 
 ## Extension and Integration Support
 
@@ -136,15 +137,7 @@ When migrating from other Open Workflow implementations to Lemline, consider:
 
 ## Testing Specification Conformance
 
-To verify specification conformance for your workflows:
-
-```bash
-# Validate workflow against specification
-lemline validate -f my-workflow.yaml --spec-version 1.0
-
-# Check for unsupported features
-lemline validate -f my-workflow.yaml --strict
-```
+Lemline has no standalone validation command. `lemline definition post` parses each definition file and reports the files it cannot read; run the workflow in a test environment (for example with `lemline listen --mock-config <file>`) to check its behavior.
 
 ## Related Information
 

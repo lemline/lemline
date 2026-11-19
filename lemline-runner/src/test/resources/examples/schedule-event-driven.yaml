@@ -8,6 +8,7 @@ schedule:
     one:
       with:
         type: com.example.hospital.events.patients.heartbeat.low
+  read: envelope
 do:
   - callNurse:
       call: http

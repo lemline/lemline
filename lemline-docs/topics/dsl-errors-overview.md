@@ -244,6 +244,8 @@ document:
   name: comprehensive-error-handling
   version: '1.0.0'
 use:
+  secrets:
+    - pass
   functions:
     - logger:
       ### ... logger implementation

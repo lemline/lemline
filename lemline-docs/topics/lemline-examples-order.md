@@ -604,21 +604,19 @@ You can use this example as a starting point for your own order processing workf
 
 ## Testing This Workflow
 
-To test this workflow locally:
+To test this workflow locally, with a runner (`lemline listen`) running:
 
 ```bash
-# Start the workflow with a test order
-lemline workflow run order-processing.yaml --input orders/test-order.json
+# Register the definition
+lemline definition post -f order-processing.yaml
 
-# Simulate a shipment status update event
-lemline events publish ShipmentStatusUpdate '{
-  "orderId": "ORD-12345",
-  "status": "SHIPPED",
-  "trackingNumber": "TRK123456789",
-  "carrier": "Express Shipping",
-  "estimatedDelivery": "2023-12-24T12:00:00Z"
-}'
+# Start the workflow with a test order
+lemline instance start <namespace> <name> --input "$(cat orders/test-order.json)"
 ```
+
+Replace `<namespace>` and `<name>` with the values declared in the `document` section. To simulate the shipment status update, publish a `ShipmentStatusUpdate` CloudEvent on the CloudEvents topic or queue of that namespace with your broker's tools; Lemline has no CLI command to publish events.
+
+To run it without calling the real services, start the runner with `lemline listen --mock-config <file>`.
 
 ## Related Resources
 
@@ -636,6 +634,5 @@ This workflow is designed for reliability and correctness. For high-volume scena
 
 1. **Parallel Processing**: Use the `fork` task to parallelize independent operations
 2. **Batched Operations**: Group related items for inventory or shipping operations
-3. **Selective Persistence**: Configure Lemline to minimize database usage for shorter paths
-4. **Event Streaming**: Use streaming responses for higher throughput
+3. **Event Streaming**: Use streaming responses for higher throughput
 5. **Response Caching**: Cache customer or product data that doesn't change frequently

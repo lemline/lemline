@@ -93,6 +93,9 @@ document:
 
 # Reusable definitions in the resource catalog
 use:
+  secrets:
+    - EMAIL_SERVICE_CLIENT_ID
+    - EMAIL_SERVICE_CLIENT_SECRET
   # Function definitions
   functions:
     - name: sendEmailFunc
@@ -260,6 +263,8 @@ do:
             batchId: "${ .batchId }"
             error: "${ $error }"
 ```
+
+> **Lemline runtime:** only `listen` task timeouts are enforced. Workflow-level timeouts and timeouts on other tasks are accepted but ignored for now. HTTP calls use fixed client limits instead: 15 seconds to connect, 30 seconds per request.
 
 ## Example 4: Time-based Scheduled Workflow
 

@@ -1,249 +1,105 @@
 # Configuring TLS for Secure Communications
 
-This guide explains how to configure Transport Layer Security (TLS) for secure communications in Lemline workflows.
+This guide lists the TLS settings Lemline actually provides and where TLS is handled outside Lemline.
 
-## Introduction to TLS in Lemline
+## Where TLS Applies
 
-TLS (Transport Layer Security) ensures secure communications between your workflows and external services by:
+| Connection | How TLS is configured |
+|------------|-----------------------|
+| Clients and dashboard → gRPC gateway | `lemline.gateway.tls.*` (see below) |
+| Runner → Kafka | `lemline.messaging.kafka.security-protocol` and SASL settings |
+| Runner → RabbitMQ | `lemline.messaging.rabbitmq.ssl-enabled` |
+| Workflow `call: http` → external service | Use an `https://` endpoint; certificates are checked against the default trust store of the Java runtime |
 
-1. Encrypting data in transit
-2. Verifying the identity of remote servers
-3. Protecting against man-in-the-middle attacks
+Lemline has no global TLS settings (protocol versions, cipher suites, keystores, certificate expiry monitoring) and no per-call TLS options in workflow definitions.
 
-Lemline supports TLS configuration at multiple levels:
+## Gateway TLS
 
-1. System-wide TLS defaults
-2. Service-specific TLS settings
-3. Individual request TLS options
-
-## System-Wide TLS Configuration
-
-Configure default TLS behavior in your Lemline configuration:
-
-```properties
-# Enable/disable TLS certificate validation (default: true)
-lemline.tls.verification.enabled=true
-
-# Default minimum TLS version (default: TLSv1.2)
-lemline.tls.minimum-version=TLSv1.3
-
-# System truststore configuration
-lemline.tls.truststore.path=/path/to/truststore.jks
-lemline.tls.truststore.password=${TRUSTSTORE_PASSWORD}
-lemline.tls.truststore.type=JKS
-
-# System keystore for client certificates
-lemline.tls.keystore.path=/path/to/keystore.p12
-lemline.tls.keystore.password=${KEYSTORE_PASSWORD}
-lemline.tls.keystore.type=PKCS12
-```
-
-## Using Client Certificates
-
-For services requiring client certificates (mutual TLS):
+The gRPC gateway serves TLS by default.
 
 ```yaml
-use:
-  authentications:
-    - name: "mtlsAuth"
-      extension:
-        mtls:
-          keystore:
-            path:
-              secret: "client.keystore.path"
-            password:
-              secret: "client.keystore.password"
-            alias: "client-cert"
+lemline:
+  gateway:
+    tls:
+      enabled: true
+      certificate: /etc/lemline/tls/server.crt
+      private-key: /etc/lemline/tls/server.key
 ```
 
-Using this authentication in a request:
+- `certificate` and `private-key` are required when TLS is enabled.
+- JWT authentication (`lemline.gateway.authentication.enabled`, on by default) requires TLS.
+- Set `enabled: false` only on a trusted local network, together with `lemline.gateway.authentication.enabled: false`.
+
+### Client Certificates (mTLS)
 
 ```yaml
-- secureApiCall:
-    callHTTP:
-      url: "https://secure-api.example.com/data"
-      method: "GET"
-      auth: "mtlsAuth"
+lemline:
+  gateway:
+    tls:
+      enabled: true
+      certificate: /etc/lemline/tls/server.crt
+      private-key: /etc/lemline/tls/server.key
+      client-auth: required        # none, request or required
+      trust-store: /etc/lemline/tls/clients.p12
+      trust-store-password: change-me
 ```
 
-## Service-Specific TLS Configuration
+`trust-store` is required when `client-auth` is `request` or `required`. Pass the password as an environment variable (`LEMLINE_GATEWAY_TLS_TRUST_STORE_PASSWORD`) rather than in the file.
 
-Define service-specific TLS settings:
+## Kafka TLS and SASL
 
 ```yaml
-use:
-  connections:
-    - name: "legacyService"
-      endpoint: "https://legacy-api.example.com"
-      tls:
-        verifyHostname: true
-        minimumVersion: "TLSv1.2"
-        truststore:
-          path:
-            secret: "legacy.truststore.path"
-          password:
-            secret: "legacy.truststore.password"
+lemline:
+  messaging:
+    type: kafka
+    kafka:
+      brokers: kafka.example.com:9093
+      security-protocol: SASL_SSL      # Kafka security.protocol
+      sasl-mechanism: PLAIN
+      sasl-username: lemline
+      sasl-password: change-me
 ```
 
-Using the connection in a request:
+`security-protocol` is passed to Kafka as `security.protocol`. When `sasl-username` and `sasl-password` are both set, Lemline configures the PLAIN login module.
+
+## RabbitMQ TLS
 
 ```yaml
-- callLegacyService:
-    callHTTP:
-      connection: "legacyService"
-      path: "/api/data"
-      method: "GET"
+lemline:
+  messaging:
+    type: rabbitmq
+    rabbitmq:
+      hostname: rabbitmq.example.com
+      port: 5671
+      ssl-enabled: true
 ```
 
-## Request-Level TLS Options
+## Calling HTTPS Services from Workflows
 
-Configure TLS for individual requests:
+Use an `https://` URI in the endpoint:
 
 ```yaml
-- oneTimeSecureCall:
-    callHTTP:
-      url: "https://api.example.com/data"
-      method: "GET"
-      tls:
-        verifyHostname: true
-        minimumVersion: "TLSv1.3"
-        cipherSuites:
-          - "TLS_AES_256_GCM_SHA384"
-          - "TLS_CHACHA20_POLY1305_SHA256"
+do:
+  - getData:
+      call: http
+      with:
+        method: get
+        endpoint: https://api.example.com/data
 ```
 
-## Managing Custom Certificate Authorities
+The server certificate must be trusted by the Java runtime that runs Lemline. A call to a server with an untrusted or invalid certificate fails.
 
-If your services use custom or internal CAs:
+## Troubleshooting
 
-### Adding CA Certificates to Truststore
-
-1. Create a custom truststore:
-   ```bash
-   keytool -import -file custom-ca.crt -alias custom-ca -keystore custom-truststore.jks
-   ```
-
-2. Configure Lemline to use this truststore:
-   ```properties
-   lemline.tls.truststore.path=/path/to/custom-truststore.jks
-   lemline.tls.truststore.password=${TRUSTSTORE_PASSWORD}
-   ```
-
-### Per-Service CA Certificates
-
-For services with specific CA requirements:
-
-```yaml
-use:
-  connections:
-    - name: "internalService"
-      endpoint: "https://internal-api.company.com"
-      tls:
-        certificates:
-          - path: "/path/to/internal-ca.pem"
-```
-
-## Handling Self-Signed Certificates
-
-For development or internal systems with self-signed certificates:
-
-```yaml
-use:
-  connections:
-    - name: "devService"
-      endpoint: "https://dev-api.example.com"
-      tls:
-        verifyHostname: false  # Warning: Only for development!
-        allowSelfSigned: true  # Warning: Only for development!
-```
-
-**Warning**: Disabling certificate verification reduces security. Use only in controlled environments.
-
-## TLS Protocol Versions and Cipher Suites
-
-Specify acceptable protocol versions and cipher suites:
-
-```properties
-# Supported protocol versions (comma-separated)
-lemline.tls.protocols=TLSv1.3,TLSv1.2
-
-# Supported cipher suites (comma-separated)
-lemline.tls.cipher-suites=TLS_AES_256_GCM_SHA384,TLS_CHACHA20_POLY1305_SHA256,TLS_AES_128_GCM_SHA256
-```
-
-## Certificate Pinning
-
-For high-security scenarios, implement certificate pinning:
-
-```yaml
-use:
-  connections:
-    - name: "criticalService"
-      endpoint: "https://critical-api.example.com"
-      tls:
-        pinning:
-          - hash: "sha256/BASE64HASH="  # Public key hash
-          - hash: "sha256/BACKUPHASH="  # Backup hash
-```
-
-This ensures the service presents a certificate with a matching public key hash.
-
-## Certificate Expiry Monitoring
-
-Lemline can monitor certificate expiry dates:
-
-```properties
-# Enable certificate expiry monitoring
-lemline.tls.monitor-expiry=true
-
-# Warning threshold before expiry (in days)
-lemline.tls.expiry-warning-days=30
-```
-
-When enabled, logs and metrics will alert you to certificates nearing expiration.
-
-## Troubleshooting TLS Issues
-
-Common TLS issues and solutions:
-
-### Certificate Validation Failures
-
-If you encounter certificate validation errors:
-
-1. Verify the server's certificate is valid and not expired
-2. Ensure the server's certificate is issued by a trusted CA
-3. Check that the hostname in the URL matches the certificate's CN/SAN
-4. Ensure your truststore contains the necessary CA certificates
-
-### Handshake Failures
-
-For TLS handshake failures:
-
-1. Check that the client and server support a common TLS version
-2. Verify they have common cipher suites
-3. Ensure your TLS configuration isn't too restrictive
-
-### Client Certificate Issues
-
-For mutual TLS problems:
-
-1. Verify the client certificate is valid and not expired
-2. Ensure the certificate has the correct usage extensions
-3. Check that the private key is accessible and the password is correct
-
-## Security Best Practices
-
-1. **Use TLS 1.3**: Prefer TLS 1.3 when possible for better security
-2. **Disable old protocols**: Avoid TLS 1.0 and 1.1
-3. **Use strong cipher suites**: Prefer GCM and CHACHA20 ciphers
-4. **Validate certificates**: Always verify certificates in production
-5. **Use certificate pinning**: For critical services, implement certificate pinning
-6. **Rotate certificates**: Implement regular certificate rotation
-7. **Monitor expiration**: Proactively monitor certificate expiration dates
+| Symptom | Check |
+|---------|-------|
+| Gateway does not start | `certificate` and `private-key` paths exist and are readable; `trust-store` is set when `client-auth` is not `none` |
+| Gateway clients get `UNAUTHENTICATED` | Authentication is enabled: send a valid bearer token |
+| Runner cannot connect to Kafka | `security-protocol`, SASL credentials and the TLS port of the brokers |
+| `call: http` fails on HTTPS | The service certificate chain is trusted by the Java runtime |
 
 ## Related Resources
 
-- [OAuth 2.0 Authentication](lemline-howto-oauth2.md)
-- [API Key Authentication](lemline-howto-api-keys.md)
-- [Managing Secrets](lemline-howto-secrets.md)
-- [Security Overview](lemline-explain-security.md)
+- [gRPC Gateway Reference](lemline-ref-gateway.md)
+- [Runner Configuration Reference](lemline-ref-config.md)
+- [Message Brokers](lemline-howto-brokers.md)

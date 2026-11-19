@@ -1,5 +1,8 @@
 # API Integration Examples
 
+> **Runtime support:** some examples on this page use `call: openapi`, `call: asyncapi`, `call: grpc` or OAuth 2.0 authentication. The Lemline runtime does not execute these yet: such a task fails when it runs. Write those calls with `call: http` and `basic` or `bearer` authentication to run them on Lemline.
+
+
 This document provides practical examples of API integrations in Lemline workflows. It demonstrates different approaches to connecting with REST APIs, GraphQL, OpenAPI, gRPC, and other API types, covering authentication, error handling, and data transformation.
 
 ## REST API Integration Examples
@@ -28,6 +31,10 @@ input:
           format: email
         name:
           type: string
+use:
+  secrets:
+    - API_KEY
+    - EMAIL_SERVICE_TOKEN
 do:
   - validateEmail:
       call: http
@@ -150,6 +157,9 @@ input:
           type: array
           items:
             type: string
+use:
+  secrets:
+    - API_TOKEN
 do:
   - initializeContext:
       set:
@@ -275,6 +285,13 @@ document:
   namespace: examples
   name: openapi-auth
   version: 1.0.0
+use:
+  secrets:
+    - API_KEY
+    - CLIENT_ID
+    - CLIENT_SECRET
+    - USERNAME
+    - PASSWORD
 do:
   - callWithApiKey:
       call: openapi
@@ -346,6 +363,9 @@ input:
       properties:
         userId:
           type: string
+use:
+  secrets:
+    - API_TOKEN
 do:
   - fetchUserData:
       call: http
@@ -406,6 +426,9 @@ input:
           required:
             - title
             - content
+use:
+  secrets:
+    - API_TOKEN
 do:
   - createPost:
       call: http
@@ -530,6 +553,10 @@ document:
   namespace: examples
   name: secure-grpc
   version: 1.0.0
+use:
+  secrets:
+    - CLIENT_ID
+    - CLIENT_SECRET
 do:
   - getAuthToken:
       call: http
@@ -693,7 +720,7 @@ When implementing API integrations in Lemline workflows, consider these best pra
 7. **Idempotency**: Design workflows to handle API call retries safely
 8. **Circuit Breaking**: Implement circuit breaking for failing endpoints
 9. **Monitoring**: Include appropriate logging for API interactions
-10. **Timeout Handling**: Set appropriate timeouts for API calls
+10. **Timeout Handling**: Set appropriate timeouts for API calls (Lemline only enforces timeouts on `listen` tasks; HTTP calls use fixed limits of 15 s to connect and 30 s per request)
 
 ## Conclusion
 

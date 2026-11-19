@@ -14,7 +14,7 @@ Key characteristics of the `fork` task:
 - Executes multiple branches concurrently
 - Waits for all branches to complete before continuing
 - Combines results from all branches
-- Can have a timeout for the entire parallel execution
+- Cannot be bounded by a timeout yet: Lemline only enforces timeouts on `listen` tasks
 
 ## Basic Fork Structure
 
@@ -260,6 +260,8 @@ You can set a timeout for the entire parallel execution:
     error: "Parallel processing timed out after 30 seconds"
   next: Fallback
 ```
+
+> **Lemline runtime:** only `listen` task timeouts are enforced. Workflow-level timeouts and timeouts on other tasks are accepted but ignored for now. HTTP calls use fixed client limits instead: 15 seconds to connect, 30 seconds per request.
 
 If any branch takes longer than the specified timeout, the entire fork is cancelled and execution continues to the `timeoutNext` task.
 
@@ -508,7 +510,7 @@ This workflow validates a customer, checks inventory, and calculates tax in para
 ## Best Practices
 
 1. **Keep branches independent**: Ensure branches don't depend on each other's results
-2. **Set appropriate timeouts**: Always include a timeout for the entire fork operation
+2. **Set appropriate timeouts**: Always include a timeout for the entire fork operation (Lemline only enforces timeouts on `listen` tasks; HTTP calls use fixed limits of 15 s to connect and 30 s per request)
 3. **Include proper error handling**: Handle errors both within branches and for the entire fork
 4. **Consider resource constraints**: Don't create too many parallel branches
 5. **Test thoroughly**: Test with real-world data volumes and timing

@@ -14,17 +14,20 @@ Before diving into debugging techniques, it's important to understand how Lemlin
 
 ## Enabling Debug Logging
 
-Lemline provides comprehensive logging to help diagnose issues. Configure your logging levels in
-`application.properties`:
+The quickest way to see what a runner does is to start it with a more verbose log level:
 
-```properties
-# Enable detailed logging for core components
-quarkus.log.category."com.lemline.core".level=DEBUG
-quarkus.log.category."com.lemline.core.expressions".level=TRACE
-quarkus.log.category."com.lemline.core.nodes".level=DEBUG
-# Logging for specific subsystems
-quarkus.log.category."com.lemline.runner.outbox".level=DEBUG
-quarkus.log.category."com.lemline.runner.messaging".level=DEBUG
+```bash
+lemline listen --debug
+```
+
+The `--debug`, `--info`, `--warn` and `--error` options work with every command; the default level is `ERROR`. At `DEBUG` level, the runner logs each task it enters with its input, and the workflow output.
+
+Quarkus log properties are not read from the Lemline configuration file, which only accepts `lemline.*` settings. Set them as environment variables instead (or as `-D` system properties):
+
+```bash
+export QUARKUS_LOG_LEVEL=INFO
+export QUARKUS_LOG_CONSOLE_LEVEL=DEBUG   # the console only shows ERROR by default
+export QUARKUS_LOG_CATEGORY__COM_LEMLINE_CORE__LEVEL=DEBUG
 ```
 
 Log levels include:
@@ -33,64 +36,29 @@ Log levels include:
 - **WARN**: Issues that don't prevent execution but might cause incorrect behavior
 - **INFO**: Normal workflow execution events
 - **DEBUG**: Detailed information for diagnosing problems
-- **TRACE**: Very detailed information, including expression evaluation steps
+- **TRACE**: not available in the released binaries, which are built with `DEBUG` as the lowest level
 
 ## Inspecting Workflow Definitions
 
-Inspect how Lemline interprets your workflow definition:
+Print the definition Lemline has stored for a workflow:
 
 ```bash
-lemline definitions get my-workflow --verbose
+lemline definition get <namespace> <name> <version>
 ```
 
-This command displays:
+Without arguments, `lemline definition get` lists the registered definitions and lets you pick one.
 
-- Parsed workflow structure
-- Validation results
-- Node graph construction
+## Following Workflow Execution
 
-## Tracing Workflow Execution
-
-Enable execution tracing to see each step of the workflow:
-
-```properties
-lemline.tracing.enabled=true
-lemline.tracing.level=DETAILED
-```
-
-Trace levels include:
-
-- **BASIC**: Shows only task transitions
-- **STANDARD**: Shows tasks, state changes, and errors
-- **DETAILED**: Shows all operations including expression evaluation results
-
-View traces using the CLI:
-
-```bash
-lemline instances traces get <instance-id>
-```
+To follow an instance step by step, run the runner at `DEBUG` level (see above) and filter the logs on the instance id: every log line carries the workflow namespace, name, version and instance id. The dashboard, served through the gRPC gateway, shows instances and their lifecycle events.
 
 ## Debugging Expressions
 
-JQ expressions are a common source of workflow issues. Debug them using:
-
-### Expression Testing Command
-
-Test expressions against sample data:
+JQ expressions are a common source of workflow issues. Lemline has no command to evaluate an expression on its own: test it with the `jq` command-line tool against sample data, then run the workflow with `--debug` to see the actual input of each task.
 
 ```bash
-lemline debug expression '.user.address.city' '{"user":{"address":{"city":"Berlin"}}}'
+echo '{"user":{"address":{"city":"Berlin"}}}' | jq '.user.address.city'
 ```
-
-### Trace Expression Evaluation
-
-Enable expression tracing:
-
-```properties
-lemline.expressions.trace=true
-```
-
-This shows step-by-step evaluation of complex expressions.
 
 ## Debugging Common Issues
 
@@ -100,10 +68,10 @@ If your workflow fails with schema validation errors:
 
 1. Check the error message for specific field issues
 2. Validate your YAML against the workflow schema
-3. Use the `lemline definitions validate` command:
+3. Register the file again: `lemline definition post` parses each file and reports the files it cannot read:
 
 ```bash
-lemline definitions validate path/to/workflow.yaml
+lemline definition post -f path/to/workflow.yaml
 ```
 
 ### Expression Evaluation Errors
@@ -111,10 +79,7 @@ lemline definitions validate path/to/workflow.yaml
 Common expression issues include:
 
 1. **Path not found**: Check that the referenced property exists
-   ```bash
-   # Debug by examining the state at that point
-   lemline instances states get <instance-id> <node-position>
-   ```
+   Run the runner with `--debug` to see the input of the task where the expression fails.
 
 2. **Type errors**: Ensure the data type matches the expected type
    ```yaml
@@ -125,18 +90,14 @@ Common expression issues include:
 3. **Array access issues**: Check array indices and iterations
    ```bash
    # Test array access
-   lemline debug expression '.items[0].name' '{"items":[{"name":"Product"}]}'
+   echo '{"items":[{"name":"Product"}]}' | jq '.items[0].name'
    ```
 
 ### HTTP Call Problems
 
 Debug HTTP task issues:
 
-1. Enable HTTP request/response logging:
-   ```properties
-   lemline.http.trace=true
-   ```
-
+1. Run the runner with `--debug`
 2. Check request details in logs
 3. Verify endpoint, method, and authentication
 4. Examine response codes and bodies
@@ -148,63 +109,32 @@ When debugging event-based tasks:
 1. Check event broker connectivity
 2. Verify event topic/queue names
 3. Ensure event correlations match
-4. Use message tracing:
-   ```properties
-   lemline.messaging.trace=true
-   ```
+4. Set the `com.lemline.runner.messaging` log category to `DEBUG`
 
-## Using the CLI for Debugging
+## Testing with Mocked Activities
 
-The CLI provides several debugging commands:
+To run workflows without calling real services, start a runner in test mode with a file of mocked activity responses:
 
 ```bash
-# List running instances
-lemline instances list
-
-# Get instance details
-lemline instances get <instance-id>
-
-# View instance state
-lemline instances states get <instance-id>
-
-# Get execution history
-lemline instances history <instance-id>
-
-# Examine specific node state
-lemline instances states get <instance-id> <node-position>
+lemline listen --mock-config mocks.yaml
 ```
 
-## Setting Breakpoints
+## Messages That Could Not Be Processed
 
-You can define workflow-level breakpoints to pause execution at specific points:
+Messages that a runner receives for a namespace it does not serve are parked in the failures table. Once the right runner is deployed, re-send them:
 
-```yaml
-- debugCheckpoint:
-    extension:
-      breakpoint: true
-    do:
-      - continueExecution:
-          # Next steps
+```bash
+lemline failures replay --dry-run
+lemline failures replay --yes
 ```
-
-Execution will pause at this point, allowing you to inspect state before continuing.
 
 ## Debugging Timeouts and Performance
 
 To troubleshoot performance issues:
 
-1. Enable performance metrics:
-   ```properties
-   lemline.metrics.enabled=true
-   ```
-
-2. View metrics for task durations, retries, and more
-3. Check for stuck workflows:
-   ```bash
-   lemline admin list-stuck-instances
-   ```
-
-4. Adjust timeout configurations as needed
+1. Read the runner metrics at `http://<host>:8080/q/metrics` (message processing counts, failures and durations per channel)
+2. Look for instances that stay pending in the dashboard
+3. Remember that only `listen` task timeouts are enforced; HTTP calls use fixed limits (15 seconds to connect, 30 seconds per request)
 
 ## Best Practices
 

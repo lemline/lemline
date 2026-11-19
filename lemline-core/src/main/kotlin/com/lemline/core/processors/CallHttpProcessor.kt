@@ -2,6 +2,7 @@
 package com.lemline.core.processors
 
 import com.fasterxml.jackson.databind.JsonNode
+import com.fasterxml.jackson.databind.node.NullNode
 import com.fasterxml.jackson.databind.node.ObjectNode
 import com.fasterxml.jackson.databind.node.ValueNode
 import com.lemline.common.json.*
@@ -111,7 +112,7 @@ class CallHttpProcessor(
         val endpoint = toUrl(httpArgs.endpoint, transformedInput, scope)
 
         // Extract and resolve authentication
-        val authentication = resolveAuthentication(httpArgs.endpoint)
+        val authentication = resolveAuthentication(httpArgs.endpoint, transformedInput, scope)
 
         // Extract headers
         val headers = evaluateStringMap(
@@ -124,9 +125,9 @@ class CallHttpProcessor(
             httpArgs.query?.runtimeExpression, "query", transformedInput, scope,
         )
 
-        // Extract body
+        // Evaluate body: runtime expressions are resolved at any depth
         val body: JsonNode? = httpArgs.body?.let {
-            with(LemlineJson) { it.toJsonNode() }
+            eval(transformedInput, with(LemlineJson) { it.toJsonNode() }, scope)
         }
 
         // Extract output format
@@ -170,7 +171,7 @@ class CallHttpProcessor(
      * Resolves authentication policy to HttpAuthentication.
      * Returns null if no authentication is configured.
      */
-    private fun resolveAuthentication(endpointUnion: Endpoint): HttpAuthentication? {
+    private fun resolveAuthentication(endpointUnion: Endpoint, input: JsonNode, scope: Scope): HttpAuthentication? {
         val authPolicy = toAuthenticationPolicy(endpointUnion) ?: return null
 
         return when (authPolicy) {
@@ -181,7 +182,10 @@ class CallHttpProcessor(
                             ?: raiseError(CONFIGURATION, "Basic authentication requires username")
                         val password = props.password
                             ?: raiseError(CONFIGURATION, "Basic authentication requires password")
-                        HttpAuthentication.Basic(username, password)
+                        HttpAuthentication.Basic(
+                            evaluateAuthValue(username, "basic.username", input, scope),
+                            evaluateAuthValue(password, "basic.password", input, scope),
+                        )
                     }
 
                     else -> raiseError(RUNTIME, "Unsupported basic authentication: ${props?.javaClass?.name}")
@@ -193,7 +197,7 @@ class CallHttpProcessor(
                     is BearerAuthenticationProperties -> {
                         val token = props.token
                             ?: raiseError(CONFIGURATION, "Bearer authentication requires token")
-                        HttpAuthentication.Bearer(token)
+                        HttpAuthentication.Bearer(evaluateAuthValue(token, "bearer.token", input, scope))
                     }
 
                     else -> raiseError(RUNTIME, "Unsupported bearer authentication: ${props?.javaClass?.name}")
@@ -215,6 +219,16 @@ class CallHttpProcessor(
             else -> raiseError(RUNTIME, "Unsupported authentication type: ${authPolicy.javaClass.name}")
         }
     }
+
+    /**
+     * Evaluates an authentication property, which may be a runtime expression (e.g. `${ $secrets.TOKEN }`).
+     */
+    private fun evaluateAuthValue(value: String, name: String, input: JsonNode, scope: Scope): String =
+        when (val result = eval(input, jsonValue(value), scope)) {
+            is NullNode -> raiseError(EXPRESSION, "Authentication $name must evaluate to a string, but got null")
+            is ValueNode -> result.content
+            else -> raiseError(EXPRESSION, "Authentication $name must evaluate to a string")
+        }
 
     /**
      * Converts endpoint to URL string.

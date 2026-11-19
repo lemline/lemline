@@ -2,6 +2,9 @@
 
 This reference documents all supported task types in Lemline, their syntax, properties, and usage.
 
+
+> **Lemline runtime:** only `listen` task timeouts are enforced. Workflow-level timeouts and timeouts on other tasks are accepted but ignored for now. HTTP calls use fixed client limits instead: 15 seconds to connect, 30 seconds per request.
+
 ## Overview of Task Types
 
 Lemline supports the following categories of tasks:
@@ -544,6 +547,8 @@ All tasks support these common properties:
       labels:
         category: "api"
 ```
+
+> **Lemline runtime:** only `listen` task timeouts are enforced. Workflow-level timeouts and timeouts on other tasks are accepted but ignored for now. HTTP calls use fixed client limits instead: 15 seconds to connect, 30 seconds per request.
 
 - **if**: Conditional expression for task execution
 - **timeout**: Task-specific timeout (ISO 8601 duration)

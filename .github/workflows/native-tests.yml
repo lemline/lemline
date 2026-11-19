@@ -1,0 +1,84 @@
+name: Native Binary Tests
+
+# Builds the native binary on each release platform and runs the packaged-artifact tests
+# (lemline-runner/src/integrationTest) against it. Started by hand only: Actions → "Native Binary Tests"
+# → "Run workflow", on the branch to check.
+on:
+  workflow_dispatch: { }
+
+permissions:
+  contents: read
+
+jobs:
+  native-tests:
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Linux runs every test: Docker provides the PostgreSQL container
+          - runner: ubuntu-22.04
+            platform: linux-x86_64
+            tests: ''
+          # No Linux containers on these runners: run the tests that need no database
+          - runner: windows-2022
+            platform: windows-x86_64
+            tests: --tests "*PackagedCliIT.prints*"
+          - runner: macos-14
+            platform: macos-arm64
+            tests: --tests "*PackagedCliIT.prints*"
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up GraalVM Native Image
+        uses: graalvm/setup-graalvm@v1
+        with:
+          distribution: graalvm-community
+          java-version: 25
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup MSBuild
+        if: ${{ runner.os == 'Windows' }}
+        uses: microsoft/setup-msbuild@v2
+        with:
+          msbuild-architecture: x64
+
+      - name: Setup MSVC (Windows)
+        if: ${{ runner.os == 'Windows' }}
+        uses: ilammy/msvc-dev-cmd@v1.12.1
+        with:
+          arch: x64
+
+      - name: Set up Java 17 for Gradle toolchain
+        if: ${{ runner.os == 'Windows' }}
+        uses: actions/setup-java@v3
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Build native binary and run its tests (Linux, macOS)
+        if: ${{ runner.os != 'Windows' }}
+        run: |
+          ./gradlew --no-daemon \
+            -Dorg.gradle.jvmargs="-Xmx2g -XX:MaxMetaspaceSize=768m -Dfile.encoding=UTF-8" \
+            :lemline-runner:testNative ${{ matrix.tests }} \
+            -Dquarkus.native.native-image-xmx=5g
+
+      - name: Build native binary and run its tests (Windows)
+        if: ${{ runner.os == 'Windows' }}
+        shell: cmd
+        run: |
+          gradlew.bat --no-daemon ^
+            -Dorg.gradle.jvmargs="-Xmx2g -XX:MaxMetaspaceSize=768m -Dfile.encoding=UTF-8" ^
+            :lemline-runner:testNative ${{ matrix.tests }} ^
+            -Dquarkus.native.native-image-xmx=5g
+
+      - name: Upload test reports
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-test-reports-${{ matrix.platform }}
+          path: lemline-runner/build/reports/tests/
+          if-no-files-found: ignore

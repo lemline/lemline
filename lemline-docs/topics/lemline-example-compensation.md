@@ -1,5 +1,8 @@
 # Compensation Pattern Examples
 
+> **Runtime support:** some examples on this page use `call: openapi`, `call: asyncapi`, `call: grpc` or OAuth 2.0 authentication. The Lemline runtime does not execute these yet: such a task fails when it runs. Write those calls with `call: http` and `basic` or `bearer` authentication to run them on Lemline.
+
+
 This document provides examples of implementing compensation patterns in Lemline workflows. Compensation patterns are essential for maintaining data consistency and handling partial failures in distributed systems by implementing actions that "undo" or "compensate" for previously completed steps when errors occur.
 
 ## Basic Compensation Pattern
@@ -924,7 +927,7 @@ When implementing compensation patterns in Lemline workflows, consider these bes
 7. **Escalation Policy**: Define clear escalation paths when compensation fails
 8. **Independent Compensation**: Design compensation actions that don't depend on workflow state
 9. **Explicit Cleanup**: Always explicitly clean up resources, don't rely on implicit cleanup
-10. **Timeouts for Compensation**: Set appropriate timeouts for compensation actions
+10. **Timeouts for Compensation**: Set appropriate timeouts for compensation actions (Lemline only enforces timeouts on `listen` tasks; HTTP calls use fixed limits of 15 s to connect and 30 s per request)
 
 ## Conclusion
 

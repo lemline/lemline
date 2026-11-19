@@ -4,6 +4,8 @@ title: Timeouts
 
 # Timeouts
 
+> **Lemline runtime:** only `listen` task timeouts are enforced. Workflow-level timeouts and timeouts on other tasks are accepted but ignored for now. HTTP calls use fixed client limits instead: 15 seconds to connect, 30 seconds per request.
+
 ## Purpose
 
 Timeouts provide a crucial mechanism for limiting the maximum execution duration of an entire workflow or individual

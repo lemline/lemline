@@ -2,5 +2,5 @@
 <!DOCTYPE vars SYSTEM "https://resources.jetbrains.com/writerside/1.0/vars.dtd">
 <vars>
     <var name="product" value="Lemline"/>
-    <var name="version" value="0.5.2"/>
+    <var name="version" value="0.7.0"/>
 </vars>

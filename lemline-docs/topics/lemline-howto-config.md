@@ -1,295 +1,205 @@
 # Configuring the Lemline Runner
 
-This guide explains how to configure the Lemline runtime environment to meet your specific requirements.
+This guide explains how to give the Lemline runner its configuration: where the file lives, how to override values, and the settings you usually change. For the full list of properties, see the [Runner Configuration Reference](lemline-ref-config.md).
 
 ## Configuration Overview
 
-Lemline uses a layered configuration approach that allows you to customize its behavior through:
+Lemline reads its configuration from, in order of decreasing priority:
 
-1. **Configuration files**: `application.properties` or `application.yaml`
-2. **Environment variables**: Override settings for different environments
-3. **Command line arguments**: Override specific settings at runtime
-4. **External configuration sources**: Load configuration from external systems
+1. **Java system properties**: `-Dlemline.messaging.type=kafka`
+2. **Environment variables**: `LEMLINE_MESSAGING_TYPE=kafka`
+3. **A YAML configuration file**
+4. **Built-in defaults**
 
-## Core Configuration File
+Every command except `lemline config create` needs a configuration file, and stops with an error when none is found. To try Lemline on one machine, use PostgreSQL for everything (database, PGMQ messaging and lifecycle analytics), as described in [Setting Up A Local Environment](lemline-tutorial-setup.md).
 
-The main configuration file can be placed in several locations (in order of precedence):
+The in-memory database and the in-memory H2 analytics store are only available in Lemline's own test suite: the released binaries and jar do not include them, so `database.type: in-memory` and the default `analytics.type: h2` cannot start a runner.
 
-1. Current directory: `./application.properties`
-2. `config` subdirectory: `./config/application.properties`
-3. User's home directory: `~/application.properties`
-4. System config directory: `/etc/lemline/application.properties`
+## Create a Configuration File
 
-Example `application.properties` file:
+Generate a starting file for your broker and database:
 
-```properties
-# Core configuration
-lemline.name=My Workflow Engine
-lemline.data-dir=/var/lib/lemline/data
-
-# Database configuration
-lemline.database.type=postgresql
-lemline.database.host=localhost
-lemline.database.port=5432
-lemline.database.name=lemline
-lemline.database.username=${DB_USERNAME}
-lemline.database.password=${DB_PASSWORD}
-
-# Messaging configuration
-lemline.messaging.type=kafka
-lemline.messaging.bootstrap.servers=localhost:9092
-lemline.messaging.group.id=lemline-group
-
-# HTTP client configuration
-lemline.http.connect-timeout=PT5S
-lemline.http.read-timeout=PT30S
-lemline.http.max-connections=100
+```bash
+lemline config create --messaging kafka --database postgresql
 ```
 
-## YAML Configuration
+This writes `lemline.yaml` in the current directory. Lemline does not look for that name on its own: either pass it with `--config lemline.yaml`, or create the file as `.lemline.yaml` with `-o .lemline.yaml` so that it is found automatically. Use `--output <path>` to choose another path, `--force` to overwrite an existing file, and `--dry-run` to print the file instead of writing it. Supported values: `kafka`, `rabbitmq` or `pgmq` for messaging, `postgresql` or `mysql` for the database.
 
-You can also use YAML format for more structured configuration:
+A minimal file looks like this:
 
 ```yaml
 lemline:
-  name: My Workflow Engine
-  data-dir: /var/lib/lemline/data
-  
   database:
     type: postgresql
-    host: localhost
-    port: 5432
-    name: lemline
-    username: ${DB_USERNAME}
-    password: ${DB_PASSWORD}
-  
+    migrate-at-start: true
+    postgresql:
+      host: localhost
+      port: 5432
+      database: lemline
+      username: postgres
   messaging:
     type: kafka
-    bootstrap:
-      servers: localhost:9092
-    group:
-      id: lemline-group
-  
-  http:
-    connect-timeout: PT5S
-    read-timeout: PT30S
-    max-connections: 100
+    kafka:
+      brokers: localhost:9092
 ```
 
-## Environment Variables
+## Tell Lemline Where the File Is
 
-All configuration properties can be overridden with environment variables using the following pattern:
+Lemline uses the first file found among:
 
-1. Convert the property name to uppercase
-2. Replace dots (`.`) with underscores (`_`)
-3. Prefix with `LEMLINE_`
-
-Examples:
-
-| Property                        | Environment Variable              |
-|---------------------------------|-----------------------------------|
-| `lemline.database.host`        | `LEMLINE_DATABASE_HOST`           |
-| `lemline.messaging.type`       | `LEMLINE_MESSAGING_TYPE`          |
-| `lemline.http.max-connections` | `LEMLINE_HTTP_MAX_CONNECTIONS`    |
-
-## Command Line Arguments
-
-Override configuration at runtime using command line arguments:
+1. the path given with `--config <path>` (or `-c <path>`)
+2. the path in the `LEMLINE_CONFIG` environment variable
+3. `./.lemline.yaml`
+4. `~/.config/lemline/config.yaml`
+5. `~/.lemline.yaml`
 
 ```bash
-lemline instances start \
-  --workflowId=order-processor \
-  -Dlemline.database.host=prod-db.example.com \
-  -Dlemline.messaging.bootstrap.servers=prod-kafka.example.com:9092
+lemline listen --config /etc/lemline/lemline.yaml
 ```
-
-## Configuration Profiles
-
-Lemline supports configuration profiles to manage environment-specific settings:
-
-```properties
-# Default settings
-lemline.database.host=localhost
-
-# Development profile settings
-%dev.lemline.database.host=dev-db.example.com
-
-# Production profile settings
-%prod.lemline.database.host=prod-db.example.com
-%prod.lemline.http.connect-timeout=PT10S
-```
-
-Activate a profile using:
 
 ```bash
-lemline instances start --workflowId=order-processor -Dquarkus.profile=prod
+LEMLINE_CONFIG=/etc/lemline/lemline.yaml lemline listen
 ```
 
-## External Configuration Sources
+A file given with `--config` or `LEMLINE_CONFIG` must exist; otherwise the command stops with an error.
 
-Lemline can load configuration from external sources:
+## Override Values with Environment Variables
 
-### ConfigMap/Secret (Kubernetes)
+Any property can be overridden with an environment variable: write the property name in upper case and replace every character that is not a letter or a digit with `_`.
 
-```properties
-# Enable Kubernetes config source
-quarkus.kubernetes-config.enabled=true
-quarkus.kubernetes-config.config-maps=lemline-config
-quarkus.kubernetes-config.secrets=lemline-secrets
+| Property                                | Environment Variable                      |
+|-----------------------------------------|-------------------------------------------|
+| `lemline.database.postgresql.host`      | `LEMLINE_DATABASE_POSTGRESQL_HOST`        |
+| `lemline.database.postgresql.password`  | `LEMLINE_DATABASE_POSTGRESQL_PASSWORD`    |
+| `lemline.messaging.kafka.brokers`       | `LEMLINE_MESSAGING_KAFKA_BROKERS`         |
+
+This is the recommended way to pass passwords:
+
+```bash
+LEMLINE_DATABASE_POSTGRESQL_PASSWORD=secret lemline listen --config lemline.yaml
 ```
 
-### Vault (HashiCorp)
+See [Environment Variables Reference](lemline-ref-env-vars.md).
 
-```properties
-# Enable Vault config source
-quarkus.vault.url=https://vault.example.com:8200
-quarkus.vault.authentication.client-token=${VAULT_TOKEN}
-quarkus.vault.secret-config-kv-path=lemline
+## Check the Effective Configuration
+
+Print the configuration Lemline will actually use, after merging all sources:
+
+```bash
+lemline config show
 ```
+
+Use `--format yaml` or `--format properties` to choose the output format, and `--all` to include non-Lemline properties.
 
 ## Configuration Categories
 
-### Database Configuration
+### Database
 
-```properties
-# Database type (postgresql, mysql, h2)
-lemline.database.type=postgresql
-
-# Connection details
-lemline.database.host=localhost
-lemline.database.port=5432
-lemline.database.name=lemline
-lemline.database.username=${DB_USERNAME}
-lemline.database.password=${DB_PASSWORD}
-
-# Connection pool settings
-lemline.database.min-pool-size=5
-lemline.database.max-pool-size=20
-lemline.database.idle-timeout=PT30M
+```yaml
+lemline:
+  database:
+    type: postgresql          # postgresql, mysql or in-memory
+    migrate-at-start: true    # apply schema migrations at startup
+    postgresql:
+      host: localhost
+      port: 5432
+      database: lemline
+      username: postgres
 ```
 
-### Messaging Configuration
+If `type` is omitted, Lemline picks `postgresql` or `mysql` from the block you filled in. You can also apply migrations explicitly with `lemline migrate`, or preview them with `lemline migrate --pretend`.
 
-```properties
-# Messaging system type (kafka, rabbitmq)
-lemline.messaging.type=kafka
+### Messaging
 
-# Kafka settings (when type=kafka)
-lemline.messaging.bootstrap.servers=localhost:9092
-lemline.messaging.group.id=lemline-group
-lemline.messaging.auto.offset.reset=earliest
-
-# RabbitMQ settings (when type=rabbitmq)
-lemline.messaging.rabbitmq.host=localhost
-lemline.messaging.rabbitmq.port=5672
-lemline.messaging.rabbitmq.username=${RABBITMQ_USER}
-lemline.messaging.rabbitmq.password=${RABBITMQ_PASSWORD}
+```yaml
+lemline:
+  messaging:
+    type: kafka               # kafka, rabbitmq, pgmq or in-memory
+    kafka:
+      brokers: localhost:9092
+      commands:
+        consumer:
+          group-id: lemline-group
 ```
 
-### HTTP Client Configuration
+RabbitMQ:
 
-```properties
-# Timeouts
-lemline.http.connect-timeout=PT5S
-lemline.http.read-timeout=PT30S
-lemline.http.call-timeout=PT60S
-
-# Connection pool
-lemline.http.max-connections=100
-lemline.http.max-connections-per-route=20
-lemline.http.keep-alive=true
-lemline.http.idle-timeout=PT60S
-
-# Proxy settings
-lemline.http.proxy.host=proxy.example.com
-lemline.http.proxy.port=8080
-lemline.http.proxy.username=${PROXY_USER}
-lemline.http.proxy.password=${PROXY_PASSWORD}
-lemline.http.non-proxy-hosts=localhost|*.example.com
+```yaml
+lemline:
+  messaging:
+    type: rabbitmq
+    rabbitmq:
+      hostname: localhost
+      port: 5672
+      username: guest
+      password: guest
 ```
 
-### Logging Configuration
+PGMQ (PostgreSQL as a message queue):
 
-```properties
-# Log levels
-quarkus.log.level=INFO
-quarkus.log.category."com.lemline".level=DEBUG
-quarkus.log.category."com.lemline.core.execution".level=INFO
-quarkus.log.category."org.apache.http".level=WARN
+```yaml
+lemline:
+  messaging:
+    type: pgmq
+    pgmq:
+      host: localhost
+      port: 5432
+      database: lemline
+      username: postgres
+```
 
-# Log file
-quarkus.log.file.enable=true
-quarkus.log.file.path=/var/log/lemline/lemline.log
-quarkus.log.file.rotation.max-file-size=10M
-quarkus.log.file.rotation.max-backup-index=5
+See [Message Brokers](lemline-howto-brokers.md).
 
-# JSON formatting for production
-%prod.quarkus.log.console.json=true
+### Namespaces
+
+By default a runner works on the `default` namespace. To make it serve other namespaces:
+
+```yaml
+lemline:
+  namespaces: orders, billing
+```
+
+### Concurrency
+
+Each channel processes up to 64 messages in parallel by default:
+
+```yaml
+lemline:
+  messaging:
+    commands:
+      consumer:
+        concurrency: 32
+```
+
+### Logging
+
+Use the command-line options `--debug`, `--info`, `--warn` or `--error` to set the log level, and `--json` for JSON logs. Quarkus log properties are not read from the Lemline configuration file, which only accepts `lemline.*` settings. Set them as environment variables instead (or as `-D` system properties):
+
+```bash
+export QUARKUS_LOG_LEVEL=INFO
+export QUARKUS_LOG_CONSOLE_LEVEL=DEBUG   # the console only shows ERROR by default
+export QUARKUS_LOG_CATEGORY__COM_LEMLINE__LEVEL=DEBUG
 ```
 
 ### Secret Management
 
-```properties
-# Secret source (file, env, vault)
-lemline.secrets.source=file
-lemline.secrets.file.path=/etc/lemline/secrets.properties
+Lemline has no secret settings. Each secret a workflow declares in `use.secrets` is read from the runner environment variable with exactly the same name. See [Managing Secrets in Lemline](lemline-howto-secrets.md).
 
-# Secret caching
-lemline.secrets.cache.enabled=true
-lemline.secrets.cache.ttl=PT15M
-```
+### Metrics and Health
 
-### Performance Tuning
-
-```properties
-# Thread pools
-lemline.execution.pool.core-size=10
-lemline.execution.pool.max-size=50
-lemline.execution.pool.queue-size=100
-lemline.execution.pool.keep-alive=PT60S
-
-# Caching
-lemline.cache.workflow-definitions.enabled=true
-lemline.cache.workflow-definitions.max-size=100
-lemline.cache.workflow-definitions.ttl=PT15M
-
-# Execution limits
-lemline.execution.max-parallel-workflows=100
-lemline.execution.max-execution-time=PT10M
-```
-
-## Configuration Validation
-
-Lemline validates your configuration at startup. Invalid configuration will cause startup to fail with clear error messages.
-
-You can validate configuration without starting the service:
-
-```bash
-lemline config validate -Dlemline.database.type=postgresql
-```
-
-## Loading External Configuration Files
-
-Load specific configuration files at runtime:
-
-```bash
-lemline instances start --workflowId=order-processor \
-  -Dquarkus.config.locations=/path/to/custom-config.properties
-```
+`lemline listen` serves Prometheus metrics at `http://<host>:8080/q/metrics` and health checks at `/q/health/live` and `/q/health/ready`. Change the port with `lemline.metrics.port` or `lemline listen --metrics-port <port>`.
 
 ## Best Practices
 
-1. **Use profiles**: Organize environment-specific configurations using profiles
-2. **Externalize secrets**: Keep sensitive values out of configuration files
-3. **Use placeholders**: Use `${ENV_VAR}` syntax for environment-specific values
-4. **Override selectively**: Override only what's necessary for each environment
-5. **Version control**: Keep configuration in version control, except for secrets
-6. **Document defaults**: Document default values and configuration options
-7. **Validate changes**: Test configuration changes before deploying to production
+1. **Keep one file per environment** and select it with `--config` or `LEMLINE_CONFIG`.
+2. **Keep passwords out of the file**: pass them as environment variables.
+3. **Set the types explicitly** (`lemline.database.type`, `lemline.messaging.type`) in production, so a stray property cannot change the backend.
+4. **Check before deploying** with `lemline config show`.
 
 ## Related Resources
 
-- [Environment Variables Reference](lemline-ref-env-vars.md)
-- [Secrets Management](lemline-howto-secrets.md)
-- [Database Configuration](lemline-howto-brokers.md)
 - [Runner Configuration Reference](lemline-ref-config.md)
+- [Environment Variables Reference](lemline-ref-env-vars.md)
+- [Command Line Reference](lemline-ref-cli.md)
+- [Secrets Management](lemline-howto-secrets.md)
+- [Message Brokers](lemline-howto-brokers.md)

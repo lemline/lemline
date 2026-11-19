@@ -76,7 +76,7 @@ An Open Workflow definition document consists of the following top-level propert
       restart cycle
   
 
-* **`timeout`** (Optional): Defines the maximum duration the entire workflow instance is allowed to execute
+* **`timeout`** (Optional): Defines the maximum duration the entire workflow instance is allowed to execute *(Lemline does not enforce workflow-level timeouts yet.)*
   before being timed out. This can prevent runaway workflows, resource leaks, or deadlock situations.
   ```yaml
   timeout:

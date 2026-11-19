@@ -4,6 +4,9 @@ title: How to make an HTTP call
 
 # How to make an HTTP call
 
+> **Runtime support:** the Lemline runtime supports only `basic` and `bearer` authentication on HTTP calls (OAuth 2.0 fails with a `configuration` error), and does not expand URI template placeholders such as `{userId}`: build dynamic URIs with a runtime expression instead. See [HTTP Reference](lemline-ref-http.md).
+
+
 This guide explains how to integrate HTTP/HTTPS API calls into your Lemline workflows. You'll learn how to define HTTP functions, make different types of requests, handle responses, and implement error handling.
 
 ## Understanding HTTP Calls in Lemline
@@ -391,6 +394,8 @@ You can set custom timeouts for HTTP calls:
   next: ProcessResponse
 ```
 
+> **Lemline runtime:** only `listen` task timeouts are enforced. Workflow-level timeouts and timeouts on other tasks are accepted but ignored for now. HTTP calls use fixed client limits instead: 15 seconds to connect, 30 seconds per request.
+
 ### Following Redirects
 
 Control redirect behavior:
@@ -700,7 +705,7 @@ This workflow makes multiple HTTP calls with proper error handling to process an
 
 1. **Use descriptive function names**: Name HTTP functions based on their purpose, not just the endpoint
 2. **Include proper error handling**: Always wrap HTTP calls in `try` tasks with appropriate retry policies
-3. **Set reasonable timeouts**: Configure timeouts appropriate for the expected response time
+3. **Set reasonable timeouts**: Configure timeouts appropriate for the expected response time (Lemline only enforces timeouts on `listen` tasks; HTTP calls use fixed limits of 15 s to connect and 30 s per request)
 4. **Validate responses**: Check status codes and response data to ensure they match expectations
 5. **Use authentication securely**: Store credentials as secrets, not hardcoded values
 6. **Handle rate limiting**: Implement exponential backoff retry strategies for rate-limited APIs

@@ -34,7 +34,13 @@ import kotlin.reflect.KVariance
         KVariance::class
     ],
     classNames = [
-        "[Lkotlin.reflect.KTypeProjection;"  // Array of KTypeProjection
+        "[Lkotlin.reflect.KTypeProjection;",  // Array of KTypeProjection
+        // Jackson instantiates these (internal) SDK error deserializers and reads these mix-ins reflectively
+        "com.lemline.common.json.ErrorTitleDeserializer",
+        "com.lemline.common.json.ErrorDetailsDeserializer",
+        "com.lemline.common.json.ErrorTitleMixIn",
+        "com.lemline.common.json.ErrorDetailsMixIn",
+        "com.lemline.common.json.LemlineJson\$ScheduleMixIn",
     ],
     registerFullHierarchy = true
 )

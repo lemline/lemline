@@ -1,5 +1,8 @@
 # DSL Syntax Reference
 
+> **Runtime support:** this page describes the DSL syntax. The Lemline runtime does not execute `call: openapi`, `call: asyncapi`, `call: grpc` or OAuth 2.0 / OpenID Connect authentication yet. See [Supported Features](lemline-ref-supported-features.md).
+
+
 This page provides a comprehensive reference for the Open Workflow DSL syntax as implemented in Lemline.
 
 ## Format and Structure
@@ -201,6 +204,8 @@ use:
       labels:
         category: "api"
 ```
+
+> **Lemline runtime:** only `listen` task timeouts are enforced. Workflow-level timeouts and timeouts on other tasks are accepted but ignored for now. HTTP calls use fixed client limits instead: 15 seconds to connect, 30 seconds per request.
 
 ### Flow Control Tasks
 

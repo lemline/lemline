@@ -193,6 +193,8 @@ Timeouts prevent operations from blocking indefinitely:
       timeout: PT30S  # 30-second timeout for HTTP call
 ```
 
+> **Lemline runtime:** only `listen` task timeouts are enforced. Workflow-level timeouts and timeouts on other tasks are accepted but ignored for now. HTTP calls use fixed client limits instead: 15 seconds to connect, 30 seconds per request.
+
 #### Workflow Timeouts
 
 ```yaml
@@ -529,7 +531,7 @@ Handle approaching deadlines:
 
 ### Error Handling
 
-1. **Set Reasonable Timeouts**: Avoid indefinite waiting with appropriate timeouts
+1. **Set Reasonable Timeouts**: Avoid indefinite waiting with appropriate timeouts (Lemline only enforces timeouts on `listen` tasks; HTTP calls use fixed limits of 15 s to connect and 30 s per request)
 2. **Handle Timeout Errors**: Explicitly catch and handle timeout errors
 3. **Implement Retries**: Use retry with backoff for time-sensitive operations
 4. **Provide Fallbacks**: Define fallback behavior when time constraints cannot be met
