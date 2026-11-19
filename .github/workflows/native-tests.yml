@@ -20,13 +20,20 @@ jobs:
           - runner: ubuntu-22.04
             platform: linux-x86_64
             tests: ''
+            gradle_xmx: 2g
+            native_xmx: 5g
           # No Linux containers on these runners: run the tests that need no database
           - runner: windows-2022
             platform: windows-x86_64
             tests: --tests "*PackagedCliIT.prints*"
+            gradle_xmx: 2g
+            native_xmx: 5g
+          # 7 GB runner: native-image needs more than 5 GB, so Gradle gets less
           - runner: macos-15
             platform: macos-arm64
             tests: --tests "*PackagedCliIT.prints*"
+            gradle_xmx: 1536m
+            native_xmx: 6g
 
     steps:
       - name: Check out source
@@ -62,18 +69,18 @@ jobs:
         if: ${{ runner.os != 'Windows' }}
         run: |
           ./gradlew --no-daemon \
-            -Dorg.gradle.jvmargs="-Xmx2g -XX:MaxMetaspaceSize=768m -Dfile.encoding=UTF-8" \
+            -Dorg.gradle.jvmargs="-Xmx${{ matrix.gradle_xmx }} -XX:MaxMetaspaceSize=768m -Dfile.encoding=UTF-8" \
             :lemline-runner:testNative ${{ matrix.tests }} \
-            -Dquarkus.native.native-image-xmx=5g
+            -Dquarkus.native.native-image-xmx=${{ matrix.native_xmx }}
 
       - name: Build native binary and run its tests (Windows)
         if: ${{ runner.os == 'Windows' }}
         shell: cmd
         run: |
           gradlew.bat --no-daemon ^
-            -Dorg.gradle.jvmargs="-Xmx2g -XX:MaxMetaspaceSize=768m -Dfile.encoding=UTF-8" ^
+            -Dorg.gradle.jvmargs="-Xmx${{ matrix.gradle_xmx }} -XX:MaxMetaspaceSize=768m -Dfile.encoding=UTF-8" ^
             :lemline-runner:testNative ${{ matrix.tests }} ^
-            -Dquarkus.native.native-image-xmx=5g
+            -Dquarkus.native.native-image-xmx=${{ matrix.native_xmx }}
 
       - name: Upload test reports
         if: ${{ always() }}

@@ -154,15 +154,16 @@ jobs:
             -Dquarkus.native.native-image-xmx=5g
 
       # **🍎 MacOS**
+      # 7 GB runner: native-image needs more than 5 GB, so Gradle gets less
       - name: Build native image (MacOs)
         if: runner.os == 'macOS'
         run: |
           ./gradlew --no-daemon \
-            -Dorg.gradle.jvmargs="-Xmx2g -XX:MaxMetaspaceSize=768m -Dfile.encoding=UTF-8" \
+            -Dorg.gradle.jvmargs="-Xmx1536m -XX:MaxMetaspaceSize=768m -Dfile.encoding=UTF-8" \
             -p lemline-runner quarkusBuild \
             -Dquarkus.native.enabled=true \
             -Dquarkus.package.jar.enabled=false \
-            -Dquarkus.native.native-image-xmx=5g 
+            -Dquarkus.native.native-image-xmx=6g 
 
       # **🪟 Windows**
       - name: Build native image (Windows)
