@@ -84,7 +84,7 @@ jobs:
             platform: linux-x86_64
           - runner: windows-2022
             platform: windows-x86_64
-          - runner: macos-14
+          - runner: macos-15
             platform: macos-arm64
 
     steps:

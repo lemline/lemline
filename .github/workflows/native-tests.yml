@@ -24,7 +24,7 @@ jobs:
           - runner: windows-2022
             platform: windows-x86_64
             tests: --tests "*PackagedCliIT.prints*"
-          - runner: macos-14
+          - runner: macos-15
             platform: macos-arm64
             tests: --tests "*PackagedCliIT.prints*"
 
