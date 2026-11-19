@@ -31,6 +31,10 @@ input:
           format: email
         name:
           type: string
+use:
+  secrets:
+    - API_KEY
+    - EMAIL_SERVICE_TOKEN
 do:
   - validateEmail:
       call: http
@@ -153,6 +157,9 @@ input:
           type: array
           items:
             type: string
+use:
+  secrets:
+    - API_TOKEN
 do:
   - initializeContext:
       set:
@@ -278,6 +285,13 @@ document:
   namespace: examples
   name: openapi-auth
   version: 1.0.0
+use:
+  secrets:
+    - API_KEY
+    - CLIENT_ID
+    - CLIENT_SECRET
+    - USERNAME
+    - PASSWORD
 do:
   - callWithApiKey:
       call: openapi
@@ -349,6 +363,9 @@ input:
       properties:
         userId:
           type: string
+use:
+  secrets:
+    - API_TOKEN
 do:
   - fetchUserData:
       call: http
@@ -409,6 +426,9 @@ input:
           required:
             - title
             - content
+use:
+  secrets:
+    - API_TOKEN
 do:
   - createPost:
       call: http
@@ -533,6 +553,10 @@ document:
   namespace: examples
   name: secure-grpc
   version: 1.0.0
+use:
+  secrets:
+    - CLIENT_ID
+    - CLIENT_SECRET
 do:
   - getAuthToken:
       call: http

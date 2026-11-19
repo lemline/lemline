@@ -130,6 +130,8 @@ A response whose status is not 2xx makes the task fail with a `runtime` error wh
 
 ## Authentication
 
+Authentication fields evaluate runtime expressions, so they can read secrets. A workflow only sees the secrets it declares in `use.secrets`; an undeclared secret evaluates to `null` and the task faults.
+
 ### Basic Authentication
 
 ```yaml
@@ -155,6 +157,8 @@ endpoint:
 
 ```yaml
 use:
+  secrets:
+    - API_TOKEN
   authentications:
     apiAuth:
       bearer:

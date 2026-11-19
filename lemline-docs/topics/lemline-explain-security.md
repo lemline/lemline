@@ -28,6 +28,9 @@ Runners themselves expose no API: they only consume from the message broker and 
 Declare an authentication inline on the endpoint:
 
 ```yaml
+use:
+  secrets:
+    - API_TOKEN
 do:
   - fetchData:
       call: http

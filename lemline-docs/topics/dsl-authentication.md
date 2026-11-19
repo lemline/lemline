@@ -157,6 +157,9 @@ common flows like client credentials).*
 Authentication can also be defined directly where it's needed, typically within an `endpoint` object.
 
 ```yaml
+use:
+  secrets:
+    - tempPassword
 do:
   - callServiceWithInlineAuth:
       call: http

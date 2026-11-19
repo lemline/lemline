@@ -93,6 +93,9 @@ document:
 
 # Reusable definitions in the resource catalog
 use:
+  secrets:
+    - EMAIL_SERVICE_CLIENT_ID
+    - EMAIL_SERVICE_CLIENT_SECRET
   # Function definitions
   functions:
     - name: sendEmailFunc
