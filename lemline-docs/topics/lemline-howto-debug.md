@@ -134,7 +134,7 @@ To troubleshoot performance issues:
 
 1. Read the runner metrics at `http://<host>:8080/q/metrics` (message processing counts, failures and durations per channel)
 2. Look for instances that stay pending in the dashboard
-3. Adjust timeout configurations as needed
+3. Remember that only `listen` task timeouts are enforced; HTTP calls use fixed limits (15 seconds to connect, 30 seconds per request)
 
 ## Best Practices
 

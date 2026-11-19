@@ -57,7 +57,7 @@ max by (workflow_name) (lemline_messaging_commands_processing_duration_seconds_m
 
 - Keep workflow data small: use `output.as` and `export.as` to keep only what later tasks need. The whole state travels in every message.
 - Run independent calls in parallel with `fork`.
-- Set `timeout` on tasks that call remote services, so a slow service does not hold an instance indefinitely.
+- Do not rely on task-level `timeout` to bound remote calls: Lemline only enforces timeouts on `listen` tasks. HTTP calls use fixed client limits instead (15 seconds to connect, 30 seconds per request).
 - Use `retry` policies with backoff rather than tight loops.
 
 ### In the deployment

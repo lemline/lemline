@@ -696,7 +696,7 @@ When implementing API integrations in Lemline workflows, consider these best pra
 7. **Idempotency**: Design workflows to handle API call retries safely
 8. **Circuit Breaking**: Implement circuit breaking for failing endpoints
 9. **Monitoring**: Include appropriate logging for API interactions
-10. **Timeout Handling**: Set appropriate timeouts for API calls
+10. **Timeout Handling**: Set appropriate timeouts for API calls (Lemline only enforces timeouts on `listen` tasks; HTTP calls use fixed limits of 15 s to connect and 30 s per request)
 
 ## Conclusion
 

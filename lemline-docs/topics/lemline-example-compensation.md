@@ -927,7 +927,7 @@ When implementing compensation patterns in Lemline workflows, consider these bes
 7. **Escalation Policy**: Define clear escalation paths when compensation fails
 8. **Independent Compensation**: Design compensation actions that don't depend on workflow state
 9. **Explicit Cleanup**: Always explicitly clean up resources, don't rely on implicit cleanup
-10. **Timeouts for Compensation**: Set appropriate timeouts for compensation actions
+10. **Timeouts for Compensation**: Set appropriate timeouts for compensation actions (Lemline only enforces timeouts on `listen` tasks; HTTP calls use fixed limits of 15 s to connect and 30 s per request)
 
 ## Conclusion
 

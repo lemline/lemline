@@ -531,7 +531,7 @@ Handle approaching deadlines:
 
 ### Error Handling
 
-1. **Set Reasonable Timeouts**: Avoid indefinite waiting with appropriate timeouts
+1. **Set Reasonable Timeouts**: Avoid indefinite waiting with appropriate timeouts (Lemline only enforces timeouts on `listen` tasks; HTTP calls use fixed limits of 15 s to connect and 30 s per request)
 2. **Handle Timeout Errors**: Explicitly catch and handle timeout errors
 3. **Implement Retries**: Use retry with backoff for time-sensitive operations
 4. **Provide Fallbacks**: Define fallback behavior when time constraints cannot be met

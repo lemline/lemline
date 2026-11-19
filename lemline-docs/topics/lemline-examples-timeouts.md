@@ -786,13 +786,13 @@ do:
 
 When implementing timeout strategies in Lemline workflows, consider these best practices:
 
-1. **Appropriate Duration**: Set timeout durations appropriate to the operation being performed
-2. **Graduated Timeouts**: Use shorter timeouts for quick operations, longer for complex ones
+1. **Appropriate Duration**: Set timeout durations appropriate to the operation being performed (Lemline only enforces timeouts on `listen` tasks; HTTP calls use fixed limits of 15 s to connect and 30 s per request)
+2. **Graduated Timeouts**: Use shorter timeouts for quick operations, longer for complex ones (Lemline only enforces timeouts on `listen` tasks; HTTP calls use fixed limits of 15 s to connect and 30 s per request)
 3. **Retry Strategy**: Combine timeouts with appropriate retry strategies
 4. **Fallback Logic**: Implement fallback mechanisms when operations timeout
 5. **Monitoring**: Log and monitor timeout occurrences to identify patterns
 6. **Circuit Breaking**: Consider implementing circuit breakers for frequently timing out services
-7. **Global Limits**: Set workflow-level timeouts to prevent indefinite execution
+7. **Global Limits**: Set workflow-level timeouts to prevent indefinite execution (Lemline only enforces timeouts on `listen` tasks; HTTP calls use fixed limits of 15 s to connect and 30 s per request)
 8. **Compensating Actions**: Implement cleanup actions when timeouts occur mid-process
 9. **Timeout Prediction**: Monitor remaining time and adjust behavior as deadlines approach
 10. **Documentation**: Document expected timeouts for each integration point

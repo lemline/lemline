@@ -705,7 +705,7 @@ This workflow makes multiple HTTP calls with proper error handling to process an
 
 1. **Use descriptive function names**: Name HTTP functions based on their purpose, not just the endpoint
 2. **Include proper error handling**: Always wrap HTTP calls in `try` tasks with appropriate retry policies
-3. **Set reasonable timeouts**: Configure timeouts appropriate for the expected response time
+3. **Set reasonable timeouts**: Configure timeouts appropriate for the expected response time (Lemline only enforces timeouts on `listen` tasks; HTTP calls use fixed limits of 15 s to connect and 30 s per request)
 4. **Validate responses**: Check status codes and response data to ensure they match expectations
 5. **Use authentication securely**: Store credentials as secrets, not hardcoded values
 6. **Handle rate limiting**: Implement exponential backoff retry strategies for rate-limited APIs

@@ -562,7 +562,7 @@ When implementing error handling in Lemline workflows:
 4. **Add context**: Capture and log relevant context information with errors
 5. **Compensate for partial failures**: Always clean up after partial successes when an error occurs
 6. **Consider idempotency**: Design operations to be safely retryable
-7. **Set timeouts**: Prevent indefinite hanging by setting appropriate timeouts
+7. **Set timeouts**: Prevent indefinite hanging by setting appropriate timeouts (Lemline only enforces timeouts on `listen` tasks; HTTP calls use fixed limits of 15 s to connect and 30 s per request)
 8. **Provide good error messages**: Make error messages informative for operations and customers
 9. **Implement circuit breakers**: Protect services from overload during persistent failures
 

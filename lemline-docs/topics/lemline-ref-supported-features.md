@@ -18,7 +18,7 @@ Lemline implements a subset of the Open Workflow DSL 1.0 specification, with mor
 | Expression Language | ✅ Supported | JQ expressions fully supported |
 | Workflow Variables | ✅ Supported | Context and scope variables |
 | Error Handling | ✅ Supported | Try/catch and retry mechanisms |
-| Workflow Timeouts | ✅ Supported | Global and operation-specific timeouts |
+| Workflow Timeouts | ⚠️ Partial | Only `listen` task timeouts are enforced; workflow-level timeouts and timeouts on other tasks are ignored. HTTP calls use fixed limits (15 s connect, 30 s per request) |
 
 ## Control Flow Support
 

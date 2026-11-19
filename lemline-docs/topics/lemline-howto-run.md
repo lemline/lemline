@@ -720,7 +720,7 @@ This example demonstrates a complete data processing pipeline that:
 
 1. **Validate Inputs**: Always validate inputs before passing them to scripts or containers
 2. **Handle Exit Codes**: Check exit codes to determine success or failure
-3. **Set Appropriate Timeouts**: Configure timeouts based on expected execution time
+3. **Set Appropriate Timeouts**: Configure timeouts based on expected execution time (Lemline only enforces timeouts on `listen` tasks; HTTP calls use fixed limits of 15 s to connect and 30 s per request)
 4. **Clean Up Resources**: Use appropriate cleanup policies for containers
 5. **Use Structured Output**: Have scripts output structured JSON for easier parsing
 6. **Implement Proper Error Handling**: Use try/catch blocks and retry policies for reliability

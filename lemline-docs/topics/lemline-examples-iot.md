@@ -624,7 +624,7 @@ When implementing IoT workflows with Lemline, consider these best practices:
 2. **Batch Processing**: Process telemetry data in batches for efficiency
 3. **Error Handling**: Use robust error handling and retry mechanisms for device communications
 4. **Correlation**: Properly correlate events from the same device across different workflows
-5. **Timeouts**: Set appropriate timeouts for device communication, which may be unstable
+5. **Timeouts**: Set appropriate timeouts for device communication, which may be unstable (Lemline only enforces timeouts on `listen` tasks; HTTP calls use fixed limits of 15 s to connect and 30 s per request)
 6. **Stateful Workflows**: Use workflow context for maintaining state about devices
 7. **Digital Twins**: Update digital twin representations with the latest device state
 8. **Progressive Deployment**: Implement batched or phased deployments for firmware updates

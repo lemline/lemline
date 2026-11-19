@@ -349,7 +349,7 @@ This enables:
 When implementing integration patterns in Lemline:
 
 1. **Error handling**: Always implement error handling for external service calls using try-catch blocks
-2. **Timeouts**: Set appropriate timeouts for service calls to prevent workflow hangs
+2. **Timeouts**: Set appropriate timeouts for service calls to prevent workflow hangs (Lemline only enforces timeouts on `listen` tasks; HTTP calls use fixed limits of 15 s to connect and 30 s per request)
 3. **Retry strategies**: Use retry mechanisms with backoff for transient failures
 4. **Authentication**: Securely manage credentials using secrets management
 5. **Data validation**: Validate inputs and outputs using schemas
