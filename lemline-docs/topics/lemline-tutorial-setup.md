@@ -55,6 +55,12 @@ docker-compose ps
 
 You should see the `postgres` container running.
 
+Create a second database for the workflow history (the lifecycle analytics that the runner records and the dashboard displays):
+
+```bash
+docker-compose exec postgres createdb -U postgres lemline_analytics
+```
+
 ## 2. Create the Configuration File
 
 Create a `.lemline.yaml` configuration file in your project directory. Lemline reads `./.lemline.yaml` automatically, so every command you run from this directory uses it (you can also point to another file with `--config <path>` or the `LEMLINE_CONFIG` environment variable):
@@ -77,10 +83,19 @@ lemline:
             username: postgres
             password: postgres
 
+    analytics:
+        postgresql:
+            host: localhost
+            port: 5432
+            database: lemline_analytics
+            username: postgres
+            password: postgres
+
     namespaces: default, examples, tutorial
 ```
 
-A runner only executes workflows of the namespaces listed in `namespaces` (only `default` when unset). This list covers the namespaces used by the getting-started guide and the tutorials; add your own namespaces to it.
+- `analytics` is required by `lemline listen`: the runner records each instance's history there and creates its table on startup. It must be a separate database from `database`.
+- A runner only executes workflows of the namespaces listed in `namespaces` (only `default` when unset). This list covers the namespaces used by the getting-started guide and the tutorials; add your own namespaces to it.
 
 ## 3. Download Lemline
 
@@ -141,7 +156,7 @@ You should see output showing the Lemline version (e.g., `%version%`).
 
 ## 4. Run Database Migrations
 
-Lemline requires database tables for workflow state persistence. Run the migration command to create them:
+Lemline requires database tables for workflow state persistence. Run the migration command to create them, and answer `y` when it asks for confirmation (add `--force` to skip the question):
 
 <tabs group="platform">
 <tab id="macos-migrate" title="macOS (ARM64)" group-key="macos">
