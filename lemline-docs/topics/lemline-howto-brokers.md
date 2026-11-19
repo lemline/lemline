@@ -8,7 +8,7 @@ This guide explains how to connect Lemline to a message broker. Runners exchange
 |--------|--------------------------|-----|
 | Kafka | `kafka` | Production, high throughput |
 | RabbitMQ | `rabbitmq` | Production |
-| PGMQ (PostgreSQL Message Queue) | `pgmq` | Production without a dedicated broker; needs the PGMQ extension in PostgreSQL |
+| PGMQ (PostgreSQL Message Queue) | `pgmq` | Production without a dedicated broker; runs on a standard PostgreSQL, no extension needed |
 | In-memory | `in-memory` | Single process only, for local tests |
 
 If `lemline.messaging.type` is not set, Lemline uses the broker whose settings block (`lemline.messaging.kafka`, `rabbitmq` or `pgmq`) is present, and in-memory messaging when there is none. At startup, the runner checks that the broker is reachable and stops with an explicit error if it is not.
@@ -171,7 +171,7 @@ Messages only travel inside one process and are lost when it stops. Use it for l
 
 - Check the host and port (`brokers` for Kafka, `hostname` and `port` for RabbitMQ, `host` and `port` for PGMQ).
 - Check credentials and network access.
-- For PGMQ, check that the PGMQ extension is installed in the database.
+- For PGMQ, check that the database migrations have run (`lemline migrate`, or `lemline migrate status` to list them): they create the `pgmq` schema and functions in SQL, without the PostgreSQL extension, so managed PostgreSQL services work too.
 
 ### Messages are not processed
 
