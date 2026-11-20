@@ -21,6 +21,8 @@ object LemlineConfigConstants {
     const val KAFKA_CONNECTOR = "smallrye-kafka"
     const val RABBITMQ_CONNECTOR = "smallrye-rabbitmq"
     const val PGMQ_CONNECTOR = "smallrye-pgmq"
+    const val SQLITE_CONNECTOR = "smallrye-sqlite"
+    const val SQLITE_MESSAGING_PATH_DEFAULT = "messaging.db"
 
     // Per-namespace destination naming convention: <prefix>-<namespace>-<type>
     const val MESSAGING_PREFIX_DEFAULT = "lemline"

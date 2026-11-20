@@ -196,12 +196,21 @@ internal class WorkflowCommandHandler(
         commandEmitter.sendPayload(payload, idempotentKey, workflowInfo?.namespace)
     }
 
-    /**
-     * Derives an idempotent key for command messages.
-     * Uses position + step to ensure deterministic IDs across redeliveries.
-     */
-    override fun deriveIdempotentKey(next: InstanceMessage<WorkflowCommand>): IDV7 =
-        next.workflowState.nodeStack.deriveIdempotentId("-command")
+    override fun deriveIdempotentKey(next: InstanceMessage<WorkflowCommand>): IDV7 {
+        val command = next.workflowState
+        val stack = command.nodeStack
+        // Entering a task and returning after a skipped task can share the
+        // same stack counters. Extension blocks can also leave the stack at
+        // their owner. Identify the target and transition in addition to the stack
+        // so two consecutive commands can coexist until the input is acked.
+        val transition = when (command) {
+            is WorkflowCommand.ResumeFromTask -> command.extensionReturn?.let { "return:${it.blockPosition}:${it.kind}" } ?: "enter"
+            is WorkflowCommand.ResumeWithCompletedTask -> "completed"
+            is WorkflowCommand.ResumeWithFaultedTask -> "faulted"
+        }
+        val phase = stack.currentExtension?.phase?.let { ":$it" }.orEmpty()
+        return stack.deriveIdempotentId("-command:${command.nodePosition}:$transition$phase")
+    }
 
     // ========================================
     // Handling

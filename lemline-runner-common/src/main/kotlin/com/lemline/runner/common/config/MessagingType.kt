@@ -20,7 +20,10 @@ enum class MessagingType(val configValue: String) {
     RABBITMQ("rabbitmq"),
 
     /** PGMQ (PostgreSQL-based message queue) */
-    PGMQ("pgmq");
+    PGMQ("pgmq"),
+
+    /** Embedded single-host SQLite queue */
+    SQLITE("sqlite");
 
     companion object {
         /**

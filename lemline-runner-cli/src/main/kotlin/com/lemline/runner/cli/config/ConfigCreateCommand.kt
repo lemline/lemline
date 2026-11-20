@@ -25,7 +25,7 @@ class ConfigCreateCommand : Runnable {
 
     @Option(
         names = ["-m", "--messaging"],
-        description = ["Messaging broker type (kafka, rabbitmq, pgmq)"],
+        description = ["Messaging broker type (kafka, rabbitmq, pgmq, sqlite)"],
         converter = [MessagingTypeConverter::class]
     )
     var messaging: MessagingType? = null
@@ -101,8 +101,14 @@ class ConfigCreateCommand : Runnable {
             println()
             println("Next steps:")
             println("  1. Review and customize the configuration")
-            println("  2. Start infrastructure: docker compose --profile <profile> up -d")
-            println("  3. Run Lemline: LEMLINE_CONFIG=$output lemline listen")
+            if (messaging == MessagingType.SQLITE) {
+                println("  2. Start the database services using the command in the generated file")
+                println("  3. Apply database migrations: LEMLINE_CONFIG=$output lemline migrate --force")
+                println("  4. Run Lemline: LEMLINE_CONFIG=$output lemline listen")
+            } else {
+                println("  2. Start infrastructure: docker compose --profile <profile> up -d")
+                println("  3. Run Lemline: LEMLINE_CONFIG=$output lemline listen")
+            }
         } catch (e: Exception) {
             throw ParameterException(
                 picocli.CommandLine(this),
@@ -116,6 +122,7 @@ class ConfigCreateCommand : Runnable {
         println("  1) kafka")
         println("  2) rabbitmq")
         println("  3) pgmq")
+        println("  4) sqlite")
         print("> ")
 
         val input = console.readLine().trim()
@@ -123,6 +130,7 @@ class ConfigCreateCommand : Runnable {
             "1", "kafka" -> MessagingType.KAFKA
             "2", "rabbitmq" -> MessagingType.RABBITMQ
             "3", "pgmq" -> MessagingType.PGMQ
+            "4", "sqlite" -> MessagingType.SQLITE
             else -> {
                 throw ParameterException(
                     picocli.CommandLine(this),
@@ -157,8 +165,9 @@ class ConfigCreateCommand : Runnable {
                 "kafka" -> MessagingType.KAFKA
                 "rabbitmq" -> MessagingType.RABBITMQ
                 "pgmq" -> MessagingType.PGMQ
+                "sqlite" -> MessagingType.SQLITE
                 else -> throw IllegalArgumentException(
-                    "Invalid messaging type: '$value'. Allowed values: kafka, rabbitmq, pgmq"
+                    "Invalid messaging type: '$value'. Allowed values: kafka, rabbitmq, pgmq, sqlite"
                 )
             }
         }

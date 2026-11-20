@@ -2,9 +2,13 @@
 package com.lemline.runner.analytics
 
 import com.lemline.core.lifecycleevents.LifecycleEventEmitter
+import com.lemline.common.values.IDV7
 import com.lemline.runner.common.test.RequiresDocker
+import com.lemline.runner.listeners.CloudEventService
 import com.lemline.runner.tests.profiles.KafkaAnalyticsProfile
 import com.lemline.runner.tests.profiles.PgmqAnalyticsProfile
+import com.lemline.runner.tests.profiles.SqliteAnalyticsProfile
+import com.lemline.runner.tests.resources.SqliteMessagingTestClient
 import com.lemline.runner.tests.profiles.RabbitMQAnalyticsProfile
 import io.agroal.api.AgroalDataSource
 import io.cloudevents.CloudEvent
@@ -17,7 +21,10 @@ import java.net.URI
 import java.time.OffsetDateTime
 import java.util.UUID
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
@@ -64,7 +71,7 @@ internal abstract class LifecycleAnalyticsBrokerIntegrationTestBase(
         assertEquals(1, countRowsByEventId(event.id))
     }
 
-    private fun buildEvent(eventId: String): CloudEvent {
+    protected fun buildEvent(eventId: String): CloudEvent {
         return CloudEventBuilder.v1()
             .withId(eventId)
             .withSource(URI.create("urn:lemline:test:$broker"))
@@ -91,7 +98,7 @@ internal abstract class LifecycleAnalyticsBrokerIntegrationTestBase(
         fail("Expected $expected row(s) for event_id='$eventId', but found ${countRowsByEventId(eventId)}")
     }
 
-    private fun countRowsByEventId(eventId: String): Int {
+    protected fun countRowsByEventId(eventId: String): Int {
         analyticsDataSource.connection.use { conn ->
             conn.prepareStatement(
                 "SELECT COUNT(*) FROM public.lemline_lifecycle_events WHERE event_id = ?"
@@ -123,3 +130,26 @@ internal class RabbitLifecycleAnalyticsIntegrationTest : LifecycleAnalyticsBroke
 @TestProfile(PgmqAnalyticsProfile::class)
 @Tag("integration")
 internal class PgmqLifecycleAnalyticsIntegrationTest : LifecycleAnalyticsBrokerIntegrationTestBase("pgmq")
+
+@QuarkusTest
+@TestProfile(SqliteAnalyticsProfile::class)
+@Tag("integration")
+internal class SqliteLifecycleAnalyticsIntegrationTest : LifecycleAnalyticsBrokerIntegrationTestBase("sqlite") {
+    @Test
+    fun `analytics deduplicates a logical message replayed after the broker ack`() = runBlocking {
+        val event = buildEvent("sqlite-replayed-${IDV7.random()}")
+        val id = IDV7.random().toString()
+        val queue = "lemline-lifecycle-events"
+        val payload = CloudEventService.serialize(event)
+        SqliteMessagingTestClient().use { client ->
+            repeat(2) {
+                client.publish(queue, payload, id)
+                withTimeout(10_000) {
+                    while (client.isActive(queue, id)) delay(30)
+                }
+                assertFalse(client.isActive("$queue.dlq", id))
+                assertEquals(1, countRowsByEventId(event.id))
+            }
+        }
+    }
+}

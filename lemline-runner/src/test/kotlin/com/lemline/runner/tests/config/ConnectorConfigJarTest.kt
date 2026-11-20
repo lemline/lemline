@@ -3,6 +3,7 @@ package com.lemline.runner.tests.config
 
 import com.lemline.runner.common.test.RequiresDocker
 import java.io.File
+import java.nio.file.Files
 import java.nio.file.Path
 import java.util.concurrent.TimeUnit
 import org.junit.jupiter.api.Assertions.assertTrue
@@ -47,6 +48,19 @@ class ConnectorConfigJarTest {
         }
     }
 
+    @Test
+    fun `SQLite connector opens a durable file from the fast JAR`() {
+        val file = temporaryDirectory.resolve("messaging.db")
+        postgres().use { database ->
+            database.start()
+            assertConnectorStarts(database, """
+                type: sqlite
+                sqlite:
+                  path: '$file'
+            """.trimIndent()) { Files.isRegularFile(file) }
+        }
+    }
+
     private fun postgres() = PostgreSQLContainer("postgres:14-alpine")
         .withDatabaseName("connector_test")
         .withUsername("test")
@@ -73,7 +87,8 @@ class ConnectorConfigJarTest {
         config.writeText("lemline:\n  database:\n    postgresql:\n" +
             databaseSettings(database).prependIndent("      ") + "\n  analytics:\n    postgresql:\n" +
             databaseSettings(database).prependIndent("      ") + "\n  messaging:\n" + messaging.prependIndent("    ") + "\n")
-        val log = temporaryDirectory.resolve("application.log").toFile()
+        val log = Files.createTempFile("lemline-connector-jar-", ".log").toFile()
+        println("Fast JAR log: ${log.canonicalPath}")
         val process = ProcessBuilder(
             File(System.getProperty("java.home"), "bin/java").path,
             "-Dquarkus.http.port=0", "-Dquarkus.grpc.server.port=0", "-jar", jar.path,

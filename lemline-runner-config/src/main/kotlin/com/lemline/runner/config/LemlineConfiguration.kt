@@ -314,7 +314,7 @@ interface LemlineConfiguration {
          * Messaging type.
          * If not provided, it will be set in [LemlineConfigSource]
          */
-        @Pattern(regexp = "in-memory|kafka|rabbitmq|pgmq")
+        @Pattern(regexp = "in-memory|kafka|rabbitmq|pgmq|sqlite")
         fun type(): String
 
         /**
@@ -347,6 +347,13 @@ interface LemlineConfiguration {
          * Optional PGMQ (PostgreSQL Message Queue) configuration
          */
         fun pgmq(): Optional<PgmqConfig>
+
+        fun sqlite(): SqliteMessagingConfig
+    }
+
+    interface SqliteMessagingConfig {
+        @WithDefault(LemlineConfigConstants.SQLITE_MESSAGING_PATH_DEFAULT)
+        fun path(): Optional<String>
     }
 
     interface ChannelConfig {
