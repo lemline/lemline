@@ -43,7 +43,8 @@ class LifecycleEventHookImpl(
     override suspend fun onWorkflowCreated(
         workflowInfo: WorkflowInfo,
         nodeStack: NodeStack,
-    ) = delegate.onWorkflowCreated(workflowInfo, nodeStack)
+        createdAt: Instant,
+    ) = delegate.onWorkflowCreated(workflowInfo, nodeStack, createdAt)
 
     override suspend fun onWorkflowStarted(
         workflowInfo: WorkflowInfo,

@@ -21,7 +21,7 @@ class LegacyJsonContractTest {
             workflowId = WorkflowId(IDV7.from("01900000-0000-7000-8000-000000000001")),
             workflowInput = parseJson("""{"null":null,"empty":[],"object":{},"false":false,"zero":0,"decimal":1.25,"text":"é☕","nested":[{"value":42},null]}"""),
             startedAt = Instant.parse("2026-01-02T03:04:05Z"),
-        )
+        ).copy(createdAt = null) // pre-migration commands have no created_at: it decodes as unknown
         assertEquals(state, WorkflowStateProtobufMapper.fromProto(WorkflowStateProto.ADAPTER.decode(legacy)))
         assertContentEquals(legacy, WorkflowStateProtobufMapper.toProto(state).encode())
     }

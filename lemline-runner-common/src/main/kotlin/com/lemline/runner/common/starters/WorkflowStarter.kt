@@ -7,10 +7,10 @@ import com.lemline.common.values.WorkflowId
 import com.lemline.common.values.WorkflowName
 import com.lemline.common.values.WorkflowNamespace
 import com.lemline.common.values.WorkflowVersion
-import com.lemline.core.lifecycleevents.LifecycleEventHook
 import com.lemline.core.states.WorkflowCommand
 import com.lemline.runner.common.messaging.InstanceMessage
 import java.time.ZoneId
+import kotlin.time.Instant
 
 /**
  * A prepared workflow ready to be dispatched.
@@ -18,18 +18,24 @@ import java.time.ZoneId
  * Contains all components needed to start a workflow instance:
  * - The instance message to send to the workflow channel
  * - Optional schedule model for scheduled workflows
- * - Lifecycle hook callback to emit workflow.created event
+ *
+ * The caller accepts the instance: it persists the command (or sends it) and, in the same
+ * transaction, enqueues its creation events with
+ * [com.lemline.runner.common.lifecycle.CreationEventEnqueuer.enqueueCreation]. It should first
+ * stamp the command with its acceptance time ([withCreatedAt]); preparation time is only a default.
  *
  * @property instanceMessage The instance message to send (null for cron-scheduled workflows)
  * @property scheduleModel The schedule model for scheduled workflows (null if no schedule)
- * @property onWorkflowCreated Lambda to trigger the workflow.created lifecycle event.
- *           Caller should invoke this after successfully sending the message.
  */
 data class PreparedWorkflow<S>(
     val instanceMessage: InstanceMessage<WorkflowCommand.ResumeFromTask>?,
     val scheduleModel: S?,
-    val onWorkflowCreated: suspend (LifecycleEventHook) -> Unit,
-)
+) {
+    /** The instance message stamped with [createdAt], its acceptance time. */
+    fun withCreatedAt(createdAt: Instant): PreparedWorkflow<S> = copy(
+        instanceMessage = instanceMessage?.let { it.copy(workflowState = it.workflowState.copy(createdAt = createdAt)) },
+    )
+}
 
 /**
  * Interface for preparing workflows for execution.

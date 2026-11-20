@@ -11,7 +11,9 @@ import { isTaskPointer, shortEventType, taskAt, taskNamesOf } from "./workflow-s
 
 export type SegmentKind = "ran" | "running" | "failed" | "backoff" | "waiting" | "scheduled" | "interrupted" | "group";
 /**
- * "scheduled": announced (task.created) but not started yet, for instance while workers are busy.
+ * "scheduled": waiting to start. From task.created (or, for a retry attempt, from its planned
+ * retry time) until task.started; still drawn once the task has started, and open-ended while it
+ * has not. It is waiting for execution, not intentional delay ("backoff").
  * "interrupted": still open when the instance ended, so it never finished.
  */
 export type StepState = "completed" | "running" | "waiting" | "failed" | "retrying" | "scheduled" | "interrupted";
@@ -55,6 +57,12 @@ export interface StepRow {
   hasActiveBody?: boolean;
   ownerId?: string;
   ownerAttempt?: number;
+  /**
+   * Time spent waiting to start (task.created → task.started) before the first attempt, in ms.
+   * Undefined when it is not known: no task.created was recorded for this run (older runtimes,
+   * a retried block, or a creation event not received yet). Never guessed as zero.
+   */
+  waitedToStart?: number;
   note: string;
   detail: string;
 }
@@ -151,8 +159,18 @@ function inHappeningOrder(list: ParsedEvent[]): ParsedEvent[] {
     return failure?.time ?? event.time;
   };
   const isRetry = (event: ParsedEvent) => (kindOf(event.view.eventType) === "retried" ? 1 : 0);
+  // Equal timestamps do not tell what came first: a task is created before it starts by
+  // definition, so at the same time a task.created comes first. Arrival order breaks other ties.
+  const createdFirst = (left: ParsedEvent, right: ParsedEvent) => {
+    const l = kindOf(left.view.eventType);
+    const r = kindOf(right.view.eventType);
+    if (l === "created" && r === "started") return -1;
+    if (l === "started" && r === "created") return 1;
+    return 0;
+  };
   // Same time: the stream order, except that a retry always follows its failure.
-  return [...list].sort((left, right) => at(left) - at(right) || isRetry(left) - isRetry(right) || left.order - right.order);
+  return [...list].sort((left, right) =>
+    at(left) - at(right) || isRetry(left) - isRetry(right) || createdFirst(left, right) || left.order - right.order);
 }
 
 export function workflowBounds(events: TimelineEventView[], status: WorkflowRuntimeStatus, nowMs: number) {
@@ -167,9 +185,15 @@ export function workflowBounds(events: TimelineEventView[], status: WorkflowRunt
   // A task.retried carries the planned retry time, not the time it happened.
   const lastHappened = parsed.filter((event) => kindOf(event.view.eventType) !== "retried").pop();
   const end = ended?.time ?? (terminal ? (lastHappened?.time ?? nowMs) : nowMs);
+  // created → started: waiting for a worker to begin the instance. Unknown (undefined) when either
+  // event is missing; clamped at zero when clocks of different hosts disagree.
+  const waitedToStart = created && started ? Math.max(0, started.time - created.time) : undefined;
   return {
     start: Math.min(created?.time ?? first, first),
     startedAt: first,
+    createdAt: created?.time,
+    waitedToStart,
+    waitingToStart: Boolean(created && !started),
     end,
     terminal,
     input: created ? created.data.input : undefined,
@@ -268,8 +292,9 @@ export function buildTimeline(
       left.pointer.localeCompare(right.pointer) ||
       (left.iteration ?? 0) - (right.iteration ?? 0),
   );
-  // A task may be stamped a few milliseconds before the workflow: the axis starts at the earliest.
-  const t0 = Math.min(bounds.startedAt, ...rows.map((row) => row.start));
+  // A task may be stamped a few milliseconds before the workflow, and a task waits to start before
+  // it starts: the axis starts at the earliest of these.
+  const t0 = Math.min(bounds.startedAt, ...rows.map((row) => row.start), ...rows.flatMap((row) => row.segments.map((segment) => segment.start)));
   const minIndent = rows.reduce((min, row) => Math.min(min, row.indent), Number.POSITIVE_INFINITY);
   for (const row of rows) row.indent -= Number.isFinite(minIndent) ? minIndent : 0;
 
@@ -321,22 +346,39 @@ function buildRow(
   const segments: Segment[] = [];
   let open: Attempt | null = null;
   let backoffFrom: number | null = null;
-  // Announced (task.created) and not started yet.
+  // Planned time of the pending retry (task.retried is stamped with it): the end of the backoff.
+  let retryAt: number | null = null;
+  // Announced (task.created), or eligible again after a retry, and not started yet.
   let scheduledFrom: number | null = null;
+  let waitedToStart: number | undefined;
   let input: unknown;
   let output: unknown;
   let hasOutput = false;
   let lastError: RawError | undefined;
 
+  /**
+   * Ends the intentional delay before a retry at its planned time (or earlier, when the attempt
+   * already resumed, as stamped by another clock): from then on the attempt is eligible, and
+   * any further time is waiting to start.
+   */
   const closeBackoff = (time: number) => {
     if (backoffFrom !== null) {
-      segments.push({ start: backoffFrom, end: Math.max(time, backoffFrom), kind: "backoff" });
+      const end = Math.max(backoffFrom, Math.min(time, retryAt ?? time));
+      segments.push({ start: backoffFrom, end, kind: "backoff" });
       backoffFrom = null;
+      retryAt = null;
+      if (scheduledFrom === null && end < time) scheduledFrom = end;
     }
   };
   const openAttempt = (time: number) => {
     closeBackoff(time);
-    scheduledFrom = null;
+    if (scheduledFrom !== null) {
+      // Clocks of different hosts can stamp a creation after the start: never a negative wait.
+      const waited = Math.max(0, time - scheduledFrom);
+      if (attempts.length === 0 && waitedToStart === undefined) waitedToStart = waited;
+      if (waited > 0) segments.push({ start: scheduledFrom, end: time, kind: "scheduled" });
+      scheduledFrom = null;
+    }
     open = { start: time, outcome: "running" };
     attempts.push(open);
   };
@@ -348,10 +390,10 @@ function buildRow(
     if (kind !== "retried") previousTime = event.time;
     if (kind === "created") {
       if (input === undefined && "input" in event.data) input = event.data.input;
-      // After a retry the new attempt starts with its task.created; otherwise the task waits
-      // to start until its task.started.
-      if (backoffFrom !== null) openAttempt(event.time);
-      else if (!open) scheduledFrom = event.time;
+      // The task waits to start until its task.started. After a retry, the backoff ends at the
+      // planned retry time (or at this creation, if stamped earlier) and the wait follows it.
+      if (backoffFrom !== null) closeBackoff(event.time);
+      if (!open && scheduledFrom === null) scheduledFrom = event.time;
     } else if (kind === "started") {
       if (!open) openAttempt(event.time);
     } else if (kind === "completed") {
@@ -387,6 +429,7 @@ function buildRow(
         open = null;
       }
       backoffFrom = failedAt;
+      retryAt = event.time;
     }
   }
 
@@ -397,7 +440,10 @@ function buildRow(
   if (backoffFrom !== null) {
     if (!terminal) {
       state = "retrying";
-      segments.push({ start: backoffFrom, end: tEnd, kind: "backoff" });
+      // Past its planned time, a retry that has not started yet is waiting to start.
+      const backoffEnd = retryAt !== null && retryAt < tEnd ? Math.max(backoffFrom, retryAt) : tEnd;
+      segments.push({ start: backoffFrom, end: backoffEnd, kind: "backoff" });
+      if (backoffEnd < tEnd) segments.push({ start: backoffEnd, end: tEnd, kind: "scheduled" });
     } else {
       state = "failed";
     }
@@ -431,7 +477,10 @@ function buildRow(
 
   const ongoing = state === "running" || state === "waiting" || state === "retrying" || state === "scheduled";
   const end = ongoing ? undefined : state === "interrupted" ? tEnd : (last?.end ?? start);
-  const groupSegments: Segment[] = isGroup ? [{ start, end: end ?? tEnd, kind: "group" }] : segments;
+  // A group keeps its wait to start (the instance's first block waits in the queue like a task).
+  const groupSegments: Segment[] = isGroup
+    ? [...segments.filter((segment) => segment.kind === "scheduled" && segment.end <= start), { start, end: end ?? tEnd, kind: "group" }]
+    : segments;
 
   let typeLabel = info.typeLabel || "task";
   if (info.extension) typeLabel += ` · ${info.extension.name} · ${info.extension.phase}`;
@@ -455,6 +504,7 @@ function buildRow(
     hasOutput,
     error: state === "failed" ? (last?.error ?? lastError) : undefined,
     listensTo: info.listensTo,
+    waitedToStart,
     isGroup,
     hasActiveBody: isGroup && info.kind !== undefined && !CONTAINER_KINDS.has(info.kind) && !waitsForEvent,
     note: "",
@@ -493,7 +543,7 @@ function buildScale(rows: StepRow[], t0: number, tEnd: number): Scale {
     .filter((row) => !row.isGroup || row.hasActiveBody)
     .flatMap((row) => row.hasActiveBody
       ? activeBodyOf(row, rows, tEnd)
-      : row.segments.filter((segment) => segment.kind !== "waiting" && segment.kind !== "backoff"))
+      : row.segments.filter((segment) => segment.kind !== "waiting" && segment.kind !== "backoff" && segment.kind !== "scheduled"))
     .map((segment) => [Math.max(t0, segment.start), Math.min(tEnd, segment.end)] as const)
     .filter(([start, end]) => end >= start)
     .sort((left, right) => left[0] - right[0]);

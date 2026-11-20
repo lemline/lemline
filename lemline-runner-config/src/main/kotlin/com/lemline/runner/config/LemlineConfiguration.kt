@@ -659,6 +659,9 @@ interface LemlineConfiguration {
         fun schedule(): Optional<ProcessOutboxConfig>
         fun listener(): Optional<ProcessOutboxConfig>
         fun gateway(): Optional<ProcessOutboxConfig>
+
+        /** Durable creation lifecycle events (workflow.created, initial and fork-branch task.created). */
+        fun creationEvents(): Optional<ProcessOutboxConfig>
         fun parent(): Optional<CleanupOutboxConfig>
         fun fork(): Optional<CleanupOutboxConfig>
     }

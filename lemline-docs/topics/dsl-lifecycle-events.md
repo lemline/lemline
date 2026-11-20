@@ -298,6 +298,29 @@ Example event data:
 }
 ```
 
+## Timestamps and Waiting Time in Lemline
+
+In Lemline, the interval between a `created` event and the matching `started` event measures
+**how long the workflow or task waited for execution**:
+
+- `workflow.created` and the first `task.created` (`/do`) are stamped when the instance is
+  durably accepted and ready to run. For a scheduled workflow, this happens when each occurrence
+  becomes due, not when the schedule is registered.
+- `task.created` of later tasks is stamped when the task becomes ready to run, usually when the
+  previous task completes.
+- `workflow.started` and `task.started` are stamped when a worker begins the work.
+
+This wait includes publication, broker transport, and worker setup. It is not the time a message
+spent in the broker. Tasks executed in the same step as their predecessor have a near-zero wait.
+
+A retry is not a new task: its waiting starts at the planned retry time carried by
+`task.retried`. The time before that is the intentional retry delay.
+
+Creation events are persisted with the accepted command. They are published even when no
+worker is running, and may arrive after the `started` event they precede. Order events by their
+timestamps and types, not by arrival order or event ID. Clocks of different hosts can disagree
+slightly.
+
 ## Use Cases for Lifecycle Events
 
 Lifecycle events enable several important use cases:

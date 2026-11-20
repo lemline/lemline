@@ -13,12 +13,13 @@ import com.lemline.common.values.WorkflowInfo
 import com.lemline.common.values.WorkflowName
 import com.lemline.common.values.WorkflowNamespace
 import com.lemline.common.values.WorkflowVersion
-import com.lemline.core.lifecycleevents.LifecycleEventHook
 import com.lemline.core.orchestrator.StepByStepOrchestrator
 import com.lemline.core.workflows.WorkflowCache
 import com.lemline.gateway.v1.StartInstanceRequest
 import com.lemline.runner.common.config.DatabaseConfig
 import com.lemline.runner.common.config.DatabaseType
+import com.lemline.runner.common.lifecycle.CreationEventEnqueuer
+import com.lemline.runner.common.lifecycle.CreationEventOutbox
 import com.lemline.runner.common.messaging.InstanceMessage
 import com.lemline.runner.definitions.Definitions
 import com.lemline.runner.gateway.auth.GatewayAuthorizer
@@ -36,7 +37,6 @@ import io.mockk.Called
 import io.mockk.clearMocks
 import io.mockk.coEvery
 import io.mockk.coVerify
-import io.mockk.coVerifyOrder
 import io.mockk.every
 import io.mockk.just
 import io.mockk.mockk
@@ -45,6 +45,8 @@ import io.mockk.slot
 import io.mockk.verify
 import io.serverlessworkflow.api.types.Workflow
 import java.sql.Connection
+import kotlin.time.Clock
+import kotlin.time.Instant
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
@@ -60,7 +62,10 @@ class InstanceStartServiceTest {
     private val scheduleRepository = mockk<ScheduleRepository>()
     private val gatewayCommandRepository = mockk<GatewayCommandRepository>()
     private val gatewayCommandOutbox = mockk<GatewayCommandOutbox>(relaxed = true)
-    private val lifecycleHook = mockk<LifecycleEventHook>(relaxed = true)
+    private val creationEventEnqueuer = mockk<CreationEventEnqueuer>()
+    private val creationEventOutbox = mockk<CreationEventOutbox>(relaxed = true)
+    private val acceptedAt = Instant.parse("2026-05-06T07:08:09.123456Z")
+    private val creationEventIds = listOf(IDV7.random(), IDV7.random())
     private val authorizer = mockk<GatewayAuthorizer>()
 
     private val databaseConfig = object : DatabaseConfig {
@@ -79,7 +84,9 @@ class InstanceStartServiceTest {
         this.scheduleRepository = this@InstanceStartServiceTest.scheduleRepository
         this.gatewayCommandRepository = this@InstanceStartServiceTest.gatewayCommandRepository
         this.gatewayCommandOutbox = this@InstanceStartServiceTest.gatewayCommandOutbox
-        this.lifecycleHook = this@InstanceStartServiceTest.lifecycleHook
+        this.creationEventEnqueuer = this@InstanceStartServiceTest.creationEventEnqueuer
+        this.creationEventOutbox = this@InstanceStartServiceTest.creationEventOutbox
+        this.clock = object : Clock { override fun now() = acceptedAt }
         this.authorizer = this@InstanceStartServiceTest.authorizer
         this.namespaceActivityMonitor = mockk(relaxed = true)
     }
@@ -93,7 +100,9 @@ class InstanceStartServiceTest {
     @BeforeEach
     fun setUp() {
         WorkflowCache.clear()
-        clearMocks(gatewayCommandOutbox, answers = false)
+        clearMocks(gatewayCommandOutbox, creationEventOutbox, answers = false)
+        clearMocks(creationEventEnqueuer)
+        coEvery { creationEventEnqueuer.enqueueCreation(any(), any()) } returns creationEventIds
         every { authorizer.requireScope(principal, "lemline.start") } just runs
         every { authorizer.requireNamespace(principal, any()) } just runs
         coEvery { scheduleRepository.insert(any<ScheduleModel>(), any<Connection>()) } returns 1
@@ -116,12 +125,12 @@ class InstanceStartServiceTest {
         result.instanceId shouldBe inserted.captured.workflowId
         result.result shouldBe StartInstanceOutcome.ACCEPTED_NEW
         result.version shouldBe WorkflowVersion("1.0.0")
-        coVerify(exactly = 1) { lifecycleHook.onWorkflowCreated(any(), any()) }
+        // The command carries its acceptance time; its creation events are enqueued with it,
+        // on the accepting transaction, then both relays are kicked independently.
+        inserted.captured.instanceMessage.workflowState.createdAt shouldBe acceptedAt
+        coVerify(exactly = 1) { creationEventEnqueuer.enqueueCreation(inserted.captured.instanceMessage, any()) }
+        coVerify(exactly = 1) { creationEventOutbox.processNow(creationEventIds) }
         coVerify(exactly = 1) { gatewayCommandOutbox.processNow(inserted.captured.id) }
-        coVerifyOrder {
-            lifecycleHook.onWorkflowCreated(any(), any())
-            gatewayCommandOutbox.processNow(inserted.captured.id)
-        }
     }
 
     @Test
@@ -211,8 +220,9 @@ class InstanceStartServiceTest {
         val result = service.start(request, principal)
 
         result.result shouldBe StartInstanceOutcome.ACCEPTED_EXISTING
-        coVerify(exactly = 0) { lifecycleHook.onWorkflowCreated(any(), any()) }
+        coVerify(exactly = 0) { creationEventEnqueuer.enqueueCreation(any(), any()) }
         verify { gatewayCommandOutbox wasNot Called }
+        verify { creationEventOutbox wasNot Called }
     }
 
     @Test
@@ -256,7 +266,9 @@ class InstanceStartServiceTest {
         first.nextRunAt shouldBe schedule.captured.outboxScheduledFor
         checkNotNull(first.nextRunAt)
         coVerify(exactly = 0) { gatewayCommandRepository.insert(any<GatewayCommandModel>(), any<Connection>()) }
-        coVerify(exactly = 0) { lifecycleHook.onWorkflowCreated(any(), any()) }
+        // Registering a schedule is not creating an occurrence: no creation event yet.
+        coVerify(exactly = 0) { creationEventEnqueuer.enqueueCreation(any(), any()) }
+        schedule.captured.instanceMessage.workflowState.createdAt shouldBe null
 
         coEvery { scheduleRepository.insert(any<ScheduleModel>(), any<Connection>()) } returns 0
         coEvery { scheduleRepository.findByWorkflowId(WorkflowId(IDV7.from(request.instanceId))) } returns schedule.captured

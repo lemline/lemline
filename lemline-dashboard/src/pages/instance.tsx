@@ -171,6 +171,16 @@ export function InstancePage() {
                 <span className="text-[13px] text-lm-muted">Duration</span>
                 <span className="text-[15px] tabular-nums">{durationText}</span>
               </span>
+              <span className="flex min-w-0 flex-col gap-1" title="From creation (accepted, ready to run) to the start of its execution">
+                <span className="text-[13px] text-lm-muted">Waited to start</span>
+                <span className="text-[15px] tabular-nums">
+                  {bounds.waitedToStart !== undefined
+                    ? formatSpan(bounds.waitedToStart)
+                    : bounds.waitingToStart && bounds.createdAt !== undefined
+                      ? `${formatSpan(nowMs - bounds.createdAt)} so far`
+                      : "Not recorded"}
+                </span>
+              </span>
               <span className="inline-flex items-center gap-1 text-sm font-medium text-lm-accent">
                 Details
                 <ChevronRightIcon width={14} height={14} />

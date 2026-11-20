@@ -215,6 +215,7 @@ class TryProcessor(
                     nodePosition = getCatchNode().position,
                     rawInput = state.transformedInput,
                     flowDirective = null,
+                    createdAt = Clock.System.now(),
                 )
             }
         }

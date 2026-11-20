@@ -34,6 +34,7 @@ Use these docs as primary context before broad refactors:
 - CLI strategy: [`docs/cli-strategy.md`](docs/cli-strategy.md)
 - Release procedure (tagging, macOS binary built by hand): [`docs/release-procedure.md`](docs/release-procedure.md)
 - Listen behavior reference: [`docs/listen-task.md`](docs/listen-task.md)
+- Lifecycle timestamp and ordering semantics (created → started): [`docs/lifecycle-timestamps.md`](docs/lifecycle-timestamps.md)
 - Namespace isolation ops guide: [`docs/namespace-isolation.md`](docs/namespace-isolation.md)
 - ADR index: [`docs/adr/README.md`](docs/adr/README.md)
 

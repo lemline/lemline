@@ -3,6 +3,7 @@ syntax = "proto3";
 package lemline.internal.v1;
 
 import "google/protobuf/struct.proto";
+import "google/protobuf/timestamp.proto";
 import "internal/common.proto";
 import "internal/state/node_stack.proto";
 import "internal/state/extensions.proto";
@@ -24,6 +25,10 @@ message ResumeFromTaskProto {
     google.protobuf.Value input_json = 3;
     FlowDirectiveProto flow_directive = 4;
     ExtensionReturnProto extension_return = 5;
+    // When this command became eligible for execution (task.created time, or retry_at for a
+    // retry attempt). Absent on commands written before this field existed: consumers must
+    // treat absence as "unknown", never as "now" or as the epoch.
+    google.protobuf.Timestamp created_at = 6;
 }
 
 message ResumeWithCompletedTaskProto {

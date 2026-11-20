@@ -121,6 +121,8 @@ abstract class AbstractOutbox<T : WithOutbox> : AbstractScheduledTask() {
         do {
             batchNumber++
             var toProcess = 0
+            // Separate transaction committed before each batch is locked and processed.
+            beforeEachBatch(batchSize, maxAttempts)
             // Find and process messages in the same transaction
             databaseConfig.withTransaction { conn ->
                 // Find and lock messages ready to process
@@ -142,6 +144,13 @@ abstract class AbstractOutbox<T : WithOutbox> : AbstractScheduledTask() {
         // Don't throw the exception to prevent scheduler from stopping
         // The next scheduled run will try again
     }
+
+    /**
+     * Hook run before each batch of [processEntities], outside the batch transaction. It lets a
+     * subclass commit preparatory state (for example, freezing a value) before entities are
+     * processed. An exception ends the current pass; the next scheduled run tries again.
+     */
+    protected open suspend fun beforeEachBatch(batchSize: Int, maxAttempts: Int) = Unit
 
     /**
      * Processes a list of entities concurrently on separate coroutines for improved performance.

@@ -148,16 +148,19 @@ object WorkflowStateProtobufMapper {
         node_position = nodePosition.toString(),
         input_json = rawInput.toProtoJsonValue(),
         flow_directive = flowDirective?.toProto(),
-        extension_return = extensionReturn?.let(ExtensionProtobufMapper::toProto)
+        extension_return = extensionReturn?.let(ExtensionProtobufMapper::toProto),
+        created_at = createdAt?.toProtoInstant(),
     )
 
+    // A missing created_at stays null (unknown): never default it to the epoch or to now.
     private fun ResumeFromTaskProto.toDomain() = WorkflowCommand.ResumeFromTask(
         nodeStack = node_stack?.let(NodeStackProtobufMapper::fromProto)
             ?: error("ResumeFromTaskCommand.node_stack is required"),
         nodePosition = NodePosition(node_position),
         rawInput = input_json.toRuntimeJsonNode(),
         flowDirective = flow_directive?.toDomain(),
-        extensionReturn = extension_return?.let(ExtensionProtobufMapper::fromProto)
+        extensionReturn = extension_return?.let(ExtensionProtobufMapper::fromProto),
+        createdAt = created_at?.toKotlinInstant(),
     )
 
     private fun WorkflowCommand.ResumeWithCompletedTask.toProto() = ResumeWithCompletedTaskProto(
@@ -260,16 +263,19 @@ object WorkflowStateProtobufMapper {
         node_position = nodePosition.toString(),
         input_json = rawInput.toProtoJsonValue(),
         flow_directive = flowDirective?.toProto(),
-        extension_return = extensionReturn?.let(ExtensionProtobufMapper::toProto)
+        extension_return = extensionReturn?.let(ExtensionProtobufMapper::toProto),
+        created_at = createdAt?.toProtoInstant(),
     )
 
+    // A missing created_at stays null (unknown): never default it to the epoch or to now.
     private fun TaskScheduledProto.toDomain() = WorkflowEvent.TaskScheduled(
         nodeStack = node_stack?.let(NodeStackProtobufMapper::fromProto)
             ?: error("TaskScheduledEvent.node_stack is required"),
         nodePosition = NodePosition(node_position),
         rawInput = input_json.toRuntimeJsonNode(),
         flowDirective = flow_directive?.toDomain(),
-        extensionReturn = extension_return?.let(ExtensionProtobufMapper::fromProto)
+        extensionReturn = extension_return?.let(ExtensionProtobufMapper::fromProto),
+        createdAt = created_at?.toKotlinInstant(),
     )
 
     private fun WorkflowEvent.WaitStarted.toProto() = WaitStartedProto(

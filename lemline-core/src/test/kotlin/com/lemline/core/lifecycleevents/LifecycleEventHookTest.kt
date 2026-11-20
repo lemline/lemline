@@ -64,6 +64,7 @@ class LifecycleEventHookTest : FunSpec() {
         override suspend fun onWorkflowCreated(
             workflowInfo: WorkflowInfo,
             nodeStack: NodeStack,
+            createdAt: Instant,
         ) {
             val workflowId = nodeStack.rootState.workflowId
             _events.add("workflow.created:$workflowId")
@@ -183,8 +184,8 @@ class LifecycleEventHookTest : FunSpec() {
             startedAt = Clock.System.now()
         )
 
-        // Emit workflow.created before starting execution (mimics Starter behavior)
-        lifecycleHook.onWorkflowCreated(workflowInfo, startState.nodeStack)
+        // Emit the creation events before starting execution (as accepting paths do)
+        StepByStepOrchestrator.emitCreationEvents(workflowInfo, startState, lifecycleHook)
 
         val outcome = FullOrchestrator.resume(
             workflow = workflow,
@@ -228,7 +229,7 @@ class LifecycleEventHookTest : FunSpec() {
             startedAt = startedAt,
         )
 
-        lifecycleHook.onWorkflowCreated(workflowInfo, startState.nodeStack)
+        StepByStepOrchestrator.emitCreationEvents(workflowInfo, startState, lifecycleHook)
 
         FullOrchestrator.resume(
             workflow = workflow,
@@ -322,8 +323,8 @@ class LifecycleEventHookTest : FunSpec() {
 
             hook.events.stripWorkflowIds() shouldBe listOf(
                 "workflow.created",
-                "workflow.started",
                 "task.created:do",
+                "workflow.started",
                 "task.started:do",
                 "task.created:setValue",
                 "task.started:setValue",
@@ -349,8 +350,8 @@ class LifecycleEventHookTest : FunSpec() {
 
             hook.events.stripWorkflowIds() shouldBe listOf(
                 "workflow.created",
-                "workflow.started",
                 "task.created:do",
+                "workflow.started",
                 "task.started:do",
                 "task.created:step1",
                 "task.started:step1",
@@ -382,8 +383,8 @@ class LifecycleEventHookTest : FunSpec() {
 
             hook.events.stripWorkflowIds() shouldBe listOf(
                 "workflow.created",
-                "workflow.started",
                 "task.created:do",
+                "workflow.started",
                 "task.started:do",
                 "task.created:step1",
                 "task.started:step1",
@@ -422,8 +423,8 @@ class LifecycleEventHookTest : FunSpec() {
 
             hook.events.stripWorkflowIds() shouldBe listOf(
                 "workflow.created",
-                "workflow.started",
                 "task.created:do",
+                "workflow.started",
                 "task.started:do",
                 "task.created:raiseError",
                 "task.started:raiseError",
@@ -455,8 +456,8 @@ class LifecycleEventHookTest : FunSpec() {
 
             hook.events.stripWorkflowIds() shouldBe listOf(
                 "workflow.created",
-                "workflow.started",
                 "task.created:do",
+                "workflow.started",
                 "task.started:do",
                 "task.created:step1",
                 "task.started:step1",
@@ -493,8 +494,8 @@ class LifecycleEventHookTest : FunSpec() {
 
             hook.events.stripWorkflowIds() shouldBe listOf(
                 "workflow.created",
-                "workflow.started",
                 "task.created:do",
+                "workflow.started",
                 "task.started:do",
                 "task.created:outer",
                 "task.started:outer",
@@ -537,8 +538,8 @@ class LifecycleEventHookTest : FunSpec() {
             // Note: try and catch are separate tasks in the workflow tree
             hook.events.stripWorkflowIds() shouldBe listOf(
                 "workflow.created",
-                "workflow.started",
                 "task.created:do",
+                "workflow.started",
                 "task.started:do",
                 "task.created:handleError",
                 "task.started:handleError",
@@ -579,8 +580,8 @@ class LifecycleEventHookTest : FunSpec() {
 
             hook.events.stripWorkflowIds() shouldBe listOf(
                 "workflow.created",
-                "workflow.started",
                 "task.created:do",
+                "workflow.started",
                 "task.started:do",
                 "task.created:outer",
                 "task.started:outer",
@@ -620,8 +621,8 @@ class LifecycleEventHookTest : FunSpec() {
             // The actual sequence shows the for loop re-enters on each iteration
             hook.events.stripWorkflowIds() shouldBe listOf(
                 "workflow.created",
-                "workflow.started",
                 "task.created:do",
+                "workflow.started",
                 "task.started:do",
                 "task.created:createData",
                 "task.started:createData",
@@ -674,8 +675,8 @@ class LifecycleEventHookTest : FunSpec() {
             // conditionalTask should be skipped entirely (no events)
             hook.events.stripWorkflowIds() shouldBe listOf(
                 "workflow.created",
-                "workflow.started",
                 "task.created:do",
+                "workflow.started",
                 "task.started:do",
                 "task.created:setupData",
                 "task.started:setupData",
@@ -708,8 +709,8 @@ class LifecycleEventHookTest : FunSpec() {
 
             hook.events.stripWorkflowIds() shouldBe listOf(
                 "workflow.created",
-                "workflow.started",
                 "task.created:do",
+                "workflow.started",
                 "task.started:do",
                 "task.created:setupData",
                 "task.started:setupData",
@@ -753,8 +754,8 @@ class LifecycleEventHookTest : FunSpec() {
             // Note: branches don't emit task.created (they're started directly by fork)
             hook.events.stripWorkflowIds() shouldBe listOf(
                 "workflow.created",
-                "workflow.started",
                 "task.created:do",
+                "workflow.started",
                 "task.started:do",
                 "task.created:raceWork",
                 "task.started:raceWork",
@@ -942,8 +943,8 @@ class LifecycleEventHookTest : FunSpec() {
             // (since these are synchronous tasks, they all complete before fork returns)
             hook.events.stripWorkflowIds() shouldBe listOf(
                 "workflow.created",
-                "workflow.started",
                 "task.created:do",
+                "workflow.started",
                 "task.started:do",
                 "task.created:raceWork",
                 "task.started:raceWork",

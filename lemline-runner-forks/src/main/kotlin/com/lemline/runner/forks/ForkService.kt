@@ -16,6 +16,8 @@ import com.lemline.core.workflows.WorkflowCache.getWorkflow
 import com.lemline.core.workflows.branches
 import com.lemline.core.workflows.getNode
 import com.lemline.runner.common.config.DatabaseConfig
+import com.lemline.runner.common.lifecycle.CreationEventEnqueuer
+import com.lemline.runner.common.lifecycle.CreationEventOutbox
 import com.lemline.runner.common.messaging.CommandEmitter
 import com.lemline.runner.common.messaging.InstanceMessage
 import io.serverlessworkflow.api.types.ForkTask
@@ -45,6 +47,15 @@ class ForkService {
 
     @Inject
     lateinit var functionResolver: FunctionResolver
+
+    @Inject
+    lateinit var creationEventEnqueuer: CreationEventEnqueuer
+
+    @Inject
+    lateinit var creationEventOutbox: CreationEventOutbox
+
+    /** Clock used for the branches' creation time (their task.created time). */
+    var clock: Clock = Clock.System
 
     private val logger = logger()
 
@@ -84,12 +95,28 @@ class ForkService {
             )
         }
 
-        // 3. Insert fork and branches atomically
-        val rowsInserted = forkRepository.insertForkWithBranches(forkModel, forkBranchModels)
+        // 3. Insert fork and branches atomically, with the branches' task.created events.
+        // Branches become eligible for execution when the fork is accepted here: each branch
+        // command carries that instant, and its task.created is stamped with it.
+        val createdAt = clock.now()
+        var creationEvents = emptyList<IDV7>()
+        val rowsInserted = forkRepository.insertForkWithBranches(forkModel, forkBranchModels) { conn ->
+            creationEvents = branches.flatMap { branchNode ->
+                creationEventEnqueuer.enqueueTaskCreated(
+                    workflowInfo = workflowInfo,
+                    nodeStack = forkStarted.nodeStack,
+                    nodePosition = branchNode.position,
+                    input = forkStarted.rawInput,
+                    createdAt = createdAt,
+                    connection = conn,
+                )
+            }
+        }
         if (rowsInserted == 0) {
             logger.warn { "Fork model already exists (idempotent insert): $forkModel" }
             return
         }
+        creationEventOutbox.processNow(creationEvents)
 
         logger.debug {
             "Fork started for instance ${instance.workflowId}, position ${forkStarted.nodePosition}, " +
@@ -103,7 +130,8 @@ class ForkService {
                 workflowState = WorkflowCommand.ResumeFromTask(
                     nodeStack = instance.workflowState.nodeStack,
                     nodePosition = branchNode.position,
-                    rawInput = instance.workflowState.rawInput
+                    rawInput = instance.workflowState.rawInput,
+                    createdAt = createdAt,
                 ),
             )
 

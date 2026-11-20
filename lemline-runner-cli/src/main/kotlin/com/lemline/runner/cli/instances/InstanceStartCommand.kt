@@ -8,7 +8,10 @@ import com.lemline.common.values.WorkflowId
 import com.lemline.common.values.WorkflowName
 import com.lemline.common.values.WorkflowNamespace
 import com.lemline.common.values.WorkflowVersion
-import com.lemline.core.lifecycleevents.LifecycleEventHook
+import com.lemline.runner.common.config.DatabaseConfig
+import com.lemline.runner.common.lifecycle.CreationEventEnqueuer
+import com.lemline.runner.common.lifecycle.CreationEventOutbox
+import kotlin.time.Clock
 import com.lemline.runner.cli.GlobalMixin
 import com.lemline.runner.cli.exceptions.CliException
 import com.lemline.runner.common.messaging.CommandEmitter
@@ -43,7 +46,13 @@ class InstanceStartCommand : Runnable {
     internal lateinit var scheduleRepository: ScheduleRepository
 
     @Inject
-    internal lateinit var lifecycleHook: LifecycleEventHook
+    internal lateinit var databaseConfig: DatabaseConfig
+
+    @Inject
+    internal lateinit var creationEventEnqueuer: CreationEventEnqueuer
+
+    @Inject
+    internal lateinit var creationEventOutbox: CreationEventOutbox
 
     @Parameters(
         index = "0",
@@ -109,18 +118,22 @@ class InstanceStartCommand : Runnable {
         val workflowVersion =
             instanceMessage?.workflowVersion ?: scheduleOutboxModel?.workflowVersion
 
-        if (scheduleOutboxModel != null) {
-            // Persist schedule to database (for cron or after/every schedules)
-            // The schedule must be persisted before sending any instance message
-            // TODO: This should ideally be transactional with message sending
-            scheduleRepository.insert(scheduleOutboxModel)
+        // Accept the instance in one transaction: the schedule (cron or after/every), the creation
+        // lifecycle events, and the command. The command is published before the commit, so a
+        // failed publication rolls everything back; once committed, the creation events are
+        // relayed by this process below, or later by any running Lemline process.
+        val creationEvents = databaseConfig.withTransaction { conn ->
+            scheduleOutboxModel?.let { scheduleRepository.insert(it, conn) }
+            instanceMessage?.let { prepared ->
+                val accepted = prepared.copy(workflowState = prepared.workflowState.copy(createdAt = Clock.System.now()))
+                val ids = creationEventEnqueuer.enqueueCreation(accepted, conn)
+                commandEmitter.send(accepted)
+                ids
+            } ?: emptyList()
         }
 
-        // Send instance message if present (no schedule or immediate first run)
-        instanceMessage?.let { commandEmitter.send(it) }
-
-        // Trigger workflow.created lifecycle event after successfully sending the message
-        preparedWorkflow.onWorkflowCreated(lifecycleHook)
+        // Short-lived process: publish the creation events now and wait for the broker.
+        creationEventOutbox.relayNow(creationEvents)
 
         cliPrint("Instance $workflowId started successfully (name: $workflowName, version: $workflowVersion, input: $workflowInput)")
     }

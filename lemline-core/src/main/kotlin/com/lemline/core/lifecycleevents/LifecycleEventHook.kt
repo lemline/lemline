@@ -37,19 +37,21 @@ interface LifecycleEventHook {
     /**
      * Called when a workflow instance is created (before execution starts).
      *
-     * This is triggered when a workflow command is created and about to be sent,
-     * representing the intent to start a workflow. It fires before `onWorkflowStarted`.
-     *
-     * Note: This hook is typically called from the `Starter` class, not from the orchestrator,
-     * since it happens before any execution begins.
+     * `workflow.created` means the initial command has been durably accepted and is eligible
+     * for dispatch. For a scheduled workflow it describes one occurrence, not the registration
+     * of the schedule. It is not called by the orchestrator: accepting paths persist it with
+     * the initial command (see `StepByStepOrchestrator.emitCreationEvents`).
      *
      * @param workflowInfo The workflow definition info (namespace, name, version)
-     * @param nodeStack The initial node stack with workflow context
-     *        (workflowId, input, and createdAt can be derived from root state)
+     * @param nodeStack The initial node stack with workflow context (workflowId, input)
+     * @param createdAt The initial command's creation time
+     *        ([com.lemline.core.states.WorkflowCommand.ResumeFromTask.createdAt]). It is not
+     *        `RootState.startedAt`, which keeps its `$workflow.startedAt` meaning.
      */
     suspend fun onWorkflowCreated(
         workflowInfo: WorkflowInfo,
         nodeStack: NodeStack,
+        createdAt: Instant,
     )
 
     /**
@@ -105,9 +107,12 @@ interface LifecycleEventHook {
     /**
      * Called when a task is created/scheduled (queued for execution).
      *
-     * This is triggered when `TaskScheduled` event is produced, indicating
-     * the task has been queued but may not have started executing yet.
-     * This differs from `onTaskStarted` which fires when execution actually begins.
+     * `task.created` marks the point where the task's command becomes eligible for execution:
+     * the transition that produced its `TaskScheduled` event, the acceptance of the initial
+     * command for `/do`, or the fork's acceptance for a fork branch. It is emitted once per task
+     * invocation: returning to an existing task (after a wait, listener, fork or child workflow)
+     * and retry attempts do not emit it. This differs from `onTaskStarted`, which fires when a
+     * worker begins processing the task.
      *
      * @param workflowInfo The workflow definition info (namespace, name, version)
      * @param nodeStack The current node stack
@@ -204,6 +209,7 @@ interface LifecycleEventHook {
             override suspend fun onWorkflowCreated(
                 workflowInfo: WorkflowInfo,
                 nodeStack: NodeStack,
+                createdAt: Instant,
             ) = Unit
 
             override suspend fun onWorkflowStarted(

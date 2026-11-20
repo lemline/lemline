@@ -295,6 +295,7 @@ abstract class AbstractProcessor<T : TaskBase, S : NodeState>(
             rawInput = output,
             flowDirective = null,
             extensionReturn = ExtensionReturn(node.position, kind),
+            createdAt = Clock.System.now(),
         )
     }
 
@@ -304,7 +305,8 @@ abstract class AbstractProcessor<T : TaskBase, S : NodeState>(
             ExtensionPhase.BEFORE, ExtensionPhase.AFTER -> {
                 extension.validate(stack.currentState)
                 TaskScheduled(stack, ExtensionController.block(node, extension).position,
-                    if (extension.phase == ExtensionPhase.BEFORE) extension.transformedInput else extension.preparedResult!!.transformedOutput, null)
+                    if (extension.phase == ExtensionPhase.BEFORE) extension.transformedInput else extension.preparedResult!!.transformedOutput, null,
+                    createdAt = Clock.System.now())
             }
             ExtensionPhase.BODY -> {
                 require(stack.currentState is PendingTaskState) { "Body already initialized at ${node.position}" }
@@ -535,6 +537,7 @@ abstract class AbstractProcessor<T : TaskBase, S : NodeState>(
             nodePosition = nextNode.position,
             rawInput = nextInput,
             flowDirective = nextDirective?.toKotlin(),
+            createdAt = Clock.System.now(),
         )
 
     }

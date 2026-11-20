@@ -44,12 +44,19 @@ dependencies {
     // Open Workflow SDK (for InstanceMessage state types)
     implementation(libs.serverlessworkflow.api)
 
+    // CloudEvents (creation event outbox stores serialized lifecycle CloudEvents)
+    implementation(libs.cloudevents.core)
+    implementation(libs.cloudevents.json.jackson)
+
     // Testing
     testImplementation(kotlin("test"))
     testImplementation(enforcedPlatform(libs.kotest.bom))
     testImplementation("io.kotest:kotest-runner-junit5")
     testImplementation("io.kotest:kotest-assertions-core")
     testImplementation(libs.mockk)
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test")
+    testImplementation(libs.cloudevents.core)
+    testImplementation(libs.cloudevents.json.jackson)
 
     // Test Fixtures - Database utilities for manual DI testing
     testFixturesImplementation(libs.bundles.kotlinxEcosystem)

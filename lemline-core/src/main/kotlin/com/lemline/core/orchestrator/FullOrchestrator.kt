@@ -61,6 +61,8 @@ object FullOrchestrator {
         secretsForWorkflow: (Workflow) -> ObjectNode = { buildJsonObject {} },
     ): JsonNode {
         val cmd = StepByStepOrchestrator.initCmd(workflowId, workflowInput, hasWaitingParent, startedAt)
+        // In-memory execution has no queue: the instance is accepted and eligible at once.
+        StepByStepOrchestrator.emitCreationEvents(workflow.info, cmd, lifecycleHook)
         return resume(
             workflow = workflow,
             command = cmd,
@@ -355,6 +357,7 @@ object FullOrchestrator {
                     workflowInput = event.config.input,
                     hasWaitingParent = true
                 )
+                StepByStepOrchestrator.emitCreationEvents(childWorkflow.info, initCmd, lifecycleHook)
                 val result = resume(
                     childWorkflow,
                     initCmd,
@@ -379,6 +382,7 @@ object FullOrchestrator {
                         workflowInput = event.config.input,
                         hasWaitingParent = false
                     )
+                    StepByStepOrchestrator.emitCreationEvents(childWorkflow.info, initCmd, lifecycleHook)
                     resume(
                         childWorkflow,
                         initCmd,

@@ -12,6 +12,7 @@ import com.lemline.runner.common.messaging.InstanceMessage
 import com.lemline.runner.definitions.DefinitionConfig
 import com.lemline.runner.forks.ForkFeatureConfig
 import com.lemline.runner.gateway.outbox.GatewayCommandConfig
+import com.lemline.runner.common.lifecycle.CreationEventOutboxConfig
 import com.lemline.runner.listeners.ListenerConfig
 import com.lemline.runner.messaging.commands.WorkflowCommandEmitter
 import com.lemline.runner.messaging.events.WorkflowEventEmitter
@@ -127,6 +128,18 @@ class ConfigProducer {
 
     @Produces
     @ApplicationScoped
+    fun creationEventOutboxConfig(): CreationEventOutboxConfig = object : CreationEventOutboxConfig {
+        private val source = config.outbox().creationEvents().getOrNull()
+        override val enabled: Boolean
+            get() = (source?.enabled() ?: true) &&
+                config.messaging().lifecycleevents().getOrNull()?.producer()?.enabled() == true
+        override val outbox: OutboxConfig
+            get() = source?.outbox()?.toOutboxProcessingConfig() ?: defaultCreationEventOutboxConfig()
+        override val cleanup: CleanupConfig get() = source?.cleanup()?.toOutboxCleanupConfig() ?: defaultCleanupConfig()
+    }
+
+    @Produces
+    @ApplicationScoped
     fun definitionConfig(): DefinitionConfig = object : DefinitionConfig {
         override val enabled: Boolean
             get() = config.messaging().cloudevents().getOrNull()?.consumer()?.enabled() ?: false
@@ -157,6 +170,20 @@ class ConfigProducer {
         override val initialJitter: Duration = 1.seconds
         override val retryDelay: Duration = 5.seconds
         override val maxAttempts: Int = 5
+    }
+
+    /**
+     * Creation events must eventually become observable (an instance without workflow.created is
+     * not listed): poll as fast as the gateway, and keep retrying through long lifecycle-channel
+     * outages. With a 1 s base doubling after each failed attempt, the 16 waits between 17
+     * attempts add up to about 18 hours.
+     */
+    private fun defaultCreationEventOutboxConfig(): OutboxConfig = object : OutboxConfig {
+        override val every: Duration = 400.milliseconds
+        override val batchSize: Int = 1000
+        override val initialJitter: Duration = 1.seconds
+        override val retryDelay: Duration = 1.seconds
+        override val maxAttempts: Int = 17
     }
 
     private fun defaultCleanupConfig(): CleanupConfig = object : CleanupConfig {

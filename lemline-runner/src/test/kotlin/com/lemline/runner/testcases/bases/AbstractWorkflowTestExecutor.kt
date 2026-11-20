@@ -17,6 +17,9 @@ import com.lemline.core.testcases.impl.WorkflowTestExecutor
 import com.lemline.core.testcases.impl.WorkflowTestResult
 import com.lemline.core.workflows.WorkflowCache
 import com.lemline.runner.common.activities.TestModeConfiguration
+import com.lemline.runner.common.config.DatabaseConfig
+import com.lemline.runner.common.lifecycle.CreationEventEnqueuer
+import com.lemline.runner.common.lifecycle.CreationEventOutbox
 import com.lemline.runner.common.messaging.InstanceMessage
 import com.lemline.runner.config.DatabaseManager
 import com.lemline.runner.definitions.DefinitionCacheSync
@@ -67,6 +70,15 @@ internal abstract class AbstractWorkflowTestExecutor : WorkflowTestExecutor {
 
     @Inject
     lateinit var definitionCacheSync: DefinitionCacheSync
+
+    @Inject
+    lateinit var databaseConfig: DatabaseConfig
+
+    @Inject
+    lateinit var creationEventEnqueuer: CreationEventEnqueuer
+
+    @Inject
+    lateinit var creationEventOutbox: CreationEventOutbox
 
     /** Default timeout for workflow completion in seconds (configurable via system property) */
     protected open val defaultTimeoutSeconds: Long by lazy {
@@ -196,7 +208,12 @@ internal abstract class AbstractWorkflowTestExecutor : WorkflowTestExecutor {
         val initialMessage = prepared.instanceMessage
             ?: throw IllegalStateException("Cannot test cron-scheduled workflows directly")
 
-        prepared.onWorkflowCreated(lifecycleHook)
+        // Accept like the gateway does: creation events are persisted, then relayed by the
+        // creation event outbox, independently of the command.
+        val creationEvents = databaseConfig.withTransaction { conn ->
+            creationEventEnqueuer.enqueueCreation(initialMessage, conn)
+        }
+        creationEventOutbox.relayNow(creationEvents)
         sendInitialCommand(initialMessage)
 
         return initialMessage
