@@ -2,14 +2,16 @@
 package com.lemline.runner.analytics
 
 import com.lemline.core.lifecycleevents.LifecycleEventEmitter
+import com.lemline.runner.common.config.ANALYTICS_LIFECYCLE_EVENTS_TABLE
 import com.lemline.runner.common.test.RequiresDocker
 import com.lemline.runner.tests.profiles.KafkaAnalyticsProfile
 import com.lemline.runner.tests.profiles.PgmqAnalyticsProfile
+import com.lemline.runner.tests.profiles.PgmqPostgresAnalyticsProfile
+import com.lemline.runner.tests.profiles.PgmqSQLiteAnalyticsProfile
 import com.lemline.runner.tests.profiles.RabbitMQAnalyticsProfile
-import io.agroal.api.AgroalDataSource
+import com.lemline.runner.gateway.analytics.AnalyticsDataSourceProvider
 import io.cloudevents.CloudEvent
 import io.cloudevents.core.builder.CloudEventBuilder
-import io.quarkus.agroal.DataSource
 import io.quarkus.test.junit.QuarkusTest
 import io.quarkus.test.junit.TestProfile
 import jakarta.inject.Inject
@@ -25,19 +27,19 @@ import org.junit.jupiter.api.fail
 
 internal abstract class LifecycleAnalyticsBrokerIntegrationTestBase(
     private val broker: String,
+    private val table: String = "public.lemline_lifecycle_events",
 ) {
     @Inject
     lateinit var lifecycleEventEmitter: LifecycleEventEmitter
 
     @Inject
-    @DataSource("analytics")
-    lateinit var analyticsDataSource: AgroalDataSource
+    lateinit var analyticsDataSourceProvider: AnalyticsDataSourceProvider
 
     @BeforeEach
     fun cleanAnalyticsTable() {
-        analyticsDataSource.connection.use { conn ->
+        analyticsDataSourceProvider.require().connection.use { conn ->
             conn.createStatement().use { stmt ->
-                stmt.execute("TRUNCATE TABLE public.lemline_lifecycle_events")
+                stmt.execute("DELETE FROM $table")
             }
         }
     }
@@ -92,9 +94,9 @@ internal abstract class LifecycleAnalyticsBrokerIntegrationTestBase(
     }
 
     private fun countRowsByEventId(eventId: String): Int {
-        analyticsDataSource.connection.use { conn ->
+        analyticsDataSourceProvider.require().connection.use { conn ->
             conn.prepareStatement(
-                "SELECT COUNT(*) FROM public.lemline_lifecycle_events WHERE event_id = ?"
+                "SELECT COUNT(*) FROM $table WHERE event_id = ?"
             ).use { stmt ->
                 stmt.setString(1, eventId)
                 stmt.executeQuery().use { rs ->
@@ -123,3 +125,17 @@ internal class RabbitLifecycleAnalyticsIntegrationTest : LifecycleAnalyticsBroke
 @TestProfile(PgmqAnalyticsProfile::class)
 @Tag("integration")
 internal class PgmqLifecycleAnalyticsIntegrationTest : LifecycleAnalyticsBrokerIntegrationTestBase("pgmq")
+
+@RequiresDocker
+@QuarkusTest
+@TestProfile(PgmqPostgresAnalyticsProfile::class)
+@Tag("integration")
+internal class PgmqPostgresLifecycleAnalyticsIntegrationTest :
+    LifecycleAnalyticsBrokerIntegrationTestBase("pgmq", "lemline.lemline_lifecycle_events")
+
+@RequiresDocker
+@QuarkusTest
+@TestProfile(PgmqSQLiteAnalyticsProfile::class)
+@Tag("integration")
+internal class PgmqSQLiteLifecycleAnalyticsIntegrationTest :
+    LifecycleAnalyticsBrokerIntegrationTestBase("pgmq", ANALYTICS_LIFECYCLE_EVENTS_TABLE)

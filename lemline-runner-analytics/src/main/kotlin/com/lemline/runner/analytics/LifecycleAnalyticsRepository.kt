@@ -6,10 +6,12 @@ import com.lemline.runner.common.config.AnalyticsConfig
 import com.lemline.runner.common.config.AnalyticsType
 import com.lemline.runner.common.config.ANALYTICS_LIFECYCLE_EVENTS_TABLE
 import com.lemline.runner.common.config.LEMLINE_ANALYTICS_POSTGRES_SCHEMA
+import com.lemline.runner.common.config.SQLiteAnalyticsTime
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
 import java.sql.PreparedStatement
 import java.sql.Types
+import java.time.Instant
 import org.eclipse.microprofile.config.inject.ConfigProperty
 
 @ApplicationScoped
@@ -27,9 +29,11 @@ class LifecycleAnalyticsRepository(
 
         when (analyticsConfig.analyticsType) {
             AnalyticsType.POSTGRESQL -> "${quoteIdentifier(validatedSchema)}.$quotedTable"
-            AnalyticsType.H2 -> quotedTable
+            AnalyticsType.H2, AnalyticsType.SQLITE -> quotedTable
         }
     }
+
+    private val sqlite by lazy { analyticsConfig.analyticsType == AnalyticsType.SQLITE }
 
     private val insertSql: String by lazy {
         analyticsConfig.insertIgnoreInto(
@@ -48,8 +52,8 @@ class LifecycleAnalyticsRepository(
             lemline_workflow_name,
             lemline_workflow_version,
             payload
-            """.trimIndent(),
-            values = "?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ${payloadValueExpression()}"
+            """.trimIndent() + if (sqlite) ", ingested_at" else "",
+            values = "?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ${payloadValueExpression()}" + if (sqlite) ", ?" else ""
         )
     }
 
@@ -60,14 +64,24 @@ class LifecycleAnalyticsRepository(
             stmt.setString(3, row.type)
             stmt.setString(4, row.specVersion)
             stmt.setNullableString(5, row.subject)
-            stmt.setNullableOffsetDateTime(6, row.eventTime)
+            if (sqlite) {
+                val eventTime = row.eventTime?.toInstant()?.let(SQLiteAnalyticsTime::encode)
+                if (eventTime == null) stmt.setNull(6, Types.BIGINT) else stmt.setLong(6, eventTime)
+            } else {
+                stmt.setNullableOffsetDateTime(6, row.eventTime)
+            }
             stmt.setNullableString(7, row.dataContentType)
             stmt.setNullableString(8, row.dataSchema)
-            stmt.setNullableUuid(9, row.workflowId)
+            if (sqlite) {
+                stmt.setNullableString(9, row.workflowId?.toString())
+            } else {
+                stmt.setNullableUuid(9, row.workflowId)
+            }
             stmt.setNullableString(10, row.workflowNamespace)
             stmt.setNullableString(11, row.workflowName)
             stmt.setNullableString(12, row.workflowVersion)
             stmt.setString(13, row.payload)
+            if (sqlite) stmt.setLong(14, SQLiteAnalyticsTime.encode(Instant.now()))
 
             if (stmt.executeUpdate() == 1) {
                 IngestResult.INSERTED
@@ -79,7 +93,7 @@ class LifecycleAnalyticsRepository(
 
     private fun payloadValueExpression(): String = when (analyticsConfig.analyticsType) {
         AnalyticsType.POSTGRESQL -> "CAST(? AS JSONB)"
-        AnalyticsType.H2 -> "?"
+        AnalyticsType.H2, AnalyticsType.SQLITE -> "?"
     }
 
     private fun validateIdentifier(kind: String, value: String): String {

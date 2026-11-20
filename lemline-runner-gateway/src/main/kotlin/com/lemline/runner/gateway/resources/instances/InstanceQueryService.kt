@@ -6,6 +6,7 @@ import com.lemline.common.json.LemlineJson
 import com.lemline.core.lifecycleevents.LifecycleEventType
 import com.lemline.runner.common.config.ANALYTICS_LIFECYCLE_EVENTS_TABLE
 import com.lemline.runner.common.config.AnalyticsType
+import com.lemline.runner.common.config.SQLiteAnalyticsTime
 import com.lemline.runner.config.LemlineConfiguration
 import com.lemline.runner.config.analyticsSchemaResolved
 import com.lemline.runner.config.analyticsTypeResolved
@@ -13,10 +14,11 @@ import com.lemline.runner.gateway.analytics.AnalyticsDataSourceProvider
 import com.lemline.runner.gateway.persistence.GatewayJdbcSupport
 import com.lemline.runner.gateway.persistence.lifecycleTypeSqlList
 import com.lemline.runner.gateway.persistence.SqlQuery
-import com.lemline.runner.gateway.persistence.getInstantOrNull
+import com.lemline.runner.gateway.persistence.getAnalyticsInstant
+import com.lemline.runner.gateway.persistence.getAnalyticsUuid
 import com.lemline.runner.gateway.persistence.normalizePageSize
 import com.lemline.runner.gateway.persistence.placeholders
-import com.lemline.runner.gateway.persistence.setGatewayObject
+import com.lemline.runner.gateway.persistence.setAnalyticsObject
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
 import java.time.Instant
@@ -41,7 +43,12 @@ class InstanceQueryService(
         )
     private val payloadTextProjection = when (analyticsType) {
         AnalyticsType.POSTGRESQL -> "payload::text"
-        AnalyticsType.H2 -> "payload"
+        AnalyticsType.H2, AnalyticsType.SQLITE -> "payload"
+    }
+
+    private val workflowIdPrefixPredicate = when (analyticsType) {
+        AnalyticsType.SQLITE -> "instr(lemline_workflow_id, ?) = 1"
+        AnalyticsType.H2, AnalyticsType.POSTGRESQL -> "CAST(lemline_workflow_id AS VARCHAR) LIKE ?"
     }
 
     suspend fun latestLifecycleSequence(): Long = withContext(Dispatchers.IO) {
@@ -120,8 +127,8 @@ class InstanceQueryService(
             params += it
         }
         filter.instanceIdPrefix?.trim()?.takeIf { it.isNotBlank() }?.let {
-            where += "${uuidToVarchar("lemline_workflow_id")} LIKE ?"
-            params += "$it%"
+            where += workflowIdPrefixPredicate
+            params += workflowIdPrefixParameter(it)
         }
         filter.allowedNamespaces?.takeIf { it.isNotEmpty() }?.let { namespaces ->
             where += "lemline_workflow_namespace IN (${placeholders(namespaces.size)})"
@@ -139,7 +146,7 @@ class InstanceQueryService(
         analyticsDataSourceProvider.require().connection.use { conn ->
             conn.prepareStatement(sql).use { stmt ->
                 params.forEachIndexed { index, value ->
-                    stmt.setGatewayObject(index + 1, value)
+                    stmt.setAnalyticsObject(index + 1, value, analyticsType)
                 }
                 stmt.setInt(params.size + 1, normalizedLimit)
                 stmt.executeQuery().use { rs ->
@@ -148,7 +155,7 @@ class InstanceQueryService(
                             add(
                                 WorkflowEventSequence(
                                     sequence = rs.getLong("id"),
-                                    workflowId = rs.getObject("lemline_workflow_id", UUID::class.java),
+                                    workflowId = rs.getAnalyticsUuid("lemline_workflow_id", analyticsType),
                                 )
                             )
                         }
@@ -167,8 +174,8 @@ class InstanceQueryService(
         if (filter.instanceIdPrefix != null && !row.instanceId.toString()
                 .startsWith(filter.instanceIdPrefix)
         ) return false
-        if (filter.createdFrom != null && row.createdAt < filter.createdFrom) return false
-        if (filter.createdTo != null && row.createdAt >= filter.createdTo) return false
+        if (filter.createdFrom != null && row.createdAt < queryPrecision(filter.createdFrom)) return false
+        if (filter.createdTo != null && row.createdAt >= queryPrecision(filter.createdTo)) return false
         if (filter.allowedNamespaces != null && row.namespace !in filter.allowedNamespaces) return false
         return true
     }
@@ -178,21 +185,21 @@ class InstanceQueryService(
             analyticsDataSourceProvider.require().connection.use { conn ->
                 conn.prepareStatement(query.sql).use { stmt ->
                     query.params.forEachIndexed { index, value ->
-                        stmt.setGatewayObject(index + 1, value)
+                        stmt.setAnalyticsObject(index + 1, value, analyticsType)
                     }
                     stmt.executeQuery().use { rs ->
                         buildList {
                             while (rs.next()) {
-                                val startedAt = rs.getInstantOrNull("started_at")
-                                val completedAt = rs.getInstantOrNull("completed_at")
-                                val faultedAt = rs.getInstantOrNull("faulted_at")
+                                val startedAt = rs.getAnalyticsInstant("started_at", analyticsType)
+                                val completedAt = rs.getAnalyticsInstant("completed_at", analyticsType)
+                                val faultedAt = rs.getAnalyticsInstant("faulted_at", analyticsType)
                                 val summary = InstanceSummaryRow(
-                                    instanceId = rs.getObject("lemline_workflow_id", UUID::class.java),
+                                    instanceId = rs.getAnalyticsUuid("lemline_workflow_id", analyticsType),
                                     namespace = rs.getString("lemline_workflow_namespace") ?: "",
                                     name = rs.getString("lemline_workflow_name") ?: "",
                                     version = rs.getString("lemline_workflow_version") ?: "",
                                     status = InstanceStatus.fromRaw(rs.getString("status")),
-                                    createdAt = rs.getInstantOrNull("instance_created_at") ?: Instant.EPOCH,
+                                    createdAt = rs.getAnalyticsInstant("instance_created_at", analyticsType) ?: Instant.EPOCH,
                                     startedAt = startedAt,
                                     completedAt = completedAt,
                                     faultedAt = faultedAt,
@@ -219,7 +226,7 @@ class InstanceQueryService(
             analyticsDataSourceProvider.require().connection.use { conn ->
                 conn.prepareStatement(query.sql).use { stmt ->
                     query.params.forEachIndexed { index, value ->
-                        stmt.setGatewayObject(index + 1, value)
+                        stmt.setAnalyticsObject(index + 1, value, analyticsType)
                     }
                     stmt.executeQuery().use { rs ->
                         if (rs.next()) rs.getLong("total_count") else 0L
@@ -328,8 +335,8 @@ class InstanceQueryService(
             innerParams += it
         }
         filter.instanceIdPrefix?.trim()?.takeIf { it.isNotBlank() }?.let {
-            innerConditions += "${uuidToVarchar("lemline_workflow_id")} LIKE ?"
-            innerParams += "$it%"
+            innerConditions += workflowIdPrefixPredicate
+            innerParams += workflowIdPrefixParameter(it)
         }
 
         outerConditions += "instance_created_at IS NOT NULL"
@@ -470,7 +477,11 @@ class InstanceQueryService(
         )
     }
 
-    private fun uuidToVarchar(column: String): String = "CAST($column AS VARCHAR)"
+    private fun queryPrecision(instant: Instant): Instant =
+        if (analyticsType == AnalyticsType.SQLITE) SQLiteAnalyticsTime.decode(SQLiteAnalyticsTime.encode(instant)) else instant
+
+    private fun workflowIdPrefixParameter(prefix: String): String =
+        if (analyticsType == AnalyticsType.SQLITE) prefix else "$prefix%"
 
     private data class InstanceQueryParts(
         val cteSql: String,

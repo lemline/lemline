@@ -8,6 +8,8 @@ import com.lemline.runner.common.config.AnalyticsType
 import com.lemline.runner.common.config.LEMLINE_ANALYTICS_TYPE
 import com.lemline.runner.config.LemlineConfiguration
 import com.lemline.runner.config.analyticsSchemaResolved
+import com.lemline.runner.gateway.persistence.GatewayJdbcSupport
+import com.lemline.runner.gateway.persistence.setAnalyticsObject
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.enterprise.inject.Typed
 import jakarta.inject.Inject
@@ -16,8 +18,8 @@ import kotlinx.coroutines.withContext
 import org.eclipse.microprofile.config.inject.ConfigProperty
 
 @ApplicationScoped
-@Typed(PostgresqlWorkflowAnalyticsEventSource::class)
-class PostgresqlWorkflowAnalyticsEventSource(
+@Typed(JdbcWorkflowAnalyticsEventSource::class)
+class JdbcWorkflowAnalyticsEventSource(
     config: LemlineConfiguration,
     @ConfigProperty(name = LEMLINE_ANALYTICS_TYPE, defaultValue = ANALYTICS_TYPE_DEFAULT)
     analyticsType: String,
@@ -27,17 +29,12 @@ class PostgresqlWorkflowAnalyticsEventSource(
     lateinit var analyticsDataSourceProvider: AnalyticsDataSourceProvider
 
     private val resolvedAnalyticsType = AnalyticsType.fromConfigValue(analyticsType)
-    private val validatedTable = validateIdentifier("table", ANALYTICS_LIFECYCLE_EVENTS_TABLE)
-    private val qualifiedTable = when (resolvedAnalyticsType) {
-        AnalyticsType.POSTGRESQL -> {
-            val validatedSchema = validateIdentifier("schema", config.analyticsSchemaResolved)
-            "\"$validatedSchema\".\"$validatedTable\""
-        }
-        AnalyticsType.H2 -> "\"$validatedTable\""
-    }
+    private val qualifiedTable = GatewayJdbcSupport.qualifiedAnalyticsTable(
+        resolvedAnalyticsType, config.analyticsSchemaResolved, ANALYTICS_LIFECYCLE_EVENTS_TABLE
+    )
     private val payloadProjection = when (resolvedAnalyticsType) {
         AnalyticsType.POSTGRESQL -> "payload::text"
-        AnalyticsType.H2 -> "payload"
+        AnalyticsType.H2, AnalyticsType.SQLITE -> "payload"
     }
 
     override suspend fun listByWorkflowIdAfter(
@@ -58,7 +55,7 @@ class PostgresqlWorkflowAnalyticsEventSource(
 
         analyticsDataSourceProvider.require().connection.use { conn ->
             conn.prepareStatement(sql).use { stmt ->
-                stmt.setObject(1, workflowId.value.value)
+                stmt.setAnalyticsObject(1, workflowId.value.value, resolvedAnalyticsType)
                 stmt.setLong(2, afterSequenceExclusive)
                 stmt.setInt(3, limit)
                 stmt.executeQuery().use { rs ->
@@ -85,16 +82,5 @@ class PostgresqlWorkflowAnalyticsEventSource(
                 stmt.executeQuery().use { _ -> }
             }
         }
-    }
-
-    private fun validateIdentifier(kind: String, value: String): String {
-        require(IDENTIFIER_REGEX.matches(value)) {
-            "Invalid analytics $kind '$value'. Only [A-Za-z_][A-Za-z0-9_]* is allowed."
-        }
-        return value
-    }
-
-    companion object {
-        private val IDENTIFIER_REGEX = Regex("^[A-Za-z_][A-Za-z0-9_]*$")
     }
 }

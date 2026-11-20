@@ -32,9 +32,30 @@ internal object PackagedEnvironment {
 
     /** Configuration file for every command, created once the database is up. */
     val config: Path by lazy {
+        configuration(
+            workDir.resolve("lemline.yaml"),
+            "postgresql: { host: localhost, port: ${postgres.firstMappedPort}, database: $ANALYTICS_DATABASE, username: postgres, password: postgres }",
+        )
+    }
+
+    fun sqliteAnalyticsConfig(directory: Path): Path = configuration(
+        directory.resolve("lemline.yaml"),
+        """
+        |type: sqlite
+        |migrate-at-start: true
+        """.trimMargin(),
+        """
+        |  gateway:
+        |    grpc: { host: 127.0.0.1 }
+        |    tls: { enabled: false }
+        |    authentication: { enabled: false }
+        """.trimMargin(),
+    )
+
+    private fun configuration(file: Path, analytics: String, gateway: String = ""): Path {
         val port = postgres.firstMappedPort
-        write(
-            "lemline.yaml",
+        Files.writeString(
+            file,
             """
             |lemline:
             |  database:
@@ -42,10 +63,12 @@ internal object PackagedEnvironment {
             |  messaging:
             |    pgmq: { host: localhost, port: $port, database: lemline, username: postgres, password: postgres }
             |  analytics:
-            |    postgresql: { host: localhost, port: $port, database: $ANALYTICS_DATABASE, username: postgres, password: postgres }
+            |${analytics.prependIndent("    ")}
             |  namespaces: packaged
+            |$gateway
             """.trimMargin(),
         )
+        return file
     }
 
     fun write(name: String, content: String): Path = workDir.resolve(name).also { Files.writeString(it, content) }
@@ -67,13 +90,14 @@ internal object PackagedEnvironment {
         }
     }
 
-    fun command(vararg args: String): List<String> = artifactCommand + listOf("--config", config.toString()) + args
+    fun command(vararg args: String, configFile: Path = config): List<String> =
+        artifactCommand + listOf("--config", configFile.toString()) + args
 
     /** Runs a command to completion and returns its exit code and combined output. */
-    fun run(vararg args: String, timeoutSeconds: Long = 120): Pair<Int, String> {
-        val log = workDir.resolve("command-${System.nanoTime()}.log").toFile()
-        val process = ProcessBuilder(command(*args))
-            .directory(workDir.toFile())
+    fun run(vararg args: String, timeoutSeconds: Long = 120, configFile: Path = config): Pair<Int, String> {
+        val log = configFile.parent.resolve("command-${System.nanoTime()}.log").toFile()
+        val process = ProcessBuilder(command(*args, configFile = configFile))
+            .directory(configFile.parent.toFile())
             .redirectErrorStream(true)
             .redirectOutput(log)
             .start()

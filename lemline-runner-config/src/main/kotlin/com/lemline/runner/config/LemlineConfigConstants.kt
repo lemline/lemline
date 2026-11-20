@@ -52,6 +52,8 @@ object LemlineConfigConstants {
     const val MYSQL_USERNAME_DEFAULT = "mysql"
     const val MYSQL_PASSWORD_DEFAULT = "mysql"
 
+    const val ANALYTICS_SQLITE_PATH_DEFAULT = "analytics.db"
+
     // H2
     const val H2_DB_NAME_DEFAULT = "lemline"
     const val H2_USERNAME_DEFAULT = "sa"

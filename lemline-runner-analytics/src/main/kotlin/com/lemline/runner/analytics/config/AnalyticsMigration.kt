@@ -6,6 +6,8 @@ import com.lemline.common.logger
 import com.lemline.runner.analytics.config.AnalyticsConfigConstants.LIFECYCLE_EVENTS_CONSUMER_ENABLED_DEFAULT
 import com.lemline.runner.analytics.config.AnalyticsConfigConstants.ANALYTICS_POSTGRES_MIGRATE_AT_START_DEFAULT
 import com.lemline.runner.common.config.LEMLINE_ANALYTICS_MIGRATE_AT_START
+import com.lemline.runner.common.config.AnalyticsType
+import com.lemline.runner.common.config.LEMLINE_GATEWAY_ENABLED
 import com.lemline.runner.common.config.LEMLINE_MESSAGING_LIFECYCLE_EVENTS_CONSUMER_ENABLED
 import io.quarkus.runtime.StartupEvent
 import jakarta.annotation.Priority
@@ -18,6 +20,8 @@ import org.eclipse.microprofile.config.inject.ConfigProperty
 internal class AnalyticsMigration(
     @param:ConfigProperty(name = LEMLINE_MESSAGING_LIFECYCLE_EVENTS_CONSUMER_ENABLED, defaultValue = LIFECYCLE_EVENTS_CONSUMER_ENABLED_DEFAULT)
     val lifecycleConsumerEnabled: Boolean,
+    @param:ConfigProperty(name = LEMLINE_GATEWAY_ENABLED, defaultValue = "false")
+    val gatewayEnabled: Boolean,
     @param:ConfigProperty(
         name = LEMLINE_ANALYTICS_MIGRATE_AT_START,
         defaultValue = ANALYTICS_POSTGRES_MIGRATE_AT_START_DEFAULT
@@ -31,7 +35,8 @@ internal class AnalyticsMigration(
 
     @Suppress("unused")
     fun onStart(@Observes @Priority(1) event: StartupEvent) {
-        if (!lifecycleConsumerEnabled || !migrateAtStart) return
+        if (!migrateAtStart) return
+        if (!lifecycleConsumerEnabled && !(gatewayEnabled && analyticsManager.analyticsType == AnalyticsType.SQLITE)) return
 
         analyticsManager.flyway.migrate()
         logger.info { "Flyway migrations applied successfully on selected analytics datasource." }

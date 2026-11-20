@@ -16,6 +16,7 @@ import com.lemline.runner.common.config.LEMLINE_ANALYTICS_POSTGRES_HOST
 import com.lemline.runner.common.config.LEMLINE_ANALYTICS_POSTGRES_PASSWORD
 import com.lemline.runner.common.config.LEMLINE_ANALYTICS_POSTGRES_PORT
 import com.lemline.runner.common.config.LEMLINE_ANALYTICS_POSTGRES_USERNAME
+import com.lemline.runner.common.config.LEMLINE_ANALYTICS_SQLITE_PATH
 import com.lemline.runner.common.config.LEMLINE_ANALYTICS_TYPE
 import com.lemline.runner.common.config.LEMLINE_DATABASE_MYSQL
 import com.lemline.runner.common.config.LEMLINE_DATABASE_MYSQL_DATABASE
@@ -192,6 +193,11 @@ import com.lemline.runner.config.LemlineConfigConstants.WORKFLOW_COMMANDS_TOPIC_
 import com.lemline.runner.config.LemlineConfigConstants.WORKFLOW_EVENTS_TOPIC_DEFAULT
 import io.smallrye.config.ConfigSourceContext
 import io.smallrye.config.PropertiesConfigSource
+import java.io.IOException
+import java.nio.file.Files
+import java.nio.file.InvalidPathException
+import java.nio.file.LinkOption.NOFOLLOW_LINKS
+import java.nio.file.Path
 
 internal const val COMMANDS_IN_CHANNEL = "commands-in"
 internal const val COMMANDS_OUT_CHANNEL = "commands-out"
@@ -251,6 +257,8 @@ class LemlineConfigSource(context: ConfigSourceContext? = null) : PropertiesConf
         private val logger = logger()
         private const val ANALYTICS_H2_DATASOURCE_NAME = "analytics"
         private const val ANALYTICS_POSTGRES_DATASOURCE_NAME = "analytics-postgresql"
+        private const val ANALYTICS_SQLITE_DATASOURCE_NAME = "analytics-sqlite"
+        private val uriScheme = Regex("^[A-Za-z][A-Za-z0-9+.-]*:")
 
         private fun buildProperties(context: ConfigSourceContext?): Map<String, String> {
             val lemlineProps = mutableMapOf<String, String>()
@@ -391,6 +399,18 @@ class LemlineConfigSource(context: ConfigSourceContext? = null) : PropertiesConf
             generated[LEMLINE_ANALYTICS_TYPE] = type.configValue
 
             if (type == AnalyticsType.H2) return generated
+            if (type == AnalyticsType.SQLITE) {
+                val path = resolveAnalyticsSQLitePath(
+                    props[LEMLINE_ANALYTICS_SQLITE_PATH] ?: LemlineConfigConstants.ANALYTICS_SQLITE_PATH_DEFAULT
+                )
+                generated["quarkus.datasource.$ANALYTICS_H2_DATASOURCE_NAME.active"] = "false"
+                generated["quarkus.datasource.$ANALYTICS_POSTGRES_DATASOURCE_NAME.active"] = "false"
+                val datasource = "quarkus.datasource.$ANALYTICS_SQLITE_DATASOURCE_NAME"
+                generated["$datasource.active"] = "true"
+                // Encode literal file names so JDBC cannot interpret their characters as options.
+                generated["$datasource.jdbc.url"] = "jdbc:sqlite:${path.toUri().toASCIIString()}"
+                return generated
+            }
 
             val host = props[LEMLINE_ANALYTICS_POSTGRES_HOST] ?: POSTGRES_HOST_DEFAULT
             val port = props[LEMLINE_ANALYTICS_POSTGRES_PORT] ?: POSTGRES_PORT_DEFAULT
@@ -409,6 +429,37 @@ class LemlineConfigSource(context: ConfigSourceContext? = null) : PropertiesConf
             generated["$flyway.locations"] = "classpath:db/migration/analytics/postgresql"
 
             return generated
+        }
+
+        private fun resolveAnalyticsSQLitePath(value: String): Path {
+            val key = LEMLINE_ANALYTICS_SQLITE_PATH
+            require(value.isNotBlank() && !value.startsWith(":memory:", ignoreCase = true)) {
+                "'$key' must be a local file path."
+            }
+            val path = try {
+                Path.of(value)
+            } catch (e: InvalidPathException) {
+                throw IllegalArgumentException("'$key' must be a local file path.", e)
+            }
+            require(path.isAbsolute || !uriScheme.containsMatchIn(value)) { "'$key' must be a local file path." }
+            val absolute = path.toAbsolutePath()
+            require(absolute.toUri().authority == null) { "'$key' must be a local file path." }
+            val resolved = try {
+                if (Files.exists(absolute, NOFOLLOW_LINKS)) {
+                    absolute.toRealPath()
+                } else {
+                    absolute.parent.toRealPath().resolve(absolute.fileName)
+                }
+            } catch (e: IOException) {
+                throw IllegalArgumentException("Cannot resolve '$key' to a local database file: $absolute", e)
+            }
+            require(!Files.exists(resolved) || (Files.isRegularFile(resolved) && Files.isWritable(resolved))) {
+                "'$key' must name a writable database file: $resolved"
+            }
+            require(Files.isDirectory(resolved.parent) && Files.isWritable(resolved.parent)) {
+                "'$key' requires an existing, writable parent directory: $resolved"
+            }
+            return resolved
         }
 
         private fun generateGatewayProperties(props: Map<String, String>): Map<String, String> {

@@ -33,6 +33,10 @@ class GatewayStartupValidator(
     private val config: LemlineConfiguration,
 ) {
 
+    @Volatile
+    var ready: Boolean = false
+        private set
+
     @Inject
     lateinit var analyticsEventSource: WorkflowAnalyticsEventSource
 
@@ -67,6 +71,7 @@ class GatewayStartupValidator(
         runBlocking(ApplicationClassLoaderContext()) {
             analyticsEventSource.validate()
         }
+        ready = true
     }
 
     private fun requireConfigured(value: String?, key: String) {

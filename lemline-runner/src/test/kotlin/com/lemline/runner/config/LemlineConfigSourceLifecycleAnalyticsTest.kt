@@ -22,15 +22,19 @@ import com.lemline.runner.common.config.LEMLINE_MESSAGING_RABBITMQ_LIFECYCLE_EVE
 import com.lemline.runner.common.config.LEMLINE_MESSAGING_TYPE
 import com.lemline.runner.common.config.ANALYTICS_TYPE_H2
 import com.lemline.runner.common.config.ANALYTICS_TYPE_POSTGRESQL
+import com.lemline.runner.common.config.LEMLINE_ANALYTICS_SQLITE_PATH
 import com.lemline.runner.common.config.LEMLINE_ANALYTICS_TYPE
+import com.lemline.runner.common.config.LEMLINE_GATEWAY_ENABLED
 import com.lemline.runner.common.messaging.LIFECYCLEEVENTS_IN_CHANNEL
 import com.lemline.runner.config.LemlineConfigConstants.KAFKA_LIFECYCLE_EVENTS_GROUP_ID_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.PGMQ_BATCH_SIZE_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.PGMQ_MAX_RETRIES_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.PGMQ_POLL_INTERVAL_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.PGMQ_VISIBILITY_TIMEOUT_DEFAULT
+import java.nio.file.Path
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -226,6 +230,66 @@ class LemlineConfigSourceLifecycleAnalyticsTest {
             )
             assertNull(source.getValue("quarkus.flyway.analytics-postgresql.migrate-at-start"))
             assertEquals("false", source.getValue("quarkus.flyway.analytics-postgresql.baseline-on-migrate"))
+        }
+    }
+
+    @Test
+    fun `SQLite path alone leaves analytics inference unchanged`() {
+        val settings = mapOf(LEMLINE_GATEWAY_ENABLED to "true", LEMLINE_ANALYTICS_SQLITE_PATH to ":memory:")
+        withSystemProperties(settings) { source ->
+            assertEquals(ANALYTICS_TYPE_H2, source.getValue(LEMLINE_ANALYTICS_TYPE))
+            assertNull(source.getValue("quarkus.datasource.analytics-sqlite.active"))
+        }
+        withSystemProperties(settings + (LEMLINE_ANALYTICS_POSTGRES_HOST to "analytics-db")) { source ->
+            assertEquals(ANALYTICS_TYPE_POSTGRESQL, source.getValue(LEMLINE_ANALYTICS_TYPE))
+            assertNull(source.getValue("quarkus.datasource.analytics-sqlite.active"))
+        }
+    }
+
+    @Test
+    fun `SQLite uses the default file in the working directory and disables the server datasource`() {
+        withSystemProperties(
+            mapOf(
+                LEMLINE_ANALYTICS_TYPE to "sqlite",
+                LEMLINE_GATEWAY_ENABLED to "true",
+                LEMLINE_ANALYTICS_POSTGRES_HOST to "unused-db"
+            )
+        ) { source ->
+            val path = Path.of(".").toRealPath().resolve("analytics.db")
+            assertEquals("jdbc:sqlite:${path.toUri()}", source.getValue("quarkus.datasource.analytics-sqlite.jdbc.url"))
+            assertEquals("true", source.getValue("quarkus.datasource.analytics-sqlite.active"))
+            assertEquals("false", source.getValue("quarkus.datasource.analytics.active"))
+            assertEquals("false", source.getValue("quarkus.datasource.analytics-postgresql.active"))
+            assertNull(source.getValue("quarkus.datasource.analytics-postgresql.jdbc.url"))
+        }
+    }
+
+    @Test
+    fun `SQLite is inactive when both analytics consumers are disabled`() {
+        withSystemProperties(
+            mapOf(LEMLINE_ANALYTICS_TYPE to "sqlite", LEMLINE_ANALYTICS_SQLITE_PATH to ":memory:")
+        ) { source ->
+            assertNull(source.getValue("quarkus.datasource.analytics-sqlite.jdbc.url"))
+        }
+    }
+
+    @Test
+    fun `SQLite rejects blank, URI, in-memory, directory and missing parent paths`() {
+        val invalidPaths = listOf(
+            "", " ", "file:analytics.db?mode=memory", "jdbc:sqlite:analytics.db", ":memory:", ".",
+            Path.of(".").toAbsolutePath().root.toString(), "missing-parent/analytics.db",
+        )
+        for (path in invalidPaths) {
+            val error = assertFailsWith<IllegalArgumentException> {
+                withSystemProperties(
+                    mapOf(
+                        LEMLINE_ANALYTICS_TYPE to "sqlite",
+                        LEMLINE_ANALYTICS_SQLITE_PATH to path,
+                        LEMLINE_MESSAGING_LIFECYCLE_EVENTS_CONSUMER_ENABLED to "true"
+                    )
+                ) { }
+            }
+            assertTrue(error.message.orEmpty().contains(LEMLINE_ANALYTICS_SQLITE_PATH), error.message)
         }
     }
 

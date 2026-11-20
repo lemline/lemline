@@ -36,6 +36,7 @@ dependencies {
 
     // Testing
     testImplementation(kotlin("test"))
+    testImplementation(libs.sqlite.jdbc)
     testImplementation(enforcedPlatform(libs.kotest.bom))
     testImplementation("io.kotest:kotest-runner-junit5")
     testImplementation("io.kotest:kotest-assertions-core")

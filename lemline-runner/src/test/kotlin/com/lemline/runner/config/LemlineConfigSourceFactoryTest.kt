@@ -1,9 +1,12 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.config
 
+import io.smallrye.config.EnvConfigSource
 import io.smallrye.config.SmallRyeConfigBuilder
 import io.smallrye.config.common.MapBackedConfigSource
 import java.nio.file.Files
+import java.nio.file.Path
+import org.junit.jupiter.api.io.TempDir
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -56,6 +59,44 @@ class LemlineConfigSourceFactoryTest {
             .withSources(LemlineConfigSourceFactory())
             .build()
         assertEquals("postgresql", config.getValue("lemline.database.type", String::class.java))
+    }
+
+    @Test
+    fun `SQLite path respects YAML environment and system precedence`(@TempDir directory: Path) {
+        val file = directory.resolve("lemline.yaml")
+        Files.writeString(file, """
+            lemline:
+              gateway:
+                enabled: true
+              analytics:
+                type: sqlite
+                sqlite:
+                  path: yaml.db
+        """.trimIndent())
+        val previousPath = ConfigPathHolder.configPath
+        try {
+            ConfigPathHolder.configPath = file
+            val env = EnvConfigSource(mapOf("LEMLINE_ANALYTICS_SQLITE_PATH" to "env.db"), 300)
+            val system = source(mapOf("lemline.analytics.sqlite.path" to "system.db"), 400)
+            val profiles = listOf(
+                "yaml.db" to emptyList(),
+                "env.db" to listOf(env),
+                "system.db" to listOf(env, system)
+            )
+            for ((name, sources) in profiles) {
+                val config = SmallRyeConfigBuilder()
+                    .withSources(sources)
+                    .withSources(LemlineConfigSourceFactory())
+                    .build()
+                val expected = Path.of(".").toRealPath().resolve(name).toUri()
+                assertEquals(
+                    "jdbc:sqlite:$expected",
+                    config.getValue("quarkus.datasource.analytics-sqlite.jdbc.url", String::class.java)
+                )
+            }
+        } finally {
+            ConfigPathHolder.configPath = previousPath
+        }
     }
 
     private fun source(properties: Map<String, String>, ordinal: Int) =

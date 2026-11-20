@@ -3,6 +3,7 @@ package com.lemline.runner.config
 
 import com.lemline.runner.common.config.ANALYTICS_TYPE_H2
 import com.lemline.runner.common.config.ANALYTICS_TYPE_POSTGRESQL
+import com.lemline.runner.common.config.ANALYTICS_TYPE_SQLITE
 import com.lemline.runner.common.config.ANALYTICS_TYPE_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.ANALYTICS_POSTGRES_BASELINE_ON_MIGRATE_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.ANALYTICS_POSTGRES_DATABASE_DEFAULT
@@ -136,10 +137,10 @@ interface LemlineConfiguration {
 
     /**
      * Analytics storage configuration.
-     * Controls analytics backend and analytics PostgreSQL destination settings.
+     * Controls analytics backend and destination settings.
      */
     interface AnalyticsConfig {
-        @Pattern(regexp = "$ANALYTICS_TYPE_H2|$ANALYTICS_TYPE_POSTGRESQL")
+        @Pattern(regexp = "$ANALYTICS_TYPE_H2|$ANALYTICS_TYPE_POSTGRESQL|$ANALYTICS_TYPE_SQLITE")
         @WithDefault(ANALYTICS_TYPE_DEFAULT)
         fun type(): String
 
@@ -150,6 +151,13 @@ interface LemlineConfiguration {
         fun baselineOnMigrate(): Boolean
 
         fun postgresql(): AnalyticsPostgreSQLConfig
+
+        fun sqlite(): AnalyticsSQLiteConfig
+    }
+
+    interface AnalyticsSQLiteConfig {
+        @WithDefault(LemlineConfigConstants.ANALYTICS_SQLITE_PATH_DEFAULT)
+        fun path(): String
     }
 
     interface AnalyticsPostgreSQLConfig {
