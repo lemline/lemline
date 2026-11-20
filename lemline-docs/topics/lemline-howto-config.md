@@ -114,7 +114,7 @@ If `type` is omitted, Lemline picks `postgresql` or `mysql` from the block you f
 ```yaml
 lemline:
   messaging:
-    type: kafka               # kafka, rabbitmq, pgmq or in-memory
+    type: kafka               # kafka, rabbitmq, pgmq, sqlite or in-memory
     kafka:
       brokers: localhost:9092
       commands:

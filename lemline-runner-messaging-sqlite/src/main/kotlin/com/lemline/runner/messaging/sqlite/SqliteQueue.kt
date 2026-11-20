@@ -3,9 +3,16 @@ package com.lemline.runner.messaging.sqlite
 
 import com.lemline.common.values.IDV7
 import com.lemline.runner.messaging.sqlite.connector.SqliteIncomingMetadata
+import java.io.IOException
+import java.nio.file.Files
+import java.nio.file.LinkOption.NOFOLLOW_LINKS
+import java.nio.file.Path
+import java.nio.file.attribute.BasicFileAttributes
+import java.sql.Connection
 import java.sql.ResultSet
 import java.time.Instant
 import java.util.Base64
+import java.util.concurrent.ArrayBlockingQueue
 import javax.sql.DataSource
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -19,7 +26,51 @@ internal data class SqliteDelivery(
     val metadata: SqliteIncomingMetadata,
 )
 
-internal class SqliteQueue(private val dataSource: DataSource) {
+internal class SqliteQueue(private val dataSource: DataSource, private val file: Path? = null) {
+    private class Pooled(val connection: Connection, val fileIdentity: Any)
+
+    // Opening a SQLite connection reopens the file and reloads its schema. Queue
+    // operations are frequent and short, so keep a few connections between them.
+    private val idle = ArrayBlockingQueue<Pooled>(MAX_IDLE_CONNECTIONS)
+
+    // A connection outlives the removal or replacement of its file. Reuse it only
+    // while [file] is still the file it opened, so a lost queue fails loudly.
+    private fun fileIdentity(): Any? = file?.let {
+        try {
+            val attributes = Files.readAttributes(it, BasicFileAttributes::class.java, NOFOLLOW_LINKS)
+            attributes.fileKey() ?: attributes.creationTime()
+        } catch (_: IOException) {
+            null
+        }
+    }
+
+    private fun <T> withConnection(block: (Connection) -> T): T {
+        val identity = fileIdentity()
+        var connection: Connection? = null
+        while (connection == null) {
+            val pooled = idle.poll() ?: break
+            if (identity != null && pooled.fileIdentity == identity) connection = pooled.connection
+            else runCatching { pooled.connection.close() }
+        }
+        val active = connection ?: dataSource.connection
+        val result = try {
+            block(active).also { if (!active.autoCommit) active.autoCommit = true }
+        } catch (e: Throwable) {
+            // Closing rolls back whatever the failed operation left open.
+            runCatching { active.close() }
+            throw e
+        }
+        if (identity == null || !idle.offer(Pooled(active, identity))) runCatching { active.close() }
+        return result
+    }
+
+    fun closeIdle() {
+        while (true) {
+            val pooled = idle.poll() ?: break
+            runCatching { pooled.connection.close() }
+        }
+    }
+
     fun verifySchema() {
         dataSource.connection.use { connection ->
             connection.createStatement().use {
@@ -48,7 +99,7 @@ internal class SqliteQueue(private val dataSource: DataSource) {
     suspend fun publish(queue: String, messageId: String, payload: ByteArray, delaySeconds: Int): Unit =
         withContext(Dispatchers.IO) {
             require(delaySeconds >= 0) { "delaySeconds must be non-negative" }
-            dataSource.connection.use { connection ->
+            withConnection { connection ->
                 // Auto-commit completes this statement before the producer can acknowledge.
                 connection.prepareStatement(PUBLISH).use { statement ->
                     statement.setString(1, queue)
@@ -68,14 +119,14 @@ internal class SqliteQueue(private val dataSource: DataSource) {
     ): List<SqliteDelivery> = withContext(Dispatchers.IO) {
         val readyPredicate = if (ordered) "$READY AND $QUEUE_HEAD" else READY
         val limit = if (ordered) 1 else batchSize
-        dataSource.connection.use { connection ->
+        withConnection { connection ->
             // Empty polls can run concurrently and never acquire SQLite's writer lock.
             val ready = connection.prepareStatement("SELECT id FROM lemline_messages AS candidate WHERE $readyPredicate LIMIT 1")
                 .use { statement ->
                     statement.setString(1, queue)
                     statement.executeQuery().use { it.next() }
                 }
-            if (!ready) return@use emptyList()
+            if (!ready) return@withConnection emptyList()
 
             val lease = IDV7.random().toString()
             // Recheck eligibility inside the write statement. Another process may have
@@ -110,7 +161,7 @@ internal class SqliteQueue(private val dataSource: DataSource) {
     // subscriber can receive it, charge an attempt and give the handler its full lease.
     suspend fun beginDelivery(delivery: SqliteDelivery, visibilitySeconds: Int): SqliteIncomingMetadata? =
         withContext(Dispatchers.IO) {
-            dataSource.connection.use { connection ->
+            withConnection { connection ->
                 connection.autoCommit = false
                 val started = connection.prepareStatement(
                     """
@@ -176,7 +227,7 @@ internal class SqliteQueue(private val dataSource: DataSource) {
         mutation: String,
         parameters: List<Any> = emptyList(),
     ): Boolean = withContext(Dispatchers.IO) {
-        dataSource.connection.use { connection ->
+        withConnection { connection ->
             connection.prepareStatement("$mutation WHERE id = ? AND lease_id = ?").use { statement ->
                 parameters.forEachIndexed { index, value -> statement.setObject(index + 1, value) }
                 statement.setLong(parameters.size + 1, delivery.rowId)
@@ -200,6 +251,7 @@ internal class SqliteQueue(private val dataSource: DataSource) {
     )
 
     companion object {
+        private const val MAX_IDLE_CONNECTIONS = 8
         private const val NOW = "CAST(unixepoch('subsec') * 1000 AS INTEGER)"
         private const val READY = "candidate.queue = ? AND candidate.available_at <= $NOW"
         // An ordered queue cannot pass its head while it is delayed or leased.

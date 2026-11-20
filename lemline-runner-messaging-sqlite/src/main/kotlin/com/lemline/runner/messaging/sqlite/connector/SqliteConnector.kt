@@ -50,9 +50,11 @@ class SqliteConnector : InboundConnector, OutboundConnector {
     private val logger = logger()
 
     private fun Config.store(): SqliteQueue {
+        // The runner configuration always supplies the file, default included. A second
+        // default here could silently open a different file than the one it reports.
         val configuredPath = getConfigValue("path")
-        val value = if (configuredPath.rawValue == null) SqliteDatabase.DEFAULT_PATH else configuredPath.value.orEmpty()
-        val path = SqliteDatabase.resolve(value)
+        require(configuredPath.rawValue != null) { "A SQLite messaging channel requires its 'path' attribute" }
+        val path = SqliteDatabase.resolve(configuredPath.value.orEmpty())
         return stores.computeIfAbsent(path, SqliteDatabase::initialize)
     }
 
@@ -209,7 +211,10 @@ class SqliteConnector : InboundConnector, OutboundConnector {
     }
 
     @PreDestroy
-    fun destroy() = scope.cancel()
+    fun destroy() {
+        scope.cancel()
+        stores.values.forEach { it.closeIdle() }
+    }
 
     private fun Config.string(key: String): String? = getOptionalValue(key, String::class.java).getOrNull()
 

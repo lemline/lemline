@@ -108,6 +108,48 @@ internal class SqliteConnectorTest {
     }
 
     @Test
+    fun `a missing parent directory or path attribute is reported as a configuration error`() {
+        val missing = directory.resolve("absent").resolve("messaging.db")
+        val error = assertFailsWith<IllegalArgumentException> { SqliteDatabase.resolve(missing.toString()) }
+        assertTrue(error.message!!.contains("lemline.messaging.sqlite.path"))
+        val connector = SqliteConnector()
+        try {
+            val config = SmallRyeConfigBuilder().withDefaultValues(mapOf("channel-name" to "test")).build()
+            assertFailsWith<IllegalArgumentException> { connector.getSubscriber(config) }
+        } finally {
+            connector.destroy()
+        }
+    }
+
+    @Test
+    fun `operations reuse a connection until the queue file is replaced`() = runBlocking {
+        val path = directory.resolve("messaging.db")
+        var opened = 0
+        val source = SqliteDatabase.open(path)
+        SqliteDatabase.initialize(path)
+        val queue = SqliteQueue(object : javax.sql.DataSource by source {
+            override fun getConnection() = source.connection.also { opened++ }
+        }, path)
+        repeat(3) { queue.publish("work", "id-$it", "payload".encodeToByteArray(), 0) }
+        val delivery = queue.reserve("work", 1, 5).single()
+        assertNotNull(queue.beginDelivery(delivery, 5))
+        assertTrue(queue.ack(delivery))
+        assertEquals(1, opened)
+
+        // The pooled connection must come back without an open transaction.
+        assertEquals(2, queue.reserve("work", 10, 5).size)
+        assertEquals(1, opened)
+
+        // A replaced file is a different queue: the old connection must not be reused.
+        queue.closeIdle()
+        Files.delete(path)
+        SqliteDatabase.initialize(path)
+        queue.publish("work", "after-replace", "payload".encodeToByteArray(), 0)
+        assertEquals(2, opened)
+        assertEquals(1, SqliteQueue(SqliteDatabase.open(path)).reserve("work", 10, 5).size)
+    }
+
+    @Test
     fun `a dead-letter queue cannot also be consumed by the same input channel`() {
         val path = directory.resolve("messaging.db")
         val connector = SqliteConnector()

@@ -21,7 +21,8 @@ import org.sqlite.SQLiteDataSource
 import org.sqlite.SQLiteOpenMode
 
 internal object SqliteDatabase {
-    const val DEFAULT_PATH = "messaging.db"
+    // This module stays independent of the runner configuration modules, which own the
+    // setting. The name is repeated here only to point operators at it in error messages.
     private const val PATH_SETTING = "lemline.messaging.sqlite.path"
     private const val BUSY_TIMEOUT_MS = 5_000
     private const val MIGRATIONS = "db/migration/messaging/sqlite"
@@ -34,7 +35,12 @@ internal object SqliteDatabase {
         val absolute = Path.of(value).toAbsolutePath()
         val path = if (Files.exists(absolute)) absolute.toRealPath() else {
             val parent = requireNotNull(absolute.parent) { "$PATH_SETTING must name a file: $absolute" }
-            parent.toRealPath().resolve(absolute.fileName)
+            val directory = try {
+                parent.toRealPath()
+            } catch (e: NoSuchFileException) {
+                throw IllegalArgumentException("$PATH_SETTING requires an existing parent directory: $parent", e)
+            }
+            directory.resolve(absolute.fileName)
         }
         require(!Files.isSymbolicLink(path) && (!Files.exists(path) || Files.isRegularFile(path))) {
             "$PATH_SETTING must name a regular file: $path"
@@ -61,7 +67,7 @@ internal object SqliteDatabase {
                 "The bundled SQLite messaging migration is missing"
             }
             val dataSource = open(path)
-            val queue = SqliteQueue(dataSource)
+            val queue = SqliteQueue(dataSource, path)
             // Flyway can inspect the schema before taking its transaction lock. Serialize
             // startup across processes, including the first creation of the history table.
             val lockPath = path.resolveSibling(".${path.fileName}.lemline-migrate.lock")
