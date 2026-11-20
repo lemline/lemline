@@ -241,9 +241,10 @@ Health checks are served on the same port at `/q/health`, `/q/health/live` and `
 
 | Property | Type | Default | Description |
 |----------|------|---------|-------------|
-| `lemline.analytics.type` | String | `h2` | `h2` or `postgresql` |
+| `lemline.analytics.type` | String | `h2` | `postgresql`, explicit `sqlite`, or `h2` for Lemline's test suite |
+| `lemline.analytics.sqlite.path` | String | `analytics.db` | SQLite analytics file. Relative paths use the process working directory. |
 | `lemline.analytics.migrate-at-start` | Boolean | `true` | Apply analytics migrations at startup |
-| `lemline.analytics.baseline-on-migrate` | Boolean | `false` | Baseline an existing analytics schema |
+| `lemline.analytics.baseline-on-migrate` | Boolean | `false` | Baseline an existing PostgreSQL analytics schema |
 | `lemline.analytics.postgresql.host` | String | `localhost` | |
 | `lemline.analytics.postgresql.port` | Integer | `5432` | |
 | `lemline.analytics.postgresql.database` | String | `lemline` | |

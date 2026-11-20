@@ -235,16 +235,14 @@ Notes:
 
 Definition stats, instance reads, and instance-event timelines are backed by the analytics lifecycle-event store.
 
-Current gateway read-side implementations support:
-
-- `h2`
-- `postgresql`
+The gateway can read from PostgreSQL, SQLite on the JVM, and H2 in Lemline's test suite.
 
 | Property | Default | Description |
 |---|---|---|
 | `lemline.analytics.type` | `h2` | Analytics backend selector |
+| `lemline.analytics.sqlite.path` | `analytics.db` | SQLite analytics file shared with the runner on the same host |
 | `lemline.analytics.migrate-at-start` | `true` | Analytics migration toggle |
-| `lemline.analytics.baseline-on-migrate` | `false` | Analytics Flyway baseline toggle |
+| `lemline.analytics.baseline-on-migrate` | `false` | PostgreSQL analytics Flyway baseline toggle |
 | `lemline.analytics.postgresql.host` | `localhost` | PostgreSQL host |
 | `lemline.analytics.postgresql.port` | `5432` | PostgreSQL port |
 | `lemline.analytics.postgresql.database` | `lemline` | PostgreSQL database name |
@@ -252,11 +250,9 @@ Current gateway read-side implementations support:
 | `lemline.analytics.postgresql.password` | `postgres` | PostgreSQL password |
 | `lemline.analytics.postgresql.schema` | `lemline` | Lifecycle-events schema |
 
-Operational note:
-
-- the analytics datasource is provisioned when either the gateway or the lifecycle-events consumer is enabled
-- if the analytics datasource cannot be resolved, gateway startup and read APIs fail validation
-- for PostgreSQL analytics, configure `lemline.analytics.type=postgresql` and the `lemline.analytics.postgresql.*` settings
+The gateway requires a reachable analytics datasource at startup. Lemline configures the datasource when either the gateway or the lifecycle event consumer is enabled.
+- For PostgreSQL analytics, configure `lemline.analytics.type=postgresql` and the `lemline.analytics.postgresql.*` settings.
+- For SQLite analytics, configure `lemline.analytics.type=sqlite` and point `lemline.analytics.sqlite.path` at the lifecycle analytics file. The gateway prepares the SQLite schema at startup when `migrate-at-start` is enabled, including with the analytics consumer disabled. See [Lifecycle Analytics Reference](lemline-ref-analytics.md).
 
 ### Minimal Local Development Example
 
