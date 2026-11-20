@@ -319,13 +319,13 @@ internal class SingleHostSQLiteIT {
         fun startGateway() {
             val port = ServerSocket(0, 1, InetAddress.getByName("127.0.0.1")).use { it.localPort }
             val (process, log) = launch("gateway", "gateway", "start", "--grpc-port", "$port", "--metrics-port", "0")
-            await("gateway startup") { process.isAlive && Files.readString(log).contains("Starting gRPC gateway server") }
+            await("gateway startup") { process.isAlive && logText(log).contains("Starting gRPC gateway server") }
             channel = ManagedChannelBuilder.forAddress("127.0.0.1", port).usePlaintext().build()
         }
 
         fun startWorker() {
             val (process, log) = launch("worker", "listen", "--metrics-port", "0")
-            await("worker startup") { process.isAlive && Files.readString(log).contains("started in") }
+            await("worker startup") { process.isAlive && logText(log).contains("started in") }
         }
 
         private fun launch(label: String, vararg args: String): Pair<Process, Path> {
@@ -335,7 +335,11 @@ internal class SingleHostSQLiteIT {
             return (process to log).also { children += it }
         }
 
-        fun logsContain(text: String): Boolean = children.any { (_, log) -> text in Files.readString(log) }
+        fun logsContain(text: String): Boolean = children.any { (_, log) -> text in logText(log) }
+
+        // These markers are ASCII. The child can use a Windows code page or be
+        // partway through writing a multibyte character when we poll its log.
+        private fun logText(log: Path): String = Files.readAllBytes(log).decodeToString()
 
         private fun gateway() = GatewayServiceGrpc.newBlockingStub(checkNotNull(channel))
             .withWaitForReady().withDeadlineAfter(5, TimeUnit.SECONDS)
