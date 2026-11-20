@@ -84,8 +84,10 @@ jobs:
             platform: linux-x86_64
           - runner: windows-2022
             platform: windows-x86_64
-          - runner: macos-14
-            platform: macos-arm64
+          # No macOS entry: the native build needs about 6.5 GB of memory and GitHub's free macOS
+          # runners have 7 GB in all, so native-image runs out of heap and aborts. The macOS arm64
+          # archive (lemline-<tag>-macos-arm64.tar.gz + .sha256, same layout as Linux) is built on
+          # a Mac and attached to the release by hand.
 
     steps:
       #################################
@@ -153,17 +155,6 @@ jobs:
             -Dquarkus.package.jar.enabled=false \
             -Dquarkus.native.native-image-xmx=5g
 
-      # **🍎 MacOS**
-      - name: Build native image (MacOs)
-        if: runner.os == 'macOS'
-        run: |
-          ./gradlew --no-daemon \
-            -Dorg.gradle.jvmargs="-Xmx2g -XX:MaxMetaspaceSize=768m -Dfile.encoding=UTF-8" \
-            -p lemline-runner quarkusBuild \
-            -Dquarkus.native.enabled=true \
-            -Dquarkus.package.jar.enabled=false \
-            -Dquarkus.native.native-image-xmx=5g 
-
       # **🪟 Windows**
       - name: Build native image (Windows)
         if: ${{ runner.os == 'Windows' }}
@@ -180,7 +171,7 @@ jobs:
       # 6) Packaging
       #################################
 
-      # **🐧 Linux & 🍎 MacOS**
+      # **🐧 Linux**
       - name: Package distribution (macOS/Linux)
         if: ${{ runner.os != 'Windows' }}
         shell: bash
