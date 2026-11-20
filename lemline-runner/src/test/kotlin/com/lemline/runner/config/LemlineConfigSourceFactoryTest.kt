@@ -45,6 +45,22 @@ class LemlineConfigSourceFactoryTest {
             ))
         }
         assertTrue("mp.messaging.incoming.commands-in.path" in overridden.message.orEmpty())
+        assertFailsWith<IllegalArgumentException> {
+            build(mapOf(
+                "lemline.messaging.sqlite.path" to distinct,
+                "quarkus.datasource.sqlite.active" to "TRUE",
+                "quarkus.datasource.sqlite.jdbc.url" to "jdbc:sqlite:$distinct ",
+                "mp.messaging.incoming.commands-in.connector" to "sqlite",
+            ))
+        }
+        build(mapOf("mp.messaging.incoming.commands-in.enabled" to "false"))
+        assertFailsWith<IllegalArgumentException> {
+            build(mapOf(
+                "lemline.messaging.sqlite.path" to distinct,
+                "mp.messaging.incoming.commands-in.concurrency" to "2",
+                "mp.messaging.incoming.commands-in\$2.path" to shared.toString(),
+            ))
+        }
         val expression = "$" + "{suffix}"
         val escaped = directory.resolve("literal\\$expression.db")
         build(mapOf("lemline.messaging.sqlite.path" to escaped.toString()))

@@ -206,10 +206,13 @@ import com.lemline.runner.config.LemlineConfigConstants.RABBITMQ_USER_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.RABBITMQ_VHOST_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.WORKFLOW_COMMANDS_TOPIC_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.WORKFLOW_EVENTS_TOPIC_DEFAULT
+import io.quarkus.runtime.configuration.TrimmedStringConverter
 import io.smallrye.config.ConfigSourceContext
 import io.smallrye.config.Expressions
 import io.smallrye.config.PropertiesConfigSource
 import io.smallrye.config.SmallRyeConfigBuilder
+import io.smallrye.reactive.messaging.providers.impl.ConcurrencyConnectorConfig
+import io.smallrye.reactive.messaging.providers.impl.ConnectorConfig
 import java.io.IOException
 import java.net.URI
 import java.nio.file.Files
@@ -398,8 +401,10 @@ class LemlineConfigSource(context: ConfigSourceContext? = null) : PropertiesConf
                 .build()
             fun value(name: String) = config.getOptionalValue(name, String::class.java).orElse(null)
             val databaseFiles = datasourceKeys.mapNotNull { (datasource, setting) ->
-                if (value("$datasource.active") != "true") return@mapNotNull null
-                val url = value("$datasource.jdbc.url") ?: return@mapNotNull null
+                if (!config.getOptionalValue("$datasource.active", Boolean::class.javaObjectType).orElse(true)) {
+                    return@mapNotNull null
+                }
+                val url = value("$datasource.jdbc.url")?.let(TrimmedStringConverter()::convert) ?: return@mapNotNull null
                 require(url.startsWith("jdbc:sqlite:")) { "'$datasource.jdbc.url' must be a SQLite file URL" }
                 val location = url.removePrefix("jdbc:sqlite:").substringBefore('?')
                 val path = if (location.startsWith("file:")) {
@@ -416,14 +421,34 @@ class LemlineConfigSource(context: ConfigSourceContext? = null) : PropertiesConf
             if (databaseFiles.size == 2) checkFiles(databaseFiles[0], databaseFiles[1])
             if (databaseFiles.isEmpty()) return
 
-            val properties = generated.keys.asSequence() + (context?.iterateNames()?.asSequence() ?: emptySequence())
-            properties.filter { it.startsWith("mp.messaging.") && it.endsWith(".connector") }.distinct().forEach { key ->
-                if (value(key) == SQLITE_CONNECTOR) {
-                    val pathKey = key.removeSuffix(".connector") + ".path"
-                    val path = value(pathKey) ?: return@forEach
-                    val setting = "$LEMLINE_MESSAGING_SQLITE_PATH ($pathKey)"
-                    val messagingFile = setting to SQLiteDatabase.resolvePath(path, setting)
-                    databaseFiles.forEach { checkFiles(it, messagingFile) }
+            val properties = config.propertyNames.toSet() + context?.iterateNames()?.asSequence().orEmpty().toSet()
+            for (prefix in listOf("mp.messaging.incoming.", "mp.messaging.outgoing.")) {
+                val channels = properties.asSequence()
+                    .filter { it.startsWith(prefix) && (it.endsWith(".connector") || it.endsWith(".type")) }
+                    .map {
+                        val name = it.removePrefix(prefix)
+                        if (name.startsWith('"')) name.substring(1, name.lastIndexOf('"')) else name.substringBefore('.')
+                    }
+                    .distinct()
+                for (channel in channels) {
+                    if (ConcurrencyConnectorConfig.isConcurrencyChannelName(channel)) {
+                        val base = ConcurrencyConnectorConfig.stripChannelNameOfSeparator(channel)
+                        if (ConcurrencyConnectorConfig.getConcurrency(base, config).isPresent) continue
+                    }
+                    val connector = ConnectorConfig.getConnectorAttribute(prefix, config, channel)
+                    if (connector != SQLITE_CONNECTOR && "smallrye-$connector" != SQLITE_CONNECTOR) continue
+                    val channelConfig = ConnectorConfig.create(prefix, config, channel)
+                    if (!channelConfig.getOptionalValue("enabled", Boolean::class.javaObjectType).orElse(true)) continue
+                    val concurrency = if (prefix == "mp.messaging.incoming.") {
+                        ConcurrencyConnectorConfig.getConcurrency(channelConfig).orElse(1)
+                    } else 1
+                    for (index in 1..concurrency.coerceAtLeast(1)) {
+                        val deliveryConfig = if (concurrency > 1) ConcurrencyConnectorConfig(channelConfig, index) else channelConfig
+                        val path = deliveryConfig.getConfigValue("path").value ?: continue
+                        val setting = "$LEMLINE_MESSAGING_SQLITE_PATH ($prefix$channel.path)"
+                        val messagingFile = setting to SQLiteDatabase.resolvePath(path, setting)
+                        databaseFiles.forEach { checkFiles(it, messagingFile) }
+                    }
                 }
             }
         }

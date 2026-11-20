@@ -150,7 +150,7 @@ internal class PgmqSQLiteLifecycleAnalyticsIntegrationTest :
 @QuarkusTest
 @TestProfile(SqliteTransportAnalyticsProfile::class)
 @Tag("integration")
-internal class SqliteLifecycleAnalyticsIntegrationTest : LifecycleAnalyticsBrokerIntegrationTestBase("sqlite") {
+internal class SqliteTransportLifecycleAnalyticsIntegrationTest : LifecycleAnalyticsBrokerIntegrationTestBase("sqlite") {
     @Test
     fun `analytics deduplicates a logical message replayed after the broker ack`() = runBlocking {
         val event = buildEvent("sqlite-replayed-${IDV7.random()}")
