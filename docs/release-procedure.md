@@ -17,8 +17,17 @@ build needs about 6.5 GB of memory, and GitHub's free macOS runners have 7 GB in
 
 1. Set `baseVersion` in `lemline-runner/build.gradle.kts` to `X.Y.Z`, then run
    `./gradlew :lemline-runner:syncDocsVersion` so the docs download links point at it.
-2. Write the release notes with `/release X.Y.Z` and save them as `RELEASE-X.Y.Z.md`.
-3. Merge these changes into `main` through a pull request.
+2. Merge this change into `main` through a pull request.
+3. Write the release notes with `/release X.Y.Z`. They are saved as `RELEASE-X.Y.Z.md` (not
+   committed) and follow the four-part format of the `release-writer` skill, written from the
+   user's point of view:
+   - **Summary**: the theme and the headline capabilities, ending with a **Before you upgrade**
+     block listing every action an upgrade requires (omitted when there is none);
+   - **New Features**: what users can now do, with short examples for the main ones;
+   - **Improvements**: existing behaviour made faster, clearer or more compliant;
+   - **Bug Fixes**: what now works, and what users suffered before.
+
+   There is no separate Breaking Changes or Dependencies section. Review the notes before tagging.
 
 ## 2. Check the native binaries before tagging
 

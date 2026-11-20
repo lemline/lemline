@@ -10,136 +10,77 @@ description: Generate user-oriented release notes for a new version using the re
 
 ## Arguments
 
-- `<version>` - The version number (e.g., `0.5.3`, `1.0.0`)
+- `<version>` - The version number (e.g., `0.7.1`, `1.0.0`)
 
 ## Options
 
 - `--from <tag>` - Previous version tag to compare from (default: latest tag)
-- `--draft` - Generate a draft template without fetching git history
+- `--draft` - Copy the empty template without reading git history
 
 ## Examples
 
 ```bash
-# Generate release notes for v0.5.3
-/release 0.5.3
-
-# Specify the previous version explicitly
+/release 0.7.1
 /release 1.0.0 --from v0.9.5
-
-# Generate a draft template to fill in manually
-/release 0.6.0 --draft
+/release 0.8.0 --draft
 ```
 
 ## Instructions
 
-When this command is invoked:
-
-1. **Read the release-writer skill** at `SKILL.md` to understand the guidelines and best practices
-2. **Follow the workflow below** to gather, categorize, and transform changes
-3. **Generate release notes** following the structure in `release-notes.md`
-4. **Reference the example** at `lemline-example.md` for style guidance
+1. **Read the release-writer skill** (`.claude/skills/release-writer/SKILL.md`): the four-part
+   format, the user-first rule, and how to classify commits.
+2. **Read the reference** (`lemline-example.md`, the published 0.7.0 notes) and start from the
+   template (`release-notes.md`).
+3. Follow the workflow below.
 
 ---
 
 ## Workflow
 
-### Step 1: Gather Changes
+### Step 1: Gather changes
 
 ```bash
-# Get the previous tag if not specified
-git describe --tags --abbrev=0
-
-# List commits since last tag
+git describe --tags --abbrev=0                      # previous tag, if --from is not given
 git log <previous-tag>..HEAD --oneline --no-merges
-
-# Get detailed commit messages
-git log <previous-tag>..HEAD --pretty=format:"### %s%n%b%n---" --no-merges
+git log <previous-tag>..HEAD --pretty=format:"### %h %s%n%b%n---" --no-merges
 ```
 
-### Step 2: Categorize by Conventional Commits
+Open the body, and if needed the diff, of every commit whose subject does not say what a user sees.
 
-| Prefix | Section |
-|--------|---------|
-| `feat:` | New Features |
-| `fix:` | Bug Fixes |
-| `perf:` | Improvements |
-| `refactor:` | Improvements (if user-visible) |
-| `deps:` | Dependencies |
-| `BREAKING CHANGE:` | Breaking Changes |
-| `docs:`, `test:`, `ci:`, `chore:` | Evaluate individually |
+### Step 2: Classify by effect
 
-### Step 3: Transform to User-Oriented Language
+Commit prefixes are not used consistently here: classify each commit by what the user sees, with
+the table in `SKILL.md` (New Features, Improvements, Bug Fixes, Before you upgrade block, or
+nothing). Drop tests, CI, internal docs, agent tooling and refactors without a visible effect.
 
-Apply the principles from `SKILL.md`:
+### Step 3: Write it from the user's point of view
 
-- **What changed?** → The feature or fix
-- **Why does it matter?** → The benefit to users
-- **How do I use it?** → Configuration and examples
+Each entry says what users can now do, or what stopped going wrong, in their words. The mechanism
+stays out.
 
-**Before (developer):** `fix: resolve race condition in PgmqIncomingConnector shutdown`
+**Before (developer):** `Speed up gateway workflow starts: dispatch the outbox row immediately`
 
-**After (user):** `Fix graceful shutdown: PGMQ connector now properly handles shutdown events to prevent error logs during teardown`
+**After (user):** `**Faster starts from the gateway**: a workflow started through the gateway begins right away, instead of waiting up to the next database check.`
 
-### Step 4: Generate Release Notes
+### Step 4: Assemble the four sections
 
-Follow the structure from `SKILL.md`:
+`## Summary` (with the Before you upgrade block when an upgrade needs action), `## New Features`,
+`## Improvements`, `## Bug Fixes`, then the `**Full changelog**` line. No other section, no
+version title.
 
-```markdown
-# {version} Release Notes
+### Step 5: Check
 
-## Summary
-<!-- MINOR/MAJOR only: 2-4 sentences on release theme -->
-
-## New Features
-
-### {Feature Name}
-{Description}
-
-#### Why {Feature Name}?
-- {Use case 1}
-- {Use case 2}
-
-#### Configuration
-```yaml
-# Complete, copy-pasteable example
-```
-
-## Bug Fixes
-
-- **{Component}**: {What was fixed} — {User impact}
-
-## Improvements
-
-- **{Area}**: {What improved} — {Measurable benefit}
-
-## Dependencies
-
-| Dependency | Version | Notes |
-|------------|---------|-------|
-| {name} | {ver} | {why added/updated/removed} |
-
-## Breaking Changes
-
-None.
-
-## Full Changelog
-
-Compare: https://github.com/{org}/{repo}/compare/{prev-tag}...v{version}
-```
-
-### Step 5: Verify Against Checklist
-
-From `SKILL.md`, confirm:
-
-- [ ] All user-facing changes documented
-- [ ] Code examples tested and working
-- [ ] Breaking changes section present (even if "None")
-- [ ] Links are valid
-- [ ] Consistent formatting throughout
-- [ ] No internal jargon without explanation
+Run the checklist in `SKILL.md`. Verify every example against the docs of this version.
 
 ---
 
 ## Output
 
-Save the generated release notes to `/tmp/RELEASE-{version}.md` and present to the user.
+Save the notes as `RELEASE-{version}.md` at the repository root and show them to the user. Once
+the release exists, they are published with:
+
+```bash
+gh release edit v{version} --notes-file RELEASE-{version}.md
+```
+
+See `docs/release-procedure.md` for the whole release.
