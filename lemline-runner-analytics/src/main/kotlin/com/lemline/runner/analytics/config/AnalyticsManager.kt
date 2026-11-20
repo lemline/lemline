@@ -88,8 +88,9 @@ internal class AnalyticsManager(
         if (datasource.isResolvable) return datasource.get()
         throw IllegalStateException(
             "$datasourceLabel analytics datasource is not available. " +
-                "Enable '$LEMLINE_MESSAGING_LIFECYCLE_EVENTS_CONSUMER_ENABLED'. " +
-                "For PostgreSQL, configure '$LEMLINE_ANALYTICS_TYPE=postgresql' and $LEMLINE_ANALYTICS_POSTGRES.*"
+                "Enable '$LEMLINE_MESSAGING_LIFECYCLE_EVENTS_CONSUMER_ENABLED' or the gateway. " +
+                "For PostgreSQL, configure '$LEMLINE_ANALYTICS_TYPE=postgresql' and $LEMLINE_ANALYTICS_POSTGRES.*. " +
+                "For SQLite, configure '$LEMLINE_ANALYTICS_TYPE=sqlite'."
         )
     }
 
@@ -100,8 +101,9 @@ internal class AnalyticsManager(
         if (flyway.isResolvable) return flyway.get()
         throw IllegalStateException(
             "$datasourceLabel analytics flyway is not available. " +
-                "Enable '$LEMLINE_MESSAGING_LIFECYCLE_EVENTS_CONSUMER_ENABLED'. " +
-                "For PostgreSQL, configure '$LEMLINE_ANALYTICS_TYPE=postgresql' and $LEMLINE_ANALYTICS_POSTGRES.*"
+                "Enable '$LEMLINE_MESSAGING_LIFECYCLE_EVENTS_CONSUMER_ENABLED' or the gateway. " +
+                "For PostgreSQL, configure '$LEMLINE_ANALYTICS_TYPE=postgresql' and $LEMLINE_ANALYTICS_POSTGRES.*. " +
+                "For SQLite, configure '$LEMLINE_ANALYTICS_TYPE=sqlite'."
         )
     }
 

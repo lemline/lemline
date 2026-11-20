@@ -5,7 +5,10 @@ import com.lemline.runner.analytics.config.AnalyticsPostgresqlFlywayCustomizer
 import com.lemline.runner.common.test.H2TestDatabaseConfig
 import com.lemline.runner.common.test.PostgresTestDatabaseConfig
 import com.lemline.runner.common.test.RequiresDocker
+import com.lemline.runner.analytics.config.SQLiteMigrationLock
 import java.nio.file.Path
+import java.util.concurrent.CyclicBarrier
+import java.util.concurrent.Executors
 import org.flywaydb.core.Flyway
 import org.junit.jupiter.api.io.TempDir
 import org.sqlite.SQLiteDataSource
@@ -89,6 +92,35 @@ class LifecycleAnalyticsMigrationTest {
         }
         assertEquals(0, flyway.migrate().migrationsExecuted)
         flyway.validate()
+    }
+
+    @Test
+    fun `SQLite migration tolerates two processes preparing the same new file`(@TempDir directory: Path) {
+        repeat(20) { round ->
+            val url = "jdbc:sqlite:${directory.resolve("analytics-$round.db")}"
+            val barrier = CyclicBarrier(2)
+            val pool = Executors.newFixedThreadPool(2)
+            try {
+                val executed = List(2) {
+                    pool.submit<Int> {
+                        val dataSource = SQLiteDataSource().apply {
+                            this.url = url
+                            setBusyTimeout(5_000)
+                        }
+                        val flyway = Flyway.configure()
+                            .dataSource(dataSource)
+                            .locations("classpath:db/migration/analytics/sqlite")
+                            .table("lemline_flyway_schema_history_analytics")
+                            .load()
+                        barrier.await()
+                        SQLiteMigrationLock.withLock(url) { flyway.migrate().migrationsExecuted }
+                    }
+                }.map { it.get() }
+                assertEquals(listOf(0, 1), executed.sorted())
+            } finally {
+                pool.shutdownNow()
+            }
+        }
     }
 
     private companion object {

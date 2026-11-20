@@ -70,7 +70,7 @@ lemline:
 
 Set `type: sqlite` explicitly. If you omit `sqlite.path`, Lemline uses `analytics.db`. It resolves relative paths against the working directory of each process. Use a dedicated local file for analytics with an existing, writable parent directory. Use an absolute path when the runner and gateway start from different directories.
 
-Start ingestion with `lemline --config lemline.yaml listen`. On the same host, configure the [gateway](lemline-ref-gateway.md) to use the same file and start it with `lemline --config lemline.yaml gateway start`. The gateway serves saved history with its analytics consumer disabled. When `migrate-at-start` is enabled, either process can prepare a new SQLite file.
+Start ingestion with `lemline --config lemline.yaml listen`. On the same host, configure the [gateway](lemline-ref-gateway.md) to use the same file and start it with `lemline --config lemline.yaml gateway start`. The gateway serves saved history with its analytics consumer disabled. When `migrate-at-start` is enabled, either process can prepare a new SQLite file. They take turns through an `analytics.db.migration.lock` file created next to the database; leave it in place. A gateway that creates a new file logs a warning, because a wrong path would otherwise show an empty history.
 
 SQLite uses write-ahead logging (WAL), so gateway reads can continue while ingestion writes. SQLite serializes writes. Each connection enables foreign keys, uses `synchronous=FULL`, and waits up to five seconds for a database lock.
 

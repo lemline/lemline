@@ -3,10 +3,12 @@ package com.lemline.runner.analytics.config
 
 import com.lemline.common.info
 import com.lemline.common.logger
+import com.lemline.common.warn
 import com.lemline.runner.analytics.config.AnalyticsConfigConstants.LIFECYCLE_EVENTS_CONSUMER_ENABLED_DEFAULT
 import com.lemline.runner.analytics.config.AnalyticsConfigConstants.ANALYTICS_POSTGRES_MIGRATE_AT_START_DEFAULT
 import com.lemline.runner.common.config.LEMLINE_ANALYTICS_MIGRATE_AT_START
 import com.lemline.runner.common.config.AnalyticsType
+import com.lemline.runner.common.config.LEMLINE_ANALYTICS_SQLITE_PATH
 import com.lemline.runner.common.config.LEMLINE_GATEWAY_ENABLED
 import com.lemline.runner.common.config.LEMLINE_MESSAGING_LIFECYCLE_EVENTS_CONSUMER_ENABLED
 import io.quarkus.runtime.StartupEvent
@@ -38,7 +40,23 @@ internal class AnalyticsMigration(
         if (!migrateAtStart) return
         if (!lifecycleConsumerEnabled && !(gatewayEnabled && analyticsManager.analyticsType == AnalyticsType.SQLITE)) return
 
-        analyticsManager.flyway.migrate()
+        if (analyticsManager.analyticsType == AnalyticsType.SQLITE) {
+            migrateSQLite()
+        } else {
+            analyticsManager.flyway.migrate()
+        }
         logger.info { "Flyway migrations applied successfully on selected analytics datasource." }
+    }
+
+    private fun migrateSQLite() {
+        val url = analyticsManager.datasource.connection.use { it.metaData.url }
+        val result = SQLiteMigrationLock.withLock(url) { analyticsManager.flyway.migrate() }
+        // A gateway pointed at the wrong path would otherwise serve an empty history silently.
+        if (!lifecycleConsumerEnabled && result.initialSchemaVersion == null && result.migrationsExecuted > 0) {
+            logger.warn {
+                "The gateway created a new, empty SQLite analytics database at $url. " +
+                    "If a runner already ingests lifecycle events, point '$LEMLINE_ANALYTICS_SQLITE_PATH' at its file."
+            }
+        }
     }
 }
