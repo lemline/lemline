@@ -178,7 +178,7 @@ Generates a configuration file. In a terminal, missing choices are asked interac
 
 | Option | Description | Default |
 |--------|-------------|---------|
-| `-m`, `--messaging` | `kafka`, `rabbitmq` or `pgmq` | asked |
+| `-m`, `--messaging` | `kafka`, `rabbitmq`, `pgmq` or `sqlite` | asked |
 | `-d`, `--database` | `postgresql` or `mysql` | asked |
 | `-o`, `--output <path>` | File to write | `lemline.yaml` |
 | `--force` | Overwrite an existing file | off |

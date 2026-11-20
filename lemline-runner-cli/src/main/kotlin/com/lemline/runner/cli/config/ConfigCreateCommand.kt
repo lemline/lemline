@@ -134,7 +134,7 @@ class ConfigCreateCommand : Runnable {
             else -> {
                 throw ParameterException(
                     picocli.CommandLine(this),
-                    "Invalid selection. Please choose 1, 2, or 3."
+                    "Invalid selection. Please choose 1, 2, 3 or 4."
                 )
             }
         }
