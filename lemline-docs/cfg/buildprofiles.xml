@@ -3,14 +3,14 @@
 <buildprofiles xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
                xsi:noNamespaceSchemaLocation="https://resources.jetbrains.com/writerside/1.0/build-profiles.xsd">
 
+    <variables>
+        <primary-color>#2e6f7e</primary-color>
+        <header-logo>lemly.png</header-logo>
+        <custom-favicons>lemly.png</custom-favicons>
+        <custom-css>custom.css</custom-css>
+    </variables>
     <build-profile instance="docs">
         <variables>
-            <!-- Theme settings to use system preference -->
-            <primary-color>amethyst</primary-color>
-            <!-- Logo settings -->
-            <header-logo>lemly.png</header-logo>
-            <custom-favicons>lemly.png</custom-favicons>
-            <custom-css>custom.css</custom-css>
             <noindex-content>true</noindex-content>
         </variables>
     </build-profile>
@@ -22,9 +22,6 @@
     <build-profile instance="lemline">
         <variables>
             <noindex-content>true</noindex-content>
-            <primary-color>purple</primary-color>
-            <header-logo>lemly.png</header-logo>
-            <custom-favicons>lemly.png</custom-favicons>
         </variables>
         <llms-txt single-file="true"/>
     </build-profile>
