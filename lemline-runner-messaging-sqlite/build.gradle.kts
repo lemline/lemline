@@ -23,3 +23,23 @@ dependencies {
 tasks.test {
     systemProperty("sqlite.test.classpath", sourceSets.test.get().runtimeClasspath.asPath)
 }
+
+// Native images cannot enumerate classpath directories at runtime.
+val sqliteMigrations = fileTree("src/main/resources/db/migration/messaging/sqlite") {
+    include("*.sql", "*.sql.conf")
+}
+val sqliteMigrationIndex = layout.buildDirectory.file("generated/sqlite-resources/sqlite-messaging-migrations.txt")
+val indexSqliteMigrations by tasks.registering {
+    inputs.files(sqliteMigrations).withPathSensitivity(PathSensitivity.RELATIVE)
+    outputs.file(sqliteMigrationIndex)
+    doLast {
+        val names = sqliteMigrations.files.map { it.name }.sorted()
+        check(names.isNotEmpty() && names.distinct().size == names.size)
+        val index = sqliteMigrationIndex.get().asFile
+        index.parentFile.mkdirs()
+        index.writeText(names.joinToString("\n", postfix = "\n"))
+    }
+}
+tasks.processResources {
+    from(indexSqliteMigrations)
+}

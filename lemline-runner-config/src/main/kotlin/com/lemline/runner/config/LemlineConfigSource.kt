@@ -206,10 +206,10 @@ import com.lemline.runner.config.LemlineConfigConstants.RABBITMQ_USER_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.RABBITMQ_VHOST_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.WORKFLOW_COMMANDS_TOPIC_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.WORKFLOW_EVENTS_TOPIC_DEFAULT
-import io.smallrye.common.expression.Expression
 import io.smallrye.config.ConfigSourceContext
 import io.smallrye.config.Expressions
 import io.smallrye.config.PropertiesConfigSource
+import io.smallrye.config.SmallRyeConfigBuilder
 import java.io.IOException
 import java.net.URI
 import java.nio.file.Files
@@ -217,6 +217,7 @@ import java.nio.file.InvalidPathException
 import java.nio.file.LinkOption.NOFOLLOW_LINKS
 import java.nio.file.Path
 import java.text.Normalizer
+import org.eclipse.microprofile.config.spi.ConfigSource
 import org.yaml.snakeyaml.LoaderOptions
 import org.yaml.snakeyaml.Yaml
 import org.yaml.snakeyaml.constructor.SafeConstructor
@@ -366,41 +367,63 @@ class LemlineConfigSource(context: ConfigSourceContext? = null) : PropertiesConf
             generated: Map<String, String>,
             context: ConfigSourceContext?,
         ) {
-            fun pathOf(datasource: String): Path? = generated["quarkus.datasource.$datasource.jdbc.url"]
-                ?.let { Path.of(URI.create(it.removePrefix("jdbc:sqlite:").substringBefore('?'))) }
-            val files = mutableListOf<Pair<String, Path>>()
-            pathOf("sqlite")?.let { files += LEMLINE_DATABASE_SQLITE_PATH to it }
-            pathOf(ANALYTICS_SQLITE_DATASOURCE_NAME)?.let { files += LEMLINE_ANALYTICS_SQLITE_PATH to it }
-            if (files.isEmpty()) return
-            if (generated.any { (key, value) -> key.endsWith(".connector") && value == SQLITE_CONNECTOR }) {
-                val rawPath = props[LEMLINE_MESSAGING_SQLITE_PATH] ?: SQLITE_MESSAGING_PATH_DEFAULT
-                val path = expandSQLitePath(rawPath, props, context)
-                files += LEMLINE_MESSAGING_SQLITE_PATH to SQLiteDatabase.resolvePath(path, LEMLINE_MESSAGING_SQLITE_PATH)
-            }
-            files.forEachIndexed { index, (key, path) ->
-                for ((otherKey, otherPath) in files.drop(index + 1)) {
-                    require(!sameSQLiteFile(path, otherPath)) {
-                        "'$key' ($path) and '$otherKey' ($otherPath) must use distinct SQLite files"
+            val datasourceKeys = mapOf(
+                "quarkus.datasource.sqlite" to LEMLINE_DATABASE_SQLITE_PATH,
+                "quarkus.datasource.$ANALYTICS_SQLITE_DATASOURCE_NAME" to LEMLINE_ANALYTICS_SQLITE_PATH,
+            )
+            if (datasourceKeys.keys.none { "$it.jdbc.url" in generated }) return
+
+            // Resolve the same higher-priority overrides and expressions as the
+            // application. Do not invoke the Lemline property factory recursively.
+            val transformed = props + generated
+            val effectiveSource = object : ConfigSource {
+                override fun getName() = "SQLite file validation"
+                override fun getOrdinal() = LemlineConfigConstants.CONFIG_ORDINAL
+                override fun getPropertyNames() = transformed.keys
+                override fun getProperties() = transformed
+
+                override fun getValue(name: String): String? {
+                    val external = Expressions.withoutExpansion<io.smallrye.config.ConfigValue> {
+                        context?.getValue(name)
                     }
+                    if (external != null && external.configSourceOrdinal > ordinal) {
+                        return external.value
+                    }
+                    return transformed[name] ?: external?.value
                 }
             }
-        }
+            val config = SmallRyeConfigBuilder().addDefaultInterceptors()
+                .withSources(effectiveSource)
+                .apply { if (context == null) addDefaultSources() }
+                .build()
+            fun value(name: String) = config.getOptionalValue(name, String::class.java).orElse(null)
+            val databaseFiles = datasourceKeys.mapNotNull { (datasource, setting) ->
+                if (value("$datasource.active") != "true") return@mapNotNull null
+                val url = value("$datasource.jdbc.url") ?: return@mapNotNull null
+                require(url.startsWith("jdbc:sqlite:")) { "'$datasource.jdbc.url' must be a SQLite file URL" }
+                val location = url.removePrefix("jdbc:sqlite:").substringBefore('?')
+                val path = if (location.startsWith("file:")) {
+                    val uri = URI.create(location)
+                    if (uri.isOpaque) uri.schemeSpecificPart else Path.of(uri).toString()
+                } else location
+                setting to SQLiteDatabase.resolvePath(path, setting)
+            }
+            fun checkFiles(first: Pair<String, Path>, second: Pair<String, Path>) {
+                require(!sameSQLiteFile(first.second, second.second)) {
+                    "'${first.first}' (${first.second}) and '${second.first}' (${second.second}) must use distinct SQLite files"
+                }
+            }
+            if (databaseFiles.size == 2) checkFiles(databaseFiles[0], databaseFiles[1])
+            if (databaseFiles.isEmpty()) return
 
-        private fun expandSQLitePath(
-            value: String,
-            props: Map<String, String>,
-            context: ConfigSourceContext?,
-            depth: Int = 0,
-        ): String {
-            require(depth < 16) { "SQLite path expression has too many references: '$value'" }
-            return Expression.compile(value, Expression.Flag.LENIENT_SYNTAX).evaluate { reference, result ->
-                val key = reference.key
-                val replacement = props[key] ?: context?.getValue(key)?.value
-                    ?: System.getProperty(key) ?: System.getenv(key)
-                when {
-                    replacement != null -> result.append(expandSQLitePath(replacement, props, context, depth + 1))
-                    reference.hasDefault() -> reference.expandDefault(result)
-                    else -> error("Unresolved SQLite path expression: '$key'")
+            val properties = generated.keys.asSequence() + (context?.iterateNames()?.asSequence() ?: emptySequence())
+            properties.filter { it.startsWith("mp.messaging.") && it.endsWith(".connector") }.distinct().forEach { key ->
+                if (value(key) == SQLITE_CONNECTOR) {
+                    val pathKey = key.removeSuffix(".connector") + ".path"
+                    val path = value(pathKey) ?: return@forEach
+                    val setting = "$LEMLINE_MESSAGING_SQLITE_PATH ($pathKey)"
+                    val messagingFile = setting to SQLiteDatabase.resolvePath(path, setting)
+                    databaseFiles.forEach { checkFiles(it, messagingFile) }
                 }
             }
         }

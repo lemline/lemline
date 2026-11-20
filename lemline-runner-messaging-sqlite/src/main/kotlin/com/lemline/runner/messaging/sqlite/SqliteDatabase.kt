@@ -25,7 +25,6 @@ internal object SqliteDatabase {
     // setting. The name is repeated here only to point operators at it in error messages.
     private const val PATH_SETTING = "lemline.messaging.sqlite.path"
     private const val BUSY_TIMEOUT_MS = 5_000
-    private const val MIGRATIONS = "db/migration/messaging/sqlite"
 
     fun resolve(value: String): Path {
         require(value.isNotBlank() && !value.startsWith("file:", ignoreCase = true) &&
@@ -63,9 +62,6 @@ internal object SqliteDatabase {
 
     fun initialize(path: Path): SqliteQueue {
         try {
-            check(SqliteDatabase::class.java.getResource("/$MIGRATIONS/V001__create_queue.sql") != null) {
-                "The bundled SQLite messaging migration is missing"
-            }
             val dataSource = open(path)
             val queue = SqliteQueue(dataSource, path)
             // Flyway can inspect the schema before taking its transaction lock. Serialize
@@ -95,8 +91,9 @@ internal object SqliteDatabase {
                     }
                     Flyway.configure()
                         .dataSource(dataSource)
-                        .locations("classpath:$MIGRATIONS")
-                        .failOnMissingLocations(true)
+                        .locations("classpath:db/migration/messaging/sqlite")
+                        .resourceProvider(SqliteMigrationResources)
+                        .javaMigrationClassProvider { emptyList() }
                         .load()
                         .migrate()
                     queue.verifySchema()

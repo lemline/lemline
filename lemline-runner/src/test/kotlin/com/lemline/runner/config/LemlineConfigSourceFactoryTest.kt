@@ -36,7 +36,18 @@ class LemlineConfigSourceFactoryTest {
         assertTrue("lemline.messaging.sqlite.path" in collision.message.orEmpty())
         assertFalse(Files.exists(shared))
         build(mapOf("lemline.messaging.commands.consumer.enabled" to "false"))
-        build(mapOf("lemline.messaging.sqlite.path" to directory.resolve("messaging.db").toString()))
+        val distinct = directory.resolve("messaging.db").toString()
+        build(mapOf("lemline.messaging.sqlite.path" to distinct))
+        val overridden = assertFailsWith<IllegalArgumentException> {
+            build(mapOf(
+                "lemline.messaging.sqlite.path" to distinct,
+                "mp.messaging.incoming.commands-in.path" to alias.toString(),
+            ))
+        }
+        assertTrue("mp.messaging.incoming.commands-in.path" in overridden.message.orEmpty())
+        val expression = "$" + "{suffix}"
+        val escaped = directory.resolve("literal\\$expression.db")
+        build(mapOf("lemline.messaging.sqlite.path" to escaped.toString()))
 
         Files.createFile(shared)
         val hardLink = Files.createLink(directory.resolve("analytics.db"), shared)

@@ -269,6 +269,9 @@ internal class SingleHostSQLiteIT {
 
     private class Fixture(val root: Path) : AutoCloseable {
         private val config = root.resolve("lemline.yaml")
+        private val processLogs = Files.createTempDirectory(
+            Files.createDirectories(Path.of("build", "packaged-process-logs")), "single-host-",
+        )
         private val children = mutableListOf<Pair<Process, Path>>()
         private var channel: ManagedChannel? = null
 
@@ -297,7 +300,7 @@ internal class SingleHostSQLiteIT {
                     wait:
                       outbox: { every: 1s, initial-jitter: 0s }
             """.trimIndent())
-            println("Single-host SQLite process logs: ${root.toAbsolutePath()}")
+            println("Single-host SQLite process logs: ${processLogs.toAbsolutePath()}")
         }
 
         fun define(namespace: String, name: String, body: String) {
@@ -326,7 +329,7 @@ internal class SingleHostSQLiteIT {
         }
 
         private fun launch(label: String, vararg args: String): Pair<Process, Path> {
-            val log = Files.createTempFile(root, "$label-", ".log")
+            val log = Files.createTempFile(processLogs, "$label-", ".log")
             val process = ProcessBuilder(PackagedEnvironment.command("--info", *args, configFile = config))
                 .directory(root.toFile()).redirectErrorStream(true).redirectOutput(log.toFile()).start()
             return (process to log).also { children += it }
@@ -424,7 +427,7 @@ internal class SingleHostSQLiteIT {
                 if (condition()) return
                 Thread.sleep(50)
             } while (System.nanoTime() < deadline && children.all { it.first.isAlive })
-            error("Expected $label. Process logs: $root")
+            error("Expected $label. Process logs: ${processLogs.toAbsolutePath()}")
         }
 
         fun stopAll(kill: Boolean = false) {
