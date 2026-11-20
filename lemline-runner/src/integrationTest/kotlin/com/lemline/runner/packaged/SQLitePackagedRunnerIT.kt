@@ -203,12 +203,15 @@ internal class SQLitePackagedRunnerIT {
     private inner class Fixture(label: String) : AutoCloseable {
         private val dir = Files.createTempDirectory(PackagedEnvironment.workDir, "$label-")
         private val file = dir.resolve("orchestration.db")
+        private val processLogs = Files.createTempDirectory(
+            Files.createDirectories(Path.of("build", "packaged-process-logs")), "sqlite-pgmq-",
+        )
         private val prefix = "s" + UUID.randomUUID().toString().take(8)
         private val processes = mutableListOf<Runner>()
         val auditTable = "public.${prefix}_acks"
 
         init {
-            println("Packaged SQLite runner logs: $dir")
+            println("Packaged SQLite runner logs: ${processLogs.toAbsolutePath()}")
         }
 
         fun queue(namespace: String) = "$prefix-$namespace-commands"
@@ -335,14 +338,17 @@ internal class SQLitePackagedRunnerIT {
         fun startGateway(label: String): Gateway {
             val grpcPort = ServerSocket(0).use { it.localPort }
             val runner = launch(label, config(label, gatewayPort = grpcPort),
-                "gateway", "start", "--grpc-port", grpcPort.toString(), "--metrics-port", grpcPort.toString())
+                "gateway", "start", "--grpc-port", grpcPort.toString(), "--metrics-port", "0")
             // The socket can accept connections while Quarkus is still starting its messaging channels.
-            eventually("gateway startup completed") { runner.logText().contains("Starting gRPC gateway server...") }
+            eventually("gateway startup completed", 45) {
+                check(runner.process.isAlive) { "Gateway exited before startup:\n${runner.logText()}" }
+                runner.logText().contains("Starting gRPC gateway server...")
+            }
             return Gateway(runner, grpcPort)
         }
 
         private fun launch(label: String, config: Path, vararg args: String): Runner {
-            val log = dir.resolve("$label.log")
+            val log = processLogs.resolve("$label.log")
             val command = PackagedEnvironment.artifactCommand + listOf("--config", config.toString(), "--info") + args
             val process = ProcessBuilder(command)
                 .directory(dir.toFile())
@@ -358,7 +364,7 @@ internal class SQLitePackagedRunnerIT {
                 if (condition()) return
                 Thread.sleep(50)
             } while (System.nanoTime() < deadline)
-            error("Timed out after ${seconds}s: $description. Process logs: $dir")
+            error("Timed out after ${seconds}s: $description. Process logs: ${processLogs.toAbsolutePath()}")
         }
 
         override fun close() {
