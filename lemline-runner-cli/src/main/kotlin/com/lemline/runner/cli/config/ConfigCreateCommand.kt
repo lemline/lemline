@@ -32,7 +32,7 @@ class ConfigCreateCommand : Runnable {
 
     @Option(
         names = ["-d", "--database"],
-        description = ["Database type (postgresql, mysql)"],
+        description = ["Database type (postgresql, mysql, sqlite)"],
         converter = [DatabaseTypeConverter::class]
     )
     var database: DatabaseType? = null
@@ -136,16 +136,18 @@ class ConfigCreateCommand : Runnable {
         println("? Select database:")
         println("  1) postgresql")
         println("  2) mysql")
+        println("  3) sqlite")
         print("> ")
 
         val input = console.readLine().trim()
         return when (input) {
             "1", "postgresql" -> DatabaseType.POSTGRESQL
             "2", "mysql" -> DatabaseType.MYSQL
+            "3", "sqlite" -> DatabaseType.SQLITE
             else -> {
                 throw ParameterException(
                     picocli.CommandLine(this),
-                    "Invalid selection. Please choose 1 or 2."
+                    "Invalid selection. Please choose 1, 2, or 3."
                 )
             }
         }
@@ -169,8 +171,9 @@ class ConfigCreateCommand : Runnable {
             return when (value.lowercase()) {
                 "postgresql" -> DatabaseType.POSTGRESQL
                 "mysql" -> DatabaseType.MYSQL
+                "sqlite" -> DatabaseType.SQLITE
                 else -> throw IllegalArgumentException(
-                    "Invalid database type: '$value'. Allowed values: postgresql, mysql"
+                    "Invalid database type: '$value'. Allowed values: postgresql, mysql, sqlite"
                 )
             }
         }

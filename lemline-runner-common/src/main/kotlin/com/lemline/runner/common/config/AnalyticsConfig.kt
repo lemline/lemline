@@ -35,11 +35,13 @@ interface AnalyticsConfig {
     ): R
 
     fun insertIgnoreSelect(tableName: String, columns: String, selectSql: String): String = when (dbType) {
+        DatabaseType.SQLITE -> error("SQLite orchestration is not an analytics dialect")
         DatabaseType.MYSQL -> "INSERT IGNORE INTO $tableName ($columns) $selectSql"
         DatabaseType.POSTGRESQL, DatabaseType.H2 -> "INSERT INTO $tableName ($columns) $selectSql ON CONFLICT DO NOTHING"
     }
 
     fun insertIgnoreInto(tableName: String, columns: String, values: String): String = when (dbType) {
+        DatabaseType.SQLITE -> error("SQLite orchestration is not an analytics dialect")
         DatabaseType.MYSQL -> "INSERT IGNORE INTO $tableName ($columns) VALUES ($values)"
         DatabaseType.POSTGRESQL, DatabaseType.H2 -> "INSERT INTO $tableName ($columns) VALUES ($values) ON CONFLICT DO NOTHING"
     }

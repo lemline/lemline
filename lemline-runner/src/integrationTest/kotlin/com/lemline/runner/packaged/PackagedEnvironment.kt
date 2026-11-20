@@ -28,6 +28,8 @@ internal object PackagedEnvironment {
             }
     }
 
+    val postgresPort: Int get() = postgres.firstMappedPort
+
     val workDir: Path by lazy { Files.createTempDirectory("lemline-packaged-") }
 
     /** Configuration file for every command, created once the database is up. */

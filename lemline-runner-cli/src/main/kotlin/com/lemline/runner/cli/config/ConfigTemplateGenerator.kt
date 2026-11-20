@@ -66,6 +66,13 @@ class ConfigTemplateGenerator {
                 |      password: ${LEMLINE_MYSQL_PASSWORD:lemline}
             """.trimMargin()
 
+            DatabaseType.SQLITE -> """
+                |  database:
+                |    type: sqlite
+                |    sqlite:
+                |      path: orchestration.db
+            """.trimMargin()
+
             DatabaseType.H2 -> error("H2 database is not supported for production configurations")
         }
     }
@@ -104,19 +111,19 @@ class ConfigTemplateGenerator {
     private fun getDockerComposeProfile(messagingType: MessagingType, databaseType: DatabaseType): String {
         return when (messagingType) {
             MessagingType.KAFKA -> when (databaseType) {
-                DatabaseType.POSTGRESQL -> "kafka-pg"
+                DatabaseType.POSTGRESQL, DatabaseType.SQLITE -> "kafka-pg"
                 DatabaseType.MYSQL -> "kafka-mysql"
                 DatabaseType.H2 -> error("H2 not supported")
             }
 
             MessagingType.RABBITMQ -> when (databaseType) {
-                DatabaseType.POSTGRESQL -> "rabbit-pg"
+                DatabaseType.POSTGRESQL, DatabaseType.SQLITE -> "rabbit-pg"
                 DatabaseType.MYSQL -> "rabbit-mysql"
                 DatabaseType.H2 -> error("H2 not supported")
             }
 
             MessagingType.PGMQ -> when (databaseType) {
-                DatabaseType.POSTGRESQL -> "pgmq"
+                DatabaseType.POSTGRESQL, DatabaseType.SQLITE -> "pgmq"
                 DatabaseType.MYSQL -> "pgmq-mysql"
                 DatabaseType.H2 -> error("H2 not supported")
             }
@@ -138,6 +145,7 @@ class ConfigTemplateGenerator {
         return when (databaseType) {
             DatabaseType.POSTGRESQL -> "PostgreSQL"
             DatabaseType.MYSQL -> "MySQL"
+            DatabaseType.SQLITE -> "SQLite"
             DatabaseType.H2 -> "H2"
         }
     }

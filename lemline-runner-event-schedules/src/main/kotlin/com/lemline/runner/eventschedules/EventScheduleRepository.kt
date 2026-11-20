@@ -150,14 +150,19 @@ class EventScheduleRepository : CrudRepository<EventScheduleModel>(),
         val correlations = if (databaseConfig.dbType == DatabaseType.MYSQL) "CAST(correlations AS BINARY)" else "correlations"
         val conditions = keys.map { key ->
             val parts = key.correlations.map { (name, value) ->
-                val property = LemlineJson.encodeToString(name) + ":"
-                val pair = property + LemlineJson.encodeToString(value)
-                parameters.addAll(listOf(
-                    likeLiteral("{" + property) + "%", "%" + likeLiteral("," + property) + "%",
-                    "%" + likeLiteral(pair + ",") + "%", "%" + likeLiteral(pair + "}"),
-                ))
-                "(($correlations NOT LIKE ? ESCAPE '!' AND $correlations NOT LIKE ? ESCAPE '!')" +
-                    " OR $correlations LIKE ? ESCAPE '!' OR $correlations LIKE ? ESCAPE '!')"
+                if (databaseConfig.dbType == DatabaseType.SQLITE) {
+                    parameters.addAll(listOf(name, value))
+                    "NOT EXISTS (SELECT 1 FROM json_each(correlations) WHERE key = ? AND value <> ?)"
+                } else {
+                    val property = LemlineJson.encodeToString(name) + ":"
+                    val pair = property + LemlineJson.encodeToString(value)
+                    parameters.addAll(listOf(
+                        likeLiteral("{" + property) + "%", "%" + likeLiteral("," + property) + "%",
+                        "%" + likeLiteral(pair + ",") + "%", "%" + likeLiteral(pair + "}"),
+                    ))
+                    "(($correlations NOT LIKE ? ESCAPE '!' AND $correlations NOT LIKE ? ESCAPE '!')" +
+                        " OR $correlations LIKE ? ESCAPE '!' OR $correlations LIKE ? ESCAPE '!')"
+                }
             }.toMutableList()
             key.availableFilter?.let { index ->
                 parameters.add("%,$index,%")
@@ -297,8 +302,8 @@ class EventScheduleRepository : CrudRepository<EventScheduleModel>(),
         ColumnBindingsBuilder<EventScheduleModel>().apply {
             idColumn(idHelper)
             instanceColumns(idHelper)
-            cleanupColumns()
-            outboxColumns()
+            cleanupColumns(databaseConfig)
+            outboxColumns(databaseConfig)
         }.build()
     }
 

@@ -32,6 +32,7 @@ import com.lemline.runner.common.repositories.ops.UPDATED_AT_COLUMN
 import com.lemline.runner.common.repositories.ops.WORKFLOW_NAMESPACE_COLUMN
 import com.lemline.runner.common.repositories.ops.WORKFLOW_NAME_COLUMN
 import com.lemline.runner.common.repositories.ops.WORKFLOW_VERSION_COLUMN
+import com.lemline.runner.common.repositories.ops.bindTimestamp
 import com.lemline.runner.common.repositories.ops.cleanupColumns
 import com.lemline.runner.common.repositories.ops.getInstanceMessage
 import com.lemline.runner.common.repositories.ops.getInstant
@@ -175,8 +176,8 @@ class ListenerRepository : CrudRepository<ListenerModel>(),
             column(com.lemline.runner.common.repositories.ops.WORKFLOW_POSITION_COLUMN) { stmt, entity, idx ->
                 stmt.setString(idx, entity.filterPosition.toString())
             }
-            cleanupColumns()
-            outboxColumns()
+            cleanupColumns(databaseConfig)
+            outboxColumns(databaseConfig)
 
             // Listener-specific columns
             column(STRATEGY_COLUMN) { stmt, entity, idx ->
@@ -184,7 +185,7 @@ class ListenerRepository : CrudRepository<ListenerModel>(),
             }
             column(TIMEOUT_AT_COLUMN) { stmt, entity, idx ->
                 entity.timeoutAt?.let {
-                    stmt.setTimestamp(idx, Timestamp.from(it.toJavaInstant()))
+                    databaseConfig.bindTimestamp(stmt, idx, Timestamp.from(it.toJavaInstant()))
                 } ?: stmt.setNull(idx, Types.TIMESTAMP)
             }
             column(FILTERS_COUNT_COLUMN) { stmt, entity, idx ->
@@ -207,7 +208,7 @@ class ListenerRepository : CrudRepository<ListenerModel>(),
             }
             column(CLOSED_AT_COLUMN) { stmt, entity, idx ->
                 entity.closedAt?.let {
-                    stmt.setTimestamp(idx, Timestamp.from(it.toJavaInstant()))
+                    databaseConfig.bindTimestamp(stmt, idx, Timestamp.from(it.toJavaInstant()))
                 } ?: stmt.setNull(idx, Types.TIMESTAMP)
             }
         }.build()
@@ -239,7 +240,7 @@ class ListenerRepository : CrudRepository<ListenerModel>(),
         databaseConfig.withConnection(connection) { conn ->
             conn.prepareStatement(findTimedOutSql).use { stmt ->
                 var idx = 1
-                stmt.setTimestamp(idx++, nowTimestamp())
+                databaseConfig.bindTimestamp(stmt, idx++, nowTimestamp())
                 namespaceScope.configured?.forEach { stmt.setString(idx++, it) }
                 stmt.setInt(idx, limit)
                 stmt.executeQuery().use { it.toModels() }
@@ -256,7 +257,7 @@ class ListenerRepository : CrudRepository<ListenerModel>(),
           ${com.lemline.runner.common.repositories.ops.namespacePredicate(namespaceScope.configured)}
         ORDER BY $TIMEOUT_AT_COLUMN ASC
         LIMIT ?
-        FOR UPDATE SKIP LOCKED
+        ${databaseConfig.forUpdate(skipLocked = true)}
         """.trimIndent()
     }
 
@@ -267,8 +268,8 @@ class ListenerRepository : CrudRepository<ListenerModel>(),
         databaseConfig.withConnection(connection) { conn ->
             conn.prepareStatement(markCompletedSql).use { stmt ->
                 val now = nowTimestamp()
-                stmt.setTimestamp(1, now)
-                stmt.setTimestamp(2, now)
+                databaseConfig.bindTimestamp(stmt, 1, now)
+                databaseConfig.bindTimestamp(stmt, 2, now)
                 setIDV7(stmt, 3, id)
                 stmt.executeUpdate()
             }
@@ -295,11 +296,11 @@ class ListenerRepository : CrudRepository<ListenerModel>(),
     ): Int = databaseConfig.withConnection(connection) { conn ->
         conn.prepareStatement(markFailedSql).use { stmt ->
             val now = nowTimestamp()
-            stmt.setTimestamp(1, now)
+            databaseConfig.bindTimestamp(stmt, 1, now)
             stmt.setString(2, errorClass)
             stmt.setString(3, errorMessage)
             stmt.setString(4, errorStackTrace)
-            stmt.setTimestamp(5, now)
+            databaseConfig.bindTimestamp(stmt, 5, now)
             setIDV7(stmt, 6, id)
             stmt.executeUpdate()
         }
@@ -362,7 +363,7 @@ class ListenerRepository : CrudRepository<ListenerModel>(),
     suspend fun batchPrepareListenerOutbox(connection: Connection? = null): Int =
         databaseConfig.withConnection(connection) { conn ->
             val sql = """
-                UPDATE $tableName l
+                UPDATE $tableName AS l
                 SET $OUTBOX_SCHEDULED_FOR_COLUMN = ?,
                     $OUTBOX_DELAYED_UNTIL_COLUMN = ?,
                     $UPDATED_AT_COLUMN = ?
@@ -377,16 +378,16 @@ class ListenerRepository : CrudRepository<ListenerModel>(),
 
             val now = nowTimestamp()
             conn.prepareStatement(sql).use { stmt ->
-                stmt.setTimestamp(1, now)
-                stmt.setTimestamp(2, now)
-                stmt.setTimestamp(3, now)
+                databaseConfig.bindTimestamp(stmt, 1, now)
+                databaseConfig.bindTimestamp(stmt, 2, now)
+                databaseConfig.bindTimestamp(stmt, 3, now)
                 stmt.executeUpdate()
             }
         }
 
     /** Lock before replacing an instance message so foreach cannot overwrite newer until progress. */
     suspend fun findByIdForUpdate(id: IDV7, connection: Connection): ListenerModel? =
-        connection.prepareStatement("SELECT * FROM $tableName WHERE $ID_COLUMN = ? FOR UPDATE").use { stmt ->
+        connection.prepareStatement("SELECT * FROM $tableName WHERE $ID_COLUMN = ? ${databaseConfig.forUpdate()}").use { stmt ->
             setIDV7(stmt, 1, id)
             stmt.executeQuery().use { rs -> if (rs.next()) createModel(rs) else null }
         }
@@ -404,7 +405,7 @@ class ListenerRepository : CrudRepository<ListenerModel>(),
         val ids = connection.prepareStatement("""
             SELECT l.id FROM $tableName l
             WHERE l.closed_at IS NULL AND (${ListenerQueryKey.buildWhereClause(keys, "l")})
-            ORDER BY l.id FOR UPDATE
+            ORDER BY l.id ${databaseConfig.forUpdate()}
         """.trimIndent()).use { stmt ->
             ListenerQueryKey.bindAllParameters(keys, stmt, 1)
             stmt.executeQuery().use { rs -> buildList { while (rs.next()) add(getIDV7(rs, "id")!!) } }
@@ -467,7 +468,7 @@ class ListenerRepository : CrudRepository<ListenerModel>(),
             WHERE l.$CLOSED_AT_COLUMN IS NULL
               AND (${ListenerQueryKey.buildWhereClause(keys, "l")})
             ORDER BY l.$ID_COLUMN
-            FOR UPDATE
+            ${databaseConfig.forUpdate()}
         """.trimIndent()
         return connection.prepareStatement(sql).use { stmt ->
             ListenerQueryKey.bindAllParameters(keys, stmt, 1)
@@ -497,7 +498,7 @@ class ListenerRepository : CrudRepository<ListenerModel>(),
             // Mark completed_at for matched listeners (termination received)
             // Note: outbox_delayed_until is NOT set here - done later when foreach events complete
             val sql = """
-                UPDATE $tableName l
+                UPDATE $tableName AS l
                 SET $CLOSED_AT_COLUMN = ?,
                     $UPDATED_AT_COLUMN = ?
                 WHERE l.$CLOSED_AT_COLUMN IS NULL
@@ -505,8 +506,8 @@ class ListenerRepository : CrudRepository<ListenerModel>(),
             """.trimIndent()
 
             conn.prepareStatement(sql).use { stmt ->
-                stmt.setTimestamp(1, now)  // completed_at
-                stmt.setTimestamp(2, now)  // updated_at
+                databaseConfig.bindTimestamp(stmt, 1, now)  // completed_at
+                databaseConfig.bindTimestamp(stmt, 2, now)  // updated_at
                 ListenerQueryKey.bindAllParameters(untilEventKeys, stmt, 3)
                 stmt.executeUpdate()
             }
@@ -533,7 +534,11 @@ class ListenerRepository : CrudRepository<ListenerModel>(),
                 table = LISTENER_EVENTS_TABLE,
                 tableAlias = "e",
                 column = "e.${ListenerEventRepository.EVENT_COLUMN}",
-                orderColumn = "e.$CREATED_AT_COLUMN",
+                orderColumn = if (databaseConfig.dbType == DatabaseType.SQLITE) {
+                    "e.$CREATED_AT_COLUMN, e.${ListenerEventRepository.EVENT_INDEX_COLUMN}"
+                } else {
+                    "e.$CREATED_AT_COLUMN"
+                },
                 whereClause = "e.$LISTENER_ID_COLUMN = l.$ID_COLUMN"
             )
 
@@ -542,7 +547,7 @@ class ListenerRepository : CrudRepository<ListenerModel>(),
                 FROM $tableName l
                 WHERE l.$CLOSED_AT_COLUMN IS NULL
                   AND (${ListenerQueryKey.buildWhereClause(exprKeys, "l")})
-                FOR UPDATE
+                ${databaseConfig.forUpdate()}
             """.trimIndent()
 
             conn.prepareStatement(sql).use { stmt ->
@@ -585,8 +590,8 @@ class ListenerRepository : CrudRepository<ListenerModel>(),
             """.trimIndent()
 
             conn.prepareStatement(sql).use { stmt ->
-                stmt.setTimestamp(1, now)
-                stmt.setTimestamp(2, now)
+                databaseConfig.bindTimestamp(stmt, 1, now)
+                databaseConfig.bindTimestamp(stmt, 2, now)
                 ids.forEachIndexed { index, id ->
                     setIDV7(stmt, 3 + index, id)
                 }
