@@ -74,8 +74,24 @@ object SQLiteDatabase {
                 connection.createStatement().use { it.execute("ROLLBACK") }
             } catch (rollbackFailure: SQLException) {
                 failure.addSuppressed(rollbackFailure)
+                releaseWriter(connection, rollbackFailure, failure)
             }
             throw failure
+        }
+    }
+
+    /**
+     * A failed ROLLBACK can leave the transaction open on a pooled connection, which would keep
+     * the only writer. Closing the physical connection makes SQLite roll back and release it;
+     * the pool's validation then discards the closed connection. SQLite has already rolled back
+     * when it reports that no transaction is active.
+     */
+    private fun releaseWriter(connection: Connection, rollbackFailure: SQLException, failure: Throwable) {
+        if (rollbackFailure.message?.contains("no transaction is active", ignoreCase = true) == true) return
+        try {
+            connection.unwrap(Connection::class.java).close()
+        } catch (closeFailure: SQLException) {
+            failure.addSuppressed(closeFailure)
         }
     }
 }

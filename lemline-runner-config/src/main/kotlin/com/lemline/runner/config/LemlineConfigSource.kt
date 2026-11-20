@@ -336,6 +336,15 @@ class LemlineConfigSource(context: ConfigSourceContext? = null) : PropertiesConf
             }
             generated[LEMLINE_DATABASE_TYPE] = type.configValue
 
+            // SQLite is an explicit opt-in: a path alone does not select it. Say so instead of
+            // silently running on another database.
+            if (type != DatabaseType.SQLITE && LEMLINE_DATABASE_SQLITE_PATH in props) {
+                logger.warn {
+                    "'$LEMLINE_DATABASE_SQLITE_PATH' is set but ignored: the database type is '${type.configValue}'. " +
+                        "Set '$LEMLINE_DATABASE_TYPE' to '${DatabaseType.SQLITE.configValue}' to use SQLite."
+                }
+            }
+
             when (type) {
                 DatabaseType.SQLITE -> {
                     val enabled = props[LEMLINE_DATABASE_ENABLED]?.toBooleanStrictOrNull() ?: true

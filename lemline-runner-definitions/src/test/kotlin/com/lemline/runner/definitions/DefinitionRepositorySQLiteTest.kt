@@ -8,8 +8,8 @@ import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.DisplayName
 
 /**
- * H2-specific tests for DefinitionRepository.
- * Uses in-memory H2 database.
+ * SQLite-specific tests for DefinitionRepository.
+ * Uses a temporary SQLite database file.
  */
 @DisplayName("DefinitionRepository [SQLite]")
 class DefinitionRepositorySQLiteTest : DefinitionRepositoryTestBase() {

@@ -3,6 +3,8 @@ package com.lemline.runner.gateway.persistence
 
 import com.lemline.core.lifecycleevents.LifecycleEventType
 import com.lemline.runner.common.config.AnalyticsType
+import com.lemline.runner.common.config.DatabaseConfig
+import com.lemline.runner.common.repositories.ops.bindTimestamp
 import java.sql.PreparedStatement
 import java.sql.ResultSet
 import java.sql.Timestamp
@@ -59,6 +61,14 @@ internal fun ResultSet.getInstantOrNull(column: String): Instant? {
 internal fun PreparedStatement.setGatewayObject(index: Int, value: Any) {
     when (value) {
         is Instant -> setTimestamp(index, Timestamp.from(value))
+        else -> setObject(index, value)
+    }
+}
+
+/** Orchestration-database variant: timestamps follow the dialect's storage (epoch micros on SQLite). */
+internal fun PreparedStatement.setGatewayObject(index: Int, value: Any, databaseConfig: DatabaseConfig) {
+    when (value) {
+        is Instant -> databaseConfig.bindTimestamp(this, index, Timestamp.from(value))
         else -> setObject(index, value)
     }
 }

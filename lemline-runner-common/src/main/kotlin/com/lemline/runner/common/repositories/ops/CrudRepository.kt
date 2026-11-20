@@ -293,12 +293,15 @@ abstract class CrudRepository<T> : WithCrudRepository<T> {
  */
 fun ResultSet.getInstant(col: String): kotlin.time.Instant? {
     // SQLite stores timestamps as signed Unix epoch microseconds.
-    val value = getObject(col) ?: return null
-    return if (value is Number) {
-        val micros = value.toLong()
-        kotlin.time.Instant.fromEpochSeconds(Math.floorDiv(micros, 1_000_000L), Math.floorMod(micros, 1_000_000L) * 1000)
-    } else {
-        getTimestamp(col)?.toInstant()?.toKotlinInstant()
+    return when (val value = getObject(col) ?: return null) {
+        is Number -> {
+            val micros = value.toLong()
+            kotlin.time.Instant.fromEpochSeconds(Math.floorDiv(micros, 1_000_000L), Math.floorMod(micros, 1_000_000L) * 1000)
+        }
+        // Reuse the decoded value instead of reading the column a second time.
+        is Timestamp -> value.toInstant().toKotlinInstant()
+        is java.time.OffsetDateTime -> value.toInstant().toKotlinInstant()
+        else -> getTimestamp(col)?.toInstant()?.toKotlinInstant()
     }
 }
 

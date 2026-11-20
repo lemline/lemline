@@ -47,10 +47,7 @@ class DatabaseStartupValidator(
     private fun verifyDatabaseConnectivity() {
         try {
             databaseManager.datasource.connection.use { conn ->
-                val valid = conn.isValid(5)
-                if (dbType == DatabaseType.SQLITE && !valid) {
-                    throw SQLException("SQLite connectivity check failed")
-                }
+                if (!conn.isValid(5)) throw SQLException("$dbType connectivity check failed")
             }
             logger.info { "Database connectivity verified for $dbType." }
         } catch (e: SQLException) {

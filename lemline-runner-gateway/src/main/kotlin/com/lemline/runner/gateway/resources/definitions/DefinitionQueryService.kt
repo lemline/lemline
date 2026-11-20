@@ -2,16 +2,14 @@
 package com.lemline.runner.gateway.resources.definitions
 
 import com.lemline.runner.common.config.DatabaseConfig
-import com.lemline.runner.common.repositories.ops.bindTimestamp
+import com.lemline.runner.common.repositories.ops.getInstant
 import com.lemline.runner.definitions.DEFINITION_TABLE
 import com.lemline.runner.gateway.persistence.SqlQuery
-import com.lemline.runner.common.repositories.ops.getInstant
 import com.lemline.runner.gateway.persistence.normalizePageSize
 import com.lemline.runner.gateway.persistence.placeholders
+import com.lemline.runner.gateway.persistence.setGatewayObject
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
-import java.sql.PreparedStatement
-import java.sql.Timestamp
 import java.time.Instant
 import kotlin.time.toJavaInstant
 import kotlinx.coroutines.Dispatchers
@@ -19,14 +17,6 @@ import kotlinx.coroutines.withContext
 
 @ApplicationScoped
 class DefinitionQueryService {
-
-    private fun bindParameter(statement: PreparedStatement, index: Int, value: Any) {
-        if (value is Instant) {
-            databaseConfig.bindTimestamp(statement, index, Timestamp.from(value))
-        } else {
-            statement.setObject(index, value)
-        }
-    }
 
     @Inject
     lateinit var databaseConfig: DatabaseConfig
@@ -46,7 +36,7 @@ class DefinitionQueryService {
         val rows = databaseConfig.withConnection { conn ->
             conn.prepareStatement(query.sql).use { stmt ->
                 query.params.forEachIndexed { index, value ->
-                    bindParameter(stmt, index + 1, value)
+                    stmt.setGatewayObject(index + 1, value, databaseConfig)
                 }
                 stmt.executeQuery().use { rs ->
                     buildList {
@@ -185,7 +175,7 @@ class DefinitionQueryService {
             databaseConfig.withConnection { conn ->
                 conn.prepareStatement(query.sql).use { stmt ->
                     query.params.forEachIndexed { index, value ->
-                        bindParameter(stmt, index + 1, value)
+                        stmt.setGatewayObject(index + 1, value, databaseConfig)
                     }
                     stmt.executeQuery().use { rs ->
                         if (rs.next()) rs.getLong("total_count") else 0L

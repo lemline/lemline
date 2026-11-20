@@ -66,6 +66,10 @@ class ListenerScheduledTimeout : AbstractScheduledTask() {
         listenerConfig.outbox?.batchSize ?: 100
     }
 
+    private companion object {
+        const val SAVEPOINT = "listener_timeout"
+    }
+
     /**
      * Find and process timed-out listeners in batches.
      */
@@ -83,10 +87,15 @@ class ListenerScheduledTimeout : AbstractScheduledTask() {
 
                 if (timedOut.isNotEmpty()) {
                     for (listener in timedOut) {
+                        // A savepoint keeps one listener's failure from aborting the shared
+                        // transaction and rolling back the listeners already processed.
+                        connection.createStatement().use { it.execute("SAVEPOINT $SAVEPOINT") }
                         try {
                             processTimedOutListener(listener, connection)
+                            connection.createStatement().use { it.execute("RELEASE SAVEPOINT $SAVEPOINT") }
                             processed++
                         } catch (e: Exception) {
+                            connection.createStatement().use { it.execute("ROLLBACK TO SAVEPOINT $SAVEPOINT") }
                             logger.error(e) { "Failed to process timed out listener ${listener.id}" }
                         }
                     }
