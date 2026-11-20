@@ -11,8 +11,9 @@ the [Hello, Workflow! tutorial](lemline-tutorial-hello.md).
 
 ### Option 1: Download the Prebuilt Binary
 
-You can download nightly builds from
+You can download nightly builds for Linux, Windows and the JAR from
 our [GitHub releases page](https://github.com/lemline/lemline/releases/tag/nightly).
+There is no nightly macOS build: the macOS binary comes with each tagged version.
 
 #### Linux (x86_64)
 
@@ -25,11 +26,8 @@ curl -L https://github.com/lemline/lemline/releases/download/nightly/lemline-nig
 tar -xzf lemline.tar.gz
 rm lemline.tar.gz
 
-# Make it executable
-chmod +x lemline
-
-# Run Lemline (add to your PATH for easier access)
-./lemline --help
+# Run Lemline (add ~/lemline/bin to your PATH for easier access)
+./bin/lemline --help
 ```
 
 #### macOS (Apple Silicon/ARM64)
@@ -38,16 +36,13 @@ chmod +x lemline
 # Create a directory for Lemline
 mkdir -p ~/lemline && cd ~/lemline
 
-# Download and extract the macOS binary
-curl -L https://github.com/lemline/lemline/releases/download/nightly/lemline-nightly-macos-arm64.tar.gz -o lemline.tar.gz
+# Download and extract the macOS binary of version %version%
+curl -L https://github.com/lemline/lemline/releases/download/v%version%/lemline-v%version%-macos-arm64.tar.gz -o lemline.tar.gz
 tar -xzf lemline.tar.gz
 rm lemline.tar.gz
 
-# Make it executable
-chmod +x lemline
-
-# Run Lemline (add to your PATH for easier access)
-./lemline --help
+# Run Lemline (add ~/lemline/bin to your PATH for easier access)
+./bin/lemline --help
 ```
 
 #### Windows (x86_64)
@@ -55,7 +50,7 @@ chmod +x lemline
 1. Download
    the [Windows ZIP file](https://github.com/lemline/lemline/releases/download/nightly/lemline-nightly-windows-x86_64.zip)
 2. Extract the ZIP to a location of your choice (e.g., `C:\Lemline`)
-3. Run `lemline.exe` from the Command Prompt or PowerShell
+3. Run `bin\lemline.exe` from the Command Prompt or PowerShell
 
 #### Other Platforms (Java JAR)
 
@@ -71,7 +66,7 @@ unzip lemline-jar.zip
 rm lemline-jar.zip
 
 # Run using Java
-java -jar lemline-runner.jar --help
+java -jar lemline.jar --help
 ```
 
 ### Option 2: Build from Source

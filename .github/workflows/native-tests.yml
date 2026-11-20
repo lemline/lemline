@@ -28,12 +28,8 @@ jobs:
             tests: --tests "*PackagedCliIT.prints*"
             gradle_xmx: 2g
             native_xmx: 5g
-          # 7 GB runner: native-image needs more than 5 GB, so Gradle gets less
-          - runner: macos-15
-            platform: macos-arm64
-            tests: --tests "*PackagedCliIT.prints*"
-            gradle_xmx: 1536m
-            native_xmx: 6g
+          # No macOS entry: GitHub's free macOS runners (7 GB) cannot hold the native build
+          # (about 6.5 GB). On a Mac, run: ./gradlew :lemline-runner:testNative
 
     steps:
       - name: Check out source
