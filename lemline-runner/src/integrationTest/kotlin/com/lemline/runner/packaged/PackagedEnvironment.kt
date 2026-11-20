@@ -3,6 +3,8 @@ package com.lemline.runner.packaged
 
 import java.nio.file.Files
 import java.nio.file.Path
+import java.sql.Connection
+import java.sql.DriverManager
 import java.util.Properties
 import java.util.concurrent.TimeUnit
 import org.testcontainers.postgresql.PostgreSQLContainer
@@ -36,7 +38,7 @@ internal object PackagedEnvironment {
     val config: Path by lazy {
         configuration(
             workDir.resolve("lemline.yaml"),
-            "postgresql: { host: localhost, port: ${postgres.firstMappedPort}, database: $ANALYTICS_DATABASE, username: postgres, password: postgres }",
+            postgresAnalyticsSettings,
         )
     }
 
@@ -54,7 +56,23 @@ internal object PackagedEnvironment {
         """.trimMargin(),
     )
 
-    private fun configuration(file: Path, analytics: String, gateway: String = ""): Path {
+    val sqliteConfig: Path by lazy {
+        configuration(
+            workDir.resolve("sqlite.yaml"),
+            postgresAnalyticsSettings,
+            messaging = "type: sqlite\nprefix: packaged-sqlite",
+        )
+    }
+
+    private val postgresAnalyticsSettings: String
+        get() = "postgresql: { host: localhost, port: ${postgres.firstMappedPort}, database: $ANALYTICS_DATABASE, username: postgres, password: postgres }"
+
+    private fun configuration(
+        file: Path,
+        analytics: String,
+        gateway: String = "",
+        messaging: String = "pgmq: { host: localhost, port: ${postgres.firstMappedPort}, database: lemline, username: postgres, password: postgres }",
+    ): Path {
         val port = postgres.firstMappedPort
         Files.writeString(
             file,
@@ -63,7 +81,7 @@ internal object PackagedEnvironment {
             |  database:
             |    postgresql: { host: localhost, port: $port, database: lemline, username: postgres, password: postgres }
             |  messaging:
-            |    pgmq: { host: localhost, port: $port, database: lemline, username: postgres, password: postgres }
+            |${messaging.prependIndent("    ")}
             |  analytics:
             |${analytics.prependIndent("    ")}
             |  namespaces: packaged
@@ -71,6 +89,14 @@ internal object PackagedEnvironment {
             """.trimMargin(),
         )
         return file
+    }
+
+    fun postgresConnection(analytics: Boolean = false): Connection {
+        val database = if (analytics) ANALYTICS_DATABASE else postgres.databaseName
+        return DriverManager.getConnection(
+            "jdbc:postgresql://${postgres.host}:${postgres.firstMappedPort}/$database",
+            postgres.username, postgres.password,
+        )
     }
 
     fun write(name: String, content: String): Path = workDir.resolve(name).also { Files.writeString(it, content) }

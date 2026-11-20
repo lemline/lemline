@@ -84,7 +84,7 @@ Each command turns on only what it needs, whatever the configuration says:
 
 | Property | Type | Default | Description |
 |----------|------|---------|-------------|
-| `lemline.messaging.type` | String | inferred | `kafka`, `rabbitmq`, `pgmq` or `in-memory`. When unset, Lemline uses the broker whose `lemline.messaging.<broker>.*` properties are set, and `in-memory` when none is. Setting several broker families without a type is an error. |
+| `lemline.messaging.type` | String | inferred | `kafka`, `rabbitmq`, `pgmq`, `sqlite` or `in-memory`. When unset, Lemline uses the broker whose `lemline.messaging.<broker>.*` properties are set (`kafka`, `rabbitmq` or `pgmq`), and `in-memory` when none is. Setting several broker families without a type is an error. `sqlite` is never inferred: set `type: sqlite` explicitly. |
 | `lemline.messaging.prefix` | String | `lemline` | Prefix of destination names. Topics and queues are named `<prefix>-<namespace>-<type>`, for example `lemline-default-commands`. Lowercase letters, digits and `-` only. |
 
 ### Channels
@@ -188,6 +188,20 @@ Lifecycle events:
 | `lemline.messaging.pgmq.lifecycleevents.queue` | String | `lemline-lifecycle-events` | Lifecycle events queue |
 | `lemline.messaging.pgmq.lifecycleevents.producer.queue-out` | String | - | Override of the queue the producer writes to |
 | `lemline.messaging.pgmq.lifecycleevents.consumer.queue-dlq` | String | - | Dead-letter queue of the lifecycle consumer |
+
+### SQLite
+
+A durable queue stored in one local file, for runners on a single host. Used only when `lemline.messaging.type` is `sqlite`.
+
+| Property | Type | Default | Description |
+|----------|------|---------|-------------|
+| `lemline.messaging.sqlite.path` | String | `messaging.db` | Queue file. A relative path is resolved against the working directory of the process. Its parent directory must exist. |
+| `lemline.messaging.sqlite.visibility-timeout` | Integer | `30` | Seconds a consumer may hold a message before it is delivered again. Set it above the longest time a workflow step can take. |
+| `lemline.messaging.sqlite.poll-interval` | Integer | `50` | Milliseconds between polls when the queue is empty |
+| `lemline.messaging.sqlite.batch-size` | Integer | `10` | Messages read per poll |
+| `lemline.messaging.sqlite.max-retries` | Integer | `3` | Deliveries before a message goes to the dead-letter queue |
+
+These settings apply to every channel.
 
 ## Orchestrator
 

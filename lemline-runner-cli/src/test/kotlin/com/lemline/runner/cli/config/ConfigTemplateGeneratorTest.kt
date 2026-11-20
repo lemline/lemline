@@ -153,6 +153,30 @@ class ConfigTemplateGeneratorTest {
     }
 
     @Test
+    fun `SQLite templates specify analytics and the required database services`() {
+        for ((databaseType, services) in listOf(
+            DatabaseType.POSTGRESQL to "postgres",
+            DatabaseType.MYSQL to "mysql postgres",
+        )) {
+            val config = generator.generate(MessagingType.SQLITE, databaseType)
+            config shouldContain "#   docker compose up -d $services\n"
+            config shouldContain "#   LEMLINE_CONFIG=./lemline.yaml lemline migrate --force\n"
+            config shouldContain "  messaging:\n    type: sqlite\n    sqlite:\n      path: messaging.db"
+            config shouldContain "  analytics:\n    postgresql:\n      host: localhost"
+        }
+    }
+
+    @Test
+    fun `SQLite database and messaging select a local analytics database`() {
+        val config = generator.generate(MessagingType.SQLITE, DatabaseType.SQLITE)
+
+        config shouldContain "  database:\n    type: sqlite\n    sqlite:\n      path: orchestration.db"
+        config shouldContain "  messaging:\n    type: sqlite\n    sqlite:\n      path: messaging.db"
+        config shouldContain "  analytics:\n    type: sqlite\n    sqlite:\n      path: analytics.db"
+        config shouldNotContain "docker compose"
+    }
+
+    @Test
     fun `test IN_MEMORY messaging is rejected`() {
         shouldThrow<IllegalArgumentException> {
             generator.generate(MessagingType.IN_MEMORY, DatabaseType.POSTGRESQL)

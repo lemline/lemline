@@ -34,6 +34,7 @@ include(":lemline-runner-event-schedules")
 include(":lemline-runner-gateway")
 include(":lemline-runner-cli")
 include(":lemline-runner-messaging-pgmq")
+include(":lemline-runner-messaging-sqlite")
 include(":lemline-runner-analytics")
 include(":lemline-runner")
 

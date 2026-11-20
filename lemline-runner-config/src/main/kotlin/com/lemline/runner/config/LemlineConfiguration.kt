@@ -330,7 +330,7 @@ interface LemlineConfiguration {
          * Messaging type.
          * If not provided, it will be set in [LemlineConfigSource]
          */
-        @Pattern(regexp = "in-memory|kafka|rabbitmq|pgmq")
+        @Pattern(regexp = "in-memory|kafka|rabbitmq|pgmq|sqlite")
         fun type(): String
 
         /**
@@ -363,6 +363,28 @@ interface LemlineConfiguration {
          * Optional PGMQ (PostgreSQL Message Queue) configuration
          */
         fun pgmq(): Optional<PgmqConfig>
+
+        fun sqlite(): SqliteMessagingConfig
+    }
+
+    interface SqliteMessagingConfig {
+        @WithDefault(LemlineConfigConstants.SQLITE_MESSAGING_PATH_DEFAULT)
+        fun path(): Optional<String>
+
+        /** Seconds a handler may hold a message before another worker can take it. */
+        @WithDefault(LemlineConfigConstants.SQLITE_VISIBILITY_TIMEOUT_DEFAULT)
+        fun visibilityTimeout(): Int
+
+        /** Milliseconds between polls of an empty queue. */
+        @WithDefault(LemlineConfigConstants.SQLITE_POLL_INTERVAL_DEFAULT)
+        fun pollInterval(): Long
+
+        @WithDefault(LemlineConfigConstants.SQLITE_BATCH_SIZE_DEFAULT)
+        fun batchSize(): Int
+
+        /** Total delivery attempts before a message is dead-lettered. */
+        @WithDefault(LemlineConfigConstants.SQLITE_MAX_RETRIES_DEFAULT)
+        fun maxRetries(): Int
     }
 
     interface ChannelConfig {
