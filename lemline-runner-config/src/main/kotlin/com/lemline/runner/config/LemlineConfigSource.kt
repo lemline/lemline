@@ -206,14 +206,17 @@ import com.lemline.runner.config.LemlineConfigConstants.RABBITMQ_USER_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.RABBITMQ_VHOST_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.WORKFLOW_COMMANDS_TOPIC_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.WORKFLOW_EVENTS_TOPIC_DEFAULT
+import io.smallrye.common.expression.Expression
 import io.smallrye.config.ConfigSourceContext
 import io.smallrye.config.Expressions
 import io.smallrye.config.PropertiesConfigSource
 import java.io.IOException
+import java.net.URI
 import java.nio.file.Files
 import java.nio.file.InvalidPathException
 import java.nio.file.LinkOption.NOFOLLOW_LINKS
 import java.nio.file.Path
+import java.text.Normalizer
 import org.yaml.snakeyaml.LoaderOptions
 import org.yaml.snakeyaml.Yaml
 import org.yaml.snakeyaml.constructor.SafeConstructor
@@ -348,12 +351,80 @@ class LemlineConfigSource(context: ConfigSourceContext? = null) : PropertiesConf
             generatedProps.putAll(generateAnalyticsDatabaseProperties(lemlineProps))
             generatedProps.putAll(generateMessagingProperties(lemlineProps))
             generatedProps.putAll(generateGatewayProperties(lemlineProps))
+            verifyDistinctSQLiteFiles(lemlineProps, generatedProps, context)
 
             logger.info { "Lemline generated properties:\n${generatedProps.toPrint()}" }
 
             return mutableMapOf<String, String>().apply {
                 putAll(lemlineProps)
                 putAll(generatedProps)
+            }
+        }
+
+        private fun verifyDistinctSQLiteFiles(
+            props: Map<String, String>,
+            generated: Map<String, String>,
+            context: ConfigSourceContext?,
+        ) {
+            fun pathOf(datasource: String): Path? = generated["quarkus.datasource.$datasource.jdbc.url"]
+                ?.let { Path.of(URI.create(it.removePrefix("jdbc:sqlite:").substringBefore('?'))) }
+            val files = mutableListOf<Pair<String, Path>>()
+            pathOf("sqlite")?.let { files += LEMLINE_DATABASE_SQLITE_PATH to it }
+            pathOf(ANALYTICS_SQLITE_DATASOURCE_NAME)?.let { files += LEMLINE_ANALYTICS_SQLITE_PATH to it }
+            if (files.isEmpty()) return
+            if (generated.any { (key, value) -> key.endsWith(".connector") && value == SQLITE_CONNECTOR }) {
+                val rawPath = props[LEMLINE_MESSAGING_SQLITE_PATH] ?: SQLITE_MESSAGING_PATH_DEFAULT
+                val path = expandSQLitePath(rawPath, props, context)
+                files += LEMLINE_MESSAGING_SQLITE_PATH to SQLiteDatabase.resolvePath(path, LEMLINE_MESSAGING_SQLITE_PATH)
+            }
+            files.forEachIndexed { index, (key, path) ->
+                for ((otherKey, otherPath) in files.drop(index + 1)) {
+                    require(!sameSQLiteFile(path, otherPath)) {
+                        "'$key' ($path) and '$otherKey' ($otherPath) must use distinct SQLite files"
+                    }
+                }
+            }
+        }
+
+        private fun expandSQLitePath(
+            value: String,
+            props: Map<String, String>,
+            context: ConfigSourceContext?,
+            depth: Int = 0,
+        ): String {
+            require(depth < 16) { "SQLite path expression has too many references: '$value'" }
+            return Expression.compile(value, Expression.Flag.LENIENT_SYNTAX).evaluate { reference, result ->
+                val key = reference.key
+                val replacement = props[key] ?: context?.getValue(key)?.value
+                    ?: System.getProperty(key) ?: System.getenv(key)
+                when {
+                    replacement != null -> result.append(expandSQLitePath(replacement, props, context, depth + 1))
+                    reference.hasDefault() -> reference.expandDefault(result)
+                    else -> error("Unresolved SQLite path expression: '$key'")
+                }
+            }
+        }
+
+        private fun sameSQLiteFile(first: Path, second: Path): Boolean {
+            if (first == second) return true
+            if (Files.exists(first) && Files.exists(second)) return Files.isSameFile(first, second)
+
+            val firstName = first.fileName.toString()
+            val secondName = second.fileName.toString()
+            fun normalize(name: String) = Normalizer.normalize(name, Normalizer.Form.NFD)
+            if (first.parent != second.parent || !normalize(firstName).equals(normalize(secondName), ignoreCase = true)) {
+                return false
+            }
+            // Two missing names can still be aliases on a case-insensitive or
+            // normalization-insensitive volume. Probe there without opening either database.
+            val probe = Files.createTempDirectory(first.parent, ".lemline-sqlite-path-")
+            val probeFile = probe.resolve(firstName)
+            try {
+                Files.createFile(probeFile)
+                return Files.exists(probe.resolve(secondName))
+            } finally {
+                Files.deleteIfExists(probeFile)
+                Files.delete(probe)
             }
         }
 

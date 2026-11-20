@@ -11,9 +11,46 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 import org.eclipse.microprofile.config.spi.ConfigSource
 
 class LemlineConfigSourceFactoryTest {
+    @Test
+    fun `enabled SQLite roles reject aliases before opening a database`(@TempDir directory: Path) {
+        val shared = directory.resolve("shared.db")
+        val alias = directory.resolve(".").resolve("shared.db")
+        val settings = mapOf(
+            "lemline.database.type" to "sqlite",
+            "lemline.database.sqlite.path" to shared.toString(),
+            "lemline.messaging.type" to "sqlite",
+            "lemline.messaging.sqlite.path" to alias.toString(),
+            "lemline.messaging.commands.consumer.enabled" to "true",
+        )
+        fun build(overrides: Map<String, String> = emptyMap()) = SmallRyeConfigBuilder()
+            .withSources(source(settings + overrides, 300))
+            .withSources(LemlineConfigSourceFactory())
+            .build()
+
+        val collision = assertFailsWith<IllegalArgumentException> { build() }
+        assertTrue("lemline.database.sqlite.path" in collision.message.orEmpty())
+        assertTrue("lemline.messaging.sqlite.path" in collision.message.orEmpty())
+        assertFalse(Files.exists(shared))
+        build(mapOf("lemline.messaging.commands.consumer.enabled" to "false"))
+        build(mapOf("lemline.messaging.sqlite.path" to directory.resolve("messaging.db").toString()))
+
+        Files.createFile(shared)
+        val hardLink = Files.createLink(directory.resolve("analytics.db"), shared)
+        val analyticsCollision = assertFailsWith<IllegalArgumentException> {
+            build(mapOf(
+                "lemline.analytics.type" to "sqlite",
+                "lemline.analytics.sqlite.path" to hardLink.toString(),
+                "lemline.gateway.enabled" to "true",
+                "lemline.messaging.commands.consumer.enabled" to "false",
+            ))
+        }
+        assertTrue("lemline.analytics.sqlite.path" in analyticsCollision.message.orEmpty())
+    }
+
     @Test
     fun `generates connector properties from profile overrides without system properties`() {
         val config = SmallRyeConfigBuilder()

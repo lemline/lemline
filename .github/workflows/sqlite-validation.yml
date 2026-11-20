@@ -1,0 +1,113 @@
+name: SQLite Validation
+
+on:
+  pull_request:
+    branches: [main, codex/sqlite-lot-0]
+    paths:
+      - 'lemline-*/**'
+      - 'buildSrc/**'
+      - 'gradle/**'
+      - '*.gradle.kts'
+      - 'gradle.properties'
+      - '.github/workflows/sqlite-validation.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sqlite-validation-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  jvm:
+    name: JVM / ${{ matrix.suite }}
+    runs-on: ubuntu-22.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - suite: persistence
+            task: test spotlessCheck -x :lemline-runner:test
+          - suite: runner
+            task: :lemline-runner:test
+          - suite: fast-jar
+            task: :lemline-runner:quarkusIntTest
+          - suite: uber-jar
+            task: :lemline-runner:quarkusIntTest -Dquarkus.package.jar.type=uber-jar
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: |
+            17
+            25
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Run tests and record the tested revision
+        shell: bash
+        run: |
+          set -euo pipefail
+          git rev-parse HEAD | tee tested-revision.txt
+          docker info --format '{{.ServerVersion}}'
+          ./gradlew --max-workers=2 ${{ matrix.task }} 2>&1 | tee validation.log
+          if [[ '${{ matrix.suite }}' == fast-jar ]]; then
+            RUN_JAR_TESTS=true ./gradlew --max-workers=2 :lemline-runner:test --tests '*ConnectorConfigJarTest' 2>&1 | tee connector-jar.log
+          fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: sqlite-${{ matrix.suite }}
+          if-no-files-found: warn
+          path: |
+            tested-revision.txt
+            validation.log
+            connector-jar.log
+            **/build/test-results/**/TEST-*.xml
+
+  native:
+    name: Native / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-22.04
+            tests: ''
+          - os: windows-2022
+            tests: --tests '*PackagedCliIT.prints*' --tests '*SingleHostSQLiteIT'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: graalvm/setup-graalvm@v1
+        with:
+          distribution: graalvm-community
+          java-version: '25'
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: ilammy/msvc-dev-cmd@v1
+        if: runner.os == 'Windows'
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Build and test the native executable
+        shell: bash
+        run: |
+          set -euo pipefail
+          git rev-parse HEAD | tee tested-revision.txt
+          ./gradlew --max-workers=2 \
+            '-Dorg.gradle.jvmargs=-Xmx2g -XX:MaxMetaspaceSize=768m -Dfile.encoding=UTF-8' \
+            :lemline-runner:testNative -Dquarkus.native.native-image-xmx=5g ${{ matrix.tests }} \
+            2>&1 | tee validation.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: sqlite-native-${{ matrix.os }}
+          path: |
+            tested-revision.txt
+            validation.log
+            **/build/test-results/**/TEST-*.xml
