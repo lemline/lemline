@@ -54,13 +54,14 @@ class LemlineConfigSourceFactoryTest {
             ))
         }
         build(mapOf("mp.messaging.incoming.commands-in.enabled" to "false"))
-        assertFailsWith<IllegalArgumentException> {
+        val indexedCollision = assertFailsWith<IllegalArgumentException> {
             build(mapOf(
                 "lemline.messaging.sqlite.path" to distinct,
                 "mp.messaging.incoming.commands-in.concurrency" to "2",
                 "mp.messaging.incoming.commands-in\$2.path" to shared.toString(),
             ))
         }
+        assertTrue("mp.messaging.incoming.commands-in\$2.path" in indexedCollision.message.orEmpty())
         val expression = "$" + "{suffix}"
         val escaped = directory.resolve("literal\\$expression.db")
         build(mapOf("lemline.messaging.sqlite.path" to escaped.toString()))

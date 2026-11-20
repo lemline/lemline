@@ -444,8 +444,9 @@ class LemlineConfigSource(context: ConfigSourceContext? = null) : PropertiesConf
                     } else 1
                     for (index in 1..concurrency.coerceAtLeast(1)) {
                         val deliveryConfig = if (concurrency > 1) ConcurrencyConnectorConfig(channelConfig, index) else channelConfig
-                        val path = deliveryConfig.getConfigValue("path").value ?: continue
-                        val setting = "$LEMLINE_MESSAGING_SQLITE_PATH ($prefix$channel.path)"
+                        val configuredPath = deliveryConfig.getConfigValue("path")
+                        val path = configuredPath.value ?: continue
+                        val setting = "$LEMLINE_MESSAGING_SQLITE_PATH (${configuredPath.name})"
                         val messagingFile = setting to SQLiteDatabase.resolvePath(path, setting)
                         databaseFiles.forEach { checkFiles(it, messagingFile) }
                     }
