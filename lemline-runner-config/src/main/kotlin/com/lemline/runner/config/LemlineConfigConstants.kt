@@ -107,4 +107,10 @@ object LemlineConfigConstants {
     const val PGMQ_POLL_INTERVAL_DEFAULT = "100"
     const val PGMQ_BATCH_SIZE_DEFAULT = "10"
     const val PGMQ_MAX_RETRIES_DEFAULT = "3"
+
+    // SQLite queue consumers
+    const val SQLITE_VISIBILITY_TIMEOUT_DEFAULT = "30"
+    const val SQLITE_POLL_INTERVAL_DEFAULT = "50"
+    const val SQLITE_BATCH_SIZE_DEFAULT = "10"
+    const val SQLITE_MAX_RETRIES_DEFAULT = "3"
 }

@@ -108,11 +108,17 @@ class LemlineConfigSourceFactoryTest {
                 "lemline.messaging.cloudevents.consumer.enabled" to "true",
                 "lemline.messaging.lifecycleevents.consumer.enabled" to "true",
                 "lemline.messaging.lifecycleevents.producer.enabled" to "true",
+                "lemline.messaging.sqlite.visibility-timeout" to "600",
             ), 300))
             .withSources(LemlineConfigSourceFactory())
             .build()
         fun value(key: String) = config.getValue("mp.messaging.$key", String::class.java)
         assertEquals("smallrye-sqlite", value("incoming.commands-in.connector"))
+        for (channel in listOf("commands-in", "cloudevents-in", "lifecycleevents-in")) {
+            assertEquals("600", value("incoming.$channel.visibility-timeout"))
+            assertEquals("3", value("incoming.$channel.max-retries"))
+        }
+        assertFalse(config.getOptionalValue("mp.messaging.outgoing.events-out.visibility-timeout", String::class.java).isPresent)
         assertEquals("messaging.db", value("incoming.commands-in.path"))
         assertEquals("prefix-acme-commands,prefix-team-blue-commands", value("incoming.commands-in.queues"))
         assertEquals("prefix-default-events", value("outgoing.events-out.queue"))

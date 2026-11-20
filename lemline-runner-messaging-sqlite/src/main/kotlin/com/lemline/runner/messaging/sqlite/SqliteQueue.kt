@@ -139,8 +139,12 @@ internal class SqliteQueue(private val dataSource: DataSource) {
 
     // As with PGMQ, keep the message invisible until the end of the visibility timeout.
     // Clear the lease so a second callback for this delivery cannot settle it again.
-    suspend fun release(delivery: SqliteDelivery): Boolean =
-        settle(delivery, "UPDATE lemline_messages SET lease_id = NULL")
+    // An ordered queue cannot pass its head, so that wait would stall every later
+    // message: [immediately] makes the failed head eligible for its next attempt now.
+    suspend fun release(delivery: SqliteDelivery, immediately: Boolean = false): Boolean = settle(
+        delivery,
+        "UPDATE lemline_messages SET lease_id = NULL" + if (immediately) ", available_at = $NOW" else "",
+    )
 
     suspend fun deadLetter(delivery: SqliteDelivery, target: String, reason: String): Boolean {
         val payload = buildJsonObject {

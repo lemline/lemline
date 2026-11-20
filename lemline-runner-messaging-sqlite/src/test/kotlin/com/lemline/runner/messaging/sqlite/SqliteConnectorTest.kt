@@ -278,6 +278,55 @@ internal class SqliteConnectorTest {
             connector.destroy()
         }
     }
+
+    @Test
+    fun `an ordered queue retries its failed head at once so later messages are not stalled`(): Unit = runBlocking {
+        val path = directory.resolve("messaging.db")
+        val connector = SqliteConnector()
+        try {
+            val outgoing = connector.producer(path)
+            publish(outgoing, "events", "poison", "poison")
+            publish(outgoing, "events", "next", "next")
+            // A long lease would block "next" for a minute if the failed head waited it out.
+            val incoming = connector.consume(path, "queue" to "events", "ordered" to "true",
+                "visibility-timeout" to "30", "max-retries" to "2")
+            val started = Instant.now()
+            incoming.take().nack(IllegalStateException("retry")).await()
+            val retried = incoming.take()
+            assertEquals("poison", retried.sqlite.messageId)
+            assertEquals(2, retried.sqlite.readCount)
+            retried.nack(IllegalStateException("permanent")).await()
+            val next = incoming.take()
+            assertEquals("next", next.sqlite.messageId)
+            assertTrue(Instant.now() < started.plusSeconds(8))
+            next.ack().await()
+        } finally {
+            connector.destroy()
+        }
+    }
+
+    @Test
+    fun `a handler finishing after shutdown can still confirm and publish`() = runBlocking {
+        val path = directory.resolve("messaging.db")
+        val connector = SqliteConnector()
+        val outgoing = connector.producer(path)
+        publish(outgoing, "work", "id", "payload")
+        val inFlight = connector.consume(path, "queue" to "work").take()
+        connector.destroy()
+
+        publish(outgoing, "results", "result", "done")
+        inFlight.ack().await()
+        val queue = SqliteQueue(SqliteDatabase.open(path))
+        assertTrue(queue.reserve("results", 1, 1).isNotEmpty())
+        SqliteDatabase.open(path).connection.use { connection ->
+            connection.createStatement().use { statement ->
+                statement.executeQuery("SELECT COUNT(*) FROM lemline_messages WHERE queue = 'work'").use {
+                    assertTrue(it.next())
+                    assertEquals(0, it.getInt(1))
+                }
+            }
+        }
+    }
 }
 
 internal fun channelConfig(path: Path, vararg options: Pair<String, String>) =

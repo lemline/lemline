@@ -129,7 +129,11 @@ import com.lemline.runner.common.config.LEMLINE_MESSAGING_RABBITMQ_PORT
 import com.lemline.runner.common.config.LEMLINE_MESSAGING_RABBITMQ_SSL_ENABLED
 import com.lemline.runner.common.config.LEMLINE_MESSAGING_RABBITMQ_USERNAME
 import com.lemline.runner.common.config.LEMLINE_MESSAGING_RABBITMQ_VIRTUAL_HOST
+import com.lemline.runner.common.config.LEMLINE_MESSAGING_SQLITE_BATCH_SIZE
+import com.lemline.runner.common.config.LEMLINE_MESSAGING_SQLITE_MAX_RETRIES
 import com.lemline.runner.common.config.LEMLINE_MESSAGING_SQLITE_PATH
+import com.lemline.runner.common.config.LEMLINE_MESSAGING_SQLITE_POLL_INTERVAL
+import com.lemline.runner.common.config.LEMLINE_MESSAGING_SQLITE_VISIBILITY_TIMEOUT
 import com.lemline.runner.common.config.LEMLINE_MESSAGING_TYPE
 import com.lemline.runner.common.config.LEMLINE_PREFIX
 import com.lemline.runner.common.config.MessagingType
@@ -173,7 +177,11 @@ import com.lemline.runner.config.LemlineConfigConstants.MYSQL_PASSWORD_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.MYSQL_PORT_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.MYSQL_USERNAME_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.PGMQ_BATCH_SIZE_DEFAULT
+import com.lemline.runner.config.LemlineConfigConstants.SQLITE_BATCH_SIZE_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.SQLITE_CONNECTOR
+import com.lemline.runner.config.LemlineConfigConstants.SQLITE_MAX_RETRIES_DEFAULT
+import com.lemline.runner.config.LemlineConfigConstants.SQLITE_POLL_INTERVAL_DEFAULT
+import com.lemline.runner.config.LemlineConfigConstants.SQLITE_VISIBILITY_TIMEOUT_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.SQLITE_MESSAGING_PATH_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.PGMQ_CONNECTOR
 import com.lemline.runner.config.LemlineConfigConstants.PGMQ_MAX_RETRIES_DEFAULT
@@ -1214,6 +1222,14 @@ class LemlineConfigSource(context: ConfigSourceContext? = null) : PropertiesConf
                 set("$key.connector", SQLITE_CONNECTOR)
                 set("$key.path", path)
                 set("$key.$queueProperty", queue)
+                if (direction == "incoming") {
+                    // A handler that outlives the visibility timeout is delivered again,
+                    // so operators must be able to size it for their longest task.
+                    set("$key.visibility-timeout", props[LEMLINE_MESSAGING_SQLITE_VISIBILITY_TIMEOUT] ?: SQLITE_VISIBILITY_TIMEOUT_DEFAULT)
+                    set("$key.poll-interval", props[LEMLINE_MESSAGING_SQLITE_POLL_INTERVAL] ?: SQLITE_POLL_INTERVAL_DEFAULT)
+                    set("$key.batch-size", props[LEMLINE_MESSAGING_SQLITE_BATCH_SIZE] ?: SQLITE_BATCH_SIZE_DEFAULT)
+                    set("$key.max-retries", props[LEMLINE_MESSAGING_SQLITE_MAX_RETRIES] ?: SQLITE_MAX_RETRIES_DEFAULT)
+                }
             }
 
             fun namespaced(type: DestinationType, incoming: String, outgoing: String, consume: String, produce: String) {

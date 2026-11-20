@@ -44,6 +44,9 @@ import org.eclipse.microprofile.reactive.messaging.spi.Connector
 class SqliteConnector : InboundConnector, OutboundConnector {
     private val stores = ConcurrentHashMap<Path, SqliteQueue>()
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO + ApplicationClassLoaderContext())
+    // Handlers still running at shutdown must be able to confirm their work and publish
+    // its result. Only polling stops with [scope]; these short writes are never cancelled.
+    private val settlement = CoroutineScope(SupervisorJob() + Dispatchers.IO + ApplicationClassLoaderContext())
     private val logger = logger()
 
     private fun Config.store(): SqliteQueue {
@@ -87,7 +90,7 @@ class SqliteConnector : InboundConnector, OutboundConnector {
                         received = received || batch.isNotEmpty()
                         val dlq = deadLetterQueues.getValue(queue)
                         for (delivery in batch) {
-                            deliveryMessage(store, delivery, dlq, visibilitySeconds, maxAttempts)?.let { emit(it) }
+                            deliveryMessage(store, delivery, dlq, visibilitySeconds, maxAttempts, ordered)?.let { emit(it) }
                         }
                     }
                     if (!received) delay(pollIntervalMs)
@@ -106,6 +109,7 @@ class SqliteConnector : InboundConnector, OutboundConnector {
         dlq: String,
         visibilitySeconds: Int,
         maxAttempts: Int,
+        ordered: Boolean,
     ): Message<String>? {
         // Backpressure may have let a prefetched lease expire. Do not charge it or
         // deliver to the handler. The write below also checks the lease under lock.
@@ -128,13 +132,13 @@ class SqliteConnector : InboundConnector, OutboundConnector {
             return null
         }
         return Message.of(payload, Metadata.of(started))
-            .withAck { scope.future { store.ack(delivery) }.thenApply { null } }
+            .withAck { settlement.future { store.ack(delivery) }.thenApply { null } }
             .withNack { reason ->
-                scope.future {
+                settlement.future {
                     if (started.readCount >= maxAttempts) {
                         store.deadLetter(delivery, dlq, reason.message ?: reason.javaClass.name)
                     } else {
-                        store.release(delivery)
+                        store.release(delivery, immediately = ordered)
                     }
                 }.thenApply { null }
             }
@@ -164,7 +168,7 @@ class SqliteConnector : InboundConnector, OutboundConnector {
             }
 
             override fun onNext(message: Message<*>) {
-                scope.launch {
+                settlement.launch {
                     val metadata = message.getMetadata(SqliteOutgoingMetadata::class.java).getOrNull()
                     val queue = metadata?.queue ?: defaultQueue
                     val failure = try {
@@ -191,7 +195,7 @@ class SqliteConnector : InboundConnector, OutboundConnector {
                     } catch (e: Exception) {
                         logger.error(e) { "SQLite publication callback failed for '$queue'" }
                     } finally {
-                        if (scope.isActive) subscription.request(1)
+                        subscription.request(1)
                     }
                 }
             }
