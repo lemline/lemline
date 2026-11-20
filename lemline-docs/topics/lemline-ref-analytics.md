@@ -106,6 +106,8 @@ Important columns:
 
 SQLite stores projected workflow IDs as lowercase UUID text and `event_time` and `ingested_at` as signed Unix epoch microseconds in UTC. A missing event time is SQL `NULL`. The original CloudEvent in `payload` retains its timestamp precision.
 
+On every backend, `lemline_workflow_id` is filled only when the `lemlineworkflowid` extension is a complete UUID such as `01890a5d-ac96-774b-bcce-b302099a8057`, in either case. Lemline stores an event with any other value, logs a warning, and leaves the column `NULL`, so the gateway does not attach that event to an instance.
+
 ## Troubleshooting
 
 - For SQLite startup errors, verify that the configured path names a local file and that the process can write to both the file and its parent directory. If you disabled `migrate-at-start`, start against an already migrated file.
