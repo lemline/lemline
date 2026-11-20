@@ -8,6 +8,8 @@ import com.lemline.runner.common.messaging.InstanceMessage
 import com.lemline.runner.common.messaging.CommandEmitter
 import com.lemline.runner.common.config.OutboxConfig
 import com.lemline.runner.common.test.H2TestDatabaseConfig
+import com.lemline.runner.common.test.OrchestrationTestDatabase
+import com.lemline.runner.common.test.SQLiteTestDatabaseConfig
 import com.lemline.runner.schedules.ScheduleRepository
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
@@ -22,41 +24,37 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withTimeout
 import org.junit.jupiter.api.AfterAll
+import org.junit.jupiter.api.TestInstance
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.BeforeEach
-import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
 
 /**
  * Integration test validating the transactional atomicity between
  * schedule insert and outbox insert, as used by InstanceStartService.
  */
-@DisplayName("Gateway Command Outbox Integration")
-class GatewayCommandOutboxIntegrationTest {
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
+abstract class GatewayCommandOutboxIntegrationTestBase(private val testDb: OrchestrationTestDatabase) {
 
-    companion object {
-        private val testDb = H2TestDatabaseConfig()
 
-        private val outboxRepository: GatewayCommandRepository by lazy {
-            GatewayCommandRepository().apply { databaseConfig = testDb }
-        }
-
-        private val scheduleRepository: ScheduleRepository by lazy {
-            ScheduleRepository().apply { databaseConfig = testDb }
-        }
-
-        @BeforeAll
-        @JvmStatic
-        fun setup() {
-            testDb.migrate()
-        }
-
-        @AfterAll
-        @JvmStatic
-        fun teardown() {
-            testDb.close()
-        }
+    private val outboxRepository: GatewayCommandRepository by lazy {
+        GatewayCommandRepository().apply { databaseConfig = testDb }
     }
+
+    private val scheduleRepository: ScheduleRepository by lazy {
+        ScheduleRepository().apply { databaseConfig = testDb }
+    }
+
+    @BeforeAll
+    fun setup() {
+        testDb.migrate()
+    }
+
+    @AfterAll
+    fun teardown() {
+        testDb.close()
+    }
+
 
     @BeforeEach
     fun cleanUp() = runTest {
@@ -264,3 +262,7 @@ class GatewayCommandOutboxIntegrationTest {
         }
     }
 }
+
+class GatewayCommandOutboxIntegrationTest : GatewayCommandOutboxIntegrationTestBase(H2TestDatabaseConfig())
+
+class GatewayCommandOutboxIntegrationSQLiteTest : GatewayCommandOutboxIntegrationTestBase(SQLiteTestDatabaseConfig())

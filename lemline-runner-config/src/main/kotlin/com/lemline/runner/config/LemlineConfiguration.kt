@@ -13,6 +13,7 @@ import com.lemline.runner.config.LemlineConfigConstants.CLOUDEVENTS_TOPIC_DEFAUL
 import com.lemline.runner.config.LemlineConfigConstants.CONSUMER_CONCURRENCY_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.DB_BASELINE_ON_MIGRATE_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.DB_MIGRATE_AT_START_DEFAULT
+import com.lemline.runner.config.LemlineConfigConstants.DB_SQLITE_PATH_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.KAFKA_BROKERS_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.KAFKA_CLOUDEVENTS_GROUP_ID_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.KAFKA_DATABASE_GROUP_ID_DEFAULT
@@ -109,7 +110,7 @@ interface LemlineConfiguration {
          * Database type.
          * If not provided, it will be set in [LemlineConfigSource]
          */
-        @Pattern(regexp = "in-memory|postgresql|mysql")
+        @Pattern(regexp = "in-memory|postgresql|mysql|sqlite")
         fun type(): String
 
         /**
@@ -133,6 +134,13 @@ interface LemlineConfiguration {
          * Optional MySQL configuration
          */
         fun mysql(): Optional<MySQLConfig>
+
+        fun sqlite(): Optional<SQLiteConfig>
+    }
+
+    interface SQLiteConfig {
+        @WithDefault(DB_SQLITE_PATH_DEFAULT)
+        fun path(): String
     }
 
     /**

@@ -10,6 +10,7 @@ import com.lemline.runner.common.repositories.ops.CrudRepository
 import com.lemline.runner.common.repositories.ops.ID_COLUMN
 import com.lemline.runner.common.repositories.ops.IdRepository
 import com.lemline.runner.common.repositories.ops.UPDATED_AT_COLUMN
+import com.lemline.runner.common.repositories.ops.bindTimestamp
 import com.lemline.runner.common.repositories.ops.getInstant
 import com.lemline.runner.common.repositories.ops.idColumn
 import com.lemline.runner.common.repositories.with.WithIdRepository
@@ -69,12 +70,12 @@ class ForkBranchRepository : CrudRepository<ForkBranchModel>(),
             column(BRANCH_OUTPUT_COLUMN) { stmt, entity, idx -> stmt.setString(idx, entity.branchOutput) }
             column(COMPLETED_AT_COLUMN) { stmt, entity, idx ->
                 entity.completedAt?.let {
-                    stmt.setTimestamp(idx, Timestamp.from(it.toJavaInstant()))
+                    databaseConfig.bindTimestamp(stmt, idx, Timestamp.from(it.toJavaInstant()))
                 } ?: stmt.setNull(idx, Types.TIMESTAMP)
             }
             column(FAILED_AT_COLUMN) { stmt, entity, idx ->
                 entity.failedAt?.let {
-                    stmt.setTimestamp(idx, Timestamp.from(it.toJavaInstant()))
+                    databaseConfig.bindTimestamp(stmt, idx, Timestamp.from(it.toJavaInstant()))
                 } ?: stmt.setNull(idx, Types.TIMESTAMP)
             }
             column(ERROR_REASON_COLUMN) { stmt, entity, idx -> stmt.setString(idx, entity.errorReason) }
@@ -83,10 +84,7 @@ class ForkBranchRepository : CrudRepository<ForkBranchModel>(),
             column(ERROR_STACKTRACE_COLUMN) { stmt, entity, idx -> stmt.setString(idx, entity.errorStackTrace) }
             // Override UPDATED_AT_COLUMN since fork_branches has NOT NULL constraint
             column(UPDATED_AT_COLUMN) { stmt, _, idx ->
-                stmt.setTimestamp(
-                    idx,
-                    Timestamp.from(java.time.Instant.now())
-                )
+                databaseConfig.bindTimestamp(stmt, idx, Timestamp.from(java.time.Instant.now()))
             }
         }.build()
     }

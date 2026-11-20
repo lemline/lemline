@@ -2,15 +2,16 @@
 package com.lemline.runner.gateway.resources.definitions
 
 import com.lemline.runner.common.config.DatabaseConfig
+import com.lemline.runner.common.repositories.ops.getInstant
 import com.lemline.runner.definitions.DEFINITION_TABLE
 import com.lemline.runner.gateway.persistence.SqlQuery
-import com.lemline.runner.gateway.persistence.getInstantOrNull
 import com.lemline.runner.gateway.persistence.normalizePageSize
 import com.lemline.runner.gateway.persistence.placeholders
 import com.lemline.runner.gateway.persistence.setGatewayObject
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
 import java.time.Instant
+import kotlin.time.toJavaInstant
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -35,7 +36,7 @@ class DefinitionQueryService {
         val rows = databaseConfig.withConnection { conn ->
             conn.prepareStatement(query.sql).use { stmt ->
                 query.params.forEachIndexed { index, value ->
-                    stmt.setGatewayObject(index + 1, value)
+                    stmt.setGatewayObject(index + 1, value, databaseConfig)
                 }
                 stmt.executeQuery().use { rs ->
                     buildList {
@@ -47,8 +48,8 @@ class DefinitionQueryService {
                                     version = rs.getString("version"),
                                     isLatest = rs.getBoolean("is_latest"),
                                     versionCount = rs.getInt("version_count"),
-                                    createdAt = rs.getInstantOrNull("created_at") ?: Instant.EPOCH,
-                                    updatedAt = rs.getInstantOrNull("updated_at"),
+                                    createdAt = rs.getInstant("created_at")?.toJavaInstant() ?: Instant.EPOCH,
+                                    updatedAt = rs.getInstant("updated_at")?.toJavaInstant(),
                                 )
                             )
                         }
@@ -102,8 +103,8 @@ class DefinitionQueryService {
                                 name = rs.getString("name"),
                                 version = rs.getString("version"),
                                 source = rs.getString("definition"),
-                                createdAt = rs.getInstantOrNull("created_at") ?: Instant.EPOCH,
-                                updatedAt = rs.getInstantOrNull("updated_at"),
+                                createdAt = rs.getInstant("created_at")?.toJavaInstant() ?: Instant.EPOCH,
+                                updatedAt = rs.getInstant("updated_at")?.toJavaInstant(),
                             )
                         }
                     }
@@ -129,8 +130,8 @@ class DefinitionQueryService {
                                 name = rs.getString("name"),
                                 version = rs.getString("version"),
                                 source = rs.getString("definition"),
-                                createdAt = rs.getInstantOrNull("created_at") ?: Instant.EPOCH,
-                                updatedAt = rs.getInstantOrNull("updated_at"),
+                                createdAt = rs.getInstant("created_at")?.toJavaInstant() ?: Instant.EPOCH,
+                                updatedAt = rs.getInstant("updated_at")?.toJavaInstant(),
                             )
                         }
                     }
@@ -174,7 +175,7 @@ class DefinitionQueryService {
             databaseConfig.withConnection { conn ->
                 conn.prepareStatement(query.sql).use { stmt ->
                     query.params.forEachIndexed { index, value ->
-                        stmt.setGatewayObject(index + 1, value)
+                        stmt.setGatewayObject(index + 1, value, databaseConfig)
                     }
                     stmt.executeQuery().use { rs ->
                         if (rs.next()) rs.getLong("total_count") else 0L

@@ -13,8 +13,10 @@ import com.lemline.runner.listeners.ListenerRepository
 import io.quarkus.runtime.Startup
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
+import java.sql.Connection
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
+import org.jetbrains.annotations.VisibleForTesting
 
 /**
  * Processes listener timeouts by emitting failure commands for listeners that have exceeded
@@ -64,10 +66,15 @@ class ListenerScheduledTimeout : AbstractScheduledTask() {
         listenerConfig.outbox?.batchSize ?: 100
     }
 
+    private companion object {
+        const val SAVEPOINT = "listener_timeout"
+    }
+
     /**
      * Find and process timed-out listeners in batches.
      */
-    override suspend fun doWork() {
+    @VisibleForTesting
+    public override suspend fun doWork() {
         var totalProcessed = 0
         var batchNumber = 0
 
@@ -80,10 +87,15 @@ class ListenerScheduledTimeout : AbstractScheduledTask() {
 
                 if (timedOut.isNotEmpty()) {
                     for (listener in timedOut) {
+                        // A savepoint keeps one listener's failure from aborting the shared
+                        // transaction and rolling back the listeners already processed.
+                        connection.createStatement().use { it.execute("SAVEPOINT $SAVEPOINT") }
                         try {
-                            processTimedOutListener(listener)
+                            processTimedOutListener(listener, connection)
+                            connection.createStatement().use { it.execute("RELEASE SAVEPOINT $SAVEPOINT") }
                             processed++
                         } catch (e: Exception) {
+                            connection.createStatement().use { it.execute("ROLLBACK TO SAVEPOINT $SAVEPOINT") }
                             logger.error(e) { "Failed to process timed out listener ${listener.id}" }
                         }
                     }
@@ -100,7 +112,7 @@ class ListenerScheduledTimeout : AbstractScheduledTask() {
     /**
      * Process a single timed-out listener by emitting a failure command.
      */
-    private suspend fun processTimedOutListener(listener: ListenerModel) {
+    private suspend fun processTimedOutListener(listener: ListenerModel, connection: Connection) {
         val listenStarted = listener.instanceMessage.workflowState
 
         // Create timeout error
@@ -128,7 +140,8 @@ class ListenerScheduledTimeout : AbstractScheduledTask() {
             id = listener.id,
             errorClass = "ListenerTimeoutException",
             errorMessage = "Listen task timed out at ${listener.timeoutAt}",
-            errorStackTrace = null
+            errorStackTrace = null,
+            connection = connection,
         )
 
         logger.info {

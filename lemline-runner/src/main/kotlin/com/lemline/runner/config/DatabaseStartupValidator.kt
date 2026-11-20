@@ -47,7 +47,7 @@ class DatabaseStartupValidator(
     private fun verifyDatabaseConnectivity() {
         try {
             databaseManager.datasource.connection.use { conn ->
-                conn.isValid(5) // 5 second timeout
+                if (!conn.isValid(5)) throw SQLException("$dbType connectivity check failed")
             }
             logger.info { "Database connectivity verified for $dbType." }
         } catch (e: SQLException) {
@@ -61,9 +61,7 @@ class DatabaseStartupValidator(
                 |  Unable to connect to the $dbType database.
                 |
                 |  Please verify:
-                |    • The database server is running
-                |    • The connection settings in .lemline.yaml are correct
-                |    • The database user has appropriate permissions
+                |${if (dbType == DatabaseType.SQLITE) sqliteChecklist else serverChecklist}
                 |
                 |  Error: ${e.message}
                 |
@@ -73,6 +71,13 @@ class DatabaseStartupValidator(
             )
         }
     }
+
+    private val sqliteChecklist = "    • lemline.database.sqlite.path names a writable local database file"
+    private val serverChecklist = """
+        |    • The database server is running
+        |    • The connection settings in .lemline.yaml are correct
+        |    • The database user has appropriate permissions
+    """.trimMargin()
 
     /**
      * Exception thrown when database startup validation fails.

@@ -3,7 +3,9 @@ package com.lemline.runner.gateway.persistence
 
 import com.lemline.core.lifecycleevents.LifecycleEventType
 import com.lemline.runner.common.config.AnalyticsType
+import com.lemline.runner.common.config.DatabaseConfig
 import com.lemline.runner.common.config.SQLiteAnalyticsTime
+import com.lemline.runner.common.repositories.ops.bindTimestamp
 import java.sql.PreparedStatement
 import java.sql.ResultSet
 import java.sql.Timestamp
@@ -84,5 +86,13 @@ internal fun PreparedStatement.setAnalyticsObject(index: Int, value: Any, type: 
         }
     } else {
         setGatewayObject(index, value)
+    }
+}
+
+/** Bind timestamps using the orchestration database's storage format. */
+internal fun PreparedStatement.setGatewayObject(index: Int, value: Any, databaseConfig: DatabaseConfig) {
+    when (value) {
+        is Instant -> databaseConfig.bindTimestamp(this, index, Timestamp.from(value))
+        else -> setObject(index, value)
     }
 }

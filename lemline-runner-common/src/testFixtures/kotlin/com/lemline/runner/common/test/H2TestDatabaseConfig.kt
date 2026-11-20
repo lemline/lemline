@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.common.test
 
-import com.lemline.runner.common.config.DatabaseConfig
 import com.lemline.runner.common.config.DatabaseType
 import com.zaxxer.hikari.HikariConfig
 import com.zaxxer.hikari.HikariDataSource
@@ -46,7 +45,7 @@ import org.flywaydb.core.Flyway
 class H2TestDatabaseConfig(
     private val migrationLocation: String = "classpath:db/migration/h2",
     databaseName: String = UUID.randomUUID().toString().replace("-", "")
-) : DatabaseConfig, AutoCloseable {
+) : OrchestrationTestDatabase {
 
     override val dbType: DatabaseType = DatabaseType.H2
 
@@ -79,7 +78,7 @@ class H2TestDatabaseConfig(
      * Runs database migrations.
      * Call this once before running tests.
      */
-    fun migrate() {
+    override fun migrate() {
         flyway.migrate()
     }
 

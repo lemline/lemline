@@ -115,6 +115,7 @@ under `lemline-runner-common`, the runner's `DatabaseManager.kt`, `DatabaseStart
 and `DatabaseMigration.kt`, plus the orchestration migrations and repositories in each feature
 module. The gateway start transaction belongs here. Extend `GatewayCommandRepository.kt`,
 `GatewayCommandOutbox.kt`, `InstanceStartService.kt` and the gateway's orchestration migrations.
+See [SQLite orchestration](sqlite-orchestration.md) for the SQL and transaction audit.
 Handle the new enum in all callers, including the CLI, and audit stable relay IDs through
 `AbstractOutbox.kt`. Add a named `sqlite` datasource and
 `classpath:db/migration/sqlite` migrations. Exercise a scheduled wait and resume after

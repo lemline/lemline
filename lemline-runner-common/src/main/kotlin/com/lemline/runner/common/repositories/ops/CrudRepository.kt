@@ -53,7 +53,7 @@ abstract class CrudRepository<T> : WithCrudRepository<T> {
     /** NULL-safe equals: `col = NULL` always fails in SQL, use `IS NOT DISTINCT FROM` / `<=>` instead. */
     private fun nullSafeEquals(column: String): String = when (databaseConfig.dbType) {
         DatabaseType.MYSQL -> "${q(column)} <=> ?"
-        DatabaseType.POSTGRESQL, DatabaseType.H2 -> "${q(column)} IS NOT DISTINCT FROM ?"
+        DatabaseType.POSTGRESQL, DatabaseType.H2, DatabaseType.SQLITE -> "${q(column)} IS NOT DISTINCT FROM ?"
     }
 
     private fun keyEquals(column: String): String =
@@ -71,7 +71,7 @@ abstract class CrudRepository<T> : WithCrudRepository<T> {
         allColumns.forEachIndexed { index, column ->
             when {
                 columns.bindings.containsKey(column) -> columns.bindings[column]!!.bind(stmt, entity, index + 1)
-                column == CREATED_AT_COLUMN -> stmt.setTimestamp(index + 1, Timestamp.from(Instant.now()))
+                column == CREATED_AT_COLUMN -> databaseConfig.bindTimestamp(stmt, index + 1, Timestamp.from(Instant.now()))
                 column == UPDATED_AT_COLUMN -> stmt.setNull(index + 1, Types.TIMESTAMP)
                 else -> error("No handler for column $column")
             }
@@ -81,7 +81,7 @@ abstract class CrudRepository<T> : WithCrudRepository<T> {
     private fun bindUpdate(stmt: PreparedStatement, entity: T) {
         updatableColumns.forEachIndexed { index, column ->
             when (column) {
-                UPDATED_AT_COLUMN -> stmt.setTimestamp(index + 1, Timestamp.from(Instant.now()))
+                UPDATED_AT_COLUMN -> databaseConfig.bindTimestamp(stmt, index + 1, Timestamp.from(Instant.now()))
                 else -> columns.bindings[column]!!.bind(stmt, entity, index + 1)
             }
         }
@@ -117,7 +117,7 @@ abstract class CrudRepository<T> : WithCrudRepository<T> {
         val valsCsv = allColumns.joinToString { "?" }
 
         when (databaseConfig.dbType) {
-            DatabaseType.POSTGRESQL -> """
+            DatabaseType.POSTGRESQL, DatabaseType.SQLITE -> """
                 INSERT INTO $tableName ($colsCsv)
                 VALUES ($valsCsv)
                 ON CONFLICT DO NOTHING
@@ -273,7 +273,7 @@ abstract class CrudRepository<T> : WithCrudRepository<T> {
      * Returns the dialect-specific quoting of an SQL identifier.
      */
     protected fun q(id: String): String = when (databaseConfig.dbType) {
-        DatabaseType.POSTGRESQL -> "\"$id\""
+        DatabaseType.POSTGRESQL, DatabaseType.SQLITE -> "\"$id\""
         DatabaseType.MYSQL -> "`$id`"
         DatabaseType.H2 -> id
     }
@@ -291,8 +291,29 @@ abstract class CrudRepository<T> : WithCrudRepository<T> {
 /**
  * Gets an Instant from a ResultSet column.
  */
-fun ResultSet.getInstant(col: String): kotlin.time.Instant? =
-    getTimestamp(col)?.toInstant()?.toKotlinInstant()
+fun ResultSet.getInstant(col: String): kotlin.time.Instant? {
+    // SQLite stores timestamps as signed Unix epoch microseconds.
+    return when (val value = getObject(col) ?: return null) {
+        is Number -> {
+            val micros = value.toLong()
+            kotlin.time.Instant.fromEpochSeconds(Math.floorDiv(micros, 1_000_000L), Math.floorMod(micros, 1_000_000L) * 1000)
+        }
+        // Reuse the decoded value instead of reading the column a second time.
+        is Timestamp -> value.toInstant().toKotlinInstant()
+        is java.time.OffsetDateTime -> value.toInstant().toKotlinInstant()
+        else -> getTimestamp(col)?.toInstant()?.toKotlinInstant()
+    }
+}
+
+fun DatabaseConfig.bindTimestamp(statement: PreparedStatement, index: Int, timestamp: Timestamp) {
+    if (dbType == DatabaseType.SQLITE) {
+        val instant = timestamp.toInstant()
+        val micros = Math.addExact(Math.multiplyExact(instant.epochSecond, 1_000_000L), instant.nano / 1000L)
+        statement.setLong(index, micros)
+    } else {
+        statement.setTimestamp(index, timestamp)
+    }
+}
 
 /**
  * Creates a current timestamp for database operations.

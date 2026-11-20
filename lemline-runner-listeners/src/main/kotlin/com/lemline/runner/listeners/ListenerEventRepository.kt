@@ -16,6 +16,7 @@ import com.lemline.runner.common.repositories.ops.OUTBOX_SCHEDULED_FOR_COLUMN
 import com.lemline.runner.common.repositories.ops.OutboxRepository
 import com.lemline.runner.common.repositories.ops.UPDATED_AT_COLUMN
 import com.lemline.runner.common.repositories.ops.WORKFLOW_NAMESPACE_COLUMN
+import com.lemline.runner.common.repositories.ops.bindTimestamp
 import com.lemline.runner.common.repositories.ops.cleanupColumns
 import com.lemline.runner.common.repositories.ops.getInstant
 import com.lemline.runner.common.repositories.ops.nowTimestamp
@@ -100,8 +101,8 @@ class ListenerEventRepository : CrudRepository<ListenerEventModel>(),
 
     override val columns: ColumnBindings<ListenerEventModel> by lazy {
         ColumnBindingsBuilder<ListenerEventModel>().apply {
-            outboxColumns()
-            cleanupColumns()
+            outboxColumns(databaseConfig)
+            cleanupColumns(databaseConfig)
 
             key(LISTENER_ID_COLUMN) { stmt, entity, idx -> setIDV7(stmt, idx, entity.listenerId) }
             column(EVENT_ID_COLUMN) { stmt, entity, idx -> stmt.setString(idx, entity.eventId) }
@@ -197,7 +198,7 @@ class ListenerEventRepository : CrudRepository<ListenerEventModel>(),
                     ?,                                                          /* event_source */
                     NOT l.$HAS_FOREACH_COLUMN,                                  /* foreach_completed = TRUE if no foreach */
                     CASE WHEN NOT l.$HAS_FOREACH_COLUMN THEN ? END,             /* foreach_output = event if not has foreach */
-                    CASE WHEN l.$HAS_FOREACH_COLUMN THEN CURRENT_TIMESTAMP END  /* outbox_scheduled_for = now if has foreach */
+                    CASE WHEN l.$HAS_FOREACH_COLUMN THEN ${databaseConfig.currentTimestampSql} END  /* outbox_scheduled_for = now if has foreach */
                 FROM $LISTENER_TABLE l
                 WHERE l.$CLOSED_AT_COLUMN IS NULL
                   AND (${ListenerQueryKey.buildWhereClause(oneAnyKeys, "l")})
@@ -242,7 +243,7 @@ class ListenerEventRepository : CrudRepository<ListenerEventModel>(),
         val now = nowTimestamp()
 
         val updateSql = """
-            UPDATE $LISTENER_TABLE l
+            UPDATE $LISTENER_TABLE AS l
             SET $CLOSED_AT_COLUMN = ?,
                 $UPDATED_AT_COLUMN = ?
             WHERE l.$CLOSED_AT_COLUMN IS NULL
@@ -255,8 +256,8 @@ class ListenerEventRepository : CrudRepository<ListenerEventModel>(),
         """.trimIndent()
 
         return conn.prepareStatement(updateSql).use { stmt ->
-            stmt.setTimestamp(1, now)
-            stmt.setTimestamp(2, now)
+            databaseConfig.bindTimestamp(stmt, 1, now)
+            databaseConfig.bindTimestamp(stmt, 2, now)
             stmt.setString(3, eventId)
             ListenerQueryKey.bindAllParameters(keys, stmt, 4)
             stmt.executeUpdate()
@@ -312,7 +313,7 @@ class ListenerEventRepository : CrudRepository<ListenerEventModel>(),
             // Build UNION ALL of all filterIndex queries
             // Include has_foreach for completion logic
             val filterIndexCast = when (databaseConfig.dbType) {
-                DatabaseType.H2 -> "CAST(? AS INT)"
+                DatabaseType.H2, DatabaseType.SQLITE -> "CAST(? AS INT)"
                 DatabaseType.MYSQL -> "CAST(? AS SIGNED)"
                 DatabaseType.POSTGRESQL -> "?::int"
             }
@@ -403,9 +404,9 @@ class ListenerEventRepository : CrudRepository<ListenerEventModel>(),
             val matchingKeys = keysWithCorrelation.filter { it.correlationValuesJson == correlationJson }
 
             val updateSql = """
-                UPDATE $LISTENER_TABLE l
+                UPDATE $LISTENER_TABLE AS l
                 SET ${ListenerRepository.CORRELATION_VALUES_COLUMN} = ?,
-                    $UPDATED_AT_COLUMN = CURRENT_TIMESTAMP
+                    $UPDATED_AT_COLUMN = ${databaseConfig.currentTimestampSql}
                 WHERE l.${ListenerRepository.CORRELATION_VALUES_COLUMN} IS NULL
                   AND EXISTS (
                       SELECT 1 FROM $tableName e
@@ -434,7 +435,7 @@ class ListenerEventRepository : CrudRepository<ListenerEventModel>(),
             FROM $LISTENER_TABLE l
             WHERE l.$CLOSED_AT_COLUMN IS NULL
               AND (${ListenerQueryKey.buildWhereClause(keys, "l")})
-            FOR UPDATE
+            ${databaseConfig.forUpdate()}
         """.trimIndent()
 
         conn.prepareStatement(lockSql).use { stmt ->
@@ -480,7 +481,7 @@ class ListenerEventRepository : CrudRepository<ListenerEventModel>(),
                 ?,                                                          /* event_source */
                 NOT m.$HAS_FOREACH_COLUMN,                                  /* foreach_completed = TRUE if no foreach */
                 CASE WHEN NOT m.$HAS_FOREACH_COLUMN THEN ? END,             /* foreach_output = event for non-foreach */
-                CASE WHEN m.$HAS_FOREACH_COLUMN THEN CURRENT_TIMESTAMP END  /* outbox_scheduled_for = NULL if not foreach */
+                CASE WHEN m.$HAS_FOREACH_COLUMN THEN ${databaseConfig.currentTimestampSql} END  /* outbox_scheduled_for = NULL if not foreach */
             FROM (
                 $unionSql
             ) m
@@ -507,7 +508,7 @@ class ListenerEventRepository : CrudRepository<ListenerEventModel>(),
         val now = nowTimestamp()
 
         val updateSql = """
-            UPDATE $LISTENER_TABLE l
+            UPDATE $LISTENER_TABLE AS l
             SET $CLOSED_AT_COLUMN = ?,
                 $UPDATED_AT_COLUMN = ?
             WHERE l.$CLOSED_AT_COLUMN IS NULL
@@ -526,8 +527,8 @@ class ListenerEventRepository : CrudRepository<ListenerEventModel>(),
         """.trimIndent()
 
         return conn.prepareStatement(updateSql).use { stmt ->
-            stmt.setTimestamp(1, now)
-            stmt.setTimestamp(2, now)
+            databaseConfig.bindTimestamp(stmt, 1, now)
+            databaseConfig.bindTimestamp(stmt, 2, now)
             stmt.setString(3, eventId)
             ListenerQueryKey.bindAllParameters(allStrategyKeys, stmt, 4)
             stmt.executeUpdate()
@@ -559,7 +560,7 @@ class ListenerEventRepository : CrudRepository<ListenerEventModel>(),
 
         conn.prepareStatement(markForeachCompletedSql).use { stmt ->
             stmt.setString(1, output)
-            stmt.setTimestamp(2, now)
+            databaseConfig.bindTimestamp(stmt, 2, now)
             setIDV7(stmt, 3, listenerId)
             stmt.setInt(4, sortKey)
             stmt.executeUpdate()
@@ -675,6 +676,7 @@ class ListenerEventRepository : CrudRepository<ListenerEventModel>(),
         DatabaseType.POSTGRESQL -> buildMarkReadyPostgresql(limit)
         DatabaseType.MYSQL -> buildMarkReadyMySql(limit)
         DatabaseType.H2 -> buildMarkReadyH2(limit)
+        DatabaseType.SQLITE -> buildMarkReadySQLite(limit)
     }
 
     // ----------------------------------------
@@ -703,7 +705,7 @@ class ListenerEventRepository : CrudRepository<ListenerEventModel>(),
     private fun buildEligibleListenersSubquery(limit: Int): String {
         val limitAndLock = when (databaseConfig.dbType) {
             DatabaseType.POSTGRESQL -> "FOR UPDATE SKIP LOCKED\n        LIMIT $limit"
-            else -> "LIMIT $limit\n        FOR UPDATE SKIP LOCKED"
+            else -> "LIMIT $limit\n        ${databaseConfig.forUpdate(skipLocked = true)}"
         }
         // Namespace scope inlined (config-bounded values validated at startup): a scoped runner only
         // advances listener events of the namespaces it follows in a shared database.
@@ -789,11 +791,29 @@ class ListenerEventRepository : CrudRepository<ListenerEventModel>(),
             t.$UPDATED_AT_COLUMN = NOW(6)
     """.trimIndent()
 
+    private fun buildMarkReadySQLite(limit: Int): String = """
+        WITH eligible AS MATERIALIZED (
+            ${buildEligibleListenersSubquery(limit)}
+        ),
+        heads AS MATERIALIZED (
+            SELECT e.$LISTENER_ID_COLUMN, MIN(e.$EVENT_INDEX_COLUMN) AS $EVENT_INDEX_COLUMN
+            FROM $tableName e JOIN eligible l ON e.$LISTENER_ID_COLUMN = l.listener_id
+            WHERE e.$pendingEventCondition
+            GROUP BY e.$LISTENER_ID_COLUMN
+        )
+        UPDATE $tableName AS t
+        SET $OUTBOX_SCHEDULED_FOR_COLUMN = ${databaseConfig.currentTimestampSql},
+            $OUTBOX_DELAYED_UNTIL_COLUMN = ${databaseConfig.currentTimestampSql},
+            $UPDATED_AT_COLUMN = ${databaseConfig.currentTimestampSql}
+        FROM heads h
+        WHERE $compositeKeyMatch
+    """.trimIndent()
+
     private fun buildMarkReadyH2(limit: Int): String = """
         UPDATE $tableName AS t
-        SET $OUTBOX_SCHEDULED_FOR_COLUMN = CURRENT_TIMESTAMP,
-            $OUTBOX_DELAYED_UNTIL_COLUMN = CURRENT_TIMESTAMP,
-            $UPDATED_AT_COLUMN = CURRENT_TIMESTAMP
+        SET $OUTBOX_SCHEDULED_FOR_COLUMN = ${databaseConfig.currentTimestampSql},
+            $OUTBOX_DELAYED_UNTIL_COLUMN = ${databaseConfig.currentTimestampSql},
+            $UPDATED_AT_COLUMN = ${databaseConfig.currentTimestampSql}
         WHERE EXISTS (
             SELECT 1
             FROM $tableName e

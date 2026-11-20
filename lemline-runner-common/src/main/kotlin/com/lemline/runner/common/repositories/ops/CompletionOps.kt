@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.common.repositories.ops
 
+import com.lemline.runner.common.config.DatabaseConfig
 import com.lemline.runner.common.models.WithCompletedAt
 import com.lemline.runner.common.repositories.helpers.ColumnBindingsBuilder
 import java.sql.ResultSet
@@ -18,10 +19,10 @@ object CompletionOps {
 /**
  * Extension function to add completion column to ColumnBindingsBuilder.
  */
-fun <T : WithCompletedAt> ColumnBindingsBuilder<T>.completionColumns() {
+fun <T : WithCompletedAt> ColumnBindingsBuilder<T>.completionColumns(databaseConfig: DatabaseConfig) {
     column(CompletionOps.COMPLETED_AT_COLUMN) { stmt, entity, idx ->
         entity.completedAt?.let {
-            stmt.setTimestamp(idx, Timestamp.from(it.toJavaInstant()))
+            databaseConfig.bindTimestamp(stmt, idx, Timestamp.from(it.toJavaInstant()))
         } ?: stmt.setNull(idx, Types.TIMESTAMP)
     }
 }

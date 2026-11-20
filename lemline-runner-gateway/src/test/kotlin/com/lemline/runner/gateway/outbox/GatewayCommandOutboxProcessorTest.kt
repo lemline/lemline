@@ -2,13 +2,17 @@
 package com.lemline.runner.gateway.outbox
 
 import com.lemline.runner.common.test.H2TestDatabaseConfig
+import com.lemline.runner.common.test.OrchestrationTestDatabase
+import com.lemline.runner.common.test.SQLiteTestDatabaseConfig
 import com.lemline.runner.common.test.outbox.OutboxProcessorTest
 import org.junit.jupiter.api.AfterAll
-import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.DisplayName
+import org.junit.jupiter.api.BeforeAll
 
-@DisplayName("GatewayCommandOutbox Processor [H2]")
-class GatewayCommandOutboxProcessorTest : OutboxProcessorTest<GatewayCommandModel>(
+abstract class GatewayCommandOutboxProcessorTestBase(
+    private val testDb: OrchestrationTestDatabase,
+    repository: GatewayCommandRepository = GatewayCommandRepository().apply { databaseConfig = testDb },
+) : OutboxProcessorTest<GatewayCommandModel>(
     outboxRepository = { repository },
     crudRepository = { repository },
     idRepository = { repository },
@@ -24,26 +28,34 @@ class GatewayCommandOutboxProcessorTest : OutboxProcessorTest<GatewayCommandMode
             outboxScheduledFor = kotlin.time.Clock.System.now(),
         )
     }
-) {
-    companion object {
-        private val testDb = H2TestDatabaseConfig()
+)
 
-        private val repository: GatewayCommandRepository by lazy {
-            GatewayCommandRepository().apply {
-                databaseConfig = testDb
-            }
-        }
+@DisplayName("GatewayCommandOutbox Processor [H2]")
+class GatewayCommandOutboxProcessorTest : GatewayCommandOutboxProcessorTestBase(database) {
+    companion object {
+        private val database = H2TestDatabaseConfig()
 
         @BeforeAll
         @JvmStatic
-        fun initDb() {
-            testDb.migrate()
-        }
+        fun initDb() = database.migrate()
 
         @AfterAll
         @JvmStatic
-        fun teardown() {
-            testDb.close()
-        }
+        fun teardown() = database.close()
+    }
+}
+
+@DisplayName("GatewayCommandOutbox Processor [SQLite]")
+class GatewayCommandOutboxProcessorSQLiteTest : GatewayCommandOutboxProcessorTestBase(database) {
+    companion object {
+        private val database = SQLiteTestDatabaseConfig()
+
+        @BeforeAll
+        @JvmStatic
+        fun initDb() = database.migrate()
+
+        @AfterAll
+        @JvmStatic
+        fun teardown() = database.close()
     }
 }
