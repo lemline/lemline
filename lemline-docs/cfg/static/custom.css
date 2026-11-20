@@ -1,0 +1,64 @@
+/* Lemly palette from lemline-dashboard/src/index.css, mapped to Writerside. */
+:root {
+    --lemline-sidebar-bg: #f6efdf;
+    --lemline-code-bg: #ffffff;
+    --lemline-code-muted: #5e7680;
+    --wh-color-bg-main: #fbf7ee;
+    --wh-color-text-main: #12303a;
+    --wh-color-text-heading: #12303a;
+    --wh-color-text-secondary: #2a4a55;
+    --wh-color-border-default: #d3c7ae;
+    --wh-color-border-pale: #e9e0cd;
+    --wh-color-backlight-pale: #f3ecdd;
+    --wh-color-accent-substrate-bg: #12303a;
+    --wh-color-accent-substrate-main-text: #f5e6bc;
+    --wh-color-accent-substrate-secondary-text: #f5ecd6;
+    --app-link-color: var(--wh-color-primary-light-theme);
+}
+
+:root.theme-dark {
+    --lemline-sidebar-bg: #0b171c;
+    --lemline-code-bg: #07131a;
+    --lemline-code-muted: #9db4bb;
+    --wh-color-bg-main: #0d1b21;
+    --wh-color-bg-main-dark: var(--wh-color-bg-main);
+    --wh-color-white-text-main: #f5ecd6;
+    --wh-color-text-heading: #f5e6bc;
+    --wh-color-text-secondary: #d6e2df;
+    --wh-color-border-default: #36596a;
+    --wh-color-border-pale: #24434f;
+    --wh-color-backlight-pale-dark: #132a33;
+    --wh-color-accent-substrate-bg: #16303a;
+    --rs-color-primary-dark-theme: #8eeff5;
+    --rs-color-primary-dim-dark-theme: #6fa6b2;
+    --rs-color-primary-fog-dark-theme: #1b3843;
+    --rs-color-primary-t-dim-dark-theme: rgba(142, 239, 245, 0.8);
+    --rs-color-primary-t-fog-dark-theme: rgba(142, 239, 245, 0.12);
+    --app-link-color-dark: var(--wh-color-primary-dark-theme);
+}
+
+.app__sidebar,
+.app__sidebar :is(.toc--theme-light, .toc--theme-dark) {
+    background-color: var(--lemline-sidebar-bg);
+}
+
+.code-block {
+    background-color: var(--lemline-code-bg);
+    box-shadow: inset 0 0 0 1px var(--wh-color-border-pale);
+}
+
+.code-block .prism--token.prism--comment,
+.theme-light .code-block .prism--token.prism--punctuation {
+    color: var(--lemline-code-muted);
+}
+
+/* Cyan fills need dark labels and controls for contrast. */
+.toc-item--selected.toc-item--theme-dark:not(.toc__virtual-toc-header *),
+.theme-dark .dropdown__list-item--theme-dark.dropdown__list-item--current,
+.theme-dark .dropdown__list-item--theme-dark.dropdown__list-item--current:not(.selected):hover {
+    color: #07131a;
+}
+
+.theme-dark .wrap-toggle--active .wrap-toggle__slider {
+    background-color: #07131a;
+}
