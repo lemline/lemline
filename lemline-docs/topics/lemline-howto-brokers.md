@@ -9,9 +9,10 @@ This guide explains how to connect Lemline to a message broker. Runners exchange
 | Kafka | `kafka` | Production, high throughput |
 | RabbitMQ | `rabbitmq` | Production |
 | PGMQ (PostgreSQL Message Queue) | `pgmq` | Production without a dedicated broker; runs on a standard PostgreSQL, no extension needed |
+| SQLite | `sqlite` | Single host without a broker or a queue server; messages are kept in a local file |
 | In-memory | `in-memory` | Single process only, for local tests |
 
-If `lemline.messaging.type` is not set, Lemline uses the broker whose settings block (`lemline.messaging.kafka`, `rabbitmq` or `pgmq`) is present, and in-memory messaging when there is none. At startup, the runner checks that the broker is reachable and stops with an explicit error if it is not.
+If `lemline.messaging.type` is not set, Lemline uses the broker whose settings block (`lemline.messaging.kafka`, `rabbitmq` or `pgmq`) is present, and in-memory messaging when there is none. SQLite is never selected this way: set `type: sqlite` explicitly. At startup, the runner checks that the broker is reachable and stops with an explicit error if it is not.
 
 ## Kafka Configuration
 
@@ -75,6 +76,24 @@ lemline:
           max-retries: 3
 ```
 
+## SQLite Configuration
+
+```yaml
+lemline:
+  messaging:
+    type: sqlite
+    sqlite:
+      path: /var/lib/lemline/messaging.db
+      batch-size: 10
+      poll-interval: 50        # milliseconds
+      visibility-timeout: 30   # seconds
+      max-retries: 3
+```
+
+All Lemline processes that share the queue must run on the same host and open the same file. A relative `path` is resolved against the directory each process is started from, so prefer an absolute path. The parent directory must already exist; Lemline creates the file and its tables itself.
+
+A message that a runner holds longer than `visibility-timeout` is delivered again to another consumer. Raise it above the longest time one workflow step can take, for example a slow HTTP call.
+
 ## Destination Names
 
 Lemline derives destination names from the namespace of each workflow:
@@ -92,7 +111,7 @@ A runner only consumes the namespaces listed in `lemline.namespaces` (default: `
 
 ## Dead-Letter Destinations
 
-A message that cannot be processed is moved to a dead-letter destination named after its source with a `.dlq` suffix, for example `lemline-default-commands.dlq`. With PGMQ, a message goes there after `max-retries` deliveries.
+A message that cannot be processed is moved to a dead-letter destination named after its source with a `.dlq` suffix, for example `lemline-default-commands.dlq`. With PGMQ and SQLite, a message goes there after `max-retries` deliveries.
 
 ## Consumer Concurrency
 

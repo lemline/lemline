@@ -58,6 +58,7 @@ dependencies {
     implementation(project(":lemline-runner-gateway"))
     implementation(project(":lemline-runner-cli"))
     implementation(project(":lemline-runner-messaging-pgmq"))
+    implementation(project(":lemline-runner-messaging-sqlite"))
     implementation(project(":lemline-runner-analytics"))
 
     // KotlinX ecosystem
