@@ -1,125 +1,51 @@
-# {VERSION} Release Notes
-
 ## Summary
 
-<!-- 
-For MINOR/MAJOR releases: Write 2-4 sentences summarizing the release theme.
-Delete this section for PATCH releases.
-Example: "This release introduces PGMQ as a new messaging backend, enabling 
-workflow orchestration using only PostgreSQL — no separate message broker required."
--->
+<!-- One sentence on the theme. Patch release: one or two sentences, then go to Bug Fixes. -->
+
+Lemline {VERSION} {theme in one sentence}.
+
+- **{What users can now do}** {in a few words}.
+- **{What users can now do}** {in a few words}.
+
+<!-- Only when the upgrade needs action; otherwise delete the whole block. -->
+
+> **Before you upgrade from {PREVIOUS MINOR}.x**
+>
+> 1. **{Action to take}.** {What changed, in one sentence.} {Link to the migration doc, if any.}
+> 2. **{Action to take}.** {What changed, in one sentence.}
 
 ---
 
 ## New Features
 
-### {Feature Name}
+### {What the feature lets the user do}
 
-<!-- Brief description of what the feature does -->
-
-#### Why {Feature Name}?
-
-<!-- 
-Explain use cases and benefits. Help users understand when to use this.
-Use bullet points for multiple scenarios.
--->
-
-{Feature Name} is ideal for deployments where:
-
-- {Use case 1}
-- {Use case 2}
-- {Use case 3}
-
-#### Features
-
-| Feature | Description |
-|---------|-------------|
-| **{Feature 1}** | {Description} |
-| **{Feature 2}** | {Description} |
-| **{Feature 3}** | {Description} |
-
-#### Configuration
+{One or two sentences: what it does, in the user's words.}
 
 ```yaml
-# Example configuration — replace with actual config
-your-app:
-  feature:
-    enabled: true
-    option: value
+# Short, valid, copy-pasteable example with realistic values
 ```
 
-#### Example
+- {A rule or variant that matters to the user}
 
-```bash
-# Usage example
-your-command --flag value
-```
+<!-- Repeat for each feature. Group small additions under: -->
 
-<!-- Repeat ### {Feature Name} for additional features -->
+### More possibilities in workflow definitions
 
----
-
-## Bug Fixes
-
-<!-- Format: Component: Description of fix — Impact on users -->
-
-- **{Component}**: {Description of what was fixed} — {How this affected users before}
-- **{Component}**: {Description of what was fixed} — {How this affected users before}
+- **`{keyword}`**: {what it lets the user write}.
 
 ---
 
 ## Improvements
 
-<!-- Format: Area: What improved — Measurable benefit if available -->
-
-- **{Area}**: {What improved} — {Benefit, e.g., "reducing test overhead by 40%"}
-- **{Area}**: {What improved} — {Benefit}
+- **{What the user notices}**: {what is better, in observable terms}.
 
 ---
 
-## Dependencies
+## Bug Fixes
 
-<!-- Only include if there are dependency changes users should know about -->
-
-| Dependency | Version | Notes |
-|------------|---------|-------|
-| {package} | {version} | {Why added/updated/removed} |
+- **{Component}**: {what now works}. {What users suffered before, if not obvious.}
 
 ---
 
-## Breaking Changes
-
-<!-- 
-ALWAYS include this section, even if empty.
-For actual breaking changes, provide migration guidance.
--->
-
-None.
-
-<!-- Or, if there are breaking changes:
-
-### {Breaking Change Title}
-
-**What changed:** {Description}
-
-**Why:** {Reason for the change}
-
-**Migration:**
-
-Before:
-```yaml
-old-config: value
-```
-
-After:
-```yaml
-new-config: value
-```
-
--->
-
----
-
-## Full Changelog
-
-Compare: https://github.com/{org}/{repo}/compare/{previous-tag}...{new-tag}
+**Full changelog**: https://github.com/lemline/lemline/compare/{PREVIOUS TAG}...v{VERSION}

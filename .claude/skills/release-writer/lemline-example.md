@@ -1,120 +1,173 @@
-# Example: Lemline v0.5.2 Release Notes
+# Example: the published Lemline 0.7.0 release notes
 
-This example demonstrates the recommended structure and style for release notes.
+This is the reference for structure, tone and level of detail. It is the text of the [v0.7.0 GitHub release](https://github.com/lemline/lemline/releases/tag/v0.7.0), unchanged.
 
 ---
 
-# 0.5.2 Release Notes
+## Summary
 
-## New Feature: PGMQ Messaging Connector
+Lemline 0.7.0 lets workflows react to the outside world and lets one deployment serve several teams safely.
 
-This release introduces **PGMQ (PostgreSQL Message Queue)** as a new messaging backend, enabling workflow orchestration using only PostgreSQL — no separate message broker required.
+- Workflows can **start by themselves when events arrive**, instead of being started by your code.
+- Workflows can **use secrets** (API keys, tokens) kept on the runner, never stored or sent in messages.
+- You can **add the same steps around many tasks** (audit, logging, test mocks) without editing each task.
+- Each runner can be **dedicated to some namespaces**, so teams or environments sharing a broker and a database never see each other's work.
+- The **dashboard is redesigned**, with dedicated pages, better search and clearer timelines.
 
-### Why PGMQ?
+> **Before you upgrade from 0.6.x**
+>
+> 1. **Stop or drain every 0.6.x runner before starting 0.7.0 runners.** The two versions cannot work side by side, and messages are now routed per namespace (`lemline-<namespace>-commands`, …). If you create topics, queues or ACLs yourself, create the new ones first.
+> 2. **Validate your stored workflow definitions.** Some 0.6.x syntax is no longer accepted: shell `arguments` are a list (`[Hello, World]`), static HTTP query values must be quoted (`page: '1'`), error filters use `catch.errors.with.detail`, and `for.in` / `while` need `${ }` unless the workflow uses `evaluate.mode: loose`. See the [migration guide](https://github.com/lemline/lemline/blob/main/docs/sdk-java-upgrade.md).
+> 3. **Update consumers of lifecycle events.** Their types are now `org.open-workflow-specification.workflow.*.v1` and `…task.*.v1`. The gateway and dashboard still read events stored with the old types.
 
-PGMQ is ideal for deployments where:
+---
 
-- You want to minimize infrastructure dependencies (just PostgreSQL)
-- Message throughput requirements are moderate
-- You need transactional guarantees between workflow state and messaging
-- You're running in environments where Kafka/RabbitMQ aren't available
+## New Features
 
-### Features
+### Start a workflow when events arrive
 
-| Feature | Description |
-|---------|-------------|
-| **SQL-Only Implementation** | Uses Flyway migrations (V800-V802) — no PGMQ extension required |
-| **Message Deduplication** | Unique index on `messageId` header prevents duplicate messages |
-| **Long Polling** | Database-side `read_with_poll()` reduces round-trips (PGMQ v1.8.1) |
-| **Batch Operations** | `sendBatch`, `deleteBatch`, `archiveBatch` for efficiency |
-| **Dead Letter Queues** | Configurable DLQ for failed message handling |
-| **Native Image Support** | Full GraalVM native compilation compatibility |
+Declare `schedule.on` and Lemline starts a new instance as soon as matching CloudEvents arrive. The workflow receives those events as its input.
 
-### Configuration
+- **`one`** / **`any`**: start on a single matching event.
+- **`all`**: wait until every listed event has arrived, optionally only those sharing a key (the same order id, for example).
+- **`until`**: collect events until a condition is true, then start once with the whole batch.
+
+The same event delivered twice never starts two instances.
+
+```yaml
+document:
+  dsl: '1.0.0'
+  namespace: examples
+  name: low-heartbeat-alert
+  version: '0.1.0'
+schedule:
+  on:
+    one:
+      with:
+        type: com.example.hospital.events.patients.heartbeat.low
+  read: envelope   # pass full CloudEvents (default: data only)
+do:
+  - callNurse:
+      call: http
+      with:
+        method: post
+        endpoint: https://hospital.example.com/api/v1/notify
+        body:
+          patientId: ${ $workflow.input[0].data.patient.id }
+```
+
+### Use secrets in workflows
+
+List the secrets a workflow needs in `use.secrets`. The runner reads them from its environment variables, and expressions read them as `$secrets`. Their values are never written to the database or sent through the broker.
+
+```yaml
+use:
+  secrets:
+    - paymentApiKey
+do:
+  - charge:
+      call: http
+      with:
+        method: post
+        endpoint: https://payments.example.com/charges
+        headers:
+          Authorization: '${ "Bearer " + $secrets.paymentApiKey }'
+```
+
+```bash
+export paymentApiKey='sk_live_…'
+```
+
+If a declared secret is missing, the task fails with an authorization error. A child workflow only gets the secrets it declares itself.
+
+### Add steps around many tasks at once
+
+Extensions (`use.extensions`) run `before` and `after` steps around every task that matches a condition: record every HTTP call, log each step, or replace calls with fake answers in tests.
+
+```yaml
+use:
+  extensions:
+    - audit:
+        extend: call
+        when: '${ $task.definition.call == "http" }'
+        before:
+          - recordRequest:
+              set:
+                reference: '${ $task.reference }'
+```
+
+Waits, retries and listeners inside extensions survive restarts like any other task, and the dashboard shows extension steps on the timeline.
+
+### Dedicate runners to namespaces
+
+Each runner declares the namespaces it serves, and only runs and stores workflows of those namespaces. You can run `acme-prod` and `acme-staging` on separate runner pools sharing one broker and one PostgreSQL, and grant broker permissions per namespace.
 
 ```yaml
 lemline:
-  messaging:
-    type: pgmq
-    pgmq:
-      host: localhost
-      port: 5432
-      database: lemline
-      username: postgres
-      password: ${LEMLINE_PG_PASSWORD}
-      queue: lemline-commands
-      visibility-timeout: 30
-      batch-size: 10
+  namespaces: acme-prod, acme-staging   # absent: "default"
 ```
 
-### Architecture
+- A message that reaches the wrong runner is set aside, not executed. Once the configuration is fixed, `lemline failures replay` sends it again.
+- The gateway warns when you start a workflow in a namespace that no runner serves.
 
-PGMQ uses the same dual-channel pattern as Kafka and RabbitMQ:
+See the [namespace isolation guide](https://github.com/lemline/lemline/blob/main/docs/namespace-isolation.md).
 
-- **Commands Channel**: High-throughput workflow step execution
-- **Events Channel**: Durable operations (waits, retries, parent tracking)
+### A redesigned dashboard
 
----
+- Dedicated pages for instances and definitions, a namespace picker, and layouts that work on a phone.
+- Better instance search and filters, clearer statuses and errors.
+- Clearer timelines: long waits take less room, loop iterations no longer look like duplicates, and failed tasks show where they stopped.
+- A **Settings** page shows every gateway setting, its value and where it comes from, with secrets hidden.
+- Old dashboard links still work.
 
-## Bug Fixes
+### More possibilities in workflow definitions
 
-- **PGMQ message ordering**: Sort results by `msg_id` to ensure FIFO order since `UPDATE...RETURNING` doesn't guarantee ordering with concurrent consumers
-- **Quarkus injection warnings**: Change `@Inject` fields from `private` to `internal`
-- **Native image compilation**: Replace raw Vert.x PostgreSQL client with Quarkus reactive-pg-client extension to resolve Netty buffer initialization conflicts
+- **Loose expressions**: with `evaluate.mode: loose`, a value can be written without `${ }`. If it is not a valid expression, it is used as plain text.
+- **Named errors**: `raise.error` can reuse an error declared in `use.errors`, and `catch` can match it by its type. Error `title` and `detail` can be computed.
+- **Computed durations**: wait durations, listen timeouts, and retry delays and limits can be computed from data.
+- **`catch.then`** chooses where the workflow continues after a caught error.
+- **`shell.stdin`** sends text to a shell command.
+- **`$workflow.definition`** gives expressions access to the workflow's own definition.
 
 ---
 
 ## Improvements
 
-- **Test initialization**: Broker test clients now initialize once per test class using `@TestInstance(PER_CLASS)`, reducing test overhead
-- **Global connector defaults**: PGMQ channels inherit connection settings from `pgmq.*` global properties, matching Kafka and RabbitMQ patterns
-- **Graceful shutdown**: `PgmqIncomingConnector` properly handles shutdown events to prevent error logs during teardown
-- **Kafka testcontainers**: Migrate from deprecated `org.testcontainers.containers.KafkaContainer` to `org.testcontainers.kafka.KafkaContainer` using Apache Kafka native image (`apache/kafka:3.7.0`) which supports KRaft mode by default
+- **Faster starts from the gateway**: a workflow started through the gateway begins right away, instead of waiting up to the next database check.
+- **Faster event handling**: workflows waiting for events, and workflows started by events, need fewer database queries.
+- **Faster workflow execution**: the engine spends less time converting data during expressions and validation.
+- **Closer to the specification**: Lemline follows the Open Workflow Specification Java SDK 7.35.3, so definitions written for other compliant runtimes behave the same way.
+- **Real waiting time on timelines**: an instance's start time is now when a runner picked it up, so time spent waiting in the queue is visible.
 
 ---
 
-## Dependencies
+## Bug Fixes
 
-| Dependency | Version | Notes |
-|------------|---------|-------|
-| `io.quarkus:quarkus-reactive-pg-client` | — | Replaces raw Vert.x pg-client |
-
----
-
-## Breaking Changes
-
-None.
-
----
-
-## Full Changelog
-
-Compare: https://github.com/lemline/lemline/compare/v0.5.1...v0.5.2
+- **HTTP calls**: expressions in the request `body` and in `basic` / `bearer` authentication are now evaluated. Before, they were sent as literal `${ … }` text, so a body or a token built from data or `$secrets` did not work.
+- **Scheduled workflows**: every cron, `every` and `after` run now appears in the gateway and the dashboard, with its own start time.
+- **CLI**: instances started with `lemline instance start` now appear in the instance list. `lemline --help` and `--version` work without a configuration file or a database.
+- **Namespaces**: `lemline.namespaces: acme-prod, acme-staging` (with spaces) no longer stops the runner from starting. A runner no longer takes events meant for another namespace's runner.
+- **PGMQ**: a message that cannot be read no longer blocks its queue; it goes to the dead letter queue. A failing queue no longer holds up the others.
+- **RabbitMQ**: the first workflow started right after startup is no longer lost, and the runner no longer reconnects after shutting down.
+- **Duplicate events**: an event delivered twice is no longer counted twice by a listener.
+- **Remote functions**: one function that cannot be loaded no longer blocks all events of its namespace.
+- **Event-triggered workflows**: updating a definition no longer leaves the old version running when another definition changes at the same time.
+- **Extensions**: `catch` and `retry` conditions can read `$task`; before, such a condition failed the workflow.
+- **Timelines**: failed tasks and fork branches now show their end.
+- **Dashboard**: starting a cron workflow shows a confirmation with a link to its instances. The live indicator is hidden on finished instances. Counters and lists keep updating while the page is open, and no update is lost after a reconnection.
 
 ---
 
-# What Makes This Example Effective
+**Full changelog**: https://github.com/lemline/lemline/compare/v0.6.3...v0.7.0
 
-## User-Oriented Focus
 
-1. **"Why PGMQ?" section** — Helps users decide if this feature is for them
-2. **Use case bullets** — Concrete scenarios, not abstract descriptions
-3. **Complete configuration** — Users can copy-paste and adapt
 
-## Technical Clarity
+---
 
-1. **Feature table** — Scannable, structured information
-2. **Architecture note** — Only included because users need to understand the dual-channel model
-3. **Bug fix context** — Explains *why* the bug occurred, not just that it was fixed
+# What makes it work
 
-## Consistent Structure
-
-1. **Clear hierarchy** — H2 for sections, H3 for subsections
-2. **Predictable sections** — Users know where to look
-3. **Breaking Changes always present** — Even when empty, confirms safe upgrade
-
-## Professional Polish
-
-1. **No jargon without context** — "FIFO" and "DLQ" are explained or obvious
-2. **Realistic examples** — `${LEMLINE_PG_PASSWORD}` shows environment variable pattern
-3. **Links for deep dives** — Full Changelog for those who want details
+- **Four sections only.** Summary, New Features, Improvements, Bug Fixes; no Dependencies or Breaking Changes section.
+- **Upgrade actions cannot be missed.** They sit in the Summary, numbered, each starting with what to do.
+- **Features are titled by what they let users do** ("Start a workflow when events arrive"), and only the main ones carry an example.
+- **Effects, not mechanisms.** "The same event delivered twice never starts two instances", not how deduplication works.
+- **Bug fixes describe the symptom** users had before, grouped by component.
