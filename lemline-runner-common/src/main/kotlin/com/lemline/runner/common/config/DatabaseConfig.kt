@@ -52,6 +52,16 @@ interface DatabaseConfig {
     // SQL Dialect Methods
     // ========================================
 
+    /** SQLite write transactions acquire the writer before any locking read. */
+    fun forUpdate(skipLocked: Boolean = false): String = when {
+        dbType == DatabaseType.SQLITE -> ""
+        skipLocked -> "FOR UPDATE SKIP LOCKED"
+        else -> "FOR UPDATE"
+    }
+
+    val currentTimestampSql: String
+        get() = if (dbType == DatabaseType.SQLITE) SQLiteDatabase.CURRENT_TIMESTAMP_SQL else "CURRENT_TIMESTAMP"
+
     /**
      * Returns the database-specific JSON array aggregation function.
      *
@@ -66,6 +76,7 @@ interface DatabaseConfig {
         DatabaseType.POSTGRESQL -> "json_agg($column::json)"
         DatabaseType.MYSQL -> "JSON_ARRAYAGG(CAST($column AS JSON))"
         DatabaseType.H2 -> "JSON_ARRAYAGG($column FORMAT JSON)"
+        DatabaseType.SQLITE -> "json_group_array(json($column))"
     }
 
     /**
@@ -88,6 +99,7 @@ interface DatabaseConfig {
         // MySQL: JSON_ARRAYAGG doesn't support ORDER BY, use subquery instead
         DatabaseType.MYSQL -> "JSON_ARRAYAGG(sub.v)"
         DatabaseType.H2 -> "JSON_ARRAYAGG($column FORMAT JSON ORDER BY $orderColumn)"
+        DatabaseType.SQLITE -> "json_group_array(json($column) ORDER BY $orderColumn)"
     }
 
     /**
@@ -119,6 +131,8 @@ interface DatabaseConfig {
             "(SELECT JSON_ARRAYAGG(sub.v) FROM (SELECT $column AS v FROM $table $tableAlias WHERE $whereClause ORDER BY $orderColumn) sub)"
         DatabaseType.H2 ->
             "(SELECT JSON_ARRAYAGG($column FORMAT JSON ORDER BY $orderColumn) FROM $table $tableAlias WHERE $whereClause)"
+        DatabaseType.SQLITE ->
+            "(SELECT ${jsonArrayAggOrdered(column, orderColumn)} FROM $table $tableAlias WHERE $whereClause)"
     }
 
     /**
@@ -134,6 +148,7 @@ interface DatabaseConfig {
      */
     fun insertIgnoreSelect(tableName: String, columns: String, selectSql: String): String = when (dbType) {
         DatabaseType.MYSQL -> "INSERT IGNORE INTO $tableName ($columns) $selectSql"
+        DatabaseType.SQLITE -> "INSERT INTO $tableName ($columns) SELECT * FROM ($selectSql) WHERE true ON CONFLICT DO NOTHING"
         DatabaseType.POSTGRESQL, DatabaseType.H2 -> "INSERT INTO $tableName ($columns) $selectSql ON CONFLICT DO NOTHING"
     }
 
@@ -150,6 +165,6 @@ interface DatabaseConfig {
      */
     fun insertIgnoreInto(tableName: String, columns: String, values: String): String = when (dbType) {
         DatabaseType.MYSQL -> "INSERT IGNORE INTO $tableName ($columns) VALUES ($values)"
-        DatabaseType.POSTGRESQL, DatabaseType.H2 -> "INSERT INTO $tableName ($columns) VALUES ($values) ON CONFLICT DO NOTHING"
+        DatabaseType.POSTGRESQL, DatabaseType.H2, DatabaseType.SQLITE -> "INSERT INTO $tableName ($columns) VALUES ($values) ON CONFLICT DO NOTHING"
     }
 }

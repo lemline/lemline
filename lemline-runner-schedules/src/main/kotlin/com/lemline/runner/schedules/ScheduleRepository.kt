@@ -87,7 +87,7 @@ class ScheduleRepository : CrudRepository<ScheduleModel>(),
 
     /** Serialize completion handling with publication and with duplicate completion events. */
     suspend fun findByWorkflowIdForUpdate(workflowId: WorkflowId, connection: Connection): ScheduleModel? =
-        connection.prepareStatement("SELECT * FROM $tableName WHERE workflow_id = ? FOR UPDATE").use { stmt ->
+        connection.prepareStatement("SELECT * FROM $tableName WHERE workflow_id = ? ${databaseConfig.forUpdate()}").use { stmt ->
             setIDV7(stmt, 1, workflowId.value)
             stmt.executeQuery().use { rs -> if (rs.next()) createModel(rs) else null }
         }
@@ -100,8 +100,8 @@ class ScheduleRepository : CrudRepository<ScheduleModel>(),
         ColumnBindingsBuilder<ScheduleModel>().apply {
             idColumn(idHelper)
             instanceColumns(idHelper)
-            cleanupColumns()
-            outboxColumns()
+            cleanupColumns(databaseConfig)
+            outboxColumns(databaseConfig)
 
             // Schedule-specific columns
             column(SCHEDULE_ID_COLUMN) { stmt, entity, idx ->

@@ -83,8 +83,8 @@ class RetryRepository : CrudRepository<RetryModel>(),
         ColumnBindingsBuilder<RetryModel>().apply {
             idColumn(idHelper)
             instanceColumns(idHelper)
-            cleanupColumns()
-            outboxColumns()
+            cleanupColumns(databaseConfig)
+            outboxColumns(databaseConfig)
 
             // Retry-specific error columns
             column(ERROR_REASON_COLUMN) { stmt, entity, idx ->

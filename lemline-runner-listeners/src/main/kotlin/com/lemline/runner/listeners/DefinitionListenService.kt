@@ -19,6 +19,7 @@ import io.cloudevents.CloudEvent
 import io.serverlessworkflow.api.types.ListenTaskConfiguration
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
+import java.sql.Connection
 import kotlin.coroutines.cancellation.CancellationException
 
 /**
@@ -141,10 +142,11 @@ class DefinitionListenService {
     suspend fun removeListeners(
         namespace: WorkflowNamespace,
         name: WorkflowName,
-        version: WorkflowVersion
+        version: WorkflowVersion,
+        connection: Connection? = null,
     ): Int {
         logger.debug { "Removing listeners for $namespace/$name:$version" }
-        return listenerRepository.deleteByWorkflowDefinition(namespace, name, version)
+        return listenerRepository.deleteByWorkflowDefinition(namespace, name, version, connection)
     }
 
     /**

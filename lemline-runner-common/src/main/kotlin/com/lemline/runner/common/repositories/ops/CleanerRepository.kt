@@ -50,7 +50,7 @@ class CleanerRepository<T : WithCleanup>(
     ): List<T> = databaseConfig.withConnection(connection) { conn ->
         conn.prepareStatement(findEntitiesToDeleteSql).use { stmt ->
             var idx = 1
-            stmt.setTimestamp(idx++, Timestamp.from(cutoffDate.toJavaInstant()))
+            databaseConfig.bindTimestamp(stmt, idx++, Timestamp.from(cutoffDate.toJavaInstant()))
             namespaces?.forEach { stmt.setString(idx++, it) }
             stmt.setInt(idx, batchSize)
             stmt.executeQuery().use { rs -> rs.toModels() }
@@ -65,7 +65,7 @@ class CleanerRepository<T : WithCleanup>(
               ${namespacePredicate(namespaces)}
             ORDER BY $CLEANUP_AFTER_COLUMN ASC
             LIMIT ?
-            FOR UPDATE SKIP LOCKED
+            ${databaseConfig.forUpdate(skipLocked = true)}
         """.trimIndent()
     }
 
@@ -93,16 +93,16 @@ fun <T : WithCleanup> T.readCleanupField(rs: ResultSet): T =
  * override val columns by lazy {
  *     ColumnBindingsBuilder<MyModel>().apply {
  *         key("id") { stmt, entity, idx -> setIDV7(stmt, idx, entity.id) }
- *         cleanupColumns()  // adds cleanup_after
+ *         cleanupColumns(databaseConfig)  // adds cleanup_after
  *         // ... other columns
  *     }.build()
  * }
  * ```
  */
-fun <T : WithCleanup> ColumnBindingsBuilder<T>.cleanupColumns() {
+fun <T : WithCleanup> ColumnBindingsBuilder<T>.cleanupColumns(databaseConfig: DatabaseConfig) {
     column(CLEANUP_AFTER_COLUMN) { stmt, entity, idx ->
         entity.cleanupAfter?.let {
-            stmt.setTimestamp(idx, Timestamp.from(it.toJavaInstant()))
+            databaseConfig.bindTimestamp(stmt, idx, Timestamp.from(it.toJavaInstant()))
         } ?: stmt.setNull(idx, Types.TIMESTAMP)
     }
 }

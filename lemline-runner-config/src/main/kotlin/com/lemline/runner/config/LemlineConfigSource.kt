@@ -17,6 +17,7 @@ import com.lemline.runner.common.config.LEMLINE_ANALYTICS_POSTGRES_PASSWORD
 import com.lemline.runner.common.config.LEMLINE_ANALYTICS_POSTGRES_PORT
 import com.lemline.runner.common.config.LEMLINE_ANALYTICS_POSTGRES_USERNAME
 import com.lemline.runner.common.config.LEMLINE_ANALYTICS_TYPE
+import com.lemline.runner.common.config.LEMLINE_DATABASE_ENABLED
 import com.lemline.runner.common.config.LEMLINE_DATABASE_MYSQL
 import com.lemline.runner.common.config.LEMLINE_DATABASE_MYSQL_DATABASE
 import com.lemline.runner.common.config.LEMLINE_DATABASE_MYSQL_HOST
@@ -29,6 +30,7 @@ import com.lemline.runner.common.config.LEMLINE_DATABASE_POSTGRES_HOST
 import com.lemline.runner.common.config.LEMLINE_DATABASE_POSTGRES_PASSWORD
 import com.lemline.runner.common.config.LEMLINE_DATABASE_POSTGRES_PORT
 import com.lemline.runner.common.config.LEMLINE_DATABASE_POSTGRES_USERNAME
+import com.lemline.runner.common.config.LEMLINE_DATABASE_SQLITE_PATH
 import com.lemline.runner.common.config.LEMLINE_DATABASE_TYPE
 import com.lemline.runner.common.config.LEMLINE_GATEWAY_AUTHENTICATION_ENABLED
 import com.lemline.runner.common.config.LEMLINE_GATEWAY_AUTHENTICATION_JWT_ISSUER
@@ -132,6 +134,7 @@ import com.lemline.runner.common.config.LEMLINE_MESSAGING_RABBITMQ_VIRTUAL_HOST
 import com.lemline.runner.common.config.LEMLINE_MESSAGING_TYPE
 import com.lemline.runner.common.config.LEMLINE_PREFIX
 import com.lemline.runner.common.config.MessagingType
+import com.lemline.runner.common.config.SQLiteDatabase
 import com.lemline.runner.common.messaging.LIFECYCLEEVENTS_IN_CHANNEL
 import com.lemline.runner.common.messaging.LIFECYCLEEVENTS_OUT_CHANNEL
 import com.lemline.runner.config.LemlineConfigConstants.ANALYTICS_POSTGRES_BASELINE_ON_MIGRATE_DEFAULT
@@ -149,6 +152,7 @@ import com.lemline.runner.config.LemlineConfigConstants.GATEWAY_GRPC_HOST_DEFAUL
 import com.lemline.runner.config.LemlineConfigConstants.GATEWAY_GRPC_PORT_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.GATEWAY_TLS_CLIENT_AUTH_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.GATEWAY_TLS_ENABLED_DEFAULT
+import com.lemline.runner.config.LemlineConfigConstants.DB_SQLITE_PATH_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.H2_DB_NAME_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.H2_PASSWORD_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.H2_USERNAME_DEFAULT
@@ -332,7 +336,32 @@ class LemlineConfigSource(context: ConfigSourceContext? = null) : PropertiesConf
             }
             generated[LEMLINE_DATABASE_TYPE] = type.configValue
 
+            // SQLite is an explicit opt-in: a path alone does not select it. Say so instead of
+            // silently running on another database.
+            if (type != DatabaseType.SQLITE && LEMLINE_DATABASE_SQLITE_PATH in props) {
+                logger.warn {
+                    "'$LEMLINE_DATABASE_SQLITE_PATH' is set but ignored: the database type is '${type.configValue}'. " +
+                        "Set '$LEMLINE_DATABASE_TYPE' to '${DatabaseType.SQLITE.configValue}' to use SQLite."
+                }
+            }
+
             when (type) {
+                DatabaseType.SQLITE -> {
+                    val enabled = props[LEMLINE_DATABASE_ENABLED]?.toBooleanStrictOrNull() ?: true
+                    val sqlite = "quarkus.datasource.sqlite"
+                    generated["$sqlite.active"] = enabled.toString()
+                    generated["quarkus.datasource.postgresql.active"] = "false"
+                    generated["quarkus.datasource.mysql.active"] = "false"
+                    generated["quarkus.datasource.active"] = "false"
+                    if (enabled) {
+                        val path = SQLiteDatabase.resolvePath(
+                            props[LEMLINE_DATABASE_SQLITE_PATH] ?: DB_SQLITE_PATH_DEFAULT,
+                            LEMLINE_DATABASE_SQLITE_PATH,
+                        )
+                        generated["$sqlite.jdbc.url"] = SQLiteDatabase.jdbcUrl(path)
+                    }
+                }
+
                 DatabaseType.POSTGRESQL -> {
                     val host = props[LEMLINE_DATABASE_POSTGRES_HOST] ?: POSTGRES_HOST_DEFAULT
                     val port = props[LEMLINE_DATABASE_POSTGRES_PORT] ?: POSTGRES_PORT_DEFAULT

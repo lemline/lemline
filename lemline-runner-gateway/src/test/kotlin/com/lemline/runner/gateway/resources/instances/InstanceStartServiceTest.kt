@@ -202,7 +202,7 @@ class InstanceStartServiceTest {
 
         coEvery { definitions.get(WorkflowNamespace("team-a"), WorkflowName("orders"), null) } returns workflow("9.9.9")
         coEvery { gatewayCommandRepository.insert(any<GatewayCommandModel>(), any<Connection>()) } returns 0
-        coEvery { gatewayCommandRepository.findByWorkflowId(workflowId) } returns existingOutbox(
+        coEvery { gatewayCommandRepository.findByWorkflowId(workflowId, any<Connection>()) } returns existingOutbox(
             workflowId = workflowId,
             workflowInput = workflowInput,
             version = WorkflowVersion("9.9.9"),
@@ -227,7 +227,7 @@ class InstanceStartServiceTest {
 
         coEvery { definitions.get(WorkflowNamespace("team-a"), WorkflowName("orders"), null) } returns workflow("2.0.0")
         coEvery { gatewayCommandRepository.insert(any<GatewayCommandModel>(), any<Connection>()) } returns 0
-        coEvery { gatewayCommandRepository.findByWorkflowId(workflowId) } returns existingOutbox(
+        coEvery { gatewayCommandRepository.findByWorkflowId(workflowId, any<Connection>()) } returns existingOutbox(
             workflowId = workflowId,
             workflowInput = workflowInput,
             version = WorkflowVersion("1.0.0"),
@@ -259,7 +259,7 @@ class InstanceStartServiceTest {
         coVerify(exactly = 0) { lifecycleHook.onWorkflowCreated(any(), any()) }
 
         coEvery { scheduleRepository.insert(any<ScheduleModel>(), any<Connection>()) } returns 0
-        coEvery { scheduleRepository.findByWorkflowId(WorkflowId(IDV7.from(request.instanceId))) } returns schedule.captured
+        coEvery { scheduleRepository.findByWorkflowId(WorkflowId(IDV7.from(request.instanceId)), any<Connection>()) } returns schedule.captured
 
         val retry = service.start(request, principal)
 
