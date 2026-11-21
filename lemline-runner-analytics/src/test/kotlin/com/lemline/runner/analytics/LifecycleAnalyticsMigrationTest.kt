@@ -123,6 +123,17 @@ class LifecycleAnalyticsMigrationTest {
         }
     }
 
+    @Test
+    fun `SQLite migration lock ignores JDBC connection options`(@TempDir directory: Path) {
+        val database = directory.resolve("analytics.db")
+        val lockFile = directory.resolve("analytics.db.migration.lock")
+        for (location in listOf(database.toUri().toString(), database.toString())) {
+            java.nio.file.Files.deleteIfExists(lockFile)
+            SQLiteMigrationLock.withLock("jdbc:sqlite:$location?busy_timeout=10000&foreign_keys=on") {}
+            assertEquals(true, java.nio.file.Files.exists(lockFile))
+        }
+    }
+
     private companion object {
         const val H2_INDEX_NAME = "idx_lemline_lifecycle_events_namespace_wftype_time"
         const val POSTGRESQL_INDEX_NAME = "idx_lemline_lifecycle_events_namespace_type"

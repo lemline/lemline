@@ -29,7 +29,9 @@ internal object SQLiteMigrationLock {
 
     private fun lockFile(jdbcUrl: String): Path {
         require(jdbcUrl.startsWith(JDBC_PREFIX)) { "Not a SQLite JDBC URL: $jdbcUrl" }
-        val location = jdbcUrl.removePrefix(JDBC_PREFIX)
+        // Connection options follow '?': they are not part of the file name, and two processes
+        // opening one file with different options must still share one lock.
+        val location = jdbcUrl.removePrefix(JDBC_PREFIX).substringBefore('?')
         val database = if (location.startsWith("file:")) Path.of(URI.create(location)) else Path.of(location)
         return database.resolveSibling("${database.fileName}.migration.lock")
     }

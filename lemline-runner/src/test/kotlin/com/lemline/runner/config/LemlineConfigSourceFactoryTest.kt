@@ -168,6 +168,43 @@ class LemlineConfigSourceFactoryTest {
     }
 
     @Test
+    fun `SQLite paths in the YAML file expand expressions before they are resolved`(@TempDir directory: Path) {
+        val file = directory.resolve("lemline.yaml")
+        Files.writeString(file, """
+            lemline:
+              gateway:
+                enabled: true
+              database:
+                type: sqlite
+                sqlite:
+                  path: ${'$'}{DATA_DIR}/orchestration.db
+              analytics:
+                type: sqlite
+                sqlite:
+                  path: ${'$'}{DATA_DIR}/${'$'}{ANALYTICS_NAME:analytics}.db
+        """.trimIndent())
+        val data = Files.createDirectory(directory.resolve("data")).toRealPath()
+        val previousPath = ConfigPathHolder.configPath
+        try {
+            ConfigPathHolder.configPath = file
+            val config = SmallRyeConfigBuilder()
+                .withSources(EnvConfigSource(mapOf("DATA_DIR" to data.toString()), 300))
+                .withSources(LemlineConfigSourceFactory())
+                .build()
+            assertEquals(
+                com.lemline.runner.common.config.SQLiteDatabase.jdbcUrl(data.resolve("orchestration.db")),
+                config.getValue("quarkus.datasource.sqlite.jdbc.url", String::class.java)
+            )
+            assertEquals(
+                "jdbc:sqlite:${data.resolve("analytics.db").toUri()}",
+                config.getValue("quarkus.datasource.analytics-sqlite.jdbc.url", String::class.java)
+            )
+        } finally {
+            ConfigPathHolder.configPath = previousPath
+        }
+    }
+
+    @Test
     fun `SQLite path alone keeps the existing default and broker inference`() {
         val settings = mapOf("lemline.messaging.sqlite.path" to "ignored.db",
             "lemline.messaging.commands.consumer.enabled" to "true")

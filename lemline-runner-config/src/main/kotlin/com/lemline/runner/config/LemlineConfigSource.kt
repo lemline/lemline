@@ -210,6 +210,7 @@ import io.quarkus.runtime.configuration.TrimmedStringConverter
 import io.smallrye.config.ConfigSourceContext
 import io.smallrye.config.Expressions
 import io.smallrye.config.PropertiesConfigSource
+import io.smallrye.config.SmallRyeConfig
 import io.smallrye.config.SmallRyeConfigBuilder
 import io.smallrye.reactive.messaging.providers.impl.ConcurrencyConnectorConfig
 import io.smallrye.reactive.messaging.providers.impl.ConnectorConfig
@@ -351,8 +352,8 @@ class LemlineConfigSource(context: ConfigSourceContext? = null) : PropertiesConf
 
             // Generate and merge transformed properties
             val generatedProps = mutableMapOf<String, String>()
-            generatedProps.putAll(generateWorkflowDatabaseProperties(lemlineProps))
-            generatedProps.putAll(generateAnalyticsDatabaseProperties(lemlineProps))
+            generatedProps.putAll(generateWorkflowDatabaseProperties(lemlineProps, context))
+            generatedProps.putAll(generateAnalyticsDatabaseProperties(lemlineProps, context))
             generatedProps.putAll(generateMessagingProperties(lemlineProps))
             generatedProps.putAll(generateGatewayProperties(lemlineProps))
             verifyDistinctSQLiteFiles(lemlineProps, generatedProps, context)
@@ -363,6 +364,48 @@ class LemlineConfigSource(context: ConfigSourceContext? = null) : PropertiesConf
                 putAll(lemlineProps)
                 putAll(generatedProps)
             }
+        }
+
+        /**
+         * Resolve the same higher-priority overrides and expressions as the application.
+         * Do not invoke the Lemline property factory recursively.
+         */
+        private fun effectiveConfig(values: Map<String, String>, context: ConfigSourceContext?): SmallRyeConfig {
+            val effectiveSource = object : ConfigSource {
+                override fun getName() = "SQLite file validation"
+                override fun getOrdinal() = LemlineConfigConstants.CONFIG_ORDINAL
+                override fun getPropertyNames() = values.keys
+                override fun getProperties() = values
+
+                override fun getValue(name: String): String? {
+                    val external = Expressions.withoutExpansion<io.smallrye.config.ConfigValue> {
+                        context?.getValue(name)
+                    }
+                    if (external != null && external.configSourceOrdinal > ordinal) {
+                        return external.value
+                    }
+                    return values[name] ?: external?.value
+                }
+            }
+            return SmallRyeConfigBuilder().addDefaultInterceptors()
+                .withSources(effectiveSource)
+                .apply { if (context == null) addDefaultSources() }
+                .build()
+        }
+
+        /**
+         * A SQLite path is resolved on the filesystem and URI-encoded while these properties are
+         * generated, so its expressions cannot wait for the application to expand them later.
+         */
+        private fun sqlitePath(
+            props: Map<String, String>,
+            context: ConfigSourceContext?,
+            key: String,
+            default: String,
+        ): String {
+            val value = props[key] ?: return default
+            if ("\${" !in value) return value
+            return effectiveConfig(props, context).getConfigValue(key).value
         }
 
         private fun verifyDistinctSQLiteFiles(
@@ -376,29 +419,7 @@ class LemlineConfigSource(context: ConfigSourceContext? = null) : PropertiesConf
             )
             if (datasourceKeys.keys.none { "$it.jdbc.url" in generated }) return
 
-            // Resolve the same higher-priority overrides and expressions as the
-            // application. Do not invoke the Lemline property factory recursively.
-            val transformed = props + generated
-            val effectiveSource = object : ConfigSource {
-                override fun getName() = "SQLite file validation"
-                override fun getOrdinal() = LemlineConfigConstants.CONFIG_ORDINAL
-                override fun getPropertyNames() = transformed.keys
-                override fun getProperties() = transformed
-
-                override fun getValue(name: String): String? {
-                    val external = Expressions.withoutExpansion<io.smallrye.config.ConfigValue> {
-                        context?.getValue(name)
-                    }
-                    if (external != null && external.configSourceOrdinal > ordinal) {
-                        return external.value
-                    }
-                    return transformed[name] ?: external?.value
-                }
-            }
-            val config = SmallRyeConfigBuilder().addDefaultInterceptors()
-                .withSources(effectiveSource)
-                .apply { if (context == null) addDefaultSources() }
-                .build()
+            val config = effectiveConfig(props + generated, context)
             fun value(name: String) = config.getOptionalValue(name, String::class.java).orElse(null)
             val databaseFiles = datasourceKeys.mapNotNull { (datasource, setting) ->
                 if (!config.getOptionalValue("$datasource.active", Boolean::class.javaObjectType).orElse(true)) {
@@ -487,7 +508,10 @@ class LemlineConfigSource(context: ConfigSourceContext? = null) : PropertiesConf
             lastDeclaration != null && (value == null || value is Map<*, *> || value is Collection<*>)
         }
 
-        private fun generateWorkflowDatabaseProperties(props: Map<String, String>): Map<String, String> {
+        private fun generateWorkflowDatabaseProperties(
+            props: Map<String, String>,
+            context: ConfigSourceContext?,
+        ): Map<String, String> {
             val generated = mutableMapOf<String, String>()
 
             val usePostgres = props.keys.any { it.startsWith("$LEMLINE_DATABASE_POSTGRES.") }
@@ -526,7 +550,7 @@ class LemlineConfigSource(context: ConfigSourceContext? = null) : PropertiesConf
                     generated["quarkus.datasource.active"] = "false"
                     if (enabled) {
                         val path = SQLiteDatabase.resolvePath(
-                            props[LEMLINE_DATABASE_SQLITE_PATH] ?: DB_SQLITE_PATH_DEFAULT,
+                            sqlitePath(props, context, LEMLINE_DATABASE_SQLITE_PATH, DB_SQLITE_PATH_DEFAULT),
                             LEMLINE_DATABASE_SQLITE_PATH,
                         )
                         generated["$sqlite.jdbc.url"] = SQLiteDatabase.jdbcUrl(path)
@@ -575,7 +599,10 @@ class LemlineConfigSource(context: ConfigSourceContext? = null) : PropertiesConf
             return generated
         }
 
-        private fun generateAnalyticsDatabaseProperties(props: Map<String, String>): Map<String, String> {
+        private fun generateAnalyticsDatabaseProperties(
+            props: Map<String, String>,
+            context: ConfigSourceContext?,
+        ): Map<String, String> {
             val generated = mutableMapOf<String, String>()
             val lifecycleConsumerEnabled = props[LEMLINE_MESSAGING_LIFECYCLE_EVENTS_CONSUMER_ENABLED].toBoolean()
             val gatewayEnabled = props[LEMLINE_GATEWAY_ENABLED]?.toBooleanStrictOrNull()
@@ -593,7 +620,12 @@ class LemlineConfigSource(context: ConfigSourceContext? = null) : PropertiesConf
             if (type == AnalyticsType.H2) return generated
             if (type == AnalyticsType.SQLITE) {
                 val path = resolveAnalyticsSQLitePath(
-                    props[LEMLINE_ANALYTICS_SQLITE_PATH] ?: LemlineConfigConstants.ANALYTICS_SQLITE_PATH_DEFAULT
+                    sqlitePath(
+                        props,
+                        context,
+                        LEMLINE_ANALYTICS_SQLITE_PATH,
+                        LemlineConfigConstants.ANALYTICS_SQLITE_PATH_DEFAULT,
+                    )
                 )
                 generated["quarkus.datasource.$ANALYTICS_H2_DATASOURCE_NAME.active"] = "false"
                 generated["quarkus.datasource.$ANALYTICS_POSTGRES_DATASOURCE_NAME.active"] = "false"
