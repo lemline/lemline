@@ -23,7 +23,7 @@ Generate a starting file for your broker and database:
 lemline config create --messaging kafka --database postgresql
 ```
 
-This writes `lemline.yaml` in the current directory. Lemline does not look for that name on its own: either pass it with `--config lemline.yaml`, or create the file as `.lemline.yaml` with `-o .lemline.yaml` so that it is found automatically. Use `--output <path>` to choose another path, `--force` to overwrite an existing file, and `--dry-run` to print the file instead of writing it. Supported values: `kafka`, `rabbitmq` or `pgmq` for messaging, `postgresql` or `mysql` for the database.
+This writes `lemline.yaml` in the current directory. Lemline does not look for that name on its own: either pass it with `--config lemline.yaml`, or create the file as `.lemline.yaml` with `-o .lemline.yaml` so that it is found automatically. Use `--output <path>` to choose another path, `--force` to overwrite an existing file, and `--dry-run` to print the file instead of writing it. Supported values: `kafka`, `rabbitmq`, `pgmq` or `sqlite` for messaging, `postgresql` or `mysql` for the database. With `sqlite`, the generated file also declares a PostgreSQL database for lifecycle analytics.
 
 A minimal file looks like this:
 
@@ -114,7 +114,7 @@ If `type` is omitted, Lemline picks `postgresql` or `mysql` from the block you f
 ```yaml
 lemline:
   messaging:
-    type: kafka               # kafka, rabbitmq, pgmq or in-memory
+    type: kafka               # kafka, rabbitmq, pgmq, sqlite or in-memory
     kafka:
       brokers: localhost:9092
       commands:

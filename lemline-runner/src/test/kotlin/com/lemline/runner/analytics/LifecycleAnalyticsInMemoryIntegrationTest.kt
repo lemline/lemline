@@ -10,7 +10,7 @@ import com.lemline.runner.tests.profiles.InMemoryAnalyticsProfile
 import io.agroal.api.AgroalDataSource
 import io.cloudevents.CloudEvent
 import io.cloudevents.core.builder.CloudEventBuilder
-import io.quarkus.agroal.DataSource
+import com.lemline.runner.gateway.analytics.AnalyticsDataSourceProvider
 import io.quarkus.test.junit.QuarkusTest
 import io.quarkus.test.junit.TestProfile
 import io.smallrye.reactive.messaging.memory.InMemoryConnector
@@ -34,7 +34,11 @@ import org.junit.jupiter.api.fail
 @QuarkusTest
 @TestProfile(InMemoryAnalyticsProfile::class)
 @Tag("integration")
-internal class LifecycleAnalyticsInMemoryIntegrationTest {
+internal class LifecycleAnalyticsInMemoryIntegrationTest : LifecycleAnalyticsInMemoryIntegrationTestBase()
+
+internal abstract class LifecycleAnalyticsInMemoryIntegrationTestBase(
+    protected val table: String = "public.lemline_lifecycle_events",
+) {
 
     @Inject
     @Any
@@ -44,14 +48,15 @@ internal class LifecycleAnalyticsInMemoryIntegrationTest {
     lateinit var analyticsService: LifecycleAnalyticsService
 
     @Inject
-    @DataSource("analytics")
-    lateinit var analyticsDataSource: AgroalDataSource
+    lateinit var analyticsDataSourceProvider: AnalyticsDataSourceProvider
+
+    protected val analyticsDataSource: AgroalDataSource get() = analyticsDataSourceProvider.require()
 
     @BeforeEach
     fun cleanAnalyticsTable() {
         analyticsDataSource.connection.use { conn ->
             conn.createStatement().use { stmt ->
-                stmt.execute("TRUNCATE TABLE public.lemline_lifecycle_events")
+                stmt.execute("DELETE FROM $table")
             }
         }
     }
@@ -115,7 +120,7 @@ internal class LifecycleAnalyticsInMemoryIntegrationTest {
             .build()
     }
 
-    private fun awaitEventCount(eventId: String, expected: Int, timeoutMs: Long = 5_000) {
+    protected fun awaitEventCount(eventId: String, expected: Int, timeoutMs: Long = 5_000) {
         val deadline = System.currentTimeMillis() + timeoutMs
         while (System.currentTimeMillis() < deadline) {
             if (countRowsByEventId(eventId) == expected) {
@@ -130,7 +135,7 @@ internal class LifecycleAnalyticsInMemoryIntegrationTest {
     private fun countRowsByEventId(eventId: String): Int {
         analyticsDataSource.connection.use { conn ->
             conn.prepareStatement(
-                "SELECT COUNT(*) FROM public.lemline_lifecycle_events WHERE event_id = ?"
+                "SELECT COUNT(*) FROM $table WHERE event_id = ?"
             ).use { stmt ->
                 stmt.setString(1, eventId)
                 stmt.executeQuery().use { rs ->

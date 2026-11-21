@@ -16,7 +16,9 @@ import com.lemline.runner.common.config.LEMLINE_ANALYTICS_POSTGRES_HOST
 import com.lemline.runner.common.config.LEMLINE_ANALYTICS_POSTGRES_PASSWORD
 import com.lemline.runner.common.config.LEMLINE_ANALYTICS_POSTGRES_PORT
 import com.lemline.runner.common.config.LEMLINE_ANALYTICS_POSTGRES_USERNAME
+import com.lemline.runner.common.config.LEMLINE_ANALYTICS_SQLITE_PATH
 import com.lemline.runner.common.config.LEMLINE_ANALYTICS_TYPE
+import com.lemline.runner.common.config.LEMLINE_DATABASE_ENABLED
 import com.lemline.runner.common.config.LEMLINE_DATABASE_MYSQL
 import com.lemline.runner.common.config.LEMLINE_DATABASE_MYSQL_DATABASE
 import com.lemline.runner.common.config.LEMLINE_DATABASE_MYSQL_HOST
@@ -29,6 +31,7 @@ import com.lemline.runner.common.config.LEMLINE_DATABASE_POSTGRES_HOST
 import com.lemline.runner.common.config.LEMLINE_DATABASE_POSTGRES_PASSWORD
 import com.lemline.runner.common.config.LEMLINE_DATABASE_POSTGRES_PORT
 import com.lemline.runner.common.config.LEMLINE_DATABASE_POSTGRES_USERNAME
+import com.lemline.runner.common.config.LEMLINE_DATABASE_SQLITE_PATH
 import com.lemline.runner.common.config.LEMLINE_DATABASE_TYPE
 import com.lemline.runner.common.config.LEMLINE_GATEWAY_AUTHENTICATION_ENABLED
 import com.lemline.runner.common.config.LEMLINE_GATEWAY_AUTHENTICATION_JWT_ISSUER
@@ -129,9 +132,15 @@ import com.lemline.runner.common.config.LEMLINE_MESSAGING_RABBITMQ_PORT
 import com.lemline.runner.common.config.LEMLINE_MESSAGING_RABBITMQ_SSL_ENABLED
 import com.lemline.runner.common.config.LEMLINE_MESSAGING_RABBITMQ_USERNAME
 import com.lemline.runner.common.config.LEMLINE_MESSAGING_RABBITMQ_VIRTUAL_HOST
+import com.lemline.runner.common.config.LEMLINE_MESSAGING_SQLITE_BATCH_SIZE
+import com.lemline.runner.common.config.LEMLINE_MESSAGING_SQLITE_MAX_RETRIES
+import com.lemline.runner.common.config.LEMLINE_MESSAGING_SQLITE_PATH
+import com.lemline.runner.common.config.LEMLINE_MESSAGING_SQLITE_POLL_INTERVAL
+import com.lemline.runner.common.config.LEMLINE_MESSAGING_SQLITE_VISIBILITY_TIMEOUT
 import com.lemline.runner.common.config.LEMLINE_MESSAGING_TYPE
 import com.lemline.runner.common.config.LEMLINE_PREFIX
 import com.lemline.runner.common.config.MessagingType
+import com.lemline.runner.common.config.SQLiteDatabase
 import com.lemline.runner.common.messaging.LIFECYCLEEVENTS_IN_CHANNEL
 import com.lemline.runner.common.messaging.LIFECYCLEEVENTS_OUT_CHANNEL
 import com.lemline.runner.config.LemlineConfigConstants.ANALYTICS_POSTGRES_BASELINE_ON_MIGRATE_DEFAULT
@@ -149,6 +158,7 @@ import com.lemline.runner.config.LemlineConfigConstants.GATEWAY_GRPC_HOST_DEFAUL
 import com.lemline.runner.config.LemlineConfigConstants.GATEWAY_GRPC_PORT_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.GATEWAY_TLS_CLIENT_AUTH_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.GATEWAY_TLS_ENABLED_DEFAULT
+import com.lemline.runner.config.LemlineConfigConstants.DB_SQLITE_PATH_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.H2_DB_NAME_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.H2_PASSWORD_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.H2_USERNAME_DEFAULT
@@ -172,6 +182,12 @@ import com.lemline.runner.config.LemlineConfigConstants.MYSQL_PASSWORD_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.MYSQL_PORT_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.MYSQL_USERNAME_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.PGMQ_BATCH_SIZE_DEFAULT
+import com.lemline.runner.config.LemlineConfigConstants.SQLITE_BATCH_SIZE_DEFAULT
+import com.lemline.runner.config.LemlineConfigConstants.SQLITE_CONNECTOR
+import com.lemline.runner.config.LemlineConfigConstants.SQLITE_MAX_RETRIES_DEFAULT
+import com.lemline.runner.config.LemlineConfigConstants.SQLITE_POLL_INTERVAL_DEFAULT
+import com.lemline.runner.config.LemlineConfigConstants.SQLITE_VISIBILITY_TIMEOUT_DEFAULT
+import com.lemline.runner.config.LemlineConfigConstants.SQLITE_MESSAGING_PATH_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.PGMQ_CONNECTOR
 import com.lemline.runner.config.LemlineConfigConstants.PGMQ_MAX_RETRIES_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.PGMQ_POLL_INTERVAL_DEFAULT
@@ -190,8 +206,24 @@ import com.lemline.runner.config.LemlineConfigConstants.RABBITMQ_USER_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.RABBITMQ_VHOST_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.WORKFLOW_COMMANDS_TOPIC_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.WORKFLOW_EVENTS_TOPIC_DEFAULT
+import io.quarkus.runtime.configuration.TrimmedStringConverter
 import io.smallrye.config.ConfigSourceContext
+import io.smallrye.config.Expressions
 import io.smallrye.config.PropertiesConfigSource
+import io.smallrye.config.SmallRyeConfigBuilder
+import io.smallrye.reactive.messaging.providers.impl.ConcurrencyConnectorConfig
+import io.smallrye.reactive.messaging.providers.impl.ConnectorConfig
+import java.io.IOException
+import java.net.URI
+import java.nio.file.Files
+import java.nio.file.InvalidPathException
+import java.nio.file.LinkOption.NOFOLLOW_LINKS
+import java.nio.file.Path
+import java.text.Normalizer
+import org.eclipse.microprofile.config.spi.ConfigSource
+import org.yaml.snakeyaml.LoaderOptions
+import org.yaml.snakeyaml.Yaml
+import org.yaml.snakeyaml.constructor.SafeConstructor
 
 internal const val COMMANDS_IN_CHANNEL = "commands-in"
 internal const val COMMANDS_OUT_CHANNEL = "commands-out"
@@ -251,16 +283,24 @@ class LemlineConfigSource(context: ConfigSourceContext? = null) : PropertiesConf
         private val logger = logger()
         private const val ANALYTICS_H2_DATASOURCE_NAME = "analytics"
         private const val ANALYTICS_POSTGRES_DATASOURCE_NAME = "analytics-postgresql"
+        private const val ANALYTICS_SQLITE_DATASOURCE_NAME = "analytics-sqlite"
+        private val uriScheme = Regex("^[A-Za-z][A-Za-z0-9+.-]*:")
 
         private fun buildProperties(context: ConfigSourceContext?): Map<String, String> {
             val lemlineProps = mutableMapOf<String, String>()
-            val contextualProperties = context?.iterateNames()?.asSequence()
-                ?.filter { it.startsWith(LEMLINE_PREFIX) }
-                ?.map { context.getValue(it) }
-                // Mapping defaults and Quarkus runtime defaults (ordinal 0) are not explicit backend settings:
-                // they would suppress database inference and enable every optional backend.
-                ?.filter { it.value != null && it.configSourceOrdinal > 0 }
-                ?.toList().orEmpty()
+            val contextualProperties = context?.let { sources ->
+                val lemlineValues = sources.iterateNames().asSequence()
+                    .filter { it.startsWith(LEMLINE_PREFIX) && it != LEMLINE_MESSAGING_SQLITE_PATH }
+                    .map(sources::getValue)
+                // Resolve path expressions after the external YAML joins the configuration sources.
+                val sqlitePath = Expressions.withoutExpansion<io.smallrye.config.ConfigValue> {
+                    sources.getValue(LEMLINE_MESSAGING_SQLITE_PATH)
+                }
+                (lemlineValues + sqlitePath)
+                    // Mapping defaults (ordinal 0) must not opt into a backend.
+                    .filter { it.value != null && it.configSourceOrdinal > 0 }
+                    .toList()
+            }.orEmpty()
             contextualProperties.forEach { lemlineProps[it.name] = it.value }
 
 
@@ -272,10 +312,22 @@ class LemlineConfigSource(context: ConfigSourceContext? = null) : PropertiesConf
                 val fileProps = mutableMapOf<String, String>()
                 ExtraFileConfigFactory().getConfig(path).properties.forEach { (name, value) ->
                     if (name.startsWith(LEMLINE_PREFIX)) {
-                        val cleaned = value.replaceFirst(Regex("""\s+#.*$"""), "").trim()
+                        val cleaned = if (name == LEMLINE_MESSAGING_SQLITE_PATH) value else {
+                            value.replaceFirst(Regex("""\s+#.*$"""), "").trim()
+                        }
                         lemlineProps[name] = cleaned
                         fileProps[name] = cleaned
                     }
+                }
+                val externalType = contextualProperties.firstOrNull {
+                    it.name == LEMLINE_MESSAGING_TYPE && it.configSourceOrdinal > LemlineConfigConstants.CONFIG_ORDINAL
+                }?.value ?: if (context == null) System.getProperty(LEMLINE_MESSAGING_TYPE) else null
+                val effectiveType = externalType ?: lemlineProps[LEMLINE_MESSAGING_TYPE]
+                // The YAML source drops null leaves. Record a declared empty path
+                // at file priority so it cannot silently enable the default file.
+                if (effectiveType == MessagingType.SQLITE.configValue && hasInvalidSqlitePath(path)) {
+                    lemlineProps[LEMLINE_MESSAGING_SQLITE_PATH] = ""
+                    fileProps[LEMLINE_MESSAGING_SQLITE_PATH] = ""
                 }
                 LoadedConfigFile.capture(path, ConfigPathHolder.locator, fileProps)
             }
@@ -303,6 +355,7 @@ class LemlineConfigSource(context: ConfigSourceContext? = null) : PropertiesConf
             generatedProps.putAll(generateAnalyticsDatabaseProperties(lemlineProps))
             generatedProps.putAll(generateMessagingProperties(lemlineProps))
             generatedProps.putAll(generateGatewayProperties(lemlineProps))
+            verifyDistinctSQLiteFiles(lemlineProps, generatedProps, context)
 
             logger.info { "Lemline generated properties:\n${generatedProps.toPrint()}" }
 
@@ -310,6 +363,128 @@ class LemlineConfigSource(context: ConfigSourceContext? = null) : PropertiesConf
                 putAll(lemlineProps)
                 putAll(generatedProps)
             }
+        }
+
+        private fun verifyDistinctSQLiteFiles(
+            props: Map<String, String>,
+            generated: Map<String, String>,
+            context: ConfigSourceContext?,
+        ) {
+            val datasourceKeys = mapOf(
+                "quarkus.datasource.sqlite" to LEMLINE_DATABASE_SQLITE_PATH,
+                "quarkus.datasource.$ANALYTICS_SQLITE_DATASOURCE_NAME" to LEMLINE_ANALYTICS_SQLITE_PATH,
+            )
+            if (datasourceKeys.keys.none { "$it.jdbc.url" in generated }) return
+
+            // Resolve the same higher-priority overrides and expressions as the
+            // application. Do not invoke the Lemline property factory recursively.
+            val transformed = props + generated
+            val effectiveSource = object : ConfigSource {
+                override fun getName() = "SQLite file validation"
+                override fun getOrdinal() = LemlineConfigConstants.CONFIG_ORDINAL
+                override fun getPropertyNames() = transformed.keys
+                override fun getProperties() = transformed
+
+                override fun getValue(name: String): String? {
+                    val external = Expressions.withoutExpansion<io.smallrye.config.ConfigValue> {
+                        context?.getValue(name)
+                    }
+                    if (external != null && external.configSourceOrdinal > ordinal) {
+                        return external.value
+                    }
+                    return transformed[name] ?: external?.value
+                }
+            }
+            val config = SmallRyeConfigBuilder().addDefaultInterceptors()
+                .withSources(effectiveSource)
+                .apply { if (context == null) addDefaultSources() }
+                .build()
+            fun value(name: String) = config.getOptionalValue(name, String::class.java).orElse(null)
+            val databaseFiles = datasourceKeys.mapNotNull { (datasource, setting) ->
+                if (!config.getOptionalValue("$datasource.active", Boolean::class.javaObjectType).orElse(true)) {
+                    return@mapNotNull null
+                }
+                val url = value("$datasource.jdbc.url")?.let(TrimmedStringConverter()::convert) ?: return@mapNotNull null
+                require(url.startsWith("jdbc:sqlite:")) { "'$datasource.jdbc.url' must be a SQLite file URL" }
+                val location = url.removePrefix("jdbc:sqlite:").substringBefore('?')
+                val path = if (location.startsWith("file:")) {
+                    val uri = URI.create(location)
+                    if (uri.isOpaque) uri.schemeSpecificPart else Path.of(uri).toString()
+                } else location
+                setting to SQLiteDatabase.resolvePath(path, setting)
+            }
+            fun checkFiles(first: Pair<String, Path>, second: Pair<String, Path>) {
+                require(!sameSQLiteFile(first.second, second.second)) {
+                    "'${first.first}' (${first.second}) and '${second.first}' (${second.second}) must use distinct SQLite files"
+                }
+            }
+            if (databaseFiles.size == 2) checkFiles(databaseFiles[0], databaseFiles[1])
+            if (databaseFiles.isEmpty()) return
+
+            val properties = config.propertyNames.toSet() + context?.iterateNames()?.asSequence().orEmpty().toSet()
+            for (prefix in listOf("mp.messaging.incoming.", "mp.messaging.outgoing.")) {
+                val channels = properties.asSequence()
+                    .filter { it.startsWith(prefix) && (it.endsWith(".connector") || it.endsWith(".type")) }
+                    .map {
+                        val name = it.removePrefix(prefix)
+                        if (name.startsWith('"')) name.substring(1, name.lastIndexOf('"')) else name.substringBefore('.')
+                    }
+                    .distinct()
+                for (channel in channels) {
+                    if (ConcurrencyConnectorConfig.isConcurrencyChannelName(channel)) {
+                        val base = ConcurrencyConnectorConfig.stripChannelNameOfSeparator(channel)
+                        if (ConcurrencyConnectorConfig.getConcurrency(base, config).isPresent) continue
+                    }
+                    val connector = ConnectorConfig.getConnectorAttribute(prefix, config, channel)
+                    if (connector != SQLITE_CONNECTOR && "smallrye-$connector" != SQLITE_CONNECTOR) continue
+                    val channelConfig = ConnectorConfig.create(prefix, config, channel)
+                    if (!channelConfig.getOptionalValue("enabled", Boolean::class.javaObjectType).orElse(true)) continue
+                    val concurrency = if (prefix == "mp.messaging.incoming.") {
+                        ConcurrencyConnectorConfig.getConcurrency(channelConfig).orElse(1)
+                    } else 1
+                    for (index in 1..concurrency.coerceAtLeast(1)) {
+                        val deliveryConfig = if (concurrency > 1) ConcurrencyConnectorConfig(channelConfig, index) else channelConfig
+                        val configuredPath = deliveryConfig.getConfigValue("path")
+                        val path = configuredPath.value ?: continue
+                        val setting = "$LEMLINE_MESSAGING_SQLITE_PATH (${configuredPath.name})"
+                        val messagingFile = setting to SQLiteDatabase.resolvePath(path, setting)
+                        databaseFiles.forEach { checkFiles(it, messagingFile) }
+                    }
+                }
+            }
+        }
+
+        private fun sameSQLiteFile(first: Path, second: Path): Boolean {
+            if (first == second) return true
+            if (Files.exists(first) && Files.exists(second)) return Files.isSameFile(first, second)
+
+            val firstName = first.fileName.toString()
+            val secondName = second.fileName.toString()
+            fun normalize(name: String) = Normalizer.normalize(name, Normalizer.Form.NFD)
+            if (first.parent != second.parent || !normalize(firstName).equals(normalize(secondName), ignoreCase = true)) {
+                return false
+            }
+            // Two missing names can still be aliases on a case-insensitive or
+            // normalization-insensitive volume. Probe there without opening either database.
+            val probe = Files.createTempDirectory(first.parent, ".lemline-sqlite-path-")
+            val probeFile = probe.resolve(firstName)
+            try {
+                Files.createFile(probeFile)
+                return Files.exists(probe.resolve(secondName))
+            } finally {
+                Files.deleteIfExists(probeFile)
+                Files.delete(probe)
+            }
+        }
+
+        private fun hasInvalidSqlitePath(file: Path): Boolean = Files.newInputStream(file).use { stream ->
+            val lastDeclaration = Yaml(SafeConstructor(LoaderOptions())).loadAll(stream).mapNotNull { document ->
+                val lemline = (document as? Map<*, *>)?.get("lemline") as? Map<*, *>
+                val messaging = lemline?.get("messaging") as? Map<*, *>
+                (messaging?.get("sqlite") as? Map<*, *>)?.takeIf { it.containsKey("path") }
+            }.lastOrNull()
+            val value = lastDeclaration?.get("path")
+            lastDeclaration != null && (value == null || value is Map<*, *> || value is Collection<*>)
         }
 
         private fun generateWorkflowDatabaseProperties(props: Map<String, String>): Map<String, String> {
@@ -332,7 +507,32 @@ class LemlineConfigSource(context: ConfigSourceContext? = null) : PropertiesConf
             }
             generated[LEMLINE_DATABASE_TYPE] = type.configValue
 
+            // SQLite is an explicit opt-in: a path alone does not select it. Say so instead of
+            // silently running on another database.
+            if (type != DatabaseType.SQLITE && LEMLINE_DATABASE_SQLITE_PATH in props) {
+                logger.warn {
+                    "'$LEMLINE_DATABASE_SQLITE_PATH' is set but ignored: the database type is '${type.configValue}'. " +
+                        "Set '$LEMLINE_DATABASE_TYPE' to '${DatabaseType.SQLITE.configValue}' to use SQLite."
+                }
+            }
+
             when (type) {
+                DatabaseType.SQLITE -> {
+                    val enabled = props[LEMLINE_DATABASE_ENABLED]?.toBooleanStrictOrNull() ?: true
+                    val sqlite = "quarkus.datasource.sqlite"
+                    generated["$sqlite.active"] = enabled.toString()
+                    generated["quarkus.datasource.postgresql.active"] = "false"
+                    generated["quarkus.datasource.mysql.active"] = "false"
+                    generated["quarkus.datasource.active"] = "false"
+                    if (enabled) {
+                        val path = SQLiteDatabase.resolvePath(
+                            props[LEMLINE_DATABASE_SQLITE_PATH] ?: DB_SQLITE_PATH_DEFAULT,
+                            LEMLINE_DATABASE_SQLITE_PATH,
+                        )
+                        generated["$sqlite.jdbc.url"] = SQLiteDatabase.jdbcUrl(path)
+                    }
+                }
+
                 DatabaseType.POSTGRESQL -> {
                     val host = props[LEMLINE_DATABASE_POSTGRES_HOST] ?: POSTGRES_HOST_DEFAULT
                     val port = props[LEMLINE_DATABASE_POSTGRES_PORT] ?: POSTGRES_PORT_DEFAULT
@@ -391,6 +591,18 @@ class LemlineConfigSource(context: ConfigSourceContext? = null) : PropertiesConf
             generated[LEMLINE_ANALYTICS_TYPE] = type.configValue
 
             if (type == AnalyticsType.H2) return generated
+            if (type == AnalyticsType.SQLITE) {
+                val path = resolveAnalyticsSQLitePath(
+                    props[LEMLINE_ANALYTICS_SQLITE_PATH] ?: LemlineConfigConstants.ANALYTICS_SQLITE_PATH_DEFAULT
+                )
+                generated["quarkus.datasource.$ANALYTICS_H2_DATASOURCE_NAME.active"] = "false"
+                generated["quarkus.datasource.$ANALYTICS_POSTGRES_DATASOURCE_NAME.active"] = "false"
+                val datasource = "quarkus.datasource.$ANALYTICS_SQLITE_DATASOURCE_NAME"
+                generated["$datasource.active"] = "true"
+                // Encode literal file names so JDBC cannot interpret their characters as options.
+                generated["$datasource.jdbc.url"] = "jdbc:sqlite:${path.toUri().toASCIIString()}"
+                return generated
+            }
 
             val host = props[LEMLINE_ANALYTICS_POSTGRES_HOST] ?: POSTGRES_HOST_DEFAULT
             val port = props[LEMLINE_ANALYTICS_POSTGRES_PORT] ?: POSTGRES_PORT_DEFAULT
@@ -409,6 +621,37 @@ class LemlineConfigSource(context: ConfigSourceContext? = null) : PropertiesConf
             generated["$flyway.locations"] = "classpath:db/migration/analytics/postgresql"
 
             return generated
+        }
+
+        private fun resolveAnalyticsSQLitePath(value: String): Path {
+            val key = LEMLINE_ANALYTICS_SQLITE_PATH
+            require(value.isNotBlank() && !value.startsWith(":memory:", ignoreCase = true)) {
+                "'$key' must be a local file path."
+            }
+            val path = try {
+                Path.of(value)
+            } catch (e: InvalidPathException) {
+                throw IllegalArgumentException("'$key' must be a local file path.", e)
+            }
+            require(path.isAbsolute || !uriScheme.containsMatchIn(value)) { "'$key' must be a local file path." }
+            val absolute = path.toAbsolutePath()
+            require(absolute.toUri().authority == null) { "'$key' must be a local file path." }
+            val resolved = try {
+                if (Files.exists(absolute, NOFOLLOW_LINKS)) {
+                    absolute.toRealPath()
+                } else {
+                    absolute.parent.toRealPath().resolve(absolute.fileName)
+                }
+            } catch (e: IOException) {
+                throw IllegalArgumentException("Cannot resolve '$key' to a local database file: $absolute", e)
+            }
+            require(!Files.exists(resolved) || (Files.isRegularFile(resolved) && Files.isWritable(resolved))) {
+                "'$key' must name a writable database file: $resolved"
+            }
+            require(Files.isDirectory(resolved.parent) && Files.isWritable(resolved.parent)) {
+                "'$key' requires an existing, writable parent directory: $resolved"
+            }
+            return resolved
         }
 
         private fun generateGatewayProperties(props: Map<String, String>): Map<String, String> {
@@ -531,7 +774,7 @@ class LemlineConfigSource(context: ConfigSourceContext? = null) : PropertiesConf
                 when {
                     messagingTypes.size > 1 -> throw IllegalArgumentException(
                         "Multiple messaging types defined: ${messagingTypes.joinToString { it.configValue }}. " +
-                            "Explicitly set '$LEMLINE_MESSAGING_TYPE' to one of: ${MessagingType.KAFKA.configValue}, ${MessagingType.RABBITMQ.configValue}, ${MessagingType.PGMQ.configValue}."
+                            "Explicitly set '$LEMLINE_MESSAGING_TYPE' to one of: ${MessagingType.KAFKA.configValue}, ${MessagingType.RABBITMQ.configValue}, ${MessagingType.PGMQ.configValue}, ${MessagingType.SQLITE.configValue}."
                     )
 
                     useKafka -> MessagingType.KAFKA
@@ -546,6 +789,7 @@ class LemlineConfigSource(context: ConfigSourceContext? = null) : PropertiesConf
                 MessagingType.KAFKA -> generated.configureKafka(props)
                 MessagingType.RABBITMQ -> generated.configureRabbit(props)
                 MessagingType.PGMQ -> generated.configurePgmq(props)
+                MessagingType.SQLITE -> generated.configureSqlite(props)
                 MessagingType.IN_MEMORY -> generated.configureInMemory(props)
             }
 
@@ -1162,6 +1406,60 @@ class LemlineConfigSource(context: ConfigSourceContext? = null) : PropertiesConf
                 set("$outgoing.username", username)
                 set("$outgoing.password", password)
                 set("$outgoing.auto-create-queue", "false")
+            }
+        }
+
+        private fun MutableMap<String, String>.configureSqlite(props: Map<String, String>) {
+            val path = props[LEMLINE_MESSAGING_SQLITE_PATH] ?: SQLITE_MESSAGING_PATH_DEFAULT
+            val prefix = prefixOf(props)
+            val namespaces = namespacesOf(props)
+
+            fun channel(direction: String, name: String, queueProperty: String, queue: String) {
+                require(path.isNotBlank()) { "$LEMLINE_MESSAGING_SQLITE_PATH must name a local file" }
+                val key = "mp.messaging.$direction.$name"
+                set("$key.connector", SQLITE_CONNECTOR)
+                set("$key.path", path)
+                set("$key.$queueProperty", queue)
+                if (direction == "incoming") {
+                    // A handler that outlives the visibility timeout is delivered again,
+                    // so operators must be able to size it for their longest task.
+                    set("$key.visibility-timeout", props[LEMLINE_MESSAGING_SQLITE_VISIBILITY_TIMEOUT] ?: SQLITE_VISIBILITY_TIMEOUT_DEFAULT)
+                    set("$key.poll-interval", props[LEMLINE_MESSAGING_SQLITE_POLL_INTERVAL] ?: SQLITE_POLL_INTERVAL_DEFAULT)
+                    set("$key.batch-size", props[LEMLINE_MESSAGING_SQLITE_BATCH_SIZE] ?: SQLITE_BATCH_SIZE_DEFAULT)
+                    set("$key.max-retries", props[LEMLINE_MESSAGING_SQLITE_MAX_RETRIES] ?: SQLITE_MAX_RETRIES_DEFAULT)
+                }
+            }
+
+            fun namespaced(type: DestinationType, incoming: String, outgoing: String, consume: String, produce: String) {
+                if (props[consume].toBoolean()) {
+                    val queues = namespaces.joinToString(",") { destinationFor(prefix, it, type) }
+                    channel("incoming", incoming, "queues", queues)
+                    if (type == DestinationType.CLOUDEVENTS) {
+                        // Until/foreach must observe earlier events before the event that closes a listener.
+                        set("mp.messaging.incoming.$incoming.ordered", "true")
+                    }
+                }
+                if (props[produce].toBoolean()) {
+                    channel("outgoing", outgoing, "queue", destinationFor(prefix, NamespaceScope.DEFAULT_NAMESPACE, type))
+                }
+            }
+
+            TopicType.entries.forEach { topic ->
+                namespaced(
+                    topic.destinationType, topic.incomingChannel, topic.outgoingChannel,
+                    topic.consumerEnabled, topic.producerEnabled,
+                )
+            }
+            namespaced(
+                DestinationType.CLOUDEVENTS, CLOUDEVENTS_IN_CHANNEL, CLOUDEVENTS_OUT_CHANNEL,
+                LEMLINE_MESSAGING_CLOUDEVENTS_CONSUMER_ENABLED, LEMLINE_MESSAGING_CLOUDEVENTS_PRODUCER_ENABLED,
+            )
+            if (props[LEMLINE_MESSAGING_LIFECYCLE_EVENTS_CONSUMER_ENABLED].toBoolean()) {
+                channel("incoming", LIFECYCLEEVENTS_IN_CHANNEL, "queue", LIFECYCLE_EVENTS_TOPIC_DEFAULT)
+                set("mp.messaging.incoming.$LIFECYCLEEVENTS_IN_CHANNEL.broadcast", "true")
+            }
+            if (props[LEMLINE_MESSAGING_LIFECYCLE_EVENTS_PRODUCER_ENABLED].toBoolean()) {
+                channel("outgoing", LIFECYCLEEVENTS_OUT_CHANNEL, "queue", LIFECYCLE_EVENTS_TOPIC_DEFAULT)
             }
         }
 

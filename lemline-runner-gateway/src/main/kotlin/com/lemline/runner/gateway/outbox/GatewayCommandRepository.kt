@@ -19,6 +19,7 @@ import com.lemline.runner.common.repositories.ops.OUTBOX_DELAYED_UNTIL_COLUMN
 import com.lemline.runner.common.repositories.ops.OUTBOX_FAILED_AT_COLUMN
 import com.lemline.runner.common.repositories.ops.OUTBOX_SCHEDULED_FOR_COLUMN
 import com.lemline.runner.common.repositories.ops.OutboxRepository
+import com.lemline.runner.common.repositories.ops.bindTimestamp
 import com.lemline.runner.common.repositories.ops.cleanupColumns
 import com.lemline.runner.common.repositories.ops.getInstanceMessage
 import com.lemline.runner.common.repositories.ops.getInstant
@@ -79,7 +80,7 @@ class GatewayCommandRepository : CrudRepository<GatewayCommandModel>(),
         databaseConfig.withConnection(connection) { conn ->
             conn.prepareStatement(findReadyByIdSql).use { stmt ->
                 idHelper.set(stmt, 1, id)
-                stmt.setTimestamp(2, Timestamp.from(Clock.System.now().toJavaInstant()))
+                databaseConfig.bindTimestamp(stmt, 2, Timestamp.from(Clock.System.now().toJavaInstant()))
                 stmt.setInt(3, maxAttempts)
                 stmt.executeQuery().use { rs -> if (rs.next()) createModel(rs) else null }
             }
@@ -95,7 +96,7 @@ class GatewayCommandRepository : CrudRepository<GatewayCommandModel>(),
               AND $OUTBOX_DELAYED_UNTIL_COLUMN <= ?
               AND $OUTBOX_ATTEMPT_COUNT_COLUMN < ?
             LIMIT 1
-            FOR UPDATE SKIP LOCKED
+            ${databaseConfig.forUpdate(skipLocked = true)}
         """.trimIndent()
     }
 
@@ -111,8 +112,8 @@ class GatewayCommandRepository : CrudRepository<GatewayCommandModel>(),
         ColumnBindingsBuilder<GatewayCommandModel>().apply {
             idColumn(idHelper)
             instanceColumns(idHelper)
-            cleanupColumns()
-            outboxColumns()
+            cleanupColumns(databaseConfig)
+            outboxColumns(databaseConfig)
         }.build()
     }
 

@@ -76,7 +76,7 @@ open class OutboxRepository<T : WithOutbox>(
     ): List<T> = databaseConfig.withConnection(connection) { conn ->
         conn.prepareStatement(findEntitiesToProcessSQL).use { stmt ->
             var idx = 1
-            stmt.setTimestamp(idx++, Timestamp.from(Clock.System.now().toJavaInstant()))
+            databaseConfig.bindTimestamp(stmt, idx++, Timestamp.from(Clock.System.now().toJavaInstant()))
             stmt.setInt(idx++, maxAttempts)
             namespaces?.forEach { stmt.setString(idx++, it) }
             stmt.setInt(idx, limit)
@@ -95,7 +95,7 @@ open class OutboxRepository<T : WithOutbox>(
               ${namespacePredicate(namespaces, namespaceColumn)}
             ORDER BY $OUTBOX_DELAYED_UNTIL_COLUMN ASC
             LIMIT ?
-            FOR UPDATE SKIP LOCKED
+            ${databaseConfig.forUpdate(skipLocked = true)}
         """.trimIndent()
     }
 
@@ -137,26 +137,26 @@ fun <T : WithOutbox> T.readOutboxFields(rs: ResultSet): T = apply {
  * override val columns by lazy {
  *     ColumnBindingsBuilder<MyModel>().apply {
  *         key("id") { stmt, entity, idx -> setIDV7(stmt, idx, entity.id) }
- *         outboxColumns()  // adds all 7 outbox columns
+ *         outboxColumns(databaseConfig)  // adds all 7 outbox columns
  *         // ... other columns
  *     }.build()
  * }
  * ```
  */
-fun <T : WithOutbox> ColumnBindingsBuilder<T>.outboxColumns() {
+fun <T : WithOutbox> ColumnBindingsBuilder<T>.outboxColumns(databaseConfig: DatabaseConfig) {
     column(OUTBOX_COMPLETED_AT_COLUMN) { stmt, entity, idx ->
         entity.outboxCompletedAt?.let {
-            stmt.setTimestamp(idx, Timestamp.from(it.toJavaInstant()))
+            databaseConfig.bindTimestamp(stmt, idx, Timestamp.from(it.toJavaInstant()))
         } ?: stmt.setNull(idx, Types.TIMESTAMP)
     }
     column(OUTBOX_SCHEDULED_FOR_COLUMN) { stmt, entity, idx ->
         entity.outboxScheduledFor?.let {
-            stmt.setTimestamp(idx, Timestamp.from(it.toJavaInstant()))
+            databaseConfig.bindTimestamp(stmt, idx, Timestamp.from(it.toJavaInstant()))
         } ?: stmt.setNull(idx, Types.TIMESTAMP)
     }
     column(OUTBOX_DELAYED_UNTIL_COLUMN) { stmt, entity, idx ->
         entity.outboxDelayedUntil?.let {
-            stmt.setTimestamp(idx, Timestamp.from(it.toJavaInstant()))
+            databaseConfig.bindTimestamp(stmt, idx, Timestamp.from(it.toJavaInstant()))
         } ?: stmt.setNull(idx, Types.TIMESTAMP)
     }
     column(OUTBOX_ATTEMPT_COUNT_COLUMN) { stmt, entity, idx ->
@@ -164,7 +164,7 @@ fun <T : WithOutbox> ColumnBindingsBuilder<T>.outboxColumns() {
     }
     column(OUTBOX_FAILED_AT_COLUMN) { stmt, entity, idx ->
         entity.outboxFailedAt?.let {
-            stmt.setTimestamp(idx, Timestamp.from(it.toJavaInstant()))
+            databaseConfig.bindTimestamp(stmt, idx, Timestamp.from(it.toJavaInstant()))
         } ?: stmt.setNull(idx, Types.TIMESTAMP)
     }
     column(OUTBOX_ERROR_CLASS_COLUMN) { stmt, entity, idx ->

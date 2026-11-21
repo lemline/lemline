@@ -42,7 +42,11 @@ class LifecycleAnalyticsService(
     private fun parseUuidExtension(event: CloudEvent, extensionName: String): UUID? {
         val value = extensionAsString(event, extensionName) ?: return null
 
-        return runCatching { UUID.fromString(value) }
+        return runCatching {
+            UUID.fromString(value).also {
+                require(it.toString().equals(value, ignoreCase = true))
+            }
+        }
             .onFailure {
                 logger.warn {
                     "Ignoring malformed UUID extension '$extensionName' for lifecycle event id=${event.id}: value='$value'"

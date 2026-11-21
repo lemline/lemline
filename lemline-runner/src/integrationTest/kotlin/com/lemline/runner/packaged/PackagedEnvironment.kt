@@ -3,6 +3,8 @@ package com.lemline.runner.packaged
 
 import java.nio.file.Files
 import java.nio.file.Path
+import java.sql.Connection
+import java.sql.DriverManager
 import java.util.Properties
 import java.util.concurrent.TimeUnit
 import org.testcontainers.postgresql.PostgreSQLContainer
@@ -28,23 +30,72 @@ internal object PackagedEnvironment {
             }
     }
 
+    val postgresPort: Int get() = postgres.firstMappedPort
+
     val workDir: Path by lazy { Files.createTempDirectory("lemline-packaged-") }
 
     /** Configuration file for every command, created once the database is up. */
     val config: Path by lazy {
+        configuration(
+            workDir.resolve("lemline.yaml"),
+            postgresAnalyticsSettings,
+        )
+    }
+
+    fun sqliteAnalyticsConfig(directory: Path): Path = configuration(
+        directory.resolve("lemline.yaml"),
+        """
+        |type: sqlite
+        |migrate-at-start: true
+        """.trimMargin(),
+        """
+        |  gateway:
+        |    grpc: { host: 127.0.0.1 }
+        |    tls: { enabled: false }
+        |    authentication: { enabled: false }
+        """.trimMargin(),
+    )
+
+    val sqliteConfig: Path by lazy {
+        configuration(
+            workDir.resolve("sqlite.yaml"),
+            postgresAnalyticsSettings,
+            messaging = "type: sqlite\nprefix: packaged-sqlite",
+        )
+    }
+
+    private val postgresAnalyticsSettings: String
+        get() = "postgresql: { host: localhost, port: ${postgres.firstMappedPort}, database: $ANALYTICS_DATABASE, username: postgres, password: postgres }"
+
+    private fun configuration(
+        file: Path,
+        analytics: String,
+        gateway: String = "",
+        messaging: String = "pgmq: { host: localhost, port: ${postgres.firstMappedPort}, database: lemline, username: postgres, password: postgres }",
+    ): Path {
         val port = postgres.firstMappedPort
-        write(
-            "lemline.yaml",
+        Files.writeString(
+            file,
             """
             |lemline:
             |  database:
             |    postgresql: { host: localhost, port: $port, database: lemline, username: postgres, password: postgres }
             |  messaging:
-            |    pgmq: { host: localhost, port: $port, database: lemline, username: postgres, password: postgres }
+            |${messaging.prependIndent("    ")}
             |  analytics:
-            |    postgresql: { host: localhost, port: $port, database: $ANALYTICS_DATABASE, username: postgres, password: postgres }
+            |${analytics.prependIndent("    ")}
             |  namespaces: packaged
+            |$gateway
             """.trimMargin(),
+        )
+        return file
+    }
+
+    fun postgresConnection(analytics: Boolean = false): Connection {
+        val database = if (analytics) ANALYTICS_DATABASE else postgres.databaseName
+        return DriverManager.getConnection(
+            "jdbc:postgresql://${postgres.host}:${postgres.firstMappedPort}/$database",
+            postgres.username, postgres.password,
         )
     }
 
@@ -67,13 +118,14 @@ internal object PackagedEnvironment {
         }
     }
 
-    fun command(vararg args: String): List<String> = artifactCommand + listOf("--config", config.toString()) + args
+    fun command(vararg args: String, configFile: Path = config): List<String> =
+        artifactCommand + listOf("--config", configFile.toString()) + args
 
     /** Runs a command to completion and returns its exit code and combined output. */
-    fun run(vararg args: String, timeoutSeconds: Long = 120): Pair<Int, String> {
-        val log = workDir.resolve("command-${System.nanoTime()}.log").toFile()
-        val process = ProcessBuilder(command(*args))
-            .directory(workDir.toFile())
+    fun run(vararg args: String, timeoutSeconds: Long = 120, configFile: Path = config): Pair<Int, String> {
+        val log = configFile.parent.resolve("command-${System.nanoTime()}.log").toFile()
+        val process = ProcessBuilder(command(*args, configFile = configFile))
+            .directory(configFile.parent.toFile())
             .redirectErrorStream(true)
             .redirectOutput(log)
             .start()

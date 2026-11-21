@@ -57,9 +57,9 @@ See [gRPC Gateway Reference](lemline-ref-gateway.md).
 
 ## Storing Lifecycle Events
 
-With lifecycle analytics enabled, a runner consumes the lifecycle events and stores each one in the `lemline_lifecycle_events` table of the `lemline` schema (set by `lemline.analytics.postgresql.schema`; replace it in the queries below if you changed it), with the full CloudEvent in the `payload` column and the workflow id, namespace, name and version in dedicated columns. See [Lifecycle Analytics Reference](lemline-ref-analytics.md) for how to enable it.
+With lifecycle analytics enabled, a runner stores the complete CloudEvent in the `payload` column of `lemline_lifecycle_events`. Dedicated columns hold the workflow ID, namespace, name and version. See [Lifecycle Analytics Reference](lemline-ref-analytics.md) to configure SQLite or PostgreSQL.
 
-Example queries on PostgreSQL:
+Run the following queries on PostgreSQL. Replace the `lemline` schema qualifier if you changed `lemline.analytics.postgresql.schema`.
 
 ```sql
 -- Complete lifecycle of one instance
@@ -75,6 +75,15 @@ WHERE type = 'org.open-workflow-specification.workflow.faulted.v1'
   AND event_time > NOW() - INTERVAL '1 day'
 GROUP BY lemline_workflow_name, lemline_workflow_version
 ORDER BY faulted DESC;
+```
+
+For SQLite, open the configured file with `sqlite3 -readonly /var/lib/lemline/analytics.db`. Query the unqualified table and order by `id` to read events in the same order as the gateway history. SQLite returns `event_time` in Unix epoch microseconds.
+
+```sql
+SELECT type, event_time, payload
+FROM lemline_lifecycle_events
+WHERE lemline_workflow_id = '01890a5d-ac96-774b-bcce-b302099a8057'
+ORDER BY id;
 ```
 
 ## Metrics

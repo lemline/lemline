@@ -118,7 +118,7 @@ class InstanceStartService {
                     instanceId = instanceId,
                     workflowInfo = resolvedWorkflowInfo,
                     workflowInput = workflowInput,
-                    loadExisting = { gatewayCommandRepository.findByWorkflowId(instanceId) },
+                    loadExisting = { gatewayCommandRepository.findByWorkflowId(instanceId, conn) },
                 ).also { if (it == null) newCommandId = outboxEntry.id }
             }
 
@@ -128,7 +128,7 @@ class InstanceStartService {
                     instanceId = instanceId,
                     workflowInfo = resolvedWorkflowInfo,
                     workflowInput = workflowInput,
-                    loadExisting = { scheduleRepository.findByWorkflowId(instanceId) },
+                    loadExisting = { scheduleRepository.findByWorkflowId(instanceId, conn) },
                     extraConflictCheck = { existing -> existing.zone != zoneId },
                     onExisting = { existing -> nextRunAt = existing.outboxScheduledFor },
                 )

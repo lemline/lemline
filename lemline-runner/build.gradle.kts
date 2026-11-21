@@ -58,6 +58,7 @@ dependencies {
     implementation(project(":lemline-runner-gateway"))
     implementation(project(":lemline-runner-cli"))
     implementation(project(":lemline-runner-messaging-pgmq"))
+    implementation(project(":lemline-runner-messaging-sqlite"))
     implementation(project(":lemline-runner-analytics"))
 
     // KotlinX ecosystem
@@ -74,7 +75,7 @@ dependencies {
     implementation("io.quarkus:quarkus-flyway")
     implementation("io.quarkus:quarkus-jdbc-postgresql")
     implementation("io.quarkus:quarkus-jdbc-mysql")
-    runtimeOnly(libs.sqlite.jdbc)
+    implementation(libs.sqlite.jdbc)
     implementation("io.quarkus:quarkus-hibernate-validator")
     implementation("io.quarkus:quarkus-micrometer")
     implementation("io.quarkus:quarkus-micrometer-registry-prometheus")

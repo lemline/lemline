@@ -10,6 +10,7 @@ object LemlineConfigConstants {
     const val CONFIG_ORDINAL = 275
     const val CONFIG_SOURCE_NAME = "LemlineConfigSource"
 
+    const val DB_SQLITE_PATH_DEFAULT = "orchestration.db"
     const val DB_MIGRATE_AT_START_DEFAULT = "false"
     const val DB_BASELINE_ON_MIGRATE_DEFAULT = "false"
 
@@ -21,6 +22,8 @@ object LemlineConfigConstants {
     const val KAFKA_CONNECTOR = "smallrye-kafka"
     const val RABBITMQ_CONNECTOR = "smallrye-rabbitmq"
     const val PGMQ_CONNECTOR = "smallrye-pgmq"
+    const val SQLITE_CONNECTOR = "smallrye-sqlite"
+    const val SQLITE_MESSAGING_PATH_DEFAULT = "messaging.db"
 
     // Per-namespace destination naming convention: <prefix>-<namespace>-<type>
     const val MESSAGING_PREFIX_DEFAULT = "lemline"
@@ -51,6 +54,8 @@ object LemlineConfigConstants {
     const val MYSQL_DATABASE_DEFAULT = "lemline"
     const val MYSQL_USERNAME_DEFAULT = "mysql"
     const val MYSQL_PASSWORD_DEFAULT = "mysql"
+
+    const val ANALYTICS_SQLITE_PATH_DEFAULT = "analytics.db"
 
     // H2
     const val H2_DB_NAME_DEFAULT = "lemline"
@@ -105,4 +110,10 @@ object LemlineConfigConstants {
     const val PGMQ_POLL_INTERVAL_DEFAULT = "100"
     const val PGMQ_BATCH_SIZE_DEFAULT = "10"
     const val PGMQ_MAX_RETRIES_DEFAULT = "3"
+
+    // SQLite queue consumers
+    const val SQLITE_VISIBILITY_TIMEOUT_DEFAULT = "30"
+    const val SQLITE_POLL_INTERVAL_DEFAULT = "50"
+    const val SQLITE_BATCH_SIZE_DEFAULT = "10"
+    const val SQLITE_MAX_RETRIES_DEFAULT = "3"
 }

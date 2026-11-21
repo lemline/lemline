@@ -12,6 +12,7 @@ import com.lemline.runner.common.repositories.ops.CleanerRepository
 import com.lemline.runner.common.repositories.ops.CrudRepository
 import com.lemline.runner.common.repositories.ops.ID_COLUMN
 import com.lemline.runner.common.repositories.ops.IdRepository
+import com.lemline.runner.common.repositories.ops.bindTimestamp
 import com.lemline.runner.common.repositories.ops.cleanupColumns
 import com.lemline.runner.common.repositories.ops.completionColumns
 import com.lemline.runner.common.repositories.ops.getInstanceMessage
@@ -87,8 +88,8 @@ class ForkRepository : CrudRepository<ForkModel>(),
         ColumnBindingsBuilder<ForkModel>().apply {
             idColumn(idHelper)
             instanceColumns(idHelper)
-            completionColumns()
-            cleanupColumns()
+            completionColumns(databaseConfig)
+            cleanupColumns(databaseConfig)
 
             // Fork-specific columns
             column(FORK_POSITION_COLUMN) { stmt, entity, idx ->
@@ -102,7 +103,7 @@ class ForkRepository : CrudRepository<ForkModel>(),
             }
             column(FORK_FAILED_AT_COLUMN) { stmt, entity, idx ->
                 entity.failedAt?.let {
-                    stmt.setTimestamp(idx, Timestamp.from(it.toJavaInstant()))
+                    databaseConfig.bindTimestamp(stmt, idx, Timestamp.from(it.toJavaInstant()))
                 } ?: stmt.setNull(idx, java.sql.Types.TIMESTAMP)
             }
             column(FORK_ERROR_REASON_COLUMN) { stmt, entity, idx ->
@@ -187,6 +188,6 @@ class ForkRepository : CrudRepository<ForkModel>(),
     }
 
     private val findByIdForUpdateSql by lazy {
-        "SELECT * FROM $tableName WHERE $ID_COLUMN = ? FOR UPDATE"
+        "SELECT * FROM $tableName WHERE $ID_COLUMN = ? ${databaseConfig.forUpdate()}"
     }
 }

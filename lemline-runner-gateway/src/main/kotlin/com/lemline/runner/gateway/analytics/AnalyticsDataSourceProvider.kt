@@ -28,9 +28,14 @@ class AnalyticsDataSourceProvider(
     @DataSource("analytics-postgresql")
     lateinit var postgresqlDataSource: Instance<AgroalDataSource>
 
+    @Inject
+    @DataSource("analytics-sqlite")
+    lateinit var sqliteDataSource: Instance<AgroalDataSource>
+
     fun require(): AgroalDataSource = when (analyticsType) {
         AnalyticsType.H2 -> requireResolvable("H2", h2DataSource)
         AnalyticsType.POSTGRESQL -> requireResolvable("PostgreSQL", postgresqlDataSource)
+        AnalyticsType.SQLITE -> requireResolvable("SQLite", sqliteDataSource)
     }
 
     fun optional(): AgroalDataSource? = runCatching { require() }.getOrNull()

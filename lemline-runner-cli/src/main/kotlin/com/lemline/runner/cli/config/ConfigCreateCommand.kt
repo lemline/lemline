@@ -25,14 +25,14 @@ class ConfigCreateCommand : Runnable {
 
     @Option(
         names = ["-m", "--messaging"],
-        description = ["Messaging broker type (kafka, rabbitmq, pgmq)"],
+        description = ["Messaging broker type (kafka, rabbitmq, pgmq, sqlite)"],
         converter = [MessagingTypeConverter::class]
     )
     var messaging: MessagingType? = null
 
     @Option(
         names = ["-d", "--database"],
-        description = ["Database type (postgresql, mysql)"],
+        description = ["Database type (postgresql, mysql, sqlite)"],
         converter = [DatabaseTypeConverter::class]
     )
     var database: DatabaseType? = null
@@ -101,8 +101,14 @@ class ConfigCreateCommand : Runnable {
             println()
             println("Next steps:")
             println("  1. Review and customize the configuration")
-            println("  2. Start infrastructure: docker compose --profile <profile> up -d")
-            println("  3. Run Lemline: LEMLINE_CONFIG=$output lemline listen")
+            if (messaging == MessagingType.SQLITE) {
+                println("  2. Start the database services using the command in the generated file")
+                println("  3. Apply database migrations: LEMLINE_CONFIG=$output lemline migrate --force")
+                println("  4. Run Lemline: LEMLINE_CONFIG=$output lemline listen")
+            } else {
+                println("  2. Start infrastructure: docker compose --profile <profile> up -d")
+                println("  3. Run Lemline: LEMLINE_CONFIG=$output lemline listen")
+            }
         } catch (e: Exception) {
             throw ParameterException(
                 picocli.CommandLine(this),
@@ -116,6 +122,7 @@ class ConfigCreateCommand : Runnable {
         println("  1) kafka")
         println("  2) rabbitmq")
         println("  3) pgmq")
+        println("  4) sqlite")
         print("> ")
 
         val input = console.readLine().trim()
@@ -123,10 +130,11 @@ class ConfigCreateCommand : Runnable {
             "1", "kafka" -> MessagingType.KAFKA
             "2", "rabbitmq" -> MessagingType.RABBITMQ
             "3", "pgmq" -> MessagingType.PGMQ
+            "4", "sqlite" -> MessagingType.SQLITE
             else -> {
                 throw ParameterException(
                     picocli.CommandLine(this),
-                    "Invalid selection. Please choose 1, 2, or 3."
+                    "Invalid selection. Please choose 1, 2, 3 or 4."
                 )
             }
         }
@@ -136,16 +144,18 @@ class ConfigCreateCommand : Runnable {
         println("? Select database:")
         println("  1) postgresql")
         println("  2) mysql")
+        println("  3) sqlite")
         print("> ")
 
         val input = console.readLine().trim()
         return when (input) {
             "1", "postgresql" -> DatabaseType.POSTGRESQL
             "2", "mysql" -> DatabaseType.MYSQL
+            "3", "sqlite" -> DatabaseType.SQLITE
             else -> {
                 throw ParameterException(
                     picocli.CommandLine(this),
-                    "Invalid selection. Please choose 1 or 2."
+                    "Invalid selection. Please choose 1, 2, or 3."
                 )
             }
         }
@@ -157,8 +167,9 @@ class ConfigCreateCommand : Runnable {
                 "kafka" -> MessagingType.KAFKA
                 "rabbitmq" -> MessagingType.RABBITMQ
                 "pgmq" -> MessagingType.PGMQ
+                "sqlite" -> MessagingType.SQLITE
                 else -> throw IllegalArgumentException(
-                    "Invalid messaging type: '$value'. Allowed values: kafka, rabbitmq, pgmq"
+                    "Invalid messaging type: '$value'. Allowed values: kafka, rabbitmq, pgmq, sqlite"
                 )
             }
         }
@@ -169,8 +180,9 @@ class ConfigCreateCommand : Runnable {
             return when (value.lowercase()) {
                 "postgresql" -> DatabaseType.POSTGRESQL
                 "mysql" -> DatabaseType.MYSQL
+                "sqlite" -> DatabaseType.SQLITE
                 else -> throw IllegalArgumentException(
-                    "Invalid database type: '$value'. Allowed values: postgresql, mysql"
+                    "Invalid database type: '$value'. Allowed values: postgresql, mysql, sqlite"
                 )
             }
         }

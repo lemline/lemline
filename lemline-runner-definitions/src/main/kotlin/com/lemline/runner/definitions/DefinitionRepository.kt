@@ -99,7 +99,7 @@ class DefinitionRepository : CrudRepository<DefinitionModel>() {
     /** Serialize event collection with definition updates and deletes across workers. */
     suspend fun findForUpdate(model: com.lemline.common.values.WorkflowInfo, connection: Connection): DefinitionModel? =
         connection.prepareStatement(
-            "SELECT * FROM $tableName WHERE namespace = ? AND name = ? AND version = ? FOR UPDATE"
+            "SELECT * FROM $tableName WHERE namespace = ? AND name = ? AND version = ? ${databaseConfig.forUpdate()}"
         ).use { stmt ->
             stmt.setString(1, model.namespace.toString())
             stmt.setString(2, model.name.toString())

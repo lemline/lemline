@@ -8,8 +8,10 @@ import com.lemline.runner.config.analyticsSchemaResolved
 import com.lemline.runner.config.analyticsTypeResolved
 import com.lemline.runner.gateway.analytics.AnalyticsDataSourceProvider
 import com.lemline.runner.gateway.persistence.GatewayJdbcSupport
-import com.lemline.runner.gateway.persistence.getInstantOrNull
+import com.lemline.runner.gateway.persistence.getAnalyticsInstant
+import com.lemline.runner.gateway.persistence.getAnalyticsUuid
 import com.lemline.runner.gateway.persistence.normalizePageSize
+import com.lemline.runner.gateway.persistence.setAnalyticsObject
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
 import java.util.UUID
@@ -33,7 +35,7 @@ class InstanceEventQueryService(
         )
     private val payloadTextProjection = when (analyticsType) {
         AnalyticsType.POSTGRESQL -> "payload::text"
-        AnalyticsType.H2 -> "payload"
+        AnalyticsType.H2, AnalyticsType.SQLITE -> "payload"
     }
 
     suspend fun listEvents(filter: InstanceEventFilter): InstanceEventListResult = withContext(Dispatchers.IO) {
@@ -56,7 +58,7 @@ class InstanceEventQueryService(
 
         val rows = analyticsDataSourceProvider.require().connection.use { conn ->
             conn.prepareStatement(sql).use { stmt ->
-                stmt.setObject(1, filter.instanceId)
+                stmt.setAnalyticsObject(1, filter.instanceId, analyticsType)
                 var nextIndex = 2
                 filter.afterSequenceExclusive?.let {
                     stmt.setLong(nextIndex++, it)
@@ -68,9 +70,9 @@ class InstanceEventQueryService(
                             add(
                                 InstanceEventRow(
                                     cursor = rs.getLong("id"),
-                                    instanceId = rs.getObject("lemline_workflow_id", UUID::class.java),
+                                    instanceId = rs.getAnalyticsUuid("lemline_workflow_id", analyticsType),
                                     eventType = rs.getString("type"),
-                                    eventTime = rs.getInstantOrNull("event_time"),
+                                    eventTime = rs.getAnalyticsInstant("event_time", analyticsType),
                                     cloudEventJson = rs.getString("payload_json") ?: "{}",
                                     namespace = rs.getString("lemline_workflow_namespace"),
                                 )
@@ -103,7 +105,7 @@ class InstanceEventQueryService(
 
             analyticsDataSourceProvider.require().connection.use { conn ->
                 conn.prepareStatement(sql).use { stmt ->
-                    stmt.setObject(1, instanceId)
+                    stmt.setAnalyticsObject(1, instanceId, analyticsType)
                     if (snapshotSequence != null) {
                         stmt.setLong(2, snapshotSequence)
                     }

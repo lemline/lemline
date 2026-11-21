@@ -1,7 +1,10 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.tests.profiles
 
+import com.lemline.runner.common.config.ANALYTICS_TYPE_POSTGRESQL
+import com.lemline.runner.common.config.ANALYTICS_TYPE_SQLITE
 import com.lemline.runner.common.config.DatabaseType
+import com.lemline.runner.common.config.LEMLINE_ANALYTICS_TYPE
 import com.lemline.runner.common.config.LEMLINE_ANALYTICS_BASELINE_ON_MIGRATE
 import com.lemline.runner.common.config.LEMLINE_ANALYTICS_MIGRATE_AT_START
 import com.lemline.runner.common.config.LEMLINE_DATABASE_TYPE
@@ -19,10 +22,14 @@ import com.lemline.runner.common.config.LEMLINE_MESSAGING_TYPE
 import com.lemline.runner.common.config.LEMLINE_OUTBOX_ENABLED
 import com.lemline.runner.common.config.LEMLINE_SCHEDULED_ENABLED
 import com.lemline.runner.common.config.MessagingType
+import com.lemline.runner.tests.resources.AnalyticsPostgresTestResource
 import com.lemline.runner.tests.resources.PgmqAnalyticsTestResource
 import io.quarkus.test.junit.QuarkusTestProfile
 
-class PgmqAnalyticsProfile : QuarkusTestProfile {
+open class PgmqAnalyticsProfile : QuarkusTestProfile {
+    protected open val analyticsOverrides: Map<String, String>
+        get() = AnalyticsH2TestProfileSupport.overrides("lemline_analytics_pgmq")
+
     override fun getConfigOverrides(): Map<String, String> {
         return mapOf(
             LEMLINE_DATABASE_TYPE to DatabaseType.POSTGRESQL.configValue,
@@ -44,7 +51,7 @@ class PgmqAnalyticsProfile : QuarkusTestProfile {
             LEMLINE_ANALYTICS_BASELINE_ON_MIGRATE to "false",
             LEMLINE_OUTBOX_ENABLED to "false",
             LEMLINE_SCHEDULED_ENABLED to "false"
-        ) + AnalyticsH2TestProfileSupport.overrides("lemline_analytics_pgmq")
+        ) + analyticsOverrides
     }
 
     override fun testResources(): List<QuarkusTestProfile.TestResourceEntry> {
@@ -56,4 +63,18 @@ class PgmqAnalyticsProfile : QuarkusTestProfile {
     override fun tags(): Set<String> {
         return setOf("analytics", MessagingType.PGMQ.configValue)
     }
+}
+
+class PgmqPostgresAnalyticsProfile : PgmqAnalyticsProfile() {
+    override val analyticsOverrides = mapOf(LEMLINE_ANALYTICS_TYPE to ANALYTICS_TYPE_POSTGRESQL)
+
+    override fun testResources(): List<QuarkusTestProfile.TestResourceEntry> =
+        super.testResources() + QuarkusTestProfile.TestResourceEntry(AnalyticsPostgresTestResource::class.java)
+}
+
+class PgmqSQLiteAnalyticsProfile : PgmqAnalyticsProfile() {
+    override val analyticsOverrides = mapOf(LEMLINE_ANALYTICS_TYPE to ANALYTICS_TYPE_SQLITE)
+
+    override fun testResources(): List<QuarkusTestProfile.TestResourceEntry> =
+        super.testResources() + QuarkusTestProfile.TestResourceEntry(SQLiteAnalyticsFile::class.java)
 }

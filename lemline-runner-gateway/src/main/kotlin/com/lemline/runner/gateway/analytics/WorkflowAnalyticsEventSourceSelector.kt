@@ -15,7 +15,7 @@ class WorkflowAnalyticsEventSourceSelector(
 ) : WorkflowAnalyticsEventSource {
 
     @Inject
-    lateinit var postgresqlEventSource: Instance<PostgresqlWorkflowAnalyticsEventSource>
+    lateinit var jdbcEventSource: Instance<JdbcWorkflowAnalyticsEventSource>
 
     override suspend fun listByWorkflowIdAfter(
         workflowId: WorkflowId,
@@ -27,8 +27,8 @@ class WorkflowAnalyticsEventSourceSelector(
     override suspend fun validate(): Unit = delegate().validate()
 
     private fun delegate(): WorkflowAnalyticsEventSource {
-        if (postgresqlEventSource.isResolvable) {
-            return postgresqlEventSource.get()
+        if (jdbcEventSource.isResolvable) {
+            return jdbcEventSource.get()
         }
         throw IllegalStateException(
             "Analytics event source is not available for analytics type '${config.analyticsTypeResolved}'. " +

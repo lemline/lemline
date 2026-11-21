@@ -26,10 +26,14 @@ import com.lemline.gateway.v1.WatchInstancesResponse
 import com.lemline.gateway.v1.GatewayServiceGrpc
 import com.lemline.runner.config.LemlineConfiguration
 import com.lemline.common.coroutines.ApplicationClassLoaderContext
+import com.lemline.runner.common.config.ANALYTICS_TYPE_SQLITE
+import com.lemline.runner.config.analyticsTypeResolved
 import com.lemline.runner.config.gatewayAuthenticationEnabled
+import com.lemline.runner.config.gatewayEnabled
 import com.lemline.runner.gateway.auth.GatewayAuthContext
 import com.lemline.runner.gateway.auth.GatewayAuthorizer
 import com.lemline.runner.gateway.auth.GatewayPrincipal
+import com.lemline.runner.gateway.config.GatewayStartupValidator
 import com.lemline.runner.gateway.resources.config.GatewayConfigRpcHandler
 import com.lemline.runner.gateway.resources.definitions.DefinitionRpcHandler
 import com.lemline.runner.gateway.resources.definitionstats.DefinitionStatsRpcHandler
@@ -55,6 +59,9 @@ class GatewayGrpcService(
     private val config: LemlineConfiguration,
     private val authorizer: GatewayAuthorizer,
 ) : GatewayServiceGrpc.GatewayServiceImplBase() {
+
+    @Inject
+    lateinit var startupValidator: GatewayStartupValidator
 
     @Inject
     lateinit var definitionRpcHandler: DefinitionRpcHandler
@@ -225,13 +232,19 @@ class GatewayGrpcService(
         }
     }
 
-    private fun requirePrincipal(responseObserver: StreamObserver<*>): GatewayPrincipal? =
-        resolvePrincipalOrNull() ?: run {
+    private fun requirePrincipal(responseObserver: StreamObserver<*>): GatewayPrincipal? {
+        // Quarkus can bind the gRPC port before the startup observers apply SQLite migrations.
+        if (config.gatewayEnabled && config.analyticsTypeResolved == ANALYTICS_TYPE_SQLITE && !startupValidator.ready) {
+            responseObserver.onError(Status.UNAVAILABLE.withDescription("SQLite analytics is starting").asRuntimeException())
+            return null
+        }
+        return resolvePrincipalOrNull() ?: run {
             responseObserver.onError(
                 Status.UNAUTHENTICATED.withDescription("Missing authenticated principal").asRuntimeException()
             )
             null
         }
+    }
 
     private fun resolvePrincipalOrNull(): GatewayPrincipal? =
         GatewayAuthContext.getOrNull()

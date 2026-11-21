@@ -2,6 +2,8 @@
 package com.lemline.runner.gateway.resources.definitionstats
 
 import com.lemline.core.lifecycleevents.LifecycleEventType
+import com.lemline.runner.common.config.ANALYTICS_TYPE_SQLITE
+import com.lemline.runner.common.config.SQLiteAnalyticsTime
 import com.lemline.runner.gateway.analytics.AnalyticsDataSourceProvider
 import com.lemline.runner.gateway.support.testLemlineConfiguration
 import io.agroal.api.AgroalDataSource
@@ -19,7 +21,7 @@ import org.junit.jupiter.api.Test
 
 /**
  * Runs the definition stats SQL against a real analytics database.
- * Subclasses provide the dialect: the analytics store supports H2 and PostgreSQL.
+ * Subclasses provide the dialect: the analytics store supports H2, PostgreSQL and SQLite.
  */
 abstract class DefinitionStatsQueryServiceTestBase {
 
@@ -119,8 +121,14 @@ abstract class DefinitionStatsQueryServiceTestBase {
                 """.trimIndent()
             ).use { stmt ->
                 stmt.setString(1, if (legacy) type.legacyType else type.type)
-                stmt.setTimestamp(2, Timestamp.from(Instant.parse(eventTime)))
-                stmt.setObject(3, workflowId)
+                val instant = Instant.parse(eventTime)
+                if (analyticsType == ANALYTICS_TYPE_SQLITE) {
+                    stmt.setLong(2, SQLiteAnalyticsTime.encode(instant))
+                    stmt.setString(3, workflowId.toString())
+                } else {
+                    stmt.setTimestamp(2, Timestamp.from(instant))
+                    stmt.setObject(3, workflowId)
+                }
                 stmt.executeUpdate()
             }
         }
