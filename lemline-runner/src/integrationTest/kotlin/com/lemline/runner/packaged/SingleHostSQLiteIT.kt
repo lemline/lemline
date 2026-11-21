@@ -16,6 +16,7 @@ import io.grpc.Status
 import io.grpc.StatusRuntimeException
 import java.net.InetAddress
 import java.net.ServerSocket
+import java.nio.file.FileSystemException
 import java.nio.file.Files
 import java.nio.file.Path
 import java.sql.Connection
@@ -25,6 +26,7 @@ import java.util.concurrent.TimeUnit
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
+import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable
 import org.junit.jupiter.api.io.TempDir
@@ -32,6 +34,28 @@ import org.junit.jupiter.api.io.TempDir
 internal class SingleHostSQLiteIT {
     @TempDir
     lateinit var directory: Path
+
+    @AfterEach
+    fun releaseWindowsTestFiles() {
+        if (!System.getProperty("os.name").startsWith("Windows")) return
+
+        // A stopped child can leave a SQLite file temporarily unavailable for
+        // deletion on Windows. Wait for the handles before JUnit removes the directory.
+        val paths = Files.walk(directory).use { it.sorted(Comparator.reverseOrder()).toList() }
+        val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(20)
+        for (path in paths) {
+            if (path == directory) continue
+            while (true) {
+                try {
+                    Files.deleteIfExists(path)
+                    break
+                } catch (failure: FileSystemException) {
+                    if (System.nanoTime() >= deadline) throw failure
+                    Thread.sleep(100)
+                }
+            }
+        }
+    }
 
     @Test
     fun `gateway workflow resumes after restart and from a three file backup`() {
