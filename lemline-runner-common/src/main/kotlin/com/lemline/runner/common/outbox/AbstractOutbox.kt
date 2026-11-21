@@ -8,7 +8,9 @@ import com.lemline.runner.common.config.OutboxConfig
 import com.lemline.runner.common.messaging.CommandEmitter
 import com.lemline.runner.common.models.WithInstanceMessage
 import com.lemline.runner.common.models.WithOutbox
+import com.lemline.runner.common.repositories.ops.CLEANUP_AFTER_COLUMN
 import com.lemline.runner.common.repositories.ops.OUTBOX_ATTEMPT_COUNT_COLUMN
+import com.lemline.runner.common.repositories.ops.OUTBOX_OUTCOME_COLUMNS
 import com.lemline.runner.common.repositories.with.WithCrudRepository
 import com.lemline.runner.common.repositories.with.WithOutboxRepository
 import com.lemline.runner.common.scheduled.AbstractScheduledTask
@@ -159,7 +161,10 @@ abstract class AbstractOutbox<T : WithOutbox> : AbstractScheduledTask() {
             return databaseConfig.withTransaction { conn ->
                 val entities = find(conn)
                 if (entities.isEmpty()) return@withTransaction 0 to 0
-                entities.forEach { it.outboxAttemptCount++ }
+                entities.forEach {
+                    it.outboxAttemptCount++
+                    prepare(it)
+                }
                 processBatch(entities, maxAttempts, retryDelay, conn)
                 val recorded = crudRepository.update(entities, conn)
                 afterRecord(entities, conn)
@@ -180,7 +185,9 @@ abstract class AbstractOutbox<T : WithOutbox> : AbstractScheduledTask() {
                 claimed.forEach {
                     it.outboxAttemptCount++
                     it.outboxDelayedUntil = claimedUntil
+                    prepare(it)
                 }
+                // The rows were read under this writer: nothing can have changed them since.
                 crudRepository.update(claimed, conn)
             }
         }
@@ -192,10 +199,18 @@ abstract class AbstractOutbox<T : WithOutbox> : AbstractScheduledTask() {
         databaseConfig.withConnection { conn -> processBatch(entities, maxAttempts, retryDelay, conn) }
 
         // Record, unless the claim expired and another relay took the row over: its attempt
-        // count has moved, and that relay now owns the outcome.
+        // count has moved, and that relay now owns the outcome. The rows were not locked during
+        // publication, so only the outcome is written: their feature may have changed the rest,
+        // and may already have scheduled a cleanup that an empty value must not erase.
         val recorded = databaseConfig.withTransaction { conn ->
-            crudRepository.updateIf(entities, OUTBOX_ATTEMPT_COUNT_COLUMN, { it.outboxAttemptCount }, conn)
-                .also { afterRecord(it, conn) }
+            crudRepository.updateIf(
+                entities = entities,
+                columns = OUTBOX_OUTCOME_COLUMNS,
+                guardColumn = OUTBOX_ATTEMPT_COUNT_COLUMN,
+                guardValue = { it.outboxAttemptCount },
+                keepWhenNull = setOf(CLEANUP_AFTER_COLUMN),
+                connection = conn,
+            ).also { afterRecord(it, conn) }
         }
         if (recorded.size < entities.size) {
             logger.warn {
@@ -205,6 +220,13 @@ abstract class AbstractOutbox<T : WithOutbox> : AbstractScheduledTask() {
         }
         return entities.size to recorded.size
     }
+
+    /**
+     * Changes [entity] into what is about to be published, once its attempt is counted.
+     * Everything a consumer of the message may look up on the row must be set here, not in
+     * [process]: on SQLite the row is stored with its claim and is readable during publication.
+     */
+    protected open fun prepare(entity: T) = Unit
 
     /**
      * Runs in the transaction that records [entities], after their outcome is written.

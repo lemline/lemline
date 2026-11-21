@@ -80,8 +80,13 @@ class ScheduleOutbox : AbstractOutbox<ScheduleModel>() {
         }
     }
 
+    /**
+     * The occurrence takes its execution identity before its start command is visible:
+     * a completion event looks the occurrence up by that identity.
+     */
+    override fun prepare(entity: ScheduleModel) = entity.prepareExecution()
+
     override suspend fun process(entity: ScheduleModel) {
-        entity.prepareExecution()
         commandEmitter.send(entity.instanceMessage, entity.messageId)
         lifecycleHook.onWorkflowCreated(entity.instanceMessage.workflowInfo, entity.instanceMessage.workflowState.nodeStack)
     }

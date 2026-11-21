@@ -10,13 +10,16 @@ interface WithCrudRepository<T> {
     suspend fun update(entities: List<T>, connection: Connection? = null): Int
 
     /**
-     * Updates each entity only while [guardColumn] still holds [guardValue] for it.
-     * Returns the entities that were updated.
+     * Writes only [columns] of each entity, and only while [guardColumn] still holds [guardValue]
+     * for it. Other columns keep what concurrent writers stored. A column of [keepWhenNull] bound
+     * to NULL keeps its stored value too. Returns the entities that were updated.
      */
     suspend fun updateIf(
         entities: List<T>,
+        columns: List<String>,
         guardColumn: String,
         guardValue: (T) -> Int,
+        keepWhenNull: Set<String> = emptySet(),
         connection: Connection? = null,
     ): List<T>
     suspend fun delete(entity: T, connection: Connection? = null): Int

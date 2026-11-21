@@ -39,14 +39,18 @@ semantics.
 1. The scheduled outbox first checks for due rows with a plain read. If there are any, a
    short write transaction selects due, uncompleted rows within its configured namespace
    scope and claims them: it increments their attempt count and hides them from other
-   relays for `lemline.database.sqlite.outbox-claim` (default `60s`). The gateway fast
-   path claims its committed start row the same way.
+   relays for `lemline.database.sqlite.outbox-claim` (default `60s`). The claim also stores
+   what the message is about to make visible, such as the execution identity of a schedule
+   occurrence, so a consumer can look the row up as soon as it receives the message. The
+   gateway fast path claims its committed start row the same way.
 2. The relay publishes without holding the writer. It sends the row's existing ID or the
    deterministic ID associated with the emission. A recurring schedule derives its identity
    from the persisted tick.
 3. A second short write transaction records completion, the next recurrence, or the retry
    or failure state. It applies only to rows whose attempt count is still the one this relay
-   claimed. Cleaners select and delete rows in one transaction under the writer reservation.
+   claimed, and writes only the publication outcome: the rows were not locked meanwhile, so
+   their feature may have changed the rest, for example a foreach result or a completed
+   hand-off. Cleaners select and delete rows in one transaction under the writer reservation.
 
 A claim outlives its process. If the relay is killed, or publication takes longer than the
 claim, the row becomes eligible again when the claim expires and another relay claims it,

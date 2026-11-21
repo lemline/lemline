@@ -43,6 +43,9 @@ import java.net.URI
 import java.util.concurrent.CyclicBarrier
 import java.util.concurrent.TimeUnit
 import kotlin.random.Random
+import com.lemline.runner.common.repositories.ops.CLEANUP_AFTER_COLUMN
+import com.lemline.runner.common.repositories.ops.OUTBOX_ATTEMPT_COUNT_COLUMN
+import com.lemline.runner.common.repositories.ops.OUTBOX_OUTCOME_COLUMNS
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.hours
@@ -330,6 +333,31 @@ abstract class ListenerRepositoryTestBase {
             getEventRepository().listAll().count { it.listenerId == model.id } shouldBe 1
             service(model).handleCloudEvent(event("data"), model.workflowInfo.namespace)
             getRepository().findById(model.id)!!.closedAt shouldNotBe null
+        }
+
+        @Test fun `recording a publication keeps a foreach result stored meanwhile`() = runTest {
+            val model = listener(rule(ListenStrategy.ONE, "stop"), foreach = true)
+            service(model).handleCloudEvent(event("data", "one", "https://a"), model.workflowInfo.namespace)
+            getEventRepository().markReadyForForeach(100)
+            // The relay read the row before publishing it, without keeping it locked.
+            val published = getEventRepository().listAll().single { it.listenerId == model.id }
+            getEventRepository().markForeachCompleted(model.id, published.sortKey, "result") shouldBe 1
+            published.outboxCompletedAt = Clock.System.now()
+            suspend fun record() = getEventRepository().updateIf(
+                entities = listOf(published),
+                columns = OUTBOX_OUTCOME_COLUMNS,
+                guardColumn = OUTBOX_ATTEMPT_COUNT_COLUMN,
+                guardValue = { it.outboxAttemptCount },
+                keepWhenNull = setOf(CLEANUP_AFTER_COLUMN),
+            )
+            record() shouldBe listOf(published)
+            val stored = getEventRepository().listAll().single { it.listenerId == model.id }
+            stored.outboxCompletedAt shouldNotBe null
+            getEventRepository().findCompletedOutputsByListeners(listOf(model.id))[model.id] shouldBe listOf("result")
+            // Another relay claimed the row: this one no longer owns its outcome.
+            stored.outboxAttemptCount++
+            getEventRepository().update(stored) shouldBe 1
+            record() shouldBe emptyList()
         }
 
         @Test fun `foreach queue distinguishes equal ids from different sources`() = runTest {
