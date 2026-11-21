@@ -4,7 +4,6 @@ package com.lemline.runner.listeners.outbox
 import com.lemline.core.errors.InternalException
 import com.lemline.core.errors.WorkflowErrorType
 import com.lemline.runner.common.config.DatabaseConfig
-import com.lemline.runner.common.config.DatabaseType
 import com.lemline.runner.common.messaging.CommandEmitter
 import com.lemline.runner.common.messaging.InstanceMessage
 import com.lemline.runner.common.scheduled.AbstractScheduledTask
@@ -83,7 +82,11 @@ class ListenerScheduledTimeout : AbstractScheduledTask() {
             batchNumber++
             var processed = 0
 
-            relay { connection ->
+            // One write transaction arbitrates between this timeout and the listener's completion,
+            // on SQLite too: it keeps the writer while each failure command is published. A
+            // completion relay that already claimed the listener hides it from findTimedOut, and
+            // one that comes later finds the listener failed.
+            databaseConfig.withTransaction { connection ->
                 val timedOut = listenerRepository.findTimedOut(batchSize, connection)
 
                 if (timedOut.isNotEmpty()) {
@@ -96,11 +99,7 @@ class ListenerScheduledTimeout : AbstractScheduledTask() {
                             connection.createStatement().use { it.execute("RELEASE SAVEPOINT $SAVEPOINT") }
                             processed++
                         } catch (e: Exception) {
-                            // Undo, then end the savepoint: on SQLite it is the transaction itself.
-                            connection.createStatement().use {
-                                it.execute("ROLLBACK TO SAVEPOINT $SAVEPOINT")
-                                it.execute("RELEASE SAVEPOINT $SAVEPOINT")
-                            }
+                            connection.createStatement().use { it.execute("ROLLBACK TO SAVEPOINT $SAVEPOINT") }
                             logger.error(e) { "Failed to process timed out listener ${listener.id}" }
                         }
                     }
@@ -113,19 +112,6 @@ class ListenerScheduledTimeout : AbstractScheduledTask() {
             logger.debug { "Processed $totalProcessed timed out listener(s) in $batchNumber batch(es)" }
         }
     }
-
-    /**
-     * SQLite has a single writer for the whole file: a transaction around the batch would hold
-     * it while every failure command is published. Without one, each savepoint is its own
-     * transaction, and it takes the writer only when the listener is marked, after publication.
-     * Two relays may then time out the same listener: the command carries the same ID.
-     */
-    private suspend fun relay(block: suspend (Connection) -> Unit) =
-        if (databaseConfig.dbType == DatabaseType.SQLITE) {
-            databaseConfig.withConnection(block = block)
-        } else {
-            databaseConfig.withTransaction(block = block)
-        }
 
     /**
      * Process a single timed-out listener by emitting a failure command.

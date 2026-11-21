@@ -240,12 +240,24 @@ class ListenerRepository : CrudRepository<ListenerModel>(),
         databaseConfig.withConnection(connection) { conn ->
             conn.prepareStatement(findTimedOutSql).use { stmt ->
                 var idx = 1
-                databaseConfig.bindTimestamp(stmt, idx++, nowTimestamp())
+                val now = nowTimestamp()
+                databaseConfig.bindTimestamp(stmt, idx++, now)
+                if (databaseConfig.dbType == DatabaseType.SQLITE) databaseConfig.bindTimestamp(stmt, idx++, now)
                 namespaceScope.configured?.forEach { stmt.setString(idx++, it) }
                 stmt.setInt(idx, limit)
                 stmt.executeQuery().use { it.toModels() }
             }
         }
+
+    // Server databases skip a listener whose completion is being published: its row is locked.
+    // A SQLite relay publishes without a lock, and hides the listener by its claim instead.
+    private val unclaimed by lazy {
+        if (databaseConfig.dbType == DatabaseType.SQLITE) {
+            "AND ($OUTBOX_DELAYED_UNTIL_COLUMN IS NULL OR $OUTBOX_DELAYED_UNTIL_COLUMN <= ?)"
+        } else {
+            ""
+        }
+    }
 
     private val findTimedOutSql by lazy {
         """
@@ -254,6 +266,7 @@ class ListenerRepository : CrudRepository<ListenerModel>(),
           AND $OUTBOX_FAILED_AT_COLUMN IS NULL
           AND $TIMEOUT_AT_COLUMN IS NOT NULL
           AND $TIMEOUT_AT_COLUMN <= ?
+          $unclaimed
           ${com.lemline.runner.common.repositories.ops.namespacePredicate(namespaceScope.configured)}
         ORDER BY $TIMEOUT_AT_COLUMN ASC
         LIMIT ?

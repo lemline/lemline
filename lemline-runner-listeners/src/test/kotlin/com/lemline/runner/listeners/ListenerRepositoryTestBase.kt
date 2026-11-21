@@ -43,6 +43,7 @@ import java.net.URI
 import java.util.concurrent.CyclicBarrier
 import java.util.concurrent.TimeUnit
 import kotlin.random.Random
+import com.lemline.runner.common.config.DatabaseType
 import com.lemline.runner.common.repositories.ops.CLEANUP_AFTER_COLUMN
 import com.lemline.runner.common.repositories.ops.OUTBOX_ATTEMPT_COUNT_COLUMN
 import com.lemline.runner.common.repositories.ops.OUTBOX_OUTCOME_COLUMNS
@@ -509,6 +510,26 @@ abstract class ListenerRepositoryTestBase {
             repository.findById(listener.id)?.outboxFailedAt shouldNotBe null
             val messageId = listener.instanceMessage.workflowState.nodeStack.deriveIdempotentId("-listen-timeout")
             coVerify(exactly = 1) { emitter.send(any(), messageId) }
+        }
+
+        @Test
+        fun `a SQLite listener whose completion is being published does not time out`() = runTest {
+            // Server databases lock the listener instead, which a single connection cannot show.
+            if (getDatabaseConfig().dbType != DatabaseType.SQLITE) return@runTest
+            val listener = createListener(Clock.System.now() - 1.hours)
+            repository.insert(listener)
+            repository.findTimedOut(10).map { it.id } shouldBe listOf(listener.id)
+
+            // The completion relay claims the listener for the time of its publication.
+            listener.outboxAttemptCount = 1
+            listener.outboxDelayedUntil = Clock.System.now() + 1.hours
+            repository.update(listener) shouldBe 1
+            repository.findTimedOut(10) shouldBe emptyList()
+
+            // A claim that expired without an outcome no longer protects it.
+            listener.outboxDelayedUntil = Clock.System.now() - 1.hours
+            repository.update(listener) shouldBe 1
+            repository.findTimedOut(10).map { it.id } shouldBe listOf(listener.id)
         }
 
         @Test
