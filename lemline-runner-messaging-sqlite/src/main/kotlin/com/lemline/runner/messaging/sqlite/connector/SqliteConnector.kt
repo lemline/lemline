@@ -178,9 +178,12 @@ class SqliteConnector : InboundConnector, OutboundConnector {
                             is ByteArray -> value
                             else -> value.toString().encodeToByteArray()
                         }
-                        store.publish(
-                            queue, metadata?.messageId ?: IDV7.random().toString(), payload, metadata?.delaySeconds ?: 0,
-                        )
+                        val messageId = metadata?.messageId ?: IDV7.random().toString()
+                        if (!store.publish(queue, messageId, payload, metadata?.delaySeconds ?: 0)) {
+                            // Expected for a resent message. Logged so that two distinct messages
+                            // sharing an ID, where the second one is lost, can be diagnosed.
+                            logger.info { "SQLite queue '$queue' already holds message $messageId: publication ignored" }
+                        }
                         null
                     } catch (e: CancellationException) {
                         throw e

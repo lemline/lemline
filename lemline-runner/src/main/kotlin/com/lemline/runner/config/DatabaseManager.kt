@@ -8,6 +8,7 @@ import com.lemline.runner.common.config.DatabaseConfig
 import com.lemline.runner.common.config.DatabaseType
 import com.lemline.runner.common.config.MigrationManager
 import com.lemline.runner.common.config.SQLiteDatabase
+import com.lemline.runner.common.config.SQLiteMigrationLock
 import io.agroal.api.AgroalDataSource
 import io.quarkus.agroal.DataSource
 import io.quarkus.arc.profile.IfBuildProfile
@@ -145,7 +146,13 @@ class DatabaseManager(
     }
 
     override fun migrate() {
-        flyway.migrate()
+        if (dbType == DatabaseType.SQLITE) {
+            // Flyway takes no lock on SQLite: serialize the processes sharing the file.
+            val url = datasource.connection.use { it.metaData.url }
+            SQLiteMigrationLock.withLock(url) { flyway.migrate() }
+        } else {
+            flyway.migrate()
+        }
     }
 
     override fun jsonArrayAggOrdered(column: String, orderColumn: String): String =

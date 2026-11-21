@@ -102,9 +102,13 @@ class ConfigCreateCommand : Runnable {
             println("Next steps:")
             println("  1. Review and customize the configuration")
             if (messaging == MessagingType.SQLITE) {
-                println("  2. Start the database services using the command in the generated file")
-                println("  3. Apply database migrations: LEMLINE_CONFIG=$output lemline migrate --force")
-                println("  4. Run Lemline: LEMLINE_CONFIG=$output lemline listen")
+                // An all-SQLite configuration has no service to start.
+                var step = 2
+                if (database != DatabaseType.SQLITE) {
+                    println("  ${step++}. Start the database services using the command in the generated file")
+                }
+                println("  ${step++}. Apply database migrations: LEMLINE_CONFIG=$output lemline migrate --force")
+                println("  $step. Run Lemline: LEMLINE_CONFIG=$output lemline listen")
             } else {
                 println("  2. Start infrastructure: docker compose --profile <profile> up -d")
                 println("  3. Run Lemline: LEMLINE_CONFIG=$output lemline listen")

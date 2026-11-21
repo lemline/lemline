@@ -11,6 +11,7 @@ import com.lemline.runner.common.config.AnalyticsType
 import com.lemline.runner.common.config.LEMLINE_ANALYTICS_SQLITE_PATH
 import com.lemline.runner.common.config.LEMLINE_GATEWAY_ENABLED
 import com.lemline.runner.common.config.LEMLINE_MESSAGING_LIFECYCLE_EVENTS_CONSUMER_ENABLED
+import com.lemline.runner.common.config.SQLiteMigrationLock
 import io.quarkus.runtime.StartupEvent
 import jakarta.annotation.Priority
 import jakarta.enterprise.context.ApplicationScoped

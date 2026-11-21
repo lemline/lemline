@@ -96,7 +96,8 @@ internal class SqliteQueue(private val dataSource: DataSource, private val file:
         }
     }
 
-    suspend fun publish(queue: String, messageId: String, payload: ByteArray, delaySeconds: Int): Unit =
+    /** Returns false when an active message with the same ID is already queued: nothing is added. */
+    suspend fun publish(queue: String, messageId: String, payload: ByteArray, delaySeconds: Int): Boolean =
         withContext(Dispatchers.IO) {
             require(delaySeconds >= 0) { "delaySeconds must be non-negative" }
             withConnection { connection ->
@@ -106,7 +107,7 @@ internal class SqliteQueue(private val dataSource: DataSource, private val file:
                     statement.setString(2, messageId)
                     statement.setBytes(3, payload)
                     statement.setLong(4, delaySeconds * 1_000L)
-                    statement.executeUpdate()
+                    statement.executeUpdate() == 1
                 }
             }
         }

@@ -5,7 +5,7 @@ import com.lemline.runner.analytics.config.AnalyticsPostgresqlFlywayCustomizer
 import com.lemline.runner.common.test.H2TestDatabaseConfig
 import com.lemline.runner.common.test.PostgresTestDatabaseConfig
 import com.lemline.runner.common.test.RequiresDocker
-import com.lemline.runner.analytics.config.SQLiteMigrationLock
+import com.lemline.runner.common.config.SQLiteMigrationLock
 import java.nio.file.Path
 import java.util.concurrent.CyclicBarrier
 import java.util.concurrent.Executors
@@ -131,6 +131,15 @@ class LifecycleAnalyticsMigrationTest {
             java.nio.file.Files.deleteIfExists(lockFile)
             SQLiteMigrationLock.withLock("jdbc:sqlite:$location?busy_timeout=10000&foreign_keys=on") {}
             assertEquals(true, java.nio.file.Files.exists(lockFile))
+        }
+        // A relative file: URL names a file in the working directory.
+        val name = "lock-probe-${System.nanoTime()}.db"
+        val relative = Path.of("$name.migration.lock")
+        try {
+            SQLiteMigrationLock.withLock("jdbc:sqlite:file:$name") {}
+            assertEquals(true, java.nio.file.Files.exists(relative))
+        } finally {
+            java.nio.file.Files.deleteIfExists(relative)
         }
     }
 
