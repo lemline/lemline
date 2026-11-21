@@ -11,6 +11,7 @@ object LemlineConfigConstants {
     const val CONFIG_SOURCE_NAME = "LemlineConfigSource"
 
     const val DB_SQLITE_PATH_DEFAULT = "orchestration.db"
+    const val DB_SQLITE_OUTBOX_CLAIM_DEFAULT = "60s"
     const val DB_MIGRATE_AT_START_DEFAULT = "false"
     const val DB_BASELINE_ON_MIGRATE_DEFAULT = "false"
 

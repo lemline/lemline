@@ -2,6 +2,8 @@
 package com.lemline.runner.common.config
 
 import java.sql.Connection
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.seconds
 
 /**
  * Interface for database access operations.
@@ -17,6 +19,12 @@ interface DatabaseConfig {
      * The database type for this configuration.
      */
     val dbType: DatabaseType
+
+    /**
+     * SQLite only: how long an outbox relay hides the rows it is publishing from other relays.
+     * A relay that outlives it, or dies, is taken over once it has elapsed.
+     */
+    val outboxClaimDuration: Duration get() = 60.seconds
 
     /**
      * Executes a block of code with a database connection.

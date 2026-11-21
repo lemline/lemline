@@ -3,10 +3,12 @@ package com.lemline.runner.common.outbox
 
 import com.lemline.common.logger.withSuspendLoggingContext
 import com.lemline.runner.common.config.DatabaseConfig
+import com.lemline.runner.common.config.DatabaseType
 import com.lemline.runner.common.config.OutboxConfig
 import com.lemline.runner.common.messaging.CommandEmitter
 import com.lemline.runner.common.models.WithInstanceMessage
 import com.lemline.runner.common.models.WithOutbox
+import com.lemline.runner.common.repositories.ops.OUTBOX_ATTEMPT_COUNT_COLUMN
 import com.lemline.runner.common.repositories.with.WithCrudRepository
 import com.lemline.runner.common.repositories.with.WithOutboxRepository
 import com.lemline.runner.common.scheduled.AbstractScheduledTask
@@ -15,6 +17,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.time.Clock
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Instant
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
@@ -118,22 +121,15 @@ abstract class AbstractOutbox<T : WithOutbox> : AbstractScheduledTask() {
         var totalProcessed = 0
         var batchNumber = 0
 
+        var toProcess: Int
         do {
             batchNumber++
-            var toProcess = 0
-            // Find and process messages in the same transaction
-            databaseConfig.withTransaction { conn ->
-                // Find and lock messages ready to process
-                val messages = outboxRepository.findEntitiesToProcess(maxAttempts, batchSize, conn)
-                toProcess = messages.size
-
-                if (toProcess > 0) {
-                    totalToProcess += toProcess
-                    processBatch(messages, maxAttempts, retryDelay, conn)
-                    val processed = crudRepository.update(messages, conn)
-                    totalProcessed += processed
-                }
+            val (found, recorded) = relayBatch(maxAttempts, retryDelay) { conn ->
+                outboxRepository.findEntitiesToProcess(maxAttempts, batchSize, conn)
             }
+            toProcess = found
+            totalToProcess += found
+            totalProcessed += recorded
         } while (toProcess >= batchSize)
 
         logBatches(totalProcessed, totalToProcess, batchNumber)
@@ -144,6 +140,79 @@ abstract class AbstractOutbox<T : WithOutbox> : AbstractScheduledTask() {
     }
 
     /**
+     * Relays the batch returned by [find] and records the outcome of each entity.
+     *
+     * Server databases lock the selected rows for the whole relay, so one transaction covers
+     * selection, publication and recording. SQLite has a single writer for the whole file:
+     * holding it while a broker answers would block every other write. There, the batch is
+     * claimed in a short transaction, published without any lock, then recorded in a second
+     * short transaction.
+     *
+     * @return the number of entities found and the number whose outcome was recorded
+     */
+    protected suspend fun relayBatch(
+        maxAttempts: Int,
+        retryDelay: Duration,
+        find: suspend (Connection) -> List<T>,
+    ): Pair<Int, Int> {
+        if (databaseConfig.dbType != DatabaseType.SQLITE) {
+            return databaseConfig.withTransaction { conn ->
+                val entities = find(conn)
+                if (entities.isEmpty()) return@withTransaction 0 to 0
+                entities.forEach { it.outboxAttemptCount++ }
+                processBatch(entities, maxAttempts, retryDelay, conn)
+                val recorded = crudRepository.update(entities, conn)
+                afterRecord(entities, conn)
+                entities.size to recorded
+            }
+        }
+
+        // An empty poll is the common case: do not take the writer for it.
+        if (databaseConfig.withConnection { find(it) }.isEmpty()) return 0 to 0
+
+        // Claim: count the attempt and hide the rows from other relays while they are published.
+        // The persisted attempt count identifies this claim when the outcome is recorded.
+        var delays = emptyList<Instant?>()
+        val entities = databaseConfig.withTransaction { conn ->
+            find(conn).also { claimed ->
+                val claimedUntil = Clock.System.now() + databaseConfig.outboxClaimDuration
+                delays = claimed.map { it.outboxDelayedUntil }
+                claimed.forEach {
+                    it.outboxAttemptCount++
+                    it.outboxDelayedUntil = claimedUntil
+                }
+                crudRepository.update(claimed, conn)
+            }
+        }
+        if (entities.isEmpty()) return 0 to 0
+        // The claim deadline is not part of the outcome: a published row keeps its own delay.
+        entities.forEachIndexed { index, entity -> entity.outboxDelayedUntil = delays[index] }
+
+        // Publish. This connection only reads related data and holds no lock.
+        databaseConfig.withConnection { conn -> processBatch(entities, maxAttempts, retryDelay, conn) }
+
+        // Record, unless the claim expired and another relay took the row over: its attempt
+        // count has moved, and that relay now owns the outcome.
+        val recorded = databaseConfig.withTransaction { conn ->
+            crudRepository.updateIf(entities, OUTBOX_ATTEMPT_COUNT_COLUMN, { it.outboxAttemptCount }, conn)
+                .also { afterRecord(it, conn) }
+        }
+        if (recorded.size < entities.size) {
+            logger.warn {
+                "$jobName: ${entities.size - recorded.size} claim(s) expired before their outcome was recorded; " +
+                    "another relay took them over"
+            }
+        }
+        return entities.size to recorded.size
+    }
+
+    /**
+     * Runs in the transaction that records [entities], after their outcome is written.
+     * A failure here rolls the recording back, so the batch is relayed again.
+     */
+    protected open suspend fun afterRecord(entities: List<T>, conn: Connection) = Unit
+
+    /**
      * Processes a list of entities concurrently on separate coroutines for improved performance.
      * Subclasses can override to pre-load related data before processing (e.g., batch-fetch
      * parent entities to avoid N+1 queries), then call [processEntitiesWith] with a custom processor.
@@ -151,7 +220,8 @@ abstract class AbstractOutbox<T : WithOutbox> : AbstractScheduledTask() {
      * @param entities The entities to process
      * @param maxAttempts Maximum retry attempts
      * @param retryDelay Base delay for exponential backoff
-     * @param conn The database connection from the enclosing transaction (for batch-loading related data)
+     * @param conn A database connection for batch-loading related data. Do not write through it:
+     *   on SQLite it is not the transaction that records the batch. Use [afterRecord] for writes.
      */
     protected open suspend fun processBatch(
         entities: List<T>,
@@ -204,7 +274,6 @@ abstract class AbstractOutbox<T : WithOutbox> : AbstractScheduledTask() {
 
         return withSuspendLoggingContext(workflowId, workflowInfo) {
             try {
-                entity.outboxAttemptCount++
                 processor(entity)
                 // Mark as completed on success and schedule for cleanup
                 entity.outboxCompletedAt = Clock.System.now()

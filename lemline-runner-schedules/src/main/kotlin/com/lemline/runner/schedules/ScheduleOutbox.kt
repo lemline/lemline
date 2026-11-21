@@ -54,11 +54,6 @@ class ScheduleOutbox : AbstractOutbox<ScheduleModel>() {
 
     override val outboxConfig: OutboxConfig by lazy { scheduleConfig.outbox }
 
-    /**
-     * Insert successors on the same connection as the locked batch and its final update.
-     * An insertion failure must escape the per-entity retry handler and roll back the batch:
-     * otherwise a published occurrence could be committed without its successor.
-     */
     override suspend fun processBatch(
         entities: List<ScheduleModel>,
         maxAttempts: Int,
@@ -66,14 +61,23 @@ class ScheduleOutbox : AbstractOutbox<ScheduleModel>() {
         conn: Connection
     ): Int {
         val processed = super.processBatch(entities, maxAttempts, retryDelay, conn)
-        for (entity in entities.filter { it.outboxCompletedAt != null }) {
-            if (entity.scheduleAfter == null) {
-                entity.nextScheduled()?.let { scheduleRepository.insert(it, conn) }
-                entity.cleanupAfter = entity.outboxCompletedAt
-            }
-            // Completion-based schedules must survive cleanup until their workflow finishes.
-        }
+        // Completion-based schedules must survive cleanup until their workflow finishes.
+        entities.filter { it.outboxCompletedAt != null && it.scheduleAfter == null }
+            .forEach { it.cleanupAfter = it.outboxCompletedAt }
         return processed
+    }
+
+    /**
+     * Insert successors in the transaction that records their published occurrence.
+     * An insertion failure rolls that recording back: otherwise a published occurrence
+     * could be committed without its successor.
+     */
+    override suspend fun afterRecord(entities: List<ScheduleModel>, conn: Connection) {
+        for (entity in entities) {
+            if (entity.outboxCompletedAt != null && entity.scheduleAfter == null) {
+                entity.nextScheduled()?.let { scheduleRepository.insert(it, conn) }
+            }
+        }
     }
 
     override suspend fun process(entity: ScheduleModel) {

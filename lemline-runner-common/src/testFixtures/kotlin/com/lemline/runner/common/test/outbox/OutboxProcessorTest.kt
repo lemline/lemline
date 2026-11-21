@@ -2,6 +2,7 @@
 package com.lemline.runner.common.test.outbox
 
 import com.lemline.runner.common.config.DatabaseConfig
+import com.lemline.runner.common.config.DatabaseType
 import com.lemline.runner.common.config.OutboxConfig
 import com.lemline.runner.common.messaging.CommandEmitter
 import com.lemline.runner.common.models.WithId
@@ -25,10 +26,16 @@ import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 
@@ -343,6 +350,64 @@ abstract class OutboxProcessorTest<T>(
         // Assert
         coVerify(exactly = 0) { mockedProcessor(any(modelClass)) }
         this@OutboxProcessorTest.crudRepository.countAll() shouldBe 0
+    }
+
+    /** Starts a relay whose single publication waits for [gate], and returns once it is in flight. */
+    private suspend fun CoroutineScope.relayHeldBy(gate: CompletableDeferred<Unit>): Deferred<Unit> {
+        val publishing = CompletableDeferred<Unit>()
+        coEvery { mockedProcessor(any(modelClass)) } coAnswers {
+            publishing.complete(Unit)
+            gate.await()
+        }
+        val relay = async(Dispatchers.IO) { outboxRelay.processEntities(batchSize, maxAttempts, retryDelay) }
+        withTimeout(10.seconds) { publishing.await() }
+        return relay
+    }
+
+    @Test
+    fun `a slow SQLite publication does not block other writes`(): Unit = runBlocking {
+        // Server databases lock rows, and MySQL also the gaps between them: out of scope here.
+        if (databaseConfig.dbType != DatabaseType.SQLITE) return@runBlocking
+        val message = createTestModel("SlowPublication")
+        crudRepository.insert(message)
+        val gate = CompletableDeferred<Unit>()
+        val relay = relayHeldBy(gate)
+        try {
+            // One writer serves the whole file: the relay must not hold it here.
+            val other = createTestModel("OtherWrite")
+            withTimeout(3.seconds) {
+                withContext(Dispatchers.IO) { databaseConfig.withTransaction { crudRepository.insert(other, it) } }
+            } shouldBe 1
+        } finally {
+            gate.complete(Unit)
+            relay.await()
+        }
+        (idRepository.findById(message.id)?.outboxCompletedAt != null) shouldBe true
+    }
+
+    @Test
+    fun `an expired SQLite claim cannot record its outcome`(): Unit = runBlocking {
+        // Server databases keep the rows locked: no other relay can take them over.
+        if (databaseConfig.dbType != DatabaseType.SQLITE) return@runBlocking
+        val message = createTestModel("ExpiredClaim")
+        crudRepository.insert(message)
+        val gate = CompletableDeferred<Unit>()
+        val relay = relayHeldBy(gate)
+        val takenOver = idRepository.findById(message.id)!!
+        try {
+            // The claim counts the attempt and hides the row while it is published.
+            takenOver.outboxAttemptCount shouldBe 1
+            takenOver.outboxDelayedUntil!! shouldBeAfter Clock.System.now()
+            // Another relay claims the row after the first claim expired.
+            takenOver.outboxAttemptCount++
+            crudRepository.update(listOf(takenOver))
+        } finally {
+            gate.complete(Unit)
+            relay.await()
+        }
+        val stored = idRepository.findById(message.id)!!
+        stored.outboxAttemptCount shouldBe 2
+        stored.outboxCompletedAt shouldBe null
     }
 
 }

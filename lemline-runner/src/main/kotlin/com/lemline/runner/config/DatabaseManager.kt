@@ -17,6 +17,7 @@ import jakarta.enterprise.context.ApplicationScoped
 import jakarta.enterprise.inject.Instance
 import jakarta.inject.Inject
 import java.sql.Connection
+import kotlin.time.Duration
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.flywaydb.core.Flyway
@@ -28,6 +29,11 @@ class DatabaseManager(
     private val log = logger()
 
     override val dbType: DatabaseType by lazy { DatabaseType.fromConfigValue(config.database().type()) }
+
+    override val outboxClaimDuration: Duration by lazy {
+        config.database().sqlite().map { it.outboxClaim() }
+            .orElse(LemlineConfigConstants.DB_SQLITE_OUTBOX_CLAIM_DEFAULT).toDuration()
+    }
 
     @Inject
     @IfBuildProfile("test")

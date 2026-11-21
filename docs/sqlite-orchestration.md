@@ -36,37 +36,42 @@ semantics.
 
 ## Reservation, publication and finalization
 
-1. The scheduled outbox opens a write transaction and selects due, uncompleted
-   rows within its configured namespace scope. The gateway fast path selects
-   its committed start row inside the same kind of transaction.
-2. The relay holds the writer reservation while awaiting publication. It sends
-   the row's existing ID or the deterministic ID associated with the emission.
-   A recurring schedule derives its identity from the persisted tick.
-3. The relay records completion, the next recurrence, or the retry or failure
-   state and commits. Cleaners select and delete rows in one transaction under
-   the same writer reservation.
+1. The scheduled outbox first checks for due rows with a plain read. If there are any, a
+   short write transaction selects due, uncompleted rows within its configured namespace
+   scope and claims them: it increments their attempt count and hides them from other
+   relays for `lemline.database.sqlite.outbox-claim` (default `60s`). The gateway fast
+   path claims its committed start row the same way.
+2. The relay publishes without holding the writer. It sends the row's existing ID or the
+   deterministic ID associated with the emission. A recurring schedule derives its identity
+   from the persisted tick.
+3. A second short write transaction records completion, the next recurrence, or the retry
+   or failure state. It applies only to rows whose attempt count is still the one this relay
+   claimed. Cleaners select and delete rows in one transaction under the writer reservation.
 
-Reservation lasts as long as the transaction. If the process is killed, its
-connection closes, SQLite rolls back the pending write, and the next poll can
-select the row. If the broker committed before SQLite did, the relay republishes
-with the same message ID. Consumers can receive the replay and the existing
-handler and repository idempotency rules apply. The PGMQ deduplication index
+A claim outlives its process. If the relay is killed, or publication takes longer than the
+claim, the row becomes eligible again when the claim expires and another relay claims it,
+which moves the attempt count. The first relay can then no longer record its outcome. The
+attempt it started stays counted. If the broker committed before SQLite recorded the outcome,
+the next relay republishes with the same message ID. Consumers can receive the replay and the
+existing handler and repository idempotency rules apply. The PGMQ deduplication index
 expects an object, and the current PGMQ connector writes these headers as JSON
 strings. The packaged crash test verifies that each active copy carries the same
-ID and that delivery of the copies preserves one durable wait. Publication requires
-a separate transport database so it can commit while orchestration holds its writer.
+ID and that delivery of the copies preserves one durable wait.
 
-An unavailable broker can delay every SQLite writer for the duration of publication
-attempts, including writers for other namespaces. The emitter's bounded retries
-still apply. WAL permits concurrent readers. A single host can run multiple workers
-with serialized write transactions and at-least-once delivery.
+An unavailable broker delays only the rows being published: other SQLite writers, including
+those of other namespaces, proceed meanwhile. The emitter's bounded retries still apply.
+Listener timeouts follow the same rule: each failure command is published before the short
+write that marks its listener. Starting a child workflow still publishes one command inside
+its write transaction. WAL permits concurrent readers. A single host can run multiple workers
+with serialized write transactions and at-least-once delivery. PostgreSQL, MySQL and H2 keep
+one transaction around selection, publication and recording.
 
 ## SQL and lock audit
 
 | Area | SQLite treatment |
 | --- | --- |
 | Common CRUD and IDs | Canonical UUID text, epoch microsecond timestamps, quoted names, null-safe equality and conflict handling that preserves other constraint errors. |
-| Wait, retry, recurring schedule, event-start and gateway outboxes | The write transaction replaces row-level `FOR UPDATE SKIP LOCKED`. Existing delays, attempts, cleanup and namespace predicates still select the candidates. |
+| Wait, retry, recurring schedule, event-start and gateway outboxes | A claim under the write transaction replaces row-level `FOR UPDATE SKIP LOCKED`: the attempt count identifies it and the delay hides the row during publication. Existing delays, attempts, cleanup and namespace predicates still select the candidates. |
 | Cleaners | The write transaction encloses candidate selection and deletion. Foreign keys cascade to owned fork branches, listener events and receipts, and event-schedule state. |
 | Gateway start and schedule completion | Insert and duplicate lookup share a connection in the start transaction. Schedule completion reads and updates the row inside its write transaction. |
 | Definitions and event schedules | The writer protects definition lookup, event collection progress, receipts and start insertion. Definition deletion removes listeners on the same connection. SQLite's `json_each` matches correlation keys and values exactly. |

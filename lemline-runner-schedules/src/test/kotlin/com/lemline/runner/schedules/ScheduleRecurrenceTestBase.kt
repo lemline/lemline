@@ -189,6 +189,10 @@ abstract class ScheduleRecurrenceTestBase {
         assertEquals(1, sent.size)
         assertNull(repository().findById(first.id)!!.outboxCompletedAt)
         assertEquals(1, repository().countAll())
+        // On SQLite the occurrence stays claimed for a while after the failed relay: expire it.
+        val unrecorded = repository().findById(first.id)!!
+        unrecorded.outboxDelayedUntil = Clock.System.now() - 1.seconds
+        repository().update(unrecorded)
         tick(outbox())
         assertEquals(sent[0].second, sent[1].second)
         assertEquals(2, repository().countAll())

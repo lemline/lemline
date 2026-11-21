@@ -203,6 +203,23 @@ abstract class CrudRepository<T> : WithCrudRepository<T> {
             }
         }
 
+    override suspend fun updateIf(
+        entities: List<T>,
+        guardColumn: String,
+        guardValue: (T) -> Int,
+        connection: Connection?,
+    ): List<T> = databaseConfig.withConnection(connection) { conn ->
+        if (entities.isEmpty()) return@withConnection emptyList()
+        conn.prepareStatement("$updateSql AND ${q(guardColumn)} = ?").use { stmt ->
+            entities.filter { entity ->
+                bindUpdate(stmt, entity)
+                bindKeys(stmt, entity, updatableColumns.size)
+                stmt.setInt(updatableColumns.size + columns.keyColumns.size + 1, guardValue(entity))
+                stmt.executeUpdate() == 1
+            }
+        }
+    }
+
     /**
      * Retrieves all entities from the table.
      */
