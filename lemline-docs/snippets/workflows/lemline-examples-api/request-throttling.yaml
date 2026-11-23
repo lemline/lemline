@@ -47,25 +47,27 @@ do:
                         export:
                           as: '${ $context + { processedItems: ($context.processedItems + [.itemResult])} }'
                   catch:
+                    errors:
+                      with:
+                        type: https://open-workflow-specification.org/spec/1.0.0/errors/communication
+                    as: apiError
+                    retry:
+                      when: ${ $apiError.status == 429 }
+                      delay:
+                        seconds: 10
+                      backoff:
+                        exponential: {}
+                      limit:
+                        attempt:
+                          count: 3
                     do:
-                      - handleError:
-                          switch:
-                            - handleError1:
-                                then: handleError1
-                            - handleError2:
-                                then: handleError2
-                      - handleError1:
-                          do:
-                            - recordError:
-                                set:
-                                  processed: true
-                          then: end
-                      - handleError2:
-                          do:
-                            - recordError:
-                                set:
-                                  processed: true
-                          then: end
+                      - recordFailure:
+                          set:
+                            failure:
+                              item: ${ $item }
+                              error: ${ $apiError }
+                          export:
+                            as: '${ $context + { failures: ($context.failures + [.failure]) } }'
         - throttleBetweenBatches:
             wait:
               seconds: 2

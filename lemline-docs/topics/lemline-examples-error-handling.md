@@ -88,10 +88,10 @@ The DSL supports hierarchical error types, allowing for more flexible error matc
 <code-block lang="yaml" src="workflows/lemline-examples-error-handling/error-type-hierarchy-example.yaml"/>
 
 This example demonstrates:
-- Multiple catch blocks for different error types
-- Hierarchical error matching (most specific to most generic)
+- A single `catch` that only accepts errors under `https://example.com/errors`
+- Hierarchical error matching with a `switch` on the caught error's type (most specific to most generic)
 - Different handling for each error category
-- Catch blocks are evaluated in order, and the first matching block handles the error
+- Switch cases are evaluated in order, and the first matching case handles the error
 
 ## Compensating Transactions
 

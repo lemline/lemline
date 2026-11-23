@@ -45,24 +45,24 @@ do:
                   customer: ${ .customerData }
                   items: ${ .orderItems }
       catch:
+        as: error
         do:
-          - handleError:
+          - routeByErrorType:
               switch:
-                - handleError1:
-                    then: handleError1
-                - handleError2:
-                    then: handleError2
-          - handleError1:
-              do:
-                - notifyCustomer:
-                    call: crm.sendNotification
-                    with:
-                      customerId: ${ .customerId }
-                      message: Your payment was declined. Please update payment information.
-              then: end
-          - handleError2:
-              do:
-                - recordError:
-                    set:
-                      processed: true
-              then: end
+                - paymentDeclined:
+                    when: ${ $error.type == "https://example.com/errors/payment-declined" }
+                    then: notifyCustomer
+                - default:
+                    then: logError
+          - notifyCustomer:
+              call: crm.sendNotification
+              with:
+                customerId: ${ .customerId }
+                message: Your payment was declined. Please update payment information.
+              then: exit
+          - logError:
+              call: http
+              with:
+                method: post
+                endpoint: https://logging.example.com/api/errors
+                body: ${ $error }

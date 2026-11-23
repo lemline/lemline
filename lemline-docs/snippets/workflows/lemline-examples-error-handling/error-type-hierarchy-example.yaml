@@ -13,33 +13,30 @@ do:
               endpoint: https://api.example.com/resource
               body: ${ .requestData }
       catch:
+        when: ${ $error.type | startswith("https://example.com/errors") }
+        as: error
         do:
-          - handleError:
+          - routeByErrorType:
               switch:
-                - handleError1:
-                    then: handleError1
-                - handleError2:
-                    then: handleError2
-                - handleError3:
-                    then: handleError3
-          - handleError1:
-              do:
-                - handleValidation:
-                    set:
-                      errorType: validation
-                      errorDetails: ${ $validationError }
-              then: end
-          - handleError2:
-              do:
-                - handleGenericApiError:
-                    set:
-                      errorType: api
-                      errorDetails: ${ $apiError }
-              then: end
-          - handleError3:
-              do:
-                - handleGenericError:
-                    set:
-                      errorType: generic
-                      errorDetails: ${ $genericError }
-              then: end
+                - validationError:
+                    when: ${ $error.type | startswith("https://example.com/errors/api/validation") }
+                    then: handleValidation
+                - apiError:
+                    when: ${ $error.type | startswith("https://example.com/errors/api") }
+                    then: handleGenericApiError
+                - default:
+                    then: handleGenericError
+          - handleValidation:
+              set:
+                errorType: validation
+                errorDetails: ${ $error }
+              then: exit
+          - handleGenericApiError:
+              set:
+                errorType: api
+                errorDetails: ${ $error }
+              then: exit
+          - handleGenericError:
+              set:
+                errorType: generic
+                errorDetails: ${ $error }
