@@ -1,22 +1,24 @@
-name: SQLite Validation
+name: Validation
 
+# These suites and native builds are long. They validate what lands on main instead of every
+# commit of a pull request; run the workflow manually on a branch to check it before merging.
 on:
-  pull_request:
-    branches: [main, codex/sqlite-lot-0]
+  push:
+    branches: [main]
     paths:
       - 'lemline-*/**'
       - 'buildSrc/**'
       - 'gradle/**'
       - '*.gradle.kts'
       - 'gradle.properties'
-      - '.github/workflows/sqlite-validation.yml'
+      - '.github/workflows/validation.yml'
   workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: sqlite-validation-${{ github.event.pull_request.number || github.ref }}
+  group: validation-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -37,8 +39,6 @@ jobs:
             task: :lemline-runner:quarkusIntTest -Dquarkus.package.jar.type=uber-jar
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -60,7 +60,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: sqlite-${{ matrix.suite }}
+          name: jvm-${{ matrix.suite }}
           if-no-files-found: warn
           path: |
             tested-revision.txt
@@ -80,8 +80,6 @@ jobs:
           - os: windows-2022
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -118,7 +116,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: sqlite-native-${{ matrix.os }}
+          name: native-${{ matrix.os }}
           path: |
             tested-revision.txt
             validation.log
