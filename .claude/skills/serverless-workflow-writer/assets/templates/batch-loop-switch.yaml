@@ -46,5 +46,5 @@ do:
         event:
           with:
             source: https://workflows.example.com/batch
-            type: com.example.batch.completed.v1
+            type: com.example.batch.summary.v1
             data: '${ {count: ($workflow.input.items | length)} }'

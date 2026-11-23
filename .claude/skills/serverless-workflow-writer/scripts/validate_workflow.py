@@ -11,7 +11,7 @@ sys.dont_write_bytecode = True
 sys.path.insert(0, str(DOCS / "validation"))
 from check_workflows import DSL_VERSION, as_specified, flow_errors, read_definition, versioned_validator
 
-PLACEHOLDER = re.compile(r"^(?:<fill-me>|<tbd>)$", re.IGNORECASE)
+PLACEHOLDER = re.compile(r"^(?:TODO|<fill-me>|<tbd>)$", re.IGNORECASE)
 
 
 def draft_markers(value, path="$"):
@@ -22,7 +22,7 @@ def draft_markers(value, path="$"):
         for index, item in enumerate(value):
             yield from draft_markers(item, f"{path}[{index}]")
     elif isinstance(value, str) and PLACEHOLDER.fullmatch(value.strip()):
-        yield f"{path}: replace the draft marker {value!r}"
+        yield path, value.strip()
 
 
 def main():
@@ -45,7 +45,11 @@ def main():
                     name, extension = next(iter(entry.items()))
                     for block in ("before", "after"):
                         errors.extend(flow_errors(extension.get(block, []), f"$.use.extensions.{name}.{block}"))
-                errors.extend(draft_markers(definition))
+                for path, marker in draft_markers(definition):
+                    if marker.upper() == "TODO":
+                        print(f"{file}: warning: {path}: confirm TODO is intentional", file=sys.stderr)
+                    else:
+                        errors.append(f"{path}: replace the draft marker {marker!r}")
         except (OSError, ValueError, YAMLError, RecursionError) as error:
             errors = [str(error)]
         for message in errors:

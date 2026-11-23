@@ -79,6 +79,9 @@ class WorkflowAuthoringScenarioTest {
             runScenario("templates/batch-loop-switch.yaml", """{"items":$items}""", services)
             val routes = if (items == "[]") emptyList() else listOf("approve", "reject")
             assertEquals(routes, services.calls.map { it.url.substringAfterLast('/') })
+            assertEquals(parseJson(items).map { it["id"].asText() }, services.calls.map { it.body!!["id"].asText() })
+            assertEquals(routes.indices.toList(), services.calls.map { it.body!!["index"].intValue() })
+            assertEquals("com.example.batch.summary.v1", services.events.single().type)
             assertEquals(parseJson("""{"count":${routes.size}}"""), services.events.single().data)
         }
     }
