@@ -49,14 +49,14 @@ do:
                     correlate:
                       requestId:
                         from: ${ .requestId }
-                        expect: ${ .workflow.id }
+                        expect: ${ $workflow.id }
                   - with:
                       type: com.example.iot.settings.applied
                       data: ${ .deviceType == "lighting" }
                     correlate:
                       requestId:
                         from: ${ .requestId }
-                        expect: ${ .workflow.id }
+                        expect: ${ $workflow.id }
             timeout:
               after: PT5M
       catch:

@@ -23,7 +23,7 @@ do:
                   correlate:
                     processId:
                       from: ${ .processId }
-                      expect: ${ .workflow.input.processId }
+                      expect: ${ $workflow.input.processId }
             timeout:
               after: PT5M
         - processResult:

@@ -139,7 +139,7 @@ do:
             correlate:
               correlationId:
                 from: ${ .correlationId }
-                expect: ${ .workflow.id }
+                expect: ${ $workflow.id }
       timeout:
         after:
           minutes: 15

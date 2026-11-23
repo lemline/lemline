@@ -18,7 +18,7 @@ do:
             correlate:
               matchOrderId:
                 from: ${ .transaction.orderRef }
-                expect: ${ .context.currentOrderId }
+                expect: ${ $context.currentOrderId }
       timeout:
         after:
           minutes: 30

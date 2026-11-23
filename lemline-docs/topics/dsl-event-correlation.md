@@ -37,7 +37,7 @@ Each `Correlation` object within the `correlate` map defines a single data-based
 *   **`from`** (String, Required): A [Runtime Expression](dsl-runtime-expressions.md) evaluated against the incoming event payload. For example, `${ .transactionId }`.
 *   **`expect`** (String, Optional): Defines the value that the extracted `from` value must match.
     *   Can be a **static (constant) value** (e.g., `expect: "processed"`).
-    *   Can be a [Runtime Expression](dsl-runtime-expressions.md) evaluated against the correlation object when the listener registers. Use `.input`, `.context`, or `.workflow` to access its fields, for example `expect: "${ .context.currentTransactionId }"`.
+    *   Can be a [Runtime Expression](dsl-runtime-expressions.md) evaluated when the listen task starts. The workflow data is available through the expression arguments (`$input`, `$context`, `$workflow`), for example `expect: "${ $context.currentTransactionId }"`. An expression that cannot be evaluated, or that evaluates to `null`, faults the task.
     *   **If omitted:** The value extracted by the `from` expression from the *first* matching event encountered establishes the expectation for subsequent events within the same filter evaluation (this behavior is primarily relevant for specific `Listen` scenarios where multiple events might be processed sequentially against the same filter instance).
 
 **Matching Logic:** An event satisfies a single correlation definition if the value produced by the `from` expression (evaluated on the event) is equal to the value produced by the `expect` expression (evaluated on the workflow context) or the static `expect` value.

@@ -27,7 +27,7 @@ do:
                   correlate:
                     orderId:
                       from: ${ .orderId }
-                      expect: ${ .context.orderId }
+                      expect: ${ $context.orderId }
             timeout:
               after: PT1H
             output:

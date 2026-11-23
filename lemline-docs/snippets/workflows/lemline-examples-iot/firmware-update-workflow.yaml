@@ -48,10 +48,10 @@ do:
                         correlate:
                           campaignId:
                             from: ${ .campaignId }
-                            expect: ${ .workflow.id }
+                            expect: ${ $workflow.id }
                           deviceId:
                             from: ${ .deviceId }
-                            expect: ${ .context.deviceId }
+                            expect: ${ $context.deviceId }
                   timeout:
                     after: PT2H
                   output:

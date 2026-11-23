@@ -127,7 +127,7 @@ do:
             correlate:
               deviceId:
                 from: ${ .deviceId }
-                expect: ${ .workflow.input.deviceId }
+                expect: ${ $workflow.input.deviceId }
       timeout:
         after:
           minutes: 15

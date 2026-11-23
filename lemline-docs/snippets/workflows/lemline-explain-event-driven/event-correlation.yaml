@@ -13,5 +13,5 @@ do:
             correlate:
               orderId:
                 from: ${ .orderId }
-                expect: ${ .workflow.input.orderId }
+                expect: ${ $workflow.input.orderId }
       then: ProcessShipmentUpdates
