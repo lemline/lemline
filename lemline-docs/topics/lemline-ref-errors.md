@@ -92,7 +92,9 @@ Custom error types can be defined in workflow definitions:
 
 ### Matching Multiple Error Types
 
-<code-block lang="yaml" src="workflows/reference/format-error-result.yaml"/>
+A `try` task has a single `catch`. To handle several errors differently, catch them and route on the fields of the caught error in `catch.do`:
+
+<code-block lang="yaml" src="workflows/lemline-ref-errors/matching-multiple-error-types.yaml" include-lines="6-38"/>
 
 ### Using Retry Policies
 

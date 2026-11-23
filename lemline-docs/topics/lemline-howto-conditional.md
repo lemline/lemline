@@ -94,9 +94,9 @@ This pattern handles cases where properties might be missing.
 
 For robust conditional handling, combine switch with try/catch:
 
-<code-block lang="yaml" src="workflows/reference/parallel-checks-with-fallback.yaml"/>
+<code-block lang="yaml" src="workflows/lemline-howto-conditional/combining-switch-with-try-catch.yaml" include-lines="6-48"/>
 
-This pattern provides comprehensive error handling around conditional logic.
+The `switch` routes on the payment result. If the payment call fails, the `catch` retries the `try` block up to three times, then runs `handleError`.
 
 ## Real-World Example: Order Processing
 

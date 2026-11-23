@@ -38,9 +38,9 @@ This example allocates two kinds of resources (a record and a file) and, when a 
 
 ### Long-Running Process with Asynchronous Compensation
 
-This example demonstrates handling compensation for long-running processes that may require asynchronous cleanup.
+This example reserves stock, then waits up to 30 minutes for a payment confirmation event. If no confirmation arrives, the `listen` task times out and the `catch` releases the reservation.
 
-<code-block lang="yaml" src="workflows/reference/compensate-reservation.yaml"/>
+<code-block lang="yaml" src="workflows/lemline-example-compensation/long-running-process-with-asynchronous-compensation.yaml"/>
 
 ## Best Practices for Compensation Patterns
 

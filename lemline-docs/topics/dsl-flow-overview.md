@@ -64,7 +64,7 @@ Use the **Fork** task when you need to:
 
 ## Combining Flow Tasks
 
-Flow tasks are often combined to create sophisticated workflows that accurately reflect complex business processes:
+Flow tasks combine with each other and with other tasks. Here, a `fork` runs two checks in parallel inside a `try`, and the `catch` provides the fallback:
 
 <code-block lang="yaml" src="workflows/reference/parallel-checks-with-fallback.yaml"/>
 

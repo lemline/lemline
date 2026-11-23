@@ -4,21 +4,17 @@ title: Order Processing Workflow Example
 
 # Order Processing Workflow Example
 
-This example demonstrates a complete order processing workflow that handles validation, payment processing, inventory management, shipping, and notifications. It showcases many of Lemline's features including error handling, event correlation, and data transformation.
+This example shows the core of an order processing workflow: reserve the stock, charge the payment, and release the stock if the charge fails. It showcases error handling, compensation, and data shared between tasks.
 
 ## Use Case Overview
 
-This workflow implements an e-commerce order processing pipeline that:
+This workflow implements the payment step of an e-commerce order:
 
-1. Receives an order request
-2. Validates customer and order details
-3. Checks inventory availability
-4. Processes payment
-5. Allocates inventory
-6. Creates a shipment
-7. Waits for shipping confirmation
-8. Sends order confirmations and updates
-9. Handles potential failures at each step
+1. Reserves the ordered items in the inventory service
+2. Keeps the reservation identifier for later tasks
+3. Charges the payment
+4. If the charge fails, releases the reservation
+5. Reports the failure with an error that the caller can catch
 
 ## Full Workflow Definition
 
@@ -28,49 +24,23 @@ This workflow implements an e-commerce order processing pipeline that:
 
 ### 1. Workflow Organization
 
-This workflow demonstrates good organization practices:
-- Clear task naming that describes the purpose
-- Logical flow grouping (validation, inventory, payment, shipping)
-- Comprehensive error handling for each major section
-- Proper event emission for important state changes
+- Task names describe their purpose (`reserveInventory`, `chargePayment`, `releaseInventory`)
+- The step that can fail is isolated in its own `try` task
 
-### 2. Error Handling
+### 2. Data Shared Between Tasks
 
-The workflow implements a robust error handling strategy:
-- Specific error handlers for different error types
-- Retry policies for transient failures
-- Rollback operations for partial failures (payment, inventory)
-- Proper customer notifications for different error scenarios
+- Every task reads the order from `$workflow.input`, whatever the previous task returned
+- `reserveInventory` stores the reservation identifier in `$context` with `export.as`, so the compensation can read it later
 
-### 3. Event Correlation
+### 3. Error Handling
 
-The workflow uses event correlation to integrate with external systems:
-- Waits for shipment updates correlated by order ID
-- Handles timeout with a fallback path to check status manually
-- Emits events at key lifecycle points
+- The `catch` receives any error raised by the payment call
+- After compensating, the workflow raises its own error (`order-failed`), so the instance ends as faulted instead of completing silently
 
-### 4. Data Transformations
+### 4. Compensation Logic
 
-Various data transformation patterns are demonstrated:
-- Building structured notification messages
-- Calculating processing durations
-- Constructing summary objects
-- Mapping and filtering array data
-
-### 5. Conditional Processing
-
-The workflow includes multiple decision points:
-- Validating input conditions
-- Checking inventory availability
-- Evaluating payment results
-- Processing shipment status
-
-### 6. Compensation Logic
-
-For handling partial failures, the workflow includes compensation logic:
-- Refunding payments if inventory allocation fails
-- Releasing allocated inventory if shipment creation fails
-- Adjusting orders for partial inventory availability
+- The reservation made before the `try` is released in `catch.do`
+- The reservation identifier is URL-encoded with `@uri` before being placed in the endpoint
 
 ## How to Use This Example
 
@@ -94,7 +64,7 @@ lemline definition post -f order-processing.yaml
 lemline instance start <namespace> <name> --input "$(cat orders/test-order.json)"
 ```
 
-Replace `<namespace>` and `<name>` with the values declared in the `document` section. To simulate the shipment status update, publish a `ShipmentStatusUpdate` CloudEvent on the CloudEvents topic or queue of that namespace with your broker's tools; Lemline has no CLI command to publish events.
+Replace `<namespace>` and `<name>` with the values declared in the `document` section.
 
 To run it without calling the real services, start the runner with `lemline listen --mock-config <file>`.
 

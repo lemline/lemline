@@ -140,18 +140,15 @@ This example demonstrates:
 
 ## Comprehensive Error Handling Strategy
 
-Combining these patterns creates a comprehensive error handling strategy:
+Several of these patterns combine in a single `try` task:
 
 <code-block lang="yaml" src="workflows/reference/retry-and-fallback.yaml"/>
 
-This comprehensive example demonstrates:
-- Nested try-catch blocks for different stages of processing
-- Different error handling strategies based on error type
-- Timeout handling for operations
-- Compensating transactions (canceling reservations)
-- Reusing retry definitions for communication errors
-- Early workflow exit with appropriate status information
-- Customer notifications for different error scenarios
+This example demonstrates:
+- A reusable retry definition declared in `use.retries` and referenced by name
+- Catching only the errors with status 503
+- Retrying with exponential backoff, up to the attempt limit
+- A fallback result set in `catch.do` once the retries are exhausted
 
 ## Best Practices for Error Handling
 

@@ -18,7 +18,7 @@ Use an inline error object when fields depend on the current task input.
 ## Read or map a caught error
 
 Inside `catch.do`, read the error variable when constructing a fallback result.
-Use `catch.errors.with.type` to match a specific error type.
+To handle only one error type, add `catch.errors.with.type` to the `catch`.
 
 <code-block lang="yaml" src="workflows/reference/format-error-result.yaml"/>
 

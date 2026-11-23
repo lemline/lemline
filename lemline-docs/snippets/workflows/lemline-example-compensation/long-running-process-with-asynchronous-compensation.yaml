@@ -1,0 +1,46 @@
+document:
+  dsl: '1.0.0'
+  namespace: examples
+  name: asynchronous-compensation
+  version: '1.0.0'
+do:
+  - reserveInventory:
+      call: http
+      with:
+        method: post
+        endpoint: https://inventory.example.com/reservations
+        body:
+          orderId: ${ $workflow.input.orderId }
+          items: ${ $workflow.input.items }
+      export:
+        as: '${ $context + { reservationId: .id } }'
+  - awaitPayment:
+      try:
+        - waitForPaymentConfirmation:
+            listen:
+              to:
+                one:
+                  with:
+                    type: com.example.payment.confirmed
+                  correlate:
+                    orderId:
+                      from: ${ .orderId }
+                      expect: ${ .workflow.input.orderId }
+            timeout:
+              after: PT30M
+        - confirmOrder:
+            set:
+              status: confirmed
+      catch:
+        errors:
+          with:
+            type: https://open-workflow-specification.org/spec/1.0.0/errors/timeout
+        do:
+          - releaseInventory:
+              call: http
+              with:
+                method: delete
+                endpoint: '${ "https://inventory.example.com/reservations/\($context.reservationId | @uri)" }'
+          - reportExpiry:
+              set:
+                status: expired

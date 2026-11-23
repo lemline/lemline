@@ -35,21 +35,15 @@ chooses one notification channel based on the customer preference.
 
 ## Example 3: Workflow with Parallel Execution and Error Handling
 
-This example illustrates a data processing workflow with parallel execution, comprehensive error handling, and timeout configuration. It fetches a batch of data, processes multiple records in parallel, aggregates the results, and handles any errors that might occur during processing.
+This example runs two checks on an order in parallel and falls back to a manual review if either of them fails.
 
 **Key features:**
 - Proper `document` structure with required workflow properties
-- Workflow-level timeout configuration
 - Parallel execution using the `fork` task
-- Retry policy with exponential backoff
-- Error handling with `try`/`catch`/`finally` blocks
-- Event emission for error notification
-- Data transformation and aggregation
-- Use of system variables like `$error` and `$now()`
+- Error handling with `try`/`catch` around the parallel branches
+- A fallback result set in the `catch` block
 
 <code-block lang="yaml" src="workflows/reference/parallel-checks-with-fallback.yaml"/>
-
-> **Lemline runtime:** only `listen` task timeouts are enforced. Workflow-level timeouts and timeouts on other tasks are accepted but ignored for now. HTTP calls use fixed client limits instead: 15 seconds to connect, 30 seconds per request.
 
 ## Example 4: Time-based Scheduled Workflow
 
@@ -66,13 +60,11 @@ This example shows a simple maintenance workflow that runs on a time-based sched
 
 ## Example 5: Input/Output Transformation Workflow
 
-This example demonstrates a workflow with input validation, transformation, and output formatting. It processes payment data, ensuring it meets the required schema before processing and formats the output in a standardized way.
+This example demonstrates a workflow with input transformation and output formatting. It reshapes the data it receives before the first task runs and returns only the fields it computed.
 
 **Key features:**
 - Proper `document` structure with required workflow properties
-- Input schema validation using JSON Schema
-- Input transformation with runtime expressions
+- Workflow-level input transformation with a runtime expression
 - Workflow-level output transformation
-- Error handling for validation failures
 
 <code-block lang="yaml" src="workflows/reference/transform-workflow-data.yaml"/>

@@ -1,0 +1,48 @@
+document:
+  dsl: '1.0.0'
+  namespace: examples
+  name: combining-switch-with-try-catch
+  version: '1.0.0'
+do:
+  - processOrder:
+      try:
+        - attemptPayment:
+            call: http
+            with:
+              method: post
+              endpoint: https://payments.example.com/charges
+              body:
+                amount: ${ .total }
+                cardToken: ${ .paymentMethod.token }
+        - evaluatePayment:
+            switch:
+              - success:
+                  when: ${ .status == "success" }
+                  then: completeOrder
+              - review:
+                  when: ${ .status == "review" }
+                  then: flagForReview
+              - default:
+                  then: handleFailure
+        - completeOrder:
+            set:
+              orderStatus: completed
+            then: exit
+        - flagForReview:
+            set:
+              orderStatus: in-review
+            then: exit
+        - handleFailure:
+            set:
+              orderStatus: payment-failed
+      catch:
+        retry:
+          delay:
+            seconds: 1
+          limit:
+            attempt:
+              count: 3
+        do:
+          - handleError:
+              set:
+                orderStatus: error

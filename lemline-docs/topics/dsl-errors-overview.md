@@ -61,7 +61,9 @@ Use the **Raise** task when you need to:
 
 A powerful pattern is combining Try and Raise tasks for comprehensive error handling:
 
-<code-block lang="yaml" src="workflows/reference/format-error-result.yaml"/>
+<code-block lang="yaml" src="workflows/dsl-errors-overview/combining-try-and-raise.yaml"/>
+
+The `raise` task rejects an empty order. The `catch` receives that error, or a failure of the payment call, and builds a failure result from it.
 
 Error handling tasks are essential for building robust, production-ready workflows. The Try and Raise tasks work
 together to provide comprehensive error management capabilities, allowing you to create workflows that gracefully handle
