@@ -82,7 +82,8 @@ fun NodeStack.taskScope(node: Node<*>, startedAt: Instant = currentState.started
     val owner = node.extensionOwner ?: node
     val frame = this[owner.position]
     val extension = frame?.extension
-    var scope = stateScope.withTask(owner, frame?.state?.startedAt ?: startedAt, extension?.rawInput ?: rawInput)
+    var scope = stateScope.withTask(owner, frame?.state?.startedAt ?: startedAt, extension?.rawInput ?: frame?.input?.raw ?: rawInput)
+    if (node.extensionOwner == null) frame?.input?.let { scope = scope.withTransformedInput(it.transformed) }
     extension?.preparedResult?.let { scope = scope.withRawOutput(it.rawOutput) }
     if (node.extensionOwner != null) scope = ObjectNode(scope + ("_extensionTaskScope" to jsonValue(true)))
     return scope

@@ -24,6 +24,7 @@ import com.lemline.core.states.ForState
 import com.lemline.core.states.NodeStack
 import com.lemline.core.states.RootState
 import com.lemline.core.states.StackFrame
+import com.lemline.core.states.TaskInput
 import com.lemline.core.states.TaskState
 import com.lemline.core.states.TryState
 import com.lemline.core.states.WorkflowCommand
@@ -210,7 +211,11 @@ fun NodeStack.Companion.random(): NodeStack {
         listOf(
             StackFrame(rootPosition, randomRootState()),
             StackFrame(childPosition, randomNodeState()),
-            StackFrame(grandchildPosition, randomNodeState())
+            StackFrame(
+                grandchildPosition,
+                randomNodeState(),
+                input = if (Random.nextBoolean()) TaskInput(randomJsonNode(), randomJsonNode()) else null,
+            )
         )
     )
 }

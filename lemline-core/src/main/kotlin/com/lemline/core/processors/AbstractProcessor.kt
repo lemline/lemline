@@ -36,6 +36,7 @@ import com.lemline.core.states.NodeStack
 import com.lemline.core.states.NodeState
 import com.lemline.core.states.PendingTaskState
 import com.lemline.core.states.PreparedTaskResult
+import com.lemline.core.states.TaskInput
 import com.lemline.core.states.WorkflowEvent
 import com.lemline.core.states.WorkflowEvent.ForEachCompleted
 import com.lemline.core.states.WorkflowEvent.ForkBranchCompleted
@@ -170,7 +171,7 @@ abstract class AbstractProcessor<T : TaskBase, S : NodeState>(
         scope = scope.withTransformedInput(transformedInput)
 
         if (node.extensions.isNotEmpty()) {
-            val pending = nodeStack.push(node.position, PendingTaskState(startedAt))
+            val pending = nodeStack.push(node.position, PendingTaskState(startedAt)).keepInput(rawInput, transformedInput)
             return withExecutionStack(pending) {
                 val selected = node.extensions.filter { plan ->
                     plan.condition?.let { condition ->
@@ -186,11 +187,14 @@ abstract class AbstractProcessor<T : TaskBase, S : NodeState>(
             }
         }
         val nodeState = stateWhenEnteringFromParent(transformedInput, scope, startedAt)
-        val updatedStack = nodeStack.push(node.position, nodeState)
+        val updatedStack = nodeStack.push(node.position, nodeState).keepInput(rawInput, transformedInput)
         return withExecutionStack(updatedStack) {
             continueTo(updatedStack, workflowInfo, transformedInput, scope, lifecycleHook)
         }
     }
+
+    private fun NodeStack.keepInput(rawInput: JsonNode, transformedInput: JsonNode): NodeStack =
+        if (node.readsInputOnCompletion) withInput(TaskInput(rawInput, transformedInput)) else this
 
     // ========================================
     // ReEntering a Control flow Node from a child

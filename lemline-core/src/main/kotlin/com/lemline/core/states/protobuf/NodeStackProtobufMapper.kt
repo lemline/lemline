@@ -16,10 +16,12 @@ import com.lemline.core.states.NodeState
 import com.lemline.core.states.PendingTaskState
 import com.lemline.core.states.RootState
 import com.lemline.core.states.StackFrame
+import com.lemline.core.states.TaskInput
 import com.lemline.core.states.TaskState
 import com.lemline.core.states.TryState
 import com.lemline.messages.internal.v1.CallFunctionStateProto
 import com.lemline.messages.internal.v1.DoStateProto
+import com.lemline.messages.internal.v1.ExtensionJsonValueProto
 import com.lemline.messages.internal.v1.ForStateProto
 import com.lemline.messages.internal.v1.ForeachStateProto
 import com.lemline.messages.internal.v1.InternalErrorProto
@@ -28,6 +30,7 @@ import com.lemline.messages.internal.v1.NodeStateProto
 import com.lemline.messages.internal.v1.PendingTaskStateProto
 import com.lemline.messages.internal.v1.RootStateProto
 import com.lemline.messages.internal.v1.StackFrameProto
+import com.lemline.messages.internal.v1.TaskInputProto
 import com.lemline.messages.internal.v1.TaskStateProto
 import com.lemline.messages.internal.v1.TryStateProto
 import java.time.Instant as JavaInstant
@@ -63,7 +66,13 @@ object NodeStackProtobufMapper {
         position = relativePosition,
         state = state.toProto(),
         counter = counter,
-        extension = extension?.let(ExtensionProtobufMapper::toProto)
+        extension = extension?.let(ExtensionProtobufMapper::toProto),
+        input = input?.let {
+            TaskInputProto(
+                raw_json = ExtensionJsonValueProto(it.raw.toProtoJsonValue()),
+                transformed_json = ExtensionJsonValueProto(it.transformed.toProtoJsonValue()),
+            )
+        }
     ).also { validateExtension() }
 
     private fun StackFrameProto.toNodePosition(previousPosition: NodePosition): NodePosition =
@@ -82,7 +91,13 @@ object NodeStackProtobufMapper {
         position = position,
         state = state?.toDomain() ?: error("StackFrameMessage.state is required"),
         counter = counter,
-        extension = extension?.let(ExtensionProtobufMapper::fromProto)
+        extension = extension?.let(ExtensionProtobufMapper::fromProto),
+        input = input?.let {
+            TaskInput(
+                raw = requireNotNull(it.raw_json) { "Task raw input is required" }.value_.toRuntimeJsonNode(),
+                transformed = requireNotNull(it.transformed_json) { "Task transformed input is required" }.value_.toRuntimeJsonNode(),
+            )
+        }
     ).also { it.validateExtension() }
 
     private fun StackFrame.validateExtension() {
