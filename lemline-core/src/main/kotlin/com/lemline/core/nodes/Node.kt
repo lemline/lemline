@@ -55,6 +55,17 @@ data class Node<T : TaskBase>(
 
     val definition: ObjectNode by lazy { LemlineJson.encodeToElement(task) }
 
+    /**
+     * True when `output.as` or `export.as` reads `$input` or `$task`. Those expressions are
+     * evaluated when the task completes, possibly on another worker: the task inputs are then
+     * carried with the workflow state until completion.
+     */
+    val readsInputOnCompletion: Boolean by lazy {
+        listOf("output", "export").any { key ->
+            definition[key]?.get("as")?.toString()?.let { "\$input" in it || "\$task" in it } == true
+        }
+    }
+
     val processor by lazy { NodeProcessors.createProcessor(this) }
 
     /**

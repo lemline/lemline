@@ -17,4 +17,11 @@ message StackFrameProto {
     NodeStateProto state = 2;
     int32 counter = 3;
     ExtensionExecutionStateProto extension = 4;
+    // Set only when the task reads its inputs once it completes.
+    TaskInputProto input = 5;
+}
+
+message TaskInputProto {
+    ExtensionJsonValueProto raw_json = 1;
+    ExtensionJsonValueProto transformed_json = 2;
 }

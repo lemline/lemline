@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.states
 
+import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.node.ObjectNode
 import com.lemline.common.json.*
 import com.lemline.common.values.IDV7
@@ -11,18 +12,23 @@ import com.lemline.core.processors.scope.merge
 import kotlin.time.Instant
 import org.jetbrains.annotations.TestOnly
 
+/** The inputs of a task: `$task.input` (raw) and `$input` (after `input.from`). */
+data class TaskInput(val raw: JsonNode, val transformed: JsonNode)
+
 /**
  * A single frame in the node stack.
  *
  * @property position The node's position in the workflow tree
  * @property state The node's execution state
  * @property counter Increments on re-entry (loops, retries, goto). Used for idempotent ID derivation.
+ * @property input The task inputs, kept only when the task reads them once it completes.
  */
 data class StackFrame(
     val position: NodePosition,
     val state: NodeState,
     val counter: Int = 0,
     val extension: ExtensionExecutionState? = null,
+    val input: TaskInput? = null,
 ) {
     fun increment() = copy(counter = counter + 1)
     fun decrement() = copy(counter = counter - 1)
@@ -127,6 +133,9 @@ class NodeStack internal constructor(
         NodeStack(frames.dropLast(1) + frames.last().copy(extension = extension))
 
     val currentExtension: ExtensionExecutionState? get() = frames.last().extension
+
+    fun withInput(input: TaskInput?): NodeStack =
+        NodeStack(frames.dropLast(1) + frames.last().copy(input = input))
 
     private fun indexOfFirst(position: NodePosition): Int {
         val index = frames.indexOfFirst { it.position == position }

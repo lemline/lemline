@@ -31,6 +31,59 @@ object WaitTestCases {
         ),
 
         WorkflowTestCase(
+            name = "output.as reads the task inputs once an asynchronous task has completed",
+            input = buildJsonObject { put("order", buildJsonObject { put("id", "ORD-1") }) },
+            yaml = $$"""
+                do:
+                  - waiting:
+                      input:
+                        from: ${ .order }
+                      wait:
+                        milliseconds: 10
+                      output:
+                        as: '${ { transformed: $input.id, raw: $task.input.order.id } }'
+            """.trimIndent(),
+            validate = expectOutput(buildJsonObject { put("transformed", "ORD-1"); put("raw", "ORD-1") })
+        ),
+
+        WorkflowTestCase(
+            name = "export.as reads the task inputs once an asynchronous task has completed",
+            input = buildJsonObject { put("buildingId", "building-42") },
+            yaml = $$"""
+                do:
+                  - waiting:
+                      wait:
+                        milliseconds: 10
+                      export:
+                        as: '${ { fromInput: $input.buildingId, fromTask: $task.input.buildingId } }'
+                  - report:
+                      set:
+                        fromInput: ${ $context.fromInput }
+                        fromTask: ${ $context.fromTask }
+            """.trimIndent(),
+            validate = expectOutput(buildJsonObject { put("fromInput", "building-42"); put("fromTask", "building-42") })
+        ),
+
+        WorkflowTestCase(
+            name = "output.as reads the task inputs of a task that ran other tasks",
+            input = buildJsonObject { put("orderId", "ORD-1") },
+            yaml = $$"""
+                do:
+                  - process:
+                      do:
+                        - pause:
+                            wait:
+                              milliseconds: 10
+                        - compute:
+                            set:
+                              total: 42
+                      output:
+                        as: '${ $input + . }'
+            """.trimIndent(),
+            validate = expectOutput(buildJsonObject { put("orderId", "ORD-1"); put("total", 42) })
+        ),
+
+        WorkflowTestCase(
             name = "wait task with seconds",
             yaml = """
                 do:
