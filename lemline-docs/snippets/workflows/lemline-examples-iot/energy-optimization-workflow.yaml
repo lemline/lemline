@@ -8,13 +8,16 @@ schedule:
 input:
   from: '${ { buildingId: "building-42" } + (. // {}) }'
 do:
+  - rememberBuilding:
+      set:
+        buildingId: ${ .buildingId }
+      export:
+        as: '${ $context + { buildingId: .buildingId } }'
   - getSensorReadings:
       call: http
       with:
         method: get
         endpoint: '${ "https://iot-platform.example/api/buildings/\(.buildingId | @uri)/sensors" }'
-      export:
-        as: '${ $context + { buildingId: $task.input.buildingId } }'
   - calculateSettings:
       call: http
       with:
