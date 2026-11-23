@@ -85,9 +85,9 @@ If the input doesn't match the schema, a validation error is raised before the t
 
 You can combine transformation with validation:
 
-<code-block lang="yaml" src="workflows/lemline-howto-schemas/input-transformation-and-validation.yaml" include-lines="7-36"/>
+<code-block lang="yaml" src="workflows/lemline-howto-schemas/input-transformation-and-validation.yaml" include-lines="7-41"/>
 
-This example transforms the input data and then validates the transformed structure.
+This example validates the input, then transforms it: `input.schema` is checked against the data the task receives, before `input.from` is applied.
 
 ## Task Output Validation
 
@@ -103,7 +103,7 @@ If the output doesn't match the schema, a validation error is raised after the t
 
 Combine transformation with validation:
 
-<code-block lang="yaml" src="workflows/lemline-howto-schemas/output-transformation-and-validation.yaml" include-lines="7-46"/>
+<code-block lang="yaml" src="workflows/lemline-howto-schemas/output-transformation-and-validation.yaml" include-lines="7-47"/>
 
 This transforms the API response into a standardized format and validates the structure.
 

@@ -13,24 +13,29 @@ do:
           document:
             type: object
             required:
-              - formattedUser
+              - userId
+              - firstName
+              - lastName
+              - email
             properties:
-              formattedUser:
-                type: object
-                required:
-                  - id
-                  - fullName
-                  - email
-                properties:
-                  id:
-                    type: string
-                  fullName:
-                    type: string
-                    minLength: 3
-                  email:
-                    type: string
-                    format: email
-                  age:
-                    type: integer
-                    minimum: 13
+              userId:
+                type: string
+              firstName:
+                type: string
+                minLength: 1
+              lastName:
+                type: string
+                minLength: 1
+              email:
+                type: string
+                format: email
+              age:
+                type: integer
+                minimum: 13
+        from:
+          formattedUser:
+            id: ${ .userId }
+            fullName: ${ .firstName + " " + .lastName }
+            email: ${ .email | ascii_downcase }
+            age: ${ .age }
       then: NextTask

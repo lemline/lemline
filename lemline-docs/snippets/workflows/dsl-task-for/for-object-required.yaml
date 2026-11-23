@@ -12,4 +12,4 @@ do:
       do:
         - processItem:
             set:
-              item: ${ $item }
+              item: ${ $currentUser }

@@ -51,7 +51,7 @@ If the expression evaluates to `false`, the `do` block for the current item is s
 The expression is evaluated against the current task state, including
 the loop variables (`$item`, `$index` by default) available in this scope.
 
-<code-block lang="yaml" src="workflows/dsl-task-for/while-string-optional.yaml" include-lines="8-13"/>
+<code-block lang="yaml" src="workflows/dsl-task-for/while-string-optional.yaml" include-lines="8-14"/>
 
 ## Data Flow
 

@@ -10,6 +10,7 @@ do:
         endpoint: /data
         parameters: ${ .queryParams }
       output:
+        as: '${ if .code == 200 then { status: "SUCCESS", data: .body.data } else { status: "ERROR", error: .body.error } end }'
         schema:
           document:
             type: object
