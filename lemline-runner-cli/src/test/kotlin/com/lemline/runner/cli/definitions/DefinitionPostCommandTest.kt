@@ -69,7 +69,7 @@ class DefinitionPostCommandTest {
         workflowVersion = WorkflowVersion("1.0.0")
         workflowDefinition = """
             document:
-              dsl: 1.0.0
+              dsl: 1.0.3
               namespace: test
               name: $workflowName
               version: '$workflowVersion'

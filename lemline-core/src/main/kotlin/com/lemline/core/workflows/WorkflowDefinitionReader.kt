@@ -17,7 +17,7 @@ internal object WorkflowDefinitionReader {
         val resource = Thread.currentThread().contextClassLoader.getResourceAsStream("schema/workflow.yaml")
         requireNotNull(resource) { "Open Workflow schema/workflow.yaml is missing" }
         resource.use {
-            SchemaRegistry.withDefaultDialect(SpecificationVersion.DRAFT_7) { builder ->
+            SchemaRegistry.withDefaultDialect(SpecificationVersion.DRAFT_2020_12) { builder ->
                 builder.schemaRegistryConfig(SchemaRegistryConfig.builder().preloadSchema(false).build())
             }.getSchema(SchemaValidator.readSchema(it, WorkflowFormat.YAML))
         }

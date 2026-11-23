@@ -1,5 +1,5 @@
 document:
-  dsl: '1.0.0'
+  dsl: '1.0.3'
   # "default" is the namespace a zero-config runner follows — a workflow in another
   # namespace stays pending until a runner is configured to follow it (lemline.namespaces)
   namespace: default

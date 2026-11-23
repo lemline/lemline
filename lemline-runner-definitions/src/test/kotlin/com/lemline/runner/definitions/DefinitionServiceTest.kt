@@ -73,7 +73,7 @@ class DefinitionServiceTest {
     fun `post commit invalidation preserves concurrently recreated definitions for every delete scope`() = runTest {
         val source = """
             document:
-              dsl: '1.0.0'
+              dsl: '1.0.3'
               namespace: recreate
               name: trigger
               version: '1.0.0'

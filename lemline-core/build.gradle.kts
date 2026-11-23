@@ -22,6 +22,17 @@ tasks.test {
     val documentationWorkflows = layout.projectDirectory.dir("../lemline-docs/snippets/workflows")
     inputs.dir(documentationWorkflows).withPathSensitivity(PathSensitivity.RELATIVE)
     systemProperty("lemline.docs.workflows", documentationWorkflows.asFile.absolutePath)
+    val exampleDirectories = listOf(
+        "src/main/resources/examples",
+        "src/test/resources/examples",
+        "../lemline-runner/src/test/resources/examples",
+        "../examples/workflows",
+        "../docker/namespace-isolation/workflows",
+    )
+    inputs.files(exampleDirectories.map { fileTree(it) { include("**/*.yaml", "**/*.yml", "**/*.json") } })
+        .withPropertyName("workflowExamples")
+        .withPathSensitivity(PathSensitivity.RELATIVE)
+    systemProperty("lemline.test.exampleDirectories", exampleDirectories.joinToString(File.pathSeparator))
     useJUnitPlatform()
     testLogging {
         events("passed", "skipped", "failed")

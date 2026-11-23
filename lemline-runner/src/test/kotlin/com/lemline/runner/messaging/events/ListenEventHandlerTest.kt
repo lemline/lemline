@@ -68,7 +68,7 @@ internal class ListenEventHandlerTest {
         // Cache the workflow definition so listen task config can be retrieved
         val definition = """
             document:
-              dsl: '1.0.0'
+              dsl: '1.0.3'
               namespace: $testNamespace
               name: $testName
               version: '$testVersion'

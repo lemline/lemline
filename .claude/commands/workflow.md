@@ -115,15 +115,17 @@ Parse the user's command to determine the action:
 **Expected Output:**
 ```yaml
 document:
-  dsl: 1.0.0
+  dsl: 1.0.3
   namespace: examples
   name: fetch-weather
   version: 1.0.0
 
 use:
+  secrets: [WEATHER_API_KEY]
   authentications:
     weatherApiKey:
-      bearer: ${ $secrets.WEATHER_API_KEY }
+      bearer:
+        token: ${ $secrets.WEATHER_API_KEY }
 
   retries:
     defaultRetry:
@@ -136,28 +138,28 @@ use:
 
 do:
   - fetchWeather:
-      call: http
-      with:
-        method: GET
-        endpoint:
-          uri: https://api.weather.com/v1/current
-          authentication: weatherApiKey
-        query:
-          city: ${ .input.city }
-      retry: defaultRetry
-      timeout:
-        after: { seconds: 30 }
-      output:
-        as: ${ .response.body }
+      try:
+        - requestWeather:
+            try:
+              - request:
+                  call: http
+                  with:
+                    method: GET
+                    endpoint:
+                      uri: https://api.weather.com/v1/current
+                      authentication: { use: weatherApiKey }
+                    query:
+                      city: ${ .city }
+                  timeout:
+                    after: { seconds: 30 }
+            catch:
+              retry: defaultRetry
       catch:
-        errors:
-          with:
-            type: "*"
         as: error
         do:
           - handleError:
               set:
-                error: ${ $error.message }
+                error: ${ $error.title }
                 success: false
 ```
 
@@ -202,7 +204,7 @@ Found 3 errors:
    After:  input: ${ .data.userId }
 
 3. Line 18: Missing required field 'dsl' in document
-   Added: dsl: 1.0.0
+   Added: dsl: 1.0.3
 
 Fixed workflow saved.
 ```

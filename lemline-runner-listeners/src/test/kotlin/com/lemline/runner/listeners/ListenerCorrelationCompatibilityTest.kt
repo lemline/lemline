@@ -17,7 +17,7 @@ class ListenerCorrelationCompatibilityTest {
     fun `expected and event correlation documents use identical historical escaping`() {
         WorkflowCache.parseYamlAndPut("""
             document:
-              dsl: '1.0.0'
+              dsl: '1.0.3'
               namespace: compatibility
               name: escaped-correlation
               version: '1.0.0'

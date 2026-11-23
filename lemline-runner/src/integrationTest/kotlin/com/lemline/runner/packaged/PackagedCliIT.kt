@@ -44,7 +44,7 @@ internal class PackagedCliIT {
             "$name.yaml",
             """
             |document:
-            |  dsl: '1.0.0'
+            |  dsl: '1.0.3'
             |  namespace: packaged
             |  name: $name
             |  version: '1.0.0'

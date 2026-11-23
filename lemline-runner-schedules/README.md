@@ -11,7 +11,7 @@ This module implements scheduled workflow execution:
 
 ## Open Workflow DSL Reference
 
-See [Schedule](https://github.com/open-workflow-specification/specification/blob/v1.0.0/dsl-reference.md#schedule) in the Open Workflow Specification:
+See [Schedule](https://github.com/open-workflow-specification/specification/blob/v1.0.3/dsl-reference.md#schedule) in the Open Workflow Specification:
 
 ```yaml
 document:

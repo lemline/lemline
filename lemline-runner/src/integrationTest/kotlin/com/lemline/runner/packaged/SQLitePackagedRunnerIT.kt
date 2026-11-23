@@ -275,7 +275,7 @@ internal class SQLitePackagedRunnerIT {
             val path = dir.resolve("$namespace.yaml")
             Files.writeString(path, """
                 document:
-                  dsl: '1.0.0'
+                  dsl: '1.0.3'
                   namespace: $namespace
                   name: waiter
                   version: '1.0.0'

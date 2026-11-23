@@ -125,6 +125,27 @@ class ConfigCreateCommandTest {
     }
 
     @Test
+    fun `analytics can use SQLite with an external broker`() {
+        cmd.execute("-m", "kafka", "-d", "mysql", "--analytics", "sqlite", "--dry-run") shouldBe 0
+        outStream.toString() shouldContain "  analytics:\n    type: sqlite\n    sqlite:\n      path: analytics.db"
+    }
+
+    @Test
+    fun `PostgreSQL analytics with SQLite requires a separate PostgreSQL database`() {
+        cmd.execute("-m", "sqlite", "-d", "sqlite", "--analytics", "postgresql", "--dry-run") shouldBe 0
+        val yaml = outStream.toString()
+        yaml shouldContain "docker compose up -d postgres"
+        yaml shouldContain "database: lemline_analytics"
+        yaml shouldNotContain "No external services required"
+    }
+
+    @Test
+    fun `unsupported analytics database is rejected`() {
+        cmd.execute("-m", "sqlite", "-d", "sqlite", "--analytics", "mysql", "--dry-run") shouldBe 2
+        errStream.toString() shouldContain "Invalid analytics type"
+    }
+
+    @Test
     fun `test invalid messaging type shows error`() {
         val exitCode = cmd.execute("--messaging=invalid", "--database=postgresql", "--dry-run")
         exitCode shouldBe 2 // Picocli returns 2 for parameter errors
@@ -254,6 +275,7 @@ class ConfigCreateCommandTest {
         output shouldContain "Generate a new configuration file"
         output shouldContain "--messaging"
         output shouldContain "--database"
+        output shouldContain "--analytics"
         output shouldContain "--output"
         output shouldContain "--force"
         output shouldContain "--dry-run"

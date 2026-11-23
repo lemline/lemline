@@ -42,7 +42,7 @@ object JsonRuntimeBenchmark {
         val nested = parseJson("""{"count":"${'$'}{ .items | length }","total":"${'$'}{ .items | map(.price * ${'$'}factor) | add }","first":"${'$'}{ .items[0].label }"}""")
         val workflow = WorkflowCache.parseYamlAndPut("""
             document:
-              dsl: '1.0.0'
+              dsl: '1.0.3'
               namespace: benchmark
               name: json-runtime
               version: '1.0.0'
