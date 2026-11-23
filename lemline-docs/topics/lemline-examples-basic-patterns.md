@@ -70,7 +70,7 @@ This example demonstrates:
 1. Iterating over a collection (`.pets`)
 2. The current item is accessible as `$pet`
 3. The index is accessible as `$childIndex`
-4. A condition (`while: .vet != null`) controls continuation
+4. A condition (`while: ${ .vet != null }`) controls continuation
 5. Inside the loop, an event listener waits for a specific event
 6. The output is transformed for each iteration
 
