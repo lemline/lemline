@@ -155,15 +155,25 @@ object CloudEventMatcher {
             ?.toMap()
             ?.takeIf { it.isNotEmpty() }
 
+    /**
+     * Evaluates a `correlate.expect` runtime expression.
+     *
+     * The workflow data is exposed as the expression arguments (`$input`, `$context`,
+     * `$workflow`, `$task`), as for any other runtime expression. The expression has no input.
+     *
+     * @throws IllegalArgumentException if the expression cannot be evaluated
+     */
+    fun evaluateExpect(expression: String, correlationContext: JsonNode): JsonNode =
+        JQExpression.eval(
+            LemlineJson.jacksonMapper.createObjectNode(),
+            ExpressionUtils.trimExpr(expression),
+            correlationContext.toLegacyCorrelationNode() as ObjectNode,
+        )
+
     private fun evaluateExpectExpression(expression: String, scopeContext: JsonNode): String? =
         if (ExpressionUtils.isExpr(expression)) {
             runCatching {
-                val trimmedExpr = ExpressionUtils.trimExpr(expression)
-                with(LemlineJson) {
-                    val inputNode = LemlineJson.jacksonMapper.createObjectNode()
-                    val scopeNode = scopeContext.toLegacyCorrelationNode() as ObjectNode
-                    JQExpression.eval(inputNode, trimmedExpr, scopeNode)
-                }.toStringValue()
+                evaluateExpect(expression, scopeContext).toStringValue()
             }.onFailure { e ->
                 logger.warn(e) { "Failed to evaluate expect expression: $expression" }
             }.getOrNull()

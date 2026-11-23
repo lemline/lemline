@@ -4,7 +4,9 @@ package com.lemline.core.processors
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.node.ObjectNode
 import com.lemline.common.json.*
+import com.lemline.core.cloudevents.CloudEventMatcher
 import com.lemline.core.errors.WorkflowErrorType.CONFIGURATION
+import com.lemline.core.errors.WorkflowErrorType.EXPRESSION
 import com.lemline.core.nodes.Node
 import com.lemline.core.processors.scope.Scope
 import com.lemline.core.states.ListenState
@@ -16,6 +18,7 @@ import com.lemline.core.workflows.CachedEventConsumption
 import io.serverlessworkflow.api.types.ListenTask
 import io.serverlessworkflow.api.types.ListenTaskConfiguration.ListenAndReadAs
 import io.serverlessworkflow.api.types.Timeout
+import io.serverlessworkflow.impl.expressions.ExpressionUtils
 import kotlin.time.Clock
 import kotlin.time.Duration
 import kotlin.time.Instant
@@ -117,7 +120,9 @@ class ListenProcessor(
 
         // Build correlation context from workflow scope for evaluating `correlate.expect`
         // This includes $input, $context, etc. that expect expressions can reference
-        val correlationContext = buildCorrelationContext(consumption.allFilters().map { it.standard }, scope)
+        val standardFilters = consumption.allFilters().map { it.standard }
+        val correlationContext = buildCorrelationContext(standardFilters, scope)
+        correlationContext?.let { requireEvaluableExpectations(standardFilters, it) }
 
         val config = ListenConfig(
             strategy = strategy,
@@ -143,6 +148,27 @@ class ListenProcessor(
      *
      * Only includes context if there are correlations with `expect` expressions.
      */
+    /**
+     * A listener stored without an expected value correlates with the first event it receives.
+     * An `expect` expression that fails or yields null must therefore fault the task instead.
+     */
+    private fun requireEvaluableExpectations(filters: List<EventFilter>, correlationContext: JsonNode) {
+        for (filter in filters) {
+            for ((key, correlation) in filter.correlations.orEmpty()) {
+                val expect = correlation.expect ?: continue
+                if (!ExpressionUtils.isExpr(expect)) continue
+                val value = try {
+                    CloudEventMatcher.evaluateExpect(expect, correlationContext)
+                } catch (e: Exception) {
+                    raiseError(EXPRESSION, "'.correlate.$key.expect' expression cannot be evaluated", e.message)
+                }
+                if (value.toCorrelationValue() == null) {
+                    raiseError(EXPRESSION, "'.correlate.$key.expect' expression must not be null: $expect")
+                }
+            }
+        }
+    }
+
     private fun buildCorrelationContext(
         filters: List<EventFilter>,
         scope: Scope

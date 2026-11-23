@@ -1430,6 +1430,95 @@ object ListenTestCases {
         ),
 
         WorkflowTestCase(
+            name = "listen with correlate expect reads the task input as an expression argument",
+            input = buildJsonObject { put("orderId", "ORD-54321") },
+            cloudEvents = listOf(orderCreatedCloudEvent, orderCreatedCloudEvent2),
+            yaml = $$"""
+                do:
+                  - waitForMyOrder:
+                      listen:
+                        to:
+                          one:
+                            with:
+                              type: order.created
+                            correlate:
+                              orderId:
+                                from: ${ .orderId }
+                                expect: ${ $input.orderId }
+            """.trimIndent(),
+            tags = setOf("listen", "correlate"),
+            validate = expectOutput(ArrayNode(listOf(orderCreatedData2)))
+        ),
+
+        WorkflowTestCase(
+            name = "listen with correlate expect reads the workflow input and the context",
+            input = buildJsonObject { put("orderId", "ORD-54321") },
+            cloudEvents = listOf(orderCreatedCloudEvent, orderCreatedCloudEvent2),
+            yaml = $$"""
+                do:
+                  - rememberCustomer:
+                      set:
+                        customerId: CUST-002
+                      export:
+                        as: '${ { customerId: .customerId } }'
+                  - waitForMyOrder:
+                      listen:
+                        to:
+                          one:
+                            with:
+                              type: order.created
+                            correlate:
+                              orderId:
+                                from: ${ .orderId }
+                                expect: ${ $workflow.input.orderId }
+                              customerId:
+                                from: ${ .customerId }
+                                expect: ${ $context.customerId }
+            """.trimIndent(),
+            tags = setOf("listen", "correlate"),
+            validate = expectOutput(ArrayNode(listOf(orderCreatedData2)))
+        ),
+
+        WorkflowTestCase(
+            name = "listen with correlate expect that yields null faults the task",
+            input = buildJsonObject { put("orderId", "ORD-54321") },
+            yaml = $$"""
+                do:
+                  - waitForMyOrder:
+                      listen:
+                        to:
+                          one:
+                            with:
+                              type: order.created
+                            correlate:
+                              orderId:
+                                from: ${ .orderId }
+                                expect: ${ .input.orderId }
+            """.trimIndent(),
+            tags = setOf("listen", "correlate"),
+            validate = expectErrorContaining("'.correlate.orderId.expect' expression must not be null")
+        ),
+
+        WorkflowTestCase(
+            name = "listen with correlate expect that cannot be evaluated faults the task",
+            yaml = $$"""
+                do:
+                  - waitForMyOrder:
+                      listen:
+                        to:
+                          one:
+                            with:
+                              type: order.created
+                            correlate:
+                              orderId:
+                                from: ${ .orderId }
+                                expect: ${ $unknown.orderId }
+            """.trimIndent(),
+            tags = setOf("listen", "correlate"),
+            validate = expectErrorContaining("'.correlate.orderId.expect' expression cannot be evaluated")
+        ),
+
+        WorkflowTestCase(
             name = "listen with multiple correlate keys requires all to match",
             cloudEvents = listOf(orderCreatedCloudEvent, orderCreatedCloudEvent2),
             yaml = $$"""
