@@ -86,7 +86,6 @@ How-to guides show users how to solve specific problems or accomplish particular
 - Assume basic knowledge
 
 **Examples in Lemline Documentation**:
-- [How to Configure HTTP Timeouts](lemline-howto-timeouts.md)
 - [How to Implement Retry Logic](lemline-howto-retry.md)
 - [How to Use OAuth2 Authentication](lemline-howto-oauth2.md)
 

@@ -1,0 +1,15 @@
+document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: load-external-script
+  version: '1.0.0'
+do:
+  - validateEmail:
+      run:
+        script:
+          language: python
+          source:
+            endpoint: file:///opt/lemline/scripts/email-validator.py
+          arguments:
+            email: ${ .email }
+        return: stdout

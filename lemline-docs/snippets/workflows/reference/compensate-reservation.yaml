@@ -1,0 +1,39 @@
+document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: compensate-reservation
+  version: '1.0.0'
+do:
+  - reserveInventory:
+      call: http
+      with:
+        method: post
+        endpoint: https://inventory.example.com/reservations
+        body:
+          orderId: ${ $workflow.input.orderId }
+          items: ${ $workflow.input.items }
+      export:
+        as: '${ $context + { reservationId: .id } }'
+  - completeOrder:
+      try:
+        - chargePayment:
+            call: http
+            with:
+              method: post
+              endpoint: https://payments.example.com/charges
+              body:
+                orderId: ${ $workflow.input.orderId }
+                paymentInfo: ${ $workflow.input.paymentInfo }
+      catch:
+        do:
+          - releaseInventory:
+              call: http
+              with:
+                method: delete
+                endpoint: '${ "https://inventory.example.com/reservations/\($context.reservationId | @uri)" }'
+          - reportFailure:
+              raise:
+                error:
+                  type: https://errors.example.com/order-failed
+                  status: 502
+                  title: Order completion failed

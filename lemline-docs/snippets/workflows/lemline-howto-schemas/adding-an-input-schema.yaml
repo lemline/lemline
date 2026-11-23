@@ -1,0 +1,44 @@
+document:
+  dsl: 1.0.3
+  namespace: examples
+  name: customer-onboarding
+  version: 1.0.0
+  title: Customer Onboarding Workflow
+input:
+  schema:
+    document:
+      type: object
+      required:
+        - name
+        - email
+        - address
+      properties:
+        name:
+          type: string
+          minLength: 1
+        email:
+          type: string
+          format: email
+        address:
+          type: object
+          required:
+            - street
+            - city
+            - zipCode
+          properties:
+            street:
+              type: string
+            city:
+              type: string
+            state:
+              type: string
+            zipCode:
+              type: string
+              pattern: ^\d{5}(-\d{4})?$
+        phoneNumber:
+          type: string
+          pattern: ^\+?[1-9]\d{1,14}$
+do:
+  - example:
+      set:
+        ready: true

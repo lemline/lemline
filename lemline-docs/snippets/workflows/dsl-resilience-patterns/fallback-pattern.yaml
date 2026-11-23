@@ -1,0 +1,19 @@
+document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: fallback-pattern
+  version: '1.0.0'
+do:
+  - getRecommendations:
+      try:
+        - request:
+            call: http
+            with:
+              method: get
+              endpoint: http://recommendations/api
+      catch:
+        as: error
+        do:
+          - useDefault:
+              set:
+                recommendations: []

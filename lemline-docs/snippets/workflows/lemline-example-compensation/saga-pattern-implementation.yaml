@@ -1,0 +1,74 @@
+document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: order-saga
+  version: '1.0.0'
+do:
+  - fulfillOrder:
+      try:
+        - reserveInventory:
+            call: http
+            with:
+              method: post
+              endpoint: https://inventory.example/reservations
+              body:
+                orderId: ${ $workflow.input.orderId }
+                items: ${ $workflow.input.items }
+            export:
+              as: '${ $context + { reservationId: .id } }'
+        - chargeCustomer:
+            call: http
+            with:
+              method: post
+              endpoint: https://payments.example/charges
+              body:
+                orderId: ${ $workflow.input.orderId }
+                paymentInfo: ${ $workflow.input.paymentInfo }
+            export:
+              as: '${ $context + { paymentId: .id } }'
+        - createShipment:
+            call: http
+            with:
+              method: post
+              endpoint: https://shipping.example/shipments
+              body:
+                orderId: ${ $workflow.input.orderId }
+                shippingAddress: ${ $workflow.input.shippingAddress }
+      catch:
+        as: fulfillmentError
+        do:
+          - attemptRefundPayment:
+              if: ${ $context.paymentId != null }
+              try:
+                - refundPayment:
+                    call: http
+                    with:
+                      method: post
+                      endpoint: '${ "https://payments.example/charges/\($context.paymentId | @uri)/refund" }'
+              catch:
+                do:
+                  - recordCleanupFailure:
+                      set:
+                        action: refundPayment
+                      export:
+                        as: '${ $context + { cleanupFailed: (($context.cleanupFailed // []) + [.action]) } }'
+          - attemptReleaseInventory:
+              if: ${ $context.reservationId != null }
+              try:
+                - releaseInventory:
+                    call: http
+                    with:
+                      method: delete
+                      endpoint: '${ "https://inventory.example/reservations/\($context.reservationId | @uri)" }'
+              catch:
+                do:
+                  - recordCleanupFailure:
+                      set:
+                        action: releaseInventory
+                      export:
+                        as: '${ $context + { cleanupFailed: (($context.cleanupFailed // []) + [.action]) } }'
+          - reportFailure:
+              set:
+                success: false
+                cleanupFailed: ${ $context.cleanupFailed // [] }
+                errorType: ${ $fulfillmentError.type }

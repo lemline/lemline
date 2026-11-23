@@ -1,0 +1,27 @@
+document:
+  dsl: 1.0.3
+  namespace: examples
+  name: example-handling-faulted-sub-workflow
+  version: 1.0.0
+do:
+  - trySubWorkflow:
+      try:
+        - operation:
+            run:
+              workflow:
+                namespace: experimental
+                name: potentially-failing-job
+                version: 0.1.0-beta
+                input:
+                  value: ${ . }
+      catch:
+        errors:
+          with:
+            type: https://open-workflow-specification.org/spec/1.0.0/errors/runtime
+        as: runtimeError
+        do:
+          - logSubWorkflowFailure:
+              call: logError
+              with:
+                message: Sub-workflow experimental/potentially-failing-job faulted
+                details: ${ $runtimeError }

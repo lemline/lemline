@@ -1,0 +1,13 @@
+document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: example-calling-a-catalog-function
+  version: '1.0.0'
+# Assumes 'globalUtils' catalog is imported via workflow.use.catalogs
+# Assumes 'logMessage:1.0' function exists in that catalog
+do:
+  - recordInfo:
+      call: logMessage:1.0@globalUtils # Function:Version@CatalogName
+      with:
+        level: INFO
+        message: '${ "Processed item \(.itemId)" }'

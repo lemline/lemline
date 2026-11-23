@@ -16,6 +16,7 @@ Lemline's error handling is designed around a few key principles:
 
 Lemline implements the RFC 7807 Problem Details specification for consistent error representation:
 
+<!-- workflow-example: data -->
 ```json
 {
   "type": "https://open-workflow-specification.org/spec/1.0.0/errors/validation",
@@ -72,35 +73,20 @@ Errors can originate from multiple sources:
 The Lemline runtime automatically generates errors for common failure scenarios:
 
 - **Schema Validation**: When input/output doesn't match the schema
-  ```yaml
-  input:
-    schema:
-      type: "object"
-      required: ["orderId"]
-      # If input missing orderId, ValidationError is raised
-  ```
+
+  <code-block lang="yaml" src="workflows/reference/validate-and-route-order.yaml"/>
 
 - **Expression Evaluation**: When JQ expressions fail
-  ```yaml
-  set:
-    total: "${ .items[].price | add }"
-    # If .items isn't an array, ExpressionError is raised
-  ```
+
+  <code-block lang="yaml" src="workflows/lemline-explain-errors/1-system-generated-errors.yaml" include-lines="8-10"/>
 
 - **HTTP Communication**: When API calls fail
-  ```yaml
-  callHTTP:
-    url: "https://api.example.com/data"
-    # If API returns 500, CommunicationError is raised
-  ```
+
+  <code-block lang="yaml" src="workflows/lemline-getting-started/connect-to-http-services.yaml"/>
 
 - **Timeout Violations**: When operations exceed their timeouts
-  ```yaml
-  wait:
-    duration: PT30S
-    timeout: PT1M
-    # If wait exceeds 1 minute, TimeoutError is raised
-  ```
+
+  <code-block lang="yaml" src="workflows/lemline-explain-errors/1-system-generated-errors-2.yaml" include-lines="8-10"/>
 
   > **Lemline runtime:** only `listen` task timeouts are enforced. Workflow-level timeouts and timeouts on other tasks are accepted but ignored for now. HTTP calls use fixed client limits instead: 15 seconds to connect, 30 seconds per request.
 
@@ -108,14 +94,7 @@ The Lemline runtime automatically generates errors for common failure scenarios:
 
 Workflows can explicitly raise errors using the `raise` task:
 
-```yaml
-- checkInventory:
-    if: "${ .stock < .quantity }"
-    raise:
-      error: "outOfStock"  # Reference to a defined error
-      with:
-        details: "Requested ${ .quantity }, only ${ .stock } available"
-```
+<code-block lang="yaml" src="workflows/reference/typed-error.yaml"/>
 
 This allows for domain-specific error conditions.
 
@@ -157,82 +136,32 @@ Lemline provides several mechanisms for handling errors:
 
 The primary error handling mechanism:
 
-```yaml
-- processPayment:
-    try:
-      do:
-        - chargeCard:
-            callHTTP:
-              url: "https://payment.example.com/charge"
-              method: "POST"
-      catch:
-        - error:
-            with:
-              type: "https://open-workflow-specification.org/spec/1.0.0/errors/communication"
-              status: 503
-            as: "paymentError"
-          do:
-            - logError:
-                set:
-                  errorMessage: "Payment service unavailable: ${ .paymentError.details }"
-```
+<code-block lang="yaml" src="workflows/lemline-explain-errors/1-try-catch-blocks.yaml" include-lines="7-23"/>
 
 Key components:
-- **do block**: Contains tasks that might fail
-- **catch blocks**: Define how to handle specific errors
-- **error.with**: Criteria for matching errors
-- **error.as**: Variable name to store the caught error
+- **try**: Contains tasks that might fail
+- **catch**: Defines how to handle specific errors
+- **errors.with**: Criteria for matching errors
+- **as**: Variable name to store the caught error
 - **do**: Compensation logic when an error is caught
 
 ### 2. Retry Policies
 
 Automated retry for transient failures:
 
-```yaml
-- processPayment:
-    try:
-      retry:
-        policy:
-          strategy: backoff
-          backoff:
-            delay: PT1S
-            multiplier: 2
-          limit:
-            attempt:
-              count: 3
-      do:
-        - chargeCard:
-            # Task that might fail temporarily
-```
+<code-block lang="yaml" src="workflows/lemline-explain-errors/2-retry-policies.yaml" include-lines="7-22"/>
 
 When an error occurs:
 1. The error is caught
 2. The retry policy is evaluated
 3. If retries remain, the system waits according to the backoff strategy
-4. The entire `do` block is re-executed
+4. The entire `try` block is re-executed
 
 ### 3. Fallback Patterns
 
 Define explicit fallback behavior:
 
-```yaml
-- getUserProfile:
-    try:
-      do:
-        - fetchFromApi:
-            callHTTP:
-              url: "https://api.example.com/users/${ .userId }"
-      catch:
-        - error:
-            do:
-              - useCachedData:
-                  callHTTP:
-                    url: "https://cache.example.com/users/${ .userId }"
-              - markStale:
-                  set:
-                    dataSource: "cache"
-                    isFresh: false
-```
+<code-block lang="yaml" src="workflows/lemline-explain-errors/3-fallback-patterns.yaml" include-lines="7-24"/>
 
 This pattern allows graceful degradation when preferred data sources fail.
 
@@ -248,50 +177,13 @@ Best practices for error-resilient workflows:
 
 Explicitly define expected error conditions:
 
-```yaml
-use:
-  errors:
-    - name: "paymentDeclined"
-      type: "https://example.com/errors/payment-declined"
-      status: 400
-      title: "Payment Method Declined"
-
-    - name: "insufficientInventory"
-      type: "https://example.com/errors/insufficient-inventory"
-      status: 409
-      title: "Insufficient Inventory"
-```
+<code-block lang="yaml" src="workflows/lemline-explain-errors/1-define-expected-errors.yaml" include-lines="6-15"/>
 
 ### 2. Implement Structured Error Handling
 
 Structure your workflow with proper error handling:
 
-```yaml
-do:
-  - mainFlow:
-      try:
-        do:
-          - validateInput:
-              # Input validation
-          - processOrder:
-              try:
-                do:
-                  - reserveInventory:
-                      # Inventory check
-                  - processPayment:
-                      # Payment processing
-                catch:
-                  - error:
-                      with:
-                        name: "paymentDeclined"
-                      do:
-                        # Payment-specific handling
-          - fulfillOrder:
-              # Order fulfillment
-        catch:
-          - error:
-              # Global error handling
-```
+<code-block lang="yaml" src="workflows/lemline-explain-errors/2-implement-structured-error-handling.yaml" include-lines="7-31"/>
 
 ### 3. Use Appropriate Retry Strategies
 
@@ -306,46 +198,13 @@ Choose retry strategies based on error types:
 
 Design workflows to handle partial failures:
 
-```yaml
-- userDashboard:
-    fork:
-      branches:
-        - loadProfile:
-            try:
-              do:
-                - fetchUserProfile:
-                    # Profile loading
-              catch:
-                - error:
-                    do:
-                      - setDefaultProfile:
-                          # Use default profile
-        - loadRecommendations:
-            try:
-              do:
-                - fetchRecommendations:
-                    # Load recommendations
-              catch:
-                - error:
-                    do:
-                      - setEmptyRecommendations:
-                          # Skip recommendations
-```
+<code-block lang="yaml" src="workflows/lemline-explain-errors/4-implement-graceful-degradation.yaml" include-lines="7-29"/>
 
 ### 5. Provide Comprehensive Error Context
 
 Ensure errors contain useful diagnostic information:
 
-```yaml
-- processRecord:
-    if: "${ .recordType == 'invalid' }"
-    raise:
-      error:
-        type: "https://example.com/errors/validation"
-        status: 400
-        title: "Invalid Record Type"
-        details: "Record ID ${ .recordId } has invalid type '${ .recordType }'"
-```
+<code-block lang="yaml" src="workflows/lemline-explain-errors/5-provide-comprehensive-error-context.yaml" include-lines="7-14"/>
 
 ## Debugging and Monitoring Errors
 

@@ -1,0 +1,157 @@
+document:
+  dsl: 1.0.3
+  namespace: examples
+  name: database-timeouts
+  version: 1.0.0
+do:
+  - simpleQuery:
+      try:
+        - executeQuery:
+            call: http
+            with:
+              method: get
+              endpoint: https://db.example/api/items
+              query:
+                limit: "10"
+            timeout:
+              after:
+                seconds: 3
+            export:
+              as: '${ $context + { queryResult: . } }'
+      catch:
+        errors:
+          with:
+            type: https://open-workflow-specification.org/spec/1.0.0/errors/timeout
+        retry:
+          delay:
+            milliseconds: 500
+          limit:
+            attempt:
+              count: 2
+  - complexQuery:
+      try:
+        - executeComplexQuery:
+            call: http
+            with:
+              method: post
+              endpoint: https://db.example/api/query
+              body:
+                joins: 3
+                filters:
+                  - field: category
+                    operator: in
+                    values:
+                      - A
+                      - B
+                      - C
+                  - field: status
+                    operator: '='
+                    value: active
+                  - field: date
+                    operator: '>='
+                    value: '2023-01-01'
+                sort:
+                  - field: date
+                    direction: desc
+            timeout:
+              after:
+                seconds: 10
+            export:
+              as: '${ $context + { complexResult: . } }'
+      catch:
+        errors:
+          with:
+            type: https://open-workflow-specification.org/spec/1.0.0/errors/timeout
+        do:
+          - simplifyAndRetry:
+              call: http
+              with:
+                method: post
+                endpoint: https://db.example/api/query
+                body:
+                  joins: 1
+                  filters:
+                    - field: status
+                      operator: '='
+                      value: active
+                  sort:
+                    - field: date
+                      direction: desc
+              timeout:
+                after:
+                  seconds: 5
+              export:
+                as: '${ $context + { usedSimplifiedQuery: true, simplifiedResult: . } }'
+  - analyticalQuery:
+      try:
+        - executeAnalyticalQuery:
+            call: http
+            with:
+              method: post
+              endpoint: https://analytics.example/api/query
+              body:
+                type: aggregate
+                groupBy:
+                  - category
+                  - month
+                metrics:
+                  - count
+                  - sum
+                  - average
+                filters: '${ $workflow.input.additionalFilters // [] }'
+            timeout:
+              after:
+                minutes: 2
+            export:
+              as: '${ $context + { analyticalResult: . } }'
+      catch:
+        errors:
+          with:
+            type: https://open-workflow-specification.org/spec/1.0.0/errors/timeout
+        do:
+          - requestAsyncProcessing:
+              call: http
+              with:
+                method: post
+                endpoint: https://analytics.example/api/jobs
+                body:
+                  queryType: aggregate
+                  parameters:
+                    groupBy:
+                      - category
+                      - month
+                    metrics:
+                      - count
+                      - sum
+                      - average
+                    filters: '${ $workflow.input.additionalFilters // [] }'
+                  callbackEvent:
+                    type: com.example.analytics.complete
+                    correlationId: ${ $workflow.id }
+              export:
+                as: '${ $context + { analyticsJobId: .id, usedAsyncAnalytics: true } }'
+  - waitForAsyncResults:
+      listen:
+        to:
+          one:
+            with:
+              type: com.example.analytics.complete
+            correlate:
+              correlationId:
+                from: ${ .correlationId }
+                expect: ${ $workflow.id }
+      timeout:
+        after:
+          minutes: 15
+      export:
+        as: '${ $context + { analyticalResult: .[0] } }'
+      if: ${ $context.usedAsyncAnalytics == true }
+  - prepareResponse:
+      set:
+        result:
+          simpleQuery: ${ $context.queryResult }
+          complexQuery: '${ if $context.usedSimplifiedQuery then $context.simplifiedResult else $context.complexResult end
+            }'
+          analyticalQuery: '${ $context.analyticalResult // "No analytical results available" }'
+          usedSimplifiedQuery: ${ $context.usedSimplifiedQuery == true }
+          usedAsyncAnalytics: ${ $context.usedAsyncAnalytics == true }

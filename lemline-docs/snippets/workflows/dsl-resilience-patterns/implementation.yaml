@@ -1,0 +1,32 @@
+document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: implementation
+  version: '1.0.0'
+do:
+  - callService:
+      try:
+        - request:
+            call: http
+            with:
+              method: get
+              endpoint: http://example.com/api
+      catch:
+        errors:
+          with:
+            type: https://open-workflow-specification.org/spec/1.0.0/errors/runtime
+        retry:
+          delay:
+            seconds: 2
+          backoff:
+            exponential: {}
+          jitter:
+            from:
+              milliseconds: 0
+            to:
+              milliseconds: 500
+          limit:
+            attempt:
+              count: 5
+            duration:
+              minutes: 5

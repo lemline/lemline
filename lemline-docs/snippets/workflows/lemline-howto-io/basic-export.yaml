@@ -1,0 +1,14 @@
+document:
+  dsl: 1.0.3
+  namespace: examples
+  name: basic-export
+  version: 1.0.0
+do:
+  - FetchCustomerData:
+      call: customerService
+      with:
+        customerId: ${ .customerId }
+      export:
+        as:
+          customer: ${ .data }
+      then: NextTask

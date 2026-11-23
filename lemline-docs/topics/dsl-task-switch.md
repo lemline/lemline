@@ -19,34 +19,7 @@ It's primarily used for:
 
 Here's an example of routing based on an input status field:
 
-```yaml
-document:
-  dsl: '1.0.0'
-  namespace: examples
-  name: switch-basic
-  version: '1.0.0'
-do:
-  - decideNextStep:
-      # Assume input is { "status": "Approved" } or { "status": "Rejected" } etc.
-      switch:
-        - caseApproved:
-            when: "${ .status == \"Approved\" }"
-            then: processApproved # Go to the 'processApproved' task
-        - caseRejected:
-            when: "${ .status == \"Rejected\" }"
-            then: processRejected # Go to the 'processRejected' task
-        - caseDefault: # Default case (no 'when')
-            then: handleOtherStatus # Go to 'handleOtherStatus' if neither matched
-  - processApproved:
-      # ... task definition ...
-      then: continue # Or specify next step
-  - processRejected:
-      # ... task definition ...
-      then: continue
-  - handleOtherStatus:
-      # ... task definition ...
-      then: continue
-```
+<code-block lang="yaml" src="workflows/dsl-task-switch/basic-usage.yaml"/>
 
 In this example, the `decideNextStep` task inspects the `.status` field of its input. If it's "Approved", execution
 jumps to `processApproved`. If it's "Rejected", it jumps to `processRejected`. Otherwise, the default case triggers,
@@ -71,27 +44,7 @@ Each case contains:
     * **`then`** (String, Required): Defines the next step if this case is selected. It follows the
       standard [Flow Control](dsl-flow-control.md) rules (`continue`, `exit`, `end`, or a task name).
 
-```yaml
-do:
-  - switch:
-      - checkHighPriority:
-          when: "${ .priority > 5 }"
-          then: handleHighPriority
-      - checkMediumPriority:
-          when: "${ .priority > 2 }" # Only checked if priority <= 5
-          then: handleMediumPriority
-      - defaultCase: # No 'when', acts as default
-          then: handleLowPriority
-  - handleHighPriority:
-      # ... task definition ...
-      then: exit
-  - handleMediumPriority:
-      # ... task definition ...
-      then: exit
-  - handleLowPriority:
-      # ... task definition ...
-      then: exit
-```
+<code-block lang="yaml" src="workflows/reference/validate-and-route-order.yaml"/>
 
 **Important**: Only the *first* `when` condition that evaluates to `true` is selected. Subsequent cases are ignored. If
 a default case (no `when`) exists, it should typically be placed last.

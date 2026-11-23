@@ -1,0 +1,34 @@
+document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: catching-and-handling-errors-try-catch
+  version: '1.0.0'
+use:
+  retries:
+    myRetryPolicy:
+      delay:
+        seconds: 2
+      limit:
+        attempt:
+          count: 3
+do:
+  - reserveInventory:
+      try:
+        - checkStock:
+            raise:
+              error:
+                type: https://errors.example.com/inventory-unavailable
+                status: 503
+                title: Inventory unavailable
+      catch:
+        errors:
+          with:
+            type: https://errors.example.com/inventory-unavailable
+        as: inventoryError
+        when: ${ $inventoryError.status >= 500 }
+        retry: myRetryPolicy
+        do:
+          - requestManualReview:
+              set:
+                status: pending-review
+                message: '${ "Operation failed with status \($inventoryError.status)" }'

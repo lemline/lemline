@@ -1,0 +1,28 @@
+document:
+  dsl: 1.0.3
+  namespace: examples
+  name: isolation-with-fork
+  version: 1.0.0
+do:
+  - processBatch:
+      fork:
+        branches:
+          - updateInventory:
+              try:
+                - reserveStock:
+                    call: http
+                    with:
+                      method: post
+                      endpoint: http://inventory/api/reservations
+                      body: ${ .items }
+              catch:
+                do:
+                  - ignore:
+                      set:
+                        inventoryUpdated: false
+          - notifyCustomer:
+              emit:
+                event:
+                  with:
+                    type: com.example.order.confirmed
+                    source: https://events.example.com/order-service

@@ -1,0 +1,25 @@
+document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: retry-behavior
+  version: '1.0.0'
+do:
+  - fetchData:
+      try:
+        - callApi:
+            call: http
+            with:
+              method: get
+              endpoint: https://api.example.com/data
+      catch:
+        errors:
+          with:
+            type: https://open-workflow-specification.org/spec/1.0.0/errors/runtime
+        retry:
+          delay:
+            seconds: 2
+          backoff:
+            exponential: {}
+          limit:
+            attempt:
+              count: 5

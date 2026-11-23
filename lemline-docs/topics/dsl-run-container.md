@@ -10,85 +10,21 @@ The `run: container` task allows a workflow to execute an external process encap
 
 ## Usage Example
 
-```yaml
-document:
-  dsl: '1.0.0'
-  namespace: container_runs
-  name: run-simple-container
-  version: '1.0.0'
-do:
-  - executeInContainer:
-      run:
-        container:
-          image: busybox:latest # The container image to use
-          command: "echo 'Hello from container'" # Command to run inside
-        # `await: true` (default) waits for completion
-        # `return: stdout` (default) sets task output to container's stdout
-      then: processContainerOutput
-  - processContainerOutput:
-      # Input will be "Hello from container\n"
-      set:
-        message: "{ trim: . }"
+<code-block lang="yaml" src="workflows/dsl-run-container/usage-example.yaml"/>
 
 ## Additional Examples
 
 ### Example: Using Environment Variables and Volumes
 
-```yaml
-do:
-  - processDataWithContainer:
-      run:
-        container:
-          image: my-data-processor:latest
-          # Pass dynamic data via environment variables
-          environment:
-            INPUT_FILE: "/data/${ .inputFile }"
-            OUTPUT_DIR: "/results"
-            API_KEY: "${ $secrets.processorApiKey }"
-          # Mount host volumes into the container
-          volumes:
-            "/mnt/shared/input": "/data:ro" # Read-only input
-            "/mnt/shared/output": "/results" # Writable output
-        return: code # Just check the exit code
-      then: checkProcessingStatus
-```
+<code-block lang="yaml" src="workflows/dsl-run-container/example-using-environment-variables-and-volumes.yaml" include-lines="6-21"/>
 
 ### Example: Getting All Process Results
 
-```yaml
-do:
-  - runDiagnostics:
-      run:
-        container:
-          image: diagnostics-tool:v2
-          command: "--check-all --verbose"
-        # Get code, stdout, and stderr
-        return: all 
-      then: analyzeDiagnostics
-  - analyzeDiagnostics:
-      # Input: { "code": 0, "stdout": "...", "stderr": "..." }
-      set:
-        exitCode: "${ .code }"
-        outputLog: "${ .stdout }"
-        errorLog: "${ .stderr }"
-```
+<code-block lang="yaml" src="workflows/dsl-run-container/example-getting-all-process-results.yaml" include-lines="6-20"/>
 
 ### Example: Running Without Awaiting (Fire and Forget)
 
-```yaml
-do:
-  - triggerBackgroundJob:
-      run:
-        container:
-          image: background-worker:latest
-          environment:
-            JOB_ID: "${ .jobId }"
-        # Don't wait for the container to finish
-        await: false 
-      # Task output is its input because await is false
-      # Workflow continues immediately
-      then: recordJobTriggered
-```
+<code-block lang="yaml" src="workflows/dsl-run-container/example-running-without-awaiting-fire-and-forget.yaml" include-lines="6-17"/>
 
 ## Configuration Options
 

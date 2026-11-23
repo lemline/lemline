@@ -1,0 +1,23 @@
+document:
+  dsl: 1.0.3
+  namespace: examples
+  name: using-flow-directives
+  version: 1.0.0
+do:
+  - parentTask:
+      do:
+        - checkCondition:
+            set:
+              processed: true
+            if: '${ .status == "done" }'
+            then: exit
+        - processNormally:
+            set:
+              processed: true
+        - taskAfterExit:
+            set:
+              processed: true
+      then: finalStep
+  - finalStep:
+      set:
+        processed: true

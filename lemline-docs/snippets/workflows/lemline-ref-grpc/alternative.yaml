@@ -1,0 +1,13 @@
+document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: alternative
+  version: '1.0.0'
+do:
+  - getUser:
+      call: http
+      with:
+        method: post
+        endpoint: https://users.example.com/v1/users:get
+        body:
+          id: ${ .userId }

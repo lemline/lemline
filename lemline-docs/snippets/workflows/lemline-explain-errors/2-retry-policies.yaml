@@ -1,0 +1,22 @@
+document:
+  dsl: 1.0.3
+  namespace: examples
+  name: 2-retry-policies
+  version: 1.0.0
+do:
+  - processPayment:
+      try:
+        - chargeCard:
+            call: http
+            with:
+              method: post
+              endpoint: https://payment.example.com/charge
+      catch:
+        retry:
+          delay:
+            seconds: 1
+          backoff:
+            exponential: {}
+          limit:
+            attempt:
+              count: 3

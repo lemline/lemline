@@ -1,0 +1,70 @@
+document:
+  dsl: 1.0.3
+  namespace: examples
+  name: complex-integration
+  version: 1.0.0
+use:
+  catalogs:
+    catalogs1:
+      endpoint: file://catalog.json
+do:
+  - getCustomerData:
+      call: crm.getCustomerById
+      with:
+        customerId: ${ .customerId }
+      export:
+        as: '${ $context + { customerData: . } }'
+  - processPurchaseOrder:
+      try:
+        - validateInventory:
+            call: openapi
+            with:
+              document:
+                endpoint: https://inventory.example.com/api/openapi.json
+              operationId: checkItemsAvailability
+              parameters:
+                items: ${ $workflow.input.orderItems }
+        - processPayment:
+            call: http
+            with:
+              method: post
+              endpoint: https://payments.example.com/api/transactions
+              headers:
+                Content-Type: application/json
+                Authorization: Bearer ${ $workflow.input.paymentToken }
+              body: '${ $workflow.input | { customerId: .customerId, amount: .totalAmount, items: .orderItems } }'
+        - notifyShipping:
+            call: asyncapi
+            with:
+              document:
+                endpoint: https://messaging.example.com/asyncapi.json
+              operation: publishShippingRequest
+              server:
+                name: production
+              message:
+                payload:
+                  orderId: ${ $workflow.input.orderId }
+                  customer: ${ $context.customerData }
+                  items: ${ $workflow.input.orderItems }
+      catch:
+        as: error
+        do:
+          - routeByErrorType:
+              switch:
+                - paymentDeclined:
+                    when: ${ $error.type == "https://example.com/errors/payment-declined" }
+                    then: notifyCustomer
+                - default:
+                    then: logError
+          - notifyCustomer:
+              call: crm.sendNotification
+              with:
+                customerId: ${ $workflow.input.customerId }
+                message: Your payment was declined. Please update payment information.
+              then: exit
+          - logError:
+              call: http
+              with:
+                method: post
+                endpoint: https://logging.example.com/api/errors
+                body: ${ $error }

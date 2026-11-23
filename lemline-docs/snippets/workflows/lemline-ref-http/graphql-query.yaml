@@ -1,0 +1,15 @@
+document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: graphql-query
+  version: '1.0.0'
+do:
+  - queryGraphQL:
+      call: http
+      with:
+        method: post
+        endpoint: https://api.example.com/graphql
+        body:
+          query: "query($id: ID!) { user(id: $id) { name email } }"
+          variables:
+            id: ${ .userId }

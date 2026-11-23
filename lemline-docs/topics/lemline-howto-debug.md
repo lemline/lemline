@@ -82,9 +82,8 @@ Common expression issues include:
    Run the runner with `--debug` to see the input of the task where the expression fails.
 
 2. **Type errors**: Ensure the data type matches the expected type
-   ```yaml
-   # Add type conversion in your expression
-   "${ number(.amount) * 0.1 }"
+   ```jq
+   (.amount | tonumber) * 0.1
    ```
 
 3. **Array access issues**: Check array indices and iterations

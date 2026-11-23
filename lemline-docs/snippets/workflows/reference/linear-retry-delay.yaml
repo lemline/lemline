@@ -1,0 +1,21 @@
+document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: linear-retry-delay
+  version: '1.0.0'
+do:
+  - request:
+      try:
+        - callApi:
+            call: http
+            with:
+              method: get
+              endpoint: https://api.example.com/data
+      catch:
+        retry:
+          delay: { seconds: 2 }
+          backoff:
+            linear: { }
+          limit:
+            duration:
+              minutes: 1

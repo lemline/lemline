@@ -1,0 +1,31 @@
+document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: workflow-extensions
+  version: '1.0.0'
+use:
+  extensions:
+    - audit:
+        extend: call
+        when: '${ $task.definition.call == "http" }'
+        before:
+          - recordRequest:
+              set:
+                reference: '${ $task.reference }'
+              export:
+                as: '${ $context + {lastRequest: .reference} }'
+        after:
+          - recordResponse:
+              call: http
+              with:
+                method: post
+                endpoint: https://audit.example.com/responses
+                body:
+                  task: '${ $task.reference }'
+                  response: '${ $task.output }'
+do:
+  - getUser:
+      call: http
+      with:
+        method: get
+        endpoint: https://api.example.com/user

@@ -17,20 +17,7 @@ more complex and conditional execution paths.
 By default, if no explicit flow control is specified, tasks within a sequence (like the top-level `do` block or the
 block within a `Do` task) execute in the order they are declared in the YAML file.
 
-```yaml
-document:
-  dsl: '1.0.0'
-  # ...
-do:
-  - validateOrder:
-      # ...
-
-  - checkInventory:
-      # ...
-
-  - processPayment:
-      # ...
-```
+<code-block lang="yaml" src="workflows/dsl-flow-control/default-flow-sequential-execution.yaml"/>
 
 In this example, `validateOrder`, `checkInventory`, and `processPayment` run one after the other.
 
@@ -51,29 +38,7 @@ boolean (`true` or `false`).
     * If the expression evaluates to `false`, the entire task is skipped and the workflow continues as this task does
       not exist (e.g. the workflow *does not follow* that skipped task's `then` directive to determine the next step).
 
-```yaml
-```yaml
-document:
-  dsl: '1.0.0'
-  # ...
-do:
-  - checkInput:
-      set:
-        # Assume input might be { "process": true } or { "process": false }
-        message: "Checking input..."
-  - conditionalTask:
-      if: "${ .process }" # Only run if input field 'process' is true
-      call: doSomethingImportant
-      # 'then' would be not followed if 'if' was false
-      then: nextStep
-  - taskAfterConditional: # This task is skipped if conditionalTask runs
-      call: log
-      with:
-        message: "Conditional task was skipped."
-      then: nextStep
-  - nextStep:
-    # ... execution continues here ...
-```
+<code-block lang="yaml" src="workflows/dsl-flow-control/conditional-execution-the-if-property.yaml"/>
 
 ## Continuation: The `then` Directive
 
@@ -88,39 +53,13 @@ current task completes successfully.
 You can provide the **name** of another task within the *same scope* (i.e., at the same level in the `do` list) as the
 value for `then`. This creates a jump or branch in the execution path.
 
-```yaml
-do:
-  - start:
-      set: { value: 1 }
-      then: processValue # Jump to processValue after start
-  - skippedTask:
-      # This task is skipped because 'start' jumps over it
-      set: { value: 2 }
-  - processValue:
-      set: { processed: "${ .value * 10 }" }
-      # Default: continues sequentially to 'finish'
-  - finish:
-      call: log
-      with: { result: "${ .processed }" }
-```
+<code-block lang="yaml" src="workflows/dsl-flow-control/targeting-a-specific-task.yaml" include-lines="6-18"/>
 
 A critical rule is that a `then` directive specifying a task name **can only target tasks declared within the same
 scope (level)**. You cannot use `then` to jump *into* or *out of* nested `Do` blocks or other flow constructs directly
 by name.
 
-```yaml
-do:
-  - outerTask1:
-      do: # Inner Scope 1
-        - innerTaskA:
-          # ...
-          # then: outerTask2 # INVALID: Cannot target task outside inner scope
-        - innerTaskB:
-            # ...
-            then: exit # VALID: Exits Inner Scope 1
-  - outerTask2:
-    # ...
-```
+<code-block lang="yaml" src="workflows/dsl-flow-control/targeting-a-specific-task-2.yaml" include-lines="7-19"/>
 
 To achieve jumps across scopes, you typically use `exit` to return control to the parent scope, which can then direct
 the flow using its own sequence or `then` directives.
@@ -132,13 +71,8 @@ Instead of a task name, `then` can use specific keywords (Flow Directives) to co
 1. **`continue`** (Default):
     * **Meaning**: Explicitly specifies the default behavior - proceed to the next task in the declaration order.
     * **Usage**: Rarely needed unless overriding a default behavior in a specific context or for clarity.
-      ```yaml
-      - taskX:
-          # ...
-          then: continue # Explicitly go to taskY next
-      - taskY:
-          # ...
-      ```
+
+      <code-block lang="yaml" src="workflows/reference/continue-to-next-task.yaml" include-lines="7-13"/>
     * **Data Flow**: as usual, the `raw input` of the next task is set to the `transformed output` of the task that
       called
       `continue`.
@@ -148,20 +82,8 @@ Instead of a task name, `then` can use specific keywords (Flow Directives) to co
       iteration) and transfers control back to the parent flow construct. The parent then determines its next step (
       often based on its *own* `then` directive or sequence).
     * **Usage**: Useful for early termination of a sub-flow or loop based on a condition met within it.
-       ```yaml
-       - parentTask:
-          do:
-            - checkCondition:
-                if: "${ .status == 'done' }"
-                then: exit # Exit this inner 'do' block
-            - processNormally: # Skipped if condition was 'done'
-                # ...
-            - taskAfterExit: # Skipped if condition was 'done'
-                # ...
-          then: finalStep # Parent continues here if inner block exited or completed normally
-       - finalStep:
-           # ...
-       ```
+
+       <code-block lang="yaml" src="workflows/dsl-flow-control/using-flow-directives.yaml" include-lines="7-23"/>
     * **Data Flow**: The `raw output` of the parent task is set to the `transformed output` of the task that called
       `exit`.
 
@@ -169,15 +91,8 @@ Instead of a task name, `then` can use specific keywords (Flow Directives) to co
     * **Meaning**: Gracefully terminates the execution of the *entire* workflow instance immediately.
     * **Usage**: Used for scenarios where processing should stop completely based on a certain condition or outcome,
       without executing any further tasks.
-      ```yaml
-      - criticalCheck:
-          call: getSystemStatus
-      - decideTermination:
-          if: "${ .status == 'FATAL' }"
-          then: end # Stop the whole workflow
-      - continueNormalProcessing: # Skipped if status was FATAL
-          # ...
-      ```
+
+      <code-block lang="yaml" src="workflows/dsl-flow-control/using-flow-directives-2.yaml" include-lines="7-16"/>
     * **Data Flow**: the `raw output` of the workflow instance is set to the `transformed output` of the task that
       called
       `end`.

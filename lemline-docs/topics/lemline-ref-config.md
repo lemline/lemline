@@ -317,6 +317,7 @@ From the command line, `--debug`, `--info`, `--warn` and `--error` set the log l
 
 ## Example
 
+<!-- workflow-example: data -->
 ```yaml
 lemline:
   database:

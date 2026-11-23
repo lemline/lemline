@@ -1,0 +1,17 @@
+document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: json-post-request
+  version: '1.0.0'
+do:
+  - createOrder:
+      call: http
+      with:
+        method: post
+        endpoint: https://api.example.com/orders
+        headers:
+          Idempotency-Key: ${ .orderId }
+        body:
+          orderId: ${ .orderId }
+          items: ${ .items }
+        output: response

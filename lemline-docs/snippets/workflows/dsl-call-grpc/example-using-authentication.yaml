@@ -1,0 +1,33 @@
+document:
+  dsl: 1.0.3
+  namespace: test
+  name: grpc-auth-example
+  version: 0.1.0
+use:
+  authentications:
+    myGrpcAuth:
+      oauth2:
+        authority: https://auth.example.com
+        client:
+          id: client-id
+          secret: client-secret
+        grant: client_credentials
+do:
+  - getAccountDetails:
+      call: grpc
+      with:
+        proto:
+          endpoint: file://protos/account.proto
+        service:
+          name: AccountService
+          host: secure-grpc
+          port: 50051
+          authentication:
+            use: myGrpcAuth
+        method: GetAccount
+        arguments:
+          accountId: ${ .user.id }
+      then: processAccount
+  - processAccount:
+      set:
+        processed: true

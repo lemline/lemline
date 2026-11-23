@@ -14,18 +14,7 @@ Secrets can include credentials, API keys, tokens, certificates, and other sensi
 
 Secrets are declared in the `use.secrets` section of a workflow definition. This establishes which secrets a workflow requires access to, without containing the actual secret values.
 
-```yaml
-document:
-  dsl: '1.0.0'
-  namespace: examples
-  name: secrets-example
-  version: '1.0.0'
-use:
-  secrets:
-    - api-key-secret
-    - database-credentials
-    - oauth-client-secret
-```
+<code-block lang="yaml" src="workflows/dsl-secrets/declaring-secrets.yaml"/>
 
 ## Secret Resolution
 
@@ -39,56 +28,17 @@ Secrets are available in runtime expressions through the `$secrets` argument. A 
 
 ### Example: Using a Secret in an HTTP Call
 
-```yaml
-use:
-  secrets:
-    - API_KEY
-do:
-  - callProtectedAPI:
-      call: http
-      with:
-        method: post
-        endpoint: https://api.example.com/data
-        headers:
-          Authorization: '${ "Bearer " + $secrets.API_KEY }'
-```
+<code-block lang="yaml" src="workflows/dsl-secrets/example-using-a-secret-in-an-http-call.yaml" include-lines="6-16"/>
 
 ### Example: Structured Secret
 
 When a secret value is a JSON object, its fields can be read directly:
 
-```yaml
-use:
-  secrets:
-    - DB_CREDENTIALS   # e.g. {"username": "app", "password": "s3cr3t"}
-do:
-  - openSession:
-      call: http
-      with:
-        method: post
-        endpoint: https://db-proxy.example.com/sessions
-        body:
-          user: ${ $secrets.DB_CREDENTIALS.username }
-          password: ${ $secrets.DB_CREDENTIALS.password }
-```
+<code-block lang="yaml" src="workflows/dsl-secrets/example-structured-secret.yaml" include-lines="6-17"/>
 
 ### Example: Secret in an Authentication Policy
 
-```yaml
-use:
-  secrets:
-    - API_TOKEN
-do:
-  - callProtectedAPI:
-      call: http
-      with:
-        method: get
-        endpoint:
-          uri: https://api.example.com/data
-          authentication:
-            bearer:
-              token: ${ $secrets.API_TOKEN }
-```
+<code-block lang="yaml" src="workflows/dsl-secrets/example-secret-in-an-authentication-policy.yaml" include-lines="6-18"/>
 
 ## Security Considerations and Best Practices
 

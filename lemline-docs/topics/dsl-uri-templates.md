@@ -26,15 +26,7 @@ The only syntax supported is **Simple String Expansion**: `{variableName}`.
 * It replaces the entire `{variableName}` placeholder with the **value** of that variable.
 * If no variable with that exact name is found, the placeholder is replaced with an **empty string**.
 
-```yaml
-# Example in an HTTP call
-call: http
-with:
-  uri: "https://api.example.com/users/{userId}/profile"
-  # Assumes a variable named 'userId' exists in the data context
-  # If userId is "abc", the final URI becomes:
-  # https://api.example.com/users/abc/profile 
-```
+<code-block lang="yaml" src="workflows/dsl-uri-templates/supported-syntax-simple-string-expansion.yaml" include-lines="8-11"/>
 
 ## Limitations Compared to Runtime Expressions (`${...}`)
 
@@ -50,14 +42,10 @@ limitations include:
    `$input`, `$output`, or `$secrets` inside `{}` placeholders. Use standard Runtime Expressions (`${...}`) when you
    need access to these.
 
-```yaml
-# --- INVALID USAGE --- 
-# uri: "https://api.example.com/data/{$context.requestPath}" # Cannot use $context
-# uri: "https://api.example.com/items/{item.id}" # Cannot use dot notation
+This expression builds an endpoint from the current input and escapes the order ID
+before inserting it into the path.
 
-# --- VALID USAGE (using Runtime Expression instead) --- 
-# uri: "${ \"https://api.example.com/data/\" + $context.requestPath }" 
-```
+<code-block lang="yaml" src="workflows/reference/dynamic-http-endpoint.yaml"/>
 
 Choose URI Templates only for very simple substitutions where the limitations are acceptable. For more complex URI
 construction or access to workflow context, use standard Runtime Expressions.

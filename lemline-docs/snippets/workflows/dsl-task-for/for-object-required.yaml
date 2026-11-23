@@ -1,0 +1,15 @@
+document:
+  dsl: 1.0.3
+  namespace: examples
+  name: for-object-required
+  version: 1.0.0
+do:
+  - example:
+      for:
+        in: ${ .users }
+        each: currentUser
+        at: userIndex
+      do:
+        - processItem:
+            set:
+              item: ${ $currentUser }

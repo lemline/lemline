@@ -1,0 +1,12 @@
+document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: default-catalog
+  version: '1.0.0'
+do:
+  - logInfo:
+      # Assumes 'logMessage:1.0' exists in the runtime's default catalog
+      call: logMessage:1.0@default
+      with:
+        level: INFO
+        text: "Task completed successfully."

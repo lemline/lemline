@@ -1,0 +1,20 @@
+document:
+  dsl: 1.0.3
+  namespace: com-example-maintenance
+  name: daily-cleanup
+  version: 1.0.0
+schedule:
+  cron: 0 0 * * *
+do:
+  - cleanupTempFiles:
+      run:
+        container:
+          image: maintenance-tools:v1.2
+          command: /bin/cleanup.sh --older-than 7d --dir /tmp
+      then: sendReport
+  - sendReport:
+      call: sendReportEmailFunc
+      with:
+        report: ${ .result }
+        recipients:
+          - admin@example.com

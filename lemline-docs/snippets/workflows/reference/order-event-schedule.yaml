@@ -1,0 +1,17 @@
+document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: order-event-schedule
+  version: '1.0.0'
+schedule:
+  on:
+    one:
+      with:
+        type: com.example.order.created
+input:
+  from: ${ .[0] }
+do:
+  - recordOrder:
+      set:
+        orderId: ${ .orderId }
+        status: received

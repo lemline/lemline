@@ -1,0 +1,14 @@
+document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: basic-variable-assignment
+  version: '1.0.0'
+do:
+  - setOrderDefaults:
+      set:
+        orderData:
+          id: '${ $workflow.input.orderId // $workflow.id }'
+          createdAt: '${ (now | todateiso8601) }'
+          status: "PENDING"
+          customerName: ${ $workflow.input.customer.firstName + " " + $workflow.input.customer.lastName }
+          priority: '${ $workflow.input.priority // "normal" }'

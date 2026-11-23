@@ -1,0 +1,45 @@
+document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: resilient-order-processing
+  version: '1.0.0'
+do:
+  - reserveInventory:
+      call: http
+      with:
+        method: post
+        endpoint: https://inventory.example/reservations
+        body:
+          orderId: ${ $workflow.input.orderId }
+          items: ${ $workflow.input.items }
+      export:
+        as: '${ $context + { reservationId: .id } }'
+  - chargeOrder:
+      try:
+        - chargePayment:
+            call: http
+            with:
+              method: post
+              endpoint: https://payments.example/charges
+              headers:
+                Idempotency-Key: ${ $workflow.id }
+              body:
+                orderId: ${ $workflow.input.orderId }
+                paymentInfo: ${ $workflow.input.paymentInfo }
+      catch:
+        as: paymentError
+        retry:
+          delay: PT2S
+          limit:
+            attempt:
+              count: 3
+        do:
+          - releaseInventory:
+              call: http
+              with:
+                method: delete
+                endpoint: '${ "https://inventory.example/reservations/\($context.reservationId | @uri)" }'
+          - reportFailure:
+              set:
+                success: false
+                errorType: ${ $paymentError.type }

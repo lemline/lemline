@@ -1,0 +1,17 @@
+document:
+  dsl: '1.0.3'
+  namespace: tutorial
+  name: hello-workflow
+  version: '0.1.0'
+do:
+  - setUserInfo:
+      set:
+        user: Workflow Author
+        role: Developer
+  - createGreeting:
+      set:
+        message: ${ "Hello, " + .user + "! Welcome, " + .role + "." }
+  - logMessage:
+      call: https://raw.githubusercontent.com/open-workflow-specification/catalog/main/functions/log/1.0.0/function.yaml
+      with:
+        message: ${ .message }

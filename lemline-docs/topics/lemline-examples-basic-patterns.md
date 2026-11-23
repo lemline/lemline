@@ -8,43 +8,13 @@ The simplest workflow pattern is a sequence of tasks executed one after another.
 
 ### Single Task Example
 
-```yaml
-document:
-  dsl: '1.0.0'
-  namespace: examples
-  name: call-http-shorthand-endpoint
-  version: '0.1.0'
-do:
-  - getPet:
-      call: http
-      with:
-        method: get
-        endpoint: https://petstore.swagger.io/v2/pet/{petId}
-```
+<code-block lang="yaml" src="workflows/lemline-examples-basic-patterns/single-task-example.yaml"/>
 
 In this example, a single HTTP GET request is made to retrieve pet data. The workflow completes after this task is executed.
 
 ### Multiple Sequential Tasks Example
 
-```yaml
-document:
-  dsl: '1.0.0'
-  namespace: examples
-  name: call-http-shorthand-endpoint
-  version: '0.1.0'
-do:
-  - getPet:
-      call: http
-      with:
-        method: get
-        endpoint: https://petstore.swagger.io/v2/pet/{petId}
-  - buyPet:
-      call: http
-      with:
-        method: put
-        endpoint: https://petstore.swagger.io/v2/pet/{petId}
-        body: '${ . + { status: "sold" } }'
-```
+<code-block lang="yaml" src="workflows/lemline-examples-basic-patterns/multiple-sequential-tasks-example.yaml"/>
 
 In this example, two HTTP calls are executed in sequence:
 1. First, get pet information
@@ -56,41 +26,7 @@ Tasks can be nested to group related operations and create hierarchical structur
 
 ### Nested Tasks Example
 
-```yaml
-document:
-  dsl: '1.0.0-alpha5'
-  namespace: examples
-  name: call-http-shorthand-endpoint
-  version: '0.1.0'
-do:
-  - getPet:
-      call: http
-      with:
-        method: get
-        endpoint: https://petstore.swagger.io/v2/pet/{petId}
-  - nested:
-      do:
-        - init:
-            set:
-              startEvent: ${ $workflow.input[0] }
-        - getPet:
-            call: http
-            with:
-              method: get
-              endpoint: https://petstore.swagger.io/v2/pet/{petId}
-        - buyPet0:
-            call: http
-            with:
-              method: put
-              endpoint: https://petstore.swagger.io/v2/pet/{petId}
-              body: '${ . + { status: "sold" } }'
-  - buyPet:
-      call: http
-      with:
-        method: put
-        endpoint: https://petstore.swagger.io/v2/pet/{petId}
-        body: '${ . + { status: "sold" } }'
-```
+<code-block lang="yaml" src="workflows/lemline-examples-basic-patterns/nested-tasks-example.yaml"/>
 
 This example demonstrates:
 1. A top-level task (`getPet`)
@@ -108,39 +44,7 @@ The `switch` construct allows workflows to implement conditional logic, executin
 
 ### Switch Example
 
-```yaml
-document:
-  dsl: '1.0.0'
-  namespace: test
-  name: sample-workflow
-  version: 0.1.0
-do:
-  - processOrder:
-      switch:
-        - case1:
-            when: .orderType == "electronic"
-            then: processElectronicOrder
-        - case2:
-            when: .orderType == "physical"
-            then: processPhysicalOrder
-        - default:
-            then: handleUnknownOrderType
-  - processElectronicOrder:
-      set:
-        validate: true
-        status: fulfilled
-      then: exit
-  - processPhysicalOrder:
-      set:
-        inventory: clear
-        items: 1
-        address: Elmer St
-      then: exit
-  - handleUnknownOrderType:
-      set:
-        log: warn
-        message: something's wrong
-```
+<code-block lang="yaml" src="workflows/lemline-examples-basic-patterns/switch-example.yaml"/>
 
 This example demonstrates:
 1. A switch statement evaluating `.orderType`
@@ -160,35 +64,13 @@ Workflows often need to iterate over collections of data or repeat tasks until c
 
 ### For Loop Example
 
-```yaml
-document:
-  dsl: '1.0.0'
-  namespace: test
-  name: for-example
-  version: '0.1.0'
-do:
-  - checkup:
-      for:
-        each: pet
-        in: .pets
-        at: childIndex
-      while: .vet != null
-      do:
-        - waitForCheckup:
-            listen:
-              to:
-                one:
-                  with:
-                    type: com.fake.petclinic.pets.checkup.completed.v2
-            output:
-              as: '.pets + [{ "id": $pet.id }]'
-```
+<code-block lang="yaml" src="workflows/lemline-examples-basic-patterns/for-loop-example.yaml"/>
 
 This example demonstrates:
 1. Iterating over a collection (`.pets`)
 2. The current item is accessible as `$pet`
 3. The index is accessible as `$childIndex`
-4. A condition (`while: .vet != null`) controls continuation
+4. A condition (`while: ${ .vet != null }`) controls continuation
 5. Inside the loop, an event listener waits for a specific event
 6. The output is transformed for each iteration
 
@@ -204,22 +86,7 @@ The `set` construct allows workflows to create or modify variables.
 
 ### Set Example
 
-```yaml
-document:
-  dsl: '1.0.0'
-  namespace: test
-  name: set
-  version: '0.1.0'
-schedule:
-  on:
-    one:
-      with:
-        type: com.lemline.samples.events.trigger.v1
-do: 
-  - initialize:
-      set:
-        startEvent: ${ $workflow.input[0] }
-```
+<code-block lang="yaml" src="workflows/lemline-examples-basic-patterns/set-example.yaml"/>
 
 This example demonstrates:
 1. Setting a variable `startEvent` to the first element of the workflow input
@@ -232,28 +99,7 @@ Additional `set` capabilities:
 
 ## Advanced Set Example
 
-```yaml
-document:
-  dsl: '1.0.0'
-  namespace: examples
-  name: advanced-set
-  version: '0.1.0'
-do:
-  - initData:
-      set:
-        user:
-          name: "John Doe"
-          role: "admin"
-          permissions: ["read", "write"]
-        timestamp: ${ now() }
-  - transformData:
-      set:
-        enrichedUser: ${ .user + { 
-          lastAccess: .timestamp,
-          isAdmin: .user.role == "admin",
-          permissionCount: length(.user.permissions)
-        } }
-```
+<code-block lang="yaml" src="workflows/lemline-examples-basic-patterns/advanced-set-example.yaml"/>
 
 This advanced example shows:
 1. Setting nested object structures
@@ -267,48 +113,7 @@ These basic patterns can be combined to create more complex workflows.
 
 ### Combined Example
 
-```yaml
-document:
-  dsl: '1.0.0'
-  namespace: examples
-  name: combined-patterns
-  version: '0.1.0'
-do:
-  - initialize:
-      set:
-        items: [
-          { "id": 1, "type": "digital", "name": "E-book" },
-          { "id": 2, "type": "physical", "name": "Notebook" },
-          { "id": 3, "type": "digital", "name": "Software" }
-        ]
-  - processItems:
-      for:
-        each: item
-        in: .items
-      do:
-        - determineProcessingType:
-            switch:
-              - digitalItem:
-                  when: $item.type == "digital"
-                  then:
-                    do:
-                      - processDigital:
-                          set:
-                            processed: ${ $item + { "status": "processed", "downloadReady": true } }
-              - physicalItem:
-                  when: $item.type == "physical"
-                  then:
-                    do:
-                      - processPhysical:
-                          set:
-                            processed: ${ $item + { "status": "processed", "shippingRequired": true } }
-        - logResult:
-            call: http
-            with:
-              method: post
-              endpoint: https://example.com/log
-              body: ${ $processed }
-```
+<code-block lang="yaml" src="workflows/lemline-examples-basic-patterns/combined-example.yaml"/>
 
 This complex example demonstrates:
 1. Initializing a data structure with `set`

@@ -1,0 +1,40 @@
+document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: coordinate-onboarding
+  version: '1.0.0'
+schedule:
+  on:
+    one:
+      with:
+        type: com.example.user.registered
+input:
+  from: ${ .[0] }
+do:
+  - storeUser:
+      set:
+        user: ${ . }
+      export:
+        as: '${ $context + { userId: .user.id } }'
+  - onboardUser:
+      fork:
+        branches:
+          - createProfile:
+              call: http
+              with:
+                method: post
+                endpoint: https://profiles.example/users
+                body: ${ .user }
+          - sendWelcomeEmail:
+              call: http
+              with:
+                method: post
+                endpoint: https://email.example/welcome
+                body: '${ { email: .user.email, name: .user.name } }'
+  - reportOnboarding:
+      emit:
+        event:
+          with:
+            source: https://onboarding.example
+            type: com.example.onboarding.completed
+            data: '${ { userId: $context.userId } }'

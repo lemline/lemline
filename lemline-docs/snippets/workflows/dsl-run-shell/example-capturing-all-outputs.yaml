@@ -1,0 +1,20 @@
+document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: example-capturing-all-outputs
+  version: '1.0.0'
+do:
+  - executeUtility:
+      run:
+        shell:
+          command: '${ "utility-tool --process \(.fileId) --verbose" }'
+        # Get exit code, stdout, and stderr together
+        return: all
+      then: processUtilityResult
+  - processUtilityResult:
+      # Input: { "code": 0, "stdout": "...", "stderr": "..." }
+      set:
+        exitCode: "${ .code }"
+        outputLog: "${ .stdout }"
+        # Use stderr only if exit code was non-zero
+        errorLog: "${ if .code != 0 then .stderr else null end }"

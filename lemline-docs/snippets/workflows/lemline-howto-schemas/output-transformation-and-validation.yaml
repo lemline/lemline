@@ -1,0 +1,47 @@
+document:
+  dsl: 1.0.3
+  namespace: examples
+  name: output-transformation-and-validation
+  version: 1.0.0
+do:
+  - ProcessAPIResponse:
+      call: externalAPI
+      with:
+        endpoint: /data
+        parameters: ${ .queryParams }
+      output:
+        as: '${ if .code == 200 then { status: "SUCCESS", data: .body.data } else { status: "ERROR", error: .body.error } end }'
+        schema:
+          document:
+            type: object
+            required:
+              - status
+            properties:
+              status:
+                type: string
+                enum:
+                  - SUCCESS
+                  - ERROR
+              data:
+                type: object
+                if:
+                  properties:
+                    status:
+                      const: SUCCESS
+                  required:
+                    - status
+                then:
+                  required:
+                    - data
+              error:
+                type: object
+                if:
+                  properties:
+                    status:
+                      const: ERROR
+                  required:
+                    - status
+                then:
+                  required:
+                    - error
+      then: HandleResult

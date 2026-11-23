@@ -1,0 +1,14 @@
+document:
+  dsl: 1.0.3
+  namespace: samples
+  name: call-custom-function-cataloged
+  version: 0.1.0
+use:
+  catalogs:
+    catalogs1:
+      endpoint: file://catalog.json
+do:
+  - getPet:
+      call: petstore.getPetById
+      with:
+        petId: 69

@@ -16,6 +16,7 @@ If `lemline.messaging.type` is not set, Lemline uses the broker whose settings b
 
 ## Kafka Configuration
 
+<!-- workflow-example: data -->
 ```yaml
 lemline:
   messaging:
@@ -40,6 +41,7 @@ Each channel (`commands`, `events`, `cloudevents`, `lifecycleevents`) accepts `c
 
 ## RabbitMQ Configuration
 
+<!-- workflow-example: data -->
 ```yaml
 lemline:
   messaging:
@@ -57,6 +59,7 @@ Lemline declares its exchanges and queues itself. Each channel accepts `consumer
 
 ## PGMQ Configuration
 
+<!-- workflow-example: data -->
 ```yaml
 lemline:
   messaging:
@@ -78,6 +81,7 @@ lemline:
 
 ## SQLite Configuration
 
+<!-- workflow-example: data -->
 ```yaml
 lemline:
   messaging:
@@ -117,6 +121,7 @@ A message that cannot be processed is moved to a dead-letter destination named a
 
 Each runner processes up to 64 messages in parallel per channel. Change it per channel, under the broker you use:
 
+<!-- workflow-example: data -->
 ```yaml
 lemline:
   messaging:
@@ -134,48 +139,19 @@ The broker-independent `lemline.messaging.<channel>.consumer.concurrency` only a
 
 `emit` tasks publish a CloudEvent on the `cloudevents` destination of the workflow's namespace:
 
-```yaml
-document:
-  dsl: '1.0.0'
-  namespace: examples
-  name: order-workflow
-  version: '0.1.0'
-do:
-  - notifyShipping:
-      emit:
-        event:
-          with:
-            type: order.shipped
-            source: order-service
-            data:
-              orderId: ${ .orderId }
-```
+<code-block lang="yaml" src="workflows/lemline-howto-brokers/emitting-events.yaml"/>
 
 ### Listening for Events
 
 `listen` tasks wait for CloudEvents received on the same destination. A workflow can also be started by an event with `schedule.on`:
 
-```yaml
-document:
-  dsl: '1.0.0'
-  namespace: examples
-  name: shipping-workflow
-  version: '0.1.0'
-schedule:
-  on:
-    one:
-      with:
-        type: order.shipped
-do:
-  - processShippingNotification:
-      set:
-        received: ${ . }
-```
+<code-block lang="yaml" src="workflows/lemline-howto-brokers/listening-for-events.yaml"/>
 
-See [Listen behavior](dsl-task-listen.md).
+See [Listen behavior](https://github.com/open-workflow-specification/specification/blob/v1.0.3/dsl-reference.md#listen).
 
 ## Testing with the In-Memory Broker
 
+<!-- workflow-example: data -->
 ```yaml
 lemline:
   messaging:

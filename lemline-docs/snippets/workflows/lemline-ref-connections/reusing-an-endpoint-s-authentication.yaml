@@ -1,0 +1,21 @@
+document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: reusing-an-endpoint-s-authentication
+  version: '1.0.0'
+use:
+  secrets:
+    - USER_API_TOKEN
+  authentications:
+    userApi:
+      bearer:
+        token: ${ $secrets.USER_API_TOKEN }
+do:
+  - getUser:
+      call: http
+      with:
+        method: get
+        endpoint:
+          uri: ${ "https://api.example.com/users/" + .userId }
+          authentication:
+            use: userApi

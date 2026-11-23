@@ -1,0 +1,17 @@
+document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: invoke-order-workflow
+  version: '1.0.0'
+do:
+  - calculateShipping:
+      run:
+        workflow:
+          namespace: examples
+          name: shipping-quote
+          version: '1.0.0'
+          input:
+            orderId: ${ .orderId }
+  - recordQuote:
+      set:
+        quote: ${ . }

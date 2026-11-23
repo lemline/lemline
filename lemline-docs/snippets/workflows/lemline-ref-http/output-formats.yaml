@@ -1,0 +1,14 @@
+document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: output-formats
+  version: '1.0.0'
+do:
+  - fetchUsers:
+      call: http
+      with:
+        method: get
+        endpoint: https://api.example.com/users
+        output: response
+      output:
+        as: ${ .content.items }

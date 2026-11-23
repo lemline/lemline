@@ -1,0 +1,23 @@
+document:
+  dsl: 1.0.3
+  namespace: examples
+  name: nested-decision-making
+  version: 1.0.0
+do:
+  - EvaluateRiskLevel:
+      switch:
+        - case1:
+            when: ${ .transaction.amount > 10000 }
+            then: HighValueCheck
+        - case2:
+            then: StandardCheck
+  - HighValueCheck:
+      switch:
+        - case1:
+            when: ${ .customer.history.flags | length > 0 }
+            then: ManualReview
+        - case2:
+            when: ${ .customer.age < 90 }
+            then: AdditionalVerification
+        - case3:
+            then: AutoApprove

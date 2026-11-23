@@ -1,0 +1,31 @@
+document:
+  dsl: 1.0.3
+  namespace: main-orchestration
+  name: order-processing
+  version: 1.1.0
+do:
+  - checkInventory:
+      run:
+        workflow:
+          namespace: shared-services
+          name: inventory-check
+          version: 1.0.0
+          input:
+            productId: ${ .order.itemId }
+            quantity: ${ .order.quantity }
+        return: stdout
+      then: processInventoryResult
+  - processInventoryResult:
+      switch:
+        - case1:
+            when: ${ .available == true }
+            then: proceedToPayment
+        - case2:
+            then: notifyOutOfStock
+  - proceedToPayment:
+      set:
+        status: ready-for-payment
+      then: end
+  - notifyOutOfStock:
+      set:
+        status: out-of-stock

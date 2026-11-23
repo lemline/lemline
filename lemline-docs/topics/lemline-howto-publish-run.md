@@ -82,6 +82,7 @@ The CLI has no command to read instances. Use:
 
 ### 1. Use a Production Database
 
+<!-- workflow-example: data -->
 ```yaml
 lemline:
   database:
@@ -97,6 +98,7 @@ Pass the password as `LEMLINE_DATABASE_POSTGRESQL_PASSWORD`.
 
 ### 2. Configure a Message Broker
 
+<!-- workflow-example: data -->
 ```yaml
 lemline:
   messaging:

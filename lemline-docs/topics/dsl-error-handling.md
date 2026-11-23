@@ -67,15 +67,8 @@ Errors can enter the system in two main ways:
 
 2. **Explicitly using the `Raise` Task**: Authors can use the [`Raise` task](dsl-task-raise.md) to explicitly throw a
    specific error (either predefined in `use.errors` or defined inline) based on workflow logic:
-   ```yaml
-   - checkInventory:
-       # ... check logic ...
-       if: "${ .stock < .needed }"
-       raise:
-         error: outOfStockError # Defined in use.errors
-         with:
-           detail: "Needed ${ .needed }, only ${ .stock } available"
-   ```
+
+   <code-block lang="yaml" src="workflows/reference/raise-order-error.yaml"/>
 
 ## Catching and Handling Errors (`Try...Catch`)
 
@@ -84,29 +77,7 @@ The primary mechanism for handling errors is the [`Try` task](dsl-task-try.md). 
 1. A `try` block containing the tasks that might raise errors
 2. A `catch` block defining how to handle those errors
 
-```yaml
-- myTryTask:
-    try:
-      # Block of tasks to attempt
-      - taskToTry:
-        # ... might raise an error ...
-    catch:
-      # Block defining how to handle errors from 'try'
-      errors:
-        with:
-          type: ".../specificErrorType"  # 1. Filter which errors to catch
-      when: "${ $error.instance == '/do/0/taskToTry' }"  # 2. Conditional catch
-      as: myError  # 3. Store error object
-      retry: myRetryPolicy  # 4. Optionally retry
-      do: # 5. Execute compensation logic
-        - logError:
-            set:
-              errorMessage: "${ $myError.detail }"
-        - setFallback:
-            set:
-              status: "error"
-              message: "Operation failed: ${ $myError.detail }"
-```
+<code-block lang="yaml" src="workflows/dsl-error-handling/catching-and-handling-errors-try-catch.yaml"/>
 
 ### Error Handling Components
 

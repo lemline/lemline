@@ -1,0 +1,32 @@
+document:
+  dsl: 1.0.3
+  namespace: multi-catalog-example
+  name: process-with-shared-and-private
+  version: 1.0.0
+use:
+  secrets:
+    - gitHubToken
+    - privateCatalogKey
+  catalogs:
+    swPublic:
+      endpoint:
+        uri: https://github.com/open-workflow-specification/catalog
+        authentication:
+          bearer:
+            token: ${ $secrets.gitHubToken }
+    internalTools:
+      endpoint:
+        uri: https://git.mycompany.com/workflow-tools
+        authentication:
+          basic:
+            username: workflow-runner
+            password: ${ $secrets.privateCatalogKey }
+do:
+  - initialLog:
+      call: log:0.5.2@swPublic
+      with:
+        message: Starting process
+  - runInternalTool:
+      call: data-validator:2.1.0@internalTools
+      with:
+        input: ${ .rawData }

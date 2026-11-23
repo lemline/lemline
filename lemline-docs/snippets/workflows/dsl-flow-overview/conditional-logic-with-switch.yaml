@@ -1,0 +1,58 @@
+document:
+  dsl: 1.0.3
+  namespace: examples
+  name: payment-processor
+  version: 1.0.0
+use:
+  functions:
+    creditCardProcessor:
+      set:
+        processed: true
+    paypalProcessor:
+      set:
+        processed: true
+    bankTransferProcessor:
+      set:
+        processed: true
+do:
+  - determinePaymentMethod:
+      switch:
+        - creditCard:
+            when: '${ $workflow.input.paymentMethod == "creditCard" }'
+            then: processCreditCard
+        - paypal:
+            when: '${ $workflow.input.paymentMethod == "paypal" }'
+            then: processPayPal
+        - bankTransfer:
+            when: '${ $workflow.input.paymentMethod == "bankTransfer" }'
+            then: processBankTransfer
+        - default:
+            then: handleUnsupportedPaymentMethod
+  - processCreditCard:
+      call: creditCardProcessor
+      with:
+        args:
+          cardDetails: ${ $workflow.input.paymentDetails }
+          amount: ${ $workflow.input.amount }
+      then: exit
+  - processPayPal:
+      call: paypalProcessor
+      with:
+        args:
+          paypalAccount: ${ $workflow.input.paymentDetails }
+          amount: ${ $workflow.input.amount }
+      then: exit
+  - processBankTransfer:
+      call: bankTransferProcessor
+      with:
+        args:
+          bankDetails: ${ $workflow.input.paymentDetails }
+          amount: ${ $workflow.input.amount }
+      then: exit
+  - handleUnsupportedPaymentMethod:
+      set:
+        result:
+          success: false
+          errorCode: UNSUPPORTED_PAYMENT_METHOD
+          message: ${ "Payment method " + $workflow.input.paymentMethod + " is not supported" }
+      then: exit

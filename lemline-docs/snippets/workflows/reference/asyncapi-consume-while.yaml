@@ -1,0 +1,15 @@
+document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: asyncapi-consume-while
+  version: '1.0.0'
+do:
+  - consumeUpdates:
+      call: asyncapi
+      with:
+        document:
+          endpoint: https://events.example.com/asyncapi.yaml
+        operation: getUpdates
+        subscription:
+          consume:
+            while: '${ .status == "processing" }'

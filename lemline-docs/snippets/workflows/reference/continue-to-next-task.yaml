@@ -1,0 +1,13 @@
+document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: continue-to-next-task
+  version: '1.0.0'
+do:
+  - taskX:
+      set:
+        value: 1
+      then: continue
+  - taskY:
+      set:
+        value: ${ .value + 1 }

@@ -1,0 +1,20 @@
+document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: prepare-order-data
+  version: '1.0.0'
+do:
+  - routeCustomer:
+      switch:
+        - known:
+            when: ${ .customerId != null }
+            then: prepareKnownCustomer
+        - new:
+            then: prepareGuest
+  - prepareKnownCustomer:
+      set:
+        customer: '${ { id: .customerId, guest: false } }'
+      then: end
+  - prepareGuest:
+      set:
+        customer: '${ { guest: true } }'

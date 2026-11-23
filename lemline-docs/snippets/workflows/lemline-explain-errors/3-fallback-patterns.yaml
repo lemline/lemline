@@ -1,0 +1,24 @@
+document:
+  dsl: 1.0.3
+  namespace: examples
+  name: 3-fallback-patterns
+  version: 1.0.0
+do:
+  - getUserProfile:
+      try:
+        - fetchFromApi:
+            call: http
+            with:
+              endpoint: ${ "https://api.example.com/users/\(.userId)" }
+              method: get
+      catch:
+        do:
+          - useCachedData:
+              call: http
+              with:
+                endpoint: ${ "https://cache.example.com/users/\(.userId)" }
+                method: get
+          - markStale:
+              set:
+                dataSource: cache
+                isFresh: false

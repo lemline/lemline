@@ -1,0 +1,21 @@
+document:
+  dsl: 1.0.3
+  namespace: examples
+  name: using-retry-policies
+  version: 1.0.0
+do:
+  - example:
+      try:
+        - operation:
+            set:
+              processed: true
+      catch:
+        retry:
+          delay:
+            seconds: 1
+          backoff:
+            exponential: {}
+          limit:
+            attempt:
+              count: 3
+          when: ${ $error.status >= 500 }

@@ -1,0 +1,49 @@
+document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: event-timeout
+  version: '1.0.0'
+input:
+  schema:
+    document:
+      type: object
+      required: [processId]
+      properties:
+        processId:
+          type: string
+do:
+  - awaitCompletion:
+      try:
+        - waitForCompletion:
+            listen:
+              to:
+                one:
+                  with:
+                    type: com.example.process.completed
+                  correlate:
+                    processId:
+                      from: ${ .processId }
+                      expect: ${ $workflow.input.processId }
+            timeout:
+              after: PT5M
+        - processResult:
+            set:
+              success: true
+              processId: ${ $workflow.input.processId }
+              data: ${ .[0] }
+      catch:
+        errors:
+          with:
+            type: https://open-workflow-specification.org/spec/1.0.0/errors/timeout
+        do:
+          - readDurableStatus:
+              call: http
+              with:
+                method: get
+                endpoint: '${ "https://process.example/status/\($workflow.input.processId | @uri)" }'
+          - summarizeStatus:
+              set:
+                success: ${ .status == "completed" }
+                status: ${ .status }
+                processId: ${ $workflow.input.processId }
+                data: ${ .result }

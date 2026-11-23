@@ -1,0 +1,20 @@
+document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: http-inline-basic-authentication
+  version: '1.0.0'
+use:
+  secrets:
+    - API_USER
+    - API_PASSWORD
+do:
+  - fetch:
+      call: http
+      with:
+        method: get
+        endpoint:
+          uri: https://api.example.com/data
+          authentication:
+            basic:
+              username: ${ $secrets.API_USER }
+              password: ${ $secrets.API_PASSWORD }

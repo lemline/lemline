@@ -1,0 +1,19 @@
+document:
+  dsl: 1.0.3
+  namespace: examples
+  name: 1-define-expected-errors
+  version: 1.0.0
+use:
+  errors:
+    paymentDeclined:
+      type: https://example.com/errors/payment-declined
+      status: 400
+      title: Payment Method Declined
+    insufficientInventory:
+      type: https://example.com/errors/insufficient-inventory
+      status: 409
+      title: Insufficient Inventory
+do:
+  - example:
+      set:
+        ready: true

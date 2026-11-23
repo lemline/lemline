@@ -1,0 +1,24 @@
+document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: timeout-listen-fallback
+  version: '1.0.0'
+do:
+  - collectApproval:
+      try:
+        - waitForApproval:
+            listen:
+              to:
+                one:
+                  with:
+                    type: com.example.request.approved
+            timeout:
+              after: PT5M
+      catch:
+        errors:
+          with:
+            type: https://open-workflow-specification.org/spec/1.0.0/errors/timeout
+        do:
+          - expireRequest:
+              set:
+                status: expired

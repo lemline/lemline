@@ -1,0 +1,17 @@
+document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: set-object-required
+  version: '1.0.0'
+do:
+  - example:
+      set:
+        # Static values
+        configValue: 100
+        # Values from transformed input
+        inputValue: "${ .inputField }"
+        processedValue: "${ (.inputField * 2) + $context.offset }" # Combine input and context
+        # Nested structures
+        details:
+          timestamp: "${ $runtime.now.iso8601 }" # Using runtime variable
+          source: "workflowX"

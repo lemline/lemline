@@ -86,18 +86,7 @@ cd lemline
 
 Create a file named `hello.yaml` with the following content:
 
-```yaml
-document:
-  dsl: '1.0.0'
-  namespace: examples
-  name: hello-workflow
-  version: '0.1.0'
-  title: Hello Workflow
-do:
-  - greeting:
-      set:
-        message: "Hello, Lemline!"
-```
+<code-block lang="yaml" src="workflows/lemline-getting-started/creating-your-first-workflow.yaml"/>
 
 This simple workflow sets a `message` value, which becomes the workflow output, and ends.
 
@@ -134,20 +123,7 @@ Extend the workflow with additional set tasks or try using a different task type
 
 For a more useful example, try creating a workflow that makes an HTTP request:
 
-```yaml
-document:
-  dsl: '1.0.0'
-  namespace: examples
-  name: http-workflow
-  version: '0.1.0'
-  title: HTTP Request Workflow
-do:
-  - makeRequest:
-      call: http
-      with:
-        method: GET
-        endpoint: https://jsonplaceholder.typicode.com/todos/1
-```
+<code-block lang="yaml" src="workflows/lemline-getting-started/connect-to-http-services.yaml"/>
 
 ## Try a Ready-to-Run Sample Project
 

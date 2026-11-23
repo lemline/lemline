@@ -1,0 +1,20 @@
+document:
+  dsl: 1.0.3
+  namespace: examples
+  name: output-object-optional-workflow-output
+  version: 1.0.0
+output:
+  as: '${ { confirmationId: .confirmation } }'
+  schema:
+    document:
+      type: object
+      required:
+        - confirmationId
+      properties:
+        confirmationId:
+          type: string
+do:
+  - lastTask:
+      set:
+        confirmation: ABC-123
+        internalStatus: Complete

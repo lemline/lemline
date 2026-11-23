@@ -1,0 +1,24 @@
+document:
+  dsl: 1.0.3
+  namespace: examples
+  name: export-object-optional
+  version: 1.0.0
+do:
+  - updateUser:
+      call: http
+      with:
+        endpoint: https://api.example.com/resource
+        method: get
+      export:
+        as: '${ $context + { lastUserId: $output.userId } }'
+        schema:
+          document:
+            type: object
+            required:
+              - lastUserId
+            properties:
+              lastUserId:
+                type: string
+  - subsequentTask:
+      set:
+        message: '${ "Processed user: " + $context.lastUserId }'

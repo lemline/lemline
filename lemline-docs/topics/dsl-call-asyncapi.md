@@ -18,90 +18,11 @@ This allows workflows to publish messages to channels or subscribe to messages f
 
 ### Example: Publishing a Message
 
-```yaml
-document:
-  dsl: '1.0.0' # Assuming alpha5 or later based on reference example
-  namespace: test
-  name: asyncapi-publish-example
-  version: '0.1.0'
-do:
-  - publishGreeting:
-      call: asyncapi
-      with:
-        # Reference to the AsyncAPI document
-        document:
-          endpoint: https://broker.example.com/docs/asyncapi.json
-        operation: sendGreeting  
-        server:
-          name: productionBroker
-          variables:
-            environment: prod
-        # Define the message to publish
-        message:
-          payload:
-            greeting: "Hello from workflow ${ $workflow.id }"
-          headers:
-            traceId: "${ $context.traceId }"
-      # Output typically confirms publish success/failure, specifics vary
-  - afterPublish:
-      # ... 
-```
+<code-block lang="yaml" src="workflows/dsl-call-asyncapi/example-publishing-a-message.yaml"/>
 
 ### Example: Subscribing to Messages
 
-```yaml
-document:
-  dsl: '1.0.0'    # Workflow DSL version
-  namespace: test  # Namespace for the workflow
-  name: asyncapi-subscribe-example  # Name of the workflow
-  version: '0.1.0'  # Version of this workflow
-do:
-  - subscribeToChatRoom:  # Task name for the subscription
-      call: asyncapi     # Use the AsyncAPI task type
-      with:
-        # Reference to the AsyncAPI specification document
-        document:
-          endpoint: https://chat.example.com/api/asyncapi.yaml
-        
-        # Operation ID for subscribing (must match one defined in the AsyncAPI doc)
-        operation: receiveChatMessages
-        
-        # Specify protocol to select appropriate server
-        protocol: ws  # WebSocket protocol
-        
-        subscription:
-          # Optional: Filter messages based on payload content
-          filter: '${ .roomId == $context.targetRoomId }'
-          
-          # Define consumption limits
-          consume:
-            amount: 10          # Max 10 messages
-            for: { minutes: 5 } # Or max 5 minutes, whichever comes first
-          
-          # Process each consumed message
-          foreach:
-            item: msg  # Variable name for the current message
-            do:
-              # Log each order update
-              - logUpdate:
-                  call: logMessage
-                  with:
-                    message: "Received order update: ${ .msg.payload.orderId }"
-              
-              # Conditionally notify shipping if status is SHIPPED
-              - checkStatus:
-                  call: notifyShipping
-                  if: "${ .msg.payload.status == 'SHIPPED' }"
-            
-            # Define the output of the foreach loop (and thus the task)
-            output:
-              as:
-                processedCount: "${ count(.) }"          # Total messages processed
-                lastOrderId: "${ .[-1]?.msg.payload.orderId }"  # Last order ID
-  
-  - afterSubscription:
-      # ...
-```
+<code-block lang="yaml" src="workflows/dsl-call-asyncapi/example-subscribing-to-messages.yaml"/>
 
 ## Configuration Options
 

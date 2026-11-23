@@ -1,0 +1,18 @@
+document:
+  dsl: 1.0.3
+  namespace: test
+  name: http-example
+  version: 0.1.0
+do:
+  - getPetById:
+      call: http
+      with:
+        method: get
+        endpoint:
+          uri: https://petstore.swagger.io/v2/pet/{petId}
+        headers:
+          Accept: application/json
+      then: processPetData
+  - processPetData:
+      set:
+        processed: true

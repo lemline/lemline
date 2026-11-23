@@ -1,0 +1,16 @@
+document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: http-request-with-api-key
+  version: '1.0.0'
+use:
+  secrets:
+    - apiKey
+do:
+  - getProducts:
+      call: http
+      with:
+        method: get
+        endpoint: https://api.example.com/products
+        headers:
+          X-API-Key: ${ $secrets.apiKey }

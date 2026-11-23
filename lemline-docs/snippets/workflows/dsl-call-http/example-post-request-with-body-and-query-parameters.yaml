@@ -1,0 +1,21 @@
+document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: example-post-request-with-body-and-query-parameters
+  version: '1.0.0'
+do:
+  - createUser:
+      call: http
+      with:
+        method: post
+        endpoint: https://api.example.com/users
+        query:
+          source: workflow
+        headers:
+          Content-Type: application/json
+          X-Request-Id: "${ $workflow.id }"
+        body:
+          name: "${ .userDetails.name }"
+          email: "${ .userDetails.email }"
+          role: viewer
+      then: handleUserCreation

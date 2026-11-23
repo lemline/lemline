@@ -1,0 +1,80 @@
+document:
+  dsl: '1.0.3'
+  namespace: iot
+  name: energy-optimization
+  version: '1.0.0'
+schedule:
+  cron: '*/15 * * * *'
+input:
+  from: '${ { buildingId: "building-42" } + (. // {}) }'
+do:
+  - rememberBuilding:
+      set:
+        buildingId: ${ .buildingId }
+      export:
+        as: '${ $context + { buildingId: .buildingId } }'
+  - getSensorReadings:
+      call: http
+      with:
+        method: get
+        endpoint: '${ "https://iot-platform.example/api/buildings/\(.buildingId | @uri)/sensors" }'
+  - calculateSettings:
+      call: http
+      with:
+        method: post
+        endpoint: https://energy-optimizer.example/api/optimize
+        body: ${ . }
+      export:
+        as: '${ $context + { settings: . } }'
+  - updateHvac:
+      emit:
+        event:
+          with:
+            type: com.example.iot.settings.requested
+            source: https://energy-optimizer.example
+            data: '${ { requestId: $workflow.id, buildingId: $context.buildingId, deviceType: "hvac", settings: $context.settings.hvac } }'
+  - updateLighting:
+      emit:
+        event:
+          with:
+            type: com.example.iot.settings.requested
+            source: https://energy-optimizer.example
+            data: '${ { requestId: $workflow.id, buildingId: $context.buildingId, deviceType: "lighting", settings: $context.settings.lighting } }'
+  - getConfirmations:
+      try:
+        - waitForConfirmations:
+            listen:
+              to:
+                all:
+                  - with:
+                      type: com.example.iot.settings.applied
+                      data: ${ .deviceType == "hvac" }
+                    correlate:
+                      requestId:
+                        from: ${ .requestId }
+                        expect: ${ $workflow.id }
+                  - with:
+                      type: com.example.iot.settings.applied
+                      data: ${ .deviceType == "lighting" }
+                    correlate:
+                      requestId:
+                        from: ${ .requestId }
+                        expect: ${ $workflow.id }
+            timeout:
+              after: PT5M
+      catch:
+        errors:
+          with:
+            type: https://open-workflow-specification.org/spec/1.0.0/errors/timeout
+        do:
+          - readDurableStatus:
+              call: http
+              with:
+                method: get
+                endpoint:  '${ "https://energy-optimizer.example/api/requests/\($workflow.id)/confirmations" }'
+  - recordOptimization:
+      call: http
+      with:
+        method: post
+        endpoint: https://energy-analytics.example/api/optimizations
+        body: '${ { buildingId: $context.buildingId, requestId: $workflow.id, confirmations: . } }'

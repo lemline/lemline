@@ -1,0 +1,42 @@
+document:
+  dsl: 1.0.3
+  namespace: examples
+  name: error-hierarchy
+  version: 0.1.0
+do:
+  - tryApiOperation:
+      try:
+        - callApi:
+            call: http
+            with:
+              method: post
+              endpoint: https://api.example.com/resource
+              body: ${ .requestData }
+      catch:
+        when: ${ $error.type | startswith("https://example.com/errors") }
+        as: error
+        do:
+          - routeByErrorType:
+              switch:
+                - validationError:
+                    when: ${ $error.type | startswith("https://example.com/errors/api/validation") }
+                    then: handleValidation
+                - apiError:
+                    when: ${ $error.type | startswith("https://example.com/errors/api") }
+                    then: handleGenericApiError
+                - default:
+                    then: handleGenericError
+          - handleValidation:
+              set:
+                errorType: validation
+                errorDetails: ${ $error }
+              then: exit
+          - handleGenericApiError:
+              set:
+                errorType: api
+                errorDetails: ${ $error }
+              then: exit
+          - handleGenericError:
+              set:
+                errorType: generic
+                errorDetails: ${ $error }

@@ -1,0 +1,18 @@
+document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: short-circuiting-and-navigation
+  version: '1.0.0'
+use:
+  extensions:
+    - simulate:
+        extend: call
+        when: '${ $task.definition.call == "http" and $task.definition.with.endpoint == "https://api.example.com/user" }'
+        before:
+          - fakeUser:
+              set: { id: 123, name: Test }
+              then: exit
+do:
+  - example:
+      set:
+        ready: true

@@ -1,0 +1,14 @@
+document:
+  dsl: 1.0.3
+  namespace: examples
+  name: while-string-optional
+  version: 1.0.0
+do:
+  - example:
+      for:
+        in: ${ .dataPoints }
+      while: ${ $item.value > 10 }
+      do:
+        - processHighValueItem:
+            set:
+              processed: true

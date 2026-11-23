@@ -24,23 +24,7 @@ and an `endpoint` specifying its location.
 
 ### Workflow Structure
 
-```yaml
-document:
-  dsl: '1.0.0'
-  namespace: my_workflows
-  name: workflow-using-catalog
-  version: '1.0.0'
-use:
-  catalogs: # Defines named catalogs
-    <catalogName1>: # User-defined name for the catalog
-      endpoint: # Definition of where the catalog is located
-        uri: <catalog_root_uri> # URI (e.g., URL, file path) of the catalog root
-        authentication: <authentication_definition_or_ref> # Optional authentication for the endpoint
-    <catalogName2>:
-      endpoint: # ... another catalog definition ...
-do:
-  - # ... tasks ...
-```
+<code-block lang="yaml" src="workflows/reference/use-function-catalog.yaml"/>
 
 **Key Properties (from [Resources Configuration Overview](dsl-resources-configuration-overview.md)):**
 
@@ -66,16 +50,7 @@ call a function defined within a catalog, you use a specific format in the `call
 
 **Example:**
 
-```yaml
-do:
-  - processSharedLogic:
-      # Calls version '1.2.0' of 'dataProcessor' function
-      # from the catalog named 'sharedUtils'
-      call: dataProcessor:1.2.0@sharedUtils
-      with:
-        config: "${ .processingConfig }"
-        inputData: "${ .rawInput }"
-```
+<code-block lang="yaml" src="workflows/dsl-resource-catalog/calling-cataloged-functions.yaml" include-lines="6-13"/>
 
 ## Catalog Structure
 
@@ -124,15 +99,7 @@ To call a function from the default catalog, use the reserved name `default` as 
 
 **Example:**
 
-```yaml
-do:
-  - logInfo:
-      # Assumes 'logMessage:1.0' exists in the runtime's default catalog
-      call: logMessage:1.0@default
-      with:
-        level: INFO
-        text: "Task completed successfully."
-```
+<code-block lang="yaml" src="workflows/dsl-resource-catalog/default-catalog.yaml" include-lines="6-12"/>
 
 How the runtime manages and resolves resources in the default catalog is implementation-specific (e.g., database, local
 files, pre-configured remote repository).
@@ -141,65 +108,11 @@ files, pre-configured remote repository).
 
 ### Example: Defining Multiple Catalogs with Authentication
 
-```yaml
-document:
-  dsl: '1.0.0'
-  namespace: multi_catalog_example
-  name: process-with-shared-and-private
-  version: '1.0.0'
-use:
-  secrets: [ gitHubToken, privateCatalogKey ]
-  catalogs:
-    # Public, well-known catalog (e.g., official Open Workflow catalog)
-    swPublic:
-      endpoint:
-        uri: https://github.com/open-workflow-specification/catalog
-        # Maybe requires a token for higher rate limits or private access within org
-        authentication:
-          bearer: ${ $secrets.gitHubToken }
-    # Internal, private catalog hosted on a company server
-    internalTools:
-      endpoint:
-        uri: https://git.mycompany.com/workflow-tools
-        authentication:
-          basic:
-            username: workflow-runner
-            password: ${ $secrets.privateCatalogKey }
-do:
-  - initialLog:
-      # Using a function from the public catalog
-      call: log:0.5.2@swPublic
-      with:
-        message: "Starting process"
-  - runInternalTool:
-      # Using a function from the internal catalog
-      call: data-validator:2.1.0@internalTools
-      with:
-        input: "${ .rawData }"
-```
+<code-block lang="yaml" src="workflows/dsl-resource-catalog/example-defining-multiple-catalogs-with-authentication.yaml"/>
 
 ### Example: Using a Local File-Based Catalog
 
-```yaml
-# Assume catalog functions are defined in /opt/workflow-catalogs/local-utils
-document:
-  dsl: '1.0.0'
-  namespace: local_dev
-  name: test-local-catalog
-  version: '1.0.0'
-use:
-  catalogs:
-    local:
-      endpoint:
-        # Path accessible by the workflow runtime
-        uri: file:///opt/workflow-catalogs/local-utils
-do:
-  - formatData:
-      # Call function from the local file system catalog
-      call: formatter:1.0.0@local
-      with:
-        value: "${ .inputString }"
-```
+<code-block lang="yaml" src="workflows/dsl-resource-catalog/example-using-a-local-file-based-catalog.yaml"/>
 
 ## Creating and Publishing Resources
 
@@ -231,25 +144,7 @@ steps apply to any resource type potentially supported by a catalog:
 
 **Example: Function Definition File (`function.yaml`)**
 
-```yaml
-# function.yaml - Example structure
-input:
-  schema:
-    document:
-      type: object
-      # ... input properties ...
-output:
-  schema:
-    document:
-      type: object
-      # ... output properties ...
-run: # Defines how the function executes
-  script: # Example: running a script
-    language: javascript
-    code: |
-      // ... function logic ...
-    # ... arguments ...
-```
+<code-block lang="yaml" src="workflows/dsl-resource-catalog/creating-and-publishing-resources.yaml" include-lines="8-24"/>
 
 For a detailed walkthrough of creating a *custom function* and its `function.yaml` file, refer to the DSL concepts
 documentation regarding function creation. The principles outlined there for definition and structure can be adapted for

@@ -1,0 +1,45 @@
+document:
+  dsl: 1.0.3
+  namespace: examples
+  name: openapi-auth
+  version: 1.0.0
+use:
+  secrets:
+    - CLIENT_ID
+    - CLIENT_SECRET
+    - USERNAME
+    - PASSWORD
+do:
+  - callWithOAuth2:
+      call: openapi
+      with:
+        document:
+          endpoint: https://api.example/openapi.json
+        operationId: createResource
+        authentication:
+          oauth2:
+            authority: https://auth.example/oauth2
+            grant: client_credentials
+            client:
+              id: ${ $secrets.CLIENT_ID }
+              secret: ${ $secrets.CLIENT_SECRET }
+            scopes:
+              - resource.write
+        parameters:
+          body:
+            name: Example Resource
+            type: test
+      export:
+        as: '${ $context + { oauth2Result: . } }'
+  - callWithBasicAuth:
+      call: openapi
+      with:
+        document:
+          endpoint: https://api.example/openapi.json
+        operationId: deleteResource
+        authentication:
+          basic:
+            username: ${ $secrets.USERNAME }
+            password: ${ $secrets.PASSWORD }
+        parameters:
+          resourceId: ${ $context.oauth2Result.id }

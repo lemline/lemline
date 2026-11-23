@@ -1,0 +1,28 @@
+document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: parallel-checks-with-fallback
+  version: '1.0.0'
+do:
+  - attemptChecks:
+      try:
+        - checkOrder:
+            fork:
+              branches:
+                - inventory:
+                    call: http
+                    with:
+                      method: post
+                      endpoint: https://inventory.example.com/check
+                      body: ${ . }
+                - shipping:
+                    call: http
+                    with:
+                      method: post
+                      endpoint: https://shipping.example.com/quote
+                      body: ${ . }
+      catch:
+        do:
+          - requestManualReview:
+              set:
+                status: needs-review

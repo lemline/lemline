@@ -1,0 +1,15 @@
+document:
+  dsl: 1.0.3
+  namespace: examples
+  name: default-flow-sequential-execution
+  version: 1.0.0
+do:
+  - validateOrder:
+      set:
+        processed: true
+  - checkInventory:
+      set:
+        processed: true
+  - processPayment:
+      set:
+        processed: true

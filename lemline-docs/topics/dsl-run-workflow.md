@@ -10,124 +10,25 @@ The `run: workflow` task allows a workflow to invoke and execute another Open Wo
 
 ## Usage Example
 
-```yaml
-document:
-  dsl: '1.0.0'
-  namespace: main_orchestration
-  name: order-processing
-  version: '1.1.0'
-# Assume 'inventory-check' workflow exists in 'shared_services' namespace
-do:
-  - checkInventory:
-      run:
-        workflow:
-          namespace: shared_services # Namespace of the workflow to run
-          name: inventory-check      # Name of the workflow to run
-          version: '1.0.0'           # Specific version to run
-          # Pass required input to the sub-workflow
-          input: 
-            productId: "${ .order.itemId }"
-            quantity: "${ .order.quantity }"
-        # `await: true` (default) waits for the sub-workflow to complete
-        # `return: stdout` (default) captures the sub-workflow's final output
-        return: stdout 
-      # Output of this task is the final output of 'inventory-check'
-      then: processInventoryResult
-  - processInventoryResult:
-      # Input might be { available: true, stockLevel: 150 }
-      switch:
-        - if: "${ .available == true }"
-          then: proceedToPayment
-        - then: notifyOutOfStock # Default case
-```
+<code-block lang="yaml" src="workflows/dsl-run-workflow/usage-example.yaml"/>
 
 ## Additional Examples
 
 ### Example: Running Latest Version
 
-```yaml
-do:
-  - runLatestUtility:
-      run:
-        workflow:
-          namespace: shared_utilities
-          name: data-cleanup
-          # version: 'latest' # Implicitly defaults to latest
-          input: { targetDir: "${ .tempDirectory }" }
-        return: stdout # Get the output of the latest cleanup workflow
-      then: processCleanupResult
-```
+<code-block lang="yaml" src="workflows/dsl-run-workflow/example-running-latest-version.yaml" include-lines="7-16"/>
 
 ### Example: Starting Sub-Workflow Without Awaiting
 
-```yaml
-do:
-  - triggerLongProcess:
-      run:
-        workflow:
-          namespace: background_jobs
-          name: monthly-report-generation
-          version: '2.0'
-          input: { month: "${ .currentMonth }", year: "${ .currentYear }" }
-        # Start the sub-workflow but don't wait for it
-        await: false 
-      # Task output is its input, workflow continues immediately
-      then: logReportTriggered
-```
+<code-block lang="yaml" src="workflows/dsl-run-workflow/example-starting-sub-workflow-without-awaiting.yaml" include-lines="6-17"/>
 
 ### Example: Handling Faulted Sub-Workflow
 
-```yaml
-do:
-  - trySubWorkflow:
-      try:
-        run:
-          workflow:
-            namespace: experimental
-            name: potentially-failing-job
-            version: '0.1-beta'
-            input: "${ . }"
-          # `await: true` is default
-          # `return: stdout` is default, but will fail if sub-workflow faults
-      catch:
-        # Catch any error from the sub-workflow execution itself
-        errors: 
-          with: { type: "https://open-workflow-specification.org/spec/1.0.0/errors/runtime" }
-        as: runtimeError
-        do:
-          - logSubWorkflowFailure:
-              call: logError
-              with:
-                message: "Sub-workflow experimental/potentially-failing-job faulted"
-                # Note: Accessing the sub-workflow's specific error might require `return: all` or `return: stderr` in the `run` task and inspecting the result within the catch block.
-                details: "${ $runtimeError }" 
-
-```
+<code-block lang="yaml" src="workflows/dsl-run-workflow/example-handling-faulted-sub-workflow.yaml" include-lines="7-27"/>
 
 ### Example: Using `return: all` to Get Status and Output/Error
 
-```yaml
-do:
-  - executeSubflowAndCheck:
-      run:
-        workflow:
-          namespace: validation_service
-          name: input-validator
-          version: '1.3'
-          input: { data: "${ .rawData }" }
-        # Get status code, stdout (if completed), and stderr (if faulted)
-        return: all 
-      then: routeBasedOnSubflowResult
-  - routeBasedOnSubflowResult:
-      # Input: { "code": 0, "stdout": { "isValid": true }, "stderr": null } OR
-      # Input: { "code": 1, "stdout": null, "stderr": { "type": "...", "title": "Validation Failed", ... } }
-      switch:
-        - if: "${ .code == 0 and .stdout.isValid == true }"
-          then: processValidData
-        - if: "${ .code == 0 and .stdout.isValid == false }"
-          then: handleInvalidData
-        - then: handleSubflowError # If .code is non-zero
-```
+<code-block lang="yaml" src="workflows/dsl-run-workflow/example-using-return-all-to-get-status-and-output-error.yaml" include-lines="7-26"/>
 
 ## Configuration Options
 

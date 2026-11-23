@@ -4,7 +4,7 @@ This page describes the support of `call: grpc` tasks in Lemline.
 
 ## gRPC Support Status
 
-Lemline does not execute `call: grpc` tasks yet. The Open Workflow DSL defines them (see [gRPC calls](dsl-call-grpc.md)), and Lemline parses workflows that contain them, but no runner can run such a task: do not use it in workflows you deploy.
+Lemline does not execute `call: grpc` tasks yet. The Open Workflow DSL defines them (see [gRPC calls](https://github.com/open-workflow-specification/specification/blob/v1.0.3/dsl-reference.md#grpc-call)), and Lemline parses workflows that contain them, but no runner can run such a task: do not use it in workflows you deploy.
 
 There are no `lemline.grpc.*` runner settings.
 
@@ -12,16 +12,7 @@ There are no `lemline.grpc.*` runner settings.
 
 Expose the service over HTTP (for example with a gRPC-JSON transcoding proxy) and call it with `call: http`:
 
-```yaml
-do:
-  - getUser:
-      call: http
-      with:
-        method: post
-        endpoint: https://users.example.com/v1/users:get
-        body:
-          id: ${ .userId }
-```
+<code-block lang="yaml" src="workflows/lemline-ref-grpc/alternative.yaml" include-lines="6-13"/>
 
 ## Related Resources
 

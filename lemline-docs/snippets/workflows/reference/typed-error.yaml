@@ -1,0 +1,19 @@
+document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: typed-error
+  version: '1.0.0'
+use:
+  errors:
+    invalidOrder:
+      type: https://errors.example.com/invalid-order
+      status: 422
+      title: Invalid order
+do:
+  - validateOrder:
+      if: ${ (.orderId // "") == "" }
+      raise:
+        error: invalidOrder
+  - acceptOrder:
+      set:
+        status: accepted

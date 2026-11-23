@@ -27,44 +27,11 @@ Runners themselves expose no API: they only consume from the message broker and 
 
 Declare an authentication inline on the endpoint:
 
-```yaml
-use:
-  secrets:
-    - API_TOKEN
-do:
-  - fetchData:
-      call: http
-      with:
-        method: get
-        endpoint:
-          uri: https://api.example.com/data
-          authentication:
-            bearer:
-              token: ${ $secrets.API_TOKEN }
-```
+<code-block lang="yaml" src="workflows/lemline-explain-security/authentication-configuration.yaml" include-lines="6-18"/>
 
 Or declare it once in `use.authentications` and reference it by name:
 
-```yaml
-use:
-  secrets:
-    - API_USER
-    - API_PASSWORD
-  authentications:
-    serviceAuth:
-      basic:
-        username: ${ $secrets.API_USER }
-        password: ${ $secrets.API_PASSWORD }
-do:
-  - fetchData:
-      call: http
-      with:
-        method: get
-        endpoint:
-          uri: https://api.example.com/data
-          authentication:
-            use: serviceAuth
-```
+<code-block lang="yaml" src="workflows/lemline-explain-security/authentication-configuration-2.yaml" include-lines="6-23"/>
 
 A reference to an unknown name fails with a `configuration` error.
 
@@ -86,17 +53,7 @@ Lemline has no built-in secret store: expose Vault, cloud secret managers or Kub
 
 Validate data with JSON Schema at the workflow or task level:
 
-```yaml
-input:
-  schema:
-    format: json
-    document:
-      type: object
-      required: [orderId]
-      properties:
-        orderId:
-          type: string
-```
+<code-block lang="yaml" src="workflows/reference/order-input-schema.yaml" include-lines="6-14"/>
 
 Lemline checks `input.schema` before a task runs, `output.schema` after it runs and `export.schema` on exported data. Data that does not match raises a `validation` error, which can be caught with `try`.
 

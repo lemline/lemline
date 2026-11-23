@@ -1,0 +1,28 @@
+document:
+  dsl: 1.0.3
+  namespace: examples
+  name: circuit-breaker
+  version: 0.1.0
+use:
+  retries:
+    circuitBreaker:
+      backoff:
+        exponential: {}
+      delay:
+        seconds: 1
+      limit:
+        attempt:
+          count: 3
+do:
+  - callExternalService:
+      try:
+        - makeApiCall:
+            call: http
+            with:
+              method: get
+              endpoint: https://api.example.com/data
+      catch:
+        errors:
+          with:
+            type: https://open-workflow-specification.org/spec/1.0.0/errors/communication
+        retry: circuitBreaker

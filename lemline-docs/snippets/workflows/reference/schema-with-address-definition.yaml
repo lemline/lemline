@@ -1,0 +1,28 @@
+document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: schema-with-address-definition
+  version: '1.0.0'
+input:
+  schema:
+    document:
+      type: object
+      required: [billing, shipping]
+      properties:
+        billing:
+          $ref: '#/$defs/address'
+        shipping:
+          $ref: '#/$defs/address'
+      $defs:
+        address:
+          type: object
+          required: [street, postalCode]
+          properties:
+            street:
+              type: string
+            postalCode:
+              type: string
+do:
+  - acceptOrder:
+      set:
+        valid: true

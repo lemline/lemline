@@ -1,0 +1,51 @@
+document:
+  dsl: '1.0.3'
+  namespace: iot
+  name: predictive-maintenance
+  version: '1.0.0'
+schedule:
+  cron: '0 0 * * *'
+do:
+  - retrieveDevices:
+      call: http
+      with:
+        method: get
+        endpoint: https://iot-analytics.example/api/devices
+  - reviewDevices:
+      for:
+        in: ${ .devices }
+        each: device
+      do:
+        - predictMaintenance:
+            call: http
+            with:
+              method: post
+              endpoint: https://iot-ml.example/api/predict-maintenance
+              body: ${ $device }
+        - routePrediction:
+            switch:
+              - maintenanceNeeded:
+                  when: ${ .probabilityOfFailure > 0.7 }
+                  then: createTicket
+              - warning:
+                  when: ${ .probabilityOfFailure > 0.4 }
+                  then: notifyMaintenance
+              - healthy:
+                  then: exit
+        - createTicket:
+            call: http
+            with:
+              method: post
+              endpoint: https://maintenance.example/api/tickets
+              body:
+                deviceId: ${ $device.id }
+                probabilityOfFailure: ${ .probabilityOfFailure }
+            then: exit
+        - notifyMaintenance:
+            call: http
+            with:
+              method: post
+              endpoint: https://notifications.example/api/notify
+              body:
+                deviceId: ${ $device.id }
+                probabilityOfFailure: ${ .probabilityOfFailure }

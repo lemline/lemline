@@ -1,0 +1,14 @@
+document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: set-example
+  version: '0.1.0'
+do:
+  - initData:
+      set:
+        user:
+          name: "John Doe"
+          role: "admin"
+  - transformData:
+      set:
+        transformedUser: '${ .user + { lastAccess: now } }'

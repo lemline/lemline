@@ -1,0 +1,114 @@
+document:
+  dsl: 1.0.3
+  namespace: examples
+  name: graduated-timeouts
+  version: 1.0.0
+do:
+  - fastQuickLookup:
+      try:
+        - callCacheService:
+            call: http
+            with:
+              method: get
+              endpoint: ${ "https://cache.example/lookup/\(.itemId)" }
+            timeout:
+              after:
+                milliseconds: 500
+            export:
+              as: '${ $context + { cacheResult: ., cacheHit: true } }'
+      catch:
+        errors:
+          with:
+            type: https://open-workflow-specification.org/spec/1.0.0/errors/timeout
+        as: timeoutError
+        do:
+          - setDefaultCache:
+              set:
+                cacheResult:
+                cacheHit: false
+              export:
+                as: '${ $context + { cacheHit: false } }'
+  - conditionalDatabaseCall:
+      try:
+        - callDatabaseService:
+            call: http
+            with:
+              method: get
+              endpoint: ${ "https://db.example/items/\($workflow.input.itemId)" }
+            timeout:
+              after:
+                seconds: 3
+            export:
+              as: '${ $context + { dbResult: ., dbLookupSuccess: true } }'
+      catch:
+        errors:
+          with:
+            type: https://open-workflow-specification.org/spec/1.0.0/errors/timeout
+        as: dbTimeoutError
+      if: ${ $context.cacheHit != true }
+  - conditionalSlowProcessing:
+      try:
+        - callFallbackService:
+            call: http
+            with:
+              method: get
+              endpoint: ${ "https://fallback.example/compute/\($workflow.input.itemId)" }
+            timeout:
+              after:
+                seconds: 10
+            export:
+              as: '${ $context + { fallbackResult: ., fallbackSuccess: true } }'
+      catch:
+        errors:
+          with:
+            type: https://open-workflow-specification.org/spec/1.0.0/errors/timeout
+        as: fallbackTimeoutError
+      if: ${ $context.dbLookupSuccess != true }
+  - prepareResponse:
+      do:
+        - route:
+            switch:
+              - cachedResult:
+                  when: ${ $context.cacheHit == true }
+                  then: cachedResultAction
+              - dbResult:
+                  when: ${ $context.dbLookupSuccess == true }
+                  then: dbResultAction
+              - fallbackResult:
+                  when: ${ $context.fallbackSuccess == true }
+                  then: fallbackResultAction
+              - default:
+                  then: defaultAction
+        - cachedResultAction:
+            do:
+              - action:
+                  set:
+                    result:
+                      source: cache
+                      data: ${ $context.cacheResult }
+            then: exit
+        - dbResultAction:
+            do:
+              - action:
+                  set:
+                    result:
+                      source: database
+                      data: ${ $context.dbResult }
+            then: exit
+        - fallbackResultAction:
+            do:
+              - action:
+                  set:
+                    result:
+                      source: fallback
+                      data: ${ $context.fallbackResult }
+            then: exit
+        - defaultAction:
+            do:
+              - action:
+                  set:
+                    result:
+                      source: default
+                      data:
+                      error: All data sources timed out
+            then: exit

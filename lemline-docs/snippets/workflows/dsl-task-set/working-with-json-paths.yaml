@@ -1,0 +1,30 @@
+document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: json-path-examples
+  version: '1.0.0'
+do:
+  - manipulateData:
+      set:
+        # Access nested properties
+        customerEmail: ${ $workflow.input.order.customer.contactInfo.email }
+
+        # Array operations
+        firstItem: ${ $workflow.input.items[0] }
+        itemCount: ${ $workflow.input.items | length }
+
+        # Filtering arrays
+        expensiveItems: '${ [$workflow.input.products[] | select(.price > 100)] }'
+
+        # Mapping arrays
+        productNames: '${ [$workflow.input.products[].name] }'
+
+        # Combining data
+        combinedList: ${ .list1 + .list2 }
+
+        # Conditional assignment
+        status: '${ if $workflow.input.approved then "APPROVED" else "PENDING" end }'
+
+        # String operations
+        upperCaseName: ${ $workflow.input.name | ascii_upcase }
+        formattedId: '${ $workflow.input.id | tostring | ("0" * (10 - length)) + . }'

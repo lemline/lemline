@@ -1,0 +1,38 @@
+document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: matching-multiple-error-types
+  version: '1.0.0'
+do:
+  - callService:
+      try:
+        - request:
+            call: http
+            with:
+              method: get
+              endpoint: https://api.example.com/items
+      catch:
+        as: error
+        do:
+          - routeByStatus:
+              switch:
+                - rateLimited:
+                    when: ${ $error.status == 429 }
+                    then: handleRateLimit
+                - unavailable:
+                    when: ${ $error.status == 503 }
+                    then: handleUnavailable
+                - default:
+                    then: handleOtherError
+          - handleRateLimit:
+              set:
+                outcome: rate-limited
+              then: exit
+          - handleUnavailable:
+              set:
+                outcome: unavailable
+              then: exit
+          - handleOtherError:
+              set:
+                outcome: failed
+                errorType: ${ $error.type }

@@ -1,0 +1,23 @@
+document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: authentication-configuration-2
+  version: '1.0.0'
+use:
+  secrets:
+    - API_USER
+    - API_PASSWORD
+  authentications:
+    serviceAuth:
+      basic:
+        username: ${ $secrets.API_USER }
+        password: ${ $secrets.API_PASSWORD }
+do:
+  - fetchData:
+      call: http
+      with:
+        method: get
+        endpoint:
+          uri: https://api.example.com/data
+          authentication:
+            use: serviceAuth

@@ -34,30 +34,7 @@ Basic workflow patterns demonstrate the fundamental building blocks of Open Work
 
 Example: `do-nested.yaml` - Demonstrates nested task execution with multiple HTTP calls and data manipulation:
 
-```yaml
-document:
-  dsl: '1.0.0-alpha5'
-  namespace: examples
-  name: call-http-shorthand-endpoint
-  version: '0.1.0'
-do:
-  - getPet:
-      call: http
-      with:
-        method: get
-        endpoint: https://petstore.swagger.io/v2/pet/{petId}
-  - nested:
-      do:
-        - init:
-            set:
-              startEvent: ${ $workflow.input[0] }
-        - getPet:
-            call: http
-            with:
-              method: get
-              endpoint: https://petstore.swagger.io/v2/pet/{petId}
-        # Additional nested tasks...
-```
+<code-block lang="yaml" src="workflows/lemline-examples-library/basic-workflow-patterns.yaml"/>
 
 For more basic patterns, see the [Basic Patterns Examples](lemline-examples-basic-patterns.md) document.
 
@@ -73,28 +50,7 @@ These examples demonstrate how to integrate with external services through vario
 
 Example: `star-wars-homeworld.yaml` - Shows HTTP endpoint calls with dynamic parameters:
 
-```yaml
-document:
-  dsl: 1.0.0
-  namespace: examples
-  name: star-wars-homeplanet
-  version: 1.0.0
-do:
-  - getStarWarsCharacter:
-      call: http
-      with:
-        method: get
-        endpoint: https://swapi.dev/api/people/{id}
-        output: response
-      export:
-        as:
-          homeworld: ${ .content.homeworld }
-  - getStarWarsHomeworld:
-      call: http
-      with:
-        method: get
-        endpoint: ${ $context.homeworld }
-```
+<code-block lang="yaml" src="workflows/lemline-examples-library/external-service-integration.yaml"/>
 
 For more integration examples, see the [Integration Examples](lemline-examples-integrations.md) document.
 
@@ -109,33 +65,7 @@ These examples show how to implement robust error handling and resilience patter
 
 Example: `try-catch-retry-inline.yaml` - Shows error handling with retry logic:
 
-```yaml
-document:
-  dsl: 1.0.0-alpha2
-  namespace: examples
-  name: star-wars-planets-batch
-  version: 1.0.0-alpha2
-do:
-  - tryGetAllCharacters:
-      try:
-        - getAllCharacters:
-            call: http
-            with:
-              method: get
-              endpoint: https://swapi.dev/api/people/
-      catch:
-        errors:
-          with:
-            type: https://open-workflow-specification.org/spec/1.0.0/errors/communication
-        retry:
-          delay:
-            seconds: 1
-          backoff:
-            exponential: { }
-          limit:
-            attempt:
-              count: 3
-```
+<code-block lang="yaml" src="workflows/lemline-examples-library/error-handling-and-resilience.yaml"/>
 
 For more error handling examples, see the [Error Handling Examples](lemline-examples-error-handling.md) document.
 
@@ -150,22 +80,7 @@ These examples demonstrate data manipulation and transformation techniques:
 
 Example: `set.yaml` - Shows how to set and transform variables:
 
-```yaml
-document:
-  dsl: '1.0.0'
-  namespace: examples
-  name: set-example
-  version: '0.1.0'
-do:
-  - initData:
-      set:
-        user:
-          name: "John Doe"
-          role: "admin"
-  - transformData:
-      set:
-        transformedUser: ${ .user + { lastAccess: now() } }
-```
+<code-block lang="yaml" src="workflows/lemline-examples-library/data-transformation.yaml"/>
 
 ## Event Processing
 
@@ -178,22 +93,7 @@ These examples show how to handle events in workflows:
 
 Example: `listen-to-any.yaml` - Shows how to listen for events:
 
-```yaml
-document:
-  dsl: '1.0.0'
-  namespace: examples
-  name: listen-to-any-example
-  version: '0.1.0'
-do:
-  - waitForEvent:
-      listen:
-        to:
-          any:
-            - event: order.created
-            - event: order.cancelled
-        for:
-          seconds: 30
-```
+<code-block lang="yaml" src="workflows/lemline-examples-library/event-processing.yaml"/>
 
 ## Real-world Examples
 
@@ -206,24 +106,7 @@ These examples combine multiple features to demonstrate realistic use cases:
 
 Example: `presentation.yaml` - A complex order fulfillment workflow:
 
-```yaml
-document:
-  dsl: 1.0.0-alpha2
-  namespace: examples
-  name: order-fulfillment
-  version: 1.0.0-alpha2
-
-do:
-  - checkItemType:
-      switch:
-        - ifDigital:
-            when: .itemType == "digital"
-            then: processDigitalOrder
-        - default:
-            then: checkPhysicalOrderLogic
-  
-  # Additional steps for different order types...
-```
+<code-block lang="yaml" src="workflows/lemline-examples-library/real-world-examples.yaml"/>
 
 For more complex examples, see the [Real-world Examples](lemline-examples-real-world.md) document.
 

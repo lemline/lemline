@@ -21,6 +21,7 @@ Lemline implements the standardized error types defined in the Open Workflow Spe
 
 All errors in Lemline follow the RFC 7807 Problem Details format:
 
+<!-- workflow-example: data -->
 ```json
 {
   "type": "https://open-workflow-specification.org/spec/1.0.0/errors/validation",
@@ -81,77 +82,23 @@ java.lang.RuntimeException
 
 Custom error types can be defined in workflow definitions:
 
-```yaml
-use:
-  errors:
-    - name: "paymentDeclined"
-      type: "https://example.com/errors/payment-declined"
-      status: 400
-      title: "Payment Method Declined"
-      details: "The payment processor rejected the transaction"
-    
-    - name: "inventoryShortage"
-      type: "https://example.com/errors/inventory-shortage"
-      status: 409
-      title: "Insufficient Inventory"
-```
+<code-block lang="yaml" src="workflows/reference/typed-error.yaml"/>
 
 ## Error Handling Examples
 
 ### Basic Try-Catch
 
-```yaml
-- secureOperation:
-    try:
-      do:
-        - riskyTask:
-            # Task that might fail
-      catch:
-        - error:
-            with:
-              type: "https://open-workflow-specification.org/spec/1.0.0/errors/timeout"
-            as: "timeoutError"
-          do:
-            - handleTimeout:
-                # Error handling tasks
-```
+<code-block lang="yaml" src="workflows/lemline-ref-errors/basic-try-catch.yaml" include-lines="7-20"/>
 
 ### Matching Multiple Error Types
 
-```yaml
-catch:
-  - error:
-      with:
-        type: "https://open-workflow-specification.org/spec/1.0.0/errors/communication"
-        status: 429
-      do:
-        # Handle rate limiting
-  
-  - error:
-      with:
-        type: "https://open-workflow-specification.org/spec/1.0.0/errors/communication"
-        status: 503
-      do:
-        # Handle service unavailable
-```
+A `try` task has a single `catch`. To handle several errors differently, catch them and route on the fields of the caught error in `catch.do`:
+
+<code-block lang="yaml" src="workflows/lemline-ref-errors/matching-multiple-error-types.yaml" include-lines="6-38"/>
 
 ### Using Retry Policies
 
-```yaml
-try:
-  retry:
-    policy:
-      strategy: backoff
-      backoff:
-        delay: PT1S
-        multiplier: 2
-      limit:
-        attempt:
-          count: 3
-      when: "${ .error.status >= 500 }"
-  do:
-    # Tasks that might temporarily fail
-```
+<code-block lang="yaml" src="workflows/lemline-ref-errors/using-retry-policies.yaml" include-lines="8-21"/>
 
 ## Error Debugging 
 

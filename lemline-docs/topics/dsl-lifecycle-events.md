@@ -66,6 +66,7 @@ includes:
 
 Example event data:
 
+<!-- workflow-example: data -->
 ```json
 {
   "workflowId": "order-processing-12345",
@@ -94,6 +95,7 @@ It typically includes:
 
 Example event data:
 
+<!-- workflow-example: data -->
 ```json
 {
   "workflowId": "order-processing-12345",
@@ -127,6 +129,7 @@ values were matched.
 
 Example correlation completed event data:
 
+<!-- workflow-example: data -->
 ```json
 {
   "workflowId": "payment-processing-67890",
@@ -169,6 +172,7 @@ The `org.open-workflow-specification.task.started.v1` event is emitted when a ta
 
 Example event data:
 
+<!-- workflow-example: data -->
 ```json
 {
   "taskReference": "validateOrder",
@@ -209,6 +213,7 @@ includes:
 
 Example event data:
 
+<!-- workflow-example: data -->
 ```json
 {
   "taskReference": "validateOrder",
@@ -249,6 +254,7 @@ valuable for monitoring and troubleshooting. It typically includes:
 
 Example event data:
 
+<!-- workflow-example: data -->
 ```json
 {
   "taskReference": "processPayment",
@@ -279,6 +285,7 @@ The `org.open-workflow-specification.task.retried.v1` event is emitted when a ta
 
 Example event data:
 
+<!-- workflow-example: data -->
 ```json
 {
   "taskReference": "sendNotification",

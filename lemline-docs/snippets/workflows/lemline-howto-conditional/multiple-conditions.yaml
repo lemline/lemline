@@ -1,0 +1,19 @@
+document:
+  dsl: 1.0.3
+  namespace: examples
+  name: multiple-conditions
+  version: 1.0.0
+do:
+  - CategorizeLead:
+      switch:
+        - case1:
+            when: ${ .score >= 80 }
+            then: ProcessHotLead
+        - case2:
+            when: ${ .score >= 50 and .score < 80 }
+            then: ProcessWarmLead
+        - case3:
+            when: ${ .score >= 20 and .score < 50 }
+            then: ProcessCoolLead
+        - case4:
+            then: ProcessColdLead

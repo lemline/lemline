@@ -10,70 +10,17 @@ The `run: shell` task allows a workflow to execute a command line instruction us
 
 ## Usage Example
 
-```yaml
-document:
-  dsl: '1.0.0'
-  namespace: shell-runs
-  name: run-simple-shell
-  version: '1.0.0'
-do:
-  - executeShellCommand:
-      run:
-        shell:
-          command: 'echo "Processing file: ${fileName}" && grep -c "ERROR" "${filePath}"' 
-          # Pass arguments as environment variables
-          environment: 
-            fileName: "${ .inputFile.name }"
-            filePath: "${ .inputFile.path }"
-        # `await: true` (default) waits for completion
-        # `return: stdout` (default) captures the standard output
-        return: stdout 
-      then: processShellOutput
-  - processShellOutput:
-      # Input might be "Processing file: data.log\n3" (if 3 errors found)
-      set:
-        # Example: extract the error count (implementation depends on shell/tools)
-        errorCount: "${ parseInteger(split(. , '\n')[1]) }"
+<code-block lang="yaml" src="workflows/dsl-run-shell/usage-example.yaml"/>
 
 ## Additional Examples
 
 ### Example: Capturing Standard Error
 
-```yaml
-do:
-  - attemptRiskyOperation:
-      run:
-        shell:
-          # Command might succeed (stdout) or fail (stderr)
-          command: "/opt/tools/do-something --input /data/input.txt || echo 'Fallback value'"
-        # Capture stderr instead of stdout
-        return: stderr 
-      then: handleOperationError
-  - handleOperationError:
-      # Input is the content sent to stderr, or empty if none
-      set:
-        errorMessage: "${ . }"
-```
+<code-block lang="yaml" src="workflows/dsl-run-shell/example-capturing-standard-error.yaml" include-lines="6-18"/>
 
 ### Example: Capturing All Outputs
 
-```yaml
-do:
-  - executeUtility:
-      run:
-        shell:
-          command: "utility-tool --process ${ .fileId } --verbose"
-        # Get exit code, stdout, and stderr together
-        return: all 
-      then: processUtilityResult
-  - processUtilityResult:
-      # Input: { "code": 0, "stdout": "...", "stderr": "..." }
-      set:
-        exitCode: "${ .code }"
-        outputLog: "${ .stdout }"
-        # Use stderr only if exit code was non-zero
-        errorLog: "${ if .code != 0 then .stderr else null end }"
-```
+<code-block lang="yaml" src="workflows/dsl-run-shell/example-capturing-all-outputs.yaml" include-lines="6-20"/>
 
 ## Configuration Options
 

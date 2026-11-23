@@ -117,6 +117,7 @@ This example uses Prometheus and Grafana:
 
 1. Configure Prometheus to scrape Lemline metrics:
 
+<!-- workflow-example: data -->
 ```yaml
 # prometheus.yml
 scrape_configs:

@@ -1,0 +1,14 @@
+document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: emit-order-created
+  version: '1.0.0'
+do:
+  - notifyOrderCreated:
+      emit:
+        event:
+          with:
+            type: com.example.order.created
+            source: https://events.example.com/order-service
+            subject: ${ .orderId }
+            data: ${ . }

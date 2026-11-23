@@ -12,35 +12,7 @@ This is crucial for building event-driven workflows where progression depends on
 
 ## Usage Example
 
-```yaml
-document:
-  dsl: '1.0.0' # Assuming alpha5 or later based on reference example
-  namespace: examples
-  name: listen-for-vitals
-  version: '1.0.0'
-do:
-  - startMonitoring:
-    # ... task that initiates monitoring ...
-  - waitForVitalSignAlert:
-      listen:
-        to:
-          any: # Complete when any of the following conditions are met
-            - with: # Condition 1: High Temperature
-                source: "http://vitals-service"
-                type: "com.fake-hospital.vitals.measurements.temperature"
-                data: '${ .temperature > 38 }'
-            - with: # Condition 2: Abnormal BPM
-                source: "http://vitals-service"
-                type: "com.fake-hospital.vitals.measurements.bpm"
-                data: '${ .bpm < 60 or .bpm > 100 }'
-        read: data # Read only the event data (default)
-      timeout:
-        after: PT1H
-      then: processAlert
-  - processAlert:
-    # ... task that handles the alert based on the received event data ...
-    # The task output here is an array containing the event(s) that met the condition
-```
+<code-block lang="yaml" src="workflows/dsl-task-listen/usage-example.yaml"/>
 
 In this example, the workflow pauses at `waitForVitalSignAlert` until an event matching either the high temperature
 condition or the abnormal BPM condition arrives, or until the 1-hour timeout is reached. The output will be an array
@@ -59,36 +31,22 @@ This object defines the core parameters for the listening behavior.
         * **Use Case**: Waiting for one of several possible outcomes or signals (e.g., 'approved' OR 'rejected', '
           payment succeeded' OR 'payment failed').
         * **Example**:
-          ```yaml
-          listen:
-            to:
-              any:
-                - with: { type: com.example.approval } # Match event type
-                - with: { source: /orders/urgent } # Match event source
-          ```
+
+          <code-block lang="yaml" src="workflows/dsl-task-listen/listen-listen-required.yaml" include-lines="8-14"/>
     * `all`: Defines a list of conditions (using `with`). The task completes only when *at least one event matching
       each* listed condition has been received.
         * **Use Case**: Waiting for multiple distinct signals or acknowledgments before proceeding (e.g., confirmation
           from inventory AND confirmation from shipping).
         * **Example**:
-          ```yaml
-          listen:
-            to:
-              all:
-                - with: { type: inventory.checked }
-                - with: { type: shipping.ready }
-          ```
+
+          <code-block lang="yaml" src="workflows/dsl-task-listen/listen-listen-required-2.yaml" include-lines="8-12"/>
     * `one`: Defines a *single* condition (using `with`). The task completes only when an event matching this specific
       condition is received.
         * **Use Case**: Waiting for a specific, singular event (e.g., 'order shipped' notification, 'user verified'
           signal).
         * **Example**:
-          ```yaml
-          listen:
-            to:
-              one:
-                with: { type: user.verified, subject: "user-123" } 
-          ```
+
+          <code-block lang="yaml" src="workflows/dsl-task-listen/listen-listen-required-3.yaml" include-lines="8-11"/>
     * Each condition is typically defined using a `with` object specifying:
         * CloudEvent attributes to match (e.g., `type`, `source`).
         * An optional `data` property containing a [Runtime Expression](dsl-runtime-expressions.md) evaluated against
@@ -100,15 +58,8 @@ This object defines the core parameters for the listening behavior.
           of whether the main `any`/`all`/`one` conditions were satisfied.
         * Events matching the `until` condition are **not** included in the task's output array.
         * **Example**:
-          ```yaml
-          listen:
-            to:
-              any: # Wait for approval OR rejection
-                - with: { type: com.example.approval }
-                - with: { type: com.example.rejection }
-              until: # But stop immediately if a cancellation event arrives
-                with: { type: com.example.cancellation }
-          ```
+
+          <code-block lang="yaml" src="workflows/reference/listen-until-complete.yaml"/>
     * *(Note: The exact structure for defining `any`, `all`, `one`, and `until` depends on the specific definition of
       the `eventConsumptionStrategy` type in the full DSL reference.)*
 

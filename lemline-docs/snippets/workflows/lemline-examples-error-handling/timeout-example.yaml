@@ -1,0 +1,28 @@
+document:
+  dsl: 1.0.3
+  namespace: examples
+  name: timeout-handling
+  version: 0.1.0
+do:
+  - callWithTimeout:
+      try:
+        - longRunningOperation:
+            call: http
+            with:
+              method: post
+              endpoint: https://api.example.com/long-process
+              body: ${ .processData }
+            timeout:
+              after:
+                seconds: 30
+      catch:
+        errors:
+          with:
+            type: https://open-workflow-specification.org/spec/1.0.0/errors/timeout
+        as: timeoutError
+        do:
+          - handleTimeout:
+              set:
+                status: timeout
+                message: Operation timed out after 30 seconds
+              then: exit

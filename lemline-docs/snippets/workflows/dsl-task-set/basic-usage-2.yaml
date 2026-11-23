@@ -1,0 +1,12 @@
+document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: basic-usage-2
+  version: '1.0.0'
+do:
+  - combineNames: # Assume input is { "firstName": "Bob", "lastName": "Smith" }
+      set:
+        fullName: '${ .firstName + " " + .lastName }'
+        originalInput: "${ . }" # Include original input if needed
+
+# Output of 'combineNames': { "fullName": "Bob Smith", "originalInput": { "firstName": "Bob", "lastName": "Smith" } }
