@@ -12,7 +12,7 @@ This module handles persistent storage of workflow definitions in the database:
 
 ## Open Workflow DSL Reference
 
-Workflow definitions follow the [Open Workflow DSL v1.0](https://open-workflow-specification.org/):
+Workflow definitions follow the [Open Workflow DSL v1.0.3](https://open-workflow-specification.org/):
 - `document.namespace` - Workflow namespace
 - `document.name` - Workflow name
 - `document.version` - Workflow version (semver)

@@ -31,7 +31,7 @@ class DefinitionsTest {
 
     private val sampleYamlWorkflow = """
         document:
-          dsl: '1.0.0'
+          dsl: '1.0.3'
           namespace: test
           name: test-workflow
           version: '1.0.0'
@@ -45,7 +45,7 @@ class DefinitionsTest {
     private val sampleJsonWorkflow = """
         {
           "document": {
-            "dsl": "1.0.0",
+            "dsl": "1.0.3",
             "namespace": "test",
             "name": "test-workflow-json",
             "version": "1.0.0"
@@ -154,7 +154,7 @@ class DefinitionsTest {
         // Given
         val invalidWorkflow = """
             document:
-              dsl: '1.0.0'
+              dsl: '1.0.3'
               namespace: test
               name: invalid-workflow
               # Missing required version field
@@ -255,7 +255,7 @@ class DefinitionsTest {
     fun `parse should handle syntax errors in YAML gracefully by trying JSON`() {
         // Given a YAML workflow with invalid syntax, but valid as JSON
         val badYamlGoodJson = """
-        {"document":{"dsl":"1.0.0","namespace":"test","name":"invalid-yaml-good-json","version":"1.0.0"},
+        {"document":{"dsl":"1.0.3","namespace":"test","name":"invalid-yaml-good-json","version":"1.0.0"},
         "do":[{"hello":{"call":"log","with":{"message":"Hello, World!"}}}]}
         """.trimIndent()
 
@@ -288,7 +288,7 @@ class DefinitionsTest {
         val workflows = (1..10).map { i ->
             """
             document:
-              dsl: '1.0.0'
+              dsl: '1.0.3'
               namespace: test
               name: test-workflow-$i
               version: '1.0.0'
@@ -344,7 +344,7 @@ class DefinitionsTest {
         // Given a more complex workflow with sequential steps only (to avoid potential parsing issues)
         val complexWorkflow = """
             document:
-              dsl: '1.0.0'
+              dsl: '1.0.3'
               namespace: test
               name: complex-workflow
               version: '1.0.0'
@@ -381,7 +381,7 @@ class DefinitionsTest {
         // Given a workflow with listen task and literal time filter
         val workflowWithListenTime = """
             document:
-              dsl: '1.0.0'
+              dsl: '1.0.3'
               namespace: test
               name: listen-time-literal
               version: '1.0.0'

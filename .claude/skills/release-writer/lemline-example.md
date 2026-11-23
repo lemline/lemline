@@ -36,7 +36,7 @@ The same event delivered twice never starts two instances.
 
 ```yaml
 document:
-  dsl: '1.0.0'
+  dsl: '1.0.3'
   namespace: examples
   name: low-heartbeat-alert
   version: '0.1.0'

@@ -11,7 +11,7 @@ This module implements the retry mechanism for failed tasks:
 
 ## Open Workflow DSL Reference
 
-See [Retry Policy](https://github.com/open-workflow-specification/specification/blob/v1.0.0/dsl-reference.md#retry) in the Open Workflow Specification:
+See [Retry Policy](https://github.com/open-workflow-specification/specification/blob/v1.0.3/dsl-reference.md#retry) in the Open Workflow Specification:
 
 ```yaml
 do:

@@ -12,7 +12,7 @@ et une base de données paient deux fois.
 
 ## Ce qu'on construit
 
-Un runtime d'exécution de l'Open Workflow DSL v1.0 qui tourne **sur l'infra existante de
+Un runtime d'exécution de l'Open Workflow DSL v1.0.3 qui tourne **sur l'infra existante de
 l'utilisateur** : workers stateless, état porté dans les messages, base de données utilisée seulement quand
 c'est indispensable (timers, retries, jointures parallèles). Autour du runner : une gateway gRPC d'ingress,
 un sink analytics et un dashboard d'observabilité.

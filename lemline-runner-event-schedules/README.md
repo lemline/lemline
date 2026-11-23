@@ -9,11 +9,12 @@ on the next definition-cache synchronization (default: 10 seconds). No manual st
 
 ```yaml
 document:
-  dsl: '1.0.0'
+  dsl: '1.0.3'
   namespace: orders
   name: order-created
   version: '1.0.0'
 schedule:
+  read: envelope
   on:
     one:
       with:
@@ -24,7 +25,7 @@ do:
         order: ${ $workflow.input[0].data }
 ```
 
-The DSL 1.0.0 input is an array of triggering CloudEvent envelopes, including `data`, even for
+With `read: envelope`, the input is an array of triggering CloudEvent envelopes, including `data`, even for
 `one`. `one` and `any` start a new instance on each matching event; `any: []` matches every event.
 `all` collects every filter before starting. Repeated events for an already-filled filter open
 the next collection, so `A1, A2, B1, B2` yields `A1+B1` and `A2+B2`. Events matching multiple

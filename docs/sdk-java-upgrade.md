@@ -9,7 +9,18 @@ The published artifacts still use `io.serverlessworkflow:serverlessworkflow-*` a
 
 ## Workflow definition changes
 
-Validation follows the schema shipped with the pinned SDK. Validate stored definitions before upgrading workers; some definitions accepted by 7.0.0.Final need edits even though `document.dsl` remains `1.0.0`.
+Lemline validates YAML and JSON with the [1.0.3 schema bundled in Java SDK 7.35.3.Final](https://github.com/open-workflow-specification/sdk-java/blob/7.35.3.Final/types/src/main/resources/schema/workflow.yaml). Set `document.dsl` to `1.0.3` for new definitions. Existing definitions declaring `1.0.0` use the same validator. Validate their contents before upgrading workers. The workflow's own `document.version` is independent of the DSL version.
+
+The runtime reads `schema/workflow.yaml` from the SDK classpath. The older `schemas/workflow-1-0-0.json` resource remains available in `lemline-common` for callers that reference its path.
+
+The SDK schema differs in places from the [official 1.0.3 tag](https://github.com/open-workflow-specification/specification/blob/v1.0.3/schema/workflow.yaml). In particular, the SDK accepts a map for `run.script.arguments` and rejects `run.script.stdin`. The tag specifies an ordered string array and optional standard input for scripts. For shell tasks, both use an ordered string array and optional `stdin`. The SDK also accepts `evaluate`, `schedule.read`, and `catch.then`.
+
+Other schema differences relevant when exchanging definitions:
+
+- `for.in` accepts an inline array or an expression in the SDK. The tag accepts a string expression.
+- The SDK permits omitting `emit.event.with.source`. The tag requires both `source` and `type`.
+- The SDK uses `detail` in error filters and accepts relative URI references in endpoint templates. The tag uses `details` and requires an absolute URI for those alternatives.
+- The SDK calls the MCP client version field `version` and requires `authority` and `grant` for inline OAuth2 data. These are schema differences. Check the [runtime support matrix](../lemline-docs/topics/lemline-ref-supported-features.md) before selecting an integration.
 
 Shell arguments are now an ordered list. Replace argument maps:
 

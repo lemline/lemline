@@ -37,7 +37,8 @@ services:
     command: ["--config=/config/lemline.yaml", "listen", "--metrics-port", "9445"]
     volumes:
       - ./config/lemline.yaml:/config/lemline.yaml:ro
-      - ../../lemline-runner/src/test/resources/examples:/workflows:ro
+      - ../../lemline-core/src/main/resources/examples:/workflows/shared:ro
+      - ../../lemline-runner/src/test/resources/examples:/workflows/runner:ro
     ports:
       - "9445:9445"
     healthcheck:
@@ -97,7 +98,8 @@ services:
         exit 1
     volumes:
       - ./config/lemline.yaml:/config/lemline.yaml:ro
-      - ../../lemline-runner/src/test/resources/examples:/workflows:ro
+      - ../../lemline-core/src/main/resources/examples:/workflows/shared:ro
+      - ../../lemline-runner/src/test/resources/examples:/workflows/runner:ro
 
   dashboard:
     build:

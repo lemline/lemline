@@ -20,8 +20,8 @@ data class EventConsumptionProgress(
     val correlations: MutableMap<String, String> = mutableMapOf(),
 ) {
     fun consume(rule: CachedEventConsumption, event: CloudEvent, context: JsonNode?): Boolean {
-        // DSL 1.0 forbids another until inside the termination strategy.
-        require(rule.untilExpression == null && rule.untilEvents == null) { "Nested until conditions are not supported by DSL 1.0" }
+        // DSL 1.0.3 forbids another until inside the termination strategy.
+        require(rule.untilExpression == null && rule.untilEvents == null) { "Nested until conditions are not supported by DSL 1.0.3" }
         val indices = rule.filters.mapIndexedNotNull { index, filter ->
             if (rule.strategy == ListenStrategy.ALL && index in matched) return@mapIndexedNotNull null
             if (filter.matches(event, correlations, context)) index else null

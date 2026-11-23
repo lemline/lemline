@@ -1,6 +1,6 @@
 # Lemline Core Documentation
 
-The `lemline-core` module implements the Open Workflow DSL v1.0 specification, providing a pure, stateless execution engine.
+The `lemline-core` module implements the Open Workflow DSL v1.0.3 specification, providing a pure, stateless execution engine.
 
 ## Documentation Index
 

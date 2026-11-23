@@ -63,7 +63,7 @@ class InstanceStartCommandTest {
         version = workflowVersion,
         definition = """
                 document:
-                  dsl: 1.0.0
+                  dsl: 1.0.3
                   namespace: test
                   name: $workflowName
                   version: '$workflowVersion'
@@ -79,7 +79,7 @@ class InstanceStartCommandTest {
         version = workflowVersion,
         definition = """
                     document:
-                      dsl: 1.0.0
+                      dsl: 1.0.3
                       namespace: test
                       name: $workflowNameWithSchema
                       version: '$workflowVersion'

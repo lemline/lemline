@@ -8,10 +8,12 @@
 [![License](https://img.shields.io/badge/License-BSL%201.1-blue.svg)](LICENSE.md)
 
 Lemline is a modern runtime for the [Open Workflow DSL](https://github.com/open-workflow-specification/specification)
-version 1.0,
+version 1.0.3 as modeled by the Java SDK,
 enabling the execution of complex workflows defined in YAML or JSON **on top of your existing infrastructure**. It
 leverages
 modern best practices for performance, reliability, and extensibility.
+
+See [supported features and SDK differences](lemline-docs/topics/lemline-ref-supported-features.md) for runtime coverage.
 
 ## 🎯 Objectives
 

@@ -69,7 +69,7 @@ class DefinitionGetCommandTest {
             version = workflowVersion,
             definition = """
                 document:
-                  dsl: 1.0.0
+                  dsl: 1.0.3
                   namespace: $workflowNamespace
                   name: $workflowName
                   version: '$workflowVersion'
@@ -154,7 +154,7 @@ class DefinitionGetCommandTest {
         fun `should output in JSON format when requested`() {
             // Given
             val jsonOutput =
-                """{"document":{"dsl":"1.0.0","namespace":"test","name":"testWorkflow","version":"1.0.0"},"do":[{"wait30Seconds":{"wait":"PT30S"}}]}"""
+                """{"document":{"dsl":"1.0.3","namespace":"test","name":"testWorkflow","version":"1.0.0"},"do":[{"wait30Seconds":{"wait":"PT30S"}}]}"""
             val workflow = mockk<Workflow>()
 
             // Mock static method

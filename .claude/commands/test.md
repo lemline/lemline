@@ -20,7 +20,7 @@ class WorkflowProcessorTest {
     fun `should execute simple workflow`() = runTest {
         val definition = """
             document:
-              dsl: 1.0.0
+              dsl: 1.0.3
               namespace: test
               name: simple-workflow
               version: 1.0.0
@@ -40,7 +40,7 @@ class WorkflowProcessorTest {
     fun `should handle task with input transformation`() = runTest {
         val definition = """
             document:
-              dsl: 1.0.0
+              dsl: 1.0.3
               namespace: test
               name: transform-workflow
               version: 1.0.0
@@ -311,7 +311,7 @@ class StepByStepRunnerTest : FunSpec({
     test("should create wait entry when WaitStartedException thrown") {
         val definition = """
             document:
-              dsl: 1.0.0
+              dsl: 1.0.3
               namespace: test
               name: wait-workflow
               version: 1.0.0
@@ -392,7 +392,7 @@ object TestDataFactory {
         tasks: String = "- setData:\n    set:\n      result: done"
     ) = """
         document:
-          dsl: 1.0.0
+          dsl: 1.0.3
           namespace: $namespace
           name: $name
           version: $version

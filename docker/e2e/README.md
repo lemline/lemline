@@ -112,7 +112,8 @@ When started with `gateway start`, the CLI enables gateway mode automatically.
 
 At startup, `seed-definitions` loads all workflow YAML files from:
 
-- `lemline-runner/src/test/resources/examples` (mounted as `/workflows` in container)
+- `lemline-core/src/main/resources/examples` supplies the shared examples at `/workflows/shared`.
+- `lemline-runner/src/test/resources/examples` supplies the runner-specific examples at `/workflows/runner`.
 
 It runs:
 

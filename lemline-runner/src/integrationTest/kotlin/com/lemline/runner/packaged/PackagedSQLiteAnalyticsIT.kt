@@ -38,7 +38,7 @@ internal class PackagedSQLiteAnalyticsIT {
         val definition = directory.resolve("$name.yaml")
         Files.writeString(definition, """
             |document:
-            |  dsl: '1.0.0'
+            |  dsl: '1.0.3'
             |  namespace: packaged
             |  name: $name
             |  version: '1.0.0'

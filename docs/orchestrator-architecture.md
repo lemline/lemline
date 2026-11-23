@@ -1,6 +1,6 @@
 # Lemline Core: Workflow Orchestrator Architecture
 
-This document describes how the `WorkflowOrchestrator` in `lemline-core` implements the [Open Workflow DSL v1.0](https://github.com/open-workflow-specification/specification) specification.
+This document describes how the `WorkflowOrchestrator` in `lemline-core` implements the [Open Workflow DSL v1.0.3](https://github.com/open-workflow-specification/specification) specification.
 
 ## Table of Contents
 

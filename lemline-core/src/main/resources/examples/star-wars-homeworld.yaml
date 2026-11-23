@@ -1,6 +1,6 @@
-# yaml-language-server: $schema=../schema/workflow.yaml
+# yaml-language-server: $schema=https://raw.githubusercontent.com/open-workflow-specification/sdk-java/7.35.3.Final/types/src/main/resources/schema/workflow.yaml
 document:
-  dsl: 1.0.0
+  dsl: 1.0.3
   namespace: examples
   name: star-wars-homeplanet
   version: 1.0.0

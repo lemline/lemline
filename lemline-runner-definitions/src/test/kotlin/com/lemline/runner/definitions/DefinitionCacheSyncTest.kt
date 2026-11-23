@@ -20,7 +20,7 @@ class DefinitionCacheSyncTest {
     private val sync = DefinitionCacheSync().apply { definitionRepository = repository }
     private fun definition(type: String = "a") = DefinitionModel.from("""
         document:
-          dsl: '1.0.0'
+          dsl: '1.0.3'
           namespace: cache-tests
           name: trigger
           version: '1.0.0'

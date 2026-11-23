@@ -29,7 +29,7 @@ import org.junit.jupiter.api.assertThrows
 class SdkCompatibilityTest {
     private fun source(body: String) = """
         document:
-          dsl: '1.0.0'
+          dsl: '1.0.3'
           namespace: sdk
           name: compatibility
           version: '1.0.0'

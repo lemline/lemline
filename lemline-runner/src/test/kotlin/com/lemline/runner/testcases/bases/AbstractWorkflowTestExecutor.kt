@@ -342,7 +342,7 @@ internal abstract class AbstractWorkflowTestExecutor : WorkflowTestExecutor {
         } else {
             """
             |document:
-            |  dsl: '1.0.0'
+            |  dsl: '1.0.3'
             |  namespace: $namespace
             |  name: $name
             |  version: '$version'

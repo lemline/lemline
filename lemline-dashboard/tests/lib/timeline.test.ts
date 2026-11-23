@@ -22,7 +22,7 @@ function event(type: string, offsetMs: number, data: Record<string, unknown> = {
 }
 
 const ORDER_SOURCE = `
-document: { dsl: '1.0.0', namespace: shop, name: order-processing, version: '1.2.0' }
+document: { dsl: '1.0.3', namespace: shop, name: order-processing, version: '1.2.0' }
 do:
   - validateOrder:
       set:
@@ -78,7 +78,7 @@ describe("buildTimeline", () => {
 
   it("puts a retry announced on the try block on the task that failed in it", () => {
     const tryRoot = parseWorkflowSource(`
-document: { dsl: '1.0.0', namespace: shop, name: payment, version: '1.0.0' }
+document: { dsl: '1.0.3', namespace: shop, name: payment, version: '1.0.0' }
 do:
   - chargePayment:
       try:
@@ -170,7 +170,7 @@ do:
 
   it("orders a task's events as they happened, not as the runtime wrote them", () => {
     const tryRoot = parseWorkflowSource(`
-document: { dsl: '1.0.0', namespace: test, name: retry-check, version: '0.1.0' }
+document: { dsl: '1.0.3', namespace: test, name: retry-check, version: '0.1.0' }
 do:
   - tryIt:
       try:
@@ -219,7 +219,7 @@ do:
 
   it("draws each run of a loop on its own row, the next one waiting to start", () => {
     const loopRoot = parseWorkflowSource(`
-document: { dsl: '1.0.0', namespace: shop, name: batch, version: '1.0.0' }
+document: { dsl: '1.0.3', namespace: shop, name: batch, version: '1.0.0' }
 do:
   - loop:
       for:
@@ -288,7 +288,7 @@ do:
 
   describe("a task still open when the instance ends", () => {
     const forkRoot = parseWorkflowSource(`
-document: { dsl: '1.0.0', namespace: shop, name: race, version: '1.0.0' }
+document: { dsl: '1.0.3', namespace: shop, name: race, version: '1.0.0' }
 do:
   - race:
       fork:
@@ -506,7 +506,7 @@ do:
 
   it("draws a for task once, without a row for its synthetic body", () => {
     const loopRoot = parseWorkflowSource(`
-document: { dsl: '1.0.0', namespace: shop, name: loop, version: '1.0.0' }
+document: { dsl: '1.0.3', namespace: shop, name: loop, version: '1.0.0' }
 do:
   - loop:
       for: { each: item, in: '\${ .items }' }
@@ -533,7 +533,7 @@ do:
 
   it("shortens a long wait inside a function call", () => {
     const functionRoot = parseWorkflowSource(`
-document: { dsl: '1.0.0', namespace: shop, name: slow, version: '1.0.0' }
+document: { dsl: '1.0.3', namespace: shop, name: slow, version: '1.0.0' }
 use:
   functions:
     slow:
@@ -563,7 +563,7 @@ do:
 
   it("shortens a long wait in an extension block around an activity", () => {
     const extendedRoot = parseWorkflowSource(`
-document: { dsl: '1.0.0', namespace: shop, name: extended, version: '1.0.0' }
+document: { dsl: '1.0.3', namespace: shop, name: extended, version: '1.0.0' }
 use:
   extensions:
     - throttle:
@@ -594,7 +594,7 @@ do:
 
   it("shows a listen task named do as waiting", () => {
     const namedRoot = parseWorkflowSource(`
-document: { dsl: '1.0.0', namespace: shop, name: named, version: '1.0.0' }
+document: { dsl: '1.0.3', namespace: shop, name: named, version: '1.0.0' }
 do:
   - do:
       listen:

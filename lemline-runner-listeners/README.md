@@ -12,7 +12,7 @@ This module implements the `listen` task from Open Workflow DSL:
 
 ## Open Workflow DSL Reference
 
-See [Listen Task](https://github.com/open-workflow-specification/specification/blob/v1.0.0/dsl-reference.md#listen) in the Open Workflow Specification:
+See [Listen Task](https://github.com/open-workflow-specification/specification/blob/v1.0.3/dsl-reference.md#listen) in the Open Workflow Specification:
 
 ```yaml
 do:
@@ -243,7 +243,7 @@ Behavior changes from the former first-filter-only implementation:
 - Termination filters now honor extensions and correlation against instance context.
 
 Expression termination and ordinary one/any/all collection retain their behavior.
-DSL 1.0 schema validation still rejects another `until` inside an event termination strategy.
+DSL 1.0.3 schema validation still rejects another `until` inside an event termination strategy.
 
 Migration V903 adds nullable listener progress on PostgreSQL, MySQL and H2. Existing
 single-filter termination messages remain readable and retain their protobuf encoding.
