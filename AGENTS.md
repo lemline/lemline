@@ -166,6 +166,17 @@ Known deviations:
 ./gradlew :lemline-runner:quarkusDev
 ```
 
+### CI validation
+
+`.github/workflows/validation.yml` runs the test suites on every database, the packaged
+integration tests and the native builds. It runs on pushes to `main` and on manual dispatch, not
+on pull requests: a branch is only validated before its merge if someone starts it.
+
+```bash
+gh workflow run validation.yml --ref <branch>
+gh run list --workflow validation.yml --branch <branch> --limit 1
+```
+
 ## Test Execution Policy for Agents
 
 Always capture full test logs to file.

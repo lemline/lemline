@@ -1,4 +1,4 @@
-name: SQLite Validation
+name: Validation
 
 # These suites and native builds are long. They validate what lands on main instead of every
 # commit of a pull request; run the workflow manually on a branch to check it before merging.
@@ -11,14 +11,14 @@ on:
       - 'gradle/**'
       - '*.gradle.kts'
       - 'gradle.properties'
-      - '.github/workflows/sqlite-validation.yml'
+      - '.github/workflows/validation.yml'
   workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: sqlite-validation-${{ github.ref }}
+  group: validation-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -60,7 +60,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: sqlite-${{ matrix.suite }}
+          name: jvm-${{ matrix.suite }}
           if-no-files-found: warn
           path: |
             tested-revision.txt
@@ -116,7 +116,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: sqlite-native-${{ matrix.os }}
+          name: native-${{ matrix.os }}
           path: |
             tested-revision.txt
             validation.log
