@@ -69,7 +69,9 @@ An unavailable broker delays only the rows being published: other SQLite writers
 those of other namespaces, proceed meanwhile. The emitter's bounded retries still apply.
 Two paths still publish inside their write transaction. A listener timeout must not race the
 completion of the same listener: its transaction arbitrates between the two, skipping a
-listener that a completion relay has claimed. Starting a child workflow publishes one command
+listener that a completion relay has claimed. A claim and the retry delay of a failed
+completion share one column, so a timeout is also held back while a completion waits to be
+retried; once that delay has passed, whichever of the two relays comes first wins. Starting a child workflow publishes one command
 with the row that makes the start idempotent. WAL permits concurrent readers. A single host can run multiple workers
 with serialized write transactions and at-least-once delivery. PostgreSQL, MySQL and H2 keep
 one transaction around selection, publication and recording.

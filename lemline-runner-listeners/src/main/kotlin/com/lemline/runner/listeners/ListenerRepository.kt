@@ -251,6 +251,9 @@ class ListenerRepository : CrudRepository<ListenerModel>(),
 
     // Server databases skip a listener whose completion is being published: its row is locked.
     // A SQLite relay publishes without a lock, and hides the listener by its claim instead.
+    // The same column holds the retry delay of a failed completion, so a timeout that falls
+    // during that delay waits for its end as well: the listener had collected its events in
+    // time, and its completion gets another chance against the timeout.
     private val unclaimed by lazy {
         if (databaseConfig.dbType == DatabaseType.SQLITE) {
             "AND ($OUTBOX_DELAYED_UNTIL_COLUMN IS NULL OR $OUTBOX_DELAYED_UNTIL_COLUMN <= ?)"
