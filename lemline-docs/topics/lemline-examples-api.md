@@ -61,9 +61,9 @@ This example demonstrates integrating with a gRPC service.
 
 <code-block lang="yaml" src="workflows/lemline-examples-api/basic-grpc-service-call.yaml"/>
 
-### gRPC with TLS and Authentication
+### gRPC with Authentication
 
-This example demonstrates gRPC integration with TLS and JWT authentication.
+This example demonstrates a gRPC call authenticated with OAuth2 client credentials.
 
 <code-block lang="yaml" src="workflows/dsl-call-grpc/example-using-authentication.yaml"/>
 
@@ -77,9 +77,9 @@ This example demonstrates AsyncAPI integration for event-driven architectures.
 
 ### Message Streaming with AsyncAPI
 
-This example shows how to process streams of messages with AsyncAPI.
+This example shows how to process a stream of messages with AsyncAPI: each sensor reading is sent to an analysis service, and an alert is published when the analysis asks for one. A failed call is retried up to three times.
 
-<code-block lang="yaml" src="workflows/lemline-examples-integrations/subscribing-to-messages.yaml"/>
+<code-block lang="yaml" src="workflows/lemline-examples-api/message-streaming-with-asyncapi.yaml"/>
 
 ## API Integration Best Practices
 
