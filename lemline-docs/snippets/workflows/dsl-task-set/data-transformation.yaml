@@ -13,9 +13,9 @@ do:
   - transformUserProfile:
       set:
         profile:
-          displayName: ${ .userData.firstName + " " + .userData.lastName }
-          email: ${ .userData.email }
-          joined: '${ (.userData.createdTimestamp | split("T")[0]) }'
-          membershipLevel: '${ if .userData.totalPurchases > 10000 then "platinum" elif .userData.totalPurchases
-            > 5000 then "gold" elif .userData.totalPurchases > 1000 then "silver" else "standard" end }'
-          tags: '${ .userData.interests // [] }'
+          displayName: ${ $context.userData.firstName + " " + $context.userData.lastName }
+          email: ${ $context.userData.email }
+          joined: '${ ($context.userData.createdTimestamp | split("T")[0]) }'
+          membershipLevel: '${ if $context.userData.totalPurchases > 10000 then "platinum" elif $context.userData.totalPurchases
+            > 5000 then "gold" elif $context.userData.totalPurchases > 1000 then "silver" else "standard" end }'
+          tags: '${ $context.userData.interests // [] }'

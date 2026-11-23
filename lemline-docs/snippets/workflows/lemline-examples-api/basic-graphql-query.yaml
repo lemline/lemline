@@ -48,6 +48,6 @@ do:
         as: '${ $context + { graphqlResponse: . } }'
   - processUserData:
       set:
-        userData: ${ .graphqlResponse.data.user }
-        totalPosts: ${ length(.graphqlResponse.data.user.posts) }
-        followerCount: ${ .graphqlResponse.data.user.followers.totalCount }
+        userData: ${ $context.graphqlResponse.data.user }
+        totalPosts: ${ length($context.graphqlResponse.data.user.posts) }
+        followerCount: ${ $context.graphqlResponse.data.user.followers.totalCount }

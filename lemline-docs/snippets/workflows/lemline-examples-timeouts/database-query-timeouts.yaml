@@ -72,7 +72,7 @@ do:
                     - field: date
                       direction: desc
               export:
-                as: '${ $context + { usedSimplifiedQuery: true } }'
+                as: '${ $context + { usedSimplifiedQuery: true, simplifiedResult: . } }'
   - analyticalQuery:
       try:
         - executeAnalyticalQuery:
@@ -117,7 +117,7 @@ do:
                     type: com.example.analytics.complete
                     correlationId: ${ $workflow.id }
               export:
-                as: '${ $context + { analyticsJobId: .analyticsJob.id, usedAsyncAnalytics: true } }'
+                as: '${ $context + { analyticsJobId: .id, usedAsyncAnalytics: true } }'
   - waitForAsyncResults:
       listen:
         to:
@@ -126,13 +126,13 @@ do:
               type: com.example.analytics.complete
               correlationId: ${ $workflow.id }
       export:
-        as: '${ $context + { analyticalResult: .asyncResults.data } }'
+        as: '${ $context + { analyticalResult: .data } }'
       if: ${ $context.usedAsyncAnalytics == true }
   - prepareResponse:
       set:
         result:
-          simpleQuery: ${ .queryResult }
-          complexQuery: '${ if $context.usedSimplifiedQuery then .simplifiedResult else .complexResult end
+          simpleQuery: ${ $context.queryResult }
+          complexQuery: '${ if $context.usedSimplifiedQuery then $context.simplifiedResult else $context.complexResult end
             }'
           analyticalQuery: '${ $context.analyticalResult // "No analytical results available" }'
           usedSimplifiedQuery: ${ $context.usedSimplifiedQuery == true }

@@ -45,7 +45,7 @@ do:
                 method: get
                 endpoint: https://cache.example/third-party/latest
               export:
-                as: '${ $context + { usedCache: true, thirdPartyResult: .cachedThirdParty } }'
+                as: '${ $context + { usedCache: true, thirdPartyResult: . } }'
   - callUnreliableAPI:
       try:
         - makeCall:
@@ -86,8 +86,8 @@ do:
   - prepareResponse:
       set:
         result:
-          reliableData: ${ .reliableResult }
-          thirdPartyData: '${ $context.thirdPartyResult // .thirdPartyResult }'
-          unreliableData: '${ $context.unreliableResult // .unreliableResult }'
+          reliableData: ${ $context.reliableResult }
+          thirdPartyData: '${ $context.thirdPartyResult }'
+          unreliableData: '${ $context.unreliableResult }'
           usedCache: ${ $context.usedCache == true }
           usedFallback: ${ $context.usedFallback == true }

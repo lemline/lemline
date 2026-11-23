@@ -28,12 +28,12 @@ do:
               as: '${ $context + { pageResult: . } }'
         - processPage:
             set:
-              allUsers: ${ $context.allUsers + .pageResult.users }
+              allUsers: ${ $context.allUsers + $context.pageResult.users }
               nextPage: ${ $context.nextPage + 1 }
-              hasMorePages: ${ .pageResult.hasMore }
+              hasMorePages: ${ $context.pageResult.hasMore }
             export:
-              as: '${ $context + { allUsers: ($context.allUsers + .pageResult.users), nextPage: ($context.nextPage
-                + 1), hasMorePages: .pageResult.hasMore } }'
+              as: '${ $context + { allUsers: ($context.allUsers + $context.pageResult.users), nextPage: ($context.nextPage
+                + 1), hasMorePages: $context.pageResult.hasMore } }'
   - processFinalResult:
       set:
         result:

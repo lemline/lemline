@@ -31,7 +31,7 @@ do:
               with:
                 method: post
                 endpoint: https://inventory.example.com/api/cancel-reservation
-                body: ${ .inventoryReservation.id }
+                body: ${ $context.inventoryReservation.id }
           - notifyCustomer:
               call: http
               with:

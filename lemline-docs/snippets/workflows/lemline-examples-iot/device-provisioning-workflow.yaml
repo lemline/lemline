@@ -113,7 +113,7 @@ do:
         message:
           payload:
             deviceId: ${ .deviceId }
-            config: ${ .deviceConfig }
+            config: ${ $context.deviceConfig }
             credentials: ${ $context.credentials }
   - waitForDeviceActivation:
       listen:

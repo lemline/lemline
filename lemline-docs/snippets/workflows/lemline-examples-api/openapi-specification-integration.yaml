@@ -39,6 +39,6 @@ do:
           endpoint: https://petstore.swagger.io/v2/swagger.json
         operationId: getPetById
         parameters:
-          petId: ${ .newPet.id }
+          petId: ${ $context.newPet.id }
       export:
         as: '${ $context + { retrievedPet: . } }'

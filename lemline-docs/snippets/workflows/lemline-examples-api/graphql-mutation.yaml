@@ -55,8 +55,8 @@ do:
         - route:
             switch:
               - hasErrors:
-                  when: ${ .graphqlResponse.data.createPost.errors != null and
-                    length(.graphqlResponse.data.createPost.errors) > 0 }
+                  when: ${ $context.graphqlResponse.data.createPost.errors != null and
+                    length($context.graphqlResponse.data.createPost.errors) > 0 }
                   then: hasErrorsAction
               - default:
                   then: defaultAction
@@ -66,7 +66,7 @@ do:
                   set:
                     result:
                       success: false
-                      errors: ${ .graphqlResponse.data.createPost.errors }
+                      errors: ${ $context.graphqlResponse.data.createPost.errors }
             then: exit
         - defaultAction:
             do:
@@ -74,5 +74,5 @@ do:
                   set:
                     result:
                       success: true
-                      post: ${ .graphqlResponse.data.createPost.post }
+                      post: ${ $context.graphqlResponse.data.createPost.post }
             then: exit

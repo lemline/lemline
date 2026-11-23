@@ -22,8 +22,8 @@ do:
         method: post
         endpoint: https://inventory.example/api/check-availability
         body:
-          orderId: ${ .order.id }
-          items: ${ .order.items }
+          orderId: ${ $context.order.id }
+          items: ${ $context.order.items }
       export:
         as: '${ $context + { availabilityCheck: . } }'
   - publishOrderStatus:
@@ -34,7 +34,7 @@ do:
         operation: publishOrderStatus
         message:
           payload:
-            orderId: ${ .order.id }
-            status: '${ if .availabilityCheck.allItemsAvailable then "confirmed" else "backorder" end }'
-            availableItems: ${ .availabilityCheck.availableItems }
-            unavailableItems: ${ .availabilityCheck.unavailableItems }
+            orderId: ${ $context.order.id }
+            status: '${ if $context.availabilityCheck.allItemsAvailable then "confirmed" else "backorder" end }'
+            availableItems: ${ $context.availabilityCheck.availableItems }
+            unavailableItems: ${ $context.availabilityCheck.unavailableItems }
