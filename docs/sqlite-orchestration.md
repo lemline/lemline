@@ -55,7 +55,10 @@ semantics.
 A claim outlives its process. If the relay is killed, or publication takes longer than the
 claim, the row becomes eligible again when the claim expires and another relay claims it,
 which moves the attempt count. The first relay can then no longer record its outcome. The
-attempt it started stays counted. If the broker committed before SQLite recorded the outcome,
+attempt it started stays counted. This also holds for the last allowed attempt: on SQLite,
+selection does not leave out a row that reached its attempt limit without an outcome, so a
+relay that died there costs one extra attempt and the message is not lost. A publication
+that fails at or past the limit is recorded as failed. If the broker committed before SQLite recorded the outcome,
 the next relay republishes with the same message ID. Consumers can receive the replay and the
 existing handler and repository idempotency rules apply. The PGMQ deduplication index
 expects an object, and the current PGMQ connector writes these headers as JSON

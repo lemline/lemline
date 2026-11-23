@@ -410,4 +410,27 @@ abstract class OutboxProcessorTest<T>(
         stored.outboxCompletedAt shouldBe null
     }
 
+    @Test
+    fun `a final attempt left without an outcome is relayed again on SQLite only`() = runTest {
+        // What a relay leaves when it dies after claiming its last allowed attempt.
+        val message = createTestModel("UnrecordedFinalAttempt").apply {
+            outboxAttemptCount = maxAttempts
+            outboxDelayedUntil = Clock.System.now() - 1.seconds
+        }
+        crudRepository.insert(message)
+
+        outboxRelay.processEntities(batchSize, maxAttempts, retryDelay)
+
+        val stored = idRepository.findById(message.id)!!
+        if (databaseConfig.dbType == DatabaseType.SQLITE) {
+            coVerify(exactly = 1) { mockedProcessor(any(modelClass)) }
+            stored.outboxAttemptCount shouldBe maxAttempts + 1
+            (stored.outboxCompletedAt != null) shouldBe true
+        } else {
+            // Elsewhere the attempt is only counted with its outcome: this row is terminal.
+            coVerify(exactly = 0) { mockedProcessor(any(modelClass)) }
+            stored.outboxCompletedAt shouldBe null
+        }
+    }
+
 }

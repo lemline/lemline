@@ -27,6 +27,16 @@ interface DatabaseConfig {
     val outboxClaimDuration: Duration get() = 60.seconds
 
     /**
+     * Whether selecting outbox rows leaves out those that reached their attempt limit.
+     *
+     * A relay that publishes and fails records the failure, so a row at its limit is normally
+     * terminal. On SQLite the attempt is counted when the row is claimed, before publication:
+     * a row at its limit with no outcome is a claim whose relay died or could not record. It
+     * must be relayed again once the claim expires, or its message could be lost.
+     */
+    val limitsOutboxAttemptsWhenSelecting: Boolean get() = dbType != DatabaseType.SQLITE
+
+    /**
      * Executes a block of code with a database connection.
      * If an existing connection is provided, it will be reused.
      * Otherwise, a new connection is obtained from the pool and closed after use.

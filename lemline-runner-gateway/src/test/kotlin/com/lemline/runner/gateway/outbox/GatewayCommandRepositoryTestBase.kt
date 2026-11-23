@@ -92,7 +92,9 @@ abstract class GatewayCommandRepositoryTestBase {
 
             getDatabaseConfig().withTransaction { conn ->
                 getRepository().findReadyById(delayed.id, 5, conn) shouldBe null
-                getRepository().findReadyById(exhausted.id, 5, conn) shouldBe null
+                // On SQLite a command at its limit with no outcome is an expired claim, relayed again.
+                val expected = if (getDatabaseConfig().limitsOutboxAttemptsWhenSelecting) null else exhausted.id
+                getRepository().findReadyById(exhausted.id, 5, conn)?.id shouldBe expected
             }
         }
     }
