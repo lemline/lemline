@@ -21,7 +21,8 @@ jobs:
             platform: linux-x86_64
             tests: ''
             gradle_xmx: 2g
-            native_xmx: 5g
+            # The runner has 16 GB; 5g ran out of heap intermittently
+            native_xmx: 8g
           # No Linux containers on these runners: run the tests that need no database
           - runner: windows-2022
             platform: windows-x86_64

@@ -100,7 +100,7 @@ jobs:
           git rev-parse HEAD | tee tested-revision.txt
           ./gradlew --max-workers=2 \
             '-Dorg.gradle.jvmargs=-Xmx2g -XX:MaxMetaspaceSize=768m -Dfile.encoding=UTF-8' \
-            :lemline-runner:testNative -Dquarkus.native.native-image-xmx=5g \
+            :lemline-runner:testNative -Dquarkus.native.native-image-xmx=8g \
             2>&1 | tee validation.log
       - name: Build and test the Windows executable
         if: runner.os == 'Windows'
