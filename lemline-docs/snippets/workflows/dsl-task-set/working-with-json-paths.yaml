@@ -7,24 +7,24 @@ do:
   - manipulateData:
       set:
         # Access nested properties
-        customerEmail: ${ .input.order.customer.contactInfo.email }
+        customerEmail: ${ $workflow.input.order.customer.contactInfo.email }
 
         # Array operations
-        firstItem: ${ .input.items[0] }
-        itemCount: ${ .input.items | length }
+        firstItem: ${ $workflow.input.items[0] }
+        itemCount: ${ $workflow.input.items | length }
 
         # Filtering arrays
-        expensiveItems: '${ [.input.products[] | select(.price > 100)] }'
+        expensiveItems: '${ [$workflow.input.products[] | select(.price > 100)] }'
 
         # Mapping arrays
-        productNames: '${ [.input.products[].name] }'
+        productNames: '${ [$workflow.input.products[].name] }'
 
         # Combining data
         combinedList: ${ .list1 + .list2 }
 
         # Conditional assignment
-        status: '${ if .input.approved then "APPROVED" else "PENDING" end }'
+        status: '${ if $workflow.input.approved then "APPROVED" else "PENDING" end }'
 
         # String operations
-        upperCaseName: ${ .input.name | ascii_upcase }
-        formattedId: '${ .input.id | tostring | ("0" * (10 - length)) + . }'
+        upperCaseName: ${ $workflow.input.name | ascii_upcase }
+        formattedId: '${ $workflow.input.id | tostring | ("0" * (10 - length)) + . }'

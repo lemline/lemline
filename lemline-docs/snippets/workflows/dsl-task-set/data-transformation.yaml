@@ -7,7 +7,7 @@ do:
   - retrieveUserData:
       call: userService
       with:
-        userId: ${ .input.userId }
+        userId: ${ $workflow.input.userId }
       export:
         as: '${ $context + { userData: . } }'
   - transformUserProfile:

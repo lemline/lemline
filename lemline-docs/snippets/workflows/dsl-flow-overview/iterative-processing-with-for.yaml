@@ -14,7 +14,7 @@ use:
 do:
   - processItems:
       for:
-        in: ${ .input.order.items }
+        in: ${ $workflow.input.order.items }
         each: currentItem
       do:
         - updateInventory:
@@ -28,6 +28,6 @@ do:
             call: orderItemTracker
             with:
               args:
-                orderId: ${ .input.order.id }
+                orderId: ${ $workflow.input.order.id }
                 itemId: ${ $currentItem.id }
                 status: FULFILLED

@@ -22,15 +22,15 @@ do:
               call: pricingService
               with:
                 args:
-                  productId: ${ .input.productId }
+                  productId: ${ $workflow.input.productId }
           - fetchInventory:
               call: inventoryService
               with:
                 args:
-                  productId: ${ .input.productId }
+                  productId: ${ $workflow.input.productId }
           - fetchReviews:
               call: reviewService
               with:
                 args:
-                  productId: ${ .input.productId }
+                  productId: ${ $workflow.input.productId }
         compete: false

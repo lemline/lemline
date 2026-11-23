@@ -43,7 +43,7 @@ do:
                         return { apiKey: "new-api-key" };
                       }
                     arguments:
-                      currentKey: ${ .input.apiKey }
+                      currentKey: ${ $workflow.input.apiKey }
                   return: stdout
           - retryHttpCall:
               call: http
@@ -53,4 +53,4 @@ do:
                 headers:
                   Content-Type: "application/json"
                   Authorization: ${ "Bearer " + .newCredentials.apiKey }
-                body: ${ .input.requestData }
+                body: ${ $workflow.input.requestData }

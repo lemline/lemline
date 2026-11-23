@@ -18,14 +18,14 @@ do:
   - validateOrder:
       call: orderValidator
       with:
-        order: ${ .input.order }
+        order: ${ $workflow.input.order }
   - processPayment:
       call: paymentProcessor
       with:
-        amount: ${ .input.order.totalAmount }
-        paymentDetails: ${ .input.paymentInfo }
+        amount: ${ $workflow.input.order.totalAmount }
+        paymentDetails: ${ $workflow.input.paymentInfo }
   - updateInventory:
       call: inventoryManager
       with:
-        items: ${ .input.order.items }
+        items: ${ $workflow.input.order.items }
         operation: reserve

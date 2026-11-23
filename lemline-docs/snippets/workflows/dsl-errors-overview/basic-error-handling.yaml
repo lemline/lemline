@@ -11,14 +11,14 @@ do:
             with:
               endpoint: https://api.example.com/validate-order
               method: post
-              body: ${ .input.order }
+              body: ${ $workflow.input.order }
               headers:
                 Content-Type: application/json
         - processPayment:
             call: processPayment
             with:
-              order: ${ .input.order }
-              paymentMethod: ${ .input.paymentMethod }
+              order: ${ $workflow.input.order }
+              paymentMethod: ${ $workflow.input.paymentMethod }
             export:
               as: '${ $context + { paymentResult: . } }'
       catch:
@@ -40,7 +40,7 @@ do:
                 endpoint: https://api.example.com/send-email
                 method: post
                 body:
-                  to: ${ .input.order.customerEmail }
+                  to: ${ $workflow.input.order.customerEmail }
                   subject: Order Processing Failed
                   body: '${ "We apologize, but we could not process your order. Error: " + $error.details }'
                 headers:
