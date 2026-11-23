@@ -143,6 +143,15 @@ runtime.
 ./gradlew test
 ```
 
+The `Validation` workflow runs the test suites, the packaged integration tests and the Linux and
+Windows native builds on GitHub. It starts when changes land on `main`, not on pull requests. To
+validate a branch before merging it, start it manually:
+
+```bash
+gh workflow run validation.yml --ref <branch>
+gh run watch                                  # follow the run just started
+```
+
 ### Native Image
 
 To produce a native image of the runner, you need to have GraalVM installed in your environment.

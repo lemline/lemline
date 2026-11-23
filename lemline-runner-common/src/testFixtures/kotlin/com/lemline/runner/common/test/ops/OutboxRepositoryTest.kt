@@ -66,7 +66,8 @@ abstract class OutboxRepositoryTest<T : WithOutbox>(
         entity.outboxCompletedAt == null &&
             entity.outboxFailedAt == null &&
             (entity.outboxDelayedUntil?.let { it <= cutoffDate } ?: false) &&
-            entity.outboxAttemptCount < maxAttempts
+            // On SQLite a row at its limit with no outcome is an expired claim, relayed again.
+            (!databaseConfig.limitsOutboxAttemptsWhenSelecting || entity.outboxAttemptCount < maxAttempts)
     }
 
     private fun randomNonZero(n: Int): Int {

@@ -82,6 +82,10 @@ class ListenerScheduledTimeout : AbstractScheduledTask() {
             batchNumber++
             var processed = 0
 
+            // One write transaction arbitrates between this timeout and the listener's completion,
+            // on SQLite too: it keeps the writer while each failure command is published. A
+            // completion relay that already claimed the listener hides it from findTimedOut, and
+            // one that comes later finds the listener failed.
             databaseConfig.withTransaction { connection ->
                 val timedOut = listenerRepository.findTimedOut(batchSize, connection)
 

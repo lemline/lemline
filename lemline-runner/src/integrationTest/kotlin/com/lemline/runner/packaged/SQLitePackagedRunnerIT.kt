@@ -92,14 +92,15 @@ internal class SQLitePackagedRunnerIT {
     }
 
     @Test
-    fun `a killed process releases the reservation and replay preserves its message ID`() = Fixture("crash-replay").use { fixture ->
+    fun `a killed process leaves a claim that expires and replay preserves its message ID`() = Fixture("crash-replay").use { fixture ->
         val namespace = "alpha"
         fixture.postDefinition(namespace, "PT1S")
         val gateway = fixture.startGateway("gateway-killed")
         val queue = fixture.queue(namespace)
         fixture.prepareQueue(queue)
 
-        // Make finalization roll back after the real PGMQ send has committed.
+        // Make finalization roll back after the real PGMQ send has committed. The claim that
+        // precedes publication leaves outbox_completed_at empty and does not fire the trigger.
         fixture.sqliteExecute("""
             CREATE TRIGGER fail_finalization BEFORE UPDATE OF outbox_completed_at ON lemline_gateway_command_outbox
             WHEN NEW.outbox_completed_at IS NOT NULL
@@ -120,16 +121,17 @@ internal class SQLitePackagedRunnerIT {
             gateway.runner.logText().contains("packaged test: finalization interrupted")
         }
 
-        // Block the next send at the broker. The PostgreSQL waiter and the occupied
-        // SQLite write lock together show that the process actually reserved the row.
+        // Block the next send at the broker, once the unrecorded claim has expired. The
+        // PostgreSQL waiter shows that the row is being published again, and the free SQLite
+        // writer that the claim does not hold it meanwhile.
         fixture.broker().use { lock ->
             lock.autoCommit = false
             lock.execute("LOCK TABLE $queueTable IN ACCESS EXCLUSIVE MODE")
-            fixture.eventually("relay is waiting on the broker with a SQLite reservation", 15) {
+            fixture.eventually("relay is waiting on the broker without holding the SQLite writer", 15) {
                 lock.scalar("""
                     SELECT count(*) FROM pg_locks
                     WHERE relation = '$queueTable'::regclass AND NOT granted
-                """.trimIndent())!!.toInt() > 0 && fixture.writerReserved()
+                """.trimIndent())!!.toInt() > 0 && !fixture.writerReserved()
             }
             gateway.runner.stop(kill = true)
             lock.rollback()
@@ -141,7 +143,7 @@ internal class SQLitePackagedRunnerIT {
         fixture.sqliteExecute("DROP TRIGGER fail_finalization")
         val recoveryStartedAt = System.nanoTime()
         fixture.startGateway("gateway-restarted")
-        fixture.eventually("restarted gateway finalized the reserved emission", 15) {
+        fixture.eventually("restarted gateway took over the expired claim", 15) {
             fixture.sqliteScalar(
                 "SELECT count(*) FROM lemline_gateway_command_outbox WHERE workflow_id = '$id' AND outbox_completed_at IS NOT NULL",
             ) == "1"
@@ -150,8 +152,8 @@ internal class SQLitePackagedRunnerIT {
         assertEquals("0", fixture.brokerScalar("SELECT count(*) FROM $queueTable WHERE ($pgmqMessageId) IS DISTINCT FROM '$expectedMessageId'"))
         val copies = fixture.brokerScalar("SELECT count(*) FROM $queueTable")
         val recoveryMillis = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - recoveryStartedAt)
-        assertTrue(recoveryMillis < 15_000, "Reservation recovery took $recoveryMillis ms")
-        println("Reserved write recovered in $recoveryMillis ms; $copies PGMQ copies carry $expectedMessageId")
+        assertTrue(recoveryMillis < 15_000, "Claim takeover took $recoveryMillis ms")
+        println("Expired claim taken over in $recoveryMillis ms; $copies PGMQ copies carry $expectedMessageId")
         fixture.worker("worker", namespace)
         fixture.assertCompleted(namespace, id)
         fixture.eventually("all copies were acknowledged") {
@@ -295,7 +297,7 @@ internal class SQLitePackagedRunnerIT {
                     database:
                       type: sqlite
                       migrate-at-start: ${!Files.exists(file)}
-                      sqlite: { path: orchestration.db }
+                      sqlite: { path: orchestration.db, outbox-claim: 3s }
                     messaging:
                       type: pgmq
                       prefix: $prefix

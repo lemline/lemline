@@ -9,6 +9,7 @@ import com.lemline.core.orchestrator.StepByStepOrchestrator
 import com.lemline.core.random.randomWorkflowInfo
 import com.lemline.core.states.WorkflowCommand
 import com.lemline.runner.common.config.DatabaseConfig
+import com.lemline.runner.common.config.DatabaseType
 import com.lemline.runner.common.messaging.CommandEmitter
 import com.lemline.runner.common.messaging.InstanceMessage
 import io.mockk.coEvery
@@ -28,9 +29,13 @@ import kotlin.time.Clock
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.withTimeout
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 
@@ -40,10 +45,16 @@ abstract class ScheduleRecurrenceTestBase {
 
     private val sent = mutableListOf<Pair<InstanceMessage<out WorkflowCommand>, IDV7?>>()
     private var failSend = false
+    private var gate: CompletableDeferred<Unit>? = null
+    private val publishing = CompletableDeferred<Unit>()
     private val emitter = object : CommandEmitter {
         override suspend fun send(message: InstanceMessage<out WorkflowCommand>, idempotentKey: IDV7?) {
             sent += message to idempotentKey
             if (failSend) error("Simulated broker failure")
+            gate?.let {
+                publishing.complete(Unit)
+                it.await()
+            }
         }
     }
 
@@ -189,9 +200,39 @@ abstract class ScheduleRecurrenceTestBase {
         assertEquals(1, sent.size)
         assertNull(repository().findById(first.id)!!.outboxCompletedAt)
         assertEquals(1, repository().countAll())
+        // On SQLite the occurrence stays claimed for a while after the failed relay: expire it.
+        val unrecorded = repository().findById(first.id)!!
+        unrecorded.outboxDelayedUntil = Clock.System.now() - 1.seconds
+        repository().update(unrecorded)
         tick(outbox())
         assertEquals(sent[0].second, sent[1].second)
         assertEquals(2, repository().countAll())
+    }
+
+    @Test
+    fun `a SQLite occurrence completing during its publication still hands off to its successor`(): Unit = runBlocking {
+        // Server databases keep the occurrence locked until its publication is recorded.
+        if (database().dbType != DatabaseType.SQLITE) return@runBlocking
+        val first = occurrence(after = true)
+        repository().insert(first)
+        val held = CompletableDeferred<Unit>().also { gate = it }
+        val relay = async(Dispatchers.IO) { tick(outbox()) }
+        try {
+            withTimeout(10.seconds) { publishing.await() }
+            // The started workflow finishes before the relay has recorded its publication.
+            val service = ScheduleService().apply { scheduleRepository = repository() }
+            val executed = sent.single().first.workflowId
+            database().withTransaction { conn -> assertTrue(service.scheduleAfterCompletion(executed, conn)) }
+        } finally {
+            gate = null
+            held.complete(Unit)
+            relay.await()
+        }
+        assertNotNull(repository().findById(first.nextOccurrenceId))
+        val published = repository().findById(first.id)!!
+        assertNotNull(published.outboxCompletedAt)
+        // The hand-off scheduled the cleanup: recording the publication must not erase it.
+        assertNotNull(published.cleanupAfter)
     }
 
     @Test

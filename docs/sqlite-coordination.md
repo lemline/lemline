@@ -71,10 +71,10 @@ through the real parent path for new files and the real path for existing ones. 
 identity for existing files to catch hard links as well. If two enabled roles resolve to the same
 file, fail startup with both setting names and the resolved paths. Recheck identities once any
 new paths have been created and before migrations or traffic, to catch aliases on filesystems
-with case-insensitive names. A shared file can stall the outbox even in WAL mode.
-Its orchestration transaction can hold SQLite's only writer lock
-while awaiting publication. The transport's second connection needs that lock to commit,
-while orchestration is waiting for the publish confirmation.
+with case-insensitive names. A shared file makes orchestration and transport compete for
+SQLite's only writer lock. Where a publication happens inside an orchestration write
+transaction, as when a child workflow starts, the transport's second connection would need
+the lock that transaction holds while it waits for the publish confirmation.
 
 ## SQLite contracts
 

@@ -203,6 +203,31 @@ abstract class CrudRepository<T> : WithCrudRepository<T> {
             }
         }
 
+    override suspend fun updateIf(
+        entities: List<T>,
+        columns: List<String>,
+        guardColumn: String,
+        guardValue: (T) -> Int,
+        keepWhenNull: Set<String>,
+        connection: Connection?,
+    ): List<T> = databaseConfig.withConnection(connection) { conn ->
+        if (entities.isEmpty()) return@withConnection emptyList()
+        val assignments = columns.joinToString { column ->
+            if (column in keepWhenNull) "${q(column)} = COALESCE(?, ${q(column)})" else "${q(column)} = ?"
+        }
+        val keys = this.columns.keyColumns.joinToString(separator = " AND ") { keyEquals(it) }
+        val sql = "UPDATE $tableName SET $assignments, ${q(UPDATED_AT_COLUMN)} = ? WHERE $keys AND ${q(guardColumn)} = ?"
+        conn.prepareStatement(sql).use { stmt ->
+            entities.filter { entity ->
+                columns.forEachIndexed { index, column -> this.columns.bindings[column]!!.bind(stmt, entity, index + 1) }
+                databaseConfig.bindTimestamp(stmt, columns.size + 1, Timestamp.from(Instant.now()))
+                bindKeys(stmt, entity, columns.size + 1)
+                stmt.setInt(columns.size + this.columns.keyColumns.size + 2, guardValue(entity))
+                stmt.executeUpdate() == 1
+            }
+        }
+    }
+
     /**
      * Retrieves all entities from the table.
      */

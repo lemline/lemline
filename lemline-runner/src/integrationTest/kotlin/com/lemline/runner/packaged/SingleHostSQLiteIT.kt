@@ -307,6 +307,8 @@ internal class SingleHostSQLiteIT {
                   database:
                     type: sqlite
                     migrate-at-start: true
+                    # A relay killed while publishing is taken over when its claim expires.
+                    sqlite: { outbox-claim: 3s }
                   analytics:
                     type: sqlite
                     migrate-at-start: true

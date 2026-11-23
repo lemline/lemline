@@ -81,7 +81,7 @@ class GatewayCommandRepository : CrudRepository<GatewayCommandModel>(),
             conn.prepareStatement(findReadyByIdSql).use { stmt ->
                 idHelper.set(stmt, 1, id)
                 databaseConfig.bindTimestamp(stmt, 2, Timestamp.from(Clock.System.now().toJavaInstant()))
-                stmt.setInt(3, maxAttempts)
+                if (databaseConfig.limitsOutboxAttemptsWhenSelecting) stmt.setInt(3, maxAttempts)
                 stmt.executeQuery().use { rs -> if (rs.next()) createModel(rs) else null }
             }
         }
@@ -94,7 +94,7 @@ class GatewayCommandRepository : CrudRepository<GatewayCommandModel>(),
               AND $OUTBOX_FAILED_AT_COLUMN IS NULL
               AND $OUTBOX_DELAYED_UNTIL_COLUMN IS NOT NULL
               AND $OUTBOX_DELAYED_UNTIL_COLUMN <= ?
-              AND $OUTBOX_ATTEMPT_COUNT_COLUMN < ?
+              ${if (databaseConfig.limitsOutboxAttemptsWhenSelecting) "AND $OUTBOX_ATTEMPT_COUNT_COLUMN < ?" else ""}
             LIMIT 1
             ${databaseConfig.forUpdate(skipLocked = true)}
         """.trimIndent()

@@ -64,11 +64,8 @@ class GatewayCommandOutbox : AbstractOutbox<GatewayCommandModel>() {
 
         scope.launch {
             try {
-                databaseConfig.withTransaction { conn ->
-                    val entity = gatewayCommandRepository.findReadyById(id, outboxConfig.maxAttempts, conn)
-                        ?: return@withTransaction
-                    processEntitiesWith(listOf(entity), outboxConfig.maxAttempts, outboxConfig.retryDelay) { process(it) }
-                    gatewayCommandRepository.update(entity, conn)
+                relayBatch(outboxConfig.maxAttempts, outboxConfig.retryDelay) { conn ->
+                    listOfNotNull(gatewayCommandRepository.findReadyById(id, outboxConfig.maxAttempts, conn))
                 }
             } catch (e: Exception) {
                 logger.warn(e) { "Immediate gateway command relay failed; scheduled relay will retry" }

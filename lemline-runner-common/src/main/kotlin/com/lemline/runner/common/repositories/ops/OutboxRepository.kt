@@ -30,6 +30,21 @@ const val OUTBOX_ERROR_MESSAGE_COLUMN = "outbox_error_message"
 const val OUTBOX_ERROR_STACKTRACE_COLUMN = "outbox_error_stacktrace"
 
 /**
+ * The columns a relay owns: the outcome of a publication. Everything else on an outbox row
+ * belongs to its feature and may change while the row is being published.
+ */
+val OUTBOX_OUTCOME_COLUMNS = listOf(
+    OUTBOX_COMPLETED_AT_COLUMN,
+    OUTBOX_FAILED_AT_COLUMN,
+    OUTBOX_DELAYED_UNTIL_COLUMN,
+    OUTBOX_ATTEMPT_COUNT_COLUMN,
+    OUTBOX_ERROR_CLASS_COLUMN,
+    OUTBOX_ERROR_MESSAGE_COLUMN,
+    OUTBOX_ERROR_STACKTRACE_COLUMN,
+    CLEANUP_AFTER_COLUMN,
+)
+
+/**
  * Helper class providing outbox-related database operations.
  * Use this via composition instead of inheriting from OutboxRepository.
  *
@@ -61,7 +76,8 @@ open class OutboxRepository<T : WithOutbox>(
      * - Not completed (outbox_completed_at IS NULL)
      * - Not failed (outbox_failed_at IS NULL)
      * - Delay has passed (outbox_delayed_until <= NOW)
-     * - Haven't exceeded max attempts (outbox_attempt_count < maxAttempts)
+     * - Haven't exceeded max attempts (outbox_attempt_count < maxAttempts), except on SQLite,
+     *   see [DatabaseConfig.limitsOutboxAttemptsWhenSelecting]
      * - Belong to a followed namespace (when scoped)
      *
      * @param maxAttempts Maximum number of retry attempts allowed
@@ -77,12 +93,14 @@ open class OutboxRepository<T : WithOutbox>(
         conn.prepareStatement(findEntitiesToProcessSQL).use { stmt ->
             var idx = 1
             databaseConfig.bindTimestamp(stmt, idx++, Timestamp.from(Clock.System.now().toJavaInstant()))
-            stmt.setInt(idx++, maxAttempts)
+            if (limitsAttempts) stmt.setInt(idx++, maxAttempts)
             namespaces?.forEach { stmt.setString(idx++, it) }
             stmt.setInt(idx, limit)
             stmt.executeQuery().use { rs -> rs.toModels() }
         }
     }
+
+    private val limitsAttempts by lazy { databaseConfig.limitsOutboxAttemptsWhenSelecting }
 
     private val findEntitiesToProcessSQL by lazy {
         """
@@ -91,7 +109,7 @@ open class OutboxRepository<T : WithOutbox>(
               AND $OUTBOX_FAILED_AT_COLUMN IS NULL
               AND $OUTBOX_DELAYED_UNTIL_COLUMN IS NOT NULL
               AND $OUTBOX_DELAYED_UNTIL_COLUMN <= ?
-              AND $OUTBOX_ATTEMPT_COUNT_COLUMN < ?
+              ${if (limitsAttempts) "AND $OUTBOX_ATTEMPT_COUNT_COLUMN < ?" else ""}
               ${namespacePredicate(namespaces, namespaceColumn)}
             ORDER BY $OUTBOX_DELAYED_UNTIL_COLUMN ASC
             LIMIT ?
