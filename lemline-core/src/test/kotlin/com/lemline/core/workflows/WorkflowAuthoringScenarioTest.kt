@@ -44,7 +44,7 @@ class WorkflowAuthoringScenarioTest {
     }
 
     private suspend fun runScenario(file: String, input: String, services: Services, incoming: InMemoryCloudEventHook = InMemoryCloudEventHook()) {
-        val definition = File("../.claude/skills/serverless-workflow-writer/assets", file)
+        val definition = File("../.claude/skills/open-workflow-writer/assets", file)
         val workflow = WorkflowCache.parseYamlAndPut(definition.readText())
         val workflowInput = parseJson(input)
         // The starter validates input before handing the instance to the orchestrator.
@@ -79,8 +79,10 @@ class WorkflowAuthoringScenarioTest {
             runScenario("templates/batch-loop-switch.yaml", """{"items":$items}""", services)
             val routes = if (items == "[]") emptyList() else listOf("approve", "reject")
             assertEquals(routes, services.calls.map { it.url.substringAfterLast('/') })
-            assertEquals(parseJson(items).map { it["id"].asText() }, services.calls.map { it.body!!["id"].asText() })
-            assertEquals(routes.indices.toList(), services.calls.map { it.body!!["index"].intValue() })
+            val expectedBodies = parseJson(items).mapIndexed { index, item ->
+                parseJson("""{"id":${item["id"]},"index":$index}""")
+            }
+            assertEquals(expectedBodies, services.calls.map { it.body })
             assertEquals("com.example.batch.summary.v1", services.events.single().type)
             assertEquals(parseJson("""{"count":${routes.size}}"""), services.events.single().data)
         }

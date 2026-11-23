@@ -32,7 +32,7 @@ build/
 
 ### other local docs 
 references/
-!/.claude/skills/serverless-workflow-writer/references/
+!/.claude/skills/open-workflow-writer/references/
 articles/
 tmp/
 specs/

@@ -3,7 +3,9 @@ name: Documentation Workflows
 on:
   pull_request:
     paths:
-      - '.claude/skills/serverless-workflow-writer/**'
+      - '.claude/skills/open-workflow-writer/**'
+      - '.agent/skills/open-workflow-writer'
+      - '.agents/skills/open-workflow-writer'
       - 'lemline-docs/**'
       - 'lemline-core/**'
       - 'lemline-common/**'
@@ -34,7 +36,10 @@ jobs:
           python -m pip install -r lemline-docs/validation/requirements.txt
           python -B -m unittest discover -s lemline-docs/validation
           python lemline-docs/validation/check_workflows.py
-          skill=.claude/skills/serverless-workflow-writer
+          skill=.claude/skills/open-workflow-writer
+          for alias in .agent/skills .agents/skills; do
+            test "$alias/open-workflow-writer/SKILL.md" -ef "$skill/SKILL.md"
+          done
           python "$skill/scripts/validate_workflow.py" "$skill"/assets/templates/*.yaml "$skill"/assets/evals/workflow-*.yaml
       - uses: actions/setup-java@v5
         with:

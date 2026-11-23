@@ -28,7 +28,7 @@ tasks.test {
         "../lemline-runner/src/test/resources/examples",
         "../examples/workflows",
         "../docker/namespace-isolation/workflows",
-        "../.claude/skills/serverless-workflow-writer/assets",
+        "../.claude/skills/open-workflow-writer/assets",
     ) + listOfNotNull(providers.gradleProperty("workflowExampleDir").orNull?.let { rootProject.file(it).absolutePath })
     inputs.files(exampleDirectories.map { fileTree(it) { include("**/*.yaml", "**/*.yml", "**/*.json") } })
         .withPropertyName("workflowExamples")

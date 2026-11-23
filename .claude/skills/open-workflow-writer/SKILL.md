@@ -1,5 +1,5 @@
 ---
-name: serverless-workflow-writer
+name: open-workflow-writer
 description: Author and review Open Workflow DSL 1.0.3 YAML for Lemline from business requirements, including data flow, HTTP calls, routing, retries and event correlation.
 ---
 
@@ -20,7 +20,7 @@ Four [templates](assets/templates/) cover HTTP orchestration, event listeners, b
 From the repository root, use Python with the dependencies in `lemline-docs/validation/requirements.txt`. Run the schema and local flow checks on the authored file:
 
 ```sh
-python .claude/skills/serverless-workflow-writer/scripts/validate_workflow.py path/to/workflow.yaml
+python .claude/skills/open-workflow-writer/scripts/validate_workflow.py path/to/workflow.yaml
 ```
 
 To check the same file with Lemline's JVM reader, place it in a directory containing just complete workflow definitions and pass that directory to the reader test:
