@@ -7,7 +7,7 @@ import com.lemline.common.json.*
 import com.lemline.common.json.LemlineJson
 import com.lemline.common.logger.logger
 import com.lemline.common.values.IDV7
-import com.lemline.core.expressions.JQExpression
+import com.lemline.core.cloudevents.CloudEventMatcher
 import com.lemline.core.functions.FunctionResolver
 import com.lemline.core.processors.ListenConfig
 import com.lemline.core.processors.UntilCondition
@@ -122,13 +122,7 @@ class ListenerService {
                     continue
                 }
 
-                val trimmedExpr = ExpressionUtils.trimExpr(expectExpr)
-
-                val result = with(LemlineJson) {
-                    val inputNode = correlationContext.toLegacyCorrelationNode()
-                    val scope = ObjectNode(emptyMap()) as ObjectNode
-                    JQExpression.eval(inputNode, trimmedExpr, scope).toJsonNode()
-                }
+                val result = CloudEventMatcher.evaluateExpect(expectExpr, correlationContext)
 
                 val value = result.toCorrelationValue()
 

@@ -236,6 +236,13 @@ correlate:
     expect: '${ $input.orderId }' # Evaluated against WORKFLOW → compares to workflow input
 ```
 
+The workflow data is available only through the expression arguments. `expect` has no input:
+`.input.orderId` evaluates to `null`.
+
+An `expect` expression that cannot be evaluated, or that evaluates to `null`, faults the listen
+task with an `expression` error. A listener stored without an expected value would otherwise
+correlate with the first event it receives.
+
 ### Examples
 
 #### Basic Correlation

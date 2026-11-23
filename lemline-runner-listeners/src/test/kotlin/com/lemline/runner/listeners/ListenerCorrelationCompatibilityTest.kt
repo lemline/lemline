@@ -28,12 +28,12 @@ class ListenerCorrelationCompatibilityTest {
                       one:
                         with: { type: escaped-correlation }
                         correlate:
-                          key: { from: '${'$'}{ .value }', expect: '${'$'}{ .expected }' }
+                          key: { from: '${'$'}{ .value }', expect: '${'$'}{ ${'$'}input.expected }' }
         """.trimIndent())
         val config = ListenConfig(
             strategy = ListenStrategy.ONE,
-            filters = listOf(EventFilter(correlations = mapOf("key" to CorrelationDef(".value", "\${ .expected }")))),
-            correlationContext = parseJson("""{"expected":"\u001b"}"""),
+            filters = listOf(EventFilter(correlations = mapOf("key" to CorrelationDef(".value", "\${ \$input.expected }")))),
+            correlationContext = parseJson("""{"input":{"expected":"\u001b"}}"""),
         )
         val expected = ListenerService().calculateCorrelationValues(config)
         val event = CloudEventBuilder.v1().withId("escaped").withSource(URI("https://test.example"))
@@ -41,5 +41,24 @@ class ListenerCorrelationCompatibilityTest {
         val actual = DefinitionListenService().findMatchingListenTasks(event).single { it.workflowInfo.name.toString() == "escaped-correlation" }.correlationValuesJson
         assertEquals("""{"key":"\u001b"}""", expected)
         assertEquals(expected, actual)
+    }
+
+    @Test
+    fun `expect reads workflow data through the expression arguments`() {
+        fun values(expect: String) = ListenerService().calculateCorrelationValues(
+            ListenConfig(
+                strategy = ListenStrategy.ONE,
+                filters = listOf(EventFilter(correlations = mapOf("key" to CorrelationDef(".value", expect)))),
+                correlationContext = parseJson(
+                    """{"input":{"id":"in"},"context":{"id":"ctx"},"workflow":{"input":{"id":"raw"}}}"""
+                ),
+            )
+        )
+
+        assertEquals("""{"key":"in"}""", values("\${ \$input.id }"))
+        assertEquals("""{"key":"ctx"}""", values("\${ \$context.id }"))
+        assertEquals("""{"key":"raw"}""", values("\${ \$workflow.input.id }"))
+        // The workflow data is not the expression input.
+        assertEquals(null, values("\${ .input.id }"))
     }
 }
