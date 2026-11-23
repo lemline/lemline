@@ -31,5 +31,5 @@ printf '%s\n' '{"items":[{"quantity":2,"price":12.5}]}' |
   jq '[.items[] | .quantity * .price] | add // 0'
 ```
 
-See [Runtime Expressions](https://github.com/open-workflow-specification/specification/blob/v1.0.0/dsl.md#runtime-expressions) for evaluation scopes and
+See [Runtime Expressions](https://github.com/open-workflow-specification/specification/blob/v1.0.3/dsl.md#runtime-expressions) for evaluation scopes and
 [Debugging Workflows](lemline-howto-debug.md) for logging task input.

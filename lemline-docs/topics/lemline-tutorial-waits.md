@@ -40,5 +40,5 @@ The listener waits for both types before continuing.
 
 <code-block lang="yaml" src="workflows/reference/listen-for-all-results.yaml"/>
 
-See [Event Correlation](https://github.com/open-workflow-specification/specification/blob/v1.0.0/dsl-reference.md#correlation) and [Timeouts](https://github.com/open-workflow-specification/specification/blob/v1.0.0/dsl.md#timeouts)
+See [Event Correlation](https://github.com/open-workflow-specification/specification/blob/v1.0.3/dsl-reference.md#correlation) and [Timeouts](https://github.com/open-workflow-specification/specification/blob/v1.0.3/dsl.md#timeouts)
 for matching and bounded waits.

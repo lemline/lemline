@@ -36,5 +36,5 @@ Use a workflow-level schedule for event-triggered instances.
 
 <code-block lang="yaml" src="workflows/reference/order-event-schedule.yaml"/>
 
-See [Event Correlation](https://github.com/open-workflow-specification/specification/blob/v1.0.0/dsl-reference.md#correlation) for the expression scopes involved
-and the [Listen Task](https://github.com/open-workflow-specification/specification/blob/v1.0.0/dsl-reference.md#listen) for matching strategies and read modes.
+See [Event Correlation](https://github.com/open-workflow-specification/specification/blob/v1.0.3/dsl-reference.md#correlation) for the expression scopes involved
+and the [Listen Task](https://github.com/open-workflow-specification/specification/blob/v1.0.3/dsl-reference.md#listen) for matching strategies and read modes.

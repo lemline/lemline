@@ -20,5 +20,5 @@ loop result. Here the body adds a line total for each input item.
 ## Stop a loop early
 
 Add a `while` condition to the same task when the loop should stop before the
-collection is exhausted. See the [For Task](https://github.com/open-workflow-specification/specification/blob/v1.0.0/dsl-reference.md#for) for the condition and
+collection is exhausted. See the [For Task](https://github.com/open-workflow-specification/specification/blob/v1.0.3/dsl-reference.md#for) for the condition and
 its scope. Use a [fork](lemline-howto-parallel.md) for independent concurrent branches.

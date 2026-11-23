@@ -26,5 +26,5 @@ path.
 
 <code-block lang="yaml" src="workflows/reference/dynamic-http-endpoint.yaml"/>
 
-See [Runtime Expressions](https://github.com/open-workflow-specification/specification/blob/v1.0.0/dsl.md#runtime-expressions) for other variables and
+See [Runtime Expressions](https://github.com/open-workflow-specification/specification/blob/v1.0.3/dsl.md#runtime-expressions) for other variables and
 [Time in Workflows](lemline-explain-time.md) for timestamp comparisons.

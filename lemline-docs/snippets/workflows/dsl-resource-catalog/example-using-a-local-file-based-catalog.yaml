@@ -1,5 +1,5 @@
 document:
-  dsl: 1.0.0
+  dsl: 1.0.3
   namespace: local-dev
   name: test-local-catalog
   version: 1.0.0

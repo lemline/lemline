@@ -1,6 +1,6 @@
 # Open Workflow DSL Supported Features
 
-This reference documents which features of the [Open Workflow DSL v1.0](https://github.com/open-workflow-specification/specification/tree/v1.0.0) are currently supported in Lemline, and any implementation-specific details or limitations.
+This reference documents which features of the [Open Workflow DSL v1.0](https://github.com/open-workflow-specification/specification/tree/v1.0.3) are currently supported in Lemline, and any implementation-specific details or limitations.
 
 ## Implementation Status Overview
 
@@ -144,4 +144,4 @@ Lemline has no standalone validation command. `lemline definition post` parses e
 - [DSL Syntax Reference](lemline-ref-dsl-syntax.md)
 - [Task Types Reference](lemline-ref-task-types.md)
 - [Configuration Reference](lemline-ref-config.md)
-- [Open Workflow Specification v1.0](https://github.com/open-workflow-specification/specification/tree/v1.0.0)
+- [Open Workflow Specification v1.0](https://github.com/open-workflow-specification/specification/tree/v1.0.3)

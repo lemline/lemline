@@ -4,7 +4,7 @@ This page describes the support of `call: asyncapi` tasks in Lemline.
 
 ## AsyncAPI Support Status
 
-Lemline does not execute `call: asyncapi` tasks yet. The Open Workflow DSL defines them (see [AsyncAPI calls](https://github.com/open-workflow-specification/specification/blob/v1.0.0/dsl-reference.md#asyncapi-call)), and Lemline parses workflows that contain them, but no runner can run such a task: do not use it in workflows you deploy.
+Lemline does not execute `call: asyncapi` tasks yet. The Open Workflow DSL defines them (see [AsyncAPI calls](https://github.com/open-workflow-specification/specification/blob/v1.0.3/dsl-reference.md#asyncapi-call)), and Lemline parses workflows that contain them, but no runner can run such a task: do not use it in workflows you deploy.
 
 There are no `lemline.asyncapi.*` runner settings.
 

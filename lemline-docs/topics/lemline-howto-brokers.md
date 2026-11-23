@@ -147,7 +147,7 @@ The broker-independent `lemline.messaging.<channel>.consumer.concurrency` only a
 
 <code-block lang="yaml" src="workflows/lemline-howto-brokers/listening-for-events.yaml"/>
 
-See [Listen behavior](https://github.com/open-workflow-specification/specification/blob/v1.0.0/dsl-reference.md#listen).
+See [Listen behavior](https://github.com/open-workflow-specification/specification/blob/v1.0.3/dsl-reference.md#listen).
 
 ## Testing with the In-Memory Broker
 

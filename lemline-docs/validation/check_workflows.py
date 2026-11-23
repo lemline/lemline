@@ -10,7 +10,7 @@ from jsonschema import Draft202012Validator
 from markdown_it import MarkdownIt
 from ruamel.yaml import YAML, YAMLError
 
-DSL_VERSION = "1.0.0"
+DSL_VERSION = "1.0.3"
 LANGUAGES = {"yaml", "yml", "json"}
 SUFFIXES = {f".{language}" for language in LANGUAGES}
 TASK_KEYS = {
@@ -135,6 +135,23 @@ def flow_errors(tasks, path="$.do"):
                 yield from flow_errors(task[key][child_key], f"{task_path}.{key}.{child_key}")
 
 
+def as_specified(node):
+    """Return the definition as the versioned schema spells it.
+
+    Lemline reads `run.script.arguments` as a name/value map, the form of the Java SDK it embeds;
+    the versioned schema specifies an ordered list. Examples document what Lemline runs.
+    """
+    if isinstance(node, list):
+        return [as_specified(item) for item in node]
+    if not isinstance(node, dict):
+        return node
+    result = {key: as_specified(value) for key, value in node.items()}
+    script = result.get("run", {}).get("script") if isinstance(result.get("run"), dict) else None
+    if isinstance(script, dict) and isinstance(script.get("arguments"), dict):
+        script["arguments"] = [str(value) for value in script["arguments"].values()]
+    return result
+
+
 def definition_errors(source, language, validator, *, complete=False):
     try:
         definition = read_definition(source, language)
@@ -142,7 +159,7 @@ def definition_errors(source, language, validator, *, complete=False):
         return [str(error)]
     errors = [
         f"{error.json_path}: {error.message}"
-        for error in validator.iter_errors(definition)
+        for error in validator.iter_errors(as_specified(definition))
     ]
     if isinstance(definition, dict):
         document = definition.get("document")

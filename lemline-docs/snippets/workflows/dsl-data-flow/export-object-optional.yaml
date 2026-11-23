@@ -1,5 +1,5 @@
 document:
-  dsl: 1.0.0
+  dsl: 1.0.3
   namespace: examples
   name: export-object-optional
   version: 1.0.0

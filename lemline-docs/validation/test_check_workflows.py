@@ -6,7 +6,7 @@ from check_workflows import check_docs
 
 
 WORKFLOW = """document:
-  dsl: '1.0.0'
+  dsl: '1.0.3'
   namespace: examples
   name: hello
   version: '1.0.0'
@@ -23,8 +23,8 @@ class WorkflowCheckTest(unittest.TestCase):
         directory = tempfile.TemporaryDirectory()
         self.addCleanup(directory.cleanup)
         self.project = Path(directory.name)
-        self.schema = Path(__file__).with_name("workflow-1.0.0.json")
-        self.write("validation/workflow-1.0.0.json", self.schema.read_text(encoding="utf-8"))
+        self.schema = Path(__file__).with_name("workflow-1.0.3.json")
+        self.write("validation/workflow-1.0.3.json", self.schema.read_text(encoding="utf-8"))
 
     def write(self, name, content):
         path = self.project / name
@@ -42,6 +42,15 @@ class WorkflowCheckTest(unittest.TestCase):
             f'{INCLUDE}\n\n<!-- workflow-example: data -->\n```yaml\nlemline:\n  database: sqlite\n```\n'
         )
         self.assertEqual({"workflows": 1, "counterexamples": 0}, counts)
+        self.assertEqual([], errors)
+
+    def test_accepts_script_arguments_as_the_map_lemline_reads(self):
+        script = WORKFLOW.replace(
+            "      set:\n        message: Hello\n",
+            "      run:\n        script:\n          language: js\n          code: console.log('hi')\n"
+            "          arguments:\n            name: ${ .name }\n",
+        )
+        _, errors = self.check(INCLUDE, script)
         self.assertEqual([], errors)
 
     def test_rejects_a_workflow_bypassing_its_source(self):

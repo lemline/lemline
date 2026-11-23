@@ -21,5 +21,5 @@ Attach a policy to the endpoint where the executing runtime supports it.
 
 <code-block lang="yaml" src="workflows/dsl-call-grpc/example-using-authentication.yaml"/>
 
-See the [gRPC Task](https://github.com/open-workflow-specification/specification/blob/v1.0.0/dsl-reference.md#grpc-call) for configuration fields and
+See the [gRPC Task](https://github.com/open-workflow-specification/specification/blob/v1.0.3/dsl-reference.md#grpc-call) for configuration fields and
 [HTTP Calls](lemline-howto-http.md) for an alternative integration supported by Lemline.

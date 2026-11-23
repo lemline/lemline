@@ -58,4 +58,4 @@ Data that does not match its schema raises a `validation` error. External schema
 
 - [HTTP Protocol Reference](lemline-ref-http.md)
 - [Message Brokers](lemline-howto-brokers.md)
-- [Data Flow](https://github.com/open-workflow-specification/specification/blob/v1.0.0/dsl.md#data-flow)
+- [Data Flow](https://github.com/open-workflow-specification/specification/blob/v1.0.3/dsl.md#data-flow)

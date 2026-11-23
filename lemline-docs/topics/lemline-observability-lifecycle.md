@@ -29,7 +29,7 @@ Lemline emits a CloudEvent for each lifecycle transition, following the Open Wor
 
 Errors carry the standard fields `type`, `status`, `title`, `instance` and `detail`.
 
-The events are published on the lifecycle events channel (by default the `lemline-lifecycle-events` topic or queue). See [Lifecycle Events](https://github.com/open-workflow-specification/specification/blob/v1.0.0/dsl-reference.md#lifecycle-events).
+The events are published on the lifecycle events channel (by default the `lemline-lifecycle-events` topic or queue). See [Lifecycle Events](https://github.com/open-workflow-specification/specification/blob/v1.0.3/dsl-reference.md#lifecycle-events).
 
 ## Monitoring Workflow Definitions
 

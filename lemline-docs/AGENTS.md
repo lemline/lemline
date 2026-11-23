@@ -32,9 +32,11 @@ Writerside documentation project for user-facing documentation.
   `<!-- workflow-example: data -->` immediately above an inline YAML or JSON data block.
 - Put deliberately invalid workflow definitions under `snippets/counterexamples/`.
   Introduce the inclusion with `**Invalid workflow example.**` and a blank line.
-- The schema in `validation/workflow-1.0.0.json` is the versioned
-  [Open Workflow schema](https://open-workflow-specification.org/schemas/1.0.0/workflow.json).
+- The schema in `validation/workflow-1.0.3.json` is the versioned
+  [Open Workflow schema](https://open-workflow-specification.org/schemas/1.0.3/workflow.json).
   Its upstream license is in `validation/LICENSE-open-workflow`.
+- Write `run.script.arguments` as a name/value map, the form Lemline reads. The schema specifies a list;
+  the checker accepts the map for this property only.
 
 Run from the repository root using a Python virtual environment:
 

@@ -1,5 +1,5 @@
 document:
-  dsl: 1.0.0
+  dsl: 1.0.3
   namespace: examples
   name: 2-implement-structured-error-handling
   version: 1.0.0
