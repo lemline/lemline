@@ -166,7 +166,7 @@ do:
                   data:
                     orderId: ${ .orderId }
                     reason: ${ $paymentError.reason }
-              then: exit
+        then: exit
   - fulfillOrder:
       do:
         - createShippingLabel:
