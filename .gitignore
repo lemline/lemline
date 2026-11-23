@@ -32,6 +32,7 @@ build/
 
 ### other local docs 
 references/
+!/.claude/skills/serverless-workflow-writer/references/
 articles/
 tmp/
 specs/

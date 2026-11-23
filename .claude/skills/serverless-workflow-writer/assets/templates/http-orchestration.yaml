@@ -1,0 +1,48 @@
+document:
+  dsl: "1.0.3"
+  namespace: sample
+  name: http-orchestration
+  version: "1.0.0"
+  title: HTTP Orchestration Template
+do:
+  - fetchCustomer:
+      call: http
+      with:
+        method: get
+        endpoint:
+          uri: '${ "https://api.example.com/customers/\(.customerId | @uri)" }'
+        output: content
+  - routeCustomer:
+      switch:
+        - highValue:
+            when: ${ (.lifetimeValue | type) == "number" and .lifetimeValue >= 10000 }
+            then: processHighValue
+        - regular:
+            when: ${ (.lifetimeValue | type) == "number" and .lifetimeValue >= 0 }
+            then: processRegular
+        - default:
+            then: rejectCustomerData
+  - processHighValue:
+      call: http
+      with:
+        method: post
+        endpoint:
+          uri: https://api.example.com/customers/high-value
+        body:
+          customer: ${ . }
+      then: end
+  - processRegular:
+      call: http
+      with:
+        method: post
+        endpoint:
+          uri: https://api.example.com/customers/regular
+        body:
+          customer: ${ . }
+      then: end
+  - rejectCustomerData:
+      raise:
+        error:
+          type: https://open-workflow-specification.org/spec/1.0.0/errors/validation
+          status: 400
+          title: Invalid customer data
