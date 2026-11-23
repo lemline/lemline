@@ -6,6 +6,7 @@ import com.lemline.common.values.WorkflowName
 import com.lemline.common.values.WorkflowNamespace
 import com.lemline.common.values.WorkflowVersion
 import com.lemline.core.errors.InternalException
+import com.lemline.core.processors.CallA2AConfig
 import com.lemline.core.processors.CallHttpConfig
 import com.lemline.core.processors.CorrelationDef
 import com.lemline.core.processors.EmitConfig
@@ -29,6 +30,8 @@ import com.lemline.core.workflows.CachedEventFilter
 import com.lemline.messages.internal.v1.BasicAuthProto
 import com.lemline.messages.internal.v1.BearerAuthProto
 import com.lemline.messages.internal.v1.CachedEventFilterProto
+import com.lemline.messages.internal.v1.CallA2AConfigProto
+import com.lemline.messages.internal.v1.CallA2AStartedProto
 import com.lemline.messages.internal.v1.CallHttpConfigProto
 import com.lemline.messages.internal.v1.CallHttpStartedProto
 import com.lemline.messages.internal.v1.CorrelationDefProto
@@ -72,6 +75,7 @@ import com.lemline.messages.internal.v1.WorkflowCompletedProto
 import com.lemline.messages.internal.v1.WorkflowEventProto
 import com.lemline.messages.internal.v1.WorkflowFaultedProto
 import com.lemline.messages.internal.v1.WorkflowStateProto
+import io.serverlessworkflow.api.types.A2AArguments.WithA2AMethod
 import io.serverlessworkflow.api.types.HTTPArguments.HTTPOutput
 import io.serverlessworkflow.api.types.ListenTaskConfiguration.ListenAndReadAs
 import io.serverlessworkflow.api.types.RunTaskConfiguration.ProcessReturnType
@@ -119,6 +123,7 @@ object WorkflowStateProtobufMapper {
         is WorkflowEvent.ForkStarted -> WorkflowEventProto(fork_started = event.toProto())
         is WorkflowEvent.ListenStarted -> WorkflowEventProto(listen_started = event.toProto())
         is WorkflowEvent.EmitStarted -> WorkflowEventProto(emit_started = event.toProto())
+        is WorkflowEvent.CallA2AStarted -> WorkflowEventProto(call_a2a_started = event.toProto())
         is WorkflowEvent.CallHttpStarted -> WorkflowEventProto(call_http_started = event.toProto())
         is WorkflowEvent.RunScriptStarted -> WorkflowEventProto(run_script_started = event.toProto())
         is WorkflowEvent.RunShellStarted -> WorkflowEventProto(run_shell_started = event.toProto())
@@ -137,6 +142,7 @@ object WorkflowStateProtobufMapper {
         event.fork_started?.let { return it.toDomain() }
         event.listen_started?.let { return it.toDomain() }
         event.emit_started?.let { return it.toDomain() }
+        event.call_a2a_started?.let { return it.toDomain() }
         event.call_http_started?.let { return it.toDomain() }
         event.run_script_started?.let { return it.toDomain() }
         event.run_shell_started?.let { return it.toDomain() }
@@ -350,6 +356,27 @@ object WorkflowStateProtobufMapper {
             ?: error("EmitStartedEvent.node_stack is required"),
         input = input_json.toRuntimeJsonNode(),
         config = config?.toDomain() ?: error("EmitStartedEvent.config is required")
+    )
+
+    private fun WorkflowEvent.CallA2AStarted.toProto() = CallA2AStartedProto(
+        node_stack = NodeStackProtobufMapper.toProto(nodeStack),
+        input_json = input.toProtoJsonValue(),
+        config = CallA2AConfigProto(
+            method = config.method.value(),
+            url = config.url,
+            is_card_resource = config.isCardResource,
+            parameters = config.parameters.toProtoJsonStruct(),
+            authentication = config.authentication?.toProto(),
+        )
+    )
+
+    private fun CallA2AStartedProto.toDomain() = WorkflowEvent.CallA2AStarted(
+        nodeStack = NodeStackProtobufMapper.fromProto(requireNotNull(node_stack)),
+        input = input_json.toRuntimeJsonNode(),
+        config = requireNotNull(config).let {
+            CallA2AConfig(WithA2AMethod.fromValue(it.method), it.url, it.is_card_resource,
+                requireNotNull(it.parameters).toRuntimeObjectNode(), it.authentication?.toDomain())
+        },
     )
 
     private fun WorkflowEvent.CallHttpStarted.toProto() = CallHttpStartedProto(

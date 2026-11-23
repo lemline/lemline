@@ -91,6 +91,8 @@ dependencies {
     implementation(libs.serverlessworkflow.api)
     implementation(libs.serverlessworkflow.impl.core)
 
+    implementation("org.a2aproject.sdk:a2a-java-sdk-http-client:1.3.2.Final")
+
     // Utilities
     implementation(libs.javaSemver)
     implementation("com.cronutils:cron-utils:9.2.1")

@@ -13,6 +13,7 @@ import com.lemline.core.processors.HttpAuthentication
 import com.lemline.core.processors.RunScriptConfig
 import com.lemline.core.processors.RunShellConfig
 import com.lemline.core.states.WorkflowEvent.ActivityStarted
+import com.lemline.core.states.WorkflowEvent.CallA2AStarted
 import com.lemline.core.states.WorkflowEvent.CallHttpStarted
 import com.lemline.core.states.WorkflowEvent.EmitStarted
 import com.lemline.core.states.WorkflowEvent.RunScriptStarted
@@ -72,8 +73,11 @@ class DefaultActivityExecutor(
         }
     }
 
+    private val a2a by lazy { A2AActivity(httpClient) }
+
     override suspend fun execute(event: ActivityStarted): JsonNode = when (event) {
         is EmitStarted -> executeEmit(event.config, event.input)
+        is CallA2AStarted -> a2a.execute(event)
         is CallHttpStarted -> executeHttp(event.config)
         is RunScriptStarted -> executeScript(event.config, event.input)
         is RunShellStarted -> executeShell(event.config, event.input)
@@ -119,23 +123,7 @@ class DefaultActivityExecutor(
             config.headers.forEach { (key, value) -> header(key, value) }
 
             // Set authentication
-            config.authentication?.let { auth ->
-                when (auth) {
-                    is HttpAuthentication.Basic -> {
-                        val credentials = Base64.getEncoder()
-                            .encodeToString("${auth.username}:${auth.password}".toByteArray())
-                        header(HttpHeaders.Authorization, "Basic $credentials")
-                    }
-
-                    is HttpAuthentication.Bearer -> {
-                        header(HttpHeaders.Authorization, "Bearer ${auth.token}")
-                    }
-
-                    is HttpAuthentication.OAuth2 -> {
-                        header(HttpHeaders.Authorization, "${auth.tokenType} ${auth.token}")
-                    }
-                }
-            }
+            config.authentication?.let { header(HttpHeaders.Authorization, it.authorizationHeader()) }
 
             // Set body
             if (config.body != null && (method == HttpMethod.Post || method == HttpMethod.Put || method == HttpMethod.Patch)) {
@@ -243,4 +231,10 @@ class DefaultActivityExecutor(
 
         return result.get(config.returnType)
     }
+}
+
+internal fun HttpAuthentication.authorizationHeader() = when (this) {
+    is HttpAuthentication.Basic -> "Basic " + Base64.getEncoder().encodeToString("$username:$password".toByteArray())
+    is HttpAuthentication.Bearer -> "Bearer $token"
+    is HttpAuthentication.OAuth2 -> "$tokenType $token"
 }

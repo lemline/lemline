@@ -5,6 +5,7 @@ import com.lemline.common.values.Token
 import com.lemline.core.nodes.Node
 import com.lemline.core.nodes.NodeOrigin
 import com.lemline.core.nodes.RootTask
+import io.serverlessworkflow.api.types.CallA2A
 import io.serverlessworkflow.api.types.CallAsyncAPI
 import io.serverlessworkflow.api.types.CallFunction
 import io.serverlessworkflow.api.types.CallGRPC
@@ -42,7 +43,7 @@ fun compileExtensions(node: Node<*>): List<ExtensionPlan> {
         val target = requireNotNull(extension.extend) { "Missing extend in '${item.name}'" }.toString()
         val type = when (node.task) {
             is DoTask, is ForkTask -> "composite"
-            is CallFunction, is CallHTTP, is CallGRPC, is CallOpenAPI, is CallAsyncAPI -> "call"
+            is CallFunction, is CallA2A, is CallHTTP, is CallGRPC, is CallOpenAPI, is CallAsyncAPI -> "call"
             is ForTask -> "for"
             is TryTask -> "try"
             is SetTask -> "set"

@@ -8,6 +8,7 @@ import com.lemline.common.logger.logger
 import com.lemline.core.activities.ActivityExecutor
 import com.lemline.core.cloudevents.CloudEventFactory
 import com.lemline.core.states.WorkflowEvent.ActivityStarted
+import com.lemline.core.states.WorkflowEvent.CallA2AStarted
 import com.lemline.core.states.WorkflowEvent.CallHttpStarted
 import com.lemline.core.states.WorkflowEvent.EmitStarted
 import com.lemline.core.states.WorkflowEvent.RunScriptStarted
@@ -61,6 +62,8 @@ class MockActivityExecutor(
     private val logger = logger()
 
     override suspend fun execute(event: ActivityStarted): JsonNode = when (event) {
+        is CallA2AStarted -> mockConfig.a2aResults[event.config.method.value()]
+            ?: throw MockNotFoundException("No A2A mock found for ${event.config.method}")
         is CallHttpStarted -> executeHttp(event)
         is RunScriptStarted -> executeScript(event)
         is RunShellStarted -> executeShell(event)
