@@ -5,37 +5,19 @@ on:
     branches: [ "main" ]
     paths:
       - 'lemline-docs/**'
+      - '.github/workflows/build-docs.yml'
   workflow_dispatch:
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
 env:
   INSTANCE: 'lemline-docs/lemline'  # Adjust 'hi' if your instance ID differs
   DOCKER_VERSION: '2025.04.8412'  # Use the latest Writerside Docker version
 
 jobs:
-  check_changes:
-    runs-on: ubuntu-latest
-    outputs:
-      docs_changed: ${{ steps.filter.outputs.docs_changed }}
-    steps:
-      - uses: actions/checkout@v5
-      - uses: dorny/paths-filter@v4
-        id: filter
-        with:
-          filters: |
-            docs_changed:
-              - 'lemline-docs/**'
-
   build:
-    needs: check_changes
-    if: needs.check_changes.outputs.docs_changed == 'true'
     runs-on: ubuntu-latest
-    outputs:
-      artifact: ${{ steps.define-ids.outputs.artifact }}
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v5
@@ -66,31 +48,31 @@ jobs:
             artifacts/report.json
           retention-days: 7
 
-  deploy:
-    needs: build
-    runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - name: Download Artifact
-        uses: actions/download-artifact@v7
-        with:
-          name: docs
-          path: artifacts
-
       - name: Unzip Artifact
-        run: unzip -O UTF-8 -qq "artifacts/${{ needs.build.outputs.artifact }}" -d dir
-
-      - name: Setup GitHub Pages
-        uses: actions/configure-pages@v6
+        run: unzip -O UTF-8 -qq "artifacts/${{ steps.define-ids.outputs.artifact }}" -d dir
 
       - name: Upload Pages Artifact
         uses: actions/upload-pages-artifact@v5
         with:
           path: dir
+          retention-days: 7
           # v3 published dotfiles; later versions leave them out unless asked.
           include-hidden-files: true
+
+  deploy:
+    # Wait for the build job so Pages can look up the uploaded artifact.
+    needs: build
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Setup GitHub Pages
+        uses: actions/configure-pages@v6
 
       - name: Deploy to GitHub Pages
         id: deployment
