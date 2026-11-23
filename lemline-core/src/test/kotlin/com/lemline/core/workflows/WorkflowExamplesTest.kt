@@ -9,14 +9,20 @@ import org.junit.jupiter.api.TestFactory
 
 class WorkflowExamplesTest {
     @TestFactory
-    fun `workflow examples conform to DSL 1_0_3`(): List<DynamicTest> =
-        System.getProperty("lemline.test.exampleDirectories").split(File.pathSeparator).flatMap { directory ->
+    fun `workflow examples conform to DSL 1_0_3`(): List<DynamicTest> {
+        val resourceOwners = mutableMapOf<String, File>()
+        return System.getProperty("lemline.test.exampleDirectories").split(File.pathSeparator).flatMap { directory ->
             val files = File(directory).walkTopDown()
                 .filter { it.isFile && it.extension in setOf("yaml", "yml", "json") }
                 .sortedBy { it.path }
                 .toList()
             check(files.isNotEmpty()) { "No workflow examples found in $directory" }
             files.map { file ->
+                if (directory.endsWith("/resources/examples")) {
+                    val resource = "examples/${file.relativeTo(File(directory)).invariantSeparatorsPath}"
+                    val previous = resourceOwners.putIfAbsent(resource, file)
+                    check(previous == null) { "Duplicate classpath resource $resource in $previous and $file" }
+                }
                 DynamicTest.dynamicTest(file.path) {
                     val format = if (file.extension == "json") WorkflowFormat.JSON else WorkflowFormat.YAML
                     val workflow = WorkflowDefinitionReader.read(file.readText(), format)
@@ -24,4 +30,5 @@ class WorkflowExamplesTest {
                 }
             }
         }
+    }
 }
