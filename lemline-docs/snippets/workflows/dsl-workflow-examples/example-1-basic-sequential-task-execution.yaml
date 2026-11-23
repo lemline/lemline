@@ -1,0 +1,40 @@
+document:
+  dsl: 1.0.0
+  namespace: com-example-orders
+  name: process-new-order
+  version: 1.1.0
+  title: Process New Customer Order
+  summary: Workflow to validate, reserve inventory, and initiate payment for new orders.
+use:
+  functions:
+    validateOrderFunc:
+      call: http
+      with:
+        method: post
+        endpoint: https://order-service/validate
+    checkInventoryFunc:
+      call: http
+      with:
+        method: post
+        endpoint: https://inventory-service/check
+    processPaymentFunc:
+      call: http
+      with:
+        method: post
+        endpoint: https://payment-service/process
+do:
+  - validateOrder:
+      call: validateOrderFunc
+      with:
+        order: ${ .inputOrder }
+      then: checkInventory
+  - checkInventory:
+      call: checkInventoryFunc
+      with:
+        items: ${ .order.items }
+      then: processPayment
+  - processPayment:
+      call: processPaymentFunc
+      with:
+        amount: ${ .order.total }
+        customerId: ${ .order.customerId }

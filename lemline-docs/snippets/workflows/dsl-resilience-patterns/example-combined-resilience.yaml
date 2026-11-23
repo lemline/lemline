@@ -1,0 +1,34 @@
+document:
+  dsl: 1.0.0
+  namespace: examples
+  name: example-combined-resilience
+  version: 1.0.0
+do:
+  - processOrder:
+      try:
+        - submitOrder:
+            call: http
+            with:
+              method: post
+              endpoint: http://order-service/api/orders
+              body: ${ .order }
+      catch:
+        errors:
+          with:
+            type: https://open-workflow-specification.org/spec/1.0.0/errors/runtime
+        retry:
+          backoff:
+            exponential: {}
+          delay:
+            seconds: 2
+          limit:
+            attempt:
+              count: 3
+        do:
+          - queueForLater:
+              emit:
+                event:
+                  with:
+                    type: com.example.order.pending
+                    source: https://events.example.com/order-workflow
+                    data: ${ .order }

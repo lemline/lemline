@@ -1,0 +1,18 @@
+document:
+  dsl: '1.0.0'
+  namespace: examples
+  name: targeting-a-specific-task
+  version: '1.0.0'
+do:
+  - start:
+      set: { value: 1 }
+      then: processValue # Jump to processValue after start
+  - skippedTask:
+      # This task is skipped because 'start' jumps over it
+      set: { value: 2 }
+  - processValue:
+      set: { processed: "${ .value * 10 }" }
+      # Default: continues sequentially to 'finish'
+  - finish:
+      call: log
+      with: { result: "${ .processed }" }

@@ -1,0 +1,78 @@
+document:
+  dsl: 1.0.0
+  namespace: examples
+  name: graphql-mutation
+  version: 1.0.0
+input:
+  schema:
+    format: json
+    document:
+      type: object
+      required:
+        - postData
+      properties:
+        postData:
+          type: object
+          required:
+            - title
+            - content
+use:
+  secrets:
+    - API_TOKEN
+do:
+  - createPost:
+      call: http
+      with:
+        method: post
+        endpoint: https://api.example/graphql
+        headers:
+          Content-Type: application/json
+          Authorization: Bearer ${ $secrets.API_TOKEN }
+        body:
+          query: |
+            mutation CreatePost($input: CreatePostInput!) {
+              createPost(input: $input) {
+                post {
+                  id
+                  title
+                  content
+                  createdAt
+                }
+                errors {
+                  field
+                  message
+                }
+              }
+            }
+          variables:
+            input:
+              title: ${ .postData.title }
+              content: ${ .postData.content }
+      export:
+        as: '${ $context + { graphqlResponse: . } }'
+  - processResult:
+      do:
+        - route:
+            switch:
+              - hasErrors:
+                  when: ${ .graphqlResponse.data.createPost.errors != null and
+                    length(.graphqlResponse.data.createPost.errors) > 0 }
+                  then: hasErrorsAction
+              - default:
+                  then: defaultAction
+        - hasErrorsAction:
+            do:
+              - handleErrors:
+                  set:
+                    result:
+                      success: false
+                      errors: ${ .graphqlResponse.data.createPost.errors }
+            then: exit
+        - defaultAction:
+            do:
+              - handleSuccess:
+                  set:
+                    result:
+                      success: true
+                      post: ${ .graphqlResponse.data.createPost.post }
+            then: exit

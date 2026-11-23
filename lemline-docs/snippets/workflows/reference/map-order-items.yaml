@@ -1,0 +1,17 @@
+document:
+  dsl: '1.0.0'
+  namespace: examples
+  name: map-order-items
+  version: '1.0.0'
+do:
+  - calculateTotals:
+      for:
+        each: item
+        in: ${ .items }
+        at: index
+      do:
+        - calculateLine:
+            set:
+              itemId: ${ $item.id }
+              index: ${ $index }
+              lineTotal: ${ $item.quantity * $item.price }

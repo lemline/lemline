@@ -1,0 +1,16 @@
+document:
+  dsl: 1.0.0
+  namespace: examples
+  name: do-list-string-object-required
+  version: 1.0.0
+do:
+  - myDoTask:
+      do:
+        - firstSubTask:
+            call: http
+            with:
+              method: get
+              endpoint: https://api.example.com/data
+        - secondSubTask:
+            set:
+              processedData: ${ .body }

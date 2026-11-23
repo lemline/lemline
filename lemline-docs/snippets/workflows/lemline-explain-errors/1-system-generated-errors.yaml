@@ -1,0 +1,10 @@
+document:
+  dsl: '1.0.0'
+  namespace: examples
+  name: 1-system-generated-errors
+  version: '1.0.0'
+do:
+  - example:
+      set:
+        total: "${ .items[].price | add }"
+        # If .items isn't an array, ExpressionError is raised

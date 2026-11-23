@@ -1,0 +1,15 @@
+document:
+  dsl: '1.0.0'
+  namespace: examples
+  name: load-external-script
+  version: '1.0.0'
+do:
+  - validateEmail:
+      run:
+        script:
+          language: python
+          source:
+            endpoint: https://assets.example.com/email-validator.py
+          arguments:
+            email: ${ .email }
+        return: stdout

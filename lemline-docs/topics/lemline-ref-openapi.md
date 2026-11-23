@@ -12,15 +12,7 @@ There are no `lemline.openapi.*` runner settings.
 
 Call the operation's URL directly with `call: http`, using the method, path, query parameters and body described in the OpenAPI document:
 
-```yaml
-do:
-  - getPet:
-      call: http
-      with:
-        method: get
-        endpoint: ${ "https://petstore.example.com/v2/pet/" + (.petId | tostring) }
-        output: content
-```
+<code-block lang="yaml" src="workflows/lemline-ref-openapi/alternative.yaml" include-lines="6-12"/>
 
 ## Related Resources
 

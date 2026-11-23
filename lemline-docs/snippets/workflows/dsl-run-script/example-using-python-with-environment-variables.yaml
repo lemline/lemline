@@ -1,0 +1,27 @@
+document:
+  dsl: '1.0.0'
+  namespace: examples
+  name: example-using-python-with-environment-variables
+  version: '1.0.0'
+do:
+  - processWithPython:
+      run:
+        script:
+          language: python
+          code: |
+            import os
+            import json
+
+            api_key = os.environ.get('API_KEY')
+            input_data = json.loads(os.environ.get('INPUT_JSON'))
+
+            # ... process data using api_key and input_data ...
+            result = { "status": "processed", "items_count": len(input_data['items']) }
+
+            print(json.dumps(result)) # Return JSON via stdout
+          # Pass data via environment variables
+          environment:
+            API_KEY: "${ $secrets.pythonServiceKey }"
+            INPUT_JSON: "${ toJsonString(.) }" # Assume toJsonString function
+        return: stdout
+      then: handlePythonResult

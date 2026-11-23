@@ -10,113 +10,21 @@ The `run: script` task allows a workflow to execute a script written in a suppor
 
 ## Usage Example
 
-```yaml
-document:
-  dsl: '1.0.0'
-  namespace: script_runs
-  name: run-simple-script
-  version: '1.0.0'
-do:
-  - executeScript:
-      run:
-        script:
-          language: js # Specify the script language
-          code: |
-            // Multi-line JavaScript code
-            function process(input) {
-              let message = `Processed item: ${input.id}`;
-              console.log('Processing done.'); // Goes to stderr usually
-              return { result: message, status: 'complete' };
-            }
-            process($input); // Use $input argument
-          # Pass arguments to the script environment
-          arguments: 
-             input: "${ . }" # Pass the entire task input
-        # `await: true` (default) waits for completion
-        # `return: stdout` (default) - Note: Script return value is often stdout
-        return: stdout # Explicitly get script return value via stdout
-      then: processScriptOutput
-  - processScriptOutput:
-      # Input might be { result: "Processed item: 123", status: "complete" }
-      set:
-        finalMessage: "${ .result }"
+<code-block lang="yaml" src="workflows/dsl-run-script/usage-example.yaml"/>
 
 ## Additional Examples
 
 ### Example: Loading Script from External Source
 
-```yaml
-# Assume 'scriptRepo' external resource is defined
-use:
-  resources:
-    scriptRepo: 
-      endpoint: file:///etc/workflow-scripts/
-
-do:
-  - runExternalScript:
-      run:
-        script:
-          language: python
-          # Load code from a file defined by the resource
-          source:
-             resource: scriptRepo
-             path: /validators/email_validator.py
-          arguments:
-            email: "${ .userEmail }"
-        return: stdout # Expect script to print JSON result
-      then: processValidation
-```
+<code-block lang="yaml" src="workflows/reference/load-external-script.yaml"/>
 
 ### Example: Using Python with Environment Variables
 
-```yaml
-do:
-  - processWithPython:
-      run:
-        script:
-          language: python
-          code: |
-            import os
-            import json
-            
-            api_key = os.environ.get('API_KEY')
-            input_data = json.loads(os.environ.get('INPUT_JSON'))
-            
-            # ... process data using api_key and input_data ...
-            result = { "status": "processed", "items_count": len(input_data['items']) }
-            
-            print(json.dumps(result)) # Return JSON via stdout
-          # Pass data via environment variables
-          environment:
-            API_KEY: "${ $secrets.pythonServiceKey }"
-            INPUT_JSON: "${ toJsonString(.) }" # Assume toJsonString function
-        return: stdout
-      then: handlePythonResult
-```
+<code-block lang="yaml" src="workflows/dsl-run-script/example-using-python-with-environment-variables.yaml" include-lines="6-27"/>
 
 ### Example: Returning Exit Code
 
-```yaml
-do:
-  - checkDataIntegrity:
-      run:
-        script:
-          language: js
-          code: |
-            // Script exits with 0 on success, 1 on failure
-            const isValid = checkData($input.data);
-            process.exit(isValid ? 0 : 1);
-          arguments: { input: "${ . }" }
-        # Capture the script's exit code
-        return: code 
-      then: handleIntegrityCheck
-  - handleIntegrityCheck:
-      # Input will be 0 or 1
-      switch:
-        - if: "${ . == 0 }"
-          then: dataIsValid
-        - then: dataIsInvalid
-```
+<code-block lang="yaml" src="workflows/dsl-run-script/example-returning-exit-code.yaml" include-lines="7-25"/>
 
 ## Configuration Options
 

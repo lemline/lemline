@@ -1,0 +1,13 @@
+document:
+  dsl: '1.0.0'
+  namespace: examples
+  name: calling-cataloged-functions
+  version: '1.0.0'
+do:
+  - processSharedLogic:
+      # Calls version '1.2.0' of 'dataProcessor' function
+      # from the catalog named 'sharedUtils'
+      call: dataProcessor:1.2.0@sharedUtils
+      with:
+        config: "${ .processingConfig }"
+        inputData: "${ .rawInput }"

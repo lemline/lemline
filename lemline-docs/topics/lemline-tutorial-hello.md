@@ -25,21 +25,7 @@ By completing this tutorial, you will learn:
 
 Create a file named `hello.yaml` with the following content:
 
-```yaml
-document:
-  dsl: '1.0.0'
-  namespace: tutorial
-  name: hello-workflow
-  version: '0.1.0'
-do:
-  - setGreeting:
-      set:
-        message: Hello, Lemline!
-  - logMessage:
-      call: https://raw.githubusercontent.com/open-workflow-specification/catalog/main/functions/log/1.0.0/function.yaml
-      with:
-        message: ${ .message }
-```
+<code-block lang="yaml" src="workflows/lemline-tutorial-hello/1-creating-your-first-workflow.yaml"/>
 
 Let's break down what this workflow does:
 
@@ -199,25 +185,7 @@ Let's make this workflow more interesting by adding more variables and string ma
 
 Update `hello.yaml` to the following:
 
-```yaml
-document:
-  dsl: '1.0.0'
-  namespace: tutorial
-  name: hello-workflow
-  version: '0.1.0'
-do:
-  - setUserInfo:
-      set:
-        user: Workflow Author
-        role: Developer
-  - createGreeting:
-      set:
-        message: ${ "Hello, " + .user + "! Welcome, " + .role + "." }
-  - logMessage:
-      call: https://raw.githubusercontent.com/open-workflow-specification/catalog/main/functions/log/1.0.0/function.yaml
-      with:
-        message: ${ .message }
-```
+<code-block lang="yaml" src="workflows/lemline-tutorial-hello/4-enhancing-your-workflow.yaml"/>
 
 This enhanced workflow:
 1. Sets `user` and `role` variables
@@ -265,6 +233,7 @@ java -jar lemline.jar instance start tutorial hello-workflow
 
 Let's modify the workflow to accept user input. Create a file named `input.json`:
 
+<!-- workflow-example: data -->
 ```json
 {
   "name": "Your Name"
@@ -273,27 +242,7 @@ Let's modify the workflow to accept user input. Create a file named `input.json`
 
 Update your workflow to use this input:
 
-```yaml
-document:
-  dsl: '1.0.0'
-  namespace: tutorial
-  name: hello-workflow
-  version: '0.1.0'
-input:
-  schema:
-    type: object
-    properties:
-      name:
-        type: string
-do:
-  - createGreeting:
-      set:
-        message: ${ "Hello, " + .name + "!" }
-  - logMessage:
-      call: https://raw.githubusercontent.com/open-workflow-specification/catalog/main/functions/log/1.0.0/function.yaml
-      with:
-        message: ${ .message }
-```
+<code-block lang="yaml" src="workflows/lemline-tutorial-hello/5-adding-user-input.yaml"/>
 
 Update the definition and run the workflow with your input:
 
@@ -336,46 +285,7 @@ java -jar lemline.jar instance start tutorial hello-workflow --input '{"name": "
 
 Let's add a conditional greeting based on the time of day using a `switch` task:
 
-```yaml
-document:
-  dsl: '1.0.0'
-  namespace: tutorial
-  name: hello-workflow
-  version: '0.1.0'
-input:
-  schema:
-    type: object
-    properties:
-      name:
-        type: string
-      hour:
-        type: integer
-do:
-  - chooseGreeting:
-      switch:
-        - when: ${ .hour < 12 }
-          then: setMorningGreeting
-        - when: ${ .hour < 18 }
-          then: setAfternoonGreeting
-        - otherwise:
-          then: setEveningGreeting
-  - setMorningGreeting:
-      set:
-        greeting: Good morning
-  - setAfternoonGreeting:
-      set:
-        greeting: Good afternoon
-  - setEveningGreeting:
-      set:
-        greeting: Good evening
-  - createMessage:
-      set:
-        message: ${ .greeting + ", " + .name + "!" }
-  - logMessage:
-      call: https://raw.githubusercontent.com/open-workflow-specification/catalog/main/functions/log/1.0.0/function.yaml
-      with:
-        message: ${ .message }
-```
+<code-block lang="yaml" src="workflows/lemline-tutorial-hello/6-adding-conditional-logic.yaml"/>
 
 Update the definition and run the workflow with a morning hour:
 

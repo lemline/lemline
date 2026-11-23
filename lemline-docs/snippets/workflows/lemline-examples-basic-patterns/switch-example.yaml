@@ -1,0 +1,31 @@
+document:
+  dsl: '1.0.0'
+  namespace: test
+  name: sample-workflow
+  version: 0.1.0
+do:
+  - processOrder:
+      switch:
+        - case1:
+            when: .orderType == "electronic"
+            then: processElectronicOrder
+        - case2:
+            when: .orderType == "physical"
+            then: processPhysicalOrder
+        - default:
+            then: handleUnknownOrderType
+  - processElectronicOrder:
+      set:
+        validate: true
+        status: fulfilled
+      then: exit
+  - processPhysicalOrder:
+      set:
+        inventory: clear
+        items: 1
+        address: Elmer St
+      then: exit
+  - handleUnknownOrderType:
+      set:
+        log: warn
+        message: something's wrong

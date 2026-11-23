@@ -29,6 +29,7 @@ cd lemline-project
 
 Create `docker-compose.yaml` with PostgreSQL:
 
+<!-- workflow-example: data -->
 ```yaml
 services:
     postgres:
@@ -65,6 +66,7 @@ docker-compose exec postgres createdb -U postgres lemline_analytics
 
 Create a `.lemline.yaml` configuration file in your project directory. Lemline reads `./.lemline.yaml` automatically, so every command you run from this directory uses it (you can also point to another file with `--config <path>` or the `LEMLINE_CONFIG` environment variable):
 
+<!-- workflow-example: data -->
 ```yaml
 lemline:
     database:

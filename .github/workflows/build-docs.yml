@@ -1,11 +1,16 @@
 name: Build and Deploy Writerside Documentation
 
 on:
+  pull_request:
+    paths:
+      - 'lemline-docs/**'
+      - '.github/workflows/build-docs.yml'
   push:
     branches: [ "main" ]
     paths:
       - 'lemline-docs/**'
       - '.github/workflows/build-docs.yml'
+      - '.github/workflows/docs-workflows.yml'
   workflow_dispatch:
 
 permissions:
@@ -16,7 +21,13 @@ env:
   DOCKER_VERSION: '2025.04.8412'  # Use the latest Writerside Docker version
 
 jobs:
+  validate_workflows:
+    if: github.event_name != 'pull_request'
+    uses: ./.github/workflows/docs-workflows.yml
+
   build:
+    needs: validate_workflows
+    if: ${{ !cancelled() && (needs.validate_workflows.result == 'success' || github.event_name == 'pull_request') }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Repository
@@ -48,10 +59,17 @@ jobs:
             artifacts/report.json
           retention-days: 7
 
+      - name: Check Writerside build report
+        uses: JetBrains/writerside-checker-action@v1
+        with:
+          instance: ${{ env.INSTANCE }}
+
       - name: Unzip Artifact
+        if: github.ref == 'refs/heads/main'
         run: unzip -O UTF-8 -qq "artifacts/${{ steps.define-ids.outputs.artifact }}" -d dir
 
       - name: Upload Pages Artifact
+        if: github.ref == 'refs/heads/main'
         uses: actions/upload-pages-artifact@v5
         with:
           path: dir

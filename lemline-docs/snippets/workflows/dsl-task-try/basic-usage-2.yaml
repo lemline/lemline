@@ -1,0 +1,27 @@
+document:
+  dsl: 1.0.0
+  namespace: examples
+  name: basic-usage-2
+  version: 1.0.0
+do:
+  - attemptWithRetry:
+      try:
+        - fetchCrucialData:
+            call: http
+            with:
+              endpoint: https://api.example.com/resource
+              method: get
+      catch:
+        errors:
+          with:
+            status: 503
+        retry:
+          backoff:
+            exponential: {}
+          delay: PT2S
+          limit:
+            attempt:
+              count: 4
+  - processData:
+      set:
+        processed: true

@@ -1,0 +1,93 @@
+document:
+  dsl: 1.0.0
+  namespace: examples
+  name: api-timeouts
+  version: 1.0.0
+do:
+  - callHighReliabilityAPI:
+      try:
+        - makeCall:
+            call: http
+            with:
+              method: get
+              endpoint: https://reliable-api.example/data
+            export:
+              as: '${ $context + { reliableResult: . } }'
+      catch:
+        errors:
+          with:
+            type: https://open-workflow-specification.org/spec/1.0.0/errors/timeout
+        retry:
+          backoff:
+            exponential: {}
+          delay:
+            milliseconds: 500
+          limit:
+            attempt:
+              count: 3
+  - callThirdPartyAPI:
+      try:
+        - makeCall:
+            call: http
+            with:
+              method: get
+              endpoint: https://third-party.example/api/resource
+            export:
+              as: '${ $context + { thirdPartyResult: . } }'
+      catch:
+        errors:
+          with:
+            type: https://open-workflow-specification.org/spec/1.0.0/errors/timeout
+        do:
+          - useCachedData:
+              call: http
+              with:
+                method: get
+                endpoint: https://cache.example/third-party/latest
+              export:
+                as: '${ $context + { usedCache: true, thirdPartyResult: .cachedThirdParty } }'
+  - callUnreliableAPI:
+      try:
+        - makeCall:
+            call: http
+            with:
+              method: get
+              endpoint: https://unreliable-api.example/data
+            export:
+              as: '${ $context + { unreliableResult: . } }'
+      catch:
+        errors:
+          with:
+            type: https://open-workflow-specification.org/spec/1.0.0/errors/timeout
+        retry:
+          when: ${ $context.retriesAttempted < 2 }
+          backoff:
+            exponential: {}
+          delay:
+            seconds: 2
+          limit:
+            attempt:
+              count: 2
+        do:
+          - trackRetry:
+              set:
+                retriesAttempted: '${ $context.retriesAttempted // 0 + 1 }'
+              export:
+                as: '${ $context + { retriesAttempted: (($context.retriesAttempted or 0) + 1)} }'
+          - generateFallbackData:
+              set:
+                unreliableResult:
+                  success: false
+                  data:
+                  message: API unavailable, using empty data set
+              export:
+                as: '${ $context + { usedFallback: true, unreliableResult: { success: false, data: null, message:
+                  "API unavailable, using empty data set" } } }'
+  - prepareResponse:
+      set:
+        result:
+          reliableData: ${ .reliableResult }
+          thirdPartyData: '${ $context.thirdPartyResult // .thirdPartyResult }'
+          unreliableData: '${ $context.unreliableResult // .unreliableResult }'
+          usedCache: ${ $context.usedCache == true }
+          usedFallback: ${ $context.usedFallback == true }

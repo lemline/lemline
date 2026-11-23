@@ -258,6 +258,7 @@ The gateway requires a reachable analytics datasource at startup. Lemline config
 
 Use this only on trusted local networks:
 
+<!-- workflow-example: data -->
 ```yaml
 lemline:
   gateway:

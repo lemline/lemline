@@ -1,0 +1,36 @@
+document:
+  dsl: 1.0.0
+  namespace: test
+  name: asyncapi-subscribe-example
+  version: 0.1.0
+do:
+  - subscribeToChatRoom:
+      call: asyncapi
+      with:
+        document:
+          endpoint: https://chat.example.com/api/asyncapi.yaml
+        operation: receiveChatMessages
+        protocol: ws
+        subscription:
+          filter: ${ .roomId == $context.targetRoomId }
+          consume:
+            amount: 10
+            for:
+              minutes: 5
+          foreach:
+            item: msg
+            do:
+              - logUpdate:
+                  call: logMessage
+                  with:
+                    message: 'Received order update: ${ .msg.payload.orderId }'
+              - checkStatus:
+                  call: notifyShipping
+                  if: '${ .msg.payload.status == "SHIPPED" }'
+            output:
+              as:
+                processedCount: ${ count(.) }
+                lastOrderId: ${ .[-1]?.msg.payload.orderId }
+  - afterSubscription:
+      set:
+        processed: true

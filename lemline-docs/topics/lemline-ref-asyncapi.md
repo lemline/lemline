@@ -12,22 +12,7 @@ There are no `lemline.asyncapi.*` runner settings.
 
 Exchange messages as CloudEvents with `emit` and `listen` tasks. They travel on the broker Lemline is configured with (see [Message Brokers](lemline-howto-brokers.md)):
 
-```yaml
-do:
-  - publishOrder:
-      emit:
-        event:
-          with:
-            type: com.example.order.created
-            source: order-service
-            data: ${ .order }
-  - waitForPayment:
-      listen:
-        to:
-          one:
-            with:
-              type: com.example.payment.received
-```
+<code-block lang="yaml" src="workflows/lemline-ref-asyncapi/alternative.yaml" include-lines="7-19"/>
 
 ## Related Resources
 

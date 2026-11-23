@@ -12,32 +12,7 @@ potentially filtering which elements are processed based on a condition.
 
 Here's an example of iterating over an array of numbers and performing an action for each:
 
-```yaml
-document:
-  dsl: '1.0.0'
-  namespace: examples
-  name: for-loop-basic
-  version: '1.0.0'
-do:
-  - setup:
-      set:
-        numbers: [ 1, 2, 3, 4, 5 ]
-  - processNumbers:
-      for:
-        in: "${ .numbers }" # Expression evaluating to the collection to iterate
-        # each: item       # Default variable name for the current item
-        # at: index        # Default variable name for the current index
-      do:
-        - logItem:
-            # Inside the 'do' block, 'item' and 'index' are available in the scope
-            call: log # Assuming a 'log' function exists
-            with:
-              message: "Processing item ${ $index }: ${ $item }"
-
-# Workflow output after 'processNumbers' will typically be the output of 'setup':
-# { "numbers": [1, 2, 3, 4, 5] }
-# The 'For' task itself doesn't aggregate results from the loop by default.
-```
+<code-block lang="yaml" src="workflows/dsl-task-for/basic-usage.yaml"/>
 
 In this example, the `processNumbers` task iterates over the `numbers` array provided by the `setup` task. For each
 number, it calls a hypothetical `log` function, accessing the current number via the default `$item` variable and its
@@ -56,12 +31,7 @@ This object defines the core iteration parameters.
 * **`at`** (String, Optional): Specifies the variable name used within the `do` block's scope to access the zero-based
   index of the current item being processed. Defaults to `index` (accessible as `$index` in expressions).
 
-```yaml
-for:
-  in: "${ .users }"      # Iterate over the 'users' array from the task's input
-  each: "currentUser"    # Access the current user as $currentUser
-  at: "userIndex"        # Access the current index as $userIndex
-```
+<code-block lang="yaml" src="workflows/dsl-task-for/for-object-required.yaml" include-lines="8-15"/>
 
 ### `do` (List<String: Object>, Required)
 
@@ -70,18 +40,7 @@ Defines the block of tasks to execute for each item in the collection (subject t
 The tasks within this block execute sequentially for each iteration. They have access to the current item and index via
 the variables defined by `for.each` and `for.at`, which are injected into the runtime expression scope.
 
-```yaml
-for:
-  in: "${ .products }"
-  each: product
-do:
-  - checkStock:
-      call: inventoryService
-      with:
-        productId: "${ $product.id }" # Access the 'id' field of the current product
-  - updatePrice:
-    # ... task definition that can use $product ...
-```
+<code-block lang="yaml" src="workflows/dsl-task-for/do-list-string-object-required.yaml" include-lines="8-18"/>
 
 ### `while` (String, Optional)
 
@@ -92,15 +51,7 @@ If the expression evaluates to `false`, the `do` block for the current item is s
 The expression is evaluated against the current task state, including
 the loop variables (`$item`, `$index` by default) available in this scope.
 
-```yaml
-for:
-  in: "${ .dataPoints }"
-  # execute 'do' block up to the first item where value > 10
-  while: "${ $item.value > 10 }"
-do:
-  - processHighValueItem:
-    # ... task definition ...
-```
+<code-block lang="yaml" src="workflows/dsl-task-for/while-string-optional.yaml" include-lines="8-13"/>
 
 ## Data Flow
 

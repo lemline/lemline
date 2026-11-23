@@ -1,0 +1,22 @@
+document:
+  dsl: 1.0.0
+  namespace: examples
+  name: conditional-execution-the-if-property
+  version: 1.0.0
+do:
+  - checkInput:
+      set:
+        message: Checking input...
+  - conditionalTask:
+      call: doSomethingImportant
+      if: ${ .process }
+      then: nextStep
+  - taskAfterConditional:
+      call:
+        https://raw.githubusercontent.com/open-workflow-specification/catalog/main/functions/log/1.0.0/function.yaml
+      with:
+        message: Conditional task was skipped.
+      then: nextStep
+  - nextStep:
+      set:
+        processed: true

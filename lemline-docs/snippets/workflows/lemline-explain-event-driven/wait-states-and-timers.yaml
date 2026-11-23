@@ -1,0 +1,9 @@
+document:
+  dsl: 1.0.0
+  namespace: examples
+  name: wait-states-and-timers
+  version: 1.0.0
+do:
+  - WaitForPaymentWindow:
+      wait: PT24H
+      then: CheckPaymentStatus

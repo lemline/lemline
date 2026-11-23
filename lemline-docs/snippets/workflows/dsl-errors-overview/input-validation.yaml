@@ -1,0 +1,37 @@
+document:
+  dsl: '1.0.0'
+  namespace: examples
+  name: input-validation
+  version: '1.0.0'
+do:
+  - validateInput:
+      do:
+        - checkRequiredFields:
+            if: '${ ([.input.email, .input.username, .input.password] | any(. == null or . == "")) }'
+            raise:
+              error:
+                type: "https://open-workflow-specification.org/errors/validation/invalid-argument"
+                status: 400
+                title: "Missing required fields"
+                detail: '${ "Required fields are missing: \([.input | to_entries[] | select(.value == null
+                  or .value == "") | .key] | join(", "))" }'
+
+        - validateEmail:
+            if: '${ (.input.email | test("^[^@]+@[^@]+[.][^@]+$") | not) }'
+            raise:
+              error:
+                type: "https://open-workflow-specification.org/errors/validation/invalid-argument"
+                status: 400
+                title: "Invalid email format"
+                detail: "${ \"Email address '\" + .input.email + \"' does not match the required format: username@domain.tld\"\
+                  \ }"
+
+        - validatePassword:
+            if: ${ .input.password.length < 8 }
+            raise:
+              error:
+                type: "https://open-workflow-specification.org/errors/validation/invalid-argument"
+                status: 400
+                title: "Password too short"
+                detail: "${ \"Password must be at least 8 characters long. Current length: \" + .input.password.length
+                  }"

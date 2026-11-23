@@ -59,6 +59,7 @@ I/O behavior is controlled in the workflow definition:
 
 ## Alerts
 
+<!-- workflow-example: data -->
 ```yaml
 groups:
   - name: lemline-io

@@ -1,0 +1,82 @@
+document:
+  dsl: 1.0.0
+  namespace: examples
+  name: user-registration
+  version: 1.0.0
+input:
+  schema:
+    format: json
+    document:
+      type: object
+      required:
+        - email
+        - name
+      properties:
+        email:
+          type: string
+          format: email
+        name:
+          type: string
+use:
+  secrets:
+    - API_KEY
+    - EMAIL_SERVICE_TOKEN
+do:
+  - validateEmail:
+      call: http
+      with:
+        method: post
+        endpoint: https://validation.example/api/verify-email
+        body:
+          email: ${ .email }
+      export:
+        as: '${ $context + { emailValidation: . } }'
+  - createUserAccount:
+      do:
+        - route:
+            switch:
+              - validEmail:
+                  when: ${ .emailValidation.valid == true }
+                  then: validEmailAction
+              - default:
+                  then: defaultAction
+        - validEmailAction:
+            do:
+              - registerUser:
+                  call: http
+                  with:
+                    method: post
+                    endpoint: https://accounts.example/api/users
+                    headers:
+                      Content-Type: application/json
+                      X-API-Key: ${ $secrets.API_KEY }
+                    body:
+                      email: ${ .email }
+                      name: ${ .name }
+                      verificationStatus: verified
+                  export:
+                    as: '${ $context + { userAccount: . } }'
+              - sendWelcomeEmail:
+                  call: http
+                  with:
+                    method: post
+                    endpoint: https://notifications.example/api/emails
+                    headers:
+                      Content-Type: application/json
+                      Authorization: Bearer ${ $secrets.EMAIL_SERVICE_TOKEN }
+                    body:
+                      template: welcome
+                      recipient: ${ .email }
+                      data:
+                        name: ${ .name }
+                        accountId: ${ .userAccount.id }
+            then: exit
+        - defaultAction:
+            do:
+              - notifyInvalidEmail:
+                  set:
+                    result:
+                      success: false
+                      reason: Invalid email address
+                      details: ${ .emailValidation.reason }
+            then: exit

@@ -1,0 +1,21 @@
+document:
+  dsl: '1.0.0'
+  namespace: examples
+  name: example-sending-different-parameter-types
+  version: '1.0.0'
+do:
+  - updatePetDetails:
+      call: openapi
+      with:
+        document:
+          endpoint:
+            uri: "https://petstore.swagger.io/v2/swagger.json"
+        operationId: "updatePetWithForm"
+        parameters:
+          petId: 123
+          name: "Fluffy Updated"
+          status: "pending"
+        authentication:
+          bearer:
+            token: "${secrets.petstore_auth}"
+      then: checkUpdateStatus

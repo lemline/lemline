@@ -1,0 +1,39 @@
+document:
+  dsl: '1.0.0'
+  namespace: examples
+  name: schema-property-dependencies
+  version: '1.0.0'
+input:
+  schema:
+    document:
+      type: object
+      properties:
+        shippingMethod:
+          type: string
+          enum:
+            - STANDARD
+            - EXPRESS
+            - SAME_DAY
+        deliveryDate:
+          type: string
+          format: date
+      dependentSchemas:
+        shippingMethod:
+          oneOf:
+            - properties:
+                shippingMethod:
+                  enum:
+                    - SAME_DAY
+                deliveryDate:
+                  type: string
+              required:
+                - deliveryDate
+            - properties:
+                shippingMethod:
+                  enum:
+                    - EXPRESS
+                    - STANDARD
+do:
+  - example:
+      set:
+        ready: true

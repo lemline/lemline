@@ -1,0 +1,26 @@
+document:
+  dsl: '1.0.0'
+  namespace: examples
+  name: loan-application-review
+  version: '1.0.0'
+do:
+  - obtainEligibility:
+      call: http
+      with:
+        method: post
+        endpoint: https://eligibility.example.com/evaluate
+        body: '${ { applicationId: .applicationId } }'
+  - routeApplication:
+      switch:
+        - needsReview:
+            when: ${ .requiresReview }
+            then: manualReview
+        - otherwise:
+            then: automaticReview
+  - manualReview:
+      set:
+        queue: manual-review
+      then: end
+  - automaticReview:
+      set:
+        queue: automatic-review

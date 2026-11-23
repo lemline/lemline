@@ -27,44 +27,7 @@ Use the **Do** task when you need to:
 - Create nested execution blocks for complex workflows
 - Implement a series of steps that build on each other
 
-```yaml
-document:
-  dsl: '1.0.0'
-  namespace: examples
-  name: order-processing
-  version: '1.0.0'
-use:
-  functions:
-    orderValidator:
-      ## define function here...
-    paymentProcessor:
-      ## define function here...
-    inventoryManager:
-      ## define function here...
-do:
-  - validateOrder:
-      call: function
-      with:
-        function: orderValidator
-        args:
-          order: ${ .input.order }
-
-  - processPayment:
-      call: function
-      with:
-        function: paymentProcessor
-        args:
-          amount: ${ .input.order.totalAmount }
-          paymentDetails: ${ .input.paymentInfo }
-
-  - updateInventory:
-      call: function
-      with:
-        function: inventoryManager
-        args:
-          items: ${ .input.order.items }
-          operation: "reserve"
-```
+<code-block lang="yaml" src="workflows/dsl-flow-overview/sequential-execution-with-do.yaml"/>
 
 ### Iterative Processing with For
 
@@ -75,40 +38,7 @@ Use the **For** task when you need to:
 - Break down bulk operations into individual item processing
 - Create data transformation pipelines that operate on collections
 
-```yaml
-document:
-  dsl: '1.0.0'
-  namespace: examples
-  name: process-order-items
-  version: '1.0.0'
-use:
-  functions:
-    inventoryUpdater:
-      ## define function here...
-    orderItemTracker:
-      ## define function here...
-do:
-  - processItems:
-      for:
-        in: ${ .input.order.items }
-        each: currentItem
-      do:
-        - updateInventory:
-            call: inventoryUpdater
-            with:
-              args:
-                productId: ${ .currentItem.productId }
-                quantity: ${ .currentItem.quantity }
-                operation: "DECREMENT"
-
-        - recordItemFulfillment:
-            call: orderItemTracker
-            with:
-              args:
-                orderId: ${ .input.order.id }
-                itemId: ${ .currentItem.id }
-                status: "FULFILLED"
-```
+<code-block lang="yaml" src="workflows/dsl-flow-overview/iterative-processing-with-for.yaml"/>
 
 ### Conditional Logic with Switch
 
@@ -119,71 +49,7 @@ Use the **Switch** task when you need to:
 - Handle multiple possible values with distinct processing for each
 - Implement business rules with clear branching logic
 
-```yaml
-document:
-  dsl: '1.0.0'
-  namespace: examples
-  name: payment-processor
-  version: '1.0.0'
-use:
-  functions:
-    creditCardProcessor:
-      ## define function here...
-    paypalProcessor:
-      ## define function here...
-    bankTransferProcessor:
-      ## define function here...
-do:
-  - determinePaymentMethod:
-      switch:
-        - creditCard:
-            when: ${ .input.paymentMethod == 'creditCard' }
-            then: processCreditCard
-
-        - paypal:
-            when: ${ .input.paymentMethod == 'paypal' }
-            then: processPayPal
-
-        - bankTransfer:
-            when: ${ .input.paymentMethod == 'bankTransfer' }
-            then: processBankTransfer
-
-        - default:
-            then: handleUnsupportedPaymentMethod
-            
-  - processCreditCard:
-      call: creditCardProcessor
-      with:
-        args:
-          cardDetails: ${ .input.paymentDetails }
-          amount: ${ .input.amount }
-      then: exit
-
-  - processPayPal:
-      call: paypalProcessor
-      with:
-        args:
-          paypalAccount: ${ .input.paymentDetails }
-          amount: ${ .input.amount }
-      then: exit
-
-  - processBankTransfer:
-      call: bankTransferProcessor
-      with:
-        args:
-          bankDetails: ${ .input.paymentDetails }
-          amount: ${ .input.amount }
-      then: exit
-
-  - handleUnsupportedPaymentMethod:
-      set:
-        result:
-          success: false
-          errorCode: "UNSUPPORTED_PAYMENT_METHOD"
-          message: ${ "Payment method " + .input.paymentMethod + " is not supported" }
-      then: exit
-
-```
+<code-block lang="yaml" src="workflows/dsl-flow-overview/conditional-logic-with-switch.yaml"/>
 
 ### Parallel Execution with Fork
 
@@ -194,126 +60,13 @@ Use the **Fork** task when you need to:
 - Process multiple streams of data concurrently
 - Implement fan-out patterns for workload distribution
 
-```yaml
-document:
-  dsl: '1.0.0'
-  namespace: examples
-  name: product-data-enrichment
-  version: '1.0.0'
-use:
-  functions:
-    pricingService:
-      ## define function here...
-    inventoryService:
-      ## define function here...
-    reviewService:
-      ## define function here...
-do:
-  - enrichProductData:
-      fork:
-        compete: false
-        branches:
-          - fetchPricing:
-              call: pricingService
-              with:
-                args:
-                  productId: ${ .input.productId }
-
-          - fetchInventory:
-              call: inventoryService
-              with:
-                args:
-                  productId: ${ .input.productId }
-
-          - fetchReviews:
-              call: reviewService
-              with:
-                args:
-                  productId: ${ .input.productId }
-```
+<code-block lang="yaml" src="workflows/dsl-flow-overview/parallel-execution-with-fork.yaml"/>
 
 ## Combining Flow Tasks
 
 Flow tasks are often combined to create sophisticated workflows that accurately reflect complex business processes:
 
-```yaml
-document:
-  dsl: '1.0.0'
-  namespace: examples
-  name: order-fulfillment-workflow
-  version: '1.0.0'
-do:
-  - validateOrder:
-      call: function
-      with:
-        function: orderValidator
-        args:
-          order: ${ .input.order }
-      result: validationResult
-
-  - checkOrderValidity:
-      switch:
-        - when: ${ .validationResult.valid == false }
-          do:
-            - handleInvalidOrder:
-                set:
-                  result:
-                    success: false
-                    message: ${ .validationResult.reason }
-                    code: "INVALID_ORDER"
-            - notifyCustomer:
-                call: emailService
-                with:
-                  to: ${ .input.customer.email }
-                  subject: "Order Validation Failed"
-                  message: ${ .validationResult.reason }
-                catch:
-                  errors:
-                    with:
-                      type: "email-service-error"
-                  do:
-                    - logEmailFailure:
-                        call: logger
-                        with:
-                          level: "WARNING"
-                          message: "Failed to send validation failure email"
-                          orderId: ${ .input.order.id }
-
-  - processValidOrder:
-      fork:
-        compete: false
-        branches:
-          - handlePayment:
-              call: function
-              with:
-                function: paymentProcessor
-                args:
-                  amount: ${ .input.order.totalAmount }
-                  currency: ${ .input.order.currency }
-                  paymentMethod: ${ .input.paymentInfo }
-              result: paymentResult
-
-          - reserveInventory:
-              for:
-                in: ${ .input.order.items }
-                each: item
-                do:
-                  - reserveItem:
-                      call: inventoryManager
-                      with:
-                        productId: ${ .item.productId }
-                        quantity: ${ .item.quantity }
-                        operation: "reserve"
-
-  - prepareOrderResponse:
-      set:
-        result:
-          orderId: ${ .input.order.id }
-          status: "PROCESSING"
-          paymentStatus: ${ .processingResults.handlePayment.paymentResult.status }
-          inventoryStatus: ${ .processingResults.reserveInventory.inventoryReservations }
-          estimatedShipDate: ${ new Date(Date.now() + 86400000 * 2).toISOString() }
-```
+<code-block lang="yaml" src="workflows/reference/parallel-checks-with-fallback.yaml"/>
 
 Flow tasks are the building blocks of workflow orchestration, 
 enabling you to create maintainable workflows that reflect

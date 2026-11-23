@@ -168,19 +168,11 @@ Lemline documentation uses Markdown with these conventions:
 - Keep examples concise and focused
 - Include comments where necessary
 
-```markdown
-```yaml
-# This is a YAML example
-document:
-  dsl: '1.0.0'
-  namespace: examples
-  name: hello-world
-  version: '0.1.0'
-do:
-  - greet:
-      set:
-        message: "Hello, world!"
-```
+Include workflow examples from a complete YAML or JSON file under `snippets/workflows/` so
+the pull request checks can validate the same definition Writerside displays.
+
+```xml
+<code-block lang="yaml" src="workflows/lemline-getting-started/creating-your-first-workflow.yaml"/>
 ```
 
 ### Command Line Examples

@@ -1,0 +1,11 @@
+document:
+  dsl: '1.0.0'
+  namespace: examples
+  name: delayed-processing
+  version: '1.0.0'
+do:
+  - pause:
+      wait: PT30S
+  - resume:
+      set:
+        state: resumed

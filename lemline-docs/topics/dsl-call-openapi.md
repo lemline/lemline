@@ -18,74 +18,17 @@ code or configurations.
 
 ## Usage Example
 
-```yaml
-document:
-  dsl: '1.0.0' # Assuming alpha5 or later based on reference example
-  namespace: test
-  name: openapi-example
-  version: '0.1.0'
-do:
-  - findAvailablePets:
-      call: openapi
-      with:
-        # Reference to the OpenAPI document
-        document:
-          endpoint: https://petstore.swagger.io/v2/swagger.json
-        # ID of the operation to call (defined within the OpenAPI doc)
-        operationId: findPetsByStatus
-        # Parameters required by the operation
-        parameters:
-          status: available # Passed as query/path/header param based on OpenAPI spec
-        # authentication: myApiAuth # Optional authentication
-      # Output by default is the deserialized response body
-      then: processAvailablePets
-  - processAvailablePets:
-    # ... uses the list of available pets from the response ...
-```
+<code-block lang="yaml" src="workflows/dsl-call-openapi/usage-example.yaml"/>
 
 ## Additional Examples
 
 ### Example: Sending Different Parameter Types
 
-```yaml
-do:
-  - updatePetDetails:
-      call: openapi
-      with:
-        document:
-          endpoint:
-            uri: "https://petstore.swagger.io/v2/swagger.json"
-        operationId: "updatePetWithForm"
-        parameters:
-          petId: 123
-          name: "Fluffy Updated"
-          status: "pending"
-        authentication:
-          bearer:
-            token: "${secrets.petstore_auth}"
-      then: checkUpdateStatus
-```
+<code-block lang="yaml" src="workflows/dsl-call-openapi/example-sending-different-parameter-types.yaml" include-lines="6-21"/>
 
 ### Example: Getting the Full HTTP Response
 
-```yaml
-do:
-  - getPetAndCheckHeaders:
-      call: openapi
-      with:
-        document:
-          endpoint:
-            uri: "https://petstore.swagger.io/v2/swagger.json"
-        operationId: "getPetById"
-        parameters:
-          petId: "${ .targetPetId }"
-        output: response
-      then: analyzeHttpResponse
-  - analyzeHttpResponse:
-      set:
-        petData: "${ .body }"
-        contentType: "${ .headers['Content-Type'] }"
-```
+<code-block lang="yaml" src="workflows/dsl-call-openapi/example-getting-the-full-http-response.yaml" include-lines="6-21"/>
 
 ## Configuration Options
 

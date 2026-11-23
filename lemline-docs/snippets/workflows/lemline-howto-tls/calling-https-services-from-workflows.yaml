@@ -1,0 +1,11 @@
+document:
+  dsl: '1.0.0'
+  namespace: examples
+  name: calling-https-services-from-workflows
+  version: '1.0.0'
+do:
+  - getData:
+      call: http
+      with:
+        method: get
+        endpoint: https://api.example.com/data

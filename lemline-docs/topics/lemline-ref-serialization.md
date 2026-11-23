@@ -41,17 +41,7 @@ CloudEvents emitted by `emit` tasks and consumed by `listen` tasks use the JSON 
 
 ## Schema Validation
 
-```yaml
-input:
-  schema:
-    format: json
-    document:
-      type: object
-      required: [customerId]
-      properties:
-        customerId:
-          type: string
-```
+<code-block lang="yaml" src="workflows/reference/customer-input-schema.yaml" include-lines="6-14"/>
 
 Data that does not match its schema raises a `validation` error. External schemas referenced by URL are fetched at validation time.
 

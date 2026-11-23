@@ -1,0 +1,11 @@
+document:
+  dsl: 1.0.0
+  namespace: examples
+  name: supported-syntax-simple-string-expansion
+  version: 1.0.0
+do:
+  - example:
+      call: http
+      with:
+        endpoint: https://api.example.com/users/{userId}/profile
+        method: get

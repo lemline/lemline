@@ -1,0 +1,41 @@
+document:
+  dsl: 1.0.0
+  namespace: examples
+  name: export-schema-validation
+  version: 1.0.0
+do:
+  - FetchCustomerData:
+      call: customerService
+      with:
+        customerId: ${ .customerId }
+      export:
+        as:
+          customer: ${ .data }
+        schema:
+          document:
+            type: object
+            required:
+              - customer
+            properties:
+              customer:
+                type: object
+                required:
+                  - id
+                  - name
+                  - email
+                  - status
+                properties:
+                  id:
+                    type: string
+                  name:
+                    type: string
+                  email:
+                    type: string
+                    format: email
+                  status:
+                    type: string
+                    enum:
+                      - ACTIVE
+                      - INACTIVE
+                      - PENDING
+      then: NextTask

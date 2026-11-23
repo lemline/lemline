@@ -1,0 +1,62 @@
+document:
+  dsl: 1.0.0
+  namespace: examples
+  name: validating-task-output
+  version: 1.0.0
+do:
+  - GenerateOrderSummary:
+      set:
+        orderSummary:
+          id: ${ .orderId }
+          customer:
+            id: ${ .customerId }
+            name: ${ .customerName }
+          items: '${ .items | map({ id: .productId, name: .productName, quantity: .quantity, price: .price
+            }) }'
+          subtotal: ${ .items | map(.price * .quantity) | add }
+          tax: ${ .items | map(.price * .quantity) | add * 0.08 }
+          total: ${ .items | map(.price * .quantity) | add * 1.08 }
+      output:
+        schema:
+          document:
+            type: object
+            required:
+              - orderSummary
+            properties:
+              orderSummary:
+                type: object
+                required:
+                  - id
+                  - customer
+                  - items
+                  - subtotal
+                  - tax
+                  - total
+                properties:
+                  id:
+                    type: string
+                  customer:
+                    type: object
+                    required:
+                      - id
+                      - name
+                  items:
+                    type: array
+                    minItems: 1
+                    items:
+                      type: object
+                      required:
+                        - id
+                        - name
+                        - quantity
+                        - price
+                  subtotal:
+                    type: number
+                    minimum: 0
+                  tax:
+                    type: number
+                    minimum: 0
+                  total:
+                    type: number
+                    minimum: 0
+      then: NextTask

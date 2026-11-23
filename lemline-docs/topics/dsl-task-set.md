@@ -19,42 +19,14 @@ It's commonly used for:
 
 Here's a simple example of using `Set` to create a new object:
 
-```yaml
-document:
-  dsl: '1.0.0'
-  namespace: examples
-  name: set-basic
-  version: '1.0.0'
-do:
-  - initialData:
-      set:
-        user:
-          name: "Alice"
-          id: 123
-        status: "active"
-  - processData: # Input to this task is the output of initialData
-      call: someFunction
-      with:
-        userData: "${ .user }"
-        currentStatus: "${ .status }"
-
-# Output of 'initialData' task: { "user": { "name": "Alice", "id": 123 }, "status": "active" }
-```
+<code-block lang="yaml" src="workflows/dsl-task-set/basic-usage.yaml"/>
 
 In this example, the `initialData` task directly defines an object with `user` and `status` fields.
 This object becomes the output of `initialData` and is subsequently passed as input to the `processData` task.
 
 Here's another example using a runtime expression to combine input data:
 
-```yaml
-do:
-  - combineNames: # Assume input is { "firstName": "Bob", "lastName": "Smith" }
-      set:
-        fullName: "${ .firstName + ' ' + .lastName }"
-        originalInput: "${ . }" # Include original input if needed
-
-# Output of 'combineNames': { "fullName": "Bob Smith", "originalInput": { "firstName": "Bob", "lastName": "Smith" } }
-```
+<code-block lang="yaml" src="workflows/dsl-task-set/basic-usage-2.yaml" include-lines="6-12"/>
 
 ## Configuration Options
 
@@ -67,18 +39,7 @@ The value provided for `set` is evaluated as a template where [Runtime Expressio
 
 The result of evaluating this structure becomes the **raw output** of the `Set` task.
 
-```yaml
-set:
-  # Static values
-  configValue: 100
-  # Values from transformed input
-  inputValue: "${ .inputField }"
-  processedValue: "${ (.inputField * 2) + $context.offset }" # Combine input and context
-  # Nested structures
-  details:
-    timestamp: "${ $runtime.now.iso8601 }" # Using runtime variable
-    source: "workflowX"
-```
+<code-block lang="yaml" src="workflows/dsl-task-set/set-object-required.yaml" include-lines="8-17"/>
 
 ## Data Flow
 
@@ -94,222 +55,28 @@ set:
 
 ### Basic Variable Assignment
 
-```yaml
-document:
-  dsl: '1.0.0'
-  namespace: examples
-  name: basic-variable-assignment
-  version: '1.0.0'
-do:
-  - setOrderDefaults:
-      set:
-        orderData:
-          id: ${ .input.orderId || uuid() }
-          createdAt: ${ new Date().toISOString() }
-          status: "PENDING"
-          customerName: ${ .input.customer.firstName + " " + .input.customer.lastName }
-          priority: ${ .input.priority || "normal" }
-```
+<code-block lang="yaml" src="workflows/dsl-task-set/basic-variable-assignment.yaml"/>
 
 ### Data Transformation
 
-```yaml
-document:
-  dsl: '1.0.0'
-  namespace: examples
-  name: data-transformation
-  version: '1.0.0'
-do:
-  - retrieveUserData:
-      call: function
-      with:
-        function: userService
-        args:
-          userId: ${ .input.userId }
-      result: userData
-
-  - transformUserProfile:
-      set:
-        profile:
-          displayName: ${ .userData.firstName + " " + .userData.lastName }
-          email: ${ .userData.email }
-          joined: ${ new Date(.userData.createdTimestamp).toLocaleDateString() }
-          membershipLevel: ${ 
-            if(.userData.totalPurchases > 10000) 
-              "platinum" 
-            else if(.userData.totalPurchases > 5000) 
-              "gold" 
-            else if(.userData.totalPurchases > 1000) 
-              "silver" 
-            else 
-              "bronze" 
-          }
-          tags: ${ .userData.interests || [] }
-```
+<code-block lang="yaml" src="workflows/dsl-task-set/data-transformation.yaml"/>
 
 ### Conditional Data Preparation
 
-```yaml
-document:
-  dsl: '1.0.0'
-  namespace: examples
-  name: conditional-data-preparation
-  version: '1.0.0'
-do:
-  - prepareApiRequest:
-      set:
-        apiRequest:
-          endpoint: ${ .input.environment == "production" ? "https://api.example.com" : "https://staging-api.example.com" }
-          headers:
-            Authorization: ${ "Bearer " + .input.authToken }
-            Content-Type: "application/json"
-            Accept: "application/json"
-          body: ${
-            {
-              "userId": .input.userId,
-              "operation": .input.operation,
-              "parameters": .input.parameters || {},
-              "tracingId": uuid(),
-              "timestamp": new Date().toISOString()
-            }
-          }
-```
+<code-block lang="yaml" src="workflows/reference/prepare-order-data.yaml"/>
 
 ### Aggregating Results
 
-```yaml
-document:
-  dsl: '1.0.0'
-  namespace: examples
-  name: result-aggregation
-  version: '1.0.0'
-do:
-  - retrieveProductData:
-      call: function
-      with:
-        function: productService
-        args:
-          productId: ${ .input.productId }
-      result: productData
-      
-  - retrievePricing:
-      call: function
-      with:
-        function: pricingService
-        args:
-          productId: ${ .input.productId }
-          region: ${ .input.region }
-      result: pricingData
-      
-  - retrieveInventory:
-      call: function
-      with:
-        function: inventoryService
-        args:
-          productId: ${ .input.productId }
-          warehouseId: ${ .input.warehouseId }
-      result: inventoryData
-      
-  - aggregateProductInfo:
-      set:
-        enrichedProduct: ${
-          {
-            "id": .productData.id,
-            "name": .productData.name,
-            "description": .productData.description,
-            "category": .productData.category,
-            "pricing": {
-              "basePrice": .pricingData.basePrice,
-              "currency": .pricingData.currency,
-              "discountPercentage": .pricingData.discountPercentage || 0,
-              "finalPrice": .pricingData.finalPrice,
-              "taxRate": .pricingData.taxRate
-            },
-            "inventory": {
-              "available": .inventoryData.quantityAvailable > 0,
-              "quantity": .inventoryData.quantityAvailable,
-              "location": .inventoryData.warehouseLocation,
-              "estimatedRestockDate": .inventoryData.quantityAvailable <= 0 ? .inventoryData.nextDeliveryDate : null
-            },
-            "lastUpdated": new Date().toISOString()
-          }
-        }
-```
+<code-block lang="yaml" src="workflows/reference/aggregate-order-data.yaml"/>
 
 ### Error Response Formatting
 
-```yaml
-document:
-  dsl: '1.0.0'
-  namespace: examples
-  name: error-response-formatting
-  version: '1.0.0'
-do:
-  - try:
-      do:
-        - processOrder:
-            call: function
-            with:
-              function: orderProcessor
-              args:
-                order: ${ .input.order }
-            result: processingResult
-      catch:
-        as: error
-        do:
-          - formatErrorResponse:
-              set:
-                errorResponse: ${
-                  {
-                    "success": false,
-                    "errorCode": .error.code || "UNKNOWN_ERROR",
-                    "message": .error.message || "An unexpected error occurred",
-                    "details": .error.details || null,
-                    "timestamp": new Date().toISOString(),
-                    "requestId": .input.requestId || uuid(),
-                    "suggestions": [
-                      "Try again later",
-                      "Contact support if the issue persists"
-                    ]
-                  }
-                }
-```
+<code-block lang="yaml" src="workflows/reference/format-error-result.yaml"/>
 
 ## Working with JSON Paths
 
 The Set task leverages JQ-style JSON path expressions for powerful data manipulation:
 
-```yaml
-document:
-  dsl: '1.0.0'
-  namespace: examples
-  name: json-path-examples
-  version: '1.0.0'
-do:
-  - manipulateData:
-      set:
-        # Access nested properties
-        customerEmail: ${ .input.order.customer.contactInfo.email }
-        
-        # Array operations
-        firstItem: ${ .input.items[0] }
-        itemCount: ${ .input.items | length }
-        
-        # Filtering arrays
-        expensiveItems: ${ .input.products[.price > 100] }
-        
-        # Mapping arrays
-        productNames: ${ .input.products[].name }
-        
-        # Combining data
-        combinedList: ${ .list1 + .list2 }
-        
-        # Conditional assignment
-        status: ${ if(.input.approved) "APPROVED" else "PENDING" }
-        
-        # String operations
-        upperCaseName: ${ .input.name | upper }
-        formattedId: ${ .input.id | pad_left(10, "0") }
-```
+<code-block lang="yaml" src="workflows/dsl-task-set/working-with-json-paths.yaml"/>
 
 Data tasks are essential for maintaining clean data flow throughout your workflows and preparing data in exactly the right format for each subsequent task. The Set task in particular offers significant flexibility in how you transform and manipulate data within your workflow's execution. 

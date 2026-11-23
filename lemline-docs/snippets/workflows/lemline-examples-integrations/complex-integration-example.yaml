@@ -1,0 +1,68 @@
+document:
+  dsl: 1.0.0
+  namespace: examples
+  name: complex-integration
+  version: 1.0.0
+use:
+  catalogs:
+    catalogs1:
+      endpoint: file://catalog.json
+do:
+  - getCustomerData:
+      call: crm.getCustomerById
+      with:
+        customerId: ${ .customerId }
+  - processPurchaseOrder:
+      try:
+        - validateInventory:
+            call: openapi
+            with:
+              document:
+                endpoint: https://inventory.example.com/api/openapi.json
+              operationId: checkItemsAvailability
+              parameters:
+                items: ${ .orderItems }
+        - processPayment:
+            call: http
+            with:
+              method: post
+              endpoint: https://payments.example.com/api/transactions
+              headers:
+                Content-Type: application/json
+                Authorization: Bearer ${ .paymentToken }
+              body: '${ { customerId: .customerId, amount: .totalAmount, items: .orderItems } }'
+        - notifyShipping:
+            call: asyncapi
+            with:
+              document:
+                endpoint: https://messaging.example.com/asyncapi.json
+              operation: publishShippingRequest
+              server:
+                name: production
+              message:
+                payload:
+                  orderId: ${ .orderId }
+                  customer: ${ .customerData }
+                  items: ${ .orderItems }
+      catch:
+        do:
+          - handleError:
+              switch:
+                - handleError1:
+                    then: handleError1
+                - handleError2:
+                    then: handleError2
+          - handleError1:
+              do:
+                - notifyCustomer:
+                    call: crm.sendNotification
+                    with:
+                      customerId: ${ .customerId }
+                      message: Your payment was declined. Please update payment information.
+              then: end
+          - handleError2:
+              do:
+                - recordError:
+                    set:
+                      processed: true
+              then: end

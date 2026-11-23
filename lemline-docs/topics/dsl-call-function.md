@@ -13,54 +13,7 @@ The generic `Call` task enables the execution of a specified, named function wit
 
 ## Usage Example
 
-```yaml
-document:
-  dsl: '1.0.0'
-  namespace: custom-functions
-  name: call-custom-example
-  version: '1.0.0'
-use:
-  functions:
-    validateAddress:
-      call: expression
-      with:
-        code: |
-          function validateAddress(street, city, zipCode) {
-            // Basic validation logic
-            if (!street || !city || !zipCode) {
-              return { valid: false, error: "Missing required fields" };
-            }
-            // Additional validation logic here
-            return { valid: true, normalized: { street, city, zipCode } };
-          }
-do:
-  - checkAddress:
-      call: validateAddress
-      with:
-        street: "${ .customer.address.street }"
-        city: "${ .customer.address.city }"
-        zipCode: "${ .customer.address.zip }"
-      # Output of the 'validateAddress' function becomes output of this task
-  - processValidationResult:
-      switch:
-        - caseValid:
-            when: "${ .checkAddress.valid }"
-            then: setNormalizedAddress
-        - default:
-            then: raiseValidationError
-  - setNormalizedAddress:
-      set:
-        normalizedAddress: "${ .checkAddress.normalized }"
-      then: exit
-  - raiseValidationError:
-      raise:
-        error:
-          type: "https://example.com/errors/validation"
-          status: 400
-          detail: "${ .checkAddress.error }"
-      then: exit
-          
-```
+<code-block lang="yaml" src="workflows/dsl-call-function/usage-example.yaml"/>
 
 In this example, the `checkAddress` task calls a function named `validateAddress`, passing arguments derived from the current context or input using the `with` property.
 
@@ -68,28 +21,11 @@ In this example, the `checkAddress` task calls a function named `validateAddress
 
 ### Example: Calling a Function with No Arguments
 
-```yaml
-do:
-  - triggerProcessing:
-      # Assumes 'startBackgroundJob' function requires no specific arguments
-      call: startBackgroundJob 
-      # No 'with' property needed
-  - monitorJob:
-      # ...
-```
+<code-block lang="yaml" src="workflows/dsl-call-function/example-calling-a-function-with-no-arguments.yaml" include-lines="7-11"/>
 
 ### Example: Calling a Catalog Function
 
-```yaml
-# Assumes 'globalUtils' catalog is imported via workflow.use.catalogs
-# Assumes 'logMessage:1.0' function exists in that catalog
-do:
-  - recordInfo:
-      call: logMessage:1.0@globalUtils # Function:Version@CatalogName
-      with:
-        level: INFO
-        message: "Processed item ${ .itemId }"
-```
+<code-block lang="yaml" src="workflows/dsl-call-function/example-calling-a-catalog-function.yaml" include-lines="6-13"/>
 
 ## Configuration Options
 

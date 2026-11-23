@@ -1,0 +1,22 @@
+document:
+  dsl: '1.0.0'
+  namespace: examples
+  name: example-getting-the-full-response-object
+  version: '1.0.0'
+do:
+  - checkServiceStatus:
+      call: http
+      with:
+        method: get
+        endpoint:
+          uri: https://status.example.com/health
+        # Get the full response including status code and headers
+        output: response
+        # Allow redirects to be considered successful
+        redirect: true
+      then: analyzeStatus
+  - analyzeStatus:
+      # Task input will be like: { "status": 200, "headers": { ... }, "body": { "status": "UP" } }
+      set:
+        isHealthy: '${ .body.status == "UP" }'
+        statusCode: "${ .status }"

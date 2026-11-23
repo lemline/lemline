@@ -1,0 +1,14 @@
+document:
+  dsl: '1.0.0'
+  namespace: examples
+  name: run-container-with-volume
+  version: '1.0.0'
+do:
+  - listReports:
+      run:
+        container:
+          image: alpine:3.22
+          command: ls /reports
+          volumes:
+            /host/reports: /reports
+        return: stdout

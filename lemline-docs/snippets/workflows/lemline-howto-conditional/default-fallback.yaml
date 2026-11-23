@@ -1,0 +1,19 @@
+document:
+  dsl: 1.0.0
+  namespace: examples
+  name: default-fallback
+  version: 1.0.0
+do:
+  - CheckOrderStatus:
+      switch:
+        - case1:
+            when: ${ .status == "approved" }
+            then: ProcessApprovedOrder
+        - case2:
+            when: ${ .status == "pending" }
+            then: WaitForApproval
+        - case3:
+            when: ${ .status == "rejected" }
+            then: HandleRejectedOrder
+        - case4:
+            then: HandleUnknownStatus

@@ -1,0 +1,39 @@
+document:
+  dsl: '1.0.0'
+  namespace: examples
+  name: business-rule-validation
+  version: '1.0.0'
+do:
+  - checkInventory:
+      call: http
+      with:
+        method: "GET"
+        endpoint: "https://api.example.com/inventory"
+        query:
+          productId: ${ .input.productId }
+        headers:
+          Content-Type: "application/json"
+
+  - validateOrder:
+      do:
+        - checkProductAvailability:
+            if: ${ .inventoryData.quantityAvailable < .input.quantity }
+            raise:
+              error:
+                type: "https://open-workflow-specification.org/errors/validation/failed-precondition"
+                status: 412
+                title: "Insufficient inventory"
+                detail: "${ \"Product '\" + .input.productId + \"' has insufficient inventory. Requested: \"\
+                  \ + .input.quantity + \", Available: \" + .inventoryData.quantityAvailable + \". Next restock
+                  date: \" + .inventoryData.nextDeliveryDate }"
+
+        - checkOrderLimit:
+            if: '${ .input.quantity > 10 and .input.customerType != "wholesale" }'
+            raise:
+              error:
+                type: "https://open-workflow-specification.org/errors/authorization/permission-denied"
+                status: 403
+                title: "Retail customers are limited to 10 units per order"
+                detail: "${ \"Customer type '\" + .input.customerType + \"' is limited to \" + 10 + \" units
+                  per order. Requested quantity: \" + .input.quantity + \". Resolution: Apply for a wholesale
+                  account or reduce order quantity.\" }"

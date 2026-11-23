@@ -9,37 +9,7 @@ independent tasks simultaneously.
 
 ## Usage Example
 
-```yaml
-document:
-  dsl: '1.0.0' # Assuming alpha5 or later based on reference example
-  namespace: test
-  name: fork-example
-  version: '0.1.0'
-do:
-  - getData:
-      # ... task to fetch initial data ...
-      then: processConcurrently
-  - processConcurrently:
-      fork:
-        # Optional: Make branches compete; first one finished provides the output
-        # compete: true 
-        branches:
-          - processUserData:
-              # This branch runs concurrently with processProductData
-              call: processUserMicroservice
-              with:
-                userId: "${ .userId }"
-          - processProductData:
-              # This branch runs concurrently with processUserData
-              call: processProductMicroservice
-              with:
-                productId: "${ .productId }"
-      # Default: compete=false, waits for both branches 
-      # Output is an array: [output_of_processUserData, output_of_processProductData]
-      then: combineResults
-  - combineResults:
-    # ... task that uses the array output from the fork ...
-```
+<code-block lang="yaml" src="workflows/dsl-task-fork/usage-example.yaml"/>
 
 In this example, after `getData`, the tasks `processUserData` and `processProductData` are executed in parallel. Since
 `compete` is false (by default), the workflow waits for both branches to complete. The output passed to `combineResults`
@@ -49,30 +19,7 @@ is an array containing the results from both branches in the order they were def
 
 #### Example: Competing Branches (`compete: true`)
 
-```yaml
-do:
-  - fetchFastestQuote:
-      fork:
-        compete: true # Branches race, first one to complete wins
-        branches:
-          - getQuoteSourceA:
-              call: http
-              with:
-                uri: https://api.sourceA.com/quote
-                method: get
-                # Assume returns { "provider": "A", "price": 100 }
-          - getQuoteSourceB:
-              call: http
-              with:
-                uri: https://api.sourceB.com/quote
-                method: get
-                # Assume returns { "provider": "B", "price": 105 }
-      # Output is the result of whichever branch finished first
-      # e.g., { "provider": "A", "price": 100 } if Source A was faster
-      then: processBestQuote
-  - processBestQuote:
-    # ... task uses the single quote object from the winner ...
-```
+<code-block lang="yaml" src="workflows/dsl-task-fork/example-competing-branches-compete-true.yaml" include-lines="7-24"/>
 
 Here, `getQuoteSourceA` and `getQuoteSourceB` run concurrently. Because `compete: true`, the `Fork` task finishes as
 soon as *one* of them completes successfully. The output passed to `processBestQuote` will be the result object from
@@ -80,25 +27,7 @@ only the faster source.
 
 #### Example: Output Array Structure (`compete: false`)
 
-```yaml
-do:
-  - gatherInfo:
-      fork:
-        # compete: false is the default
-        branches:
-          - getUserProfile:
-              set: { profile: { name: "Alice", id: 123 } }
-          - getUserOrders:
-              set: { orders: [ { orderId: "A" }, { orderId: "B" } ] }
-      # Output is an array: [ { profile: { ... } }, { orders: [ ... ] } ]
-      then: displayInfo
-  - displayInfo:
-      # Input to this task is the array from the fork
-      # Access results via index: ${ .[0].profile.name }, ${ .[1].orders[0].orderId }
-      call: log
-      with:
-        message: "User: ${ .[0].profile.name }, First Order: ${ .[1].orders[0].orderId }"
-```
+<code-block lang="yaml" src="workflows/dsl-task-fork/example-output-array-structure-compete-false.yaml" include-lines="6-22"/>
 
 This demonstrates the output when `compete` is false. The `rawOutput` of the `gatherInfo` task is an array where the
 first element is the output of `getUserProfile` and the second element is the output of `getUserOrders`. The

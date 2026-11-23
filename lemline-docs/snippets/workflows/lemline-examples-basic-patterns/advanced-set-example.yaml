@@ -1,0 +1,17 @@
+document:
+  dsl: '1.0.0'
+  namespace: examples
+  name: advanced-set
+  version: '0.1.0'
+do:
+  - initData:
+      set:
+        user:
+          name: "John Doe"
+          role: "admin"
+          permissions: ["read", "write"]
+        timestamp: '${ now }'
+  - transformData:
+      set:
+        enrichedUser: "${ .user + { \n  lastAccess: .timestamp,\n  isAdmin: (.user.role == \"admin\"),\n  permissionCount:
+          ((.user.permissions | length))} }"

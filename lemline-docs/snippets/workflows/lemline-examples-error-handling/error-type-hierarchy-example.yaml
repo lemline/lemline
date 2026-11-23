@@ -1,0 +1,45 @@
+document:
+  dsl: 1.0.0
+  namespace: examples
+  name: error-hierarchy
+  version: 0.1.0
+do:
+  - tryApiOperation:
+      try:
+        - callApi:
+            call: http
+            with:
+              method: post
+              endpoint: https://api.example.com/resource
+              body: ${ .requestData }
+      catch:
+        do:
+          - handleError:
+              switch:
+                - handleError1:
+                    then: handleError1
+                - handleError2:
+                    then: handleError2
+                - handleError3:
+                    then: handleError3
+          - handleError1:
+              do:
+                - handleValidation:
+                    set:
+                      errorType: validation
+                      errorDetails: ${ $validationError }
+              then: end
+          - handleError2:
+              do:
+                - handleGenericApiError:
+                    set:
+                      errorType: api
+                      errorDetails: ${ $apiError }
+              then: end
+          - handleError3:
+              do:
+                - handleGenericError:
+                    set:
+                      errorType: generic
+                      errorDetails: ${ $genericError }
+              then: end

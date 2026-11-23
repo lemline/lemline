@@ -1,0 +1,14 @@
+document:
+  dsl: '1.0.0'
+  namespace: examples
+  name: transform-workflow-data
+  version: '1.0.0'
+input:
+  from: '${ { customer: .user, items: .payload.items } }'
+do:
+  - summarize:
+      set:
+        customerId: ${ .customer.id }
+        itemCount: ${ .items | length }
+output:
+  as: '${ { customerId, itemCount } }'

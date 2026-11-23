@@ -1,0 +1,21 @@
+document:
+  dsl: '1.0.0'
+  namespace: examples
+  name: exit-nested-scope
+  version: '1.0.0'
+do:
+  - processOrder:
+      do:
+        - checkOrder:
+            switch:
+              - invalid:
+                  when: ${ .orderId == null }
+                  then: exit
+              - valid:
+                  then: recordOrder
+        - recordOrder:
+            set:
+              status: received
+  - finalize:
+      set:
+        completed: true

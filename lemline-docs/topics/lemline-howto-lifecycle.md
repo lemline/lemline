@@ -22,25 +22,7 @@ The rest of this guide shows how to build these behaviors into the workflow itse
 
 Let the workflow listen for a cancellation event while it waits, and end when it arrives:
 
-```yaml
-do:
-  - waitForPaymentOrCancellation:
-      listen:
-        to:
-          any:
-            - with:
-                type: com.example.payment.received
-            - with:
-                type: com.example.order.cancelled
-        read: envelope
-  - checkCancellation:
-      switch:
-        - cancelled:
-            when: ${ .[0].type == "com.example.order.cancelled" }
-            then: end
-        - default:
-            then: continue
-```
+<code-block lang="yaml" src="workflows/lemline-howto-lifecycle/stopping-a-workflow-on-request.yaml" include-lines="6-22"/>
 
 Send the cancellation as a CloudEvent on the CloudEvents channel of the workflow's namespace. See [How to emit and listen for events](lemline-howto-events.md).
 
@@ -48,18 +30,7 @@ Send the cancellation as a CloudEvent on the CloudEvents channel of the workflow
 
 Lemline does not enforce workflow-level timeouts yet, nor timeouts on tasks other than `listen`: they are accepted but ignored. To keep an instance from waiting forever for an external signal, put a timeout on the `listen` task:
 
-```yaml
-do:
-  - waitForPayment:
-      listen:
-        to:
-          one:
-            with:
-              type: com.example.payment.received
-      timeout:
-        after:
-          hours: 24
-```
+<code-block lang="yaml" src="workflows/lemline-howto-lifecycle/bounding-how-long-a-workflow-waits.yaml" include-lines="6-15"/>
 
 When the timeout expires, the task faults with a `timeout` error, which a `try` task can catch. See [Timeouts](dsl-timeouts.md).
 
@@ -67,15 +38,7 @@ When the timeout expires, the task faults with a `timeout` error, which a `try` 
 
 A `listen` task pauses the instance until a matching event arrives; a `wait` task pauses it for a fixed duration. Neither uses runner resources while waiting.
 
-```yaml
-do:
-  - waitForApproval:
-      listen:
-        to:
-          one:
-            with:
-              type: com.example.order.approved
-```
+<code-block lang="yaml" src="workflows/lemline-howto-lifecycle/pausing-until-an-external-signal.yaml" include-lines="6-12"/>
 
 ## Recovering from Failures
 

@@ -1,0 +1,11 @@
+document:
+  dsl: '1.0.0'
+  namespace: examples
+  name: basic-http-request
+  version: '1.0.0'
+do:
+  - fetchUserData:
+      call: http
+      with:
+        method: get
+        endpoint: https://api.example.com/users/123

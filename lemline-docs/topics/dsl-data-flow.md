@@ -60,27 +60,7 @@ Controls processing of the initial data the workflow receives.
 * **`schema`** (Schema Definition, Optional): A [JSON Schema](https://json-schema.org/) used to validate the *raw*
   workflow input *before* `input.from` is applied. If validation fails, the workflow faults immediately
 
-```yaml
-document:
-  dsl: '1.0.0'
-  # ... workflow metadata ...
-input:
-  schema:
-    type: object
-    required: ["user", "payload"]
-    properties:
-      user:
-        type: object
-        properties:
-          id:
-            type: string
-      payload:
-        type: object
-  from: "${ { userId: .user.id, orderDetails: .payload } }" # Select and restructure
-do:
-  - firstTask: # Receives { userId: ..., orderDetails: ... } as raw input
-    # ...
-```
+<code-block lang="yaml" src="workflows/dsl-data-flow/input-object-optional-workflow-input.yaml"/>
 
 ### `output` (Object, Optional) {#workflow-output}
 
@@ -91,25 +71,7 @@ Controls processing of the final data returned by the workflow.
 * **`schema`** (Schema Definition, Optional): A [JSON Schema](https://json-schema.org/) used to validate the *final
   transformed workflow output* (after `output.as` is applied). If validation fails, the workflow faults
 
-```yaml
-document:
-# ... workflow definition ...
-do:
-  - # ... tasks ...
-  - lastTask:
-      set:
-        confirmation: "ABC-123"
-        internalStatus: "Complete"
-output:
-  # Only return the confirmation field from the last task's output
-  as: "${ { confirmationId: .confirmation } }"
-  schema:
-    type: object
-    required: ["confirmationId"]
-    properties:
-      confirmationId:
-        type: string
-```
+<code-block lang="yaml" src="workflows/dsl-data-flow/output-object-optional-workflow-output.yaml"/>
 
 ## Task Level Data Handling
 
@@ -123,20 +85,7 @@ Controls processing of data entering a specific task.
   `$input` within the task's scope. Defaults to identity (`${ . }`)
 * **`schema`** (Schema Definition, Optional): Validates the task's *raw input* *before* `input.from` is applied
 
-```yaml
-- taskA:
-    # Assume previous task output was { "data": { "value": 10 }, "meta": ... }
-    input:
-      schema:
-        type: object
-        required: ["data"]
-        properties:
-          value:
-            type: number
-      from: "${ .data }" # Pass only the 'data' part to this task
-    set:
-      doubled: "${ $input.value * 2 }" # Use the transformed input ($input)
-```
+<code-block lang="yaml" src="workflows/dsl-data-flow/input-object-optional-task-input.yaml" include-lines="7-19"/>
 
 ### `output` (Object, Optional) {#task-output}
 
@@ -147,24 +96,7 @@ Controls processing of data produced by a specific task.
   available as `$output` for `export.as`. Defaults to identity (`${. }`)
 * **`schema`** (Schema Definition, Optional): Validates the *transformed output* (after `output.as` is applied)
 
-```yaml
-- callApi:
-    call: http
-    with:
-    # ... call definition ...
-    # Assume API returns { "result": { "payload": ..., "debug": ... }, "status": ... }
-    output:
-      # Select only the payload from the API response
-      as: "${ .result.payload }"
-      schema:
-        # Define expected payload structure
-        type: object
-        properties:
-          # ... payload schema ...
-- nextTask:
-    # Raw input here will be the value of 'result.payload' from the API call
-    # ...
-```
+<code-block lang="yaml" src="workflows/dsl-data-flow/output-object-optional-task-output.yaml" include-lines="7-20"/>
 
 ### `export` (Object, Optional)
 
@@ -176,24 +108,7 @@ Controls how the task's results update the shared workflow context (`$context`).
 * **`schema`** (Schema Definition, Optional): Validates the data structure produced by `export.as` *before* it updates
   `$context`
 
-```yaml
-- updateUser:
-    call: http # Assume API call returns user ID { "userId": "user-xyz" }
-    # ...
-    export:
-      # Add/update the lastUserId in the context
-      as: "${ $context + { lastUserId: $output.userId } }"
-      schema:
-        type: object
-        required: ["lastUserId"]
-        properties:
-          lastUserId:
-            type: string
-- subsequentTask:
-    # Can now access $context.lastUserId
-    set:
-      message: "Processed user: ${ $context.lastUserId }"
-```
+<code-block lang="yaml" src="workflows/dsl-data-flow/export-object-optional.yaml" include-lines="7-24"/>
 
 ## Visualization
 

@@ -1,0 +1,25 @@
+document:
+  dsl: 1.0.0
+  namespace: examples
+  name: input-object-optional-workflow-input
+  version: 1.0.0
+input:
+  from: '${ { userId: .user.id, orderDetails: .payload } }'
+  schema:
+    document:
+      type: object
+      required:
+        - user
+        - payload
+      properties:
+        user:
+          type: object
+          properties:
+            id:
+              type: string
+        payload:
+          type: object
+do:
+  - firstTask:
+      set:
+        processed: true

@@ -2,34 +2,7 @@
 
 DSL 1.0.0 `use.extensions` adds tasks before and after selected tasks without moving the original task's execution position.
 
-```yaml
-use:
-  extensions:
-    - audit:
-        extend: call
-        when: '${ $task.definition.call == "http" }'
-        before:
-          - recordRequest:
-              set:
-                reference: '${ $task.reference }'
-              export:
-                as: '${ $context + {lastRequest: .reference} }'
-        after:
-          - recordResponse:
-              call: http
-              with:
-                method: post
-                endpoint: https://audit.example.com/responses
-                body:
-                  task: '${ $task.reference }'
-                  response: '${ $task.output }'
-do:
-  - getUser:
-      call: http
-      with:
-        method: get
-        endpoint: https://api.example.com/user
-```
+<code-block lang="yaml" src="workflows/dsl-use-extensions/workflow-extensions.yaml" include-lines="6-31"/>
 
 `extend` accepts `call`, `composite`, `emit`, `for`, `listen`, `raise`, `run`, `set`, `switch`, `try`, `wait`, and `all`. `composite` matches declared `do` and `fork` tasks. Reusable function calls match `call`; their declared body tasks can also have extensions. Internal execution blocks are excluded.
 
@@ -43,17 +16,7 @@ Within extension expressions, `$task` describes the owner, including its origina
 
 A top-level `before` step with `then: exit` returns a simulated raw result, skips the body and remaining extensions, and applies the owner's output transformation, validation, and export once. The owner's own `then` is still honored.
 
-```yaml
-use:
-  extensions:
-    - simulate:
-        extend: call
-        when: '${ $task.definition.call == "http" and $task.definition.with.endpoint == "https://api.example.com/user" }'
-        before:
-          - fakeUser:
-              set: { id: 123, name: Test }
-              then: exit
-```
+<code-block lang="yaml" src="workflows/dsl-use-extensions/short-circuiting-and-navigation.yaml" include-lines="6-14"/>
 
 A nested `exit` remains local to its nested block. A top-level `after` exit skips remaining after blocks and keeps the owner's result. `end` terminates the workflow without executing additional after blocks.
 

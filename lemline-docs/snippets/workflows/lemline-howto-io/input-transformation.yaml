@@ -1,0 +1,21 @@
+document:
+  dsl: 1.0.0
+  namespace: examples
+  name: input-transformation
+  version: 1.0.0
+do:
+  - FormatData:
+      set:
+        formattedUser:
+          id: ${ .user.id }
+          name: ${ .user.name }
+          email: ${ .contactInfo.email }
+          phone: ${ .contactInfo.phone }
+      input:
+        from:
+          transform:
+            user: ${ .userProfile }
+            contactInfo:
+              email: ${ .userProfile.email | ascii_downcase }
+              phone: ${ .userProfile.phone | gsub("[^0-9]"; "") }
+      then: NextTask

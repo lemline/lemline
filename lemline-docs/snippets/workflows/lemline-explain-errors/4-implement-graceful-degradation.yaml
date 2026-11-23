@@ -1,0 +1,29 @@
+document:
+  dsl: 1.0.0
+  namespace: examples
+  name: 4-implement-graceful-degradation
+  version: 1.0.0
+do:
+  - userDashboard:
+      fork:
+        branches:
+          - loadProfile:
+              try:
+                - fetchUserProfile:
+                    set:
+                      processed: true
+              catch:
+                do:
+                  - setDefaultProfile:
+                      set:
+                        processed: true
+          - loadRecommendations:
+              try:
+                - fetchRecommendations:
+                    set:
+                      processed: true
+              catch:
+                do:
+                  - setEmptyRecommendations:
+                      set:
+                        processed: true

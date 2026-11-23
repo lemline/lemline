@@ -1,0 +1,58 @@
+document:
+  dsl: 1.0.0
+  namespace: examples
+  name: payment-processor
+  version: 1.0.0
+use:
+  functions:
+    creditCardProcessor:
+      set:
+        processed: true
+    paypalProcessor:
+      set:
+        processed: true
+    bankTransferProcessor:
+      set:
+        processed: true
+do:
+  - determinePaymentMethod:
+      switch:
+        - creditCard:
+            when: '${ .input.paymentMethod == "creditCard" }'
+            then: processCreditCard
+        - paypal:
+            when: '${ .input.paymentMethod == "paypal" }'
+            then: processPayPal
+        - bankTransfer:
+            when: '${ .input.paymentMethod == "bankTransfer" }'
+            then: processBankTransfer
+        - default:
+            then: handleUnsupportedPaymentMethod
+  - processCreditCard:
+      call: creditCardProcessor
+      with:
+        args:
+          cardDetails: ${ .input.paymentDetails }
+          amount: ${ .input.amount }
+      then: exit
+  - processPayPal:
+      call: paypalProcessor
+      with:
+        args:
+          paypalAccount: ${ .input.paymentDetails }
+          amount: ${ .input.amount }
+      then: exit
+  - processBankTransfer:
+      call: bankTransferProcessor
+      with:
+        args:
+          bankDetails: ${ .input.paymentDetails }
+          amount: ${ .input.amount }
+      then: exit
+  - handleUnsupportedPaymentMethod:
+      set:
+        result:
+          success: false
+          errorCode: UNSUPPORTED_PAYMENT_METHOD
+          message: ${ "Payment method " + .input.paymentMethod + " is not supported" }
+      then: exit

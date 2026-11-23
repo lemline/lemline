@@ -1,0 +1,12 @@
+document:
+  dsl: '1.0.0'
+  namespace: examples
+  name: listen-listen-required-2
+  version: '1.0.0'
+do:
+  - example:
+      listen:
+        to:
+          all:
+            - with: { type: inventory.checked }
+            - with: { type: shipping.ready }

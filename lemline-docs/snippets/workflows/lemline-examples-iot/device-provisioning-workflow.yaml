@@ -1,0 +1,134 @@
+document:
+  dsl: 1.0.0
+  namespace: iot
+  name: device-provisioning
+  version: 1.0.0
+input:
+  schema:
+    format: json
+    document:
+      type: object
+      required:
+        - deviceId
+        - deviceType
+        - location
+      properties:
+        deviceId:
+          type: string
+        deviceType:
+          type: string
+          enum:
+            - sensor
+            - gateway
+            - controller
+        location:
+          type: object
+          required:
+            - siteId
+            - zone
+do:
+  - validateDevice:
+      try:
+        - checkDeviceExists:
+            call: http
+            with:
+              method: get
+              endpoint: ${ "https://iot-registry.example/api/devices/\(.deviceId)" }
+      catch:
+        errors:
+          with:
+            type: https://open-workflow-specification.org/spec/1.0.0/errors/communication
+            status: 404
+        as: notFoundError
+        do:
+          - createDeviceRecord:
+              call: http
+              with:
+                method: post
+                endpoint: https://iot-registry.example/api/devices
+                body:
+                  deviceId: ${ .deviceId }
+                  deviceType: ${ .deviceType }
+                  location: ${ .location }
+                  status: provisioning
+              export:
+                as: '${ $context + { deviceRegistry: .deviceRegistry } }'
+  - generateCredentials:
+      try:
+        - createCredentials:
+            call: http
+            with:
+              method: post
+              endpoint: https://iot-security.example/api/credentials/generate
+              body:
+                deviceId: ${ .deviceId }
+                deviceType: ${ .deviceType }
+            export:
+              as: '${ $context + { credentials: .credentials } }'
+      catch:
+        errors:
+          with:
+            type: https://open-workflow-specification.org/spec/1.0.0/errors/communication
+        retry:
+          delay:
+            seconds: 5
+          limit:
+            attempt:
+              count: 3
+  - configureDevice:
+      do:
+        - generateConfig:
+            call: http
+            with:
+              method: post
+              endpoint: https://iot-config.example/api/config/generate
+              body:
+                deviceId: ${ .deviceId }
+                deviceType: ${ .deviceType }
+                location: ${ .location }
+            export:
+              as: '${ $context + { deviceConfig: . } }'
+        - createDigitalTwin:
+            call: http
+            with:
+              method: post
+              endpoint: https://digital-twins.example/api/twins
+              body:
+                deviceId: ${ .deviceId }
+                deviceType: ${ .deviceType }
+                attributes:
+                  location: ${ .location }
+                  firmware: 1.0.0
+                  status: provisioning
+            export:
+              as: '${ $context + { digitalTwin: . } }'
+  - activateDevice:
+      call: asyncapi
+      with:
+        document:
+          endpoint: https://iot-messaging.example/asyncapi.json
+        operation: activateDevice
+        server:
+          name: production
+        message:
+          payload:
+            deviceId: ${ .deviceId }
+            config: ${ .deviceConfig }
+            credentials: ${ $context.credentials }
+  - waitForDeviceActivation:
+      listen:
+        to:
+          one:
+            with:
+              type: com.example.iot.device.activated
+              correlationId: ${ .deviceId }
+      output:
+        as: activationResult
+  - finalizeProvisioning:
+      call: http
+      with:
+        method: patch
+        endpoint: ${ "https://iot-registry.example/api/devices/\(.deviceId)" }
+        body:
+          status: active
+          lastPing: ${ .activationResult.timestamp }

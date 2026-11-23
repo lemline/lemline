@@ -1,0 +1,27 @@
+document:
+  dsl: 1.0.0
+  namespace: order-processing
+  name: wait-for-payment
+  version: 1.0.0
+do:
+  - storeOrderId:
+      set:
+        orderId: ${ .initialOrder.id }
+      export:
+        as: '${ $context + { currentOrderId: .orderId } }'
+  - waitForPaymentEvent:
+      listen:
+        to:
+          one:
+            with:
+              type: com.payment.processed.v1
+            correlate:
+              matchOrderId:
+                from: ${ .transaction.orderRef }
+                expect: ${ .context.currentOrderId }
+      timeout:
+        after:
+          minutes: 30
+  - processPaymentConfirmation:
+      set:
+        processed: true

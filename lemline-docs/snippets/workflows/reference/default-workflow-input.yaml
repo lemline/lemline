@@ -1,0 +1,13 @@
+document:
+  dsl: '1.0.0'
+  namespace: examples
+  name: default-workflow-input
+  version: '1.0.0'
+input:
+  from: '${ { priority: "NORMAL", currency: "USD" } + . }'
+do:
+  - recordOrder:
+      set:
+        orderId: ${ .orderId }
+        priority: ${ .priority }
+        currency: ${ .currency }

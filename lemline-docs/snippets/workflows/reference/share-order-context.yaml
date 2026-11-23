@@ -1,0 +1,15 @@
+document:
+  dsl: '1.0.0'
+  namespace: examples
+  name: share-order-context
+  version: '1.0.0'
+do:
+  - identifyCustomer:
+      set:
+        customerId: ${ .customer.id }
+      export:
+        as: '${ $context + { customerId: .customerId } }'
+  - prepareOrder:
+      set:
+        orderId: ${ $workflow.input.orderId }
+        customerId: ${ $context.customerId }

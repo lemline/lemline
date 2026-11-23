@@ -1,0 +1,45 @@
+document:
+  dsl: 1.0.0
+  namespace: examples
+  name: validating-task-input
+  version: 1.0.0
+do:
+  - ProcessPayment:
+      call: paymentService
+      with:
+        amount: ${ .cart.total }
+        currency: ${ .cart.currency }
+        paymentMethod: ${ .payment }
+      input:
+        schema:
+          document:
+            type: object
+            required:
+              - amount
+              - currency
+              - paymentMethod
+            properties:
+              amount:
+                type: number
+                exclusiveMinimum: 0
+              currency:
+                type: string
+                enum:
+                  - USD
+                  - EUR
+                  - GBP
+              paymentMethod:
+                type: object
+                required:
+                  - type
+                  - token
+                properties:
+                  type:
+                    type: string
+                    enum:
+                      - CREDIT_CARD
+                      - PAYPAL
+                      - BANK_TRANSFER
+                  token:
+                    type: string
+      then: HandlePaymentResult

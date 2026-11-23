@@ -1,0 +1,23 @@
+document:
+  dsl: '1.0.0'
+  namespace: examples
+  name: schema-media-type
+  version: '1.0.0'
+input:
+  schema:
+    document:
+      type: object
+      properties:
+        htmlContent:
+          type: string
+          contentMediaType: text/html
+        csvData:
+          type: string
+          contentMediaType: text/csv
+        jsonData:
+          type: string
+          contentMediaType: application/json
+do:
+  - example:
+      set:
+        ready: true

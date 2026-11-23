@@ -1,0 +1,27 @@
+document:
+  dsl: '1.0.0'
+  namespace: examples
+  name: patient-intake
+  version: '1.0.0'
+input:
+  schema:
+    document:
+      type: object
+      required: [requestId]
+      properties:
+        requestId:
+          type: string
+do:
+  - registerRequest:
+      call: http
+      with:
+        method: post
+        endpoint: https://intake.example.com/requests
+        body: '${ { requestId: .requestId } }'
+  - publishIntakeEvent:
+      emit:
+        event:
+          with:
+            type: com.example.intake.received
+            source: https://events.example.com/intake
+            subject: ${ $workflow.input.requestId }

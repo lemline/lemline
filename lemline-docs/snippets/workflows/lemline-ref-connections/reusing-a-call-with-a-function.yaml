@@ -1,0 +1,19 @@
+document:
+  dsl: '1.0.0'
+  namespace: examples
+  name: reusing-a-call-with-a-function
+  version: '1.0.0'
+use:
+  functions:
+    getUser:
+      do:
+        - request:
+            call: http
+            with:
+              method: get
+              endpoint: ${ "https://api.example.com/users/" + .userId }
+do:
+  - fetchUser:
+      call: getUser
+      with:
+        userId: ${ .id }

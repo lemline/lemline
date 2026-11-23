@@ -164,11 +164,7 @@ When resolving variables, Lemline searches:
 
 JQ expressions are evaluated against the current context:
 
-```yaml
-- setTax:
-    set:
-      taxAmount: "${ .orderTotal * .taxRate }"
-```
+<code-block lang="yaml" src="workflows/lemline-explain-execution/expression-evaluation.yaml" include-lines="7-9"/>
 
 The expression `.orderTotal * .taxRate` is evaluated with:
 1. Current node's variables

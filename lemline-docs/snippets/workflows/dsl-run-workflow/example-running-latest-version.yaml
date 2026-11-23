@@ -1,0 +1,16 @@
+document:
+  dsl: 1.0.0
+  namespace: examples
+  name: example-running-latest-version
+  version: 1.0.0
+do:
+  - runLatestUtility:
+      run:
+        workflow:
+          namespace: shared-utilities
+          name: data-cleanup
+          input:
+            targetDir: ${ .tempDirectory }
+          version: 1.0.0
+        return: stdout
+      then: processCleanupResult

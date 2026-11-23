@@ -18,12 +18,7 @@ This page summarizes how Lemline resolves workflow secrets. For a step-by-step g
 
 ## Declaration
 
-```yaml
-use:
-  secrets:
-    - PAYMENT_API_KEY
-    - DB_CREDENTIALS
-```
+<code-block lang="yaml" src="workflows/lemline-ref-secrets/declaration.yaml" include-lines="6-9"/>
 
 ## Value Types
 
@@ -36,13 +31,7 @@ use:
 
 `$secrets` is available in every runtime expression of the workflow: HTTP `endpoint`, `headers`, `query`, `body` and authentication policies (`basic`, `bearer`), shell `command` and `arguments`, `if`, `set`, `export`, `output`, and so on.
 
-```yaml
-endpoint:
-  uri: https://payments.example.com/v1/charges
-  authentication:
-    bearer:
-      token: ${ $secrets.PAYMENT_API_KEY }
-```
+<code-block lang="yaml" src="workflows/reference/http-secrets-reference.yaml" include-lines="14-18"/>
 
 Lemline does not provide its own secret store, file source, or vault integration. Use your platform to inject environment variables (Kubernetes Secrets, Docker secrets mapped to variables, your deployment tool…).
 

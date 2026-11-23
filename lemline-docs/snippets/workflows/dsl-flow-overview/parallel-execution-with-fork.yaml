@@ -1,0 +1,36 @@
+document:
+  dsl: 1.0.0
+  namespace: examples
+  name: product-data-enrichment
+  version: 1.0.0
+use:
+  functions:
+    pricingService:
+      set:
+        processed: true
+    inventoryService:
+      set:
+        processed: true
+    reviewService:
+      set:
+        processed: true
+do:
+  - enrichProductData:
+      fork:
+        branches:
+          - fetchPricing:
+              call: pricingService
+              with:
+                args:
+                  productId: ${ .input.productId }
+          - fetchInventory:
+              call: inventoryService
+              with:
+                args:
+                  productId: ${ .input.productId }
+          - fetchReviews:
+              call: reviewService
+              with:
+                args:
+                  productId: ${ .input.productId }
+        compete: false

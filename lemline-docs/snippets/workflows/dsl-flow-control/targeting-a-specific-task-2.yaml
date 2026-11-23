@@ -1,0 +1,18 @@
+document:
+  dsl: 1.0.0
+  namespace: examples
+  name: targeting-a-specific-task-2
+  version: 1.0.0
+do:
+  - outerTask1:
+      do:
+        - innerTaskA:
+            set:
+              processed: true
+        - innerTaskB:
+            set:
+              processed: true
+            then: exit
+  - outerTask2:
+      set:
+        processed: true

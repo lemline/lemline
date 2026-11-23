@@ -28,6 +28,7 @@ Stopping a runner is safe: messages it did not acknowledge are delivered to anot
 
 Runners in the same consumer group share a topic's partitions, so a topic needs at least as many partitions as runners. Keep the same group id on every runner:
 
+<!-- workflow-example: data -->
 ```yaml
 lemline:
   messaging:
@@ -47,6 +48,7 @@ Runners reading the same queue compete for its messages; no extra setting is nee
 
 Each channel processes up to 64 messages in parallel. Raise the limit when steps mostly wait on remote calls, lower it when a runner runs short of memory:
 
+<!-- workflow-example: data -->
 ```yaml
 lemline:
   messaging:
@@ -65,6 +67,7 @@ Set the limit under the broker you use (`lemline.messaging.<broker>.<channel>.co
 
 Waits, retries, schedules, listeners and gateway starts are processed from the database by every runner. For a large backlog, process bigger batches or run more often:
 
+<!-- workflow-example: data -->
 ```yaml
 lemline:
   outbox:
@@ -80,6 +83,7 @@ See the outbox properties in the [Runner Configuration Reference](lemline-ref-co
 
 Give a workload its own runners by putting it in its own namespace and starting runners that serve only that namespace:
 
+<!-- workflow-example: data -->
 ```yaml
 lemline:
   namespaces: orders
@@ -95,6 +99,7 @@ Run several `lemline gateway start` processes behind a load balancer that suppor
 
 Run runners as a Deployment and scale its replicas. A CPU-based Horizontal Pod Autoscaler is a reasonable starting point:
 
+<!-- workflow-example: data -->
 ```yaml
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler

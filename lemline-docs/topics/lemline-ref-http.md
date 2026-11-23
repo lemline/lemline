@@ -18,69 +18,35 @@ Not supported: URI template placeholders, connection definitions, form or multip
 
 ## Basic HTTP Request
 
-```yaml
-do:
-  - fetchUserData:
-      call: http
-      with:
-        method: get
-        endpoint: https://api.example.com/users/123
-```
+<code-block lang="yaml" src="workflows/lemline-ref-http/basic-http-request.yaml" include-lines="6-11"/>
 
 ## URL Construction
 
 ### Plain URL
 
-```yaml
-endpoint: https://api.example.com/users/123
-```
+<code-block lang="yaml" src="workflows/reference/http-literal-endpoint.yaml" include-lines="11-11"/>
 
 ### Runtime Expression
 
-```yaml
-endpoint: ${ "https://api.example.com/users/" + .user.id }
-```
+<code-block lang="yaml" src="workflows/reference/http-expression-endpoint.yaml" include-lines="11-11"/>
 
 The expression must return a string. RFC 6570 placeholders such as `{userId}` are not expanded: build dynamic URLs with an expression.
 
 ## Request Headers
 
-```yaml
-with:
-  method: get
-  endpoint: https://api.example.com/data
-  headers:
-    Accept: application/json
-    X-Request-Id: ${ .requestId }
-```
+<code-block lang="yaml" src="workflows/reference/http-request-headers.yaml" include-lines="9-14"/>
 
 `headers` can also be a single runtime expression that returns an object. Every value is sent as a string.
 
 ## Query Parameters
 
-```yaml
-with:
-  method: get
-  endpoint: https://api.example.com/users
-  query:
-    page: 1
-    status: ${ .status }
-```
+<code-block lang="yaml" src="workflows/reference/http-query-parameters.yaml" include-lines="9-14"/>
 
 Query parameters are appended to the URL. Like `headers`, `query` can be a runtime expression returning an object.
 
 ## Request Body
 
-```yaml
-- createUser:
-    call: http
-    with:
-      method: post
-      endpoint: https://api.example.com/users
-      body:
-        name: ${ .name }
-        email: ${ .email }
-```
+<code-block lang="yaml" src="workflows/lemline-ref-http/request-body.yaml" include-lines="7-14"/>
 
 The body is serialized as JSON and sent with `Content-Type: application/json`. It is only sent for `post`, `put` and `patch`.
 
@@ -94,39 +60,13 @@ The body is serialized as JSON and sent with `Content-Type: application/json`. I
 | `response` | An object with `request` (`method`, `uri`, `headers`), `statusCode`, `headers` and `content` |
 | `raw` | The response body encoded in Base64 |
 
-```yaml
-- fetchUsers:
-    call: http
-    with:
-      method: get
-      endpoint: https://api.example.com/users
-      output: response
-    output:
-      as: ${ .content.items }
-```
+<code-block lang="yaml" src="workflows/lemline-ref-http/output-formats.yaml" include-lines="7-14"/>
 
 ### Error Status Handling
 
 A response whose status is not 2xx makes the task fail with a `runtime` error whose title contains the status code and the response body (for example `HTTP 404: ...`). Network failures fail the task the same way. Catch them with `try`:
 
-```yaml
-- fetchData:
-    try:
-      - callApi:
-          call: http
-          with:
-            method: get
-            endpoint: https://api.example.com/data
-    catch:
-      errors:
-        with:
-          type: https://open-workflow-specification.org/spec/1.0.0/errors/runtime
-      as: apiError
-      do:
-        - fallback:
-            set:
-              data: []
-```
+<code-block lang="yaml" src="workflows/lemline-ref-http/error-status-handling.yaml" include-lines="7-22"/>
 
 ## Authentication
 
@@ -134,56 +74,21 @@ Authentication fields evaluate runtime expressions, so they can read secrets. A 
 
 ### Basic Authentication
 
-```yaml
-endpoint:
-  uri: https://api.example.com/data
-  authentication:
-    basic:
-      username: ${ $secrets.API_USER }
-      password: ${ $secrets.API_PASSWORD }
-```
+<code-block lang="yaml" src="workflows/reference/http-inline-basic-authentication.yaml" include-lines="15-20"/>
 
 ### Bearer Token
 
-```yaml
-endpoint:
-  uri: https://api.example.com/data
-  authentication:
-    bearer:
-      token: ${ $secrets.API_TOKEN }
-```
+<code-block lang="yaml" src="workflows/reference/http-inline-bearer-token.yaml" include-lines="14-18"/>
 
 ### Named Authentication
 
-```yaml
-use:
-  secrets:
-    - API_TOKEN
-  authentications:
-    apiAuth:
-      bearer:
-        token: ${ $secrets.API_TOKEN }
-do:
-  - callApi:
-      call: http
-      with:
-        method: get
-        endpoint:
-          uri: https://api.example.com/data
-          authentication:
-            use: apiAuth
-```
+<code-block lang="yaml" src="workflows/lemline-ref-http/named-authentication.yaml" include-lines="6-21"/>
 
 An API key can be sent as a regular header. OAuth 2.0 is not supported yet: a task using it fails with a `configuration` error.
 
 ## Redirects
 
-```yaml
-with:
-  method: get
-  endpoint: https://api.example.com/old
-  redirect: true
-```
+<code-block lang="yaml" src="workflows/reference/http-follow-redirects.yaml" include-lines="9-12"/>
 
 Without `redirect: true`, a redirect response (3xx) is not followed and fails the task like any other non-2xx status.
 
@@ -195,59 +100,17 @@ The runner's HTTP client uses fixed limits: 15 seconds to connect, 30 seconds fo
 
 HTTP calls are not retried automatically. Use `try` with `retry`:
 
-```yaml
-- fetchData:
-    try:
-      - callApi:
-          call: http
-          with:
-            method: get
-            endpoint: https://api.example.com/data
-    catch:
-      errors:
-        with:
-          type: https://open-workflow-specification.org/spec/1.0.0/errors/runtime
-      retry:
-        delay:
-          seconds: 2
-        backoff:
-          exponential: {}
-        limit:
-          attempt:
-            count: 5
-```
+<code-block lang="yaml" src="workflows/lemline-ref-http/retry-behavior.yaml" include-lines="7-25"/>
 
 ## HTTP Request Examples
 
 ### JSON POST Request
 
-```yaml
-- createOrder:
-    call: http
-    with:
-      method: post
-      endpoint: https://api.example.com/orders
-      headers:
-        Idempotency-Key: ${ .orderId }
-      body:
-        orderId: ${ .orderId }
-        items: ${ .items }
-      output: response
-```
+<code-block lang="yaml" src="workflows/lemline-ref-http/json-post-request.yaml" include-lines="7-17"/>
 
 ### GraphQL Query
 
-```yaml
-- queryGraphQL:
-    call: http
-    with:
-      method: post
-      endpoint: https://api.example.com/graphql
-      body:
-        query: "query($id: ID!) { user(id: $id) { name email } }"
-        variables:
-          id: ${ .userId }
-```
+<code-block lang="yaml" src="workflows/lemline-ref-http/graphql-query.yaml" include-lines="7-15"/>
 
 ## Related Resources
 

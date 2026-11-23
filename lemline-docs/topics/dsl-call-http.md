@@ -11,91 +11,21 @@ The HTTP Call task enables workflows to interact with external services and APIs
 
 ## Usage Example
 
-```yaml
-document:
-  dsl: '1.0.0' # Assuming alpha5 or later based on reference example
-  namespace: test
-  name: http-example
-  version: '0.1.0'
-do:
-  - getPetById:
-      call: http
-      with:
-        method: get
-        # URI Template used here for dynamic petId
-        endpoint: 
-          uri: https://petstore.swagger.io/v2/pet/{petId} 
-        headers:
-          Accept: "application/json"
-        # Assume petId is available in the task input or context
-        # Authentication would typically be defined on the endpoint or globally
-      # Output by default is the deserialized response body 
-      then: processPetData
-  - processPetData:
-      # ... uses the pet data received in the response body ...
-```
+<code-block lang="yaml" src="workflows/dsl-call-http/usage-example.yaml"/>
 
 ## Additional Examples
 
 ### Example: POST Request with Body and Query Parameters
 
-```yaml
-do:
-  - createUser:
-      call: http
-      with:
-        method: post
-        endpoint: https://api.example.com/users
-        query:
-          source: workflow
-        headers:
-          Content-Type: application/json
-          X-Request-Id: "${ $workflow.id }"
-        body:
-          name: "${ .userDetails.name }"
-          email: "${ .userDetails.email }"
-          role: viewer
-      then: handleUserCreation
-```
+<code-block lang="yaml" src="workflows/dsl-call-http/example-post-request-with-body-and-query-parameters.yaml" include-lines="6-21"/>
 
 ### Example: Getting the Full Response Object
 
-```yaml
-do:
-  - checkServiceStatus:
-      call: http
-      with:
-        method: get
-        endpoint:
-          uri: https://status.example.com/health
-        # Get the full response including status code and headers
-        output: response 
-        # Allow redirects to be considered successful
-        redirect: true 
-      then: analyzeStatus
-  - analyzeStatus:
-      # Task input will be like: { "status": 200, "headers": { ... }, "body": { "status": "UP" } }
-      set:
-        isHealthy: "${ .body.status == 'UP' }"
-        statusCode: "${ .status }"
-```
+<code-block lang="yaml" src="workflows/dsl-call-http/example-getting-the-full-response-object.yaml" include-lines="6-22"/>
 
 ### Example: Getting Raw Response (e.g., for Binary Data)
 
-```yaml
-do:
-  - downloadImage:
-      call: http
-      with:
-        method: get
-        endpoint: 
-          uri: https://images.example.com/logo.png
-        # Get the raw response bytes (likely base64 encoded)
-        output: raw 
-      # output.as could decode the base64 if needed
-      output:
-        as: "${ base64decode(.) }" # Example - assumes a base64decode function
-```
+<code-block lang="yaml" src="workflows/dsl-call-http/example-getting-raw-response-e-g-for-binary-data.yaml" include-lines="6-17"/>
 
 ## Configuration Options
 

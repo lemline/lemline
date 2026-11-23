@@ -1,0 +1,41 @@
+document:
+  dsl: 1.0.0
+  namespace: examples
+  name: list-all-users
+  version: 1.0.0
+do:
+  - initializeUserList:
+      set:
+        allUsers: []
+        nextPage: 1
+        hasMorePages: true
+      export:
+        as: '${ $context + { allUsers: [], nextPage: 1, hasMorePages: true } }'
+  - fetchAllPages:
+      for:
+        in: ${ range(0; 10000) }
+      while: ${ $context.hasMorePages }
+      do:
+        - fetchNextUserPage:
+            call: http
+            with:
+              method: get
+              endpoint: https://api.example/users
+              query:
+                page: ${ $context.nextPage }
+                limit: '100'
+            export:
+              as: '${ $context + { pageResult: . } }'
+        - processPage:
+            set:
+              allUsers: ${ $context.allUsers + .pageResult.users }
+              nextPage: ${ $context.nextPage + 1 }
+              hasMorePages: ${ .pageResult.hasMore }
+            export:
+              as: '${ $context + { allUsers: ($context.allUsers + .pageResult.users), nextPage: ($context.nextPage
+                + 1), hasMorePages: .pageResult.hasMore } }'
+  - processFinalResult:
+      set:
+        result:
+          totalUsers: ${ length($context.allUsers) }
+          users: ${ $context.allUsers }

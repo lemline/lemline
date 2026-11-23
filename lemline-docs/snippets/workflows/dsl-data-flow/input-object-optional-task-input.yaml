@@ -1,0 +1,19 @@
+document:
+  dsl: 1.0.0
+  namespace: examples
+  name: input-object-optional-task-input
+  version: 1.0.0
+do:
+  - taskA:
+      set:
+        doubled: ${ $input.value * 2 }
+      input:
+        from: ${ .data }
+        schema:
+          document:
+            type: object
+            required:
+              - data
+            properties:
+              value:
+                type: number

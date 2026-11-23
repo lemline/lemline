@@ -1,0 +1,14 @@
+document:
+  dsl: 1.0.0
+  namespace: examples
+  name: listen-to-any-example
+  version: 0.1.0
+do:
+  - waitForEvent:
+      listen:
+        to:
+          any:
+            - with:
+                type: order.created
+            - with:
+                type: order.cancelled

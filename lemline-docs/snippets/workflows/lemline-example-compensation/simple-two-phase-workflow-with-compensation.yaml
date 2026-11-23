@@ -1,0 +1,54 @@
+document:
+  dsl: '1.0.0'
+  namespace: examples
+  name: simple-compensation
+  version: '1.0.0'
+input:
+  schema:
+    document:
+      type: object
+      required: [orderId, items, paymentInfo]
+do:
+  - processOrder:
+      try:
+        - reserveInventory:
+            call: http
+            with:
+              method: post
+              endpoint: https://inventory.example/api/reserve
+              body:
+                orderId: ${ .orderId }
+                items: ${ .items }
+            export:
+              as: '${ $context + { reservationId: .id } }'
+        - chargePayment:
+            call: http
+            with:
+              method: post
+              endpoint: https://payments.example/api/charge
+              body:
+                orderId: ${ $workflow.input.orderId }
+                amount: ${ .totalAmount }
+                paymentInfo: ${ $workflow.input.paymentInfo }
+        - returnSuccess:
+            set:
+              success: true
+              orderId: ${ $workflow.input.orderId }
+              reservationId: ${ $context.reservationId }
+              paymentId: ${ .id }
+      catch:
+        as: orderError
+        do:
+          - releaseReservation:
+              if: ${ $context.reservationId != null }
+              call: http
+              with:
+                method: post
+                endpoint: https://inventory.example/api/cancel-reservation
+                body:
+                  reservationId: ${ $context.reservationId }
+          - returnFailure:
+              set:
+                success: false
+                orderId: ${ $workflow.input.orderId }
+                errorType: ${ $orderError.type }

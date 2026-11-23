@@ -1,0 +1,23 @@
+document:
+  dsl: '1.0.0'
+  namespace: examples
+  name: parallel-order-checks
+  version: '1.0.0'
+do:
+  - checkOrder:
+      fork:
+        branches:
+          - checkStock:
+              call: http
+              with:
+                method: post
+                endpoint: https://inventory.example.com/check
+                body: ${ . }
+          - checkShipping:
+              call: http
+              with:
+                method: post
+                endpoint: https://shipping.example.com/quote
+                body: ${ . }
+      output:
+        as: '${ { checks: . } }'

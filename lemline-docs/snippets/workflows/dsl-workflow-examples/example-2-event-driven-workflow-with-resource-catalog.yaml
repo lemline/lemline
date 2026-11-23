@@ -1,0 +1,41 @@
+document:
+  dsl: '1.0.0'
+  namespace: com-example-notifications
+  name: customer-communication
+  version: '2.0.0'
+schedule:
+  on:
+    one:
+      with:
+        type: CustomerSignupEvent
+input:
+  from: ${ .[0] }
+do:
+  - determineChannel:
+      switch:
+        - emailPreference:
+            when: ${ .preferences.contactMethod == "email" }
+            then: sendEmail
+        - smsPreference:
+            when: ${ .preferences.contactMethod == "sms" }
+            then: sendSms
+        - noPreference:
+            then: end
+  - sendEmail:
+      call: http
+      with:
+        method: post
+        endpoint: https://email.example/send
+        body:
+          to: ${ .email }
+          template: welcome_email
+          name: ${ .name }
+      then: end
+  - sendSms:
+      call: http
+      with:
+        method: post
+        endpoint: https://sms.example/send
+        body:
+          to: ${ .phone }
+          message: '${ "Welcome to our service, \(.name)!" }'

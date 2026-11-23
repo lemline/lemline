@@ -1,0 +1,17 @@
+document:
+  dsl: '1.0.0'
+  namespace: examples
+  name: example-starting-sub-workflow-without-awaiting
+  version: '1.0.0'
+do:
+  - triggerLongProcess:
+      run:
+        workflow:
+          namespace: background_jobs
+          name: monthly-report-generation
+          version: '2.0'
+          input: { month: "${ .currentMonth }", year: "${ .currentYear }" }
+        # Start the sub-workflow but don't wait for it
+        await: false
+      # Task output is its input, workflow continues immediately
+      then: logReportTriggered

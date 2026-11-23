@@ -1,0 +1,28 @@
+document:
+  dsl: 1.0.0
+  namespace: examples
+  name: switch-basic
+  version: 1.0.0
+do:
+  - decideNextStep:
+      switch:
+        - caseApproved:
+            when: ${ .status == "Approved" }
+            then: processApproved
+        - caseRejected:
+            when: ${ .status == "Rejected" }
+            then: processRejected
+        - caseDefault:
+            then: handleOtherStatus
+  - processApproved:
+      set:
+        processed: true
+      then: continue
+  - processRejected:
+      set:
+        processed: true
+      then: continue
+  - handleOtherStatus:
+      set:
+        processed: true
+      then: continue

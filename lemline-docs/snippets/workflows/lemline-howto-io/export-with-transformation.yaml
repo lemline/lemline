@@ -1,0 +1,16 @@
+document:
+  dsl: 1.0.0
+  namespace: examples
+  name: export-with-transformation
+  version: 1.0.0
+do:
+  - FetchProductData:
+      call: productService
+      with:
+        productIds: ${ .items | map(.productId) }
+      export:
+        as:
+          products: ${ .products }
+          productMap: '${ .products | map({key: .id, value: .}) | from_entries }'
+          categories: ${ .products | map(.category) | unique }
+      then: NextTask

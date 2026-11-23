@@ -1,0 +1,32 @@
+document:
+  dsl: 1.0.0
+  namespace: travel-booking
+  name: wait-for-flight-confirmation
+  version: 1.0.0
+do:
+  - storeBookingInfo:
+      set:
+        bookingId: ${ .flightRequest.id }
+        provider: AcmeAir
+      export:
+        as: '${ $context + { currentBookingId: .bookingId, currentProvider: .provider } }'
+      then: waitForConfirmation
+  - waitForConfirmation:
+      listen:
+        to:
+          one:
+            with:
+              type: com.travel.confirmation.flight.v1
+            correlate:
+              matchBookingId:
+                from: ${ .confirmation.bookingRef }
+                expect: ${ .context.currentBookingId }
+              matchProvider:
+                from: ${ .confirmation.providerName }
+                expect: ${ .context.currentProvider }
+      timeout:
+        after:
+          hours: 1
+  - processFlightConfirmation:
+      set:
+        processed: true

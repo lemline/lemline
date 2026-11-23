@@ -18,27 +18,7 @@ It's primarily used for:
 
 Here's an example of raising a custom error based on input data:
 
-```yaml
-document:
-  dsl: '1.0.0'
-  namespace: examples
-  name: raise-basic
-  version: '1.0.0'
-use:
-  errors:
-    # Define a reusable error type
-    invalidInputError:
-      type: https://mycompany.com/errors/invalid-input
-      title: "Invalid Input Received"
-      status: 400 # Bad Request
-do:
-  - validateInput:
-      if: "${ .value < 0 }" # Check if input value is negative
-      raise:
-        error: invalidInputError # Reference the defined error
-  - processValue: # Only executed if value >= 0
-    # ...
-```
+<code-block lang="yaml" src="workflows/dsl-task-raise/basic-usage.yaml"/>
 
 In this example, if the `validateInput` task receives an input object where `.value` is less than 0, it raises the
 predefined `invalidInputError`. This raised error
@@ -46,64 +26,19 @@ would then typically be caught by a surrounding `Try` task.
 
 You can also define the error inline:
 
-```yaml
-do:
-  - checkInventory:
-      # ... logic to check stock ...
-      if: "${ .stockCount < .requestedAmount }"
-      raise:
-        # Define the error directly within the raise task
-        error:
-          type: https://mycompany.com/errors/out-of-stock
-          title: "Insufficient Stock"
-          status: 409 # Conflict
-          detail: "Requested ${ .requestedAmount }, but only ${ .stockCount } available."
-```
+<code-block lang="yaml" src="workflows/dsl-task-raise/basic-usage-2.yaml" include-lines="6-16"/>
 
 ## Additional Examples
 
 ### Example: Raising Error with Dynamic Detail (Inline)
 
-```yaml
-do:
-  - processItem:
-      # ... some logic ...
-      if: "${ .itemStatus == \"FAILED\" }"
-      raise:
-        error:
-          type: "https://myapp.com/errors/processing-failure"
-          title: "Item Processing Failed"
-          status: 500
-          # Construct detail dynamically using workflow context/input
-          detail: "Failed to process item ID ${ .itemId }. Error code: ${ $context.errorCodeFromPreviousStep }"
-          instance: "${ $task.reference }" # Include task path for context
-```
+<code-block lang="yaml" src="workflows/reference/raise-order-error.yaml"/>
 
 This example shows how to define an error completely inline, using runtime expressions within the `detail` and `instance` fields to provide context-specific information when the error is raised.
 
 ### Example: Raising Error to be Caught by Try
 
-```yaml
-do:
-  - outerTask:
-      try:
-        - riskyOperation:
-            if: "${ .needsSpecialHandling == false }"
-            # This error will be caught by the 'catch' block below
-            raise:
-              error: specialHandlingRequiredError # Defined in workflow.use.errors
-        - normalProcessing: # Skipped if error was raised
-            # ...
-      catch:
-        errors:
-          with: { type: "https://myapp.com/errors/special-handling" } # Matches the type from specialHandlingRequiredError
-        do:
-          - handleSpecialCase:
-              # ... logic for the special case ...
-      then: continueAfterTry
-  - continueAfterTry:
-      # ... 
-```
+<code-block lang="yaml" src="workflows/dsl-task-raise/example-raising-error-to-be-caught-by-try.yaml" include-lines="7-27"/>
 
 Here, the `riskyOperation` might raise a specific error. The surrounding `Try` task is configured to `catch` errors of that specific type (`specialHandlingRequiredError` presumably has the type `https://myapp.com/errors/special-handling`). Instead of faulting the workflow, control transfers to the `catch.do` block (`handleSpecialCase`).
 

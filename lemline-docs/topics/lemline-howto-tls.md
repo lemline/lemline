@@ -17,6 +17,7 @@ Lemline has no global TLS settings (protocol versions, cipher suites, keystores,
 
 The gRPC gateway serves TLS by default.
 
+<!-- workflow-example: data -->
 ```yaml
 lemline:
   gateway:
@@ -32,6 +33,7 @@ lemline:
 
 ### Client Certificates (mTLS)
 
+<!-- workflow-example: data -->
 ```yaml
 lemline:
   gateway:
@@ -48,6 +50,7 @@ lemline:
 
 ## Kafka TLS and SASL
 
+<!-- workflow-example: data -->
 ```yaml
 lemline:
   messaging:
@@ -64,6 +67,7 @@ lemline:
 
 ## RabbitMQ TLS
 
+<!-- workflow-example: data -->
 ```yaml
 lemline:
   messaging:
@@ -78,14 +82,7 @@ lemline:
 
 Use an `https://` URI in the endpoint:
 
-```yaml
-do:
-  - getData:
-      call: http
-      with:
-        method: get
-        endpoint: https://api.example.com/data
-```
+<code-block lang="yaml" src="workflows/lemline-howto-tls/calling-https-services-from-workflows.yaml" include-lines="6-11"/>
 
 The server certificate must be trusted by the Java runtime that runs Lemline. A call to a server with an untrusted or invalid certificate fails.
 

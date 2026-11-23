@@ -16,34 +16,7 @@ Retry an operation automatically when a transient failure occurs.
 
 Retries are declared in the `catch` clause of a `try` task:
 
-```yaml
-- callService:
-    try:
-      - request:
-          call: http
-          with:
-            method: get
-            endpoint: http://example.com/api
-    catch:
-      errors:
-        with:
-          type: https://open-workflow-specification.org/spec/1.0.0/errors/runtime
-      retry:
-        delay:
-          seconds: 2
-        backoff:
-          exponential: {}
-        jitter:
-          from:
-            milliseconds: 0
-          to:
-            milliseconds: 500
-        limit:
-          attempt:
-            count: 5
-          duration:
-            minutes: 5
-```
+<code-block lang="yaml" src="workflows/dsl-resilience-patterns/implementation.yaml" include-lines="7-32"/>
 
 Failed HTTP calls raise a `runtime` error. A retry policy can also be declared once in `use.retries` and referenced by name (`retry: <name>`).
 
@@ -69,21 +42,7 @@ While waiting for a retry, the instance is stored in the database: runners can s
 
 Catch an error and continue with a default value or an alternative path:
 
-```yaml
-- getRecommendations:
-    try:
-      - request:
-          call: http
-          with:
-            method: get
-            endpoint: http://recommendations/api
-    catch:
-      as: error
-      do:
-        - useDefault:
-            set:
-              recommendations: []
-```
+<code-block lang="yaml" src="workflows/dsl-resilience-patterns/fallback-pattern.yaml" include-lines="7-19"/>
 
 ## Timeout Pattern
 
@@ -97,56 +56,13 @@ Avoid waiting forever.
 - **HTTP calls**: the runner's HTTP client stops a request after 30 seconds (15 seconds to connect). This limit is fixed.
 - Task-level `timeout` on other tasks and workflow-level timeouts are not applied by Lemline.
 
-```yaml
-- waitForPayment:
-    try:
-      - listenPayment:
-          listen:
-            to:
-              one:
-                with:
-                  type: com.example.payment.received
-          timeout:
-            after:
-              minutes: 30
-    catch:
-      errors:
-        with:
-          type: https://open-workflow-specification.org/spec/1.0.0/errors/timeout
-      do:
-        - cancelOrder:
-            set:
-              status: cancelled
-```
+<code-block lang="yaml" src="workflows/dsl-resilience-patterns/implementation-2.yaml" include-lines="7-25"/>
 
 ## Isolation with Fork
 
 Branches of a `fork` run in parallel. Combine `fork` with `try` in each branch so that the failure of one branch is handled without failing the others:
 
-```yaml
-- processBatch:
-    fork:
-      branches:
-        - updateInventory:
-            try:
-              - reserveStock:
-                  call: http
-                  with:
-                    method: post
-                    endpoint: http://inventory/api/reservations
-                    body: ${ .items }
-            catch:
-              do:
-                - ignore:
-                    set:
-                      inventoryUpdated: false
-        - notifyCustomer:
-            emit:
-              event:
-                with:
-                  type: com.example.order.confirmed
-                  source: order-service
-```
+<code-block lang="yaml" src="workflows/dsl-resilience-patterns/isolation-with-fork.yaml" include-lines="7-28"/>
 
 ## Durability of the Runtime
 
@@ -158,35 +74,6 @@ Some resilience comes from the runtime itself, without anything to declare in wo
 
 ## Example: Combined Resilience
 
-```yaml
-- processOrder:
-    try:
-      - submitOrder:
-          call: http
-          with:
-            method: post
-            endpoint: http://order-service/api/orders
-            body: ${ .order }
-    catch:
-      errors:
-        with:
-          type: https://open-workflow-specification.org/spec/1.0.0/errors/runtime
-      retry:
-        delay:
-          seconds: 2
-        backoff:
-          exponential: {}
-        limit:
-          attempt:
-            count: 3
-      do:
-        - queueForLater:
-            emit:
-              event:
-                with:
-                  type: com.example.order.pending
-                  source: order-workflow
-                  data: ${ .order }
-```
+<code-block lang="yaml" src="workflows/dsl-resilience-patterns/example-combined-resilience.yaml" include-lines="7-34"/>
 
 This example retries the call with exponential backoff and, once the retries are exhausted, emits an event so the order can be processed later.

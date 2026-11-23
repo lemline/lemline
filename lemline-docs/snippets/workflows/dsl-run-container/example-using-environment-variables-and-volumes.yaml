@@ -1,0 +1,21 @@
+document:
+  dsl: '1.0.0'
+  namespace: examples
+  name: example-using-environment-variables-and-volumes
+  version: '1.0.0'
+do:
+  - processDataWithContainer:
+      run:
+        container:
+          image: my-data-processor:latest
+          # Pass dynamic data via environment variables
+          environment:
+            INPUT_FILE: "/data/${ .inputFile }"
+            OUTPUT_DIR: "/results"
+            API_KEY: "${ $secrets.processorApiKey }"
+          # Mount host volumes into the container
+          volumes:
+            "/mnt/shared/input": "/data:ro" # Read-only input
+            "/mnt/shared/output": "/results" # Writable output
+        return: code # Just check the exit code
+      then: checkProcessingStatus

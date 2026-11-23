@@ -1,0 +1,74 @@
+document:
+  dsl: '1.0.0'
+  namespace: iot
+  name: firmware-update
+  version: '1.0.0'
+input:
+  schema:
+    document:
+      type: object
+      required: [firmwareVersion, deviceQuery]
+      properties:
+        firmwareVersion:
+          type: string
+        deviceQuery:
+          type: object
+do:
+  - findEligibleDevices:
+      call: http
+      with:
+        method: post
+        endpoint: https://iot-registry.example/api/devices/query
+        body: ${ .deviceQuery }
+  - updateDevices:
+      for:
+        in: ${ .devices }
+        each: device
+      do:
+        - rememberDevice:
+            set:
+              deviceId: ${ $device.id }
+            export:
+              as: '${ $context + { deviceId: .deviceId } }'
+        - dispatchUpdate:
+            emit:
+              event:
+                with:
+                  type: com.example.iot.firmware.requested
+                  source: https://iot-campaigns.example
+                  data: '${ { campaignId: $workflow.id, deviceId: $device.id, firmwareVersion: $workflow.input.firmwareVersion } }'
+        - awaitStatus:
+            try:
+              - waitForStatus:
+                  listen:
+                    to:
+                      one:
+                        with:
+                          type: com.example.iot.firmware.status
+                        correlate:
+                          campaignId:
+                            from: ${ .campaignId }
+                            expect: ${ .workflow.id }
+                          deviceId:
+                            from: ${ .deviceId }
+                            expect: ${ .context.deviceId }
+                  timeout:
+                    after: PT2H
+                  output:
+                    as: ${ .[0] }
+            catch:
+              errors:
+                with:
+                  type: https://open-workflow-specification.org/spec/1.0.0/errors/timeout
+              do:
+                - readDurableStatus:
+                    call: http
+                    with:
+                      method: get
+                      endpoint:  '${ "https://iot-campaigns.example/api/status/\($workflow.id)/\($context.deviceId | @uri)" }'
+        - recordStatus:
+            call: http
+            with:
+              method: post
+              endpoint: https://iot-campaigns.example/api/status
+              body: ${ . }

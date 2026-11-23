@@ -17,45 +17,7 @@ It's primarily used for:
 
 Here's a simple example of trying to call an external service and catching a potential communication error:
 
-```yaml
-document:
-  dsl: '1.0.0'
-  namespace: examples
-  name: try-catch-basic
-  version: '1.0.0'
-do:
-  - attemptServiceCall:
-      try:
-        # Tasks to attempt inside the 'try' block (must be a list)
-        - callMyApi:
-            call: http  # See [HTTP Call Task](dsl-call-http.md) for details
-            with:
-              method: get
-              uri: https://api.unreliable.com/data
-            # This call might fail with a communication error
-      catch:
-        # Define how to handle errors caught from the 'try' block
-        errors:
-          # Catch specific error types (optional)
-          with:
-            type: https://open-workflow-specification.org/spec/1.0.0/errors/communication
-        as: "apiError" # Store the caught error details in $apiError variable (default is $error)
-        do:
-          # Tasks to execute ONLY if an error matching the filter is caught
-          - logFailure:
-              call: log
-              with:
-                level: "warn"
-                message: "API call failed. Error: ${ $apiError }"
-          - setDefaultValue:
-              set: # Provide a default output if the try block failed
-                data: null
-                status: "failed"
-  - continueProcessing: # Executes after attemptServiceCall (either success or caught error)
-    # Input is the output of 'callMyApi' if successful,
-    # or the output of 'setDefaultValue' if an error was caught.
-    # ...
-```
+<code-block lang="yaml" src="workflows/dsl-task-try/basic-usage.yaml"/>
 
 In this example, if `callMyApi` fails with a standard `communication` error, the `catch` block is activated. The error
 details are stored in the `$apiError` variable (accessible within the `catch.do` block), the failure is logged, and a
@@ -64,29 +26,7 @@ block is skipped entirely.
 
 Here's an example demonstrating automatic retries:
 
-```yaml
-do:
-  - attemptWithRetry:
-      try:
-        - fetchCrucialData:
-            call: http
-            with: # ... service details ...
-            # Might temporarily fail with 503
-      catch:
-        errors:
-          with:
-            status: 503 # Only catch 'Service Unavailable' errors
-        retry:
-          delay: PT2S    # Initial delay 2 seconds
-          backoff:
-            exponential: { } # Exponential backoff (2s, 4s, 8s...)
-          limit:
-            attempt:
-              count: 4   # Max 1 initial attempt + 3 retries = 4 total
-        # No 'catch.do' means if all retries fail, the error is re-thrown
-  - processData: # Only reached if fetchCrucialData succeeds eventually
-    # ...
-```
+<code-block lang="yaml" src="workflows/dsl-task-try/basic-usage-2.yaml" include-lines="7-27"/>
 
 This example attempts `fetchCrucialData`. If it fails with a 503 status, it waits 2 seconds and retries. If it fails
 again, it waits 4 seconds, then 8 seconds. If it still fails after the 4th total attempt, the 503 error is *not*
@@ -133,43 +73,22 @@ The `catch` block can contain the following properties:
         * If the `with` object is omitted, this specific property-based filtering step is skipped, and all errors are
           considered potentially catchable (subject to further filtering by `when`/`exceptWhen`).
         * **Example**:
-            ```yaml
-            catch:
-              errors:
-                with: 
-                  # Only catch errors of this specific type AND status
-                  type: "https://open-workflow-specification.org/spec/1.0.0/errors/communication"
-                  status: 503 
-                  # instance: /do/0/callApi # Optionally match instance too
-              # ... other catch properties (as, when, retry, do) ...
-            ```
+
+            <code-block lang="yaml" src="workflows/reference/catch-type-and-status.yaml" include-lines="14-21"/>
 * **`as`** (String, Optional): Specifies the variable name used to store the caught error object within the scope of the
   `catch` block (`when`, `exceptWhen`, `retry`, `do`). Defaults to `error` (accessible as `$error` in expressions).
 * **`when`** (String, Optional): A [Runtime Expression](dsl-runtime-expressions.md) evaluated *if* an error matches the
   `errors.with` filter. The expression has access to the caught error via the variable named by `as`. The error is only
   caught if this expression evaluates to `true`.
     * **Example**: Catch communication errors only if they occurred for a specific instance:
-      ```yaml
-      catch:
-        errors:
-          with: { type: ".../communication" }
-        as: "commErr" # Optional, using 'commErr' instead of default 'error'
-        when: "${ $commErr.instance == '/do/0/unreliableApiCall' }"
-        # ... retry or do ...
-      ```
+
+      <code-block lang="yaml" src="workflows/reference/use-named-caught-error.yaml" include-lines="14-19"/>
 * **`exceptWhen`** (String, Optional): A [Runtime Expression](dsl-runtime-expressions.md) evaluated *if* an error
   matches the `errors.with` filter *and* the `when` condition (if present) was true. The expression has access to the
   caught error. The error is *not* caught if this expression evaluates to `true`.
     * **Example**: Catch all validation errors *except* those related to a specific field:
-      ```yaml
-      catch:
-        errors:
-          with: { type: ".../validation" }
-        # Uses default 'error' variable -> $error
-        exceptWhen: "${ $error.details | contains(\"userEmail\" }" # Don't catch if details mention userEmail
-        do:
-          # Handle other validation errors
-      ```
+
+      <code-block lang="yaml" src="workflows/reference/filter-caught-error.yaml" include-lines="14-22"/>
     * **`retry`** (String | Object, Optional): Defines the retry strategy if an error is caught (passes filters). Can be
       a
       string referencing a named `RetryPolicy` defined in `workflow.use.retries`, or an inline `RetryPolicy` object.
@@ -221,55 +140,24 @@ The `catch` block can contain the following properties:
 
       **1. Simple Retry Count:** Retry up to 3 times with a fixed 5-second delay.
 
-        ```yaml
-        retry:
-          delay: { seconds: 5 }
-          limit:
-            attempt:
-              count: 4 # 1 initial + 3 retries
-        ```
+        <code-block lang="yaml" src="workflows/reference/fixed-retry-delay.yaml" include-lines="15-19"/>
 
       **2. Linear Backoff with Total Duration Limit:** Retry with delay increasing linearly (2s, 4s, 6s...), stopping
       after a
       total of 1 minute.
 
-        ```yaml
-        retry:
-          delay: { seconds: 2 }
-          backoff:
-            linear: { }
-          limit:
-            duration: { minutes: 1 }
-        ```
+        <code-block lang="yaml" src="workflows/reference/linear-retry-delay.yaml" include-lines="15-21"/>
 
       **3. Exponential Backoff with Jitter:** Retry with exponentially increasing delay (1s, 2s, 4s...) plus random
       jitter
       between 0.5 and 1.5 seconds.
 
-        ```yaml
-        retry:
-          delay: { seconds: 1 }
-          backoff:
-            exponential: { }
-          jitter:
-            from: { milliseconds: 500 }
-            to: { seconds: 1, milliseconds: 500 }
-          limit:
-            attempt:
-              count: 5
-        ```
+        <code-block lang="yaml" src="workflows/reference/exponential-backoff-with-jitter.yaml" include-lines="15-24"/>
 
       **4. Conditional Retry:** Only retry if the error details mention a timeout, using the default error variable
       `$error`.
 
-        ```yaml
-        retry:
-          when: "${ $error.details | contains(\"timeout\") }" # Only retry on timeouts
-          delay: { seconds: 10 }
-          limit:
-            attempt:
-              count: 3
-        ```
+        <code-block lang="yaml" src="workflows/reference/conditional-retry.yaml" include-lines="15-20"/>
 * **`do`** (List<String, Object>, Optional): A block of tasks to execute sequentially *only if* an error is successfully
   caught (passes `errors.with`, `when`, and `exceptWhen` filters).
     * **Output**: If the `catch.do` block executes, its final transformed output becomes the `rawOutput` of the entire

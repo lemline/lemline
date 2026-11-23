@@ -1,0 +1,47 @@
+document:
+  dsl: 1.0.0
+  namespace: examples
+  name: basic-error-handling
+  version: 1.0.0
+do:
+  - processOrder:
+      try:
+        - validateOrder:
+            call: http
+            with:
+              endpoint: https://api.example.com/validate-order
+              method: post
+              body: ${ .input.order }
+              headers:
+                Content-Type: application/json
+        - processPayment:
+            call: processPayment
+            with:
+              order: ${ .input.order }
+              paymentMethod: ${ .input.paymentMethod }
+            export:
+              as: '${ $context + { paymentResult: . } }'
+      catch:
+        as: error
+        do:
+          - logError:
+              call: http
+              with:
+                endpoint: https://api.example.com/log-error
+                method: post
+                body:
+                  error: ${ .error }
+                  context: Order processing
+                headers:
+                  Content-Type: application/json
+          - notifyCustomer:
+              call: http
+              with:
+                endpoint: https://api.example.com/send-email
+                method: post
+                body:
+                  to: ${ .input.order.customerEmail }
+                  subject: Order Processing Failed
+                  body: '${ "We apologize, but we could not process your order. Error: " + .error.message }'
+                headers:
+                  Content-Type: application/json

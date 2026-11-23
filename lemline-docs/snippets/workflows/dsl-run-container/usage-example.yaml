@@ -1,0 +1,15 @@
+document:
+  dsl: 1.0.0
+  namespace: container-runs
+  name: run-simple-container
+  version: 1.0.0
+do:
+  - executeInContainer:
+      run:
+        container:
+          image: busybox:latest
+          command: echo 'Hello from container'
+      then: processContainerOutput
+  - processContainerOutput:
+      set:
+        message: '{ trim: . }'

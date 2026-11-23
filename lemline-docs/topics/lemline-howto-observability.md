@@ -28,6 +28,7 @@ Lemline does not include distributed tracing (OpenTelemetry) or alerting; use yo
 
 `lemline listen` and `lemline gateway start` serve Prometheus metrics. Change the port with `lemline.metrics.port` or `--metrics-port`, and the path with `lemline.metrics.path`:
 
+<!-- workflow-example: data -->
 ```yaml
 lemline:
   metrics:
@@ -54,6 +55,7 @@ Most counters are tagged with `workflow_name` and `workflow_version`. The gatewa
 
 ### Prometheus Integration
 
+<!-- workflow-example: data -->
 ```yaml
 # prometheus.yml
 scrape_configs:

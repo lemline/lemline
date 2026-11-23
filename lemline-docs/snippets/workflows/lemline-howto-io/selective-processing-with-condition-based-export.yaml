@@ -1,0 +1,16 @@
+document:
+  dsl: 1.0.0
+  namespace: examples
+  name: selective-processing-with-condition-based-export
+  version: 1.0.0
+do:
+  - ConditionalExport:
+      set:
+        status: '${ if .code == 200 then "SUCCESS" else "ERROR" end }'
+        successData: if .code == 200 then .data else null end
+        errorData: if .code != 200 then .error else null end
+      export:
+        as:
+          result: '${ if .status == "SUCCESS" then .successData else .errorData end }'
+          isError: ${ .status == "ERROR" }
+      then: NextStep

@@ -43,6 +43,7 @@ See [How to Configure Scaling](lemline-howto-scaling.md) for adding runners, spl
 
 Example Prometheus rules based on real metrics:
 
+<!-- workflow-example: data -->
 ```yaml
 groups:
   - name: lemline-sizing

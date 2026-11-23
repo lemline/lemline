@@ -12,16 +12,7 @@ There are no `lemline.grpc.*` runner settings.
 
 Expose the service over HTTP (for example with a gRPC-JSON transcoding proxy) and call it with `call: http`:
 
-```yaml
-do:
-  - getUser:
-      call: http
-      with:
-        method: post
-        endpoint: https://users.example.com/v1/users:get
-        body:
-          id: ${ .userId }
-```
+<code-block lang="yaml" src="workflows/lemline-ref-grpc/alternative.yaml" include-lines="6-13"/>
 
 ## Related Resources
 

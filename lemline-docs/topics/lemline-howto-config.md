@@ -27,6 +27,7 @@ This writes `lemline.yaml` in the current directory. Lemline does not look for t
 
 A minimal file looks like this:
 
+<!-- workflow-example: data -->
 ```yaml
 lemline:
   database:
@@ -95,6 +96,7 @@ Use `--format yaml` or `--format properties` to choose the output format, and `-
 
 ### Database
 
+<!-- workflow-example: data -->
 ```yaml
 lemline:
   database:
@@ -111,6 +113,7 @@ If `type` is omitted, Lemline picks `postgresql` or `mysql` from the block you f
 
 ### Messaging
 
+<!-- workflow-example: data -->
 ```yaml
 lemline:
   messaging:
@@ -124,6 +127,7 @@ lemline:
 
 RabbitMQ:
 
+<!-- workflow-example: data -->
 ```yaml
 lemline:
   messaging:
@@ -137,6 +141,7 @@ lemline:
 
 PGMQ (PostgreSQL as a message queue):
 
+<!-- workflow-example: data -->
 ```yaml
 lemline:
   messaging:
@@ -154,6 +159,7 @@ See [Message Brokers](lemline-howto-brokers.md).
 
 By default a runner works on the `default` namespace. To make it serve other namespaces:
 
+<!-- workflow-example: data -->
 ```yaml
 lemline:
   namespaces: orders, billing
@@ -163,6 +169,7 @@ lemline:
 
 Each channel processes up to 64 messages in parallel by default:
 
+<!-- workflow-example: data -->
 ```yaml
 lemline:
   messaging:

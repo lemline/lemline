@@ -1,0 +1,143 @@
+document:
+  dsl: 1.0.0
+  namespace: examples
+  name: order-processing
+  version: 1.0.0
+  title: Order Processing Workflow
+do:
+  - ValidateOrder:
+      set:
+        isValid: ${ .items | length > 0 }
+        hasFulfillableItems: true
+      then: CheckOrderValidity
+  - CheckOrderValidity:
+      switch:
+        - case1:
+            when: ${ .isValid == false }
+            then: RejectOrder
+        - case2:
+            then: CheckInventory
+  - CheckInventory:
+      call: http
+      with:
+        method: get
+        endpoint: https://inventory-api.example.com/check
+        body:
+          items: '${ .items | map({id: .productId, quantity: .quantity}) }'
+      then: EvaluateInventory
+  - EvaluateInventory:
+      switch:
+        - case1:
+            when: ${ .allAvailable == true }
+            then: CalculateShipping
+        - case2:
+            when: ${ .partiallyAvailable == true and .order.allowPartial == true }
+            then: AdjustForPartialInventory
+        - case3:
+            then: HandleOutOfStock
+  - AdjustForPartialInventory:
+      set:
+        items: ${ .items | map(select(.productId as $id | .availableItems | map(.id) | contains([$id])))
+          }
+        message: Some items were unavailable and have been removed from your order.
+      then: CalculateShipping
+  - CalculateShipping:
+      call: http
+      with:
+        method: post
+        endpoint: https://shipping-api.example.com/calculate
+        body:
+          destination: ${ .shippingAddress }
+          items: ${ .items }
+      then: DetermineShippingMethod
+  - DetermineShippingMethod:
+      switch:
+        - case1:
+            when: ${ .expressSelected == true and .expressAvailable == true }
+            then: ApplyExpressShipping
+        - case2:
+            when: ${ .total.weight > 20 }
+            then: ApplyFreightShipping
+        - case3:
+            then: ApplyStandardShipping
+  - ApplyExpressShipping:
+      set:
+        shippingMethod: EXPRESS
+        shippingCost: ${ .rates.express }
+        estimatedDelivery: ${ .deliveryEstimates.express }
+      then: CalculateTotals
+  - ApplyFreightShipping:
+      set:
+        shippingMethod: FREIGHT
+        shippingCost: ${ .rates.freight }
+        estimatedDelivery: ${ .deliveryEstimates.freight }
+      then: CalculateTotals
+  - ApplyStandardShipping:
+      set:
+        shippingMethod: STANDARD
+        shippingCost: ${ .rates.standard }
+        estimatedDelivery: ${ .deliveryEstimates.standard }
+      then: CalculateTotals
+  - CalculateTotals:
+      set:
+        subtotal: ${ .items | map(.price * .quantity) | add }
+        tax: ${ .subtotal * 0.08 }
+        total: ${ .subtotal + .tax + .shippingCost }
+      then: ProcessPayment
+  - ProcessPayment:
+      call: http
+      with:
+        method: post
+        endpoint: https://payment-api.example.com/process
+        body:
+          amount: ${ .total }
+          method: ${ .paymentMethod }
+          currency: USD
+      then: EvaluatePayment
+  - EvaluatePayment:
+      switch:
+        - case1:
+            when: ${ .status == "approved" }
+            then: CompleteOrder
+        - case2:
+            when: ${ .status == "review" }
+            then: FlagForReview
+        - case3:
+            when: ${ .status == "declined" }
+            then: HandleDeclinedPayment
+        - case4:
+            then: HandlePaymentError
+  - CompleteOrder:
+      set:
+        orderStatus: CONFIRMED
+        confirmationNumber: ${ .transactionId }
+        message: Your order has been confirmed and will ship via .shippingMethod.
+      then: end
+  - RejectOrder:
+      set:
+        orderStatus: REJECTED
+        reason: Invalid order
+        message: Your order could not be processed because it contains no items.
+      then: end
+  - HandleOutOfStock:
+      set:
+        orderStatus: REJECTED
+        reason: Out of stock
+        message: Your order could not be processed because some items are out of stock.
+      then: end
+  - FlagForReview:
+      set:
+        orderStatus: PENDING_REVIEW
+        message: Your order requires additional review. We will contact you shortly.
+      then: end
+  - HandleDeclinedPayment:
+      set:
+        orderStatus: PAYMENT_DECLINED
+        reason: ${ .declineReason }
+        message: Your payment was declined. Please try a different payment method.
+      then: end
+  - HandlePaymentError:
+      set:
+        orderStatus: PAYMENT_ERROR
+        message: We encountered an error processing your payment. Please try again later.
+      then: end

@@ -1,0 +1,21 @@
+document:
+  dsl: 1.0.0
+  namespace: tutorial
+  name: hello-workflow
+  version: 0.1.0
+input:
+  schema:
+    document:
+      type: object
+      properties:
+        name:
+          type: string
+do:
+  - createGreeting:
+      set:
+        message: ${ "Hello, " + .name + "!" }
+  - logMessage:
+      call:
+        https://raw.githubusercontent.com/open-workflow-specification/catalog/main/functions/log/1.0.0/function.yaml
+      with:
+        message: ${ .message }

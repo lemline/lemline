@@ -1,0 +1,19 @@
+document:
+  dsl: 1.0.0
+  namespace: examples
+  name: simple-binary-decision
+  version: 1.0.0
+do:
+  - CheckInventory:
+      call: inventoryService
+      with:
+        productId: ${ .productId }
+        quantity: ${ .quantity }
+      then: EvaluateInventory
+  - EvaluateInventory:
+      switch:
+        - case1:
+            when: ${ .available == true }
+            then: ProcessOrder
+        - case2:
+            then: HandleOutOfStock

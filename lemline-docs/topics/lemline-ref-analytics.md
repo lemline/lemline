@@ -24,6 +24,7 @@ Lifecycle analytics requires both:
 
 ### Configure PostgreSQL
 
+<!-- workflow-example: data -->
 ```yaml
 lemline:
   messaging:
@@ -59,6 +60,7 @@ Use a database dedicated to analytics. Its Flyway history is separate from the w
 
 Add this analytics block to the runner configuration alongside your workflow database and messaging settings. Use the JVM package for SQLite analytics.
 
+<!-- workflow-example: data -->
 ```yaml
 lemline:
   analytics:

@@ -1,0 +1,27 @@
+document:
+  dsl: 1.0.0
+  namespace: examples
+  name: example-raising-error-to-be-caught-by-try
+  version: 1.0.0
+do:
+  - outerTask:
+      try:
+        - riskyOperation:
+            raise:
+              error: specialHandlingRequiredError
+            if: ${ .needsSpecialHandling == false }
+        - normalProcessing:
+            set:
+              processed: true
+      catch:
+        errors:
+          with:
+            type: https://myapp.com/errors/special-handling
+        do:
+          - handleSpecialCase:
+              set:
+                processed: true
+      then: continueAfterTry
+  - continueAfterTry:
+      set:
+        processed: true

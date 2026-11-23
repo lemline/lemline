@@ -1,0 +1,17 @@
+document:
+  dsl: 1.0.0
+  namespace: examples
+  name: event-correlation
+  version: 1.0.0
+do:
+  - WaitForShipmentEvents:
+      listen:
+        to:
+          one:
+            with:
+              type: ShipmentStatusUpdate
+            correlate:
+              orderId:
+                from: ${ .orderId }
+                expect: ${ .workflow.input.orderId }
+      then: ProcessShipmentUpdates

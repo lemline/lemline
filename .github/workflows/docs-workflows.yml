@@ -1,0 +1,44 @@
+name: Documentation Workflows
+
+on:
+  pull_request:
+    paths:
+      - 'lemline-docs/**'
+      - 'lemline-core/**'
+      - 'lemline-common/**'
+      - 'lemline-messages-proto/**'
+      - 'buildSrc/**'
+      - 'gradle/**'
+      - '*.gradle.kts'
+      - 'gradle.properties'
+      - '.github/workflows/docs-workflows.yml'
+  workflow_call:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+          cache: pip
+          cache-dependency-path: lemline-docs/validation/requirements.txt
+      - name: Check the Open Workflow schema and documentation coverage
+        run: |
+          python -m pip install -r lemline-docs/validation/requirements.txt
+          python -B -m unittest discover -s lemline-docs/validation
+          python lemline-docs/validation/check_workflows.py
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: |
+            17
+            25
+      - uses: gradle/actions/setup-gradle@v5
+      - name: Check that Lemline can load the documentation workflows
+        run: ./gradlew :lemline-core:test --tests '*DocumentationWorkflowTest'

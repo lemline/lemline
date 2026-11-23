@@ -1,0 +1,15 @@
+document:
+  dsl: '1.0.0'
+  namespace: examples
+  name: bounding-how-long-a-workflow-waits
+  version: '1.0.0'
+do:
+  - waitForPayment:
+      listen:
+        to:
+          one:
+            with:
+              type: com.example.payment.received
+      timeout:
+        after:
+          hours: 24

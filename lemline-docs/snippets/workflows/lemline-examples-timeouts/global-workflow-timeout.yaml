@@ -1,0 +1,35 @@
+document:
+  dsl: '1.0.0'
+  namespace: examples
+  name: deadline-between-tasks
+  version: '1.0.0'
+do:
+  - recordDeadline:
+      set:
+        deadline: ${ now + 1800 }
+      export:
+        as: '${ $context + { deadline: .deadline } }'
+  - prepareResults:
+      call: http
+      with:
+        method: post
+        endpoint: https://process.example/prepare
+        body: ${ $workflow.input }
+  - checkDeadline:
+      switch:
+        - expired:
+            when: ${ now >= $context.deadline }
+            then: returnExpired
+        - timeRemaining:
+            then: finish
+  - returnExpired:
+      set:
+        success: false
+        reason: Deadline reached before the final step
+      then: end
+  - finish:
+      call: http
+      with:
+        method: post
+        endpoint: https://process.example/finish
+        body: ${ . }

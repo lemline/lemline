@@ -1,0 +1,22 @@
+document:
+  dsl: 1.0.0
+  namespace: examples
+  name: order-fulfillment
+  version: 1.0.0-alpha2
+
+do:
+  - checkItemType:
+      switch:
+        - ifDigital:
+            when: ${ .itemType == "digital" }
+            then: processDigitalOrder
+        - default:
+            then: checkPhysicalOrderLogic
+
+  - processDigitalOrder:
+      set:
+        fulfillment: digital-delivery
+      then: end
+  - checkPhysicalOrderLogic:
+      set:
+        fulfillment: physical-shipping

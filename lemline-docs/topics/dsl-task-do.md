@@ -12,25 +12,7 @@ defined steps.
 
 Here's a simple example of a `Do` task executing two sub-tasks sequentially:
 
-```yaml
-document:
-  dsl: '1.0.0'
-  namespace: examples
-  name: sequential-tasks
-  version: '1.0.0'
-do: # This is the main 'Do'
-  - step1:
-      do: # This is a `Do` task containing sub-tasks
-        - taskA:
-            set:
-              result: "Value from Task A"
-        - taskB:
-            set:
-              # Input to taskB is the output of taskA
-              resultB: "${ .result + ' and Task B' }"
-
-# Workflow output will be { "resultB": "Value from Task A and Task B" }
-```
+<code-block lang="yaml" src="workflows/dsl-task-do/basic-usage.yaml"/>
 
 In this example, `taskA` executes first, setting the `result` field. Its output is then implicitly passed as input to
 `taskB`, which uses that result to compute its own `resultB`.
@@ -48,19 +30,7 @@ value defines the sub-task to be executed. The sub-tasks are executed sequential
 Each element in the list specifies a unique name for the sub-task and the task definition itself (e.g., `set`,
 `call`, another `do`, etc.). The order in the list determines the execution sequence.
 
-```yaml
-do:
-  - myDoTask: # Name of the parent Do task
-      do: # The 'do' property containing the list of sub-tasks
-        - firstSubTask:
-            call: http
-            with:
-              uri: https://api.example.com/data
-              method: get
-        - secondSubTask:
-            set:
-              processedData: "${ .body }" # Access output from firstSubTask
-```
+<code-block lang="yaml" src="workflows/dsl-task-do/do-list-string-object-required.yaml" include-lines="7-16"/>
 
 ## Data Flow
 

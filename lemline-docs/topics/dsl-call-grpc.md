@@ -14,75 +14,13 @@ The gRPC Call task enables workflows to interact with external systems using the
 
 ## Usage Example
 
-```yaml
-document:
-  dsl: '1.0.0'
-  namespace: test
-  name: grpc-example
-  version: '0.1.0'
-do:
-  - greetUser:
-      call: grpc
-      with:
-        # Reference to the Protobuf definition file
-        proto:
-          endpoint: file://app/protos/greet.proto
-        # Service details
-        service:
-          name: GreeterApi.Greeter # Service name defined in proto
-          host: localhost
-          port: 5011
-          authentication:
-            use: myGrpcAuth # Optional authentication
-        # Method and arguments
-        method: SayHello # Method name defined in proto
-        arguments:
-          name: "${ .user.preferredDisplayName }"
-      # Output is the response message from the SayHello method
-  - processGreeting:
-      # Store the greeting response
-      set:
-        greeting: "${ .greetUser.response }"
-```
+<code-block lang="yaml" src="workflows/dsl-call-grpc/usage-example.yaml"/>
 
 ## Additional Examples
 
 ### Example: Using Authentication
 
-```yaml
-document:
-  dsl: '1.0.0'
-  namespace: test
-  name: grpc-auth-example
-  version: '0.1.0'
-use:
-  authentications:
-    myGrpcAuth:
-      oauth2:
-        authority: "https://auth.example.com"
-        client:
-          id: "client-id"
-          secret: "client-secret"
-        grant: "client_credentials"
-do:
-  - getAccountDetails:
-      call: grpc
-      with:
-        proto: 
-          endpoint: "file://protos/account.proto"
-        service:
-          name: AccountService
-          host: secure-grpc
-          port: 50051
-          authentication:
-            use: myGrpcAuth
-        method: GetAccount
-        arguments:
-          accountId: "${ .user.id }"
-      then: processAccount
-  - processAccount:
-      ###
-```
+<code-block lang="yaml" src="workflows/dsl-call-grpc/example-using-authentication.yaml"/>
 ## Configuration Options
 
 The configuration for a gRPC call is provided within the `with` property of the `call: grpc` task.

@@ -1,0 +1,8 @@
+document:
+  dsl: 1.0.0
+  namespace: examples
+  name: 1-system-generated-errors-2
+  version: 1.0.0
+do:
+  - example:
+      wait: PT30S

@@ -1,0 +1,31 @@
+document:
+  dsl: 1.0.0
+  namespace: examples
+  name: order-processing
+  version: 1.0.0
+use:
+  functions:
+    orderValidator:
+      set:
+        processed: true
+    paymentProcessor:
+      set:
+        processed: true
+    inventoryManager:
+      set:
+        processed: true
+do:
+  - validateOrder:
+      call: orderValidator
+      with:
+        order: ${ .input.order }
+  - processPayment:
+      call: paymentProcessor
+      with:
+        amount: ${ .input.order.totalAmount }
+        paymentDetails: ${ .input.paymentInfo }
+  - updateInventory:
+      call: inventoryManager
+      with:
+        items: ${ .input.order.items }
+        operation: reserve

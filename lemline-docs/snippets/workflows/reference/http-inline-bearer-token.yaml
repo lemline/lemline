@@ -1,0 +1,18 @@
+document:
+  dsl: '1.0.0'
+  namespace: examples
+  name: http-inline-bearer-token
+  version: '1.0.0'
+use:
+  secrets:
+    - API_TOKEN
+do:
+  - fetch:
+      call: http
+      with:
+        method: get
+        endpoint:
+          uri: https://api.example.com/data
+          authentication:
+            bearer:
+              token: ${ $secrets.API_TOKEN }

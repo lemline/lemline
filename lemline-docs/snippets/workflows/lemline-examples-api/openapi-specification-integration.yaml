@@ -1,0 +1,44 @@
+document:
+  dsl: 1.0.0
+  namespace: examples
+  name: pet-store-integration
+  version: 1.0.0
+do:
+  - listAvailablePets:
+      call: openapi
+      with:
+        document:
+          endpoint: https://petstore.swagger.io/v2/swagger.json
+        operationId: findPetsByStatus
+        parameters:
+          status: available
+      export:
+        as: '${ $context + { availablePets: . } }'
+  - addNewPet:
+      call: openapi
+      with:
+        document:
+          endpoint: https://petstore.swagger.io/v2/swagger.json
+        operationId: addPet
+        parameters:
+          body:
+            name: Fluffy
+            status: available
+            category:
+              id: 1
+              name: Dogs
+            tags:
+              - id: 1
+                name: friendly
+      export:
+        as: '${ $context + { newPet: . } }'
+  - retrievePet:
+      call: openapi
+      with:
+        document:
+          endpoint: https://petstore.swagger.io/v2/swagger.json
+        operationId: getPetById
+        parameters:
+          petId: ${ .newPet.id }
+      export:
+        as: '${ $context + { retrievedPet: . } }'

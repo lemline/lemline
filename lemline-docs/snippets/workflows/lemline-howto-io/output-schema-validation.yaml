@@ -1,0 +1,35 @@
+document:
+  dsl: 1.0.0
+  namespace: examples
+  name: output-schema-validation
+  version: 1.0.0
+do:
+  - GenerateUserProfile:
+      set:
+        profile:
+          id: ${ .userId }
+          name: ${ .firstName + " " + .lastName }
+          email: ${ .emailAddress }
+          memberSince: ${ .joinDate }
+      output:
+        schema:
+          document:
+            type: object
+            required:
+              - profile
+            properties:
+              profile:
+                type: object
+                required:
+                  - id
+                  - name
+                  - email
+                properties:
+                  id:
+                    type: string
+                  name:
+                    type: string
+                  email:
+                    type: string
+                    format: email
+      then: NextTask

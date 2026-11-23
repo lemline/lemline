@@ -1,0 +1,14 @@
+document:
+  dsl: '1.0.0'
+  namespace: examples
+  name: raise-order-error
+  version: '1.0.0'
+do:
+  - checkStock:
+      if: ${ .stock < .quantity }
+      raise:
+        error:
+          type: https://errors.example.com/out-of-stock
+          status: 409
+          title: Insufficient stock
+          detail: '${ "Requested \(.quantity); available \(.stock)" }'

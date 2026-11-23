@@ -1,0 +1,20 @@
+document:
+  dsl: 1.0.0
+  namespace: examples
+  name: star-wars-homeplanet
+  version: 1.0.0
+do:
+  - getStarWarsCharacter:
+      call: http
+      with:
+        method: get
+        endpoint: https://swapi.dev/api/people/{id}
+        output: response
+      export:
+        as:
+          homeworld: ${ .content.homeworld }
+  - getStarWarsHomeworld:
+      call: http
+      with:
+        method: get
+        endpoint: ${ $context.homeworld }

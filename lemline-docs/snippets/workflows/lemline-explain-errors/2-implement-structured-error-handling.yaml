@@ -1,0 +1,31 @@
+document:
+  dsl: 1.0.0
+  namespace: examples
+  name: 2-implement-structured-error-handling
+  version: 1.0.0
+do:
+  - mainFlow:
+      try:
+        - validateInput:
+            set:
+              processed: true
+        - processOrder:
+            try:
+              - reserveInventory:
+                  set:
+                    processed: true
+              - processPayment:
+                  set:
+                    processed: true
+            catch:
+              errors:
+                with:
+                  type: https://errors.example.com/payment-declined
+              do:
+                - handleError:
+                    set:
+                      processed: true
+        - fulfillOrder:
+            set:
+              processed: true
+      catch: {}

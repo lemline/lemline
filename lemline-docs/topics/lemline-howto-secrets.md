@@ -12,24 +12,7 @@ Secret values are resolved on the runner each time it executes a step. `$secrets
 
 ## Step 1: Declare the Secrets
 
-```yaml
-document:
-  dsl: '1.0.0'
-  namespace: billing
-  name: charge-customer
-  version: '1.0.0'
-use:
-  secrets:
-    - PAYMENT_API_KEY
-do:
-  - charge:
-      call: http
-      with:
-        method: post
-        endpoint: https://payments.example.com/v1/charges
-        headers:
-          Authorization: '${ "Bearer " + $secrets.PAYMENT_API_KEY }'
-```
+<code-block lang="yaml" src="workflows/lemline-howto-secrets/step-1-declare-the-secrets.yaml"/>
 
 A workflow only sees the secrets it declares. A secret that is set on the runner but not listed in `use.secrets` is not visible to expressions.
 
@@ -44,6 +27,7 @@ lemline listen
 
 With Kubernetes, map a Kubernetes Secret to the same variable name:
 
+<!-- workflow-example: data -->
 ```yaml
 env:
   - name: PAYMENT_API_KEY
@@ -63,20 +47,7 @@ If the value is a JSON object, Lemline parses it, and expressions can read its f
 export DB_CREDENTIALS='{"username": "app", "password": "s3cr3t"}'
 ```
 
-```yaml
-use:
-  secrets:
-    - DB_CREDENTIALS
-do:
-  - connect:
-      call: http
-      with:
-        method: post
-        endpoint: https://db-proxy.example.com/sessions
-        body:
-          user: ${ $secrets.DB_CREDENTIALS.username }
-          password: ${ $secrets.DB_CREDENTIALS.password }
-```
+<code-block lang="yaml" src="workflows/lemline-howto-secrets/structured-secrets.yaml" include-lines="6-17"/>
 
 Any other value (including a JSON array or number) is passed as a plain string.
 
@@ -84,13 +55,7 @@ Any other value (including a JSON array or number) is passed as a plain string.
 
 Every part of an HTTP call evaluates expressions: `endpoint`, `headers`, `query`, `body`, and the fields of `endpoint.authentication`. Instead of building the `Authorization` header yourself, you can use an authentication policy:
 
-```yaml
-endpoint:
-  uri: https://payments.example.com/v1/charges
-  authentication:
-    bearer:
-      token: ${ $secrets.PAYMENT_API_KEY }
-```
+<code-block lang="yaml" src="workflows/reference/http-secrets.yaml" include-lines="14-18"/>
 
 Basic authentication works the same way, with `username` and `password` expressions.
 

@@ -1,0 +1,14 @@
+document:
+  dsl: '1.0.0'
+  namespace: examples
+  name: http-query-parameters
+  version: '1.0.0'
+do:
+  - fetch:
+      call: http
+      with:
+        method: get
+        endpoint: https://api.example.com/users
+        query:
+          page: "1"
+          status: ${ .status }

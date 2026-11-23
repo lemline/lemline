@@ -1,0 +1,17 @@
+document:
+  dsl: '1.0.0'
+  namespace: examples
+  name: example-running-without-awaiting-fire-and-forget
+  version: '1.0.0'
+do:
+  - triggerBackgroundJob:
+      run:
+        container:
+          image: background-worker:latest
+          environment:
+            JOB_ID: "${ .jobId }"
+        # Don't wait for the container to finish
+        await: false
+      # Task output is its input because await is false
+      # Workflow continues immediately
+      then: recordJobTriggered

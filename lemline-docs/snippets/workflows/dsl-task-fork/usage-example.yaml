@@ -1,0 +1,25 @@
+document:
+  dsl: 1.0.0
+  namespace: test
+  name: fork-example
+  version: 0.1.0
+do:
+  - getData:
+      set:
+        processed: true
+      then: processConcurrently
+  - processConcurrently:
+      fork:
+        branches:
+          - processUserData:
+              call: processUserMicroservice
+              with:
+                userId: ${ .userId }
+          - processProductData:
+              call: processProductMicroservice
+              with:
+                productId: ${ .productId }
+      then: combineResults
+  - combineResults:
+      set:
+        processed: true

@@ -1,0 +1,40 @@
+document:
+  dsl: 1.0.0
+  namespace: examples
+  name: input-schema-validation
+  version: 1.0.0
+do:
+  - ValidatePaymentInfo:
+      set:
+        validPayment: true
+        formattedAmount: '"$" + (.amount | tostring)'
+      input:
+        schema:
+          document:
+            type: object
+            required:
+              - amount
+              - currency
+              - paymentMethod
+            properties:
+              amount:
+                type: number
+                minimum: 0.01
+              currency:
+                type: string
+                enum:
+                  - USD
+                  - EUR
+                  - GBP
+              paymentMethod:
+                type: object
+                required:
+                  - type
+                properties:
+                  type:
+                    type: string
+                    enum:
+                      - CREDIT
+                      - DEBIT
+                      - PAYPAL
+      then: ProcessPayment

@@ -22,6 +22,7 @@ Metrics are on by default on `lemline listen` and `lemline gateway start`, at `h
 
 Prometheus scrape configuration:
 
+<!-- workflow-example: data -->
 ```yaml
 scrape_configs:
   - job_name: lemline
@@ -69,6 +70,7 @@ max by (workflow_name) (lemline_messaging_commands_processing_duration_seconds_m
 
 ## Alerts
 
+<!-- workflow-example: data -->
 ```yaml
 groups:
   - name: lemline-performance

@@ -1,0 +1,36 @@
+document:
+  dsl: 1.0.0
+  namespace: examples
+  name: input-transformation-and-validation
+  version: 1.0.0
+do:
+  - FormatUserData:
+      set:
+        userProfile: ${ .formattedUser }
+        isAdult: ${ .formattedUser.age >= 18 }
+      input:
+        schema:
+          document:
+            type: object
+            required:
+              - formattedUser
+            properties:
+              formattedUser:
+                type: object
+                required:
+                  - id
+                  - fullName
+                  - email
+                properties:
+                  id:
+                    type: string
+                  fullName:
+                    type: string
+                    minLength: 3
+                  email:
+                    type: string
+                    format: email
+                  age:
+                    type: integer
+                    minimum: 13
+      then: NextTask

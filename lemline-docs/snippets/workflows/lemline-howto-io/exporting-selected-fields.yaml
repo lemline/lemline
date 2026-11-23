@@ -1,0 +1,16 @@
+document:
+  dsl: 1.0.0
+  namespace: examples
+  name: exporting-selected-fields
+  version: 1.0.0
+do:
+  - ProcessOrder:
+      call: orderService
+      with:
+        orderId: ${ .orderId }
+      export:
+        as:
+          orderItems: ${ .items }
+          orderTotal: ${ .total }
+          shippingAddress: ${ .shippingAddress }
+      then: NextTask

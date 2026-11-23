@@ -19,6 +19,9 @@ plugins {
  *   - Uses the full exception format for detailed debugging information.
  */
 tasks.test {
+    val documentationWorkflows = layout.projectDirectory.dir("../lemline-docs/snippets/workflows")
+    inputs.dir(documentationWorkflows).withPathSensitivity(PathSensitivity.RELATIVE)
+    systemProperty("lemline.docs.workflows", documentationWorkflows.asFile.absolutePath)
     useJUnitPlatform()
     testLogging {
         events("passed", "skipped", "failed")

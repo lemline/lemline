@@ -1,0 +1,68 @@
+document:
+  dsl: '1.0.0'
+  namespace: examples
+  name: allocate-mixed-resources
+  version: '1.0.0'
+do:
+  - storeDocument:
+      try:
+        - allocateRecord:
+            call: http
+            with:
+              method: post
+              endpoint: https://records.example/records
+              body: '${ { name: $workflow.input.name } }'
+            export:
+              as: '${ $context + { recordId: .id } }'
+        - allocateFile:
+            call: http
+            with:
+              method: post
+              endpoint: https://files.example/files
+              body: '${ { content: $workflow.input.content } }'
+            export:
+              as: '${ $context + { fileId: .id } }'
+        - attachFile:
+            call: http
+            with:
+              method: patch
+              endpoint: '${ "https://records.example/records/\($context.recordId | @uri)" }'
+              body: '${ { fileId: $context.fileId } }'
+      catch:
+        as: allocationError
+        do:
+          - attemptDeleteFile:
+              if: ${ $context.fileId != null }
+              try:
+                - deleteFile:
+                    call: http
+                    with:
+                      method: delete
+                      endpoint: '${ "https://files.example/files/\($context.fileId | @uri)" }'
+              catch:
+                do:
+                  - recordCleanupFailure:
+                      set:
+                        action: deleteFile
+                      export:
+                        as: '${ $context + { cleanupFailed: (($context.cleanupFailed // []) + [.action]) } }'
+          - attemptDeleteRecord:
+              if: ${ $context.recordId != null }
+              try:
+                - deleteRecord:
+                    call: http
+                    with:
+                      method: delete
+                      endpoint: '${ "https://records.example/records/\($context.recordId | @uri)" }'
+              catch:
+                do:
+                  - recordCleanupFailure:
+                      set:
+                        action: deleteRecord
+                      export:
+                        as: '${ $context + { cleanupFailed: (($context.cleanupFailed // []) + [.action]) } }'
+          - reportFailure:
+              set:
+                success: false
+                cleanupFailed: ${ $context.cleanupFailed // [] }
+                errorType: ${ $allocationError.type }

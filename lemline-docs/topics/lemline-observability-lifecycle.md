@@ -94,6 +94,7 @@ These counters track message handling. A workflow that faults (an HTTP call retu
 
 Example Prometheus alert on message-processing failures (broker, database or infrastructure problems):
 
+<!-- workflow-example: data -->
 ```yaml
 groups:
 - name: lemline-alerts

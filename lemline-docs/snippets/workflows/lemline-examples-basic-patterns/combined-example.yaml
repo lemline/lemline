@@ -1,0 +1,51 @@
+document:
+  dsl: 1.0.0
+  namespace: examples
+  name: combined-patterns
+  version: 0.1.0
+do:
+  - initialize:
+      set:
+        items:
+          - id: 1
+            type: digital
+            name: E-book
+          - id: 2
+            type: physical
+            name: Notebook
+          - id: 3
+            type: digital
+            name: Software
+  - processItems:
+      for:
+        in: ${ .items }
+        each: item
+      do:
+        - determineProcessingType:
+            do:
+              - route:
+                  switch:
+                    - digitalItem:
+                        when: ${ $item.type == "digital" }
+                        then: digitalItemAction
+                    - physicalItem:
+                        when: ${ $item.type == "physical" }
+                        then: physicalItemAction
+              - digitalItemAction:
+                  do:
+                    - processDigital:
+                        set:
+                          processed: '${ $item + { "status": "processed", "downloadReady": true } }'
+                  then: exit
+              - physicalItemAction:
+                  do:
+                    - processPhysical:
+                        set:
+                          processed: '${ $item + { "status": "processed", "shippingRequired": true } }'
+                  then: exit
+        - logResult:
+            call: http
+            with:
+              method: post
+              endpoint: https://example.com/log
+              body: ${ $processed }

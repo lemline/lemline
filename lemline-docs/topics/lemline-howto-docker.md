@@ -19,6 +19,7 @@ This guide uses **PostgreSQL** and **Kafka**. You can substitute with other supp
 
 Create a `docker-compose.yaml` file:
 
+<!-- workflow-example: data -->
 ```yaml
 services:
   postgres:
@@ -48,6 +49,7 @@ services:
 
 Create a `.lemline.yaml` configuration file:
 
+<!-- workflow-example: data -->
 ```yaml
 lemline:
   database:
@@ -82,6 +84,7 @@ bin/lemline listen --info
 
 If you prefer RabbitMQ, replace the Kafka service in `docker-compose.yaml`:
 
+<!-- workflow-example: data -->
 ```yaml
 services:
   postgres:
@@ -99,6 +102,7 @@ services:
 
 And update `.lemline.yaml`:
 
+<!-- workflow-example: data -->
 ```yaml
 lemline:
   database:

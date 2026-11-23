@@ -1,0 +1,17 @@
+document:
+  dsl: '1.0.0'
+  namespace: examples
+  name: example-getting-raw-response-e-g-for-binary-data
+  version: '1.0.0'
+do:
+  - downloadImage:
+      call: http
+      with:
+        method: get
+        endpoint:
+          uri: https://images.example.com/logo.png
+        # Get the raw response bytes (likely base64 encoded)
+        output: raw
+      # output.as could decode the base64 if needed
+      output:
+        as: "${ base64decode(.) }" # Example - assumes a base64decode function

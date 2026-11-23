@@ -18,70 +18,17 @@ Workflows reuse settings with the reusable components of the Open Workflow DSL t
 
 ## Reusing an Endpoint's Authentication
 
-```yaml
-use:
-  secrets:
-    - USER_API_TOKEN
-  authentications:
-    userApi:
-      bearer:
-        token: ${ $secrets.USER_API_TOKEN }
-do:
-  - getUser:
-      call: http
-      with:
-        method: get
-        endpoint:
-          uri: ${ "https://api.example.com/users/" + .userId }
-          authentication:
-            use: userApi
-```
+<code-block lang="yaml" src="workflows/lemline-ref-connections/reusing-an-endpoint-s-authentication.yaml" include-lines="6-21"/>
 
 ## Reusing a Call with a Function
 
 Wrap a call in a function and call it by name. The `with` values of the calling task are the function's input:
 
-```yaml
-use:
-  functions:
-    getUser:
-      do:
-        - request:
-            call: http
-            with:
-              method: get
-              endpoint: ${ "https://api.example.com/users/" + .userId }
-do:
-  - fetchUser:
-      call: getUser
-      with:
-        userId: ${ .id }
-```
+<code-block lang="yaml" src="workflows/lemline-ref-connections/reusing-a-call-with-a-function.yaml" include-lines="6-19"/>
 
 ## Reusing a Retry Policy
 
-```yaml
-use:
-  retries:
-    standard:
-      delay:
-        seconds: 2
-      backoff:
-        exponential: {}
-      limit:
-        attempt:
-          count: 5
-do:
-  - fetchData:
-      try:
-        - callApi:
-            call: http
-            with:
-              method: get
-              endpoint: https://api.example.com/data
-      catch:
-        retry: standard
-```
+<code-block lang="yaml" src="workflows/lemline-ref-connections/reusing-a-retry-policy.yaml" include-lines="6-25"/>
 
 ## Broker and Database Connections
 

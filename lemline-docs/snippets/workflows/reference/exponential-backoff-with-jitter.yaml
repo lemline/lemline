@@ -1,0 +1,24 @@
+document:
+  dsl: '1.0.0'
+  namespace: examples
+  name: exponential-backoff-with-jitter
+  version: '1.0.0'
+do:
+  - request:
+      try:
+        - callApi:
+            call: http
+            with:
+              method: get
+              endpoint: https://api.example.com/data
+      catch:
+        retry:
+          delay: { seconds: 1 }
+          backoff:
+            exponential: { }
+          jitter:
+            from: { milliseconds: 500 }
+            to: { seconds: 1, milliseconds: 500 }
+          limit:
+            attempt:
+              count: 5

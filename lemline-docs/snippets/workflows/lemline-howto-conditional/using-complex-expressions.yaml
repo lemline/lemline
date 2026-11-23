@@ -1,0 +1,25 @@
+document:
+  dsl: 1.0.0
+  namespace: examples
+  name: using-complex-expressions
+  version: 1.0.0
+do:
+  - RouteCustomerRequest:
+      switch:
+        - case1:
+            when: ${ .type == "refund" and .amount > 1000 }
+            then: EscalateToSupervisor
+        - case2:
+            when: ${ .type == "refund" and .daysSincePurchase > 30 }
+            then: ApplyReturnPolicy
+        - case3:
+            when: ${ .type == "refund" }
+            then: ProcessStandardRefund
+        - case4:
+            when: ${ .type == "exchange" and .reason == "defective" }
+            then: ProcessDefectiveExchange
+        - case5:
+            when: ${ .type == "exchange" }
+            then: ProcessStandardExchange
+        - case6:
+            then: HandleGenericRequest

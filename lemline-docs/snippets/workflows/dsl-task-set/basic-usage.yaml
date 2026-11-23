@@ -1,0 +1,19 @@
+document:
+  dsl: '1.0.0'
+  namespace: examples
+  name: set-basic
+  version: '1.0.0'
+do:
+  - initialData:
+      set:
+        user:
+          name: "Alice"
+          id: 123
+        status: "active"
+  - processData: # Input to this task is the output of initialData
+      call: someFunction
+      with:
+        userData: "${ .user }"
+        currentStatus: "${ .status }"
+
+# Output of 'initialData' task: { "user": { "name": "Alice", "id": 123 }, "status": "active" }

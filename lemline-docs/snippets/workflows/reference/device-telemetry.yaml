@@ -1,0 +1,28 @@
+document:
+  dsl: '1.0.0'
+  namespace: examples
+  name: device-telemetry
+  version: '1.0.0'
+schedule:
+  on:
+    one:
+      with:
+        type: com.example.device.telemetry.received
+input:
+  from: ${ .[0] }
+do:
+  - inspectReading:
+      switch:
+        - highTemperature:
+            when: ${ .temperature > 80 }
+            then: raiseAlert
+        - other:
+            then: end
+  - raiseAlert:
+      emit:
+        event:
+          with:
+            type: com.example.device.temperature.high
+            source: https://events.example.com/telemetry
+            subject: ${ .deviceId }
+            data: '${ { deviceId, temperature } }'

@@ -1,0 +1,12 @@
+document:
+  dsl: '1.0.0'
+  namespace: examples
+  name: http-workflow
+  version: '0.1.0'
+  title: HTTP Request Workflow
+do:
+  - makeRequest:
+      call: http
+      with:
+        method: GET
+        endpoint: https://jsonplaceholder.typicode.com/todos/1
