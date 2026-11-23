@@ -11,7 +11,8 @@ runtime support for each variant.
 ## Load an external script
 
 Use `run.script.source.endpoint` to reference a script. Set `language` and pass
-inputs as named `arguments`.
+inputs as named `arguments`. Lemline reads the script from the file system of the runner
+that executes the task: use a `file://` URI and place the script at that path on every runner.
 
 <code-block lang="yaml" src="workflows/reference/load-external-script.yaml"/>
 

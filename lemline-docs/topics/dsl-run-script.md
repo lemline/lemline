@@ -16,6 +16,8 @@ The `run: script` task allows a workflow to execute a script written in a suppor
 
 ### Example: Loading Script from External Source
 
+Lemline loads an external script from the runner's file system only: the endpoint must be a `file://` URI.
+
 <code-block lang="yaml" src="workflows/reference/load-external-script.yaml"/>
 
 ### Example: Using Python with Environment Variables

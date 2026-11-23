@@ -9,7 +9,7 @@ do:
         script:
           language: python
           source:
-            endpoint: https://assets.example.com/email-validator.py
+            endpoint: file:///opt/lemline/scripts/email-validator.py
           arguments:
             email: ${ .email }
         return: stdout
