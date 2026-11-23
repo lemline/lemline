@@ -11,6 +11,7 @@ import com.lemline.core.lifecycleevents.LifecycleEventHook
 import com.lemline.core.orchestrator.FullOrchestrator
 import com.lemline.core.processors.CallHttpConfig
 import com.lemline.core.processors.EmitConfig
+import com.lemline.core.schemas.SchemaValidator
 import com.lemline.core.states.WorkflowEvent
 import io.cloudevents.core.builder.CloudEventBuilder
 import java.io.File
@@ -43,15 +44,54 @@ class WorkflowAuthoringScenarioTest {
     }
 
     private suspend fun runScenario(file: String, input: String, services: Services, incoming: InMemoryCloudEventHook = InMemoryCloudEventHook()) {
-        val definition = File("../.claude/skills/serverless-workflow-writer/assets/evals", file)
+        val definition = File("../.claude/skills/serverless-workflow-writer/assets", file)
+        val workflow = WorkflowCache.parseYamlAndPut(definition.readText())
+        val workflowInput = parseJson(input)
+        // The starter validates input before handing the instance to the orchestrator.
+        workflow.input?.schema?.let { SchemaValidator.validate(workflowInput, it) }
         FullOrchestrator.start(
-            workflow = WorkflowCache.parseYamlAndPut(definition.readText()),
-            workflowInput = parseJson(input),
+            workflow = workflow,
+            workflowInput = workflowInput,
             activityExecutor = services,
             functionResolver = MockFunctionResolver(),
             cloudEventHook = incoming,
             lifecycleHook = LifecycleEventHook.NOOP,
         )
+    }
+
+    @Test
+    fun `customer template sends the identifier as a query and rejects malformed values`() = runTest {
+        val services = Services { parseJson("""{"lifetimeValue":"unknown"}""") }
+        val failure = assertFailsWith<InternalException> {
+            runScenario("templates/http-orchestration.yaml", """{"customerId":"north/west"}""", services)
+        }
+        val request = services.calls.single()
+        assertEquals("GET", request.method)
+        assertEquals("https://api.example.com/customers", request.url)
+        assertEquals(mapOf("id" to "north/west"), request.query)
+        assertEquals("Invalid customer data", failure.error.title)
+    }
+
+    @Test
+    fun `batch template handles each item once and summarizes an empty or mixed batch`() = runTest {
+        for (items in listOf("[]", """[{"id":"a","score":85},{"id":"b","score":45}]""")) {
+            val services = Services { parseJson("""{"receipt":true}""") }
+            runScenario("templates/batch-loop-switch.yaml", """{"items":$items}""", services)
+            val routes = if (items == "[]") emptyList() else listOf("approve", "reject")
+            assertEquals(routes, services.calls.map { it.url.substringAfterLast('/') })
+            assertEquals(parseJson("""{"count":${routes.size}}"""), services.events.single().data)
+        }
+    }
+
+    @Test
+    fun `missing identifiers are rejected before any side effect`() = runTest {
+        val services = Services { error("Unexpected call") }
+        assertFailsWith<IllegalArgumentException> {
+            runScenario("evals/workflow-01.yaml", """{"order":{"items":[],"totalAmount":73}}""", services)
+        }
+        assertFailsWith<IllegalArgumentException> { runScenario("evals/workflow-03.yaml", """[{}]""", services) }
+        assertEquals(emptyList(), services.calls)
+        assertEquals(emptyList(), services.events)
     }
 
     @Test
@@ -61,7 +101,7 @@ class WorkflowAuthoringScenarioTest {
             if (call.url == "https://payments.example.com/charges" && ++attempts == 1) error("HTTP 503: busy")
             parseJson("""{"receipt":"received"}""")
         }
-        runScenario("workflow-01.yaml", order, services)
+        runScenario("evals/workflow-01.yaml", order, services)
         val (reserve, charge, retry) = services.calls
         assertEquals(listOf("reservations", "charges", "charges"), services.calls.map { it.url.substringAfterLast('/') })
         assertEquals(listOf("POST", "POST", "POST"), services.calls.map { it.method })
@@ -80,7 +120,7 @@ class WorkflowAuthoringScenarioTest {
             if (call.url.endsWith("/charges")) error("HTTP 503: busy")
             parseJson("{}")
         }
-        val failure = assertFailsWith<InternalException> { runScenario("workflow-01.yaml", order, services) }
+        val failure = assertFailsWith<InternalException> { runScenario("evals/workflow-01.yaml", order, services) }
         assertEquals("Payment failed after retries", failure.error.title)
         assertEquals(5, services.calls.count { it.url.endsWith("/charges") })
         assertEquals(emptyList(), services.events)
@@ -94,7 +134,7 @@ class WorkflowAuthoringScenarioTest {
             if (++reserveAttempts == 1) throw SocketException("Connection reset")
             parseJson("{}")
         }
-        assertFailsWith<InternalException> { runScenario("workflow-01.yaml", order, services) }
+        assertFailsWith<InternalException> { runScenario("evals/workflow-01.yaml", order, services) }
         assertEquals(listOf("reservations", "reservations", "charges"), services.calls.map { it.url.substringAfterLast('/') })
         assertEquals(emptyList(), services.events)
     }
@@ -102,7 +142,7 @@ class WorkflowAuthoringScenarioTest {
     @Test
     fun `malformed loan scores fail before any application is routed`() = runTest {
         val services = Services { parseJson("""{"applications":[{"id":"a","score":750},{"id":"b","score":"599"}]}""") }
-        assertFailsWith<InternalException> { runScenario("workflow-02.yaml", "{}", services) }
+        assertFailsWith<InternalException> { runScenario("evals/workflow-02.yaml", "{}", services) }
         assertEquals(listOf("GET"), services.calls.map { it.method })
         assertEquals(emptyList(), services.events)
     }
@@ -113,7 +153,7 @@ class WorkflowAuthoringScenarioTest {
         val services = Services { call ->
             if (call.url == "https://risk.example.com/applications/pending") parseJson(batch) else parseJson("{}")
         }
-        runScenario("workflow-02.yaml", "{}", services)
+        runScenario("evals/workflow-02.yaml", "{}", services)
         assertEquals(listOf("GET", "POST", "POST", "POST"), services.calls.map { it.method })
         assertEquals(listOf("approve" to "a", "review" to "b", "reject" to "c"), services.calls.drop(1).map {
             it.url.substringAfterLast('/') to it.body!!["applicationId"].asText()
@@ -173,7 +213,7 @@ class WorkflowAuthoringScenarioTest {
                 .withType("com.example.incident.$kind.v1")
                 .withData("application/json", """{"incidentId":"$id"}""".toByteArray()).build())
         }
-        runScenario("workflow-03.yaml", """[{"incidentId":"ticket-9"}]""", services, incoming)
+        runScenario("evals/workflow-03.yaml", """[{"incidentId":"ticket-9"}]""", services, incoming)
         assertEquals("com.example.incident.processed.v1", services.events.single().type)
         assertEquals("ticket-9", services.events.single().data!!["incidentId"].asText())
         services.calls.forEach { assertEquals("ticket-9", it.body!!["incidentId"].asText()) }

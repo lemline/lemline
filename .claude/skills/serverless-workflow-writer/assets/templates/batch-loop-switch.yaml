@@ -47,4 +47,4 @@ do:
           with:
             source: https://workflows.example.com/batch
             type: com.example.batch.completed.v1
-            data: '${ {result: .} }'
+            data: '${ {count: ($workflow.input.items | length)} }'

@@ -9,8 +9,9 @@ do:
       call: http
       with:
         method: get
-        endpoint:
-          uri: '${ "https://api.example.com/customers/\(.customerId | @uri)" }'
+        endpoint: https://api.example.com/customers
+        query:
+          id: ${ .customerId }
         output: content
   - routeCustomer:
       switch:

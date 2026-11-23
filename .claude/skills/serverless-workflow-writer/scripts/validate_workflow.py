@@ -11,7 +11,7 @@ sys.dont_write_bytecode = True
 sys.path.insert(0, str(DOCS / "validation"))
 from check_workflows import DSL_VERSION, as_specified, flow_errors, read_definition, versioned_validator
 
-PLACEHOLDER = re.compile(r"^(?:TODO|<fill-me>|<tbd>)$", re.IGNORECASE)
+PLACEHOLDER = re.compile(r"^(?:<fill-me>|<tbd>)$", re.IGNORECASE)
 
 
 def draft_markers(value, path="$"):

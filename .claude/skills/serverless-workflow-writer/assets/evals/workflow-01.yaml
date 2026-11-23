@@ -4,6 +4,19 @@ document:
   name: order-confirmation
   version: "1.0.0"
   title: Order Confirmation
+input:
+  schema:
+    document:
+      type: object
+      required: [order]
+      properties:
+        order:
+          type: object
+          required: [id, items, totalAmount]
+          properties:
+            id: {type: string, minLength: 1}
+            items: {type: array}
+            totalAmount: {type: number}
 use:
   retries:
     transientHttp:
