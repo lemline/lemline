@@ -456,49 +456,56 @@ use:
 do:
   - processOrderWithRetries:
       try:
-        - validateOrder:
-            call: http
-            with:
-              method: post
-              endpoint: https://validation.example.com/api/orders/validate
-              body: '${ .order }'
-            timeout:
-              after:
-                seconds: 10
-        - reserveInventory:
+        - attemptOrder:
             try:
-              - reserveItems:
+              - validateOrder:
                   call: http
                   with:
                     method: post
-                    endpoint: https://inventory.example.com/api/reserve
-                    body: '${ .order.items }'
-                  output:
-                    as: '${ $input + { "inventoryReservation": . } }'
+                    endpoint: https://validation.example.com/api/orders/validate
+                    body: '${ .order }'
+                  timeout:
+                    after:
+                      seconds: 10
+              - reserveInventory:
+                  try:
+                    - reserveItems:
+                        call: http
+                        with:
+                          method: post
+                          endpoint: https://inventory.example.com/api/reserve
+                          body: '${ .order.items }'
+                        output:
+                          as: '${ $input + { "inventoryReservation": . } }'
+                  catch:
+                    errors:
+                      with:
+                        type: https://example.com/errors/inventory/insufficient
+                    as: inventoryError
+                    do:
+                      - notifyCustomer:
+                          call: http
+                          with:
+                            method: post
+                            endpoint: https://notifications.example.com/api/send
+                            body:
+                              customerId: '${ .order.customerId }'
+                              message: "Some items in your order are out of stock"
+                    then: exit
+              - processPayment:
+                  call: http
+                  with:
+                    method: post
+                    endpoint: https://payments.example.com/api/charge
+                    body: '${ .order.payment }'
             catch:
               errors:
                 with:
-                  type: https://example.com/errors/inventory/insufficient
-              as: inventoryError
-              do:
-                - notifyCustomer:
-                    call: http
-                    with:
-                      method: post
-                      endpoint: https://notifications.example.com/api/send
-                      body:
-                        customerId: '${ .order.customerId }'
-                        message: "Some items in your order are out of stock"
-              then: exit
-        - processPayment:
-            call: http
-            with:
-              method: post
-              endpoint: https://payments.example.com/api/charge
-              body: '${ .order.payment }'
+                  type: https://open-workflow-specification.org/spec/1.0.0/errors/communication
+              retry: transientFailure
       catch:
         as: failure
-        when: ${ ($failure.type == "https://open-workflow-specification.org/spec/1.0.0/errors/validation") or ($failure.type == "https://open-workflow-specification.org/spec/1.0.0/errors/timeout") or ($failure.type == "https://example.com/errors/payment") or ($failure.type == "https://open-workflow-specification.org/spec/1.0.0/errors/communication") }
+        when: ${ ($failure.type == "https://open-workflow-specification.org/spec/1.0.0/errors/validation") or ($failure.type == "https://open-workflow-specification.org/spec/1.0.0/errors/timeout") or ($failure.type == "https://example.com/errors/payment") }
         do:
           - selectHandler:
               switch:
@@ -511,9 +518,6 @@ do:
                 - case3:
                     then: handle3
                     when: ${ $failure.type == "https://example.com/errors/payment" }
-                - case4:
-                    then: handle4
-                    when: ${ $failure.type == "https://open-workflow-specification.org/spec/1.0.0/errors/communication" }
           - handle1:
               do:
                 - handleValidationError:
@@ -550,9 +554,6 @@ do:
                       body:
                         customerId: ${ .order.customerId }
                         message: 'Payment failed: ${ $failure.message }'
-              then: exit
-          - handle4:
-              set: ${ . }
               then: exit
 ```
 

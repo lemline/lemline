@@ -424,7 +424,13 @@ do:
                       message: Your payment was declined. Please update payment information.
               then: exit
           - handle2:
-              set: ${ . }
+              do:
+                - logError:
+                    call: http
+                    with:
+                      method: post
+                      endpoint: https://logging.example.com/api/errors
+                      body: ${ $failure }
               then: exit
 ```
 

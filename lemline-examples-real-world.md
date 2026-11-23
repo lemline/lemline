@@ -106,63 +106,66 @@ do:
 
   - processPayment:
       try:
-        - reserveInventory:
-            call: http
-            with:
-              method: post
-              endpoint: https://inventory.example.com/api/reserve
-              body:
-                orderId: ${ .orderId }
-                items: ${ .items }
-            output:
-              as: '${ $input + { "reservation": . } }'
-        - chargePayment:
-            call: http
-            with:
-              method: post
-              endpoint: https://payments.example.com/api/charge
-              body:
-                orderId: ${ .orderId }
-                customerId: ${ .customerId }
-                amount: ${ .payment.amount }
-                method: ${ .payment.method }
-            output:
-              as: '${ $input + { "paymentResult": . } }'
+        - reserveAndCharge:
+            try:
+              - reserveInventory:
+                  call: http
+                  with:
+                    method: post
+                    endpoint: https://inventory.example.com/api/reserve
+                    body:
+                      orderId: ${ .orderId }
+                      items: ${ .items }
+                  output:
+                    as: '${ $input + { "reservation": . } }'
+              - chargePayment:
+                  call: http
+                  with:
+                    method: post
+                    endpoint: https://payments.example.com/api/charge
+                    body:
+                      orderId: ${ .orderId }
+                      customerId: ${ .customerId }
+                      amount: ${ .payment.amount }
+                      method: ${ .payment.method }
+                  output:
+                    as: '${ $input + { "paymentResult": . } }'
+            catch:
+              errors:
+                with:
+                  type: https://open-workflow-specification.org/spec/1.0.0/errors/communication
+              retry:
+                delay:
+                  seconds: 5
+                backoff:
+                  exponential: {}
+                limit:
+                  attempt:
+                    count: 3
       catch:
-        as: failure
-        when: ${ ($failure.type == "https://example.com/errors/payment/declined") or ($failure.type == "https://open-workflow-specification.org/spec/1.0.0/errors/communication") }
+        errors:
+          with:
+            type: https://example.com/errors/payment/declined
+        as: paymentError
         do:
-          - selectHandler:
-              switch:
-                - case1:
-                    then: handle1
-                    when: ${ $failure.type == "https://example.com/errors/payment/declined" }
-                - case2:
-                    then: handle2
-                    when: ${ $failure.type == "https://open-workflow-specification.org/spec/1.0.0/errors/communication" }
-          - handle1:
-              do:
-                - releaseInventory:
-                    call: http
-                    with:
-                      method: post
-                      endpoint: https://inventory.example.com/api/release
-                      body:
-                        reservationId: ${ .reservation.id }
-                - notifyCustomer:
-                    call: http
-                    with:
-                      method: post
-                      endpoint: https://notifications.example.com/api/send
-                      body:
-                        to: ${ .customerId }
-                        template: payment_declined
-                        data:
-                          orderId: ${ .orderId }
-                          reason: ${ $failure.reason }
-              then: exit
-          - handle2:
-              set: ${ . }
+          - releaseInventory:
+              call: http
+              with:
+                method: post
+                endpoint: https://inventory.example.com/api/release
+                body:
+                  reservationId: ${ .reservation.id }
+          - notifyCustomer:
+              call: http
+              with:
+                method: post
+                endpoint: https://notifications.example.com/api/send
+                body:
+                  to: ${ .customerId }
+                  template: payment_declined
+                  data:
+                    orderId: ${ .orderId }
+                    reason: ${ $paymentError.reason }
               then: exit
   - fulfillOrder:
       do:
