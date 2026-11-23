@@ -32,6 +32,7 @@ build/
 
 ### other local docs 
 references/
+!/.claude/skills/open-workflow-writer/references/
 articles/
 tmp/
 specs/

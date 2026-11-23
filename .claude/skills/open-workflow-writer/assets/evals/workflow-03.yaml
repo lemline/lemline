@@ -1,0 +1,104 @@
+document:
+  dsl: "1.0.3"
+  namespace: ops
+  name: incident-handler
+  version: "1.0.0"
+  title: Incident Handler
+input:
+  schema:
+    document:
+      type: array
+      minItems: 1
+      items:
+        type: object
+        required: [incidentId]
+        properties:
+          incidentId: {type: string, minLength: 1}
+schedule:
+  "on":
+    one:
+      with:
+        type: com.example.alert.high.v1
+do:
+  - waitForDecision:
+      listen:
+        to:
+          any:
+            - with:
+                type: com.example.incident.ack.v1
+              correlate:
+                incident:
+                  from: ${ .incidentId }
+                  expect: ${ $workflow.input[0].incidentId }
+            - with:
+                type: com.example.incident.escalate.v1
+              correlate:
+                incident:
+                  from: ${ .incidentId }
+                  expect: ${ $workflow.input[0].incidentId }
+        read: envelope
+  - notifyIncident:
+      try:
+        - routeDecision:
+            switch:
+              - acked:
+                  when: ${ (.[0].type == "com.example.incident.ack.v1") }
+                  then: notifyChat
+              - escalated:
+                  when: ${ (.[0].type == "com.example.incident.escalate.v1") }
+                  then: notifyParallel
+              - default:
+                  then: exit
+        - notifyChat:
+            call: http
+            with:
+              method: post
+              endpoint:
+                uri: https://chat.example.com/incidents/notify
+              body:
+                incidentId: ${ $workflow.input[0].incidentId }
+                decision: ack
+            then: exit
+        - notifyParallel:
+            fork:
+              compete: true
+              branches:
+                - notifyPager:
+                    call: http
+                    with:
+                      method: post
+                      endpoint:
+                        uri: https://pager.example.com/incidents/notify
+                      body:
+                        incidentId: ${ $workflow.input[0].incidentId }
+                - notifyOnCall:
+                    call: http
+                    with:
+                      method: post
+                      endpoint:
+                        uri: https://oncall.example.com/incidents/notify
+                      body:
+                        incidentId: ${ $workflow.input[0].incidentId }
+            then: exit
+      catch:
+        as: notificationError
+        do:
+          - retainError:
+              set:
+                notificationError: ${ $notificationError }
+              export:
+                as: ${ $context + . }
+  - publishProcessed:
+      emit:
+        event:
+          with:
+            source: https://workflows.example.com/incidents
+            type: com.example.incident.processed.v1
+            data: '${ {incidentId: $workflow.input[0].incidentId, status: (if $context.notificationError then "notification-failed" else "processed" end)} }'
+  - reportNotificationFailure:
+      if: ${ $context.notificationError != null }
+      raise:
+        error:
+          type: https://errors.example.com/incident-notification
+          status: 502
+          title: Incident notification failed

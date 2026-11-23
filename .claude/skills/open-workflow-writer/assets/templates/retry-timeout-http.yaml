@@ -1,0 +1,50 @@
+document:
+  dsl: "1.0.3"
+  namespace: sample
+  name: retry-timeout-http
+  version: "1.0.0"
+  title: Retry And Timeout Template
+use:
+  retries:
+    transientHttp:
+      limit:
+        attempt:
+          count: 5
+      # HTTP status failures carry the status in the title; transport errors retain their exception class.
+      when: >-
+        ${ (($error.title // "") | test("^HTTP (408|429|502|503|504):")) or
+           (($error.details // "") | test("^(java[.]net[.](ConnectException|SocketException|SocketTimeoutException)|io[.]ktor[.]client[.](plugins[.]HttpRequestTimeoutException|network[.]sockets[.](ConnectTimeoutException|SocketTimeoutException)))(:|$)")) }
+      delay: PT2S
+      backoff:
+        exponential: {}
+  timeouts:
+    shortCall:
+      after:
+        seconds: 20
+# Lemline currently enforces listen timeouts only. These limits express the DSL contract.
+timeout:
+  after:
+    minutes: 2
+do:
+  - invokeRemote:
+      try:
+        - callRemote:
+            call: http
+            timeout: shortCall
+            with:
+              method: get
+              endpoint:
+                uri: https://api.example.com/health
+      catch:
+        retry: transientHttp
+        do:
+          - raiseFinalFailure:
+              raise:
+                error:
+                  type: https://open-workflow-specification.org/spec/1.0.0/errors/runtime
+                  status: 500
+                  title: Remote service remained unavailable
+  - waitBeforeExit:
+      wait:
+        seconds: 1
+      then: end
