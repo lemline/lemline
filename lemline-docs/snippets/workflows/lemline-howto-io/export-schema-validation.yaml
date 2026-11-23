@@ -10,7 +10,7 @@ do:
         id: ${ .entityId }
       export:
         as:
-          validatedEntity: .
+          validatedEntity: ${ . }
         schema:
           document:
             type: object

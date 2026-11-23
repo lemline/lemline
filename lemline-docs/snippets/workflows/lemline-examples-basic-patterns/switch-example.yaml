@@ -7,10 +7,10 @@ do:
   - processOrder:
       switch:
         - case1:
-            when: .orderType == "electronic"
+            when: ${ .orderType == "electronic" }
             then: processElectronicOrder
         - case2:
-            when: .orderType == "physical"
+            when: ${ .orderType == "physical" }
             then: processPhysicalOrder
         - default:
             then: handleUnknownOrderType
