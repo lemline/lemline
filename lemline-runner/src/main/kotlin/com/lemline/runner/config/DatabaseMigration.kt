@@ -37,7 +37,7 @@ class DatabaseMigration(
         // - if the database type is in-memory - as it is provided by the app
         // - if migrateAtStart is true - as it is requested by the user
         if (LaunchMode.current() == LaunchMode.TEST || dbType == DatabaseType.H2 || migrateAtStart) {
-            databaseManager.flyway.migrate()
+            databaseManager.migrate()
             logger.info { "Flyway migrations applied successfully on ${databaseManager.dbType} database." }
         } else {
             // Check for pending migrations and fail with clear message if found

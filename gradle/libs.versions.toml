@@ -11,6 +11,7 @@ kotlinxCoroutines = "1.11.0"
 # NOTE: Quarkus 3.27-3.30.1 had a regression ignoring ConfigSource ordinal for
 # mp.messaging.*.connector properties. Fixed in 3.30.6.
 quarkus = "3.40.1.2"
+sqliteJdbc = "3.54.1.0"
 smallryeReactiveMessagingInMemory = "4.37.1"
 # The published Java 17 SDK retains the io.serverlessworkflow coordinates.
 serverlessworkflow = "7.35.3.Final"
@@ -37,6 +38,7 @@ kotlinxCoroutinesReactive = { module = "org.jetbrains.kotlinx:kotlinx-coroutines
 kotlinxCoroutinesSlf4j = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-slf4j", version.ref = "kotlinxCoroutines" }
 quarkus-bom = { group = "io.quarkus", name = "quarkus-bom", version.ref = "quarkus" }
 quarkus-amazon-services-bom = { group = "io.quarkus.platform", name = "quarkus-amazon-services-bom", version.ref = "quarkus" }
+sqlite-jdbc = { module = "org.xerial:sqlite-jdbc", version.ref = "sqliteJdbc" }
 smallrye-reactive-messaging-inmemory = { module = "io.smallrye.reactive:smallrye-reactive-messaging-in-memory", version.ref = "smallryeReactiveMessagingInMemory" }
 serverlessworkflow-api = { module = "io.serverlessworkflow:serverlessworkflow-api", version.ref = "serverlessworkflow" }
 serverlessworkflow-impl-core = { module = "io.serverlessworkflow:serverlessworkflow-impl-core", version.ref = "serverlessworkflow" }

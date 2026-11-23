@@ -7,6 +7,7 @@ import com.lemline.runner.common.namespaces.DestinationType
 import com.lemline.runner.common.namespaces.NamespaceScope
 import com.lemline.runner.config.LemlineConfiguration
 import com.lemline.runner.messaging.pgmq.connector.PgmqIncomingMetadata
+import com.lemline.runner.messaging.sqlite.connector.SqliteIncomingMetadata
 import io.smallrye.reactive.messaging.kafka.api.IncomingKafkaRecordMetadata
 import io.smallrye.reactive.messaging.rabbitmq.IncomingRabbitMQMetadata
 import jakarta.enterprise.context.ApplicationScoped
@@ -26,7 +27,7 @@ import org.eclipse.microprofile.reactive.messaging.Message
  * - KAFKA: the record topic is the per-namespace destination.
  * - RABBITMQ: the envelope exchange when it follows the per-namespace convention; otherwise the
  *   routing key (internal publications go to the channel exchange with routing key = namespace).
- * - PGMQ: the source queue carried by [PgmqIncomingMetadata].
+ * - PGMQ and SQLite: the source queue carried by connector metadata.
  * - IN_MEMORY: the [MetaData.namespace] field when present (tests); otherwise the runner's single
  *   followed namespace.
  *
@@ -47,6 +48,11 @@ class ArrivalNamespaceResolver(
         MessagingType.KAFKA -> message.kafkaArrivalNamespace(type)
         MessagingType.RABBITMQ -> message.rabbitArrivalNamespace(type)
         MessagingType.PGMQ -> message.pgmqArrivalNamespace(type)
+        MessagingType.SQLITE -> {
+            val md = message.getMetadata(SqliteIncomingMetadata::class.java).getOrNull()
+                ?: error("Cannot resolve the arrival namespace: SQLite incoming metadata is missing")
+            namespaceFromDestination(md.queue, type)
+        }
         MessagingType.IN_MEMORY -> message.inMemoryArrivalNamespace()
     }
 

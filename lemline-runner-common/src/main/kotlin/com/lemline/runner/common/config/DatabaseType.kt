@@ -16,6 +16,9 @@ enum class DatabaseType(val configValue: String) {
     /** MySQL database */
     MYSQL("mysql"),
 
+    /** SQLite database on the local filesystem */
+    SQLITE("sqlite"),
+
     /** H2 in-memory database (for testing and development) */
     H2("in-memory");
 

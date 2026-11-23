@@ -11,6 +11,7 @@ import io.mockk.mockk
 import java.util.concurrent.Executors
 import kotlin.test.Test
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
 import kotlinx.coroutines.asCoroutineDispatcher
@@ -121,7 +122,9 @@ class GatewayStartupValidatorTest {
             analyticsEventSource = eventSource
         }
 
+        assertFalse(validator.ready)
         validator.onStart(mockk())
+        assertTrue(validator.ready)
         coVerify(exactly = 1) { eventSource.validate() }
     }
 }

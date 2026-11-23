@@ -8,6 +8,7 @@ import io.quarkus.runtime.ShutdownEvent
 import io.quarkus.runtime.StartupEvent
 import jakarta.annotation.Priority
 import jakarta.enterprise.event.Observes
+import jakarta.enterprise.inject.spi.ObserverMethod
 import jakarta.inject.Inject
 import java.util.concurrent.Executors
 import java.util.concurrent.ScheduledExecutorService
@@ -104,11 +105,11 @@ abstract class AbstractScheduledTask {
     protected abstract suspend fun doWork()
 
     /**
-     * Called when Quarkus application starts, after database migrations complete.
-     * Priority 100 ensures this runs after FlywayMigration (priority 1).
+     * Start after migrations, messaging channel initialization and RabbitMQ topology setup.
+     * A due row can run immediately when the configured initial jitter is zero.
      */
     @Suppress("unused")
-    fun onStart(@Observes @Priority(100) event: StartupEvent) {
+    fun onStart(@Observes @Priority(ObserverMethod.DEFAULT_PRIORITY + 2) event: StartupEvent) {
         // Global kill switch - disabled for non-listen commands (migrate, config, etc.)
         if (scheduledEnabled != "true" && !runWhenScheduledDisabled) {
             logger.debug { "$jobName disabled globally (scheduled tasks off)" }

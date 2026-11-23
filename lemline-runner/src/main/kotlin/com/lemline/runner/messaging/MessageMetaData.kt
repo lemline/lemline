@@ -8,6 +8,8 @@ import com.lemline.runner.common.config.MessagingType
 import com.lemline.runner.config.LemlineConfiguration
 import com.lemline.runner.messaging.pgmq.connector.PgmqIncomingMetadata
 import com.lemline.runner.messaging.pgmq.connector.PgmqOutgoingMetadata
+import com.lemline.runner.messaging.sqlite.connector.SqliteIncomingMetadata
+import com.lemline.runner.messaging.sqlite.connector.SqliteOutgoingMetadata
 import io.smallrye.reactive.messaging.kafka.api.IncomingKafkaRecordMetadata
 import io.smallrye.reactive.messaging.kafka.api.OutgoingKafkaRecordMetadata
 import io.smallrye.reactive.messaging.rabbitmq.IncomingRabbitMQMetadata
@@ -42,6 +44,10 @@ class MessageMetaData(
             MessagingType.KAFKA -> { message: Message<*> -> message.kafkaMeta }
             MessagingType.RABBITMQ -> { message: Message<*> -> message.rabbitMeta }
             MessagingType.PGMQ -> { message: Message<*> -> message.pgmqMeta }
+            MessagingType.SQLITE -> { message: Message<*> ->
+                val md = message.getMetadata(SqliteIncomingMetadata::class.java).orElseThrow()
+                MetaData(messageId = IDV7.from(md.messageId))
+            }
             MessagingType.IN_MEMORY -> { message: Message<*> -> message.inMemoryMeta }
         }
     }
@@ -96,6 +102,9 @@ class MessageMetaData(
             MessagingType.KAFKA -> { message: Message<*>, metaData: MetaData -> message.addKafkaMetaData(metaData) }
             MessagingType.RABBITMQ -> { message: Message<*>, metaData: MetaData -> message.addRabbitMQMeta(metaData) }
             MessagingType.PGMQ -> { message: Message<*>, metaData: MetaData -> message.addPgmqMeta(metaData) }
+            MessagingType.SQLITE -> { message: Message<*>, md: MetaData ->
+                message.addMetadata(SqliteOutgoingMetadata(messageId = md.messageId.toString(), queue = md.destination))
+            }
             MessagingType.IN_MEMORY -> { message: Message<*>, metaData: MetaData -> message.addInMemoryMeta(metaData) }
         }
     }

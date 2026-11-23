@@ -15,15 +15,6 @@ interface AnalyticsConfig {
      */
     val analyticsType: AnalyticsType
 
-    /**
-     * Maps analytics backend type to the shared SQL dialect type.
-     */
-    val dbType: DatabaseType
-        get() = when (analyticsType) {
-            AnalyticsType.POSTGRESQL -> DatabaseType.POSTGRESQL
-            AnalyticsType.H2 -> DatabaseType.H2
-        }
-
     suspend fun <R> withConnection(
         connection: Connection? = null,
         block: suspend (Connection) -> R
@@ -34,13 +25,11 @@ interface AnalyticsConfig {
         block: suspend (Connection) -> R
     ): R
 
-    fun insertIgnoreSelect(tableName: String, columns: String, selectSql: String): String = when (dbType) {
-        DatabaseType.MYSQL -> "INSERT IGNORE INTO $tableName ($columns) $selectSql"
-        DatabaseType.POSTGRESQL, DatabaseType.H2 -> "INSERT INTO $tableName ($columns) $selectSql ON CONFLICT DO NOTHING"
-    }
-
-    fun insertIgnoreInto(tableName: String, columns: String, values: String): String = when (dbType) {
-        DatabaseType.MYSQL -> "INSERT IGNORE INTO $tableName ($columns) VALUES ($values)"
-        DatabaseType.POSTGRESQL, DatabaseType.H2 -> "INSERT INTO $tableName ($columns) VALUES ($values) ON CONFLICT DO NOTHING"
+    fun insertIgnoreInto(tableName: String, columns: String, values: String): String {
+        val conflictTarget = when (analyticsType) {
+            AnalyticsType.H2, AnalyticsType.POSTGRESQL -> ""
+            AnalyticsType.SQLITE -> " (source, event_id)"
+        }
+        return "INSERT INTO $tableName ($columns) VALUES ($values) ON CONFLICT$conflictTarget DO NOTHING"
     }
 }

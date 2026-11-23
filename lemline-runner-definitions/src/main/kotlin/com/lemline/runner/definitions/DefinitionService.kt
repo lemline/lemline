@@ -187,7 +187,7 @@ class DefinitionService {
                 ?: return@withTransaction DeleteResult.NotFound("Workflow '$name' version '$version' not found")
 
             // Remove active listeners for this workflow definition
-            definitionListenService.removeListeners(namespace, name, version)
+            definitionListenService.removeListeners(namespace, name, version, conn)
 
             // Delete the definition
             val deleted = definitionRepository.delete(model, conn) == 1
@@ -229,7 +229,7 @@ class DefinitionService {
 
             definitions.forEach { model ->
                 // Remove active listeners for each version
-                definitionListenService.removeListeners(namespace, name, model.version)
+                definitionListenService.removeListeners(namespace, name, model.version, conn)
             }
 
             val deletedCount = definitionRepository.delete(definitions, conn)
@@ -267,7 +267,7 @@ class DefinitionService {
 
             definitions.forEach { model ->
                 // Remove active listeners for each definition
-                definitionListenService.removeListeners(namespace, model.name, model.version)
+                definitionListenService.removeListeners(namespace, model.name, model.version, conn)
             }
 
             val deletedCount = definitionRepository.deleteAllInNamespace(namespace, conn)

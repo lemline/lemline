@@ -10,6 +10,9 @@ enum class AnalyticsType(val configValue: String) {
 
     /** PostgreSQL analytics storage. */
     POSTGRESQL(ANALYTICS_TYPE_POSTGRESQL),
+
+    /** File-backed SQLite analytics storage. */
+    SQLITE(ANALYTICS_TYPE_SQLITE),
     ;
 
     companion object {

@@ -13,7 +13,7 @@ import com.lemline.runner.gateway.persistence.lifecycleTypeSqlList
 import com.lemline.runner.gateway.persistence.SqlQuery
 import com.lemline.runner.gateway.persistence.normalizePageSize
 import com.lemline.runner.gateway.persistence.placeholders
-import com.lemline.runner.gateway.persistence.setGatewayObject
+import com.lemline.runner.gateway.persistence.setAnalyticsObject
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
 import kotlinx.coroutines.Dispatchers
@@ -27,9 +27,10 @@ class DefinitionStatsQueryService(
     @Inject
     lateinit var analyticsDataSourceProvider: AnalyticsDataSourceProvider
 
+    private val analyticsType = AnalyticsType.fromConfigValue(config.analyticsTypeResolved)
     private val analyticsQualifiedTable =
         GatewayJdbcSupport.qualifiedAnalyticsTable(
-            analyticsType = AnalyticsType.fromConfigValue(config.analyticsTypeResolved),
+            analyticsType = analyticsType,
             schema = config.analyticsSchemaResolved,
             table = ANALYTICS_LIFECYCLE_EVENTS_TABLE
         )
@@ -75,7 +76,7 @@ class DefinitionStatsQueryService(
         analyticsDataSourceProvider.require().connection.use { conn ->
             conn.prepareStatement(query.sql).use { stmt ->
                 query.params.forEachIndexed { index, value ->
-                    stmt.setGatewayObject(index + 1, value)
+                    stmt.setAnalyticsObject(index + 1, value, analyticsType)
                 }
                 stmt.executeQuery().use { rs ->
                     buildList {
@@ -104,7 +105,7 @@ class DefinitionStatsQueryService(
             analyticsDataSourceProvider.require().connection.use { conn ->
                 conn.prepareStatement(query.sql).use { stmt ->
                     query.params.forEachIndexed { index, value ->
-                        stmt.setGatewayObject(index + 1, value)
+                        stmt.setAnalyticsObject(index + 1, value, analyticsType)
                     }
                     stmt.executeQuery().use { rs ->
                         if (rs.next()) rs.getLong("total_count") else 0L

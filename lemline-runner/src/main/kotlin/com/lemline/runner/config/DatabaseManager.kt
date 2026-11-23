@@ -7,6 +7,8 @@ import com.lemline.common.trace
 import com.lemline.runner.common.config.DatabaseConfig
 import com.lemline.runner.common.config.DatabaseType
 import com.lemline.runner.common.config.MigrationManager
+import com.lemline.runner.common.config.SQLiteDatabase
+import com.lemline.runner.common.config.SQLiteMigrationLock
 import io.agroal.api.AgroalDataSource
 import io.quarkus.agroal.DataSource
 import io.quarkus.arc.profile.IfBuildProfile
@@ -39,6 +41,10 @@ class DatabaseManager(
     @DataSource("mysql")
     internal lateinit var mysqlDataSource: Instance<AgroalDataSource>
 
+    @Inject
+    @DataSource("sqlite")
+    internal lateinit var sqliteDataSource: Instance<AgroalDataSource>
+
     val datasource: AgroalDataSource by lazy {
         log.debug { "Resolving datasource for type: $dbType" }
         log.trace { "- PostgreSQL datasource resolvable: ${postgresDataSource.isResolvable}" }
@@ -54,6 +60,10 @@ class DatabaseManager(
             DatabaseType.MYSQL -> {
                 if (mysqlDataSource.isResolvable) mysqlDataSource.get()
                 else throw IllegalStateException("MySQL datasource is not available")
+            }
+
+            DatabaseType.SQLITE -> sqliteDataSource.get().also { pool ->
+                pool.connection.use(SQLiteDatabase::initialize)
             }
 
             DatabaseType.H2 -> {
@@ -75,6 +85,10 @@ class DatabaseManager(
     @FlywayDataSource("mysql")
     internal lateinit var mysqlFlyway: Instance<Flyway>
 
+    @Inject
+    @FlywayDataSource("sqlite")
+    internal lateinit var sqliteFlyway: Instance<Flyway>
+
     val flyway: Flyway by lazy {
         log.debug { "Resolving flyway for type: $dbType" }
         log.debug { "- PostgreSQL flyway resolvable: ${postgresqlFlyway.isResolvable}" }
@@ -90,6 +104,12 @@ class DatabaseManager(
             DatabaseType.MYSQL -> {
                 if (mysqlFlyway.isResolvable) mysqlFlyway.get()
                 else throw IllegalStateException("MySQL flyway is not available")
+            }
+
+            DatabaseType.SQLITE -> {
+                // Also initialize WAL when the CLI invokes Flyway before runtime hooks.
+                check(datasource.isHealthy(false)) { "SQLite datasource is unavailable" }
+                sqliteFlyway.get()
             }
 
             DatabaseType.H2 -> {
@@ -126,102 +146,21 @@ class DatabaseManager(
     }
 
     override fun migrate() {
-        flyway.migrate()
+        if (dbType == DatabaseType.SQLITE) {
+            // Flyway takes no lock on SQLite: serialize the processes sharing the file.
+            val url = datasource.connection.use { it.metaData.url }
+            SQLiteMigrationLock.withLock(url) { flyway.migrate() }
+        } else {
+            flyway.migrate()
+        }
     }
 
-    /**
-     * Returns the database-specific JSON array aggregation function.
-     *
-     * This function handles the case where the column contains JSON data stored as a string.
-     * The aggregation properly parses the string as JSON before aggregating.
-     *
-     * - PostgreSQL: json_agg(column::json) - casts string to json before aggregation
-     * - MySQL: JSON_ARRAYAGG(CAST(column AS JSON)) - casts string to JSON
-     * - H2: JSON_ARRAYAGG(column FORMAT JSON) - tells H2 the column is JSON
-     *
-     * @param column The column expression containing JSON strings to aggregate
-     * @return SQL fragment for JSON array aggregation
-     */
-    override fun jsonArrayAgg(column: String): String = when (dbType) {
-        DatabaseType.POSTGRESQL -> "json_agg($column::json)"
-        DatabaseType.MYSQL -> "JSON_ARRAYAGG(CAST($column AS JSON))"
-        DatabaseType.H2 -> "JSON_ARRAYAGG($column FORMAT JSON)"
-    }
-
-    /**
-     * Returns the database-specific JSON array aggregation function with ordering.
-     *
-     * - PostgreSQL: json_agg(column::json ORDER BY orderColumn)
-     * - MySQL: JSON_ARRAYAGG(CAST(column AS JSON) ORDER BY orderColumn)
-     * - H2: JSON_ARRAYAGG(column FORMAT JSON ORDER BY orderColumn)
-     *
-     * @param column The column expression containing JSON strings to aggregate
-     * @param orderColumn The column to order by
-     * @return SQL fragment for ordered JSON array aggregation
-     */
-    override fun jsonArrayAggOrdered(column: String, orderColumn: String): String = when (dbType) {
-        DatabaseType.POSTGRESQL -> "json_agg($column::json ORDER BY $orderColumn)"
-        DatabaseType.MYSQL -> "JSON_ARRAYAGG(CAST($column AS JSON) ORDER BY $orderColumn)"
-        DatabaseType.H2 -> "JSON_ARRAYAGG($column FORMAT JSON ORDER BY $orderColumn)"
-    }
-
-    /**
-     * Returns the database-specific random UUID generation function.
-     *
-     * - PostgreSQL: gen_random_uuid()
-     * - MySQL: UUID_TO_BIN(UUID())
-     * - H2: RANDOM_UUID()
-     *
-     * @return SQL fragment for generating a random UUID
-     */
-    fun randomUuid(): String = when (dbType) {
-        DatabaseType.POSTGRESQL -> "gen_random_uuid()"
-        DatabaseType.MYSQL -> "UUID_TO_BIN(UUID())"
-        DatabaseType.H2 -> "RANDOM_UUID()"
-    }
-
-    /**
-     * Returns the database-specific INSERT ON CONFLICT/IGNORE syntax for INSERT...SELECT.
-     *
-     * - PostgreSQL/H2: INSERT ... ON CONFLICT DO NOTHING
-     * - MySQL: INSERT IGNORE INTO ...
-     *
-     * @param tableName The table name
-     * @param columns The columns to insert
-     * @param selectSql The SELECT SQL to insert from
-     * @return Full INSERT...SELECT SQL with conflict handling
-     */
-    override fun insertIgnoreSelect(tableName: String, columns: String, selectSql: String): String = when (dbType) {
-        DatabaseType.MYSQL -> "INSERT IGNORE INTO $tableName ($columns) $selectSql"
-        DatabaseType.POSTGRESQL, DatabaseType.H2 -> "INSERT INTO $tableName ($columns) $selectSql ON CONFLICT DO NOTHING"
-    }
-
-    /**
-     * Returns the database-specific INSERT ON CONFLICT/IGNORE syntax for INSERT...VALUES.
-     *
-     * - PostgreSQL/H2: INSERT INTO ... VALUES (...) ON CONFLICT DO NOTHING
-     * - MySQL: INSERT IGNORE INTO ... VALUES (...)
-     *
-     * @param tableName The table name
-     * @param columns The columns to insert
-     * @param values The VALUES clause (with placeholders)
-     * @return Full INSERT...VALUES SQL with conflict handling
-     */
-    override fun insertIgnoreInto(tableName: String, columns: String, values: String): String = when (dbType) {
-        DatabaseType.MYSQL -> "INSERT IGNORE INTO $tableName ($columns) VALUES ($values)"
-        DatabaseType.POSTGRESQL, DatabaseType.H2 -> "INSERT INTO $tableName ($columns) VALUES ($values) ON CONFLICT DO NOTHING"
-    }
-
-    /**
-     * Returns a NULL value explicitly cast to timestamp type.
-     * PostgreSQL requires explicit casts in CASE expressions when one branch is NULL.
-     *
-     * @return Database-specific NULL::timestamp expression
-     */
-    fun nullTimestamp(): String = when (dbType) {
-        DatabaseType.POSTGRESQL -> "NULL::TIMESTAMPTZ"
-        DatabaseType.MYSQL, DatabaseType.H2 -> "NULL"
-    }
+    override fun jsonArrayAggOrdered(column: String, orderColumn: String): String =
+        if (dbType == DatabaseType.MYSQL) {
+            "JSON_ARRAYAGG(CAST($column AS JSON) ORDER BY $orderColumn)"
+        } else {
+            super.jsonArrayAggOrdered(column, orderColumn)
+        }
 
     /**
      * Executes a block of code with a database connection.
@@ -260,6 +199,7 @@ class DatabaseManager(
         when (connection) {
             null -> {
                 datasource.connection.use { conn ->
+                    if (dbType == DatabaseType.SQLITE) return@withContext SQLiteDatabase.writeTransaction(conn, block)
                     conn.autoCommit = false
                     try {
                         block(conn).also { conn.commit() }

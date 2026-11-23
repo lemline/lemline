@@ -2,14 +2,20 @@
 package com.lemline.runner.analytics
 
 import com.lemline.core.lifecycleevents.LifecycleEventEmitter
+import com.lemline.runner.common.config.ANALYTICS_LIFECYCLE_EVENTS_TABLE
+import com.lemline.common.values.IDV7
 import com.lemline.runner.common.test.RequiresDocker
+import com.lemline.runner.listeners.CloudEventService
 import com.lemline.runner.tests.profiles.KafkaAnalyticsProfile
 import com.lemline.runner.tests.profiles.PgmqAnalyticsProfile
+import com.lemline.runner.tests.profiles.PgmqPostgresAnalyticsProfile
+import com.lemline.runner.tests.profiles.PgmqSQLiteAnalyticsProfile
+import com.lemline.runner.tests.profiles.SqliteTransportAnalyticsProfile
+import com.lemline.runner.tests.resources.SqliteMessagingTestClient
 import com.lemline.runner.tests.profiles.RabbitMQAnalyticsProfile
-import io.agroal.api.AgroalDataSource
+import com.lemline.runner.gateway.analytics.AnalyticsDataSourceProvider
 import io.cloudevents.CloudEvent
 import io.cloudevents.core.builder.CloudEventBuilder
-import io.quarkus.agroal.DataSource
 import io.quarkus.test.junit.QuarkusTest
 import io.quarkus.test.junit.TestProfile
 import jakarta.inject.Inject
@@ -17,7 +23,10 @@ import java.net.URI
 import java.time.OffsetDateTime
 import java.util.UUID
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
@@ -25,19 +34,19 @@ import org.junit.jupiter.api.fail
 
 internal abstract class LifecycleAnalyticsBrokerIntegrationTestBase(
     private val broker: String,
+    private val table: String = "public.lemline_lifecycle_events",
 ) {
     @Inject
     lateinit var lifecycleEventEmitter: LifecycleEventEmitter
 
     @Inject
-    @DataSource("analytics")
-    lateinit var analyticsDataSource: AgroalDataSource
+    lateinit var analyticsDataSourceProvider: AnalyticsDataSourceProvider
 
     @BeforeEach
     fun cleanAnalyticsTable() {
-        analyticsDataSource.connection.use { conn ->
+        analyticsDataSourceProvider.require().connection.use { conn ->
             conn.createStatement().use { stmt ->
-                stmt.execute("TRUNCATE TABLE public.lemline_lifecycle_events")
+                stmt.execute("DELETE FROM $table")
             }
         }
     }
@@ -64,7 +73,7 @@ internal abstract class LifecycleAnalyticsBrokerIntegrationTestBase(
         assertEquals(1, countRowsByEventId(event.id))
     }
 
-    private fun buildEvent(eventId: String): CloudEvent {
+    protected fun buildEvent(eventId: String): CloudEvent {
         return CloudEventBuilder.v1()
             .withId(eventId)
             .withSource(URI.create("urn:lemline:test:$broker"))
@@ -91,10 +100,10 @@ internal abstract class LifecycleAnalyticsBrokerIntegrationTestBase(
         fail("Expected $expected row(s) for event_id='$eventId', but found ${countRowsByEventId(eventId)}")
     }
 
-    private fun countRowsByEventId(eventId: String): Int {
-        analyticsDataSource.connection.use { conn ->
+    protected fun countRowsByEventId(eventId: String): Int {
+        analyticsDataSourceProvider.require().connection.use { conn ->
             conn.prepareStatement(
-                "SELECT COUNT(*) FROM public.lemline_lifecycle_events WHERE event_id = ?"
+                "SELECT COUNT(*) FROM $table WHERE event_id = ?"
             ).use { stmt ->
                 stmt.setString(1, eventId)
                 stmt.executeQuery().use { rs ->
@@ -123,3 +132,40 @@ internal class RabbitLifecycleAnalyticsIntegrationTest : LifecycleAnalyticsBroke
 @TestProfile(PgmqAnalyticsProfile::class)
 @Tag("integration")
 internal class PgmqLifecycleAnalyticsIntegrationTest : LifecycleAnalyticsBrokerIntegrationTestBase("pgmq")
+
+@RequiresDocker
+@QuarkusTest
+@TestProfile(PgmqPostgresAnalyticsProfile::class)
+@Tag("integration")
+internal class PgmqPostgresLifecycleAnalyticsIntegrationTest :
+    LifecycleAnalyticsBrokerIntegrationTestBase("pgmq", "lemline.lemline_lifecycle_events")
+
+@RequiresDocker
+@QuarkusTest
+@TestProfile(PgmqSQLiteAnalyticsProfile::class)
+@Tag("integration")
+internal class PgmqSQLiteLifecycleAnalyticsIntegrationTest :
+    LifecycleAnalyticsBrokerIntegrationTestBase("pgmq", ANALYTICS_LIFECYCLE_EVENTS_TABLE)
+
+@QuarkusTest
+@TestProfile(SqliteTransportAnalyticsProfile::class)
+@Tag("integration")
+internal class SqliteTransportLifecycleAnalyticsIntegrationTest : LifecycleAnalyticsBrokerIntegrationTestBase("sqlite") {
+    @Test
+    fun `analytics deduplicates a logical message replayed after the broker ack`() = runBlocking {
+        val event = buildEvent("sqlite-replayed-${IDV7.random()}")
+        val id = IDV7.random().toString()
+        val queue = "lemline-lifecycle-events"
+        val payload = CloudEventService.serialize(event)
+        SqliteMessagingTestClient().use { client ->
+            repeat(2) {
+                client.publish(queue, payload, id)
+                withTimeout(10_000) {
+                    while (client.isActive(queue, id)) delay(30)
+                }
+                assertFalse(client.isActive("$queue.dlq", id))
+                assertEquals(1, countRowsByEventId(event.id))
+            }
+        }
+    }
+}

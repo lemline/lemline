@@ -69,7 +69,7 @@ internal class PackagedRunnerIT {
             assertSucceeded(PackagedEnvironment.run("migrate", "--force"))
             assertSucceeded(PackagedEnvironment.run("definition", "post", "-f", definition.toString()))
 
-            runner = ProcessBuilder(PackagedEnvironment.command("listen", "--info"))
+            runner = ProcessBuilder(PackagedEnvironment.command("listen", "--metrics-port", "0", "--info"))
                 .directory(PackagedEnvironment.workDir.toFile())
                 .redirectErrorStream(true)
                 .redirectOutput(runnerLog)

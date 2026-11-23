@@ -30,6 +30,8 @@ class IdV7Helper(private val dbType: DatabaseType) {
             }
         }
 
+        DatabaseType.SQLITE -> { stmt, parameterIndex, id -> stmt.setString(parameterIndex, id?.toString()) }
+
         DatabaseType.MYSQL -> { stmt, parameterIndex, id ->
             when (id) {
                 null -> stmt.setNull(parameterIndex, Types.BINARY)
@@ -46,6 +48,8 @@ class IdV7Helper(private val dbType: DatabaseType) {
         DatabaseType.H2, DatabaseType.POSTGRESQL -> { rs, columnName ->
             rs.getObject(columnName, UUID::class.java)?.let { IDV7(it) }
         }
+
+        DatabaseType.SQLITE -> { rs, columnName -> rs.getString(columnName)?.let { IDV7(UUID.fromString(it)) } }
 
         DatabaseType.MYSQL -> { rs, columnName ->
             rs.getBytes(columnName)?.let { IDV7.from(it) }

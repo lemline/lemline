@@ -1,10 +1,14 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.gateway.resources.definitions
 
+import com.lemline.runner.common.repositories.ops.bindTimestamp
 import com.lemline.runner.common.test.H2TestDatabaseConfig
+import com.lemline.runner.common.test.OrchestrationTestDatabase
+import com.lemline.runner.common.test.SQLiteTestDatabaseConfig
 import com.lemline.runner.definitions.DEFINITION_TABLE
 import io.kotest.matchers.collections.shouldContainExactly
 import io.kotest.matchers.shouldBe
+import java.sql.Timestamp
 import java.sql.Types
 import java.time.Instant
 import kotlinx.coroutines.runBlocking
@@ -12,15 +16,12 @@ import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.BeforeEach
-import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.TestInstance
 
-@DisplayName("DefinitionQueryService [H2]")
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-class DefinitionQueryServiceH2Test {
+abstract class DefinitionQueryServiceTestBase(private val testDb: OrchestrationTestDatabase) {
 
-    private val testDb = H2TestDatabaseConfig()
 
     private val service = DefinitionQueryService().apply {
         databaseConfig = testDb
@@ -28,26 +29,7 @@ class DefinitionQueryServiceH2Test {
 
     @BeforeAll
     fun createSchema() {
-        runBlocking {
-            testDb.withConnection { conn ->
-                conn.createStatement().use { stmt ->
-                    stmt.execute(
-                        """
-                        CREATE TABLE IF NOT EXISTS $DEFINITION_TABLE
-                        (
-                            namespace  VARCHAR(255)             NOT NULL,
-                            name       VARCHAR(255)             NOT NULL,
-                            version    VARCHAR(255)             NOT NULL,
-                            definition CLOB                     NOT NULL,
-                            created_at TIMESTAMP WITH TIME ZONE NOT NULL,
-                            updated_at TIMESTAMP WITH TIME ZONE,
-                            PRIMARY KEY (namespace, name, version)
-                        )
-                        """.trimIndent()
-                    )
-                }
-            }
-        }
+        testDb.migrate()
     }
 
     @AfterAll
@@ -155,14 +137,18 @@ class DefinitionQueryServiceH2Test {
                 stmt.setString(2, name)
                 stmt.setString(3, version)
                 stmt.setString(4, source)
-                stmt.setObject(5, Instant.parse(createdAt))
+                testDb.bindTimestamp(stmt, 5, Timestamp.from(Instant.parse(createdAt)))
                 if (updatedAt == null) {
                     stmt.setNull(6, Types.TIMESTAMP_WITH_TIMEZONE)
                 } else {
-                    stmt.setObject(6, Instant.parse(updatedAt))
+                    testDb.bindTimestamp(stmt, 6, Timestamp.from(Instant.parse(updatedAt)))
                 }
                 stmt.executeUpdate()
             }
         }
     }
 }
+
+class DefinitionQueryServiceH2Test : DefinitionQueryServiceTestBase(H2TestDatabaseConfig())
+
+class DefinitionQueryServiceSQLiteTest : DefinitionQueryServiceTestBase(SQLiteTestDatabaseConfig())

@@ -11,4 +11,5 @@ dependencies {
     implementation("io.quarkus:quarkus-arc")
     implementation("io.quarkus:quarkus-config-yaml")
     implementation("io.quarkus:quarkus-hibernate-validator")
+    implementation("io.smallrye.reactive:smallrye-reactive-messaging-provider")
 }

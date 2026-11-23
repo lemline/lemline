@@ -80,8 +80,8 @@ class ParentRepository : CrudRepository<ParentModel>(),
         ColumnBindingsBuilder<ParentModel>().apply {
             idColumn(idHelper)
             instanceColumns(idHelper)
-            completionColumns()
-            cleanupColumns()
+            completionColumns(databaseConfig)
+            cleanupColumns(databaseConfig)
 
             // Parent-specific column
             column(CHILD_ID_COLUMN) { stmt, entity, idx ->

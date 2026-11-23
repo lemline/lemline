@@ -76,8 +76,8 @@ class WaitRepository : CrudRepository<WaitModel>(),
         ColumnBindingsBuilder<WaitModel>().apply {
             idColumn(idHelper)
             instanceColumns(idHelper)
-            cleanupColumns()
-            outboxColumns()
+            cleanupColumns(databaseConfig)
+            outboxColumns(databaseConfig)
         }.build()
     }
 

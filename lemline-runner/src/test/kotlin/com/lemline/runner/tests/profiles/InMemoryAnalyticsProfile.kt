@@ -10,8 +10,10 @@ import com.lemline.runner.common.config.LEMLINE_OUTBOX_ENABLED
 import com.lemline.runner.common.config.LEMLINE_SCHEDULED_ENABLED
 import io.quarkus.test.junit.QuarkusTestProfile
 
-class InMemoryAnalyticsProfile : QuarkusTestProfile {
+open class InMemoryAnalyticsProfile : QuarkusTestProfile {
     private val base = InMemoryProfile()
+    protected open val analyticsOverrides: Map<String, String>
+        get() = AnalyticsH2TestProfileSupport.overrides("lemline_analytics_inmemory")
 
     override fun getConfigOverrides(): Map<String, String> {
         return base.configOverrides + mapOf(
@@ -22,7 +24,7 @@ class InMemoryAnalyticsProfile : QuarkusTestProfile {
             LEMLINE_ANALYTICS_BASELINE_ON_MIGRATE to "false",
             LEMLINE_OUTBOX_ENABLED to "false",
             LEMLINE_SCHEDULED_ENABLED to "false"
-        ) + AnalyticsH2TestProfileSupport.overrides("lemline_analytics_inmemory")
+        ) + analyticsOverrides
     }
 
     override fun testResources(): List<QuarkusTestProfile.TestResourceEntry> {

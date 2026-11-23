@@ -60,6 +60,8 @@ dependencies {
     // H2 Database for in-memory testing
     testFixturesImplementation("com.h2database:h2:2.5.252")
 
+    testFixturesRuntimeOnly(libs.sqlite.jdbc)
+
     // HikariCP for connection pooling
     testFixturesImplementation("com.zaxxer:HikariCP:7.1.0")
 

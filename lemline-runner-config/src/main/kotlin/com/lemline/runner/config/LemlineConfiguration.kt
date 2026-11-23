@@ -3,6 +3,7 @@ package com.lemline.runner.config
 
 import com.lemline.runner.common.config.ANALYTICS_TYPE_H2
 import com.lemline.runner.common.config.ANALYTICS_TYPE_POSTGRESQL
+import com.lemline.runner.common.config.ANALYTICS_TYPE_SQLITE
 import com.lemline.runner.common.config.ANALYTICS_TYPE_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.ANALYTICS_POSTGRES_BASELINE_ON_MIGRATE_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.ANALYTICS_POSTGRES_DATABASE_DEFAULT
@@ -12,6 +13,7 @@ import com.lemline.runner.config.LemlineConfigConstants.CLOUDEVENTS_TOPIC_DEFAUL
 import com.lemline.runner.config.LemlineConfigConstants.CONSUMER_CONCURRENCY_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.DB_BASELINE_ON_MIGRATE_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.DB_MIGRATE_AT_START_DEFAULT
+import com.lemline.runner.config.LemlineConfigConstants.DB_SQLITE_PATH_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.KAFKA_BROKERS_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.KAFKA_CLOUDEVENTS_GROUP_ID_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.KAFKA_DATABASE_GROUP_ID_DEFAULT
@@ -108,7 +110,7 @@ interface LemlineConfiguration {
          * Database type.
          * If not provided, it will be set in [LemlineConfigSource]
          */
-        @Pattern(regexp = "in-memory|postgresql|mysql")
+        @Pattern(regexp = "in-memory|postgresql|mysql|sqlite")
         fun type(): String
 
         /**
@@ -132,14 +134,21 @@ interface LemlineConfiguration {
          * Optional MySQL configuration
          */
         fun mysql(): Optional<MySQLConfig>
+
+        fun sqlite(): Optional<SQLiteConfig>
+    }
+
+    interface SQLiteConfig {
+        @WithDefault(DB_SQLITE_PATH_DEFAULT)
+        fun path(): String
     }
 
     /**
      * Analytics storage configuration.
-     * Controls analytics backend and analytics PostgreSQL destination settings.
+     * Controls analytics backend and destination settings.
      */
     interface AnalyticsConfig {
-        @Pattern(regexp = "$ANALYTICS_TYPE_H2|$ANALYTICS_TYPE_POSTGRESQL")
+        @Pattern(regexp = "$ANALYTICS_TYPE_H2|$ANALYTICS_TYPE_POSTGRESQL|$ANALYTICS_TYPE_SQLITE")
         @WithDefault(ANALYTICS_TYPE_DEFAULT)
         fun type(): String
 
@@ -150,6 +159,13 @@ interface LemlineConfiguration {
         fun baselineOnMigrate(): Boolean
 
         fun postgresql(): AnalyticsPostgreSQLConfig
+
+        fun sqlite(): AnalyticsSQLiteConfig
+    }
+
+    interface AnalyticsSQLiteConfig {
+        @WithDefault(LemlineConfigConstants.ANALYTICS_SQLITE_PATH_DEFAULT)
+        fun path(): String
     }
 
     interface AnalyticsPostgreSQLConfig {
@@ -314,7 +330,7 @@ interface LemlineConfiguration {
          * Messaging type.
          * If not provided, it will be set in [LemlineConfigSource]
          */
-        @Pattern(regexp = "in-memory|kafka|rabbitmq|pgmq")
+        @Pattern(regexp = "in-memory|kafka|rabbitmq|pgmq|sqlite")
         fun type(): String
 
         /**
@@ -347,6 +363,28 @@ interface LemlineConfiguration {
          * Optional PGMQ (PostgreSQL Message Queue) configuration
          */
         fun pgmq(): Optional<PgmqConfig>
+
+        fun sqlite(): SqliteMessagingConfig
+    }
+
+    interface SqliteMessagingConfig {
+        @WithDefault(LemlineConfigConstants.SQLITE_MESSAGING_PATH_DEFAULT)
+        fun path(): Optional<String>
+
+        /** Seconds a handler may hold a message before another worker can take it. */
+        @WithDefault(LemlineConfigConstants.SQLITE_VISIBILITY_TIMEOUT_DEFAULT)
+        fun visibilityTimeout(): Int
+
+        /** Milliseconds between polls of an empty queue. */
+        @WithDefault(LemlineConfigConstants.SQLITE_POLL_INTERVAL_DEFAULT)
+        fun pollInterval(): Long
+
+        @WithDefault(LemlineConfigConstants.SQLITE_BATCH_SIZE_DEFAULT)
+        fun batchSize(): Int
+
+        /** Total delivery attempts before a message is dead-lettered. */
+        @WithDefault(LemlineConfigConstants.SQLITE_MAX_RETRIES_DEFAULT)
+        fun maxRetries(): Int
     }
 
     interface ChannelConfig {

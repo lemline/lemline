@@ -25,14 +25,19 @@ import com.lemline.core.workflows.CachedEventFilter
 import com.lemline.core.workflows.CachedListenTask
 import com.lemline.core.workflows.WorkflowCache
 import com.lemline.runner.common.config.DatabaseConfig
+import com.lemline.runner.common.messaging.CommandEmitter
 import com.lemline.runner.common.messaging.InstanceMessage
 import com.lemline.runner.common.test.ops.CleanerRepositoryTest
 import com.lemline.runner.common.test.ops.CrudRepositoryTest
 import com.lemline.runner.common.test.ops.IdRepositoryTest
 import com.lemline.runner.common.test.ops.OutboxRepositoryTest
+import com.lemline.runner.listeners.outbox.ListenerScheduledTimeout
 import io.cloudevents.core.builder.CloudEventBuilder
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
+import io.mockk.coVerify
+import io.mockk.every
+import io.mockk.mockk
 import io.serverlessworkflow.api.types.ListenTaskConfiguration.ListenAndReadAs
 import java.net.URI
 import java.util.concurrent.CyclicBarrier
@@ -450,6 +455,32 @@ abstract class ListenerRepositoryTestBase {
             // Then
             timedOut.size shouldBe 1
             timedOut[0].id shouldBe timedOutListener.id
+        }
+
+        @Test
+        fun `timeout relay marks the reserved listener failed once`() = runTest {
+            val listener = createListener(Clock.System.now() - 1.hours)
+            repository.insert(listener)
+            val emitter = mockk<CommandEmitter>(relaxed = true)
+            val timeout = ListenerScheduledTimeout().apply {
+                listenerConfig = mockk {
+                    every { outbox.batchSize } returns 10
+                }
+            }
+            for ((field, value) in mapOf(
+                "listenerRepository" to repository,
+                "commandEmitter" to emitter,
+                "databaseConfig" to getDatabaseConfig(),
+            )) {
+                ListenerScheduledTimeout::class.java.getDeclaredField(field).apply { isAccessible = true }.set(timeout, value)
+            }
+
+            timeout.doWork()
+            timeout.doWork()
+
+            repository.findById(listener.id)?.outboxFailedAt shouldNotBe null
+            val messageId = listener.instanceMessage.workflowState.nodeStack.deriveIdempotentId("-listen-timeout")
+            coVerify(exactly = 1) { emitter.send(any(), messageId) }
         }
 
         @Test

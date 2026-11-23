@@ -36,7 +36,9 @@ class MessagingStartupValidator(
             MessagingType.KAFKA -> verifyKafkaConnectivity()
             MessagingType.RABBITMQ -> verifyRabbitMQConnectivity()
             MessagingType.PGMQ -> verifyPgmqConnectivity()
-            MessagingType.IN_MEMORY -> Unit
+            // The SQLite connector resolves the file, verifies WAL and migrates
+            // when SmallRye opens an enabled channel, before accepting traffic.
+            MessagingType.SQLITE, MessagingType.IN_MEMORY -> Unit
         }
     }
 

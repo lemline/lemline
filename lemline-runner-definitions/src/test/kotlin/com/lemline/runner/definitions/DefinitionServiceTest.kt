@@ -91,7 +91,7 @@ class DefinitionServiceTest {
         coEvery { mockedRepository.listByName(any(), any(), any()) } returns listOf(model)
         coEvery { mockedRepository.listAllInNamespace(any(), any()) } returns listOf(model)
         coEvery { mockedRepository.countAllInNamespace(any(), any()) } returns 1
-        coEvery { mockedListenService.removeListeners(any(), any(), any()) } returns 0
+        coEvery { mockedListenService.removeListeners(any(), any(), any(), any()) } returns 0
         coEvery { mockedRepository.delete(model, any()) } returns 1
         coEvery { mockedRepository.delete(listOf(model), any()) } returns 1
         coEvery { mockedRepository.deleteAllInNamespace(any(), any()) } returns 1

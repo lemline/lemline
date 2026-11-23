@@ -42,12 +42,20 @@ internal class AnalyticsManager(
     internal lateinit var postgresqlDataSource: Instance<AgroalDataSource>
 
     @Inject
+    @DataSource("analytics-sqlite")
+    internal lateinit var sqliteDataSource: Instance<AgroalDataSource>
+
+    @Inject
     @FlywayDataSource("analytics")
     internal lateinit var h2Flyway: Instance<Flyway>
 
     @Inject
     @FlywayDataSource("analytics-postgresql")
     internal lateinit var postgresqlFlyway: Instance<Flyway>
+
+    @Inject
+    @FlywayDataSource("analytics-sqlite")
+    internal lateinit var sqliteFlyway: Instance<Flyway>
 
     val datasource: AgroalDataSource by lazy {
         log.debug { "Resolving analytics datasource for type: ${analyticsType.configValue}" }
@@ -57,6 +65,7 @@ internal class AnalyticsManager(
         when (analyticsType) {
             AnalyticsType.H2 -> requireResolvableDataSource("H2", h2DataSource)
             AnalyticsType.POSTGRESQL -> requireResolvableDataSource("PostgreSQL", postgresqlDataSource)
+            AnalyticsType.SQLITE -> requireResolvableDataSource("SQLite", sqliteDataSource)
         }
     }
 
@@ -68,6 +77,7 @@ internal class AnalyticsManager(
         when (analyticsType) {
             AnalyticsType.H2 -> requireResolvableFlyway("H2", h2Flyway)
             AnalyticsType.POSTGRESQL -> requireResolvableFlyway("PostgreSQL", postgresqlFlyway)
+            AnalyticsType.SQLITE -> requireResolvableFlyway("SQLite", sqliteFlyway)
         }
     }
 
@@ -78,8 +88,9 @@ internal class AnalyticsManager(
         if (datasource.isResolvable) return datasource.get()
         throw IllegalStateException(
             "$datasourceLabel analytics datasource is not available. " +
-                "Enable '$LEMLINE_MESSAGING_LIFECYCLE_EVENTS_CONSUMER_ENABLED'. " +
-                "For PostgreSQL, configure '$LEMLINE_ANALYTICS_TYPE=postgresql' and $LEMLINE_ANALYTICS_POSTGRES.*"
+                "Enable '$LEMLINE_MESSAGING_LIFECYCLE_EVENTS_CONSUMER_ENABLED' or the gateway. " +
+                "For PostgreSQL, configure '$LEMLINE_ANALYTICS_TYPE=postgresql' and $LEMLINE_ANALYTICS_POSTGRES.*. " +
+                "For SQLite, configure '$LEMLINE_ANALYTICS_TYPE=sqlite'."
         )
     }
 
@@ -90,8 +101,9 @@ internal class AnalyticsManager(
         if (flyway.isResolvable) return flyway.get()
         throw IllegalStateException(
             "$datasourceLabel analytics flyway is not available. " +
-                "Enable '$LEMLINE_MESSAGING_LIFECYCLE_EVENTS_CONSUMER_ENABLED'. " +
-                "For PostgreSQL, configure '$LEMLINE_ANALYTICS_TYPE=postgresql' and $LEMLINE_ANALYTICS_POSTGRES.*"
+                "Enable '$LEMLINE_MESSAGING_LIFECYCLE_EVENTS_CONSUMER_ENABLED' or the gateway. " +
+                "For PostgreSQL, configure '$LEMLINE_ANALYTICS_TYPE=postgresql' and $LEMLINE_ANALYTICS_POSTGRES.*. " +
+                "For SQLite, configure '$LEMLINE_ANALYTICS_TYPE=sqlite'."
         )
     }
 

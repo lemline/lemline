@@ -29,14 +29,15 @@ lifecycleevents-in (String payload)
 
 ## Dual-Database Support (the key structural fact)
 
-Unlike most runner feature modules, analytics is **not** single-datasource. `config/AnalyticsManager` (implements `AnalyticsConfig` from `lemline-runner-common`) resolves between two datasources/Flyway instances at runtime based on `lemline.analytics.type`:
+Unlike most runner feature modules, analytics is **not** single-datasource. `config/AnalyticsManager` (implements `AnalyticsConfig` from `lemline-runner-common`) resolves between three datasources/Flyway instances at runtime based on `lemline.analytics.type`:
 
 - `AnalyticsType.H2` → `@DataSource("analytics")` / `@FlywayDataSource("analytics")`
 - `AnalyticsType.POSTGRESQL` → `@DataSource("analytics-postgresql")` / `@FlywayDataSource("analytics-postgresql")`
+- `AnalyticsType.SQLITE` → `@DataSource("analytics-sqlite")` / `@FlywayDataSource("analytics-sqlite")` (a local file shared by the processes of one host)
 
 Consequences for any SQL or schema change:
 
-- Migrations are **per-database**: `src/main/resources/db/migration/analytics/{h2,postgresql}/`. Add/version both, keeping versions (`V00x__`) in lockstep.
+- Migrations are **per-database**: `src/main/resources/db/migration/analytics/{h2,postgresql,sqlite}/`. Add/version all of them, keeping versions (`V00x__`) in lockstep.
 - Type-specific SQL branches live in the repository, keyed on `analyticsConfig.analyticsType`:
   - PostgreSQL stores `payload` as `JSONB` (`CAST(? AS JSONB)`); H2 stores it as a plain string (`?`).
   - PostgreSQL qualifies the table with the configured schema (`"schema"."table"`); H2 uses the bare table name.
@@ -52,7 +53,7 @@ Consequences for any SQL or schema change:
 ## Configuration & Startup
 
 - Property keys are centralized in `lemline-runner-common` (`LemlineConfigKeys`); **defaults** live in `config/AnalyticsConfigConstants`. Don't scatter literal keys.
-- The whole module is gated by `lemline.messaging.lifecycle-events.consumer.enabled` (**default `false`**). When disabled, the subscriber is inert and startup hooks no-op.
+- The whole module is gated by `lemline.messaging.lifecycle-events.consumer.enabled` (**default `false`**). When disabled, the subscriber is inert and startup hooks no-op, with one exception: a gateway using SQLite analytics still validates and migrates the file it reads, under the cross-process `SQLiteMigrationLock`.
 - Startup hooks (CDI `@Observes StartupEvent`, ordered by `@Priority`):
   - `AnalyticsStartupValidator` (`@Priority(0)`): verifies analytics DB connectivity, fails fast with an actionable banner.
   - `AnalyticsMigration` (`@Priority(1)`): runs Flyway on the resolved datasource when `lemline.analytics.migrate-at-start` is true (default `true`).

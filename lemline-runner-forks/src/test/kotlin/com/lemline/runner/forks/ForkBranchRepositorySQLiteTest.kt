@@ -1,0 +1,42 @@
+// SPDX-License-Identifier: BUSL-1.1
+package com.lemline.runner.forks
+
+import com.lemline.runner.common.config.DatabaseConfig
+import com.lemline.runner.common.test.SQLiteTestDatabaseConfig
+import org.junit.jupiter.api.AfterAll
+import org.junit.jupiter.api.BeforeAll
+import org.junit.jupiter.api.DisplayName
+
+/**
+ * H2-specific tests for ForkBranchRepository.
+ * Uses in-memory H2 database.
+ */
+@DisplayName("ForkBranchRepository [SQLite]")
+class ForkBranchRepositorySQLiteTest : ForkBranchRepositoryTestBase() {
+
+    override fun getDatabaseConfig(): DatabaseConfig = testDb
+    override fun getForkRepository(): ForkRepository = forkRepository
+    override fun getBranchRepository(): ForkBranchRepository = branchRepository
+
+    companion object {
+        private val testDb = SQLiteTestDatabaseConfig()
+        private val forkRepository: ForkRepository by lazy {
+            ForkRepository().apply { databaseConfig = testDb }
+        }
+        private val branchRepository: ForkBranchRepository by lazy {
+            ForkBranchRepository().apply { databaseConfig = testDb }
+        }
+
+        @BeforeAll
+        @JvmStatic
+        fun setupClass() {
+            testDb.migrate()
+        }
+
+        @AfterAll
+        @JvmStatic
+        fun teardownClass() {
+            testDb.close()
+        }
+    }
+}
