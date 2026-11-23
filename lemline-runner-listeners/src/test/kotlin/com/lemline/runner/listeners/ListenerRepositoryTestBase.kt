@@ -1456,7 +1456,7 @@ abstract class ListenerRepositoryTestBase {
         @org.junit.jupiter.api.AfterEach fun clearDefinitionsAfter() = WorkflowCache.clear()
 
         private fun definition(functions: Boolean): String = if (functions) """
-            document: { dsl: '1.0.0', namespace: extensions, name: routing-functions, version: '1.0.0' }
+            document: { dsl: '1.0.3', namespace: extensions, name: routing-functions, version: '1.0.0' }
             use:
               functions:
                 alpha:
@@ -1471,7 +1471,7 @@ abstract class ListenerRepositoryTestBase {
               - first: { call: alpha, if: '§{ .choice == "alpha" }' }
               - second: { call: beta }
         """.trimIndent().replace('§', '$') else """
-            document: { dsl: '1.0.0', namespace: extensions, name: routing-extensions, version: '1.0.0' }
+            document: { dsl: '1.0.3', namespace: extensions, name: routing-extensions, version: '1.0.0' }
             use:
               functions:
                 entry:
@@ -1553,7 +1553,7 @@ abstract class ListenerRepositoryTestBase {
         fun `remote function extension listener hydrates filters on a different events worker`() = runTest {
             val remote = "https://example.com/remote.yaml"
             val function = WorkflowCache.parseYaml(
-                """document: { dsl: '1.0.0', namespace: extensions, name: unused, version: '1.0.0' }
+                """document: { dsl: '1.0.3', namespace: extensions, name: unused, version: '1.0.0' }
 do: [{ owner: { set: { value: 42 } } }]""").`do`.single().task
             var resolutions = 0
             val resolver = object : FunctionResolver {
@@ -1564,7 +1564,7 @@ do: [{ owner: { set: { value: 42 } } }]""").`do`.single().task
                 }
             }
             val source = """
-                document: { dsl: '1.0.0', namespace: extensions, name: remote-listener, version: '1.0.0' }
+                document: { dsl: '1.0.3', namespace: extensions, name: remote-listener, version: '1.0.0' }
                 use:
                   extensions:
                     - prepare:

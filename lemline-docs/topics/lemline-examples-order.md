@@ -23,525 +23,475 @@ This workflow implements an e-commerce order processing pipeline that:
 ## Full Workflow Definition
 
 ```yaml
-id: order-processing
-name: Order Processing Workflow
-version: '1.0'
-specVersion: '1.0'
-start: ReceiveOrder
-functions:
-  - name: validateCustomer
-    type: http
-    operation: GET
-    url: https://api.example.com/customers/{customerId}/validate
-  
-  - name: checkInventory
-    type: http
-    operation: POST
-    url: https://api.example.com/inventory/check
-  
-  - name: processPayment
-    type: http
-    operation: POST
-    url: https://api.example.com/payments/process
-  
-  - name: allocateInventory
-    type: http
-    operation: POST
-    url: https://api.example.com/inventory/allocate
-  
-  - name: createShipment
-    type: http
-    operation: POST
-    url: https://api.example.com/shipments
-  
-  - name: sendNotification
-    type: http
-    operation: POST
-    url: https://api.example.com/notifications/send
-tasks:
-  - name: ReceiveOrder
-    type: set
-    data:
-      orderId: "$WORKFLOW.input.orderId"
-      customerId: "$WORKFLOW.input.customerId"
-      items: "$WORKFLOW.input.items"
-      shippingAddress: "$WORKFLOW.input.shippingAddress"
-      paymentMethod: "$WORKFLOW.input.paymentMethod"
-      timestamp: "$WORKFLOW.startTime"
-      orderStatus: "RECEIVED"
-    next: ValidateOrder
-  
-  - name: ValidateOrder
-    type: set
-    data:
-      isValid: ".items && .items | length > 0 && .customerId && .shippingAddress && .paymentMethod"
-      validationMessage: "if .isValid then \"Order validated\" else \"Invalid order: Missing required fields\" end"
-    next: CheckOrderValidity
-  
-  - name: CheckOrderValidity
-    type: switch
-    conditions:
-      - condition: ".isValid == false"
-        next: RejectOrder
-      - condition: true
-        next: ValidateCustomer
-  
-  - name: ValidateCustomer
-    type: try
-    retry:
-      maxAttempts: 3
-      interval: PT2S
-    catch:
-      - error: "HTTP_ERROR"
-        status: 404
-        next: HandleInvalidCustomer
-      - error: "*"
-        next: HandleValidationError
-    do:
-      - name: CheckCustomer
-        type: call
-        function: validateCustomer
-        data:
-          customerId: ".customerId"
-    next: CheckInventory
-  
-  - name: CheckInventory
-    type: try
-    retry:
-      maxAttempts: 2
-    catch:
-      - error: "*"
-        next: HandleInventoryError
-    do:
-      - name: VerifyInventory
-        type: call
-        function: checkInventory
-        data:
-          body:
-            items: ".items | map({productId: .productId, quantity: .quantity})"
-    next: EvaluateInventory
-  
-  - name: EvaluateInventory
-    type: set
-    data:
-      inventoryResult: "."
-      allAvailable: ".available == true"
-      partiallyAvailable: ".partiallyAvailable == true"
-      unavailableItems: ".unavailableItems || []"
-      availableItems: ".availableItems || .items"
-      orderTotal: ".totalPrice"
-    next: CheckInventoryResult
-  
-  - name: CheckInventoryResult
-    type: switch
-    conditions:
-      - condition: ".allAvailable == true"
-        next: ProcessPayment
-      - condition: ".partiallyAvailable == true"
-        next: AdjustForPartialInventory
-      - condition: true
-        next: HandleUnavailableInventory
-  
-  - name: AdjustForPartialInventory
-    type: set
-    data:
-      originalItems: ".items"
-      items: ".availableItems"
-      unavailableItems: ".unavailableItems"
-      adjustmentReason: "Some items are unavailable"
-      orderTotal: ".adjustedTotalPrice"
-      orderStatus: "ADJUSTED"
-    next: NotifyAdjustment
-  
-  - name: NotifyAdjustment
-    type: call
-    function: sendNotification
-    data:
-      body:
-        to: ".customerId"
-        type: "ORDER_ADJUSTED"
-        subject: "Your order has been adjusted"
-        message: "Some items in your order were unavailable and have been removed."
-        details:
-          unavailableItems: ".unavailableItems | map(.productId)"
-          adjustedTotal: ".orderTotal"
-    next: ProcessPayment
-  
-  - name: ProcessPayment
-    type: try
-    retry:
-      maxAttempts: 2
-    catch:
-      - error: "HTTP_ERROR"
-        status: 402
-        next: HandlePaymentRejected
-      - error: "*"
-        next: HandlePaymentError
-    do:
-      - name: ChargePayment
-        type: call
-        function: processPayment
-        data:
-          body:
-            customerId: ".customerId"
-            orderId: ".orderId"
-            amount: ".orderTotal"
-            currency: "USD"
-            paymentMethod: ".paymentMethod"
-    next: CheckPaymentResult
-  
-  - name: CheckPaymentResult
-    type: switch
-    conditions:
-      - condition: ".status == 'APPROVED'"
-        next: AllocateInventory
-      - condition: true
-        next: HandlePaymentRejection
-  
-  - name: AllocateInventory
-    type: try
-    retry:
-      maxAttempts: 3
-    catch:
-      - error: "*"
-        next: RollbackPayment
-    do:
-      - name: ReserveInventory
-        type: call
-        function: allocateInventory
-        data:
-          body:
-            orderId: ".orderId"
-            items: ".items | map({productId: .productId, quantity: .quantity})"
-    next: CreateShipment
-  
-  - name: CreateShipment
-    type: try
-    retry:
-      maxAttempts: 3
-    catch:
-      - error: "*"
-        next: RollbackAllocation
-    do:
-      - name: ArrangeShipment
-        type: call
-        function: createShipment
-        data:
-          body:
-            orderId: ".orderId"
-            customerId: ".customerId"
-            items: ".items"
-            shippingAddress: ".shippingAddress"
-    next: WaitForShipmentUpdate
-  
-  - name: WaitForShipmentUpdate
-    type: listen
-    events:
-      - name: ShipmentUpdates
-        type: "ShipmentStatusUpdate"
-        correlations:
-          - orderId = .orderId
-        consume: 1
-        timeouts:
-          eventTimeout: PT24H
-          eventTimeoutNext: HandleShipmentTimeout
-    next: ProcessShipmentUpdate
-  
-  - name: ProcessShipmentUpdate
-    type: set
-    data:
-      shipmentEvent: ".events.ShipmentUpdates[0]"
-      shipmentStatus: ".shipmentEvent.status"
-      trackingNumber: ".shipmentEvent.trackingNumber"
-      estimatedDelivery: ".shipmentEvent.estimatedDelivery"
-      carrierName: ".shipmentEvent.carrier"
-      orderStatus: "SHIPPED"
-    next: SendOrderConfirmation
-  
-  - name: SendOrderConfirmation
-    type: call
-    function: sendNotification
-    data:
-      body:
-        to: ".customerId"
-        type: "ORDER_SHIPPED"
-        subject: "Your order has shipped!"
-        message: "Your order has been shipped and is on its way."
-        details:
-          orderId: ".orderId"
-          status: ".orderStatus"
-          trackingNumber: ".trackingNumber"
-          carrier: ".carrierName"
-          estimatedDelivery: ".estimatedDelivery"
-          items: ".items | map({productId: .productId, quantity: .quantity})"
-    next: CompleteOrder
-  
-  - name: CompleteOrder
-    type: set
-    data:
-      completedAt: "$WORKFLOW.currentTime"
-      orderStatus: "COMPLETED"
-      processingDuration: "date.difference(.timestamp, $WORKFLOW.currentTime, 'seconds')"
-      summary: {
-        orderId: ".orderId",
-        customerId: ".customerId",
-        status: ".orderStatus",
-        items: ".items | length",
-        total: ".orderTotal",
-        paymentId: ".transactionId",
-        trackingNumber: ".trackingNumber",
-        estimatedDelivery: ".estimatedDelivery"
-      }
-    next: EmitOrderCompleted
-  
-  - name: EmitOrderCompleted
-    type: emit
-    data:
-      eventType: "OrderCompleted"
-      payload:
-        orderId: ".orderId"
-        customerId: ".customerId"
-        status: ".orderStatus"
-        completedAt: ".completedAt"
-        summary: ".summary"
-    end: true
-  
-  # Error handling tasks
-  - name: RejectOrder
-    type: set
-    data:
-      orderStatus: "REJECTED"
-      rejectionReason: ".validationMessage"
-    next: NotifyRejection
-  
-  - name: NotifyRejection
-    type: call
-    function: sendNotification
-    data:
-      body:
-        to: ".customerId"
-        type: "ORDER_REJECTED"
-        subject: "Your order could not be processed"
-        message: ".rejectionReason"
-    next: FinalizeRejection
-  
-  - name: FinalizeRejection
-    type: set
-    data:
-      completedAt: "$WORKFLOW.currentTime"
-      summary: {
-        orderId: ".orderId",
-        customerId: ".customerId",
-        status: ".orderStatus",
-        reason: ".rejectionReason"
-      }
-    next: EmitOrderRejected
-  
-  - name: EmitOrderRejected
-    type: emit
-    data:
-      eventType: "OrderRejected"
-      payload:
-        orderId: ".orderId"
-        customerId: ".customerId"
-        status: ".orderStatus"
-        reason: ".rejectionReason"
-        completedAt: ".completedAt"
-    end: true
-  
-  - name: HandleInvalidCustomer
-    type: set
-    data:
-      orderStatus: "REJECTED"
-      rejectionReason: "Invalid customer account"
-    next: NotifyRejection
-  
-  - name: HandleValidationError
-    type: set
-    data:
-      orderStatus: "ERROR"
-      errorType: "VALIDATION_ERROR"
-      errorMessage: "Customer validation failed"
-      errorDetails: "$WORKFLOW.error"
-    next: NotifyError
-  
-  - name: HandleInventoryError
-    type: set
-    data:
-      orderStatus: "ERROR"
-      errorType: "INVENTORY_ERROR"
-      errorMessage: "Failed to check inventory availability"
-      errorDetails: "$WORKFLOW.error"
-    next: NotifyError
-  
-  - name: HandleUnavailableInventory
-    type: set
-    data:
-      orderStatus: "REJECTED"
-      rejectionReason: "Items are unavailable"
-      unavailableItems: ".unavailableItems"
-    next: NotifyUnavailableItems
-  
-  - name: NotifyUnavailableItems
-    type: call
-    function: sendNotification
-    data:
-      body:
-        to: ".customerId"
-        type: "ITEMS_UNAVAILABLE"
-        subject: "Items in your order are unavailable"
-        message: "Unfortunately, some items in your order are currently unavailable."
-        details:
-          orderId: ".orderId"
-          unavailableItems: ".unavailableItems | map(.productId)"
-    next: FinalizeRejection
-  
-  - name: HandlePaymentRejected
-    type: set
-    data:
-      orderStatus: "PAYMENT_FAILED"
-      rejectionReason: "Payment was declined"
-      declineReason: ".declineReason || 'Unknown decline reason'"
-    next: NotifyPaymentDeclined
-  
-  - name: NotifyPaymentDeclined
-    type: call
-    function: sendNotification
-    data:
-      body:
-        to: ".customerId"
-        type: "PAYMENT_DECLINED"
-        subject: "Your payment was declined"
-        message: "The payment for your order was declined: .declineReason"
-    next: FinalizeRejection
-  
-  - name: HandlePaymentError
-    type: set
-    data:
-      orderStatus: "ERROR"
-      errorType: "PAYMENT_ERROR"
-      errorMessage: "Payment processing failed"
-      errorDetails: "$WORKFLOW.error"
-    next: NotifyError
-  
-  - name: HandlePaymentRejection
-    type: set
-    data:
-      orderStatus: "PAYMENT_FAILED"
-      rejectionReason: "Payment status: .status"
-    next: NotifyPaymentDeclined
-  
-  - name: RollbackPayment
-    type: call
-    function: processPayment
-    data:
-      body:
-        operation: "REFUND"
-        customerId: ".customerId"
-        orderId: ".orderId"
-        paymentId: ".transactionId"
-        amount: ".orderTotal"
-        reason: "Inventory allocation failed"
-    next: HandleAllocationError
-  
-  - name: HandleAllocationError
-    type: set
-    data:
-      orderStatus: "ERROR"
-      errorType: "ALLOCATION_ERROR"
-      errorMessage: "Failed to allocate inventory"
-      errorDetails: "$WORKFLOW.error"
-    next: NotifyError
-  
-  - name: RollbackAllocation
-    type: call
-    function: allocateInventory
-    data:
-      body:
-        operation: "RELEASE"
-        orderId: ".orderId"
-        items: ".items | map({productId: .productId, quantity: .quantity})"
-    next: RollbackPayment
-  
-  - name: HandleShipmentTimeout
-    type: set
-    data:
-      orderStatus: "PROCESSING"
-      message: "Shipment update not received within expected timeframe"
-    next: CheckShipmentStatus
-  
-  - name: CheckShipmentStatus
-    type: call
-    function: createShipment
-    data:
-      operation: "STATUS"
-      shipmentId: ".shipmentId"
-    next: ProcessManualShipmentCheck
-  
-  - name: ProcessManualShipmentCheck
-    type: set
-    data:
-      shipmentStatus: ".status"
-      trackingNumber: ".trackingNumber || 'Not available'"
-      estimatedDelivery: ".estimatedDelivery || 'Unknown'"
-      carrierName: ".carrier || 'Unknown'"
-    next: SendShipmentFollowup
-  
-  - name: SendShipmentFollowup
-    type: call
-    function: sendNotification
-    data:
-      body:
-        to: ".customerId"
-        type: "SHIPMENT_UPDATE"
-        subject: "Your order is on its way"
-        message: "Your order is currently being processed by our shipping department."
-        details:
-          orderId: ".orderId"
-          status: ".shipmentStatus"
-          trackingNumber: ".trackingNumber"
-    next: CompleteOrder
-  
-  - name: NotifyError
-    type: call
-    function: sendNotification
-    data:
-      body:
-        to: ".customerId"
-        type: "ORDER_ERROR"
-        subject: "There was a problem with your order"
-        message: ".errorMessage"
-        details:
-          orderId: ".orderId"
-          status: ".orderStatus"
-          errorType: ".errorType"
-    next: FinalizeError
-  
-  - name: FinalizeError
-    type: set
-    data:
-      completedAt: "$WORKFLOW.currentTime"
-      summary: {
-        orderId: ".orderId",
-        customerId: ".customerId",
-        status: ".orderStatus",
-        errorType: ".errorType",
-        errorMessage: ".errorMessage"
-      }
-    next: EmitOrderError
-  
-  - name: EmitOrderError
-    type: emit
-    data:
-      eventType: "OrderError"
-      payload:
-        orderId: ".orderId"
-        customerId: ".customerId"
-        status: ".orderStatus"
-        errorType: ".errorType"
-        errorMessage: ".errorMessage"
-        completedAt: ".completedAt"
-    end: true
+document:
+  dsl: 1.0.3
+  namespace: examples
+  name: order-processing
+  version: 1.0.0
+  title: Order Processing Workflow
+do:
+  - ReceiveOrder:
+      set:
+        orderId: ${ $workflow.input.orderId }
+        customerId: ${ $workflow.input.customerId }
+        items: ${ $workflow.input.items }
+        shippingAddress: ${ $workflow.input.shippingAddress }
+        paymentMethod: ${ $workflow.input.paymentMethod }
+        timestamp: ${ $workflow.startedAt }
+        orderStatus: "RECEIVED"
+      then: ValidateOrder
+  - ValidateOrder:
+      set:
+        isValid: ${ .items and .items | length > 0 and .customerId and .shippingAddress and .paymentMethod }
+        validationMessage: '${ if .isValid then "Order validated" else "Invalid order: Missing required fields" end }'
+      then: CheckOrderValidity
+  - CheckOrderValidity:
+      switch:
+        - case1:
+            then: RejectOrder
+            when: ${ .isValid == false }
+        - default:
+            then: ValidateCustomer
+  - ValidateCustomer:
+      try:
+        - CheckCustomer:
+            call: http
+            with:
+              method: get
+              endpoint: https://api.example.com/customers/{customerId}/validate
+              query:
+                customerId: ${ .customerId }
+      catch:
+        as: failure
+        do:
+          - routeError:
+              switch:
+                - case1:
+                    then: HandleInvalidCustomer
+                    when: ${ $failure.status == 404 }
+                - case2:
+                    then: HandleValidationError
+        retry:
+          limit:
+            attempt:
+              count: 3
+          delay: PT2S
+      then: CheckInventory
+  - CheckInventory:
+      try:
+        - VerifyInventory:
+            call: http
+            with:
+              method: post
+              endpoint: https://api.example.com/inventory/check
+              body:
+                items: '${ .items | map({productId: .productId, quantity: .quantity}) }'
+      catch:
+        as: failure
+        then: HandleInventoryError
+        retry:
+          limit:
+            attempt:
+              count: 2
+      then: EvaluateInventory
+  - EvaluateInventory:
+      set:
+        inventoryResult: ${ . }
+        allAvailable: ${ .available == true }
+        partiallyAvailable: ${ .partiallyAvailable == true }
+        unavailableItems: ${ .unavailableItems // [] }
+        availableItems: ${ .availableItems // .items }
+        orderTotal: ${ .totalPrice }
+      then: CheckInventoryResult
+  - CheckInventoryResult:
+      switch:
+        - case1:
+            then: ProcessPayment
+            when: ${ .allAvailable == true }
+        - case2:
+            then: AdjustForPartialInventory
+            when: ${ .partiallyAvailable == true }
+        - default:
+            then: HandleUnavailableInventory
+  - AdjustForPartialInventory:
+      set:
+        originalItems: ${ .items }
+        items: ${ .availableItems }
+        unavailableItems: ${ .unavailableItems }
+        adjustmentReason: "Some items are unavailable"
+        orderTotal: ${ .adjustedTotalPrice }
+        orderStatus: "ADJUSTED"
+      then: NotifyAdjustment
+  - NotifyAdjustment:
+      call: http
+      with:
+        method: post
+        endpoint: https://api.example.com/notifications/send
+        body:
+          to: ${ .customerId }
+          type: "ORDER_ADJUSTED"
+          subject: "Your order has been adjusted"
+          message: "Some items in your order were unavailable and have been removed."
+          details:
+            unavailableItems: ${ .unavailableItems | map(.productId) }
+            adjustedTotal: ${ .orderTotal }
+      then: ProcessPayment
+  - ProcessPayment:
+      try:
+        - ChargePayment:
+            call: http
+            with:
+              method: post
+              endpoint: https://api.example.com/payments/process
+              body:
+                customerId: ${ .customerId }
+                orderId: ${ .orderId }
+                amount: ${ .orderTotal }
+                currency: "USD"
+                paymentMethod: ${ .paymentMethod }
+      catch:
+        as: failure
+        do:
+          - routeError:
+              switch:
+                - case1:
+                    then: HandlePaymentRejected
+                    when: ${ $failure.status == 402 }
+                - case2:
+                    then: HandlePaymentError
+        retry:
+          limit:
+            attempt:
+              count: 2
+      then: CheckPaymentResult
+  - CheckPaymentResult:
+      switch:
+        - case1:
+            then: AllocateInventory
+            when: ${ .status == "APPROVED" }
+        - default:
+            then: HandlePaymentRejection
+  - AllocateInventory:
+      try:
+        - ReserveInventory:
+            call: http
+            with:
+              method: post
+              endpoint: https://api.example.com/inventory/allocate
+              body:
+                orderId: ${ .orderId }
+                items: '${ .items | map({productId: .productId, quantity: .quantity}) }'
+      catch:
+        as: failure
+        then: RollbackPayment
+        retry:
+          limit:
+            attempt:
+              count: 3
+      then: CreateShipment
+  - CreateShipment:
+      try:
+        - ArrangeShipment:
+            call: http
+            with:
+              method: post
+              endpoint: https://api.example.com/shipments
+              body:
+                orderId: ${ .orderId }
+                customerId: ${ .customerId }
+                items: ${ .items }
+                shippingAddress: ${ .shippingAddress }
+      catch:
+        as: failure
+        then: RollbackAllocation
+        retry:
+          limit:
+            attempt:
+              count: 3
+      then: WaitForShipmentUpdate
+  - WaitForShipmentUpdate:
+      try:
+        - WaitForShipmentUpdateEvents:
+            listen:
+              to:
+                one:
+                  with:
+                    type: "ShipmentStatusUpdate"
+                  correlate:
+                    orderId:
+                      from: ${ .data.orderId }
+                      expect: ${ .orderId }
+            timeout:
+              after: PT24H
+      catch:
+        errors:
+          with:
+            status: 408
+        then: HandleShipmentTimeout
+      then: ProcessShipmentUpdate
+  - ProcessShipmentUpdate:
+      set:
+        shipmentEvent: ${ .events.ShipmentUpdates[0] }
+        shipmentStatus: ${ .shipmentEvent.status }
+        trackingNumber: ${ .shipmentEvent.trackingNumber }
+        estimatedDelivery: ${ .shipmentEvent.estimatedDelivery }
+        carrierName: ${ .shipmentEvent.carrier }
+        orderStatus: "SHIPPED"
+      then: SendOrderConfirmation
+  - SendOrderConfirmation:
+      call: http
+      with:
+        method: post
+        endpoint: https://api.example.com/notifications/send
+        body:
+          to: ${ .customerId }
+          type: "ORDER_SHIPPED"
+          subject: "Your order has shipped!"
+          message: "Your order has been shipped and is on its way."
+          details:
+            orderId: ${ .orderId }
+            status: ${ .orderStatus }
+            trackingNumber: ${ .trackingNumber }
+            carrier: ${ .carrierName }
+            estimatedDelivery: ${ .estimatedDelivery }
+            items: '${ .items | map({productId: .productId, quantity: .quantity}) }'
+      then: CompleteOrder
+  - CompleteOrder:
+      set:
+        completedAt: ${ now | todateiso8601 }
+        orderStatus: "COMPLETED"
+        processingDuration: ${ now - $workflow.startedAt.epoch.seconds | floor }
+        summary:
+          orderId: ${ .orderId }
+          customerId: ${ .customerId }
+          status: ${ .orderStatus }
+          items: ${ .items | length }
+          total: ${ .orderTotal }
+          paymentId: ${ .transactionId }
+          trackingNumber: ${ .trackingNumber }
+          estimatedDelivery: ${ .estimatedDelivery }
+      then: EmitOrderCompleted
+  - EmitOrderCompleted:
+      emit:
+        event:
+          with:
+            type: "OrderCompleted"
+            data:
+              orderId: ${ .orderId }
+              customerId: ${ .customerId }
+              status: ${ .orderStatus }
+              completedAt: ${ .completedAt }
+              summary: ${ .summary }
+      then: end
+  - RejectOrder:
+      set:
+        orderStatus: "REJECTED"
+        rejectionReason: ${ .validationMessage }
+      then: NotifyRejection
+  - NotifyRejection:
+      call: http
+      with:
+        method: post
+        endpoint: https://api.example.com/notifications/send
+        body:
+          to: ${ .customerId }
+          type: "ORDER_REJECTED"
+          subject: "Your order could not be processed"
+          message: ${ .rejectionReason }
+      then: FinalizeRejection
+  - FinalizeRejection:
+      set:
+        completedAt: ${ now | todateiso8601 }
+        summary:
+          orderId: ${ .orderId }
+          customerId: ${ .customerId }
+          status: ${ .orderStatus }
+          reason: ${ .rejectionReason }
+      then: EmitOrderRejected
+  - EmitOrderRejected:
+      emit:
+        event:
+          with:
+            type: "OrderRejected"
+            data:
+              orderId: ${ .orderId }
+              customerId: ${ .customerId }
+              status: ${ .orderStatus }
+              reason: ${ .rejectionReason }
+              completedAt: ${ .completedAt }
+      then: end
+  - HandleInvalidCustomer:
+      set:
+        orderStatus: "REJECTED"
+        rejectionReason: "Invalid customer account"
+      then: NotifyRejection
+  - HandleValidationError:
+      set:
+        orderStatus: "ERROR"
+        errorType: "VALIDATION_ERROR"
+        errorMessage: "Customer validation failed"
+        errorDetails: ${ $context.error }
+      then: NotifyError
+  - HandleInventoryError:
+      set:
+        orderStatus: "ERROR"
+        errorType: "INVENTORY_ERROR"
+        errorMessage: "Failed to check inventory availability"
+        errorDetails: ${ $context.error }
+      then: NotifyError
+  - HandleUnavailableInventory:
+      set:
+        orderStatus: "REJECTED"
+        rejectionReason: "Items are unavailable"
+        unavailableItems: ${ .unavailableItems }
+      then: NotifyUnavailableItems
+  - NotifyUnavailableItems:
+      call: http
+      with:
+        method: post
+        endpoint: https://api.example.com/notifications/send
+        body:
+          to: ${ .customerId }
+          type: "ITEMS_UNAVAILABLE"
+          subject: "Items in your order are unavailable"
+          message: "Unfortunately, some items in your order are currently unavailable."
+          details:
+            orderId: ${ .orderId }
+            unavailableItems: ${ .unavailableItems | map(.productId) }
+      then: FinalizeRejection
+  - HandlePaymentRejected:
+      set:
+        orderStatus: "PAYMENT_FAILED"
+        rejectionReason: "Payment was declined"
+        declineReason: ${ .declineReason // "Unknown decline reason" }
+      then: NotifyPaymentDeclined
+  - NotifyPaymentDeclined:
+      call: http
+      with:
+        method: post
+        endpoint: https://api.example.com/notifications/send
+        body:
+          to: ${ .customerId }
+          type: "PAYMENT_DECLINED"
+          subject: "Your payment was declined"
+          message: '${ "The payment for your order was declined: \(.declineReason)" }'
+      then: FinalizeRejection
+  - HandlePaymentError:
+      set:
+        orderStatus: "ERROR"
+        errorType: "PAYMENT_ERROR"
+        errorMessage: "Payment processing failed"
+        errorDetails: ${ $context.error }
+      then: NotifyError
+  - HandlePaymentRejection:
+      set:
+        orderStatus: "PAYMENT_FAILED"
+        rejectionReason: '${ "Payment status: \(.status)" }'
+      then: NotifyPaymentDeclined
+  - RollbackPayment:
+      call: http
+      with:
+        method: post
+        endpoint: https://api.example.com/payments/process
+        body:
+          operation: "REFUND"
+          customerId: ${ .customerId }
+          orderId: ${ .orderId }
+          paymentId: ${ .transactionId }
+          amount: ${ .orderTotal }
+          reason: "Inventory allocation failed"
+      then: HandleAllocationError
+  - HandleAllocationError:
+      set:
+        orderStatus: "ERROR"
+        errorType: "ALLOCATION_ERROR"
+        errorMessage: "Failed to allocate inventory"
+        errorDetails: ${ $context.error }
+      then: NotifyError
+  - RollbackAllocation:
+      call: http
+      with:
+        method: post
+        endpoint: https://api.example.com/inventory/allocate
+        body:
+          operation: "RELEASE"
+          orderId: ${ .orderId }
+          items: '${ .items | map({productId: .productId, quantity: .quantity}) }'
+      then: RollbackPayment
+  - HandleShipmentTimeout:
+      set:
+        orderStatus: "PROCESSING"
+        message: "Shipment update not received within expected timeframe"
+      then: CheckShipmentStatus
+  - CheckShipmentStatus:
+      call: http
+      with:
+        method: post
+        endpoint: https://api.example.com/shipments
+        body:
+          operation: "STATUS"
+          shipmentId: ${ .shipmentId }
+      then: ProcessManualShipmentCheck
+  - ProcessManualShipmentCheck:
+      set:
+        shipmentStatus: ${ .status }
+        trackingNumber: ${ .trackingNumber // "Not available" }
+        estimatedDelivery: ${ .estimatedDelivery // "Unknown" }
+        carrierName: ${ .carrier // "Unknown" }
+      then: SendShipmentFollowup
+  - SendShipmentFollowup:
+      call: http
+      with:
+        method: post
+        endpoint: https://api.example.com/notifications/send
+        body:
+          to: ${ .customerId }
+          type: "SHIPMENT_UPDATE"
+          subject: "Your order is on its way"
+          message: "Your order is currently being processed by our shipping department."
+          details:
+            orderId: ${ .orderId }
+            status: ${ .shipmentStatus }
+            trackingNumber: ${ .trackingNumber }
+      then: CompleteOrder
+  - NotifyError:
+      call: http
+      with:
+        method: post
+        endpoint: https://api.example.com/notifications/send
+        body:
+          to: ${ .customerId }
+          type: "ORDER_ERROR"
+          subject: "There was a problem with your order"
+          message: ${ .errorMessage }
+          details:
+            orderId: ${ .orderId }
+            status: ${ .orderStatus }
+            errorType: ${ .errorType }
+      then: FinalizeError
+  - FinalizeError:
+      set:
+        completedAt: ${ now | todateiso8601 }
+        summary:
+          orderId: ${ .orderId }
+          customerId: ${ .customerId }
+          status: ${ .orderStatus }
+          errorType: ${ .errorType }
+          errorMessage: ${ .errorMessage }
+      then: EmitOrderError
+  - EmitOrderError:
+      emit:
+        event:
+          with:
+            type: "OrderError"
+            data:
+              orderId: ${ .orderId }
+              customerId: ${ .customerId }
+              status: ${ .orderStatus }
+              errorType: ${ .errorType }
+              errorMessage: ${ .errorMessage }
+              completedAt: ${ .completedAt }
+      then: end
 ```
 
 ## Key Features Demonstrated

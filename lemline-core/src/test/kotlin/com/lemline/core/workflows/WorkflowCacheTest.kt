@@ -16,7 +16,7 @@ class WorkflowCacheTest {
     fun `uncached schedule consumption keeps the loose evaluation mode`() {
         val definition = """
             document:
-              dsl: '1.0.0'
+              dsl: '1.0.3'
               namespace: cache-${IDV7.random()}
               name: trigger
               version: '1.0.0'
@@ -45,7 +45,7 @@ class WorkflowCacheTest {
         val reference = "https://example.com/extended.yaml"
         val workflow = WorkflowCache.parseYamlAndPut("""
             document:
-              dsl: '1.0.0'
+              dsl: '1.0.3'
               namespace: $namespace
               name: extended
               version: '1.0.0'
@@ -60,7 +60,7 @@ class WorkflowCacheTest {
         """.trimIndent())
         val function = WorkflowCache.parseYamlAndPut("""
             document:
-              dsl: '1.0.0'
+              dsl: '1.0.3'
               namespace: $namespace
               name: function
               version: '1.0.0'

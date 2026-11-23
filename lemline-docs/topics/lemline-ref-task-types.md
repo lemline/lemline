@@ -22,12 +22,12 @@ Lemline supports the following categories of tasks:
 Executes a sequence of subtasks in order.
 
 ```yaml
-- sequentialSteps:
-    do:
-      - firstStep:
-          # Task definition
-      - secondStep:
-          # Task definition
+  - sequentialSteps:
+      do:
+        - firstStep:
+            set: ${ . }
+        - secondStep:
+            set: ${ . }
 ```
 
 **Properties**:
@@ -42,22 +42,33 @@ Executes a sequence of subtasks in order.
 Conditionally executes a branch based on evaluated conditions.
 
 ```yaml
-- routeRequest:
-    switch:
-      - condition: "${ .type == 'standard' }"
-        do:
-          - standardProcessing:
-              # Task definition
-      
-      - condition: "${ .type == 'express' }"
-        do:
-          - expressProcessing:
-              # Task definition
-      
-      - otherwise:
-          do:
-            - defaultProcessing:
-                # Task definition
+  - routeRequest:
+      do:
+        - choose:
+            switch:
+              - branch1:
+                  when: ${ .type == "standard" }
+                  then: branch1
+              - branch2:
+                  when: ${ .type == "express" }
+                  then: branch2
+              - branch3:
+                  then: branch3
+        - branch1:
+            do:
+              - standardProcessing:
+                  set: ${ . }
+            then: exit
+        - branch2:
+            do:
+              - expressProcessing:
+                  set: ${ . }
+            then: exit
+        - branch3:
+            do:
+              - defaultProcessing:
+                  set: ${ . }
+            then: exit
 ```
 
 **Properties**:
@@ -75,15 +86,13 @@ Conditionally executes a branch based on evaluated conditions.
 Iterates over a collection and executes subtasks for each item.
 
 ```yaml
-- processItems:
-    for:
-      iterator: "${ .items }"
-      as: "item"
+  - processItems:
+      for:
+        in: "${ .items }"
+        each: "item"
       do:
         - processItem:
-            # Task using .item variable
-      output:
-        collect: true  # Optional, collect results from iterations
+            set: ${ $item }
 ```
 
 **Properties**:
@@ -100,16 +109,13 @@ Iterates over a collection and executes subtasks for each item.
 Executes multiple branches in parallel.
 
 ```yaml
-- parallelProcessing:
-    fork:
-      branches:
-        - processPayment:
-            # Payment processing tasks
-        
-        - prepareShipment:
-            # Shipment preparation tasks
-      
-      output: "*"  # Merge outputs from all branches
+  - parallelProcessing:
+      fork:
+        branches:
+          - processPayment:
+              set: ${ . }
+          - prepareShipment:
+              set: ${ . }
 ```
 
 **Properties**:
@@ -128,29 +134,25 @@ Executes multiple branches in parallel.
 Provides error handling and retry capabilities.
 
 ```yaml
-- secureOperation:
-    try:
-      retry:
-        policy:
-          strategy: backoff
-          backoff:
-            delay: PT1S
-            multiplier: 2
+  - secureOperation:
+      try:
+        - riskyTask:
+            set: ${ . }
+      catch:
+        as: "timeoutError"
+        do:
+          - handleTimeout:
+              set: ${ . }
+        errors:
+          with:
+            type: "https://open-workflow-specification.org/spec/1.0.0/errors/timeout"
+        retry:
           limit:
             attempt:
               count: 3
-      do:
-        - riskyTask:
-            # Task that might fail
-      
-      catch:
-        - error:
-            with:
-              type: "https://open-workflow-specification.org/spec/1.0.0/errors/timeout"
-            as: "timeoutError"
-          do:
-            - handleTimeout:
-                # Error handling tasks
+          delay: PT1S
+          backoff:
+            exponential: {}
 ```
 
 **Properties**:
@@ -179,18 +181,21 @@ Provides error handling and retry capabilities.
 Makes HTTP requests to external services.
 
 ```yaml
-- fetchData:
-    callHTTP:
-      url: "https://api.example.com/data"
-      method: "GET"
-      query:
-        param1: "value1"
-        param2: "${ .dynamicValue }"
-      headers:
-        Content-Type: "application/json"
-        Authorization: "Bearer ${ .token }"
-      auth: "apiAuth"  # Reference to authentication
-      body: "${ .requestBody }"
+  - fetchData:
+      call: http
+      with:
+        method: "GET"
+        query:
+          param1: "value1"
+          param2: "${ .dynamicValue }"
+        headers:
+          Content-Type: "application/json"
+          Authorization: "Bearer ${ .token }"
+        body: "${ .requestBody }"
+        endpoint:
+          uri: "https://api.example.com/data"
+          authentication:
+            use: "apiAuth"
 ```
 
 **Properties**:
@@ -426,14 +431,14 @@ Sets or updates variables in the current context.
 Emits an event to the event bus.
 
 ```yaml
-- notifyShipping:
-    emit:
-      event: "OrderProcessed"
-      data: "${ .order }"
-      context:
-        source: "order-service"
-        type: "com.example.order.processed"
-        subject: "${ .order.id }"
+  - notifyShipping:
+      emit:
+        event:
+          with:
+            type: "com.example.order.processed"
+            source: "order-service"
+            subject: "${ .order.id }"
+            data: "${ .order }"
 ```
 
 **Properties**:
@@ -455,9 +460,8 @@ Emits an event to the event bus.
 Pauses workflow execution for a specified duration.
 
 ```yaml
-- delayProcessing:
-    wait:
-      duration: PT1H
+  - delayProcessing:
+      wait: PT1H
 ```
 
 **Properties**:
@@ -473,15 +477,24 @@ Pauses workflow execution for a specified duration.
 Waits for events from the event bus.
 
 ```yaml
-- waitForApproval:
-    listen:
-      to: "any"
-      events:
-        - event: "OrderApproved"
-          filter: "${ .orderId == .currentOrder.id }"
-        - event: "OrderRejected"
-          filter: "${ .orderId == .currentOrder.id }"
-      timeout: PT24H
+  - waitForApproval:
+      listen:
+        to:
+          "any":
+            - with:
+                type: "OrderApproved"
+              correlate:
+                orderId:
+                  from: ${ .data.orderId }
+                  expect: ${ .currentOrder.id }
+            - with:
+                type: "OrderRejected"
+              correlate:
+                orderId:
+                  from: ${ .data.orderId }
+                  expect: ${ .currentOrder.id }
+      timeout:
+        after: PT24H
 ```
 
 **Properties**:
@@ -510,12 +523,13 @@ Waits for events from the event bus.
 Explicitly raises an error.
 
 ```yaml
-- checkInventory:
-    if: "${ .stock < .quantity }"
-    raise:
-      error: "outOfStock"  # Reference to a defined error
-      with:
-        details: "Requested ${ .quantity }, only ${ .stock } available"
+  - checkInventory:
+      if: "${ .stock < .quantity }"
+      raise:
+        error:             # Reference to a defined error
+          type: https://example.com/errors/out-of-stock
+          status: 409
+          detail: ${ "Requested \(.quantity), only \(.stock) available" }
 ```
 
 **Properties**:

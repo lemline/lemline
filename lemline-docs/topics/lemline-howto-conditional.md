@@ -15,15 +15,16 @@ The `switch` task lets you create conditional branches in your workflow based on
 Here's the basic structure of a `switch` task:
 
 ```yaml
-- name: DecideAction
-  type: switch
-  conditions:
-    - condition: ".temperature > 30"
-      next: HandleHotWeather
-    - condition: ".temperature < 10"
-      next: HandleColdWeather
-    - condition: true
-      next: HandleMildWeather
+  - DecideAction:
+      switch:
+        - case1:
+            then: HandleHotWeather
+            when: ${ .temperature > 30 }
+        - case2:
+            then: HandleColdWeather
+            when: ${ .temperature < 10 }
+        - default:
+            then: HandleMildWeather
 ```
 
 Each condition is a JQ expression that evaluates to a boolean. The first condition that evaluates to `true` determines the next task to execute.
@@ -33,21 +34,19 @@ Each condition is a JQ expression that evaluates to a boolean. The first conditi
 Let's start with a simple yes/no decision pattern:
 
 ```yaml
-- name: CheckInventory
-  type: call
-  function: inventoryService
-  data:
-    productId: ".productId"
-    quantity: ".quantity"
-  next: EvaluateInventory
-
-- name: EvaluateInventory
-  type: switch
-  conditions:
-    - condition: ".available == true"
-      next: ProcessOrder
-    - condition: true
-      next: HandleOutOfStock
+  - CheckInventory:
+      call: inventoryService
+      with:
+        productId: ${ .productId }
+        quantity: ${ .quantity }
+      then: EvaluateInventory
+  - EvaluateInventory:
+      switch:
+        - case1:
+            then: ProcessOrder
+            when: ${ .available == true }
+        - default:
+            then: HandleOutOfStock
 ```
 
 This example checks inventory availability and branches to different tasks based on the result.
@@ -57,17 +56,19 @@ This example checks inventory availability and branches to different tasks based
 You can define multiple conditions for more complex decision trees:
 
 ```yaml
-- name: CategorizeLead
-  type: switch
-  conditions:
-    - condition: ".score >= 80"
-      next: ProcessHotLead
-    - condition: ".score >= 50 && .score < 80"
-      next: ProcessWarmLead
-    - condition: ".score >= 20 && .score < 50"
-      next: ProcessCoolLead
-    - condition: true
-      next: ProcessColdLead
+  - CategorizeLead:
+      switch:
+        - case1:
+            then: ProcessHotLead
+            when: ${ .score >= 80 }
+        - case2:
+            then: ProcessWarmLead
+            when: ${ .score >= 50 and .score < 80 }
+        - case3:
+            then: ProcessCoolLead
+            when: ${ .score >= 20 and .score < 50 }
+        - default:
+            then: ProcessColdLead
 ```
 
 This example categorizes leads based on score ranges.
@@ -77,21 +78,25 @@ This example categorizes leads based on score ranges.
 JQ expressions in conditions can be complex logical statements:
 
 ```yaml
-- name: RouteCustomerRequest
-  type: switch
-  conditions:
-    - condition: ".type == 'refund' && .amount > 1000"
-      next: EscalateToSupervisor
-    - condition: ".type == 'refund' && .daysSincePurchase > 30"
-      next: ApplyReturnPolicy
-    - condition: ".type == 'refund'"
-      next: ProcessStandardRefund
-    - condition: ".type == 'exchange' && .reason == 'defective'"
-      next: ProcessDefectiveExchange
-    - condition: ".type == 'exchange'"
-      next: ProcessStandardExchange
-    - condition: true
-      next: HandleGenericRequest
+  - RouteCustomerRequest:
+      switch:
+        - case1:
+            then: EscalateToSupervisor
+            when: ${ .type == "refund" and .amount > 1000 }
+        - case2:
+            then: ApplyReturnPolicy
+            when: ${ .type == "refund" and .daysSincePurchase > 30 }
+        - case3:
+            then: ProcessStandardRefund
+            when: ${ .type == "refund" }
+        - case4:
+            then: ProcessDefectiveExchange
+            when: ${ .type == "exchange" and .reason == "defective" }
+        - case5:
+            then: ProcessStandardExchange
+            when: ${ .type == "exchange" }
+        - default:
+            then: HandleGenericRequest
 ```
 
 This example routes customer requests based on multiple criteria.
@@ -101,17 +106,19 @@ This example routes customer requests based on multiple criteria.
 Always include a default condition as the last one in your switch task to ensure the workflow always has a path forward:
 
 ```yaml
-- name: CheckOrderStatus
-  type: switch
-  conditions:
-    - condition: ".status == 'approved'"
-      next: ProcessApprovedOrder
-    - condition: ".status == 'pending'"
-      next: WaitForApproval
-    - condition: ".status == 'rejected'"
-      next: HandleRejectedOrder
-    - condition: true
-      next: HandleUnknownStatus
+  - CheckOrderStatus:
+      switch:
+        - case1:
+            then: ProcessApprovedOrder
+            when: ${ .status == "approved" }
+        - case2:
+            then: WaitForApproval
+            when: ${ .status == "pending" }
+        - case3:
+            then: HandleRejectedOrder
+            when: ${ .status == "rejected" }
+        - default:
+            then: HandleUnknownStatus
 ```
 
 The last condition using `true` ensures there's always a matching path, even if none of the explicit conditions match.
@@ -121,17 +128,19 @@ The last condition using `true` ensures there's always a matching path, even if 
 JQ expressions can work with complex data structures:
 
 ```yaml
-- name: DetermineShippingMethod
-  type: switch
-  conditions:
-    - condition: ".items | map(.weight) | add > 20"
-      next: ArrangeFreightShipping
-    - condition: ".shipping.express == true"
-      next: ArrangeExpressShipping
-    - condition: ".customer.tier == 'premium'"
-      next: ArrangePriorityShipping
-    - condition: true
-      next: ArrangeStandardShipping
+  - DetermineShippingMethod:
+      switch:
+        - case1:
+            then: ArrangeFreightShipping
+            when: ${ .items | map(.weight) | add > 20 }
+        - case2:
+            then: ArrangeExpressShipping
+            when: ${ .shipping.express == true }
+        - case3:
+            then: ArrangePriorityShipping
+            when: ${ .customer.tier == "premium" }
+        - default:
+            then: ArrangeStandardShipping
 ```
 
 This example determines shipping method based on order weight, shipping preferences, and customer tier.
@@ -141,17 +150,19 @@ This example determines shipping method based on order weight, shipping preferen
 You can reference multiple variables in a single condition:
 
 ```yaml
-- name: ApplyDiscount
-  type: switch
-  conditions:
-    - condition: ".customer.loyalty_years >= 5 && .order.total > 100"
-      next: ApplyPremiumDiscount
-    - condition: ".customer.loyalty_years >= 2 || .order.total > 200"
-      next: ApplyStandardDiscount
-    - condition: ".order.items | map(select(.category == 'sale')) | length > 0"
-      next: ApplySaleDiscount
-    - condition: true
-      next: NoDiscount
+  - ApplyDiscount:
+      switch:
+        - case1:
+            then: ApplyPremiumDiscount
+            when: ${ .customer.loyalty_years >= 5 and .order.total > 100 }
+        - case2:
+            then: ApplyStandardDiscount
+            when: ${ .customer.loyalty_years >= 2 // .order.total > 200 }
+        - case3:
+            then: ApplySaleDiscount
+            when: ${ .order.items | map(select(.category == "sale")) | length > 0 }
+        - default:
+            then: NoDiscount
 ```
 
 This example determines discounts based on customer loyalty, order total, and item categories.
@@ -161,23 +172,23 @@ This example determines discounts based on customer loyalty, order total, and it
 For complex decision making, you can use multiple switch tasks in sequence:
 
 ```yaml
-- name: EvaluateRiskLevel
-  type: switch
-  conditions:
-    - condition: ".transaction.amount > 10000"
-      next: HighValueCheck
-    - condition: true
-      next: StandardCheck
-
-- name: HighValueCheck
-  type: switch
-  conditions:
-    - condition: ".customer.history.flags | length > 0"
-      next: ManualReview
-    - condition: ".customer.age < 90"
-      next: AdditionalVerification
-    - condition: true
-      next: AutoApprove
+  - EvaluateRiskLevel:
+      switch:
+        - case1:
+            then: HighValueCheck
+            when: ${ .transaction.amount > 10000 }
+        - default:
+            then: StandardCheck
+  - HighValueCheck:
+      switch:
+        - case1:
+            then: ManualReview
+            when: ${ .customer.history.flags | length > 0 }
+        - case2:
+            then: AdditionalVerification
+            when: ${ .customer.age < 90 }
+        - default:
+            then: AutoApprove
 ```
 
 This example implements a two-level decision tree for risk evaluation.
@@ -187,25 +198,25 @@ This example implements a two-level decision tree for risk evaluation.
 You can use a `set` task to prepare data for a switch decision:
 
 ```yaml
-- name: PrepareDecisionData
-  type: set
-  data:
-    isNewCustomer: ".customer.joinDate > now() - duration('P30D')"
-    isHighValue: ".order.total > 1000"
-    hasRiskyItems: ".order.items | map(select(.category == 'restricted')) | length > 0"
-  next: RouteOrder
-
-- name: RouteOrder
-  type: switch
-  conditions:
-    - condition: ".hasRiskyItems == true"
-      next: ComplianceReview
-    - condition: ".isNewCustomer == true && .isHighValue == true"
-      next: VerificationProcess
-    - condition: ".isHighValue == true"
-      next: PriorityProcessing
-    - condition: true
-      next: StandardProcessing
+  - PrepareDecisionData:
+      set:
+        isNewCustomer: ${ .customer.joinDate > now() - duration("P30D") }
+        isHighValue: ${ .order.total > 1000 }
+        hasRiskyItems: ${ .order.items | map(select(.category == "restricted")) | length > 0 }
+      then: RouteOrder
+  - RouteOrder:
+      switch:
+        - case1:
+            then: ComplianceReview
+            when: ${ .hasRiskyItems == true }
+        - case2:
+            then: VerificationProcess
+            when: ${ .isNewCustomer == true and .isHighValue == true }
+        - case3:
+            then: PriorityProcessing
+            when: ${ .isHighValue == true }
+        - default:
+            then: StandardProcessing
 ```
 
 This pattern improves readability by computing derived values before the switch.
@@ -215,15 +226,16 @@ This pattern improves readability by computing derived values before the switch.
 If an expression in a condition results in an error, Lemline will treat it as `false`:
 
 ```yaml
-- name: ProcessPayment
-  type: switch
-  conditions:
-    - condition: "try .paymentResult.status == 'success' catch false"
-      next: CompleteOrder
-    - condition: "try .paymentResult.status == 'pending' catch false"
-      next: WaitForPayment
-    - condition: true
-      next: HandlePaymentFailure
+  - ProcessPayment:
+      switch:
+        - case1:
+            then: CompleteOrder
+            when: ${ "try \(.paymentResult.status) == 'success' catch false" }
+        - case2:
+            then: WaitForPayment
+            when: ${ "try \(.paymentResult.status) == 'pending' catch false" }
+        - default:
+            then: HandlePaymentFailure
 ```
 
 This pattern handles cases where properties might be missing.
@@ -233,33 +245,38 @@ This pattern handles cases where properties might be missing.
 For robust conditional handling, combine switch with try/catch:
 
 ```yaml
-- name: ProcessOrder
-  type: try
-    retry:
-      maxAttempts: 3
-    catch:
-      - error: "PAYMENT_DECLINED"
-        next: HandlePaymentDeclined
-      - error: "*"
-        next: HandleGenericError
-    do:
-      - name: AttemptPayment
-        type: call
-        function: paymentService
-        data:
-          amount: ".total"
-          cardToken: ".paymentMethod.token"
-        next: EvaluatePayment
-      
-      - name: EvaluatePayment
-        type: switch
-        conditions:
-          - condition: ".status == 'success'"
-            next: CompleteOrder
-          - condition: ".status == 'review'"
-            next: FlagForReview
-          - condition: true
-            next: HandleFailure
+  - ProcessOrder:
+      try:
+        - AttemptPayment:
+            call: paymentService
+            with:
+              amount: ${ .total }
+              cardToken: ${ .paymentMethod.token }
+            then: EvaluatePayment
+        - EvaluatePayment:
+            switch:
+              - case1:
+                  then: CompleteOrder
+                  when: ${ .status == "success" }
+              - case2:
+                  then: FlagForReview
+                  when: ${ .status == "review" }
+              - default:
+                  then: HandleFailure
+      catch:
+        as: failure
+        do:
+          - routeError:
+              switch:
+                - case1:
+                    then: HandlePaymentDeclined
+                    when: ${ $failure.type == "PAYMENT_DECLINED" }
+                - case2:
+                    then: HandleGenericError
+        retry:
+          limit:
+            attempt:
+              count: 3
 ```
 
 This pattern provides comprehensive error handling around conditional logic.
@@ -269,180 +286,148 @@ This pattern provides comprehensive error handling around conditional logic.
 Here's a complete example of an order processing workflow with multiple decision points:
 
 ```yaml
-id: order-processing
-name: Order Processing Workflow
-version: '1.0'
-specVersion: '1.0'
-start: ValidateOrder
-functions:
-  - name: validateInventory
-    type: http
-    operation: GET
-    url: https://inventory-api.example.com/check
-  - name: calculateShipping
-    type: http
-    operation: POST
-    url: https://shipping-api.example.com/calculate
-  - name: processPayment
-    type: http
-    operation: POST
-    url: https://payment-api.example.com/process
-tasks:
-  - name: ValidateOrder
-    type: set
-    data:
-      isValid: ".items | length > 0"
-      hasFulfillableItems: true
-    next: CheckOrderValidity
-  
-  - name: CheckOrderValidity
-    type: switch
-    conditions:
-      - condition: ".isValid == false"
-        next: RejectOrder
-      - condition: true
-        next: CheckInventory
-  
-  - name: CheckInventory
-    type: call
-    function: validateInventory
-    data:
-      items: ".items | map({id: .productId, quantity: .quantity})"
-    next: EvaluateInventory
-  
-  - name: EvaluateInventory
-    type: switch
-    conditions:
-      - condition: ".allAvailable == true"
-        next: CalculateShipping
-      - condition: ".partiallyAvailable == true && .order.allowPartial == true"
-        next: AdjustForPartialInventory
-      - condition: true
-        next: HandleOutOfStock
-  
-  - name: AdjustForPartialInventory
-    type: set
-    data:
-      items: ".items | map(select(.productId as $id | .availableItems | map(.id) | contains([$id])))"
-      message: "Some items were unavailable and have been removed from your order."
-    next: CalculateShipping
-  
-  - name: CalculateShipping
-    type: call
-    function: calculateShipping
-    data:
-      destination: ".shippingAddress"
-      items: ".items"
-    next: DetermineShippingMethod
-  
-  - name: DetermineShippingMethod
-    type: switch
-    conditions:
-      - condition: ".expressSelected == true && .expressAvailable == true"
-        next: ApplyExpressShipping
-      - condition: ".total.weight > 20"
-        next: ApplyFreightShipping
-      - condition: true
-        next: ApplyStandardShipping
-  
-  - name: ApplyExpressShipping
-    type: set
-    data:
-      shippingMethod: "EXPRESS"
-      shippingCost: ".rates.express"
-      estimatedDelivery: ".deliveryEstimates.express"
-    next: CalculateTotals
-  
-  - name: ApplyFreightShipping
-    type: set
-    data:
-      shippingMethod: "FREIGHT"
-      shippingCost: ".rates.freight"
-      estimatedDelivery: ".deliveryEstimates.freight"
-    next: CalculateTotals
-  
-  - name: ApplyStandardShipping
-    type: set
-    data:
-      shippingMethod: "STANDARD"
-      shippingCost: ".rates.standard"
-      estimatedDelivery: ".deliveryEstimates.standard"
-    next: CalculateTotals
-  
-  - name: CalculateTotals
-    type: set
-    data:
-      subtotal: ".items | map(.price * .quantity) | add"
-      tax: ".subtotal * 0.08"
-      total: ".subtotal + .tax + .shippingCost"
-    next: ProcessPayment
-  
-  - name: ProcessPayment
-    type: call
-    function: processPayment
-    data:
-      amount: ".total"
-      method: ".paymentMethod"
-      currency: "USD"
-    next: EvaluatePayment
-  
-  - name: EvaluatePayment
-    type: switch
-    conditions:
-      - condition: ".status == 'approved'"
-        next: CompleteOrder
-      - condition: ".status == 'review'"
-        next: FlagForReview
-      - condition: ".status == 'declined'"
-        next: HandleDeclinedPayment
-      - condition: true
-        next: HandlePaymentError
-  
-  - name: CompleteOrder
-    type: set
-    data:
-      orderStatus: "CONFIRMED"
-      confirmationNumber: ".transactionId"
-      message: "Your order has been confirmed and will ship via .shippingMethod."
-    end: true
-  
-  - name: RejectOrder
-    type: set
-    data:
-      orderStatus: "REJECTED"
-      reason: "Invalid order"
-      message: "Your order could not be processed because it contains no items."
-    end: true
-  
-  - name: HandleOutOfStock
-    type: set
-    data:
-      orderStatus: "REJECTED"
-      reason: "Out of stock"
-      message: "Your order could not be processed because some items are out of stock."
-    end: true
-  
-  - name: FlagForReview
-    type: set
-    data:
-      orderStatus: "PENDING_REVIEW"
-      message: "Your order requires additional review. We will contact you shortly."
-    end: true
-  
-  - name: HandleDeclinedPayment
-    type: set
-    data:
-      orderStatus: "PAYMENT_DECLINED"
-      reason: ".declineReason"
-      message: "Your payment was declined. Please try a different payment method."
-    end: true
-  
-  - name: HandlePaymentError
-    type: set
-    data:
-      orderStatus: "PAYMENT_ERROR"
-      message: "We encountered an error processing your payment. Please try again later."
-    end: true
+document:
+  dsl: 1.0.3
+  namespace: examples
+  name: order-processing
+  version: 1.0.0
+  title: Order Processing Workflow
+do:
+  - ValidateOrder:
+      set:
+        isValid: ${ .items | length > 0 }
+        hasFulfillableItems: true
+      then: CheckOrderValidity
+  - CheckOrderValidity:
+      switch:
+        - case1:
+            then: RejectOrder
+            when: ${ .isValid == false }
+        - default:
+            then: CheckInventory
+  - CheckInventory:
+      call: http
+      with:
+        method: get
+        endpoint: https://inventory-api.example.com/check
+        query:
+          items: '${ .items | map({id: .productId, quantity: .quantity}) }'
+      then: EvaluateInventory
+  - EvaluateInventory:
+      switch:
+        - case1:
+            then: CalculateShipping
+            when: ${ .allAvailable == true }
+        - case2:
+            then: AdjustForPartialInventory
+            when: ${ .partiallyAvailable == true and .order.allowPartial == true }
+        - default:
+            then: HandleOutOfStock
+  - AdjustForPartialInventory:
+      set:
+        items: ${ .items | map(select(.productId as $id | .availableItems | map(.id) | contains([$id]))) }
+        message: "Some items were unavailable and have been removed from your order."
+      then: CalculateShipping
+  - CalculateShipping:
+      call: http
+      with:
+        method: post
+        endpoint: https://shipping-api.example.com/calculate
+        body:
+          destination: ${ .shippingAddress }
+          items: ${ .items }
+      then: DetermineShippingMethod
+  - DetermineShippingMethod:
+      switch:
+        - case1:
+            then: ApplyExpressShipping
+            when: ${ .expressSelected == true and .expressAvailable == true }
+        - case2:
+            then: ApplyFreightShipping
+            when: ${ .total.weight > 20 }
+        - default:
+            then: ApplyStandardShipping
+  - ApplyExpressShipping:
+      set:
+        shippingMethod: "EXPRESS"
+        shippingCost: ${ .rates.express }
+        estimatedDelivery: ${ .deliveryEstimates.express }
+      then: CalculateTotals
+  - ApplyFreightShipping:
+      set:
+        shippingMethod: "FREIGHT"
+        shippingCost: ${ .rates.freight }
+        estimatedDelivery: ${ .deliveryEstimates.freight }
+      then: CalculateTotals
+  - ApplyStandardShipping:
+      set:
+        shippingMethod: "STANDARD"
+        shippingCost: ${ .rates.standard }
+        estimatedDelivery: ${ .deliveryEstimates.standard }
+      then: CalculateTotals
+  - CalculateTotals:
+      set:
+        subtotal: ${ .items | map(.price * .quantity) | add }
+        tax: ${ .subtotal * 0.08 }
+        total: ${ .subtotal + .tax + .shippingCost }
+      then: ProcessPayment
+  - ProcessPayment:
+      call: http
+      with:
+        method: post
+        endpoint: https://payment-api.example.com/process
+        body:
+          amount: ${ .total }
+          method: ${ .paymentMethod }
+          currency: "USD"
+      then: EvaluatePayment
+  - EvaluatePayment:
+      switch:
+        - case1:
+            then: CompleteOrder
+            when: ${ .status == "approved" }
+        - case2:
+            then: FlagForReview
+            when: ${ .status == "review" }
+        - case3:
+            then: HandleDeclinedPayment
+            when: ${ .status == "declined" }
+        - default:
+            then: HandlePaymentError
+  - CompleteOrder:
+      set:
+        orderStatus: "CONFIRMED"
+        confirmationNumber: ${ .transactionId }
+        message: ${ "Your order has been confirmed and will ship via \(.shippingMethod)." }
+      then: end
+  - RejectOrder:
+      set:
+        orderStatus: "REJECTED"
+        reason: "Invalid order"
+        message: "Your order could not be processed because it contains no items."
+      then: end
+  - HandleOutOfStock:
+      set:
+        orderStatus: "REJECTED"
+        reason: "Out of stock"
+        message: "Your order could not be processed because some items are out of stock."
+      then: end
+  - FlagForReview:
+      set:
+        orderStatus: "PENDING_REVIEW"
+        message: "Your order requires additional review. We will contact you shortly."
+      then: end
+  - HandleDeclinedPayment:
+      set:
+        orderStatus: "PAYMENT_DECLINED"
+        reason: ${ .declineReason }
+        message: "Your payment was declined. Please try a different payment method."
+      then: end
+  - HandlePaymentError:
+      set:
+        orderStatus: "PAYMENT_ERROR"
+        message: "We encountered an error processing your payment. Please try again later."
+      then: end
 ```
 
 ## Best Practices for Switch Tasks

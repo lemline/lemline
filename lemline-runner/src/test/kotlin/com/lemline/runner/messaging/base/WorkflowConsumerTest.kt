@@ -99,7 +99,7 @@ internal abstract class WorkflowConsumerTest {
             version = WorkflowVersion("1.0.0"),
             definition = $$"""
             document:
-                dsl: '1.0.0'
+                dsl: '1.0.3'
                 namespace: test
                 name: test-workflow
                 version: '1.0.0'

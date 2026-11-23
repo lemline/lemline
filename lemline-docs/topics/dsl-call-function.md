@@ -15,7 +15,7 @@ The generic `Call` task enables the execution of a specified, named function wit
 
 ```yaml
 document:
-  dsl: '1.0.0'
+  dsl: '1.0.3'
   namespace: custom-functions
   name: call-custom-example
   version: '1.0.0'
@@ -72,10 +72,10 @@ In this example, the `checkAddress` task calls a function named `validateAddress
 do:
   - triggerProcessing:
       # Assumes 'startBackgroundJob' function requires no specific arguments
-      call: startBackgroundJob 
+      call: startBackgroundJob
       # No 'with' property needed
   - monitorJob:
-      # ...
+      set: ${ . }
 ```
 
 ### Example: Calling a Catalog Function

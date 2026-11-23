@@ -26,20 +26,26 @@ and an `endpoint` specifying its location.
 
 ```yaml
 document:
-  dsl: '1.0.0'
-  namespace: my_workflows
+  dsl: '1.0.3'
+  namespace: my-workflows
   name: workflow-using-catalog
   version: '1.0.0'
 use:
   catalogs: # Defines named catalogs
     <catalogName1>: # User-defined name for the catalog
       endpoint: # Definition of where the catalog is located
-        uri: <catalog_root_uri> # URI (e.g., URL, file path) of the catalog root
-        authentication: <authentication_definition_or_ref> # Optional authentication for the endpoint
+        uri: https://catalog.example.org # URI (e.g., URL, file path) of the catalog root
+        authentication:                                    # Optional authentication for the endpoint
+          use: catalogAuth
     <catalogName2>:
-      endpoint: # ... another catalog definition ...
-do:
-  - # ... tasks ...
+      endpoint: https://catalog.example.org # ... another catalog definition ...
+  authentications:
+    catalogAuth:
+      bearer:
+        token: ${ $secrets.catalogToken }
+  secrets:
+    - catalogToken
+do: []
 ```
 
 **Key Properties (from [Resources Configuration Overview](dsl-resources-configuration-overview.md)):**
@@ -143,12 +149,12 @@ files, pre-configured remote repository).
 
 ```yaml
 document:
-  dsl: '1.0.0'
-  namespace: multi_catalog_example
+  dsl: '1.0.3'
+  namespace: multi-catalog-example
   name: process-with-shared-and-private
   version: '1.0.0'
 use:
-  secrets: [ gitHubToken, privateCatalogKey ]
+  secrets: [gitHubToken, privateCatalogKey]
   catalogs:
     # Public, well-known catalog (e.g., official Open Workflow catalog)
     swPublic:
@@ -156,8 +162,9 @@ use:
         uri: https://github.com/open-workflow-specification/catalog
         # Maybe requires a token for higher rate limits or private access within org
         authentication:
-          bearer: ${ $secrets.gitHubToken }
+          bearer:
     # Internal, private catalog hosted on a company server
+            token: ${ $secrets.gitHubToken }
     internalTools:
       endpoint:
         uri: https://git.mycompany.com/workflow-tools
@@ -183,8 +190,8 @@ do:
 ```yaml
 # Assume catalog functions are defined in /opt/workflow-catalogs/local-utils
 document:
-  dsl: '1.0.0'
-  namespace: local_dev
+  dsl: '1.0.3'
+  namespace: local-dev
   name: test-local-catalog
   version: '1.0.0'
 use:

@@ -317,11 +317,11 @@ Assign values to variables:
 Control workflow execution:
 
 ```yaml
-- checkOrder:
-    if: "${ .order.total > 1000 }"
-    do:
-      - applyDiscount:
-          # Apply discount logic
+  - checkOrder:
+      if: "${ .order.total > 1000 }"
+      do:
+        - applyDiscount:
+            set: ${ . }
 ```
 
 ### In Switch Statements
@@ -329,22 +329,33 @@ Control workflow execution:
 Make multi-way decisions:
 
 ```yaml
-- routeOrder:
-    switch:
-      - condition: "${ .order.total > 1000 }"
-        do:
-          - handlePremium:
-              # Premium order handling
-      
-      - condition: "${ .order.items | length > 10 }"
-        do:
-          - handleBulk:
-              # Bulk order handling
-      
-      - otherwise:
-          do:
-            - handleStandard:
-                # Standard order handling
+  - routeOrder:
+      do:
+        - choose:
+            switch:
+              - branch1:
+                  when: ${ .order.total > 1000 }
+                  then: branch1
+              - branch2:
+                  when: ${ .order.items | length > 10 }
+                  then: branch2
+              - branch3:
+                  then: branch3
+        - branch1:
+            do:
+              - handlePremium:
+                  set: ${ . }
+            then: exit
+        - branch2:
+            do:
+              - handleBulk:
+                  set: ${ . }
+            then: exit
+        - branch3:
+            do:
+              - handleStandard:
+                  set: ${ . }
+            then: exit
 ```
 
 ### In HTTP Requests
@@ -352,14 +363,15 @@ Make multi-way decisions:
 Construct dynamic HTTP requests:
 
 ```yaml
-- callApi:
-    callHTTP:
-      url: "https://api.example.com/customers/${ .customerId }"
-      method: "GET"
-      headers:
-        Authorization: "Bearer ${ .token }"
-      query:
-        include: "${ .includeDetails ? \"details\" : null }"
+  - callApi:
+      call: http
+      with:
+        method: "GET"
+        headers:
+          Authorization: "Bearer ${ .token }"
+        query:
+          include: "${ .includeDetails ? \"details\" : null }"
+        endpoint: ${ "https://api.example.com/customers/\(.customerId)" }
 ```
 
 ### In Event Definitions
@@ -367,13 +379,16 @@ Construct dynamic HTTP requests:
 Construct event data:
 
 ```yaml
-- notifyShipping:
-    emit:
-      event: "OrderShipped"
-      data:
-        orderId: "${ .order.id }"
-        customer: "${ .order.customer }"
-        shippingInfo: "${ .shipping }"
+  - notifyShipping:
+      emit:
+        event:
+          with:
+            type: "OrderShipped"
+            data:
+              orderId: "${ .order.id }"
+              customer: "${ .order.customer }"
+              shippingInfo: "${ .shipping }"
+            source: https://example.com/workflows
 ```
 
 ## Best Practices
@@ -388,23 +403,8 @@ Write clear, maintainable expressions:
 4. **Add Comments**: Explain complex transformations
 
 ```yaml
-# Instead of this:
-result: "${ .d | map(select(.t > 100) | {i: .i, n: .n, v: (.p * .q)}) | add }"
-
-# Use this:
 set:
-  # Filter for expensive items (price > 100)
-  expensiveItems: "${ .data | map(select(.price > 100)) }"
-  
-  # Transform to summary format
-  itemSummaries: "${ .expensiveItems | map({
-    id: .id,
-    name: .name,
-    value: (.price * .quantity)
-  }) }"
-  
-  # Calculate total value
-  totalValue: "${ .itemSummaries | map(.value) | add }"
+  itemSummaries: '${ .data | map(select(.price > 100) | {id, name, value: (.price * .quantity)}) }'
 ```
 
 ### Performance
@@ -417,17 +417,8 @@ Optimize for efficiency:
 4. **Limit Data Size**: Process only necessary data
 
 ```yaml
-# Instead of repeatedly calculating the same value:
-item1Total: "${ .items[0].price * .items[0].quantity * (1 + .taxRate) }"
-item2Total: "${ .items[1].price * .items[1].quantity * (1 + .taxRate) }"
-
-# Calculate once and reuse:
 set:
-  # Calculate tax multiplier once
-  taxMultiplier: "${ 1 + .taxRate }"
-  
-  # Calculate item totals using the multiplier
-  itemTotals: "${ .items | map(.price * .quantity * .taxMultiplier) }"
+  itemTotals: '${ (1 + .taxRate) as $multiplier | .items | map(.price * .quantity * $multiplier) }'
 ```
 
 ### Error Handling

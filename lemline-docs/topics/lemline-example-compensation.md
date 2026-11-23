@@ -13,7 +13,7 @@ This example demonstrates a simple order processing workflow with reservation an
 
 ```yaml
 document:
-  dsl: 1.0.0
+  dsl: 1.0.3
   namespace: examples
   name: simple-compensation
   version: 1.0.0
@@ -37,10 +37,10 @@ do:
               body:
                 orderId: ${ .orderId }
                 items: ${ .items }
-              output: inventoryReservation
             export:
-              as: '$context + { inventoryReservationId: .inventoryReservation.id }'
-        
+              as: '${ $context + { inventoryReservationId: .inventoryReservation.id } }'
+            output:
+              as: '${ $input + { "inventoryReservation": . } }'
         - processPayment:
             call: http
             with:
@@ -50,64 +50,72 @@ do:
                 orderId: ${ .orderId }
                 amount: ${ .inventoryReservation.totalAmount }
                 paymentInfo: ${ .paymentInfo }
-              output: paymentResult
+            output:
+              as: '${ $input + { "paymentResult": . } }'
       catch:
-        - errors:
-            with:
-              type: https://example.com/errors/payment/declined
-          as: paymentError
-          do:
-            - cancelReservation:
-                call: http
-                with:
-                  method: post
-                  endpoint: https://inventory.example/api/cancel-reservation
-                  body:
-                    reservationId: ${ $context.inventoryReservationId }
-                  output: cancellationResult
-            - notifyPaymentFailure:
-                call: http
-                with:
-                  method: post
-                  endpoint: https://notifications.example/api/send
-                  body:
-                    orderId: ${ .orderId }
-                    template: "payment_declined"
-                    data:
-                      reason: ${ $paymentError.reason }
-            - returnErrorResult:
-                set:
-                  result:
-                    success: false
-                    orderId: ${ .orderId }
-                    error: "Payment declined"
-                    details: ${ $paymentError }
-                    reservation: "cancelled"
-                then: exit
-        
-        - errors:
-            with:
-              type: https://open-workflow-specification.org/spec/1.0.0/errors/communication
-          as: communicationError
-          do:
-            - cancelReservation:
-                call: http
-                with:
-                  method: post
-                  endpoint: https://inventory.example/api/cancel-reservation
-                  body:
-                    reservationId: ${ $context.inventoryReservationId }
-                  output: cancellationResult
-            - returnErrorResult:
-                set:
-                  result:
-                    success: false
-                    orderId: ${ .orderId }
-                    error: "Communication error"
-                    details: ${ $communicationError }
-                    reservation: "cancelled"
-                then: exit
-
+        as: failure
+        when: ${ ($failure.type == "https://example.com/errors/payment/declined") or ($failure.type == "https://open-workflow-specification.org/spec/1.0.0/errors/communication") }
+        do:
+          - selectHandler:
+              switch:
+                - case1:
+                    then: handle1
+                    when: ${ $failure.type == "https://example.com/errors/payment/declined" }
+                - case2:
+                    then: handle2
+                    when: ${ $failure.type == "https://open-workflow-specification.org/spec/1.0.0/errors/communication" }
+          - handle1:
+              do:
+                - cancelReservation:
+                    call: http
+                    with:
+                      method: post
+                      endpoint: https://inventory.example/api/cancel-reservation
+                      body:
+                        reservationId: ${ $context.inventoryReservationId }
+                    output:
+                      as: '${ $input + { "cancellationResult": . } }'
+                - notifyPaymentFailure:
+                    call: http
+                    with:
+                      method: post
+                      endpoint: https://notifications.example/api/send
+                      body:
+                        orderId: ${ .orderId }
+                        template: payment_declined
+                        data:
+                          reason: ${ $failure.reason }
+                - returnErrorResult:
+                    set:
+                      result:
+                        success: false
+                        orderId: ${ .orderId }
+                        error: Payment declined
+                        details: ${ $failure }
+                        reservation: cancelled
+                    then: exit
+              then: exit
+          - handle2:
+              do:
+                - cancelReservation:
+                    call: http
+                    with:
+                      method: post
+                      endpoint: https://inventory.example/api/cancel-reservation
+                      body:
+                        reservationId: ${ $context.inventoryReservationId }
+                    output:
+                      as: '${ $input + { "cancellationResult": . } }'
+                - returnErrorResult:
+                    set:
+                      result:
+                        success: false
+                        orderId: ${ .orderId }
+                        error: Communication error
+                        details: ${ $failure }
+                        reservation: cancelled
+                    then: exit
+              then: exit
   - completeOrder:
       call: http
       with:
@@ -117,8 +125,8 @@ do:
           orderId: ${ .orderId }
           reservationId: ${ $context.inventoryReservationId }
           paymentId: ${ .paymentResult.id }
-        output: completedOrder
-
+      output:
+        as: '${ $input + { "completedOrder": . } }'
   - returnSuccessResult:
       set:
         result:
@@ -137,7 +145,7 @@ This example implements the Saga pattern for a multi-step business process with 
 
 ```yaml
 document:
-  dsl: 1.0.0
+  dsl: 1.0.3
   namespace: examples
   name: saga-pattern
   version: 1.0.0
@@ -145,12 +153,13 @@ do:
   - initializeSaga:
       set:
         sagaState:
-          orderId: ${ uuidv4() }
+          orderId: ${ $workflow.id }
           customerId: ${ .customerId }
           steps: []
           completedSteps: []
       export:
-        as: '$context + { sagaState: { orderId: uuidv4(), customerId: .customerId, steps: [], completedSteps: [] } }'
+        as: '${ $context + { sagaState: { orderId: $workflow.id, customerId: .customerId, steps: [], completedSteps: [] }
+          } }'
 
   - step1_CreateOrder:
       try:
@@ -163,9 +172,11 @@ do:
                 orderId: ${ $context.sagaState.orderId }
                 customerId: ${ $context.sagaState.customerId }
                 items: ${ .items }
-              output: orderCreated
             export:
-              as: '$context + { sagaState: $context.sagaState + { steps: $context.sagaState.steps + ["create_order"], completedSteps: $context.sagaState.completedSteps + ["create_order"], orderDetails: .orderCreated } }'
+              as: '${ $context + { sagaState: ($context.sagaState + { steps: ($context.sagaState.steps + ["create_order"]),
+                completedSteps: ($context.sagaState.completedSteps + ["create_order"]), orderDetails: (.orderCreated)})} }'
+            output:
+              as: '${ $input + { "orderCreated": . } }'
       catch:
         errors:
           with:
@@ -182,9 +193,12 @@ do:
               body:
                 orderId: ${ $context.sagaState.orderId }
                 items: ${ .items }
-              output: inventoryReserved
             export:
-              as: '$context + { sagaState: $context.sagaState + { steps: $context.sagaState.steps + ["reserve_inventory"], completedSteps: $context.sagaState.completedSteps + ["reserve_inventory"], inventoryDetails: .inventoryReserved } }'
+              as: '${ $context + { sagaState: ($context.sagaState + { steps: ($context.sagaState.steps + ["reserve_inventory"]),
+                completedSteps: ($context.sagaState.completedSteps + ["reserve_inventory"]), inventoryDetails: (.inventoryReserved)})}
+                }'
+            output:
+              as: '${ $input + { "inventoryReserved": . } }'
       catch:
         errors:
           with:
@@ -203,9 +217,12 @@ do:
                 customerId: ${ $context.sagaState.customerId }
                 amount: ${ $context.sagaState.inventoryDetails.totalAmount }
                 paymentMethod: ${ .paymentMethod }
-              output: paymentProcessed
             export:
-              as: '$context + { sagaState: $context.sagaState + { steps: $context.sagaState.steps + ["process_payment"], completedSteps: $context.sagaState.completedSteps + ["process_payment"], paymentDetails: .paymentProcessed } }'
+              as: '${ $context + { sagaState: ($context.sagaState + { steps: ($context.sagaState.steps + ["process_payment"]),
+                completedSteps: ($context.sagaState.completedSteps + ["process_payment"]), paymentDetails: (.paymentProcessed)})}
+                }'
+            output:
+              as: '${ $input + { "paymentProcessed": . } }'
       catch:
         errors:
           with:
@@ -223,9 +240,12 @@ do:
                 orderId: ${ $context.sagaState.orderId }
                 items: ${ .items }
                 shippingAddress: ${ .shippingAddress }
-              output: shippingScheduled
             export:
-              as: '$context + { sagaState: $context.sagaState + { steps: $context.sagaState.steps + ["schedule_shipping"], completedSteps: $context.sagaState.completedSteps + ["schedule_shipping"], shippingDetails: .shippingScheduled } }'
+              as: '${ $context + { sagaState: ($context.sagaState + { steps: ($context.sagaState.steps + ["schedule_shipping"]),
+                completedSteps: ($context.sagaState.completedSteps + ["schedule_shipping"]), shippingDetails: (.shippingScheduled)})}
+                }'
+            output:
+              as: '${ $input + { "shippingScheduled": . } }'
       catch:
         errors:
           with:
@@ -246,9 +266,12 @@ do:
                 data:
                   orderDetails: ${ $context.sagaState.orderDetails }
                   shippingDetails: ${ $context.sagaState.shippingDetails }
-              output: notificationSent
             export:
-              as: '$context + { sagaState: $context.sagaState + { steps: $context.sagaState.steps + ["notify_customer"], completedSteps: $context.sagaState.completedSteps + ["notify_customer"], notificationDetails: .notificationSent } }'
+              as: '${ $context + { sagaState: ($context.sagaState + { steps: ($context.sagaState.steps + ["notify_customer"]),
+                completedSteps: ($context.sagaState.completedSteps + ["notify_customer"]), notificationDetails: (.notificationSent)})}
+                }'
+            output:
+              as: '${ $input + { "notificationSent": . } }'
       catch:
         errors:
           with:
@@ -283,10 +306,9 @@ do:
             set:
               compensatingActions: []
             export:
-              as: '$context + { compensatingActions: [] }'
-        
+              as: '${ $context + { compensatingActions: [] } }'
         - checkNotifyCustomerStep:
-            if: ${ "notify_customer" in $context.sagaState.completedSteps }
+            if: ${ $context.sagaState.completedSteps | index("notify_customer") != null }
             call: http
             with:
               method: post
@@ -297,22 +319,23 @@ do:
                 template: "order_cancelled"
                 data:
                   reason: "Technical error"
-              output: cancellationNotificationSent
             export:
-              as: '$context + { compensatingActions: $context.compensatingActions + ["notify_customer_cancellation"] }'
-        
+              as: '${ $context + { compensatingActions: ($context.compensatingActions + ["notify_customer_cancellation"])}
+                }'
+            output:
+              as: '${ $input + { "cancellationNotificationSent": . } }'
         - checkScheduleShippingStep:
-            if: ${ "schedule_shipping" in $context.sagaState.completedSteps }
+            if: ${ $context.sagaState.completedSteps | index("schedule_shipping") != null }
             call: http
             with:
               method: delete
-              endpoint: https://shipping.example/api/schedules/${$context.sagaState.orderId}
-              output: shippingCancelled
+              endpoint: ${ "https://shipping.example/api/schedules/\($context.sagaState.orderId)" }
             export:
-              as: '$context + { compensatingActions: $context.compensatingActions + ["cancel_shipping"] }'
-        
+              as: '${ $context + { compensatingActions: ($context.compensatingActions + ["cancel_shipping"])} }'
+            output:
+              as: '${ $input + { "shippingCancelled": . } }'
         - checkProcessPaymentStep:
-            if: ${ "process_payment" in $context.sagaState.completedSteps }
+            if: ${ $context.sagaState.completedSteps | index("process_payment") != null }
             call: http
             with:
               method: post
@@ -321,30 +344,31 @@ do:
                 paymentId: ${ $context.sagaState.paymentDetails.id }
                 amount: ${ $context.sagaState.paymentDetails.amount }
                 reason: "Order processing failed"
-              output: paymentRefunded
             export:
-              as: '$context + { compensatingActions: $context.compensatingActions + ["refund_payment"] }'
-        
+              as: '${ $context + { compensatingActions: ($context.compensatingActions + ["refund_payment"])} }'
+            output:
+              as: '${ $input + { "paymentRefunded": . } }'
         - checkReserveInventoryStep:
-            if: ${ "reserve_inventory" in $context.sagaState.completedSteps }
+            if: ${ $context.sagaState.completedSteps | index("reserve_inventory") != null }
             call: http
             with:
               method: delete
-              endpoint: https://inventory.example/api/reservations/${$context.sagaState.inventoryDetails.reservationId}
-              output: inventoryReleased
+              endpoint: ${
+                "https://inventory.example/api/reservations/\($context.sagaState.inventoryDetails.reservationId)" }
             export:
-              as: '$context + { compensatingActions: $context.compensatingActions + ["release_inventory"] }'
-        
+              as: '${ $context + { compensatingActions: ($context.compensatingActions + ["release_inventory"])} }'
+            output:
+              as: '${ $input + { "inventoryReleased": . } }'
         - checkCreateOrderStep:
-            if: ${ "create_order" in $context.sagaState.completedSteps }
+            if: ${ $context.sagaState.completedSteps | index("create_order") != null }
             call: http
             with:
               method: delete
-              endpoint: https://orders.example/api/orders/${$context.sagaState.orderId}
-              output: orderCancelled
+              endpoint: ${ "https://orders.example/api/orders/\($context.sagaState.orderId)" }
             export:
-              as: '$context + { compensatingActions: $context.compensatingActions + ["cancel_order"] }'
-        
+              as: '${ $context + { compensatingActions: ($context.compensatingActions + ["cancel_order"])} }'
+            output:
+              as: '${ $input + { "orderCancelled": . } }'
         - returnCompensationResult:
             set:
               result:
@@ -363,7 +387,7 @@ This example demonstrates combining retry policies with compensation actions for
 
 ```yaml
 document:
-  dsl: 1.0.0
+  dsl: 1.0.3
   namespace: examples
   name: compensation-with-retry
   version: 1.0.0
@@ -399,9 +423,10 @@ do:
                     body:
                       orderId: ${ .orderId }
                       items: ${ .items }
-                    output: inventoryReservation
                   export:
-                    as: '$context + { inventoryReservationId: .inventoryReservation.id }'
+                    as: '${ $context + { inventoryReservationId: .inventoryReservation.id } }'
+                  output:
+                    as: '${ $input + { "inventoryReservation": . } }'
             catch:
               errors:
                 with:
@@ -427,7 +452,7 @@ do:
                         error: "Inventory reservation failed"
                         details: ${ $reservationError }
                     then: exit
-        
+
         - processPayment:
             try:
               - callPaymentService:
@@ -439,64 +464,74 @@ do:
                       orderId: ${ .orderId }
                       amount: ${ .inventoryReservation.totalAmount }
                       paymentInfo: ${ .paymentInfo }
-                    output: paymentResult
+                  output:
+                    as: '${ $input + { "paymentResult": . } }'
             catch:
-              - errors:
-                  with:
-                    type: https://example.com/errors/payment/declined
-                as: paymentError
-                do:
-                  - cancelReservation:
-                      call: http
-                      with:
-                        method: post
-                        endpoint: https://inventory.example/api/cancel-reservation
-                        body:
-                          reservationId: ${ $context.inventoryReservationId }
-                        output: cancellationResult
-                  - notifyPaymentFailure:
-                      call: http
-                      with:
-                        method: post
-                        endpoint: https://notifications.example/api/send
-                        body:
-                          orderId: ${ .orderId }
-                          template: "payment_declined"
-                          data:
-                            reason: ${ $paymentError.reason }
-                  - returnErrorResult:
-                      set:
-                        result:
-                          success: false
-                          orderId: ${ .orderId }
-                          error: "Payment declined"
-                          details: ${ $paymentError }
-                          inventoryReservation: "cancelled"
-                      then: exit
-              
-              - errors:
-                  with:
-                    type: https://open-workflow-specification.org/spec/1.0.0/errors/communication
-                retry: transientFailure
-                as: communicationError
-                do:
-                  - cancelReservation:
-                      call: http
-                      with:
-                        method: post
-                        endpoint: https://inventory.example/api/cancel-reservation
-                        body:
-                          reservationId: ${ $context.inventoryReservationId }
-                        output: cancellationResult
-                  - returnErrorResult:
-                      set:
-                        result:
-                          success: false
-                          orderId: ${ .orderId }
-                          error: "Payment service communication error"
-                          details: ${ $communicationError }
-                          inventoryReservation: "cancelled"
-                      then: exit
+              as: failure
+              when: ${ ($failure.type == "https://example.com/errors/payment/declined") or ($failure.type ==
+                "https://open-workflow-specification.org/spec/1.0.0/errors/communication") }
+              do:
+                - selectHandler:
+                    switch:
+                      - case1:
+                          then: handle1
+                          when: ${ $failure.type == "https://example.com/errors/payment/declined" }
+                      - case2:
+                          then: handle2
+                          when: ${ $failure.type ==
+                            "https://open-workflow-specification.org/spec/1.0.0/errors/communication" }
+                - handle1:
+                    do:
+                      - cancelReservation:
+                          call: http
+                          with:
+                            method: post
+                            endpoint: https://inventory.example/api/cancel-reservation
+                            body:
+                              reservationId: ${ $context.inventoryReservationId }
+                          output:
+                            as: '${ $input + { "cancellationResult": . } }'
+                      - notifyPaymentFailure:
+                          call: http
+                          with:
+                            method: post
+                            endpoint: https://notifications.example/api/send
+                            body:
+                              orderId: ${ .orderId }
+                              template: payment_declined
+                              data:
+                                reason: ${ $failure.reason }
+                      - returnErrorResult:
+                          set:
+                            result:
+                              success: false
+                              orderId: ${ .orderId }
+                              error: Payment declined
+                              details: ${ $failure }
+                              inventoryReservation: cancelled
+                          then: exit
+                    then: exit
+                - handle2:
+                    do:
+                      - cancelReservation:
+                          call: http
+                          with:
+                            method: post
+                            endpoint: https://inventory.example/api/cancel-reservation
+                            body:
+                              reservationId: ${ $context.inventoryReservationId }
+                          output:
+                            as: '${ $input + { "cancellationResult": . } }'
+                      - returnErrorResult:
+                          set:
+                            result:
+                              success: false
+                              orderId: ${ .orderId }
+                              error: Payment service communication error
+                              details: ${ $failure }
+                              inventoryReservation: cancelled
+                          then: exit
+                    then: exit
       catch:
         errors:
           with:
@@ -559,7 +594,8 @@ do:
                 orderId: ${ .orderId }
                 reservationId: ${ $context.inventoryReservationId }
                 paymentId: ${ .paymentResult.id }
-              output: completedOrder
+            output:
+              as: '${ $input + { "completedOrder": . } }'
       catch:
         errors:
           with:
@@ -588,8 +624,8 @@ do:
                   reservationId: ${ $context.inventoryReservationId }
                   paymentId: ${ .paymentResult.id }
                   error: ${ $finalizationError }
-                output: manualTask
-
+              output:
+                as: '${ $input + { "manualTask": . } }'
   - returnSuccessResult:
       set:
         result:
@@ -597,7 +633,7 @@ do:
           orderId: ${ .orderId }
           reservationId: ${ $context.inventoryReservationId }
           paymentId: ${ .paymentResult.id }
-          completionDetails: ${ .completedOrder || null }
+          completionDetails: ${ .completedOrder // null }
           manualReviewNeeded: ${ .manualTask != null }
 ```
 
@@ -609,17 +645,17 @@ This example demonstrates different compensation strategies for various resource
 
 ```yaml
 document:
-  dsl: 1.0.0
+  dsl: 1.0.3
   namespace: examples
   name: mixed-resource-compensation
   version: 1.0.0
 do:
   - initializeWorkflow:
       set:
-        workflowId: ${ uuidv4() }
+        workflowId: ${ $workflow.id }
         allocatedResources: []
       export:
-        as: '$context + { workflowId: uuidv4(), allocatedResources: [] }'
+        as: '${ $context + { workflowId: $workflow.id, allocatedResources: [] } }'
 
   - step1_CreateDatabaseRecord:
       try:
@@ -632,9 +668,11 @@ do:
                 type: "transaction"
                 workflowId: ${ $context.workflowId }
                 data: ${ .transactionData }
-              output: dbRecord
             export:
-              as: '$context + { allocatedResources: $context.allocatedResources + [{ type: "database", id: .dbRecord.id }] }'
+              as: '${ $context + { allocatedResources: ($context.allocatedResources + [{ type: ("database"), id: (.dbRecord.id)}])}
+                }'
+            output:
+              as: '${ $input + { "dbRecord": . } }'
       catch:
         errors:
           with:
@@ -654,9 +692,11 @@ do:
                   workflowId: ${ $context.workflowId }
                   recordId: ${ .dbRecord.id }
                   action: "process"
-              output: messageInfo
             export:
-              as: '$context + { allocatedResources: $context.allocatedResources + [{ type: "message", id: .messageInfo.messageId }] }'
+              as: '${ $context + { allocatedResources: ($context.allocatedResources + [{ type: ("message"), id: (.messageInfo.messageId)}])}
+                }'
+            output:
+              as: '${ $input + { "messageInfo": . } }'
       catch:
         errors:
           with:
@@ -674,9 +714,11 @@ do:
                 workflowId: ${ $context.workflowId }
                 content: ${ .fileContent }
                 format: "pdf"
-              output: fileInfo
             export:
-              as: '$context + { allocatedResources: $context.allocatedResources + [{ type: "file", id: .fileInfo.fileId, path: .fileInfo.path }] }'
+              as: '${ $context + { allocatedResources: ($context.allocatedResources + [{ type: ("file"), id: (.fileInfo.fileId),
+                path: (.fileInfo.path)}])} }'
+            output:
+              as: '${ $input + { "fileInfo": . } }'
       catch:
         errors:
           with:
@@ -694,9 +736,11 @@ do:
                 workflowId: ${ $context.workflowId }
                 service: "premium"
                 amount: ${ .quotaAmount }
-              output: quotaInfo
             export:
-              as: '$context + { allocatedResources: $context.allocatedResources + [{ type: "quota", id: .quotaInfo.quotaId }] }'
+              as: '${ $context + { allocatedResources: ($context.allocatedResources + [{ type: ("quota"), id: (.quotaInfo.quotaId)}])}
+                }'
+            output:
+              as: '${ $input + { "quotaInfo": . } }'
       catch:
         errors:
           with:
@@ -724,53 +768,63 @@ do:
                   switch:
                     - databaseResource:
                         when: ${ $resource.type == "database" }
-                        then:
-                          do:
-                            - deleteDbRecord:
-                                call: http
-                                with:
-                                  method: delete
-                                  endpoint: https://database.example/api/records/${$resource.id}
-                                  output: dbCleanup
-                    
+                        then: compensateBasedOnType-databaseResource
                     - messageResource:
                         when: ${ $resource.type == "message" }
-                        then:
-                          do:
-                            - cancelMessage:
-                                call: asyncapi
-                                with:
-                                  document:
-                                    endpoint: file:///apis/messaging.asyncapi.json
-                                  operation: cancelMessage
-                                  message:
-                                    payload:
-                                      messageId: ${ $resource.id }
-                                      workflowId: ${ $context.workflowId }
-                                  output: messageCleanup
-                    
+                        then: compensateBasedOnType-messageResource
                     - fileResource:
                         when: ${ $resource.type == "file" }
-                        then:
-                          do:
-                            - deleteFile:
-                                call: http
-                                with:
-                                  method: delete
-                                  endpoint: https://storage.example/api/files/${$resource.id}
-                                  output: fileCleanup
-                    
+                        then: compensateBasedOnType-fileResource
                     - quotaResource:
                         when: ${ $resource.type == "quota" }
-                        then:
-                          do:
-                            - releaseQuota:
-                                call: http
-                                with:
-                                  method: delete
-                                  endpoint: https://api-gateway.example/api/quotas/${$resource.id}
-                                  output: quotaCleanup
-        
+                        then: compensateBasedOnType-quotaResource
+              - compensateBasedOnType-databaseResource:
+                  do:
+                    - deleteDbRecord:
+                        call: http
+                        with:
+                          method: delete
+                          endpoint: ${ "https://database.example/api/records/\($resource.id)" }
+                        output:
+                          as: '${ $input + { "dbCleanup": . } }'
+                  then: compensateBasedOnType-done
+              - compensateBasedOnType-messageResource:
+                  do:
+                    - cancelMessage:
+                        call: asyncapi
+                        with:
+                          document:
+                            endpoint: file:///apis/messaging.asyncapi.json
+                          operation: cancelMessage
+                          message:
+                            payload:
+                              messageId: ${ $resource.id }
+                              workflowId: ${ $context.workflowId }
+                        output:
+                          as: '${ $input + { "messageCleanup": . } }'
+                  then: compensateBasedOnType-done
+              - compensateBasedOnType-fileResource:
+                  do:
+                    - deleteFile:
+                        call: http
+                        with:
+                          method: delete
+                          endpoint: ${ "https://storage.example/api/files/\($resource.id)" }
+                        output:
+                          as: '${ $input + { "fileCleanup": . } }'
+                  then: compensateBasedOnType-done
+              - compensateBasedOnType-quotaResource:
+                  do:
+                    - releaseQuota:
+                        call: http
+                        with:
+                          method: delete
+                          endpoint: ${ "https://api-gateway.example/api/quotas/\($resource.id)" }
+                        output:
+                          as: '${ $input + { "quotaCleanup": . } }'
+                  then: compensateBasedOnType-done
+              - compensateBasedOnType-done:
+                  set: ${ . }
         - logCompensation:
             call: http
             with:
@@ -781,7 +835,7 @@ do:
                 message: "Workflow compensated due to error"
                 workflowId: ${ $context.workflowId }
                 compensatedResources: ${ $context.allocatedResources }
-        
+
         - returnErrorResult:
             set:
               result:
@@ -799,7 +853,7 @@ This example demonstrates handling compensation for long-running processes that 
 
 ```yaml
 document:
-  dsl: 1.0.0
+  dsl: 1.0.3
   namespace: examples
   name: async-compensation
   version: 1.0.0
@@ -817,9 +871,10 @@ do:
                 callbackEvent:
                   type: "com.example.job.completed"
                   correlationId: ${ $workflow.id }
-              output: job
             export:
-              as: '$context + { jobId: .job.id }'
+              as: '${ $context + { jobId: .job.id } }'
+            output:
+              as: '${ $input + { "job": . } }'
       catch:
         errors:
           with:
@@ -843,10 +898,11 @@ do:
                   with:
                     type: com.example.job.completed
                     correlationId: ${ $workflow.id }
-              for:
-                hours: 2
             output:
               as: completionEvent
+            timeout:
+              after:
+                hours: 2
       catch:
         errors:
           with:
@@ -856,21 +912,25 @@ do:
               call: http
               with:
                 method: post
-                endpoint: https://batch-processor.example/api/jobs/${$context.jobId}/cancel
-                output: cancellationRequest
-            export:
-              as: '$context + { cancellationRequested: true }'
-          - waitForCancellationConfirmation:
-              listen:
-                to:
-                  one:
-                    with:
-                      type: com.example.job.cancelled
-                      correlationId: ${ $workflow.id }
-                for:
-                  minutes: 10
+                endpoint: ${ "https://batch-processor.example/api/jobs/\($context.jobId)/cancel" }
               output:
-                as: cancellationEvent
+                as: '${ $input + { "cancellationRequest": . } }'
+              export:
+                as: '$context + { cancellationRequested: true }'
+          - waitForCancellationConfirmation:
+              try:
+                - waitForCancellationConfirmationOperation:
+                    listen:
+                      to:
+                        one:
+                          with:
+                            type: com.example.job.cancelled
+                            correlationId: ${ $workflow.id }
+                    output:
+                      as: cancellationEvent
+                    timeout:
+                      after:
+                        minutes: 10
               catch:
                 errors:
                   with:
@@ -886,7 +946,8 @@ do:
                           jobId: ${ $context.jobId }
                           workflowId: ${ $workflow.id }
                           reason: "Cancellation confirmation timed out"
-                        output: manualTask
+                      output:
+                        as: '${ $input + { "manualTask": . } }'
                   - setEscalationResult:
                       set:
                         result:

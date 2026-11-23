@@ -11,7 +11,7 @@ class DefinitionModelTest {
         for (schedule in listOf("every: PT1M", "after: PT1M", "cron: '0 * * * *'")) {
             val workflow = WorkflowCache.parseYaml("""
                 document:
-                  dsl: '1.0.0'
+                  dsl: '1.0.3'
                   namespace: test
                   name: timer
                   version: '1.0.0'

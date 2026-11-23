@@ -20,7 +20,7 @@ import kotlin.time.Instant
  *
  * ```yaml
  * document:
- *   dsl: '1.0.0'
+ *   dsl: '1.0.3'
  *   namespace: example
  *   name: my-workflow
  *   version: 1.0.0

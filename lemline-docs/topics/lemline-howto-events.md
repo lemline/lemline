@@ -29,16 +29,17 @@ The `emit` task allows workflows to publish events to message brokers or other e
 Here's a simple example of emitting an event:
 
 ```yaml
-- name: NotifyOrderCreated
-  type: emit
-  data:
-    eventType: "OrderCreated"
-    payload:
-      orderId: ".orderId"
-      customerId: ".customerId"
-      timestamp: "$WORKFLOW.currentTime"
-      total: ".total"
-  next: NextTask
+  - NotifyOrderCreated:
+      emit:
+        event:
+          with:
+            type: "OrderCreated"
+            data:
+              orderId: ${ .orderId }
+              customerId: ${ .customerId }
+              timestamp: ${ $context.currentTime }
+              total: ${ .total }
+      then: NextTask
 ```
 
 ### Event Structure
@@ -69,19 +70,17 @@ Events emitted by Lemline have this basic structure:
 You can customize various aspects of the emitted event:
 
 ```yaml
-- name: EmitCustomEvent
-  type: emit
-  data:
-    eventType: "PaymentProcessed"
-    eventSource: "payment-service"
-    eventId: ".transactionId"  # Custom event ID
-    correlationId: ".orderId"  # For event correlation
-    payload:
-      orderId: ".orderId"
-      amount: ".amount"
-      status: ".status"
-      timestamp: "$WORKFLOW.currentTime"
-  next: NextTask
+  - EmitCustomEvent:
+      emit:
+        event:
+          with:
+            type: "PaymentProcessed"
+            data:
+              orderId: ${ .orderId }
+              amount: ${ .amount }
+              status: ${ .status }
+              timestamp: ${ $context.currentTime }
+      then: NextTask
 ```
 
 ### Specifying Event Destinations
@@ -89,56 +88,43 @@ You can customize various aspects of the emitted event:
 By default, events are emitted to the default event channel, but you can specify custom destinations:
 
 ```yaml
-- name: EmitToSpecificChannel
-  type: emit
-  data:
-    eventType: "InventoryUpdated"
-    payload: 
-      productId: ".productId"
-      quantity: ".newQuantity"
-    destination:
-      channel: "inventory-events"
-  next: NextTask
+  - EmitToSpecificChannel:
+      emit:
+        event:
+          with:
+            type: "InventoryUpdated"
+            data:
+              productId: ${ .productId }
+              quantity: ${ .newQuantity }
+      then: NextTask
 ```
 
 For Kafka-specific configurations:
 
 ```yaml
-- name: EmitToKafkaTopic
-  type: emit
-  data:
-    eventType: "UserRegistered"
-    payload:
-      userId: ".userId"
-      email: ".email"
-    destination:
-      type: "kafka"
-      topic: "user-events"
-      key: ".userId"  # Partition key
-      headers:
-        version: "1.0"
-        tenant: ".tenantId"
-  next: NextTask
+  - EmitToKafkaTopic:
+      emit:
+        event:
+          with:
+            type: "UserRegistered"
+            data:
+              userId: ${ .userId }
+              email: ${ .email }
+      then: NextTask
 ```
 
 For RabbitMQ:
 
 ```yaml
-- name: EmitToRabbitMQ
-  type: emit
-  data:
-    eventType: "MetricCollected"
-    payload:
-      metricName: ".name"
-      value: ".value"
-    destination:
-      type: "rabbitmq"
-      exchange: "metrics"
-      routingKey: "system.cpu"
-      properties:
-        contentType: "application/json"
-        priority: 5
-  next: NextTask
+  - EmitToRabbitMQ:
+      emit:
+        event:
+          with:
+            type: "MetricCollected"
+            data:
+              metricName: ${ .name }
+              value: ${ .value }
+      then: NextTask
 ```
 
 ### Error Handling for Emit Tasks
@@ -146,23 +132,25 @@ For RabbitMQ:
 When emitting events, it's important to handle potential failures:
 
 ```yaml
-- name: AttemptEmitEvent
-  type: try
-  retry:
-    maxAttempts: 3
-    interval: PT2S
-  catch:
-    - error: "*"
-      next: HandleEmitError
-  do:
-    - name: EmitOrderEvent
-      type: emit
-      data:
-        eventType: "OrderCreated"
-        payload:
-          orderId: ".orderId"
-          customerId: ".customerId"
-  next: ContinueProcessing
+  - AttemptEmitEvent:
+      try:
+        - EmitOrderEvent:
+            emit:
+              event:
+                with:
+                  type: "OrderCreated"
+                  data:
+                    orderId: ${ .orderId }
+                    customerId: ${ .customerId }
+      catch:
+        as: failure
+        then: HandleEmitError
+        retry:
+          limit:
+            attempt:
+              count: 3
+          delay: PT2S
+      then: ContinueProcessing
 ```
 
 ## Listening for Events
@@ -174,15 +162,17 @@ The `listen` task allows workflows to wait for and process incoming events from 
 Here's a simple example of listening for an event:
 
 ```yaml
-- name: WaitForPayment
-  type: listen
-  events:
-    - name: PaymentReceived
-      type: "PaymentReceived"
-      correlations:
-        - orderId = .orderId
-      consume: 1
-  next: ProcessPayment
+  - WaitForPayment:
+      listen:
+        to:
+          one:
+            with:
+              type: "PaymentReceived"
+            correlate:
+              orderId:
+                from: ${ .data.orderId }
+                expect: ${ .orderId }
+      then: ProcessPayment
 ```
 
 This task pauses workflow execution until a `PaymentReceived` event with a matching `orderId` is received.
@@ -192,18 +182,26 @@ This task pauses workflow execution until a `PaymentReceived` event with a match
 Event correlation is a key feature that allows workflows to wait for specific events related to the current workflow instance:
 
 ```yaml
-- name: WaitForShipment
-  type: listen
-  events:
-    - name: ShipmentCreated
-      type: "ShipmentCreated"
-      correlations:
-        - orderId = .orderId
-      consume: 1
-      timeouts:
-        eventTimeout: PT1H
-        eventTimeoutNext: HandleShipmentTimeout
-  next: NotifyCustomerOfShipment
+  - WaitForShipment:
+      try:
+        - WaitForShipmentEvents:
+            listen:
+              to:
+                one:
+                  with:
+                    type: "ShipmentCreated"
+                  correlate:
+                    orderId:
+                      from: ${ .data.orderId }
+                      expect: ${ .orderId }
+            timeout:
+              after: PT1H
+      catch:
+        errors:
+          with:
+            status: 408
+        then: HandleShipmentTimeout
+      then: NotifyCustomerOfShipment
 ```
 
 The `correlations` property contains conditions that must be met for an event to match. The left side refers to a field in the incoming event, and the right side refers to a field in the current workflow context.
@@ -213,17 +211,23 @@ The `correlations` property contains conditions that must be met for an event to
 You can specify multiple correlation conditions:
 
 ```yaml
-- name: WaitForSpecificRefund
-  type: listen
-  events:
-    - name: RefundProcessed
-      type: "RefundProcessed"
-      correlations:
-        - orderId = .orderId
-        - amount = .refundAmount
-        - customerId = .customerId
-      consume: 1
-  next: FinalizeRefund
+  - WaitForSpecificRefund:
+      listen:
+        to:
+          one:
+            with:
+              type: "RefundProcessed"
+            correlate:
+              orderId:
+                from: ${ .data.orderId }
+                expect: ${ .orderId }
+              amount:
+                from: ${ .data.amount }
+                expect: ${ .refundAmount }
+              customerId:
+                from: ${ .data.customerId }
+                expect: ${ .customerId }
+      then: FinalizeRefund
 ```
 
 All conditions must match for the event to be consumed.
@@ -233,24 +237,31 @@ All conditions must match for the event to be consumed.
 You can wait for different types of events simultaneously:
 
 ```yaml
-- name: WaitForOrderFeedback
-  type: listen
-  events:
-    - name: OrderCancellation
-      type: "OrderCancelled"
-      correlations:
-        - orderId = .orderId
-      consume: 1
-      next: HandleCancellation
-    - name: OrderReview
-      type: "ReviewSubmitted"
-      correlations:
-        - orderId = .orderId
-      consume: 1
-      next: ProcessReview
-  timeouts:
-    eventTimeout: PT72H
-    eventTimeoutNext: CloseOrderProcessing
+  - WaitForOrderFeedback:
+      try:
+        - WaitForOrderFeedbackEvents:
+            listen:
+              to:
+                any:
+                  - with:
+                      type: "OrderCancelled"
+                    correlate:
+                      orderId:
+                        from: ${ .data.orderId }
+                        expect: ${ .orderId }
+                  - with:
+                      type: "ReviewSubmitted"
+                    correlate:
+                      orderId:
+                        from: ${ .data.orderId }
+                        expect: ${ .orderId }
+            timeout:
+              after: PT72H
+      catch:
+        errors:
+          with:
+            status: 408
+        then: CloseOrderProcessing
 ```
 
 In this example, the workflow will continue to either `HandleCancellation` or `ProcessReview` depending on which event arrives first.
@@ -260,18 +271,27 @@ In this example, the workflow will continue to either `HandleCancellation` or `P
 The `listen` task can collect multiple matching events before continuing:
 
 ```yaml
-- name: CollectDeliveryConfirmations
-  type: listen
-  events:
-    - name: DeliveryConfirmations
-      type: "PackageDelivered"
-      correlations:
-        - orderId = .orderId
-      consume: 3  # Wait for 3 matching events
-      timeouts:
-        eventTimeout: PT48H
-        eventTimeoutNext: HandleIncompleteDelivery
-  next: CompleteMultiPackageOrder
+  - CollectDeliveryConfirmations:
+      try:
+        - CollectDeliveryConfirmationsEvents:
+            listen:
+              to:
+                any:
+                  - with:
+                      type: "PackageDelivered"
+                    correlate:
+                      orderId:
+                        from: ${ .data.orderId }
+                        expect: ${ .orderId }
+                until: ${ length >= 3 }
+            timeout:
+              after: PT48H
+      catch:
+        errors:
+          with:
+            status: 408
+        then: HandleIncompleteDelivery
+      then: CompleteMultiPackageOrder
 ```
 
 This example waits for three `PackageDelivered` events for the same order before continuing.
@@ -281,18 +301,17 @@ This example waits for three `PackageDelivered` events for the same order before
 You can process a continuous stream of events:
 
 ```yaml
-- name: ProcessSensorReadings
-  type: listen
-  events:
-    - name: SensorReadings
-      type: "SensorReading"
-      correlations:
-        - deviceId = .deviceId
-      consume: forever
-      foreach:
-        as: "reading"
-        next: ProcessReading
-  next: FinalizeSensorProcessing
+  - ProcessSensorReadings:
+      listen:
+        to:
+          one:
+            with:
+              type: "SensorReading"
+            correlate:
+              deviceId:
+                from: ${ .data.deviceId }
+                expect: ${ .deviceId }
+      then: FinalizeSensorProcessing
 ```
 
 The `foreach` property specifies how to process each event, and the workflow will continue processing events until explicitly ended or timed out.
@@ -302,18 +321,18 @@ The `foreach` property specifies how to process each event, and the workflow wil
 You can continue listening until a specific condition is met:
 
 ```yaml
-- name: MonitorTemperature
-  type: listen
-  events:
-    - name: TemperatureReadings
-      type: "TemperatureReading"
-      correlations:
-        - sensorId = .sensorId
-      consume: while: ".events.TemperatureReadings | map(.temperature) | max < 30"
-      foreach:
-        as: "reading"
-        next: LogReading
-  next: HandleHighTemperature
+  - MonitorTemperature:
+      listen:
+        to:
+          any:
+            - with:
+                type: "TemperatureReading"
+              correlate:
+                sensorId:
+                  from: ${ .data.sensorId }
+                  expect: ${ .sensorId }
+          until: ${ (.events.TemperatureReadings | map(.temperature) | max < 30) | not }
+      then: HandleHighTemperature
 ```
 
 This example continues collecting temperature readings until a reading with a temperature of 30 or higher is received.
@@ -323,18 +342,26 @@ This example continues collecting temperature readings until a reading with a te
 It's important to handle cases where expected events don't arrive:
 
 ```yaml
-- name: WaitForApproval
-  type: listen
-  events:
-    - name: ApprovalDecision
-      type: "ApprovalDecision"
-      correlations:
-        - requestId = .requestId
-      consume: 1
-  timeouts:
-    eventTimeout: PT24H
-    eventTimeoutNext: HandleApprovalTimeout
-  next: ProcessApprovalDecision
+  - WaitForApproval:
+      try:
+        - WaitForApprovalEvents:
+            listen:
+              to:
+                one:
+                  with:
+                    type: "ApprovalDecision"
+                  correlate:
+                    requestId:
+                      from: ${ .data.requestId }
+                      expect: ${ .requestId }
+            timeout:
+              after: PT24H
+      catch:
+        errors:
+          with:
+            status: 408
+        then: HandleApprovalTimeout
+      then: ProcessApprovalDecision
 ```
 
 If no matching event is received within 24 hours, the workflow will continue to the `HandleApprovalTimeout` task.
@@ -344,29 +371,27 @@ If no matching event is received within 24 hours, the workflow will continue to 
 After the `listen` task completes, events are available in the workflow context:
 
 ```yaml
-- name: ProcessPayment
-  type: set
-  data:
-    paymentEvent: ".events.PaymentReceived[0]"  # First (or only) event
-    transactionId: ".paymentEvent.transactionId"
-    amount: ".paymentEvent.amount"
-    paymentMethod: ".paymentEvent.method"
-    message: "Received payment of .amount via .paymentMethod"
-  next: CompleteOrder
+  - ProcessPayment:
+      set:
+        paymentEvent: ${ .events.PaymentReceived[0] }
+        transactionId: ${ .paymentEvent.transactionId }
+        amount: ${ .paymentEvent.amount }
+        paymentMethod: ${ .paymentEvent.method }
+        message: ${ "Received payment of \(.amount) via \(.paymentMethod)" }
+      then: CompleteOrder
 ```
 
 If collecting multiple events, you can access them as an array:
 
 ```yaml
-- name: AnalyzeMultipleEvents
-  type: set
-  data:
-    allEvents: ".events.DeliveryConfirmations"  # Array of events
-    eventCount: ".allEvents | length"
-    timestamps: ".allEvents | map(.timestamp)"
-    lastEvent: ".allEvents[-1]"  # Last event in the array
-    message: "Received .eventCount delivery confirmations"
-  next: NextTask
+  - AnalyzeMultipleEvents:
+      set:
+        allEvents: ${ .events.DeliveryConfirmations }
+        eventCount: ${ .allEvents | length }
+        timestamps: ${ .allEvents | map(.timestamp) }
+        lastEvent: ${ .allEvents[-1] }
+        message: ${ "Received \(.eventCount) delivery confirmations" }
+      then: NextTask
 ```
 
 ## Advanced Event Patterns
@@ -376,55 +401,63 @@ If collecting multiple events, you can access them as an array:
 Events can be used to implement state machines:
 
 ```yaml
-- name: InitializeStateMachine
-  type: set
-  data:
-    currentState: "ORDER_CREATED"
-    possibleStates: ["ORDER_CREATED", "PAYMENT_RECEIVED", "SHIPMENT_CREATED", "DELIVERED", "CANCELLED"]
-    validTransitions:
-      ORDER_CREATED: ["PAYMENT_RECEIVED", "CANCELLED"]
-      PAYMENT_RECEIVED: ["SHIPMENT_CREATED", "CANCELLED"]
-      SHIPMENT_CREATED: ["DELIVERED", "CANCELLED"]
-      DELIVERED: []
-      CANCELLED: []
-  next: WaitForStateChange
-
-- name: WaitForStateChange
-  type: listen
-  events:
-    - name: PaymentEvent
-      type: "PaymentReceived"
-      correlations:
-        - orderId = .orderId
-      consume: 1
-      next: TransitionToPaymentReceived
-    - name: ShipmentEvent
-      type: "ShipmentCreated"
-      correlations:
-        - orderId = .orderId
-      consume: 1
-      next: TransitionToShipmentCreated
-    - name: DeliveryEvent
-      type: "OrderDelivered"
-      correlations:
-        - orderId = .orderId
-      consume: 1
-      next: TransitionToDelivered
-    - name: CancellationEvent
-      type: "OrderCancelled"
-      correlations:
-        - orderId = .orderId
-      consume: 1
-      next: TransitionToCancelled
-  next: HandleUnexpectedEvent
-
-- name: TransitionToPaymentReceived
-  type: set
-  data:
-    previousState: ".currentState"
-    requestedState: "PAYMENT_RECEIVED"
-    isValidTransition: ".validTransitions[.currentState] | contains([.requestedState])"
-  next: ValidateTransition
+  - InitializeStateMachine:
+      set:
+        currentState: "ORDER_CREATED"
+        possibleStates:
+          - "ORDER_CREATED"
+          - "PAYMENT_RECEIVED"
+          - "SHIPMENT_CREATED"
+          - "DELIVERED"
+          - "CANCELLED"
+        validTransitions:
+          ORDER_CREATED:
+            - "PAYMENT_RECEIVED"
+            - "CANCELLED"
+          PAYMENT_RECEIVED:
+            - "SHIPMENT_CREATED"
+            - "CANCELLED"
+          SHIPMENT_CREATED:
+            - "DELIVERED"
+            - "CANCELLED"
+          DELIVERED: []
+          CANCELLED: []
+      then: WaitForStateChange
+  - WaitForStateChange:
+      listen:
+        to:
+          any:
+            - with:
+                type: "PaymentReceived"
+              correlate:
+                orderId:
+                  from: ${ .data.orderId }
+                  expect: ${ .orderId }
+            - with:
+                type: "ShipmentCreated"
+              correlate:
+                orderId:
+                  from: ${ .data.orderId }
+                  expect: ${ .orderId }
+            - with:
+                type: "OrderDelivered"
+              correlate:
+                orderId:
+                  from: ${ .data.orderId }
+                  expect: ${ .orderId }
+            - with:
+                type: "OrderCancelled"
+              correlate:
+                orderId:
+                  from: ${ .data.orderId }
+                  expect: ${ .orderId }
+      then: HandleUnexpectedEvent
+  - TransitionToPaymentReceived:
+      set:
+        previousState: ${ .currentState }
+        requestedState: "PAYMENT_RECEIVED"
+        isValidTransition: ${ .validTransitions[.currentState] | contains([.requestedState]) }
+      then: ValidateTransition
 ```
 
 ### Event Aggregation and Analysis
@@ -432,29 +465,30 @@ Events can be used to implement state machines:
 You can collect and analyze multiple events:
 
 ```yaml
-- name: AggregateMetrics
-  type: listen
-  events:
-    - name: MetricEvents
-      type: "MetricReported"
-      correlations:
-        - systemId = .systemId
-      consume: amount: 100
-      timeouts:
-        eventTimeout: PT5M
-  next: AnalyzeMetrics
-
-- name: AnalyzeMetrics
-  type: set
-  data:
-    metrics: ".events.MetricEvents"
-    cpuMetrics: ".metrics | map(select(.name == 'cpu'))"
-    memoryMetrics: ".metrics | map(select(.name == 'memory'))"
-    avgCpu: ".cpuMetrics | map(.value) | add / .cpuMetrics | length"
-    avgMemory: ".memoryMetrics | map(.value) | add / .memoryMetrics | length"
-    maxCpu: ".cpuMetrics | max_by(.value).value"
-    isHighUsage: ".avgCpu > 80 || .avgMemory > 90"
-  next: CheckResourceUsage
+  - AggregateMetrics:
+      listen:
+        to:
+          any:
+            - with:
+                type: "MetricReported"
+              correlate:
+                systemId:
+                  from: ${ .data.systemId }
+                  expect: ${ .systemId }
+          until: ${ length >= 100 }
+      timeout:
+        after: PT5M
+      then: AnalyzeMetrics
+  - AnalyzeMetrics:
+      set:
+        metrics: ${ .events.MetricEvents }
+        cpuMetrics: ${ .metrics | map(select(.name == "cpu")) }
+        memoryMetrics: ${ .metrics | map(select(.name == "memory")) }
+        avgCpu: ${ .cpuMetrics | map(.value) | add / .cpuMetrics | length }
+        avgMemory: ${ .memoryMetrics | map(.value) | add / .memoryMetrics | length }
+        maxCpu: ${ .cpuMetrics | max_by(.value).value }
+        isHighUsage: ${ .avgCpu > 80 // .avgMemory > 90 }
+      then: CheckResourceUsage
 ```
 
 ### Event-Based Timeouts
@@ -462,42 +496,42 @@ You can collect and analyze multiple events:
 You can implement timeout patterns using events:
 
 ```yaml
-- name: InitiateApprovalProcess
-  type: fork
-  branches:
-    - name: WaitForApproval
-      tasks:
-        - name: ListenForApproval
-          type: listen
-          events:
-            - name: ApprovalEvent
-              type: "ApprovalReceived"
-              correlations:
-                - requestId = .requestId
-              consume: 1
-    - name: TimeoutBranch
-      tasks:
-        - name: EmitTimeout
-          type: wait
-          data:
-            duration: PT24H
-          next: EmitTimeoutEvent
-        - name: EmitTimeoutEvent
-          type: emit
-          data:
-            eventType: "ApprovalTimeout"
-            payload:
-              requestId: ".requestId"
-              message: "Approval request timed out"
-  next: CheckApprovalOutcome
-
-- name: CheckApprovalOutcome
-  type: switch
-  conditions:
-    - condition: ".events.ApprovalEvent != null"
-      next: HandleApproval
-    - condition: true
-      next: HandleTimeout
+  - InitiateApprovalProcess:
+      fork:
+        branches:
+          - WaitForApproval:
+              do:
+                - ListenForApproval:
+                    listen:
+                      to:
+                        one:
+                          with:
+                            type: "ApprovalReceived"
+                          correlate:
+                            requestId:
+                              from: ${ .data.requestId }
+                              expect: ${ .requestId }
+          - TimeoutBranch:
+              do:
+                - EmitTimeout:
+                    wait: PT24H
+                    then: EmitTimeoutEvent
+                - EmitTimeoutEvent:
+                    emit:
+                      event:
+                        with:
+                          type: "ApprovalTimeout"
+                          data:
+                            requestId: ${ .requestId }
+                            message: "Approval request timed out"
+      then: CheckApprovalOutcome
+  - CheckApprovalOutcome:
+      switch:
+        - case1:
+            then: HandleApproval
+            when: ${ .events.ApprovalEvent != null }
+        - default:
+            then: HandleTimeout
 ```
 
 ### Event-Based Circuit Breakers
@@ -505,34 +539,40 @@ You can implement timeout patterns using events:
 You can implement circuit breaker patterns:
 
 ```yaml
-- name: MonitorServiceHealth
-  type: listen
-  events:
-    - name: ErrorEvents
-      type: "ServiceError"
-      correlations:
-        - serviceId = .serviceId
-      consume: amount: 5
-      timeouts:
-        eventTimeout: PT1M
-        eventTimeoutNext: ServiceHealthy
-  next: TripCircuitBreaker
-
-- name: TripCircuitBreaker
-  type: emit
-  data:
-    eventType: "CircuitBreakerTripped"
-    payload:
-      serviceId: ".serviceId"
-      errorCount: ".events.ErrorEvents | length"
-      timestamp: "$WORKFLOW.currentTime"
-  next: WaitForRecovery
-
-- name: WaitForRecovery
-  type: wait
-  data:
-    duration: PT5M
-  next: ResetCircuitBreaker
+  - MonitorServiceHealth:
+      try:
+        - MonitorServiceHealthEvents:
+            listen:
+              to:
+                any:
+                  - with:
+                      type: "ServiceError"
+                    correlate:
+                      serviceId:
+                        from: ${ .data.serviceId }
+                        expect: ${ .serviceId }
+                until: ${ length >= 5 }
+            timeout:
+              after: PT1M
+      catch:
+        errors:
+          with:
+            status: 408
+        then: ServiceHealthy
+      then: TripCircuitBreaker
+  - TripCircuitBreaker:
+      emit:
+        event:
+          with:
+            type: "CircuitBreakerTripped"
+            data:
+              serviceId: ${ .serviceId }
+              errorCount: ${ .events.ErrorEvents | length }
+              timestamp: ${ $context.currentTime }
+      then: WaitForRecovery
+  - WaitForRecovery:
+      wait: PT5M
+      then: ResetCircuitBreaker
 ```
 
 ## Real-World Example: Multi-Step Approval Process
@@ -540,171 +580,163 @@ You can implement circuit breaker patterns:
 Here's a complete example of an event-driven approval workflow:
 
 ```yaml
-id: approval-workflow
-name: Multi-step Approval Process
-version: '1.0'
-specVersion: '1.0'
-start: InitiateApproval
-tasks:
-  - name: InitiateApproval
-    type: set
-    data:
-      requestId: "$WORKFLOW.input.requestId"
-      requestType: "$WORKFLOW.input.requestType"
-      requestorId: "$WORKFLOW.input.requestorId"
-      amount: "$WORKFLOW.input.amount"
-      description: "$WORKFLOW.input.description"
-      approvalStatus: "PENDING"
-      requiredApprovals: 2
-      approvals: []
-      rejections: []
-    next: NotifyApprovers
-  
-  - name: NotifyApprovers
-    type: emit
-    data:
-      eventType: "ApprovalRequested"
-      payload:
-        requestId: ".requestId"
-        requestType: ".requestType"
-        requestorId: ".requestorId"
-        amount: ".amount"
-        description: ".description"
-        requiredApprovals: ".requiredApprovals"
-    next: WaitForApprovals
-  
-  - name: WaitForApprovals
-    type: listen
-    events:
-      - name: ApprovalResponses
-        type: "ApprovalResponse"
-        correlations:
-          - requestId = .requestId
-        consume: while: ".events.ApprovalResponses | map(select(.decision == \"APPROVED\")) | length < .requiredApprovals && .events.ApprovalResponses | map(select(.decision == \"REJECTED\")) | length == 0"
-        foreach:
-          as: "response"
-          next: ProcessApprovalResponse
-    timeouts:
-      eventTimeout: PT72H
-      eventTimeoutNext: HandleApprovalTimeout
-    next: EvaluateApprovalStatus
-  
-  - name: ProcessApprovalResponse
-    type: set
-    data:
-      currentResponse: ".response"
-      approverName: ".currentResponse.approverName"
-      decision: ".currentResponse.decision"
-      comments: ".currentResponse.comments"
-      approvals: "if .decision == \"APPROVED\" then .approvals + [.currentResponse] else .approvals end"
-      rejections: "if .decision == \"REJECTED\" then .rejections + [.currentResponse] else .rejections end"
-    next: EmitResponseReceived
-  
-  - name: EmitResponseReceived
-    type: emit
-    data:
-      eventType: "ApprovalResponseReceived"
-      payload:
-        requestId: ".requestId"
-        approverName: ".approverName"
-        decision: ".decision"
-        comments: ".comments"
-        timestamp: "$WORKFLOW.currentTime"
-        approvalCount: ".approvals | length"
-        rejectionCount: ".rejections | length"
-    end: false
-  
-  - name: EvaluateApprovalStatus
-    type: set
-    data:
-      allResponses: ".events.ApprovalResponses"
-      approvalCount: ".approvals | length"
-      rejectionCount: ".rejections | length"
-      finalStatus: "if .rejectionCount > 0 then \"REJECTED\" else if .approvalCount >= .requiredApprovals then \"APPROVED\" else \"PENDING\" end end"
-    next: FinalizeApproval
-  
-  - name: FinalizeApproval
-    type: switch
-    conditions:
-      - condition: ".finalStatus == \"APPROVED\""
-        next: HandleApproved
-      - condition: ".finalStatus == \"REJECTED\""
-        next: HandleRejected
-      - condition: true
-        next: HandlePending
-  
-  - name: HandleApproved
-    type: emit
-    data:
-      eventType: "RequestApproved"
-      payload:
-        requestId: ".requestId"
-        requestType: ".requestType"
-        requestorId: ".requestorId"
-        amount: ".amount"
-        approvers: ".approvals | map(.approverName)"
-        timestamp: "$WORKFLOW.currentTime"
-    next: CompleteApproved
-  
-  - name: CompleteApproved
-    type: set
-    data:
-      status: "APPROVED"
-      message: "Request approved by .approvalCount approvers"
-      approvers: ".approvals | map(.approverName)"
-    end: true
-  
-  - name: HandleRejected
-    type: emit
-    data:
-      eventType: "RequestRejected"
-      payload:
-        requestId: ".requestId"
-        requestType: ".requestType"
-        requestorId: ".requestorId"
-        rejectedBy: ".rejections[0].approverName"
-        reason: ".rejections[0].comments"
-        timestamp: "$WORKFLOW.currentTime"
-    next: CompleteRejected
-  
-  - name: CompleteRejected
-    type: set
-    data:
-      status: "REJECTED"
-      message: "Request rejected by .rejections[0].approverName"
-      reason: ".rejections[0].comments"
-    end: true
-  
-  - name: HandlePending
-    type: set
-    data:
-      status: "PENDING"
-      message: "Request is still pending approval"
-      currentApprovals: ".approvalCount"
-      requiredApprovals: ".requiredApprovals"
-    end: true
-  
-  - name: HandleApprovalTimeout
-    type: emit
-    data:
-      eventType: "ApprovalTimeout"
-      payload:
-        requestId: ".requestId"
-        requestType: ".requestType"
-        requestorId: ".requestorId"
-        timestamp: "$WORKFLOW.currentTime"
-        currentApprovals: ".approvals | length"
-        requiredApprovals: ".requiredApprovals"
-    next: CompleteTimeout
-  
-  - name: CompleteTimeout
-    type: set
-    data:
-      status: "TIMEOUT"
-      message: "Request timed out after 72 hours"
-      currentApprovals: ".approvals | length"
-      requiredApprovals: ".requiredApprovals"
-    end: true
+document:
+  dsl: 1.0.3
+  namespace: examples
+  name: approval-workflow
+  version: 1.0.0
+  title: Multi-step Approval Process
+do:
+  - InitiateApproval:
+      set:
+        requestId: ${ $workflow.input.requestId }
+        requestType: ${ $workflow.input.requestType }
+        requestorId: ${ $workflow.input.requestorId }
+        amount: ${ $workflow.input.amount }
+        description: ${ $workflow.input.description }
+        approvalStatus: "PENDING"
+        requiredApprovals: 2
+        approvals: []
+        rejections: []
+      then: NotifyApprovers
+  - NotifyApprovers:
+      emit:
+        event:
+          with:
+            type: "ApprovalRequested"
+            data:
+              requestId: ${ .requestId }
+              requestType: ${ .requestType }
+              requestorId: ${ .requestorId }
+              amount: ${ .amount }
+              description: ${ .description }
+              requiredApprovals: ${ .requiredApprovals }
+      then: WaitForApprovals
+  - WaitForApprovals:
+      try:
+        - WaitForApprovalsEvents:
+            listen:
+              to:
+                any:
+                  - with:
+                      type: "ApprovalResponse"
+                    correlate:
+                      requestId:
+                        from: ${ .data.requestId }
+                        expect: ${ .requestId }
+                until: ${ (.events.ApprovalResponses | map(select(.decision == "APPROVED")) | length < .requiredApprovals and .events.ApprovalResponses | map(select(.decision == "REJECTED")) | length == 0) | not }
+            timeout:
+              after: PT72H
+      catch:
+        errors:
+          with:
+            status: 408
+        then: HandleApprovalTimeout
+      then: EvaluateApprovalStatus
+  - ProcessApprovalResponse:
+      set:
+        currentResponse: ${ .response }
+        approverName: ${ .currentResponse.approverName }
+        decision: ${ .currentResponse.decision }
+        comments: ${ .currentResponse.comments }
+        approvals: ${ if .decision == "APPROVED" then .approvals + [.currentResponse] else .approvals end }
+        rejections: ${ if .decision == "REJECTED" then .rejections + [.currentResponse] else .rejections end }
+      then: EmitResponseReceived
+  - EmitResponseReceived:
+      emit:
+        event:
+          with:
+            type: "ApprovalResponseReceived"
+            data:
+              requestId: ${ .requestId }
+              approverName: ${ .approverName }
+              decision: ${ .decision }
+              comments: ${ .comments }
+              timestamp: ${ $context.currentTime }
+              approvalCount: ${ .approvals | length }
+              rejectionCount: ${ .rejections | length }
+  - EvaluateApprovalStatus:
+      set:
+        allResponses: ${ .events.ApprovalResponses }
+        approvalCount: ${ .approvals | length }
+        rejectionCount: ${ .rejections | length }
+        finalStatus: ${ if .rejectionCount > 0 then "REJECTED" else if .approvalCount >= .requiredApprovals then "APPROVED" else "PENDING" end end }
+      then: FinalizeApproval
+  - FinalizeApproval:
+      switch:
+        - case1:
+            then: HandleApproved
+            when: ${ .finalStatus == "APPROVED" }
+        - case2:
+            then: HandleRejected
+            when: ${ .finalStatus == "REJECTED" }
+        - default:
+            then: HandlePending
+  - HandleApproved:
+      emit:
+        event:
+          with:
+            type: "RequestApproved"
+            data:
+              requestId: ${ .requestId }
+              requestType: ${ .requestType }
+              requestorId: ${ .requestorId }
+              amount: ${ .amount }
+              approvers: ${ .approvals | map(.approverName) }
+              timestamp: ${ $context.currentTime }
+      then: CompleteApproved
+  - CompleteApproved:
+      set:
+        status: "APPROVED"
+        message: ${ "Request approved by \(.approvalCount) approvers" }
+        approvers: ${ .approvals | map(.approverName) }
+      then: end
+  - HandleRejected:
+      emit:
+        event:
+          with:
+            type: "RequestRejected"
+            data:
+              requestId: ${ .requestId }
+              requestType: ${ .requestType }
+              requestorId: ${ .requestorId }
+              rejectedBy: ${ .rejections[0].approverName }
+              reason: ${ .rejections[0].comments }
+              timestamp: ${ $context.currentTime }
+      then: CompleteRejected
+  - CompleteRejected:
+      set:
+        status: "REJECTED"
+        message: ${ "Request rejected by \(.rejections)[0]\(.approverName)" }
+        reason: ${ .rejections[0].comments }
+      then: end
+  - HandlePending:
+      set:
+        status: "PENDING"
+        message: "Request is still pending approval"
+        currentApprovals: ${ .approvalCount }
+        requiredApprovals: ${ .requiredApprovals }
+      then: end
+  - HandleApprovalTimeout:
+      emit:
+        event:
+          with:
+            type: "ApprovalTimeout"
+            data:
+              requestId: ${ .requestId }
+              requestType: ${ .requestType }
+              requestorId: ${ .requestorId }
+              timestamp: ${ $context.currentTime }
+              currentApprovals: ${ .approvals | length }
+              requiredApprovals: ${ .requiredApprovals }
+      then: CompleteTimeout
+  - CompleteTimeout:
+      set:
+        status: "TIMEOUT"
+        message: "Request timed out after 72 hours"
+        currentApprovals: ${ .approvals | length }
+        requiredApprovals: ${ .requiredApprovals }
+      then: end
 ```
 
 This workflow demonstrates many event patterns:
@@ -736,32 +768,32 @@ This workflow demonstrates many event patterns:
 Separate command and query operations:
 
 ```yaml
-- name: ProcessCommand
-  type: emit
-  data:
-    eventType: "UpdateInventory"
-    payload:
-      productId: ".productId"
-      quantityChange: ".quantityChange"
-      operation: ".operation"
-  next: WaitForCompletion
-
-- name: WaitForCompletion
-  type: listen
-  events:
-    - name: InventoryUpdated
-      type: "InventoryUpdateCompleted"
-      correlations:
-        - requestId = .requestId
-      consume: 1
-  next: QueryCurrentState
-
-- name: QueryCurrentState
-  type: call
-  function: inventoryService
-  data:
-    productId: ".productId"
-  next: ProcessResult
+  - ProcessCommand:
+      emit:
+        event:
+          with:
+            type: "UpdateInventory"
+            data:
+              productId: ${ .productId }
+              quantityChange: ${ .quantityChange }
+              operation: ${ .operation }
+      then: WaitForCompletion
+  - WaitForCompletion:
+      listen:
+        to:
+          one:
+            with:
+              type: "InventoryUpdateCompleted"
+            correlate:
+              requestId:
+                from: ${ .data.requestId }
+                expect: ${ .requestId }
+      then: QueryCurrentState
+  - QueryCurrentState:
+      call: inventoryService
+      with:
+        productId: ${ .productId }
+      then: ProcessResult
 ```
 
 ### Event Sourcing
@@ -769,24 +801,23 @@ Separate command and query operations:
 Use events as the system of record:
 
 ```yaml
-- name: RecordEvent
-  type: emit
-  data:
-    eventType: "OrderStateChanged"
-    payload:
-      orderId: ".orderId"
-      previousState: ".currentState"
-      newState: ".newState"
-      reason: ".reason"
-      timestamp: "$WORKFLOW.currentTime"
-  next: UpdateLocalState
-
-- name: UpdateLocalState
-  type: set
-  data:
-    currentState: ".newState"
-    stateHistory: ".stateHistory + [{state: .newState, timestamp: $WORKFLOW.currentTime, reason: .reason}]"
-  next: NextTask
+  - RecordEvent:
+      emit:
+        event:
+          with:
+            type: "OrderStateChanged"
+            data:
+              orderId: ${ .orderId }
+              previousState: ${ .currentState }
+              newState: ${ .newState }
+              reason: ${ .reason }
+              timestamp: ${ $context.currentTime }
+      then: UpdateLocalState
+  - UpdateLocalState:
+      set:
+        currentState: ${ .newState }
+        stateHistory: '${ .stateHistory + [{state: .newState, timestamp: $context.currentTime, reason: .reason}] }'
+      then: NextTask
 ```
 
 ### Saga Pattern
@@ -794,69 +825,70 @@ Use events as the system of record:
 Coordinate distributed transactions with compensation:
 
 ```yaml
-- name: StartTransaction
-  type: emit
-  data:
-    eventType: "PaymentRequested"
-    payload:
-      transactionId: ".transactionId"
-      amount: ".amount"
-      customerId: ".customerId"
-  next: WaitForPaymentResult
-
-- name: WaitForPaymentResult
-  type: listen
-  events:
-    - name: PaymentResult
-      type: "PaymentProcessed"
-      correlations:
-        - transactionId = .transactionId
-      consume: 1
-  next: CheckPaymentSuccess
-
-- name: CheckPaymentSuccess
-  type: switch
-  conditions:
-    - condition: ".events.PaymentResult[0].success == true"
-      next: RequestInventoryReservation
-    - condition: true
-      next: HandlePaymentFailure
-
-- name: RequestInventoryReservation
-  type: emit
-  data:
-    eventType: "InventoryReservationRequested"
-    payload:
-      transactionId: ".transactionId"
-      items: ".items"
-  next: WaitForReservationResult
-
-- name: WaitForReservationResult
-  type: listen
-  events:
-    - name: ReservationResult
-      type: "InventoryReserved"
-      correlations:
-        - transactionId = .transactionId
-      consume: 1
-  next: CheckReservationSuccess
-
-- name: CheckReservationSuccess
-  type: switch
-  conditions:
-    - condition: ".events.ReservationResult[0].success == true"
-      next: FinalizeTransaction
-    - condition: true
-      next: CompensatePayment
-
-- name: CompensatePayment
-  type: emit
-  data:
-    eventType: "PaymentReversal"
-    payload:
-      transactionId: ".transactionId"
-      reason: "Inventory reservation failed"
-  next: HandleTransactionFailure
+  - StartTransaction:
+      emit:
+        event:
+          with:
+            type: "PaymentRequested"
+            data:
+              transactionId: ${ .transactionId }
+              amount: ${ .amount }
+              customerId: ${ .customerId }
+      then: WaitForPaymentResult
+  - WaitForPaymentResult:
+      listen:
+        to:
+          one:
+            with:
+              type: "PaymentProcessed"
+            correlate:
+              transactionId:
+                from: ${ .data.transactionId }
+                expect: ${ .transactionId }
+      then: CheckPaymentSuccess
+  - CheckPaymentSuccess:
+      switch:
+        - case1:
+            then: RequestInventoryReservation
+            when: ${ .events.PaymentResult[0].success == true }
+        - default:
+            then: HandlePaymentFailure
+  - RequestInventoryReservation:
+      emit:
+        event:
+          with:
+            type: "InventoryReservationRequested"
+            data:
+              transactionId: ${ .transactionId }
+              items: ${ .items }
+      then: WaitForReservationResult
+  - WaitForReservationResult:
+      listen:
+        to:
+          one:
+            with:
+              type: "InventoryReserved"
+            correlate:
+              transactionId:
+                from: ${ .data.transactionId }
+                expect: ${ .transactionId }
+      then: CheckReservationSuccess
+  - CheckReservationSuccess:
+      switch:
+        - case1:
+            then: FinalizeTransaction
+            when: ${ .events.ReservationResult[0].success == true }
+        - default:
+            then: CompensatePayment
+  - CompensatePayment:
+      emit:
+        event:
+          with:
+            type: "PaymentReversal"
+            data:
+              transactionId: ${ .transactionId }
+              reason: "Inventory reservation failed"
+      then: HandleTransactionFailure
 ```
 
 ## Next Steps

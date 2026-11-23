@@ -22,20 +22,18 @@ The primary way to implement loops in Lemline is using the `for` task type. The 
 ### Basic For Loop Structure
 
 ```yaml
-- name: ProcessItems
-  type: for
-  iterator:
-    collect: ".items"
-    as: "item"
-  do:
-    - name: ProcessItem
-      type: set
-      data:
-        processedItem:
-          id: ".item.id"
-          name: ".item.name"
-          status: "PROCESSED"
-  next: AfterLoop
+  - ProcessItems:
+      for:
+        each: "item"
+        in: ${ .items }
+      do:
+        - ProcessItem:
+            set:
+              processedItem:
+                id: ${ .item.id }
+                name: ${ .item.name }
+                status: "PROCESSED"
+      then: AfterLoop
 ```
 
 This example iterates over an array of items, processing each one in turn.
@@ -55,21 +53,19 @@ During loop execution, you can access:
 - The total count using `$LOOP.count`
 
 ```yaml
-- name: ProcessItems
-  type: for
-  iterator:
-    collect: ".items"
-    as: "item"
-  do:
-    - name: ProcessWithIndex
-      type: set
-      data:
-        result:
-          id: ".item.id"
-          position: "$LOOP.index"
-          isLast: "$LOOP.index == $LOOP.count - 1"
-          processedTime: "$WORKFLOW.currentTime"
-  next: AfterLoop
+  - ProcessItems:
+      for:
+        each: "item"
+        in: ${ .items }
+      do:
+        - ProcessWithIndex:
+            set:
+              result:
+                id: ${ .item.id }
+                position: ${ $LOOP.index }
+                isLast: ${ $LOOP.index == $LOOP.count - 1 }
+                processedTime: ${ $context.currentTime }
+      then: AfterLoop
 ```
 
 ### Collecting Results
@@ -77,13 +73,12 @@ During loop execution, you can access:
 Results from each iteration are collected in an array under the task name:
 
 ```yaml
-- name: AfterLoop
-  type: set
-  data:
-    allResults: "$WORKFLOW.ProcessItems.results"
-    count: "$WORKFLOW.ProcessItems.results | length"
-    message: "Processed .count items successfully"
-  end: true
+  - AfterLoop:
+      set:
+        allResults: ${ $context.ProcessItems.results }
+        count: ${ $context.ProcessItems.results | length }
+        message: ${ "Processed \(.count) items successfully" }
+      then: end
 ```
 
 The `$WORKFLOW.ProcessItems.results` array contains the output from the last task in each iteration.
@@ -95,20 +90,18 @@ The `$WORKFLOW.ProcessItems.results` array contains the output from the last tas
 You can iterate over nested collections using JQ expressions:
 
 ```yaml
-- name: ProcessOrders
-  type: for
-  iterator:
-    collect: ".customers | map(.orders[]) | flatten"
-    as: "order"
-  do:
-    - name: ProcessOrder
-      type: set
-      data:
-        processedOrder:
-          id: ".order.id"
-          amount: ".order.amount"
-          status: "PROCESSED"
-  next: AfterProcessing
+  - ProcessOrders:
+      for:
+        each: "order"
+        in: ${ .customers | map(.orders[]) | flatten }
+      do:
+        - ProcessOrder:
+            set:
+              processedOrder:
+                id: ${ .order.id }
+                amount: ${ .order.amount }
+                status: "PROCESSED"
+      then: AfterProcessing
 ```
 
 This example flattens a nested structure to iterate over all orders from all customers.
@@ -118,19 +111,17 @@ This example flattens a nested structure to iterate over all orders from all cus
 You can filter the collection before iteration:
 
 ```yaml
-- name: ProcessPendingOrders
-  type: for
-  iterator:
-    collect: ".orders | map(select(.status == \"PENDING\"))"
-    as: "order"
-  do:
-    - name: ProcessPendingOrder
-      type: call
-      function: orderService
-      data:
-        orderId: ".order.id"
-        action: "process"
-  next: AfterProcessing
+  - ProcessPendingOrders:
+      for:
+        each: "order"
+        in: ${ .orders | map(select(.status == "PENDING")) }
+      do:
+        - ProcessPendingOrder:
+            call: orderService
+            with:
+              orderId: ${ .order.id }
+              action: "process"
+      then: AfterProcessing
 ```
 
 This example only processes orders with a "PENDING" status.
@@ -140,20 +131,18 @@ This example only processes orders with a "PENDING" status.
 To iterate over key-value pairs in an object:
 
 ```yaml
-- name: ProcessAttributes
-  type: for
-  iterator:
-    collect: ".attributes | to_entries"
-    as: "attribute"
-  do:
-    - name: ProcessAttribute
-      type: set
-      data:
-        processedAttribute:
-          key: ".attribute.key"
-          value: ".attribute.value"
-          normalized: ".attribute.value | ascii_downcase"
-  next: CombineResults
+  - ProcessAttributes:
+      for:
+        each: "attribute"
+        in: ${ .attributes | to_entries }
+      do:
+        - ProcessAttribute:
+            set:
+              processedAttribute:
+                key: ${ .attribute.key }
+                value: ${ .attribute.value }
+                normalized: ${ .attribute.value | ascii_downcase }
+      then: CombineResults
 ```
 
 The `to_entries` JQ function converts an object to an array of key-value pairs.
@@ -163,37 +152,30 @@ The `to_entries` JQ function converts an object to an array of key-value pairs.
 While Lemline doesn't have a dedicated `while` task, you can implement while-loop behavior using a combination of `for` and conditional logic:
 
 ```yaml
-- name: InitializeWhileLoop
-  type: set
-  data:
-    counter: 0
-    maxIterations: 10
-    condition: true
-  next: WhileLoop
-
-- name: WhileLoop
-  type: switch
-  conditions:
-    - condition: ".condition == true && .counter < .maxIterations"
-      next: LoopBody
-    - condition: true
-      next: AfterLoop
-
-- name: LoopBody
-  type: set
-  data:
-    # Do something in the loop body
-    result: ".counter * 2"
-    counter: ".counter + 1"
-    condition: ".result < 15"  # Continue condition
-  next: WhileLoop
-
-- name: AfterLoop
-  type: set
-  data:
-    finalCounter: ".counter"
-    message: "Loop executed .counter times"
-  end: true
+  - InitializeWhileLoop:
+      set:
+        counter: 0
+        maxIterations: 10
+        condition: true
+      then: WhileLoop
+  - WhileLoop:
+      switch:
+        - case1:
+            then: LoopBody
+            when: ${ .condition == true and .counter < .maxIterations }
+        - default:
+            then: AfterLoop
+  - LoopBody:
+      set:
+        result: ${ .counter * 2 }
+        counter: ${ .counter + 1 }
+        condition: ${ .result < 15 }
+      then: WhileLoop
+  - AfterLoop:
+      set:
+        finalCounter: ${ .counter }
+        message: ${ "Loop executed \(.counter) times" }
+      then: end
 ```
 
 This pattern implements a while loop that continues as long as `condition` is true and `counter` is less than `maxIterations`.
@@ -205,33 +187,31 @@ This pattern implements a while loop that continues as long as `condition` is tr
 You can handle errors within each iteration:
 
 ```yaml
-- name: ProcessItems
-  type: for
-  iterator:
-    collect: ".items"
-    as: "item"
-  do:
-    - name: ProcessWithErrorHandling
-      type: try
-      retry:
-        maxAttempts: 3
-        interval: PT2S
-      catch:
-        - error: "*"
-          next: HandleItemError
+  - ProcessItems:
+      for:
+        each: "item"
+        in: ${ .items }
       do:
-        - name: AttemptProcessing
-          type: call
-          function: processItem
-          data:
-            itemId: ".item.id"
-    - name: HandleItemError
-      type: set
-      data:
-        status: "ERROR"
-        error: "$WORKFLOW.error"
-        message: "Failed to process item .item.id"
-  next: AfterLoop
+        - ProcessWithErrorHandling:
+            try:
+              - AttemptProcessing:
+                  call: processItem
+                  with:
+                    itemId: ${ .item.id }
+            catch:
+              as: failure
+              then: HandleItemError
+              retry:
+                limit:
+                  attempt:
+                    count: 3
+                delay: PT2S
+        - HandleItemError:
+            set:
+              status: "ERROR"
+              error: ${ $context.error }
+              message: ${ "Failed to process item \(.item.id)" }
+      then: AfterLoop
 ```
 
 This approach allows the loop to continue even if processing fails for some items.
@@ -241,34 +221,31 @@ This approach allows the loop to continue even if processing fails for some item
 You can also handle errors for the entire loop:
 
 ```yaml
-- name: TryProcessingItems
-  type: try
-  retry:
-    maxAttempts: 2
-  catch:
-    - error: "*"
-      next: HandleLoopError
-  do:
-    - name: ProcessItems
-      type: for
-      iterator:
-        collect: ".items"
-        as: "item"
-      do:
-        - name: ProcessItem
-          type: call
-          function: processItem
-          data:
-            itemId: ".item.id"
-      next: AfterLoop
-
-- name: HandleLoopError
-  type: set
-  data:
-    status: "LOOP_ERROR"
-    error: "$WORKFLOW.error"
-    message: "Loop processing failed"
-  end: true
+  - TryProcessingItems:
+      try:
+        - ProcessItems:
+            for:
+              each: "item"
+              in: ${ .items }
+            do:
+              - ProcessItem:
+                  call: processItem
+                  with:
+                    itemId: ${ .item.id }
+            then: AfterLoop
+      catch:
+        as: failure
+        then: HandleLoopError
+        retry:
+          limit:
+            attempt:
+              count: 2
+  - HandleLoopError:
+      set:
+        status: "LOOP_ERROR"
+        error: ${ $context.error }
+        message: "Loop processing failed"
+      then: end
 ```
 
 This approach handles errors that might occur during loop execution.
@@ -280,24 +257,20 @@ This approach handles errors that might occur during loop execution.
 Process items in batches instead of individually:
 
 ```yaml
-- name: PrepareBatches
-  type: set
-  data:
-    batches: ".items | _array_chunks(10)"  # Split into batches of 10
-  next: ProcessBatches
-
-- name: ProcessBatches
-  type: for
-  iterator:
-    collect: ".batches"
-    as: "batch"
-  do:
-    - name: ProcessBatch
-      type: call
-      function: batchProcessor
-      data:
-        items: ".batch"
-  next: AfterProcessing
+  - PrepareBatches:
+      set:
+        batches: ${ .items | _array_chunks(10) }
+      then: ProcessBatches
+  - ProcessBatches:
+      for:
+        each: "batch"
+        in: ${ .batches }
+      do:
+        - ProcessBatch:
+            call: batchProcessor
+            with:
+              items: ${ .batch }
+      then: AfterProcessing
 ```
 
 This pattern is useful for optimizing calls to external systems.
@@ -307,36 +280,31 @@ This pattern is useful for optimizing calls to external systems.
 Combine `for` with `fork` for parallel processing:
 
 ```yaml
-- name: PrepareParallelProcessing
-  type: set
-  data:
-    batches: ".items | _array_chunks(5)"  # Split into batches of 5
-  next: ParallelBatchProcessing
-
-- name: ParallelBatchProcessing
-  type: for
-  iterator:
-    collect: ".batches"
-    as: "batch"
-  do:
-    - name: ProcessBatchInParallel
-      type: fork
-      branches:
-        - name: Branch1
-          tasks:
-            - name: ProcessItems1
-              type: call
-              function: processItems
-              data:
-                items: ".batch[0:2]"  # First half of batch
-        - name: Branch2
-          tasks:
-            - name: ProcessItems2
-              type: call
-              function: processItems
-              data:
-                items: ".batch[2:]"  # Second half of batch
-  next: AfterProcessing
+  - PrepareParallelProcessing:
+      set:
+        batches: ${ .items | _array_chunks(5) }
+      then: ParallelBatchProcessing
+  - ParallelBatchProcessing:
+      for:
+        each: "batch"
+        in: ${ .batches }
+      do:
+        - ProcessBatchInParallel:
+            fork:
+              branches:
+                - Branch1:
+                    do:
+                      - ProcessItems1:
+                          call: processItems
+                          with:
+                            items: ${ .batch[0:2] }
+                - Branch2:
+                    do:
+                      - ProcessItems2:
+                          call: processItems
+                          with:
+                            items: ${ .batch[2:] }
+      then: AfterProcessing
 ```
 
 This pattern combines the iteration of a for loop with parallel processing.
@@ -346,46 +314,38 @@ This pattern combines the iteration of a for loop with parallel processing.
 Handle paginated API calls:
 
 ```yaml
-- name: InitializePaging
-  type: set
-  data:
-    page: 1
-    pageSize: 100
-    hasMorePages: true
-    allResults: []
-  next: PageLoop
-
-- name: PageLoop
-  type: switch
-  conditions:
-    - condition: ".hasMorePages == true"
-      next: FetchPage
-    - condition: true
-      next: ProcessAllResults
-
-- name: FetchPage
-  type: call
-  function: dataService
-  data:
-    page: ".page"
-    pageSize: ".pageSize"
-  next: ProcessPageResults
-
-- name: ProcessPageResults
-  type: set
-  data:
-    currentResults: ".results"
-    allResults: ".allResults + .results"
-    page: ".page + 1"
-    hasMorePages: ".results | length == .pageSize"
-  next: PageLoop
-
-- name: ProcessAllResults
-  type: set
-  data:
-    totalCount: ".allResults | length"
-    message: "Retrieved .totalCount items across .page pages"
-  next: FinalProcessing
+  - InitializePaging:
+      set:
+        page: 1
+        pageSize: 100
+        hasMorePages: true
+        allResults: []
+      then: PageLoop
+  - PageLoop:
+      switch:
+        - case1:
+            then: FetchPage
+            when: ${ .hasMorePages == true }
+        - default:
+            then: ProcessAllResults
+  - FetchPage:
+      call: dataService
+      with:
+        page: ${ .page }
+        pageSize: ${ .pageSize }
+      then: ProcessPageResults
+  - ProcessPageResults:
+      set:
+        currentResults: ${ .results }
+        allResults: ${ .allResults + .results }
+        page: ${ .page + 1 }
+        hasMorePages: ${ .results | length == .pageSize }
+      then: PageLoop
+  - ProcessAllResults:
+      set:
+        totalCount: ${ .allResults | length }
+        message: ${ "Retrieved \(.totalCount) items across \(.page) pages" }
+      then: FinalProcessing
 ```
 
 This pattern fetches data in pages until no more results are available.
@@ -395,185 +355,158 @@ This pattern fetches data in pages until no more results are available.
 Here's a complete example that processes items in a customer order:
 
 ```yaml
-id: order-item-processor
-name: Order Item Processing
-version: '1.0'
-specVersion: '1.0'
-start: ReceiveOrder
-functions:
-  - name: inventoryService
-    type: http
-    operation: GET
-    url: https://api.example.com/inventory/{itemId}
-  - name: pricingService
-    type: http
-    operation: POST
-    url: https://api.example.com/pricing/calculate
-  - name: fulfillmentService
-    type: http
-    operation: POST
-    url: https://api.example.com/fulfillment/request
-tasks:
-  - name: ReceiveOrder
-    type: set
-    data:
-      orderId: "$WORKFLOW.input.orderId"
-      customerId: "$WORKFLOW.input.customerId"
-      items: "$WORKFLOW.input.items"
-      shippingAddress: "$WORKFLOW.input.shippingAddress"
-    next: ValidateOrder
-  
-  - name: ValidateOrder
-    type: set
-    data:
-      isValid: ".items | length > 0"
-    next: CheckOrderValidity
-  
-  - name: CheckOrderValidity
-    type: switch
-    conditions:
-      - condition: ".isValid == false"
-        next: RejectOrder
-      - condition: true
-        next: ProcessOrderItems
-  
-  - name: ProcessOrderItems
-    type: for
-    iterator:
-      collect: ".items"
-      as: "item"
-    do:
-      - name: CheckInventory
-        type: try
-        retry:
-          maxAttempts: 3
-          interval: PT2S
-        catch:
-          - error: "*"
-            next: MarkItemUnavailable
-        do:
-          - name: VerifyInventory
-            type: call
-            function: inventoryService
-            data:
-              itemId: ".item.id"
-      
-      - name: EvaluateInventory
-        type: switch
-        conditions:
-          - condition: ".available == true && .quantity >= .item.quantity"
-            next: CalculateItemPrice
-          - condition: true
-            next: MarkItemUnavailable
-      
-      - name: CalculateItemPrice
-        type: call
-        function: pricingService
-        data:
-          itemId: ".item.id"
-          quantity: ".item.quantity"
-          customerId: ".customerId"
-          promoCode: ".promoCode"
-      
-      - name: PrepareItemResult
-        type: set
-        data:
-          processedItem:
-            id: ".item.id"
-            name: ".item.name"
-            quantity: ".item.quantity"
-            unitPrice: ".unitPrice"
-            totalPrice: ".totalPrice"
-            discounts: ".discounts"
-            finalPrice: ".finalPrice"
-            available: true
-            warehouse: ".warehouse"
-      
-      - name: MarkItemUnavailable
-        type: set
-        data:
-          processedItem:
-            id: ".item.id"
-            name: ".item.name"
-            quantity: ".item.quantity"
-            available: false
-            reason: ".error || 'Insufficient inventory'"
-    next: AnalyzeProcessedItems
-  
-  - name: AnalyzeProcessedItems
-    type: set
-    data:
-      processedItems: "$WORKFLOW.ProcessOrderItems.results"
-      availableItems: ".processedItems | map(select(.available == true))"
-      unavailableItems: ".processedItems | map(select(.available == false))"
-      allAvailable: ".unavailableItems | length == 0"
-      subtotal: ".availableItems | map(.finalPrice) | add"
-    next: CheckAvailability
-  
-  - name: CheckAvailability
-    type: switch
-    conditions:
-      - condition: ".allAvailable == true"
-        next: FulfillOrder
-      - condition: ".availableItems | length > 0"
-        next: FulfillPartialOrder
-      - condition: true
-        next: RejectUnavailableOrder
-  
-  - name: FulfillOrder
-    type: call
-    function: fulfillmentService
-    data:
-      orderId: ".orderId"
-      customerId: ".customerId"
-      items: ".availableItems"
-      shippingAddress: ".shippingAddress"
-    next: CompleteOrder
-  
-  - name: FulfillPartialOrder
-    type: call
-    function: fulfillmentService
-    data:
-      orderId: ".orderId"
-      customerId: ".customerId"
-      items: ".availableItems"
-      shippingAddress: ".shippingAddress"
-      partial: true
-    next: CompletePartialOrder
-  
-  - name: CompleteOrder
-    type: set
-    data:
-      status: "COMPLETED"
-      message: "Order processed successfully"
-      subtotal: ".subtotal"
-      items: ".availableItems"
-    end: true
-  
-  - name: CompletePartialOrder
-    type: set
-    data:
-      status: "PARTIAL"
-      message: "Order partially processed"
-      subtotal: ".subtotal"
-      availableItems: ".availableItems"
-      unavailableItems: ".unavailableItems"
-    end: true
-  
-  - name: RejectOrder
-    type: set
-    data:
-      status: "REJECTED"
-      reason: "Invalid order - no items specified"
-    end: true
-  
-  - name: RejectUnavailableOrder
-    type: set
-    data:
-      status: "REJECTED"
-      reason: "All items unavailable"
-      unavailableItems: ".unavailableItems"
-    end: true
+document:
+  dsl: 1.0.3
+  namespace: examples
+  name: order-item-processor
+  version: 1.0.0
+  title: Order Item Processing
+do:
+  - ReceiveOrder:
+      set:
+        orderId: ${ $workflow.input.orderId }
+        customerId: ${ $workflow.input.customerId }
+        items: ${ $workflow.input.items }
+        shippingAddress: ${ $workflow.input.shippingAddress }
+      then: ValidateOrder
+  - ValidateOrder:
+      set:
+        isValid: ${ .items | length > 0 }
+      then: CheckOrderValidity
+  - CheckOrderValidity:
+      switch:
+        - case1:
+            then: RejectOrder
+            when: ${ .isValid == false }
+        - default:
+            then: ProcessOrderItems
+  - ProcessOrderItems:
+      for:
+        each: "item"
+        in: ${ .items }
+      do:
+        - CheckInventory:
+            try:
+              - VerifyInventory:
+                  call: http
+                  with:
+                    method: get
+                    endpoint: https://api.example.com/inventory/{itemId}
+                    query:
+                      itemId: ${ .item.id }
+            catch:
+              as: failure
+              then: MarkItemUnavailable
+              retry:
+                limit:
+                  attempt:
+                    count: 3
+                delay: PT2S
+        - EvaluateInventory:
+            switch:
+              - case1:
+                  then: CalculateItemPrice
+                  when: ${ .available == true and .quantity >= .item.quantity }
+              - default:
+                  then: MarkItemUnavailable
+        - CalculateItemPrice:
+            call: http
+            with:
+              method: post
+              endpoint: https://api.example.com/pricing/calculate
+              body:
+                itemId: ${ .item.id }
+                quantity: ${ .item.quantity }
+                customerId: ${ .customerId }
+                promoCode: ${ .promoCode }
+        - PrepareItemResult:
+            set:
+              processedItem:
+                id: ${ .item.id }
+                name: ${ .item.name }
+                quantity: ${ .item.quantity }
+                unitPrice: ${ .unitPrice }
+                totalPrice: ${ .totalPrice }
+                discounts: ${ .discounts }
+                finalPrice: ${ .finalPrice }
+                available: true
+                warehouse: ${ .warehouse }
+        - MarkItemUnavailable:
+            set:
+              processedItem:
+                id: ${ .item.id }
+                name: ${ .item.name }
+                quantity: ${ .item.quantity }
+                available: false
+                reason: ${ .error // "Insufficient inventory" }
+      then: AnalyzeProcessedItems
+  - AnalyzeProcessedItems:
+      set:
+        processedItems: ${ $context.ProcessOrderItems.results }
+        availableItems: ${ .processedItems | map(select(.available == true)) }
+        unavailableItems: ${ .processedItems | map(select(.available == false)) }
+        allAvailable: ${ .unavailableItems | length == 0 }
+        subtotal: ${ .availableItems | map(.finalPrice) | add }
+      then: CheckAvailability
+  - CheckAvailability:
+      switch:
+        - case1:
+            then: FulfillOrder
+            when: ${ .allAvailable == true }
+        - case2:
+            then: FulfillPartialOrder
+            when: ${ .availableItems | length > 0 }
+        - default:
+            then: RejectUnavailableOrder
+  - FulfillOrder:
+      call: http
+      with:
+        method: post
+        endpoint: https://api.example.com/fulfillment/request
+        body:
+          orderId: ${ .orderId }
+          customerId: ${ .customerId }
+          items: ${ .availableItems }
+          shippingAddress: ${ .shippingAddress }
+      then: CompleteOrder
+  - FulfillPartialOrder:
+      call: http
+      with:
+        method: post
+        endpoint: https://api.example.com/fulfillment/request
+        body:
+          orderId: ${ .orderId }
+          customerId: ${ .customerId }
+          items: ${ .availableItems }
+          shippingAddress: ${ .shippingAddress }
+          partial: true
+      then: CompletePartialOrder
+  - CompleteOrder:
+      set:
+        status: "COMPLETED"
+        message: "Order processed successfully"
+        subtotal: ${ .subtotal }
+        items: ${ .availableItems }
+      then: end
+  - CompletePartialOrder:
+      set:
+        status: "PARTIAL"
+        message: "Order partially processed"
+        subtotal: ${ .subtotal }
+        availableItems: ${ .availableItems }
+        unavailableItems: ${ .unavailableItems }
+      then: end
+  - RejectOrder:
+      set:
+        status: "REJECTED"
+        reason: "Invalid order - no items specified"
+      then: end
+  - RejectUnavailableOrder:
+      set:
+        status: "REJECTED"
+        reason: "All items unavailable"
+        unavailableItems: ${ .unavailableItems }
+      then: end
 ```
 
 This workflow processes each item in an order, checking inventory and calculating prices before fulfilling the order.

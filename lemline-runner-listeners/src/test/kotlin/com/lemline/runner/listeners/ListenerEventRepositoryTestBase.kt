@@ -70,7 +70,7 @@ abstract class ListenerEventRepositoryTestBase {
             version = testVersion,
             definition = """
                 document:
-                  dsl: '1.0.0'
+                  dsl: '1.0.3'
                   namespace: $testNamespace
                   name: $testName
                   version: '$testVersion'

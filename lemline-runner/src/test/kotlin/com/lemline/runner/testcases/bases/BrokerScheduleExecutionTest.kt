@@ -145,7 +145,7 @@ internal abstract class BrokerScheduleExecutionTest {
         val waitTask = if (waitSeconds == 0) "" else "  - pause:\n      wait:\n        seconds: $waitSeconds\n"
         val yaml = """
             |document:
-            |  dsl: '1.0.0'
+            |  dsl: '1.0.3'
             |  namespace: test
             |  name: $name
             |  version: '1.0.0'

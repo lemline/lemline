@@ -14,13 +14,13 @@ This is crucial for building event-driven workflows where progression depends on
 
 ```yaml
 document:
-  dsl: '1.0.0' # Assuming alpha5 or later based on reference example
+  dsl: '1.0.3'
   namespace: examples
   name: listen-for-vitals
   version: '1.0.0'
 do:
   - startMonitoring:
-    # ... task that initiates monitoring ...
+      set: ${ . }
   - waitForVitalSignAlert:
       listen:
         to:
@@ -38,8 +38,7 @@ do:
         after: PT1H
       then: processAlert
   - processAlert:
-    # ... task that handles the alert based on the received event data ...
-    # The task output here is an array containing the event(s) that met the condition
+      set: ${ . }
 ```
 
 In this example, the workflow pauses at `waitForVitalSignAlert` until an event matching either the high temperature
@@ -104,10 +103,11 @@ This object defines the core parameters for the listening behavior.
           listen:
             to:
               any: # Wait for approval OR rejection
-                - with: { type: com.example.approval }
-                - with: { type: com.example.rejection }
+                - with: {type: com.example.approval}
+                - with: {type: com.example.rejection}
               until: # But stop immediately if a cancellation event arrives
-                with: { type: com.example.cancellation }
+                one: # But stop immediately if a cancellation event arrives
+                  with: {type: com.example.cancellation}
           ```
     * *(Note: The exact structure for defining `any`, `all`, `one`, and `until` depends on the specific definition of
       the `eventConsumptionStrategy` type in the full DSL reference.)*

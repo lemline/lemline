@@ -14,7 +14,7 @@ Here's an example of iterating over an array of numbers and performing an action
 
 ```yaml
 document:
-  dsl: '1.0.0'
+  dsl: '1.0.3'
   namespace: examples
   name: for-loop-basic
   version: '1.0.0'
@@ -61,6 +61,9 @@ for:
   in: "${ .users }"      # Iterate over the 'users' array from the task's input
   each: "currentUser"    # Access the current user as $currentUser
   at: "userIndex"        # Access the current index as $userIndex
+do:
+  - currentItem:
+      set: ${ $currentUser }
 ```
 
 ### `do` (List<String: Object>, Required)
@@ -80,7 +83,7 @@ do:
       with:
         productId: "${ $product.id }" # Access the 'id' field of the current product
   - updatePrice:
-    # ... task definition that can use $product ...
+      set: ${ . }
 ```
 
 ### `while` (String, Optional)
@@ -96,10 +99,10 @@ the loop variables (`$item`, `$index` by default) available in this scope.
 for:
   in: "${ .dataPoints }"
   # execute 'do' block up to the first item where value > 10
-  while: "${ $item.value > 10 }"
 do:
   - processHighValueItem:
-    # ... task definition ...
+      set: ${ . }
+while: "${ $item.value > 10 }"
 ```
 
 ## Data Flow

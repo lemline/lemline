@@ -87,7 +87,7 @@ class LifecycleAnalyticsServiceTest {
     @Test
     fun `extension lifecycle payload keeps task and fault origin through analytics serialization`() = kotlinx.coroutines.runBlocking<Unit> {
         val workflow = WorkflowCache.parseYamlAndPut("""
-            document: { dsl: '1.0.0', namespace: analytics, name: extensions, version: '1.0.0' }
+            document: { dsl: '1.0.3', namespace: analytics, name: extensions, version: '1.0.0' }
             use:
               extensions:
                 - audit:

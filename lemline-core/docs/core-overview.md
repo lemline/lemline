@@ -2,7 +2,7 @@
 
 ## Purpose
 
-The `lemline-core` module implements the Open Workflow DSL v1.0 specification. It provides a pure, stateless execution engine that can be embedded in any runtime.
+The `lemline-core` module implements the Open Workflow DSL v1.0.3 specification. It provides a pure, stateless execution engine that can be embedded in any runtime.
 
 ## Package Structure
 

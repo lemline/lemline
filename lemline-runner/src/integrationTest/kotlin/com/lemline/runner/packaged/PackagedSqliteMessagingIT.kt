@@ -109,7 +109,7 @@ internal class PackagedSqliteMessagingIT {
 
     private fun workflow(name: String, body: String) = """
         |document:
-        |  dsl: '1.0.0'
+        |  dsl: '1.0.3'
         |  namespace: packaged
         |  name: $name
         |  version: '1.0.0'

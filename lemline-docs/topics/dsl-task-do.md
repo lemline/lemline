@@ -14,7 +14,7 @@ Here's a simple example of a `Do` task executing two sub-tasks sequentially:
 
 ```yaml
 document:
-  dsl: '1.0.0'
+  dsl: '1.0.3'
   namespace: examples
   name: sequential-tasks
   version: '1.0.0'
@@ -27,7 +27,7 @@ do: # This is the main 'Do'
         - taskB:
             set:
               # Input to taskB is the output of taskA
-              resultB: "${ .result + ' and Task B' }"
+              resultB: "${ .result + \" and Task B\" }"
 
 # Workflow output will be { "resultB": "Value from Task A and Task B" }
 ```
@@ -55,8 +55,8 @@ do:
         - firstSubTask:
             call: http
             with:
-              uri: https://api.example.com/data
               method: get
+              endpoint: https://api.example.com/data
         - secondSubTask:
             set:
               processedData: "${ .body }" # Access output from firstSubTask

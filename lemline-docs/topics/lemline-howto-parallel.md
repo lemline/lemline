@@ -21,22 +21,20 @@ Key characteristics of the `fork` task:
 Here's the basic structure of a `fork` task:
 
 ```yaml
-- name: ParallelProcessing
-  type: fork
-  branches:
-    - name: Branch1
-      tasks:
-        - name: Task1
-          type: set
-          data:
-            result1: "Branch 1 result"
-    - name: Branch2
-      tasks:
-        - name: Task2
-          type: set
-          data:
-            result2: "Branch 2 result"
-  next: CombineResults
+  - ParallelProcessing:
+      fork:
+        branches:
+          - Branch1:
+              do:
+                - Task1:
+                    set:
+                      result1: "Branch 1 result"
+          - Branch2:
+              do:
+                - Task2:
+                    set:
+                      result2: "Branch 2 result"
+      then: CombineResults
 ```
 
 Each branch contains its own series of tasks that execute independently. After all branches complete, execution continues to the task specified in the `next` property.
@@ -56,68 +54,58 @@ Use the `fork` task when:
 Here's a simple example that makes three API calls in parallel:
 
 ```yaml
-id: parallel-api-calls
-name: Parallel API Calls Example
-version: '1.0'
-specVersion: '1.0'
-start: PrepareData
-functions:
-  - name: getWeather
-    type: http
-    operation: GET
-    url: https://api.weather.com/current?location={location}
-  - name: getNews
-    type: http
-    operation: GET
-    url: https://api.news.com/headlines?category={category}
-  - name: getStocks
-    type: http
-    operation: GET
-    url: https://api.stocks.com/quotes?symbols={symbols}
-tasks:
-  - name: PrepareData
-    type: set
-    data:
-      location: "New York"
-      category: "technology"
-      symbols: "AAPL,GOOG,MSFT"
-    next: FetchData
-  
-  - name: FetchData
-    type: fork
-    branches:
-      - name: WeatherBranch
-        tasks:
-          - name: GetWeather
-            type: call
-            function: getWeather
-            data:
-              location: ".location"
-      - name: NewsBranch
-        tasks:
-          - name: GetNews
-            type: call
-            function: getNews
-            data:
-              category: ".category"
-      - name: StocksBranch
-        tasks:
-          - name: GetStocks
-            type: call
-            function: getStocks
-            data:
-              symbols: ".symbols"
-    next: CombineResults
-  
-  - name: CombineResults
-    type: set
-    data:
-      dashboard:
-        weather: "$WORKFLOW.WeatherBranch.result"
-        news: "$WORKFLOW.NewsBranch.result"
-        stocks: "$WORKFLOW.StocksBranch.result"
-      message: "Dashboard data collected successfully"
-    end: true
+document:
+  dsl: 1.0.3
+  namespace: examples
+  name: parallel-api-calls
+  version: 1.0.0
+  title: Parallel API Calls Example
+do:
+  - PrepareData:
+      set:
+        location: "New York"
+        category: "technology"
+        symbols: "AAPL,GOOG,MSFT"
+      then: FetchData
+  - FetchData:
+      fork:
+        branches:
+          - WeatherBranch:
+              do:
+                - GetWeather:
+                    call: http
+                    with:
+                      method: get
+                      endpoint: https://api.weather.com/current?location={location}
+                      query:
+                        location: ${ .location }
+          - NewsBranch:
+              do:
+                - GetNews:
+                    call: http
+                    with:
+                      method: get
+                      endpoint: https://api.news.com/headlines?category={category}
+                      query:
+                        category: ${ .category }
+          - StocksBranch:
+              do:
+                - GetStocks:
+                    call: http
+                    with:
+                      method: get
+                      endpoint: https://api.stocks.com/quotes?symbols={symbols}
+                      query:
+                        symbols: ${ .symbols }
+      then: CombineResults
+  - CombineResults:
+      set:
+        dashboard:
+          weather: ${ $context.WeatherBranch.result }
+          news: ${ $context.NewsBranch.result }
+          stocks: ${ $context.StocksBranch.result }
+        message: "Dashboard data collected successfully"
+      then: end
 ```
 
 In this example, three API calls run simultaneously instead of sequentially, significantly reducing the overall execution time.
@@ -139,36 +127,31 @@ You can then combine these results in subsequent tasks.
 Each branch can contain multiple tasks that execute in sequence:
 
 ```yaml
-- name: ParallelProcessing
-  type: fork
-  branches:
-    - name: OrderBranch
-      tasks:
-        - name: FetchOrder
-          type: call
-          function: getOrder
-          data:
-            orderId: ".orderId"
-        - name: ValidateOrder
-          type: set
-          data:
-            isValid: ".items | length > 0"
-        - name: CalculateTotal
-          type: set
-          data:
-            total: ".items | map(.price * .quantity) | add"
-    - name: CustomerBranch
-      tasks:
-        - name: FetchCustomer
-          type: call
-          function: getCustomer
-          data:
-            customerId: ".customerId"
-        - name: CheckEligibility
-          type: set
-          data:
-            isEligible: ".status == 'active' && .flags | length == 0"
-  next: ProcessResults
+  - ParallelProcessing:
+      fork:
+        branches:
+          - OrderBranch:
+              do:
+                - FetchOrder:
+                    call: getOrder
+                    with:
+                      orderId: ${ .orderId }
+                - ValidateOrder:
+                    set:
+                      isValid: ${ .items | length > 0 }
+                - CalculateTotal:
+                    set:
+                      total: ${ .items | map(.price * .quantity) | add }
+          - CustomerBranch:
+              do:
+                - FetchCustomer:
+                    call: getCustomer
+                    with:
+                      customerId: ${ .customerId }
+                - CheckEligibility:
+                    set:
+                      isEligible: ${ .status == "active" and .flags | length == 0 }
+      then: ProcessResults
 ```
 
 Each branch executes its tasks in sequence, while the branches themselves run in parallel.
@@ -180,34 +163,32 @@ Each branch executes its tasks in sequence, while the branches themselves run in
 You can use the `try` task within branches to handle errors locally:
 
 ```yaml
-- name: ParallelProcessing
-  type: fork
-  branches:
-    - name: CustomerBranch
-      tasks:
-        - name: GetCustomerData
-          type: try
-          retry:
-            maxAttempts: 3
-            interval: PT2S
-          catch:
-            - error: "*"
-              next: CustomerFallback
-          do:
-            - name: FetchCustomer
-              type: call
-              function: customerService
-              data:
-                id: ".customerId"
-        - name: CustomerFallback
-          type: set
-          data:
-            customer:
-              name: "Unknown"
-              status: "unknown"
-              error: "Failed to fetch customer data"
-    # other branches...
-  next: ContinueProcessing
+  - ParallelProcessing:
+      fork:
+        branches:
+          - CustomerBranch:
+              do:
+                - GetCustomerData:
+                    try:
+                      - FetchCustomer:
+                          call: customerService
+                          with:
+                            id: ${ .customerId }
+                    catch:
+                      as: failure
+                      then: CustomerFallback
+                      retry:
+                        limit:
+                          attempt:
+                            count: 3
+                        delay: PT2S
+                - CustomerFallback:
+                    set:
+                      customer:
+                        name: "Unknown"
+                        status: "unknown"
+                        error: "Failed to fetch customer data"
+      then: ContinueProcessing
 ```
 
 This allows each branch to handle its own errors independently.
@@ -217,26 +198,24 @@ This allows each branch to handle its own errors independently.
 You can also wrap the entire `fork` task in a `try` task:
 
 ```yaml
-- name: AttemptParallelProcessing
-  type: try
-  retry:
-    maxAttempts: 2
-  catch:
-    - error: "*"
-      next: HandleParallelError
-  do:
-    - name: ParallelProcessing
-      type: fork
-      branches:
-        # branches defined here...
-      next: ContinueProcessing
-
-- name: HandleParallelError
-  type: set
-  data:
-    error: "Parallel processing failed"
-    details: "$WORKFLOW.error"
-  next: Fallback
+  - AttemptParallelProcessing:
+      try:
+        - ParallelProcessing:
+            fork:
+              branches: []
+            then: ContinueProcessing
+      catch:
+        as: failure
+        then: HandleParallelError
+        retry:
+          limit:
+            attempt:
+              count: 2
+  - HandleParallelError:
+      set:
+        error: "Parallel processing failed"
+        details: ${ $context.error }
+      then: Fallback
 ```
 
 This handles cases where the entire parallel execution fails.
@@ -246,19 +225,16 @@ This handles cases where the entire parallel execution fails.
 You can set a timeout for the entire parallel execution:
 
 ```yaml
-- name: ParallelProcessing
-  type: fork
-  timeout: PT30S
-  timeoutNext: HandleTimeout
-  branches:
-    # branches defined here...
-  next: ContinueProcessing
-
-- name: HandleTimeout
-  type: set
-  data:
-    error: "Parallel processing timed out after 30 seconds"
-  next: Fallback
+  - ParallelProcessing:
+      fork:
+        branches: []
+      then: ContinueProcessing
+      timeout:
+        after: PT30S
+  - HandleTimeout:
+      set:
+        error: "Parallel processing timed out after 30 seconds"
+      then: Fallback
 ```
 
 > **Lemline runtime:** only `listen` task timeouts are enforced. Workflow-level timeouts and timeouts on other tasks are accepted but ignored for now. HTTP calls use fixed client limits instead: 15 seconds to connect, 30 seconds per request.
@@ -270,27 +246,15 @@ If any branch takes longer than the specified timeout, the entire fork is cancel
 You can dynamically create parallel branches based on runtime data:
 
 ```yaml
-- name: PrepareParallel
-  type: set
-  data:
-    productIds: [123, 456, 789]
-    branches: ".productIds | map({
-      name: \"Product\" + (. | tostring),
-      tasks: [{
-        name: \"FetchProduct\",
-        type: \"call\",
-        function: \"getProduct\",
-        data: {
-          productId: .
-        }
-      }]
-    })"
-  next: ProcessProducts
-
-- name: ProcessProducts
-  type: fork
-  branches: ".branches"
-  next: CombineResults
+- processProducts:
+    for:
+      each: productId
+      in: '${ .productIds }'
+    do:
+      - fetchProduct:
+          call: getProduct
+          with:
+            productId: '${ $productId }'
 ```
 
 This example dynamically creates a branch for each product ID in the list.
@@ -300,194 +264,169 @@ This example dynamically creates a branch for each product ID in the list.
 Here's a more complex example that processes an order using parallel execution:
 
 ```yaml
-id: order-processor
-name: Order Processing Workflow
-version: '1.0'
-specVersion: '1.0'
-start: ReceiveOrder
-functions:
-  - name: validateCustomer
-    type: http
-    operation: GET
-    url: https://api.example.com/customers/{customerId}/validate
-  - name: checkInventory
-    type: http
-    operation: POST
-    url: https://api.example.com/inventory/check
-  - name: calculateTax
-    type: http
-    operation: POST
-    url: https://api.example.com/tax/calculate
-  - name: processPayment
-    type: http
-    operation: POST
-    url: https://api.example.com/payments/process
-tasks:
-  - name: ReceiveOrder
-    type: set
-    data:
-      orderId: "$WORKFLOW.input.orderId"
-      customerId: "$WORKFLOW.input.customerId"
-      items: "$WORKFLOW.input.items"
-      shippingAddress: "$WORKFLOW.input.shippingAddress"
-      paymentMethod: "$WORKFLOW.input.paymentMethod"
-    next: ParallelValidation
-  
-  - name: ParallelValidation
-    type: fork
-    timeout: PT30S
-    timeoutNext: HandleTimeout
-    branches:
-      - name: CustomerBranch
-        tasks:
-          - name: ValidateCustomer
-            type: try
-            retry:
-              maxAttempts: 3
-              interval: PT2S
-            catch:
-              - error: "*"
-                next: CustomerFallback
-            do:
-              - name: CheckCustomer
-                type: call
-                function: validateCustomer
-                data:
-                  customerId: ".customerId"
-          - name: CustomerFallback
-            type: set
-            data:
-              customerValid: false
-              customerError: "Failed to validate customer"
-      
-      - name: InventoryBranch
-        tasks:
-          - name: CheckInventory
-            type: try
-            retry:
-              maxAttempts: 2
-            catch:
-              - error: "*"
-                next: InventoryFallback
-            do:
-              - name: VerifyInventory
-                type: call
-                function: checkInventory
-                data:
-                  items: ".items"
-          - name: InventoryFallback
-            type: set
-            data:
-              inventoryValid: false
-              inventoryError: "Failed to check inventory"
-      
-      - name: TaxBranch
-        tasks:
-          - name: CalculateTax
-            type: try
-            retry:
-              maxAttempts: 2
-            catch:
-              - error: "*"
-                next: TaxFallback
-            do:
-              - name: ComputeTax
-                type: call
-                function: calculateTax
-                data:
-                  items: ".items"
-                  shippingAddress: ".shippingAddress"
-          - name: TaxFallback
-            type: set
-            data:
-              taxValid: false
-              taxError: "Failed to calculate tax"
-    next: EvaluateResults
-  
-  - name: EvaluateResults
-    type: set
-    data:
-      customerValid: "$WORKFLOW.CustomerBranch.customerValid || $WORKFLOW.CustomerBranch.status == 'ACTIVE'"
-      inventoryValid: "$WORKFLOW.InventoryBranch.inventoryValid || $WORKFLOW.InventoryBranch.allAvailable == true"
-      taxValid: "$WORKFLOW.TaxBranch.taxValid || $WORKFLOW.TaxBranch.taxAmount >= 0"
-      allValid: ".customerValid && .inventoryValid && .taxValid"
-      subtotal: ".items | map(.price * .quantity) | add"
-      tax: "$WORKFLOW.TaxBranch.taxAmount || (.subtotal * 0.08)"
-      total: ".subtotal + .tax"
-    next: CheckValidations
-  
-  - name: CheckValidations
-    type: switch
-    conditions:
-      - condition: ".allValid == true"
-        next: ProcessPayment
-      - condition: ".customerValid == false"
-        next: HandleCustomerError
-      - condition: ".inventoryValid == false"
-        next: HandleInventoryError
-      - condition: ".taxValid == false"
-        next: HandleTaxError
-      - condition: true
-        next: HandleUnknownError
-  
-  - name: ProcessPayment
-    type: call
-    function: processPayment
-    data:
-      orderId: ".orderId"
-      customerId: ".customerId"
-      amount: ".total"
-      method: ".paymentMethod"
-    next: CompleteOrder
-  
-  - name: CompleteOrder
-    type: set
-    data:
-      status: "COMPLETED"
-      message: "Order processed successfully"
-      finalAmount: ".total"
-      paymentConfirmation: ".transactionId"
-    end: true
-  
-  - name: HandleCustomerError
-    type: set
-    data:
-      status: "FAILED"
-      reason: "Customer validation failed"
-      details: "$WORKFLOW.CustomerBranch.customerError || 'Invalid customer'"
-    end: true
-  
-  - name: HandleInventoryError
-    type: set
-    data:
-      status: "FAILED"
-      reason: "Inventory check failed"
-      details: "$WORKFLOW.InventoryBranch.inventoryError || 'Inventory not available'"
-    end: true
-  
-  - name: HandleTaxError
-    type: set
-    data:
-      status: "FAILED"
-      reason: "Tax calculation failed"
-      details: "$WORKFLOW.TaxBranch.taxError || 'Unable to calculate tax'"
-    end: true
-  
-  - name: HandleUnknownError
-    type: set
-    data:
-      status: "FAILED"
-      reason: "Order processing failed"
-      details: "Unknown error occurred during validation"
-    end: true
-  
-  - name: HandleTimeout
-    type: set
-    data:
-      status: "FAILED"
-      reason: "Order processing timed out"
-      details: "The operation took too long to complete"
-    end: true
+document:
+  dsl: 1.0.3
+  namespace: examples
+  name: order-processor
+  version: 1.0.0
+  title: Order Processing Workflow
+do:
+  - ReceiveOrder:
+      set:
+        orderId: ${ $workflow.input.orderId }
+        customerId: ${ $workflow.input.customerId }
+        items: ${ $workflow.input.items }
+        shippingAddress: ${ $workflow.input.shippingAddress }
+        paymentMethod: ${ $workflow.input.paymentMethod }
+      then: ParallelValidation
+  - ParallelValidation:
+      fork:
+        branches:
+          - CustomerBranch:
+              do:
+                - ValidateCustomer:
+                    try:
+                      - CheckCustomer:
+                          call: http
+                          with:
+                            method: get
+                            endpoint: https://api.example.com/customers/{customerId}/validate
+                            query:
+                              customerId: ${ .customerId }
+                    catch:
+                      as: failure
+                      then: CustomerFallback
+                      retry:
+                        limit:
+                          attempt:
+                            count: 3
+                        delay: PT2S
+                - CustomerFallback:
+                    set:
+                      customerValid: false
+                      customerError: "Failed to validate customer"
+          - InventoryBranch:
+              do:
+                - CheckInventory:
+                    try:
+                      - VerifyInventory:
+                          call: http
+                          with:
+                            method: post
+                            endpoint: https://api.example.com/inventory/check
+                            body:
+                              items: ${ .items }
+                    catch:
+                      as: failure
+                      then: InventoryFallback
+                      retry:
+                        limit:
+                          attempt:
+                            count: 2
+                - InventoryFallback:
+                    set:
+                      inventoryValid: false
+                      inventoryError: "Failed to check inventory"
+          - TaxBranch:
+              do:
+                - CalculateTax:
+                    try:
+                      - ComputeTax:
+                          call: http
+                          with:
+                            method: post
+                            endpoint: https://api.example.com/tax/calculate
+                            body:
+                              items: ${ .items }
+                              shippingAddress: ${ .shippingAddress }
+                    catch:
+                      as: failure
+                      then: TaxFallback
+                      retry:
+                        limit:
+                          attempt:
+                            count: 2
+                - TaxFallback:
+                    set:
+                      taxValid: false
+                      taxError: "Failed to calculate tax"
+      then: EvaluateResults
+      timeout:
+        after: PT30S
+  - EvaluateResults:
+      set:
+        customerValid: ${ $context.CustomerBranch.customerValid // $context.CustomerBranch.status == "ACTIVE" }
+        inventoryValid: ${ $context.InventoryBranch.inventoryValid // $context.InventoryBranch.allAvailable == true }
+        taxValid: ${ $context.TaxBranch.taxValid // $context.TaxBranch.taxAmount >= 0 }
+        allValid: ${ .customerValid and .inventoryValid and .taxValid }
+        subtotal: ${ .items | map(.price * .quantity) | add }
+        tax: ${ $context.TaxBranch.taxAmount // (.subtotal * 0.08) }
+        total: ${ .subtotal + .tax }
+      then: CheckValidations
+  - CheckValidations:
+      switch:
+        - case1:
+            then: ProcessPayment
+            when: ${ .allValid == true }
+        - case2:
+            then: HandleCustomerError
+            when: ${ .customerValid == false }
+        - case3:
+            then: HandleInventoryError
+            when: ${ .inventoryValid == false }
+        - case4:
+            then: HandleTaxError
+            when: ${ .taxValid == false }
+        - default:
+            then: HandleUnknownError
+  - ProcessPayment:
+      call: http
+      with:
+        method: post
+        endpoint: https://api.example.com/payments/process
+        body:
+          orderId: ${ .orderId }
+          customerId: ${ .customerId }
+          amount: ${ .total }
+          method: ${ .paymentMethod }
+      then: CompleteOrder
+  - CompleteOrder:
+      set:
+        status: "COMPLETED"
+        message: "Order processed successfully"
+        finalAmount: ${ .total }
+        paymentConfirmation: ${ .transactionId }
+      then: end
+  - HandleCustomerError:
+      set:
+        status: "FAILED"
+        reason: "Customer validation failed"
+        details: ${ $context.CustomerBranch.customerError // "Invalid customer" }
+      then: end
+  - HandleInventoryError:
+      set:
+        status: "FAILED"
+        reason: "Inventory check failed"
+        details: ${ $context.InventoryBranch.inventoryError // "Inventory not available" }
+      then: end
+  - HandleTaxError:
+      set:
+        status: "FAILED"
+        reason: "Tax calculation failed"
+        details: ${ $context.TaxBranch.taxError // "Unable to calculate tax" }
+      then: end
+  - HandleUnknownError:
+      set:
+        status: "FAILED"
+        reason: "Order processing failed"
+        details: "Unknown error occurred during validation"
+      then: end
+  - HandleTimeout:
+      set:
+        status: "FAILED"
+        reason: "Order processing timed out"
+        details: "The operation took too long to complete"
+      then: end
 ```
 
 This workflow validates a customer, checks inventory, and calculates tax in parallel, then processes the payment if all validations pass.

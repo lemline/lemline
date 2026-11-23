@@ -30,10 +30,8 @@ The only syntax supported is **Simple String Expansion**: `{variableName}`.
 # Example in an HTTP call
 call: http
 with:
-  uri: "https://api.example.com/users/{userId}/profile"
-  # Assumes a variable named 'userId' exists in the data context
-  # If userId is "abc", the final URI becomes:
-  # https://api.example.com/users/abc/profile 
+  endpoint: "https://api.example.com/users/{userId}/profile"
+  method: get
 ```
 
 ## Limitations Compared to Runtime Expressions (`${...}`)

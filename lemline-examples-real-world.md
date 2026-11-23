@@ -8,7 +8,7 @@ This example demonstrates a complete order processing workflow for an e-commerce
 
 ```yaml
 document:
-  dsl: 1.0.0
+  dsl: 1.0.3
   namespace: examples
   name: order-fulfillment
   version: 1.0.0
@@ -59,7 +59,8 @@ do:
               method: post
               endpoint: https://inventory.example.com/api/check
               body: ${ .items }
-              output: inventoryStatus
+            output:
+              as: '${ $input + { "inventoryStatus": . } }'
         - validateInventory:
             switch:
               - allInStock:
@@ -113,7 +114,8 @@ do:
               body:
                 orderId: ${ .orderId }
                 items: ${ .items }
-              output: reservation
+            output:
+              as: '${ $input + { "reservation": . } }'
         - chargePayment:
             call: http
             with:
@@ -124,44 +126,44 @@ do:
                 customerId: ${ .customerId }
                 amount: ${ .payment.amount }
                 method: ${ .payment.method }
-              output: paymentResult
+            output:
+              as: '${ $input + { "paymentResult": . } }'
       catch:
-        - errors:
-            with:
-              type: https://example.com/errors/payment/declined
-          as: paymentError
-          do:
-            - releaseInventory:
-                call: http
-                with:
-                  method: post
-                  endpoint: https://inventory.example.com/api/release
-                  body:
-                    reservationId: ${ .reservation.id }
-            - notifyCustomer:
-                call: http
-                with:
-                  method: post
-                  endpoint: https://notifications.example.com/api/send
-                  body:
-                    to: ${ .customerId }
-                    template: "payment_declined"
-                    data:
-                      orderId: ${ .orderId }
-                      reason: ${ $paymentError.reason }
-          then: exit
-        - errors:
-            with:
-              type: https://open-workflow-specification.org/spec/1.0.0/errors/communication
-          retry:
-            delay:
-              seconds: 5
-            backoff:
-              exponential: {}
-            limit:
-              attempt:
-                count: 3
-
+        as: failure
+        when: ${ ($failure.type == "https://example.com/errors/payment/declined") or ($failure.type == "https://open-workflow-specification.org/spec/1.0.0/errors/communication") }
+        do:
+          - selectHandler:
+              switch:
+                - case1:
+                    then: handle1
+                    when: ${ $failure.type == "https://example.com/errors/payment/declined" }
+                - case2:
+                    then: handle2
+                    when: ${ $failure.type == "https://open-workflow-specification.org/spec/1.0.0/errors/communication" }
+          - handle1:
+              do:
+                - releaseInventory:
+                    call: http
+                    with:
+                      method: post
+                      endpoint: https://inventory.example.com/api/release
+                      body:
+                        reservationId: ${ .reservation.id }
+                - notifyCustomer:
+                    call: http
+                    with:
+                      method: post
+                      endpoint: https://notifications.example.com/api/send
+                      body:
+                        to: ${ .customerId }
+                        template: payment_declined
+                        data:
+                          orderId: ${ .orderId }
+                          reason: ${ $failure.reason }
+              then: exit
+          - handle2:
+              set: ${ . }
+              then: exit
   - fulfillOrder:
       do:
         - createShippingLabel:
@@ -173,7 +175,8 @@ do:
                 orderId: ${ .orderId }
                 customerId: ${ .customerId }
                 items: ${ .items }
-              output: shippingLabel
+            output:
+              as: '${ $input + { "shippingLabel": . } }'
         - schedulePickup:
             call: http
             with:
@@ -181,12 +184,13 @@ do:
               endpoint: https://shipping.example.com/api/pickup
               body:
                 labelId: ${ .shippingLabel.id }
-              output: pickupDetails
+            output:
+              as: '${ $input + { "pickupDetails": . } }'
         - updateOrderStatus:
             call: http
             with:
               method: put
-              endpoint: https://orders.example.com/api/orders/${.orderId}
+              endpoint: ${ "https://orders.example.com/api/orders/\(.orderId)" }
               body:
                 status: "processing"
                 shippingLabel: ${ .shippingLabel }
@@ -210,16 +214,17 @@ do:
             with:
               type: com.example.shipping.order.shipped
               correlationId: ${ .orderId }
-        for:
-          days: 7
       output:
         as: shippingUpdate
 
+      timeout:
+        after:
+          days: 7
   - completeOrder:
       call: http
       with:
         method: put
-        endpoint: https://orders.example.com/api/orders/${.orderId}
+        endpoint: ${ "https://orders.example.com/api/orders/\(.orderId)" }
         body:
           status: "shipped"
           trackingDetails: ${ .shippingUpdate }
@@ -242,7 +247,7 @@ This example demonstrates a patient onboarding workflow in a healthcare system, 
 
 ```yaml
 document:
-  dsl: 1.0.0
+  dsl: 1.0.3
   namespace: healthcare
   name: patient-onboarding
   version: 1.0.0
@@ -275,13 +280,14 @@ do:
             with:
               method: post
               endpoint: https://emr.hospital.example/api/patients
-              body: ${ .patientInfo }
-              output: patientRecord
+              body: '${ .patientInfo }'
+            output:
+              as: '${ $input + { "patientRecord": . } }'
         - assignMRN:
             set:
-              patientMRN: ${ .patientRecord.mrn }
+              patientMRN: '${ .patientRecord.mrn }'
             export:
-              as: '$context + { patientMRN: .patientRecord.mrn }'
+              as: '${ $context + { patientMRN: .patientRecord.mrn } }'
       catch:
         errors:
           with:
@@ -291,10 +297,10 @@ do:
           - handleValidationError:
               set:
                 status: "rejected"
-                errorDetails: ${ $validationError }
+                errorDetails: '${ $validationError }'
               export:
-                as: '$context + { status: "rejected", errorDetails: $validationError }'
-          then: exit
+                as: '${ $context + { status: "rejected", errorDetails: $validationError } }'
+        then: exit
 
   - verifyInsurance:
       try:
@@ -304,17 +310,18 @@ do:
               method: post
               endpoint: https://insurance.example/api/verify
               body:
-                patientMRN: ${ $context.patientMRN }
-                provider: ${ .insuranceInfo.provider }
-                policyNumber: ${ .insuranceInfo.policyNumber }
-              output: insuranceVerification
+                patientMRN: '${ $context.patientMRN }'
+                provider: '${ .insuranceInfo.provider }'
+                policyNumber: '${ .insuranceInfo.policyNumber }'
+            output:
+              as: '${ $input + { "insuranceVerification": . } }'
         - evaluateVerification:
             switch:
               - coverageVerified:
-                  when: ${ .insuranceVerification.status == "verified" }
+                  when: '${ .insuranceVerification.status == "verified" }'
                   then: setupInitialAppointment
               - coveragePending:
-                  when: ${ .insuranceVerification.status == "pending" }
+                  when: '${ .insuranceVerification.status == "pending" }'
                   then: waitForManualVerification
               - default:
                   then: handleRejectedCoverage
@@ -340,23 +347,24 @@ do:
                 team: "insurance"
                 action: "verify"
                 data:
-                  patientMRN: ${ $context.patientMRN }
-                  insuranceDetails: ${ .insuranceInfo }
+                  patientMRN: '${ $context.patientMRN }'
+                  insuranceDetails: '${ .insuranceInfo }'
         - waitForVerification:
             listen:
               to:
                 one:
                   with:
                     type: com.hospital.insurance.verification.completed
-                    correlationId: ${ $context.patientMRN }
-              for:
-                days: 5
+                    correlationId: '${ $context.patientMRN }'
             output:
               as: manualVerificationResult
+            timeout:
+              after:
+                days: 5
         - checkManualResult:
             switch:
               - coverageVerified:
-                  when: ${ .manualVerificationResult.status == "verified" }
+                  when: '${ .manualVerificationResult.status == "verified" }'
                   then: setupInitialAppointment
               - default:
                   then: handleRejectedCoverage
@@ -367,7 +375,7 @@ do:
             call: http
             with:
               method: put
-              endpoint: https://emr.hospital.example/api/patients/${$context.patientMRN}
+              endpoint: ${ "https://emr.hospital.example/api/patients/\($context.patientMRN)" }
               body:
                 insuranceStatus: "not_verified"
                 paymentMethod: "self_pay"
@@ -377,7 +385,7 @@ do:
               method: post
               endpoint: https://notifications.hospital.example/api/patients/notify
               body:
-                patientMRN: ${ $context.patientMRN }
+                patientMRN: '${ $context.patientMRN }'
                 template: "insurance_not_verified"
                 channel: "email"
       then: setupInitialAppointment
@@ -391,40 +399,42 @@ do:
               endpoint: https://scheduling.hospital.example/api/availability
               query:
                 departmentId: "primary_care"
-                daysForward: 14
-              output: availableSlots
+                daysForward: '14'
+            output:
+              as: '${ $input + { "availableSlots": . } }'
         - sendAppointmentOptions:
             call: http
             with:
               method: post
               endpoint: https://notifications.hospital.example/api/patients/notify
               body:
-                patientMRN: ${ $context.patientMRN }
+                patientMRN: '${ $context.patientMRN }'
                 template: "appointment_options"
                 channel: "email"
                 data:
-                  slots: ${ .availableSlots }
+                  slots: '${ .availableSlots }'
         - waitForSelection:
             listen:
               to:
                 one:
                   with:
                     type: com.hospital.appointment.slot.selected
-                    correlationId: ${ $context.patientMRN }
-              for:
-                days: 7
+                    correlationId: '${ $context.patientMRN }'
             output:
               as: selectedSlot
+            timeout:
+              after:
+                days: 7
         - scheduleAppointment:
             call: http
             with:
               method: post
               endpoint: https://scheduling.hospital.example/api/appointments
               body:
-                patientMRN: ${ $context.patientMRN }
-                slotId: ${ .selectedSlot.slotId }
-              output: appointment
-
+                patientMRN: '${ $context.patientMRN }'
+                slotId: '${ .selectedSlot.slotId }'
+            output:
+              as: '${ $input + { "appointment": . } }'
   - processDocuments:
       do:
         - sendDocumentRequests:
@@ -433,7 +443,7 @@ do:
               method: post
               endpoint: https://notifications.hospital.example/api/patients/notify
               body:
-                patientMRN: ${ $context.patientMRN }
+                patientMRN: '${ $context.patientMRN }'
                 template: "required_documents"
                 channel: "email"
         - processConsentForm:
@@ -442,47 +452,49 @@ do:
                 one:
                   with:
                     type: com.hospital.document.consent.submitted
-                    correlationId: ${ $context.patientMRN }
-              for:
-                days: 14
+                    correlationId: '${ $context.patientMRN }'
             output:
               as: consentForm
+            timeout:
+              after:
+                days: 14
         - processMedicalHistory:
             listen:
               to:
                 one:
                   with:
                     type: com.hospital.document.history.submitted
-                    correlationId: ${ $context.patientMRN }
-              for:
-                days: 14
+                    correlationId: '${ $context.patientMRN }'
             output:
               as: medicalHistory
 
+            timeout:
+              after:
+                days: 14
   - finalizeOnboarding:
       do:
         - updatePatientStatus:
             call: http
             with:
               method: put
-              endpoint: https://emr.hospital.example/api/patients/${$context.patientMRN}
+              endpoint: ${ "https://emr.hospital.example/api/patients/\($context.patientMRN)" }
               body:
                 status: "active"
                 onboardingComplete: true
                 documents:
-                  consent: ${ .consentForm.documentId }
-                  medicalHistory: ${ .medicalHistory.documentId }
+                  consent: '${ .consentForm.documentId }'
+                  medicalHistory: '${ .medicalHistory.documentId }'
         - sendWelcomePacket:
             call: http
             with:
               method: post
               endpoint: https://notifications.hospital.example/api/patients/notify
               body:
-                patientMRN: ${ $context.patientMRN }
+                patientMRN: '${ $context.patientMRN }'
                 template: "welcome_packet"
                 channel: "email"
                 data:
-                  appointmentDetails: ${ .appointment }
+                  appointmentDetails: '${ .appointment }'
 ```
 
 This healthcare example demonstrates:
@@ -501,7 +513,7 @@ This example demonstrates a mortgage loan application workflow, including applic
 
 ```yaml
 document:
-  dsl: 1.0.0
+  dsl: 1.0.3
   namespace: finance
   name: mortgage-application
   version: 1.0.0
@@ -512,11 +524,11 @@ do:
           one:
             with:
               type: com.bank.mortgage.application.submitted
-        output:
-          as: application
       export:
-        as: '$context + { applicationId: .application.id }'
+        as: '${ $context + { applicationId: .application.id } }'
 
+      output:
+        as: application
   - validateApplication:
       try:
         - performInitialValidation:
@@ -524,12 +536,13 @@ do:
             with:
               method: post
               endpoint: https://validation.bank.example/api/mortgage/validate
-              body: ${ .application }
-              output: validationResult
+              body: '${ .application }'
+            output:
+              as: '${ $input + { "validationResult": . } }'
         - checkValidationResult:
             switch:
               - validApplication:
-                  when: ${ .validationResult.valid == true }
+                  when: '${ .validationResult.valid == true }'
                   then: initiateBackgroundChecks
               - default:
                   then: rejectApplication
@@ -547,9 +560,9 @@ do:
                 body:
                   level: "error"
                   source: "mortgage_application"
-                  applicationId: ${ $context.applicationId }
-                  error: ${ $validationError }
-          then: rejectApplication
+                  applicationId: '${ $context.applicationId }'
+                  error: '${ $validationError }'
+        then: rejectApplication
 
   - rejectApplication:
       do:
@@ -557,21 +570,21 @@ do:
             call: http
             with:
               method: put
-              endpoint: https://applications.bank.example/api/mortgage/${$context.applicationId}
+              endpoint: ${ "https://applications.bank.example/api/mortgage/\($context.applicationId)" }
               body:
                 status: "rejected"
-                reason: ${ .validationResult.reason || "Failed validation" }
+                reason: '${ .validationResult.reason // "Failed validation" }'
         - notifyApplicant:
             call: http
             with:
               method: post
               endpoint: https://notifications.bank.example/api/send
               body:
-                to: ${ .application.email }
+                to: '${ .application.email }'
                 template: "mortgage_application_rejected"
                 data:
-                  applicationId: ${ $context.applicationId }
-                  reason: ${ .validationResult.reason || "Failed validation" }
+                  applicationId: '${ $context.applicationId }'
+                  reason: '${ .validationResult.reason // "Failed validation" }'
       then: exit
 
   - initiateBackgroundChecks:
@@ -580,56 +593,61 @@ do:
             call: http
             with:
               method: put
-              endpoint: https://applications.bank.example/api/mortgage/${$context.applicationId}
+              endpoint: ${ "https://applications.bank.example/api/mortgage/\($context.applicationId)" }
               body:
                 status: "background_checks"
         - performParallelChecks:
             fork:
-              - creditCheck:
-                  do:
-                    - runCreditCheck:
-                        call: http
-                        with:
-                          method: post
-                          endpoint: https://credit.bank.example/api/check
-                          body:
-                            ssn: ${ .application.ssn }
-                            name: ${ .application.name }
-                          output: creditReport
-              - employmentVerification:
-                  do:
-                    - verifyEmployment:
-                        call: http
-                        with:
-                          method: post
-                          endpoint: https://verification.bank.example/api/employment
-                          body:
-                            employer: ${ .application.employer }
-                            applicantName: ${ .application.name }
-                            claimed_income: ${ .application.income }
-                          output: employmentVerification
-              - propertyAppraisal:
-                  do:
-                    - scheduleAppraisal:
-                        call: http
-                        with:
-                          method: post
-                          endpoint: https://appraisal.bank.example/api/schedule
-                          body:
-                            propertyAddress: ${ .application.propertyAddress }
-                            applicantPhone: ${ .application.phone }
-                          output: appraisalSchedule
-                    - waitForAppraisal:
-                        listen:
-                          to:
-                            one:
-                              with:
-                                type: com.bank.mortgage.appraisal.completed
-                                correlationId: ${ $context.applicationId }
-                          for:
-                            days: 14
-                        output:
-                          as: appraisalResult
+              branches:
+                - creditCheck:
+                    do:
+                      - runCreditCheck:
+                          call: http
+                          with:
+                            method: post
+                            endpoint: https://credit.bank.example/api/check
+                            body:
+                              ssn: '${ .application.ssn }'
+                              name: '${ .application.name }'
+                          output:
+                            as: '${ $input + { "creditReport": . } }'
+                - employmentVerification:
+                    do:
+                      - verifyEmployment:
+                          call: http
+                          with:
+                            method: post
+                            endpoint: https://verification.bank.example/api/employment
+                            body:
+                              employer: '${ .application.employer }'
+                              applicantName: '${ .application.name }'
+                              claimed_income: '${ .application.income }'
+                          output:
+                            as: '${ $input + { "employmentVerification": . } }'
+                - propertyAppraisal:
+                    do:
+                      - scheduleAppraisal:
+                          call: http
+                          with:
+                            method: post
+                            endpoint: https://appraisal.bank.example/api/schedule
+                            body:
+                              propertyAddress: '${ .application.propertyAddress }'
+                              applicantPhone: '${ .application.phone }'
+                          output:
+                            as: '${ $input + { "appraisalSchedule": . } }'
+                      - waitForAppraisal:
+                          listen:
+                            to:
+                              one:
+                                with:
+                                  type: com.bank.mortgage.appraisal.completed
+                                  correlationId: '${ $context.applicationId }'
+                          output:
+                            as: appraisalResult
+                          timeout:
+                            after:
+                              days: 14
             output:
               as: backgroundChecks
 
@@ -638,27 +656,29 @@ do:
         - compileResults:
             set:
               assessmentPackage:
-                application: ${ .application }
-                creditScore: ${ .backgroundChecks.creditCheck.creditReport.score }
-                creditReport: ${ .backgroundChecks.creditCheck.creditReport }
-                employmentVerified: ${ .backgroundChecks.employmentVerification.verified }
-                income: ${ .backgroundChecks.employmentVerification.verifiedIncome }
-                propertyValue: ${ .backgroundChecks.propertyAppraisal.appraisalResult.value }
-                loanToValue: ${ .application.loanAmount / .backgroundChecks.propertyAppraisal.appraisalResult.value * 100 }
+                application: '${ .application }'
+                creditScore: '${ .backgroundChecks.creditCheck.creditReport.score }'
+                creditReport: '${ .backgroundChecks.creditCheck.creditReport }'
+                employmentVerified: '${ .backgroundChecks.employmentVerification.verified }'
+                income: '${ .backgroundChecks.employmentVerification.verifiedIncome }'
+                propertyValue: '${ .backgroundChecks.propertyAppraisal.appraisalResult.value }'
+                loanToValue: '${ .application.loanAmount / .backgroundChecks.propertyAppraisal.appraisalResult.value * 100
+                  }'
         - assessRisk:
             call: http
             with:
               method: post
               endpoint: https://risk.bank.example/api/mortgage/assess
-              body: ${ .assessmentPackage }
-              output: riskAssessment
+              body: '${ .assessmentPackage }'
+            output:
+              as: '${ $input + { "riskAssessment": . } }'
         - routeApplication:
             switch:
               - lowRisk:
-                  when: ${ .riskAssessment.riskLevel == "low" }
+                  when: '${ .riskAssessment.riskLevel == "low" }'
                   then: automaticApproval
               - mediumRisk:
-                  when: ${ .riskAssessment.riskLevel == "medium" }
+                  when: '${ .riskAssessment.riskLevel == "medium" }'
                   then: manualUnderwriting
               - default:
                   then: rejectHighRiskApplication
@@ -671,46 +691,48 @@ do:
               method: post
               endpoint: https://offers.bank.example/api/mortgage/generate
               body:
-                applicationId: ${ $context.applicationId }
-                creditScore: ${ .assessmentPackage.creditScore }
-                loanAmount: ${ .application.loanAmount }
-                propertyValue: ${ .assessmentPackage.propertyValue }
-                income: ${ .assessmentPackage.income }
-              output: offerTerms
+                applicationId: '${ $context.applicationId }'
+                creditScore: '${ .assessmentPackage.creditScore }'
+                loanAmount: '${ .application.loanAmount }'
+                propertyValue: '${ .assessmentPackage.propertyValue }'
+                income: '${ .assessmentPackage.income }'
+            output:
+              as: '${ $input + { "offerTerms": . } }'
         - updateApplicationStatus:
             call: http
             with:
               method: put
-              endpoint: https://applications.bank.example/api/mortgage/${$context.applicationId}
+              endpoint: ${ "https://applications.bank.example/api/mortgage/\($context.applicationId)" }
               body:
                 status: "approved"
-                terms: ${ .offerTerms }
+                terms: '${ .offerTerms }'
         - sendOfferToApplicant:
             call: http
             with:
               method: post
               endpoint: https://notifications.bank.example/api/send
               body:
-                to: ${ .application.email }
+                to: '${ .application.email }'
                 template: "mortgage_offer"
                 data:
-                  applicationId: ${ $context.applicationId }
-                  terms: ${ .offerTerms }
+                  applicationId: '${ $context.applicationId }'
+                  terms: '${ .offerTerms }'
         - waitForAcceptance:
             listen:
               to:
                 one:
                   with:
                     type: com.bank.mortgage.offer.response
-                    correlationId: ${ $context.applicationId }
-              for:
-                days: 30
+                    correlationId: '${ $context.applicationId }'
             output:
               as: offerResponse
+            timeout:
+              after:
+                days: 30
         - processFinalDecision:
             switch:
               - offerAccepted:
-                  when: ${ .offerResponse.accepted == true }
+                  when: '${ .offerResponse.accepted == true }'
                   then: processAcceptedOffer
               - default:
                   then: closeRejectedOffer
@@ -724,14 +746,15 @@ do:
               endpoint: https://workflow.bank.example/api/tasks/assign
               body:
                 type: "mortgage_underwriting"
-                applicationId: ${ $context.applicationId }
-                data: ${ .assessmentPackage }
-              output: underwritingTask
+                applicationId: '${ $context.applicationId }'
+                data: '${ .assessmentPackage }'
+            output:
+              as: '${ $input + { "underwritingTask": . } }'
         - updateApplicationStatus:
             call: http
             with:
               method: put
-              endpoint: https://applications.bank.example/api/mortgage/${$context.applicationId}
+              endpoint: ${ "https://applications.bank.example/api/mortgage/\($context.applicationId)" }
               body:
                 status: "underwriting"
         - waitForUnderwritingDecision:
@@ -740,31 +763,29 @@ do:
                 one:
                   with:
                     type: com.bank.mortgage.underwriting.completed
-                    correlationId: ${ $context.applicationId }
-              for:
-                days: 14
+                    correlationId: '${ $context.applicationId }'
             output:
               as: underwritingDecision
+            timeout:
+              after:
+                days: 14
         - processUnderwritingResult:
             switch:
               - approved:
-                  when: ${ .underwritingDecision.approved == true }
+                  when: '${ .underwritingDecision.approved == true }'
                   then: sendManualApproval
               - default:
                   then: rejectUnderwrittenApplication
 
   - rejectHighRiskApplication:
-      # Similar to rejectApplication but with high risk specific messaging
+      set: ${ . }
       then: exit
-
   - rejectUnderwrittenApplication:
-      # Similar to rejectApplication but with underwriting specific messaging
+      set: ${ . }
       then: exit
-
   - sendManualApproval:
-      # Similar to automaticApproval but with any special terms from underwriting
+      set: ${ . }
       then: waitForAcceptance
-
   - processAcceptedOffer:
       do:
         - initiateClosingProcess:
@@ -773,9 +794,9 @@ do:
               method: post
               endpoint: https://closing.bank.example/api/initiate
               body:
-                applicationId: ${ $context.applicationId }
-                applicantDetails: ${ .application }
-                terms: ${ .offerTerms || .underwritingDecision.terms }
+                applicationId: '${ $context.applicationId }'
+                applicantDetails: '${ .application }'
+                terms: '${ .offerTerms // .underwritingDecision.terms }'
 
   - closeRejectedOffer:
       do:
@@ -783,7 +804,7 @@ do:
             call: http
             with:
               method: put
-              endpoint: https://applications.bank.example/api/mortgage/${$context.applicationId}
+              endpoint: ${ "https://applications.bank.example/api/mortgage/\($context.applicationId)" }
               body:
                 status: "closed"
                 reason: "offer_rejected_by_customer"
@@ -794,9 +815,9 @@ do:
               endpoint: https://archive.bank.example/api/store
               body:
                 type: "mortgage_application"
-                id: ${ $context.applicationId }
+                id: '${ $context.applicationId }'
                 status: "closed"
-                data: ${ . }
+                data: '${ . }'
 ```
 
 This financial example demonstrates:
@@ -815,7 +836,7 @@ This example demonstrates a workflow for provisioning and monitoring IoT devices
 
 ```yaml
 document:
-  dsl: 1.0.0
+  dsl: 1.0.3
   namespace: iot
   name: device-lifecycle-management
   version: 1.0.0
@@ -852,7 +873,8 @@ do:
                 deviceId: ${ .deviceId }
                 deviceType: ${ .deviceType }
                 location: ${ .location }
-              output: deviceRegistry
+            output:
+              as: '${ $input + { "deviceRegistry": . } }'
         - generateCredentials:
             call: http
             with:
@@ -861,9 +883,10 @@ do:
               body:
                 deviceId: ${ .deviceId }
                 deviceType: ${ .deviceType }
-              output: credentials
             export:
-              as: '$context + { deviceKey: .credentials.key }'
+              as: '${ $context + { deviceKey: .credentials.key } }'
+            output:
+              as: '${ $input + { "credentials": . } }'
       catch:
         errors:
           with:
@@ -874,13 +897,14 @@ do:
               call: http
               with:
                 method: get
-                endpoint: https://iot-registry.example/api/devices/${.deviceId}
-                output: deviceRegistry
+                endpoint: ${ "https://iot-registry.example/api/devices/\(.deviceId)" }
+              output:
+                as: '${ $input + { "deviceRegistry": . } }'
           - updateDeviceLocation:
               call: http
               with:
                 method: patch
-                endpoint: https://iot-registry.example/api/devices/${.deviceId}
+                endpoint: ${ "https://iot-registry.example/api/devices/\(.deviceId)" }
                 body:
                   location: ${ .location }
 
@@ -896,9 +920,10 @@ do:
                 deviceType: ${ .deviceType }
                 attributes:
                   location: ${ .location }
-                  firmware: ${ .deviceRegistry.firmwareVersion || "1.0.0" }
+                  firmware: ${ .deviceRegistry.firmwareVersion // "1.0.0" }
                   status: "provisioning"
-              output: digitalTwin
+            output:
+              as: '${ $input + { "digitalTwin": . } }'
         - assignToFleet:
             call: http
             with:
@@ -908,7 +933,8 @@ do:
                 deviceId: ${ .deviceId }
                 deviceType: ${ .deviceType }
                 location: ${ .location }
-              output: fleetAssignment
+            output:
+              as: '${ $input + { "fleetAssignment": . } }'
         - prepareFirmwareUpdate:
             switch:
               - needsUpdate:
@@ -940,7 +966,8 @@ do:
                 deviceId: ${ .deviceId }
                 currentVersion: ${ .deviceRegistry.firmwareVersion }
                 targetVersion: ${ .deviceRegistry.latestFirmwareVersion }
-              output: firmwareJob
+            output:
+              as: '${ $input + { "firmwareJob": . } }'
       then: configureDevice
 
   - configureDevice:
@@ -954,7 +981,8 @@ do:
                 deviceId: ${ .deviceId }
                 deviceType: ${ .deviceType }
                 fleetId: ${ .fleetAssignment.fleetId }
-              output: deviceConfig
+            output:
+              as: '${ $input + { "deviceConfig": . } }'
         - pushConfiguration:
             call: asyncapi
             with:
@@ -975,18 +1003,19 @@ do:
                   with:
                     type: com.example.iot.device.configured
                     correlationId: ${ .deviceId }
-              for:
-                minutes: 30
             output:
               as: configAck
 
+            timeout:
+              after:
+                minutes: 30
   - monitorDeviceHealth:
       do:
         - updateDeviceStatus:
             call: http
             with:
               method: patch
-              endpoint: https://digital-twins.example/api/twins/${.deviceId}
+              endpoint: ${ "https://digital-twins.example/api/twins/\(.deviceId)" }
               body:
                 status: "active"
         - startTelemetryProcessing:
@@ -998,51 +1027,56 @@ do:
               subscription:
                 filter: '${ .deviceId == $context.deviceId }'
                 consume:
-                  forever:
-                    foreach:
-                      do:
-                        - processTelemetry:
-                            try:
-                              - analyzeTelemetry:
-                                  call: http
-                                  with:
-                                    method: post
-                                    endpoint: https://analytics.example/api/telemetry/analyze
-                                    body: ${ . }
-                                    output: analysis
-                              - updateTwinState:
-                                  call: http
-                                  with:
-                                    method: patch
-                                    endpoint: https://digital-twins.example/api/twins/${.deviceId}/state
-                                    body: ${ .analysis.state }
-                              - checkAnomalies:
-                                  switch:
-                                    - hasAnomaly:
-                                        when: ${ .analysis.anomalyDetected == true }
-                                        then:
-                                          do:
-                                            - triggerAlert:
-                                                emit:
-                                                  event:
-                                                    with:
-                                                      source: "device-monitoring"
-                                                      type: "com.example.iot.anomaly.detected"
-                                                      data:
-                                                        deviceId: ${ .deviceId }
-                                                        anomaly: ${ .analysis.anomaly }
-                                                        severity: ${ .analysis.anomalySeverity }
-                                                        timestamp: ${ .timestamp }
-                            catch:
-                              errors:
-                                with:
-                                  type: https://open-workflow-specification.org/spec/1.0.0/errors/communication
-                              retry:
-                                delay:
-                                  seconds: 5
-                                limit:
-                                  attempt:
-                                    count: 3
+                  while: ${ true }
+                foreach:
+                  do:
+                    - processTelemetry:
+                        try:
+                          - analyzeTelemetry:
+                              call: http
+                              with:
+                                method: post
+                                endpoint: https://analytics.example/api/telemetry/analyze
+                                body: ${ . }
+                              output:
+                                as: '${ $input + { "analysis": . } }'
+                          - updateTwinState:
+                              call: http
+                              with:
+                                method: patch
+                                endpoint: ${ "https://digital-twins.example/api/twins/\(.deviceId)/state" }
+                                body: ${ .analysis.state }
+                          - checkAnomalies:
+                              switch:
+                                - hasAnomaly:
+                                    when: ${ .analysis.anomalyDetected == true }
+                                    then: checkAnomalies-hasAnomaly
+                          - checkAnomalies-hasAnomaly:
+                              do:
+                                - triggerAlert:
+                                    emit:
+                                      event:
+                                        with:
+                                          source: "device-monitoring"
+                                          type: "com.example.iot.anomaly.detected"
+                                          data:
+                                            deviceId: ${ .deviceId }
+                                            anomaly: ${ .analysis.anomaly }
+                                            severity: ${ .analysis.anomalySeverity }
+                                            timestamp: ${ .timestamp }
+                              then: checkAnomalies-done
+                          - checkAnomalies-done:
+                              set: ${ . }
+                        catch:
+                          errors:
+                            with:
+                              type: https://open-workflow-specification.org/spec/1.0.0/errors/communication
+                          retry:
+                            delay:
+                              seconds: 5
+                            limit:
+                              attempt:
+                                count: 3
         - listenForDecommission:
             listen:
               to:
@@ -1059,19 +1093,19 @@ do:
             call: http
             with:
               method: patch
-              endpoint: https://digital-twins.example/api/twins/${.deviceId}
+              endpoint: ${ "https://digital-twins.example/api/twins/\(.deviceId)" }
               body:
                 status: "decommissioned"
         - revokeCredentials:
             call: http
             with:
               method: delete
-              endpoint: https://iot-security.example/api/credentials/${.deviceId}
+              endpoint: ${ "https://iot-security.example/api/credentials/\(.deviceId)" }
         - removeFromFleet:
             call: http
             with:
               method: delete
-              endpoint: https://fleet-manager.example/api/fleet/devices/${.deviceId}
+              endpoint: ${ "https://fleet-manager.example/api/fleet/devices/\(.deviceId)" }
         - archiveDeviceData:
             call: http
             with:

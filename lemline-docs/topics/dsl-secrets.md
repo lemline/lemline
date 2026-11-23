@@ -16,7 +16,7 @@ Secrets are declared in the `use.secrets` section of a workflow definition. This
 
 ```yaml
 document:
-  dsl: '1.0.0'
+  dsl: '1.0.3'
   namespace: examples
   name: secrets-example
   version: '1.0.0'
@@ -25,6 +25,9 @@ use:
     - api-key-secret
     - database-credentials
     - oauth-client-secret
+do:
+  - inspectInput:
+      set: ${ . }
 ```
 
 ## Secret Resolution

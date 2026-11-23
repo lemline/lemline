@@ -16,7 +16,7 @@ The gRPC Call task enables workflows to interact with external systems using the
 
 ```yaml
 document:
-  dsl: '1.0.0'
+  dsl: '1.0.3'
   namespace: test
   name: grpc-example
   version: '0.1.0'
@@ -51,7 +51,7 @@ do:
 
 ```yaml
 document:
-  dsl: '1.0.0'
+  dsl: '1.0.3'
   namespace: test
   name: grpc-auth-example
   version: '0.1.0'
@@ -68,7 +68,7 @@ do:
   - getAccountDetails:
       call: grpc
       with:
-        proto: 
+        proto:
           endpoint: "file://protos/account.proto"
         service:
           name: AccountService
@@ -81,7 +81,7 @@ do:
           accountId: "${ .user.id }"
       then: processAccount
   - processAccount:
-      ###
+      set: ${ . }
 ```
 ## Configuration Options
 

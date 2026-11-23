@@ -9,22 +9,22 @@ The Try-Catch mechanism allows you to handle errors that occur during workflow e
 ### Basic Try-Catch Structure
 
 ```yaml
-- errorHandlingTask:
-    try:
-      do:
+  - errorHandlingTask:
+      try:
         - riskyOperation:
-            callHTTP:
-              url: "http://example.com/api"
-              method: "GET"
-      catch:
-        - error:
+            call: http
             with:
-              type: "https://open-workflow-specification.org/spec/1.0.0/errors/communication"
-          do:
-            - handleError:
-                set:
-                  status: "error"
-                  message: "API call failed, using default values"
+              method: "GET"
+              endpoint: "http://example.com/api"
+      catch:
+        do:
+          - handleError:
+              set:
+                status: "error"
+                message: "API call failed, using default values"
+        errors:
+          with:
+            type: "https://open-workflow-specification.org/spec/1.0.0/errors/communication"
 ```
 
 The above example:
@@ -59,24 +59,24 @@ catch:
 Access error details using the `as` property:
 
 ```yaml
-- validateTask:
-    try:
-      do:
+  - validateTask:
+      try:
         - validateData:
-            callHTTP:
-              url: "http://validator/check"
+            call: http
+            with:
               method: "POST"
               body: "${ .payload }"
+              endpoint: "http://validator/check"
       catch:
-        - error:
-            with:
-              type: "https://open-workflow-specification.org/spec/1.0.0/errors/validation"
-            as: "validationError"
-          do:
-            - logValidationError:
-                set:
-                  errorDetails: "${ .validationError.details }"
-                  errorField: "${ .validationError.instance }"
+        as: "validationError"
+        do:
+          - logValidationError:
+              set:
+                errorDetails: "${ .validationError.details }"
+                errorField: "${ .validationError.instance }"
+        errors:
+          with:
+            type: "https://open-workflow-specification.org/spec/1.0.0/errors/validation"
 ```
 
 In this example, the caught error is stored in the `validationError` variable, which can be used in subsequent tasks.
@@ -106,25 +106,23 @@ catch:
 If an error isn't caught by any catch block, it propagates up the workflow hierarchy:
 
 ```yaml
-- outerTask:
-    try:
-      do:
+  - outerTask:
+      try:
         - innerTask:
             try:
+              - riskyOperation:
+                  set: ${ . }
+            catch:
               do:
-                - riskyOperation:
-                    # ...
-              catch:
-                - error:
-                    with:
-                      type: "https://open-workflow-specification.org/spec/1.0.0/errors/timeout"
-                  do:
-                    # ...
+                - passInput:
+                    set: ${ . }
+              errors:
+                with:
+                  type: "https://open-workflow-specification.org/spec/1.0.0/errors/timeout"
       catch:
-        # This will catch any errors not caught by innerTask
-        - error:
-            do:
-              # ...
+        do:
+          - passInput:
+              set: ${ . }
 ```
 
 ## Best Practices

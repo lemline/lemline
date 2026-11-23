@@ -43,7 +43,7 @@ Use the **Raise** task when you need to:
 
 ```yaml
 document:
-  dsl: '1.0.0'
+  dsl: '1.0.3'
   namespace: examples
   name: basic-error-handling
   version: '1.0.0'
@@ -63,7 +63,8 @@ do:
             with:
               order: ${ .input.order }
               paymentMethod: ${ .input.paymentMethod }
-            result: paymentResult
+            output:
+              as: '${ $input + { "paymentResult": . } }'
       catch:
         as: error
         do:
@@ -85,7 +86,7 @@ do:
                 body:
                   to: ${ .input.order.customerEmail }
                   subject: "Order Processing Failed"
-                  body: "${ 'We apologize, but we could not process your order. Error: ' + .error.message }"
+                  body: "${ \"We apologize, but we could not process your order. Error: \" + .error.message }"
                 headers:
                   Content-Type: "application/json"
 ```
@@ -94,7 +95,7 @@ do:
 
 ```yaml
 document:
-  dsl: '1.0.0'
+  dsl: '1.0.3'
   namespace: examples
   name: retry-logic
   version: '1.0.0'
@@ -116,7 +117,7 @@ do:
           with:
             type: "PERMISSION_DENIED"
         retry:
-          when: ${ .error.code == "UNAVAILABLE" || .error.code == "RESOURCE_EXHAUSTED" }
+          when: ${ .error.code == "UNAVAILABLE" or .error.code == "RESOURCE_EXHAUSTED" }
           delay: PT2S
           backoff:
             exponential:
@@ -157,7 +158,7 @@ do:
 
 ```yaml
 document:
-  dsl: '1.0.0'
+  dsl: '1.0.3'
   namespace: examples
   name: input-validation
   version: '1.0.0'
@@ -165,22 +166,24 @@ do:
   - validateInput:
       do:
         - checkRequiredFields:
-            if: ${ !.input.email || !.input.username || !.input.password }
+            if: ${ [.input.email, .input.username, .input.password] | any(. == null or . == "") }
             raise:
               error:
                 type: "https://open-workflow-specification.org/errors/validation/invalid-argument"
                 status: 400
                 title: "Missing required fields"
-                detail: "${ \"The following fields are required but missing: \" + [if(!.input.email) \"email\", if(!.input.username) \"username\", if(!.input.password) \"password\"].filter(Boolean).join(\", \") }"
+                detail: "${ .input as $in | \"The following fields are required but missing: \" + ([\"email\", \"username\"\
+                  , \"password\"] | map(select(($in[.] // \"\") == \"\")) | join(\", \")) }"
 
         - validateEmail:
-            if: ${ !.input.email.match(/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/) }
+            if: ${ (.input.email // "") | test("^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+[.][A-Za-z]{2,}$") | not }
             raise:
               error:
                 type: "https://open-workflow-specification.org/errors/validation/invalid-argument"
                 status: 400
                 title: "Invalid email format"
-                detail: "${ \"Email address '\" + .input.email + \"' does not match the required format: username@domain.tld\" }"
+                detail: "${ \"Email address '\" + .input.email + \"' does not match the required format: username@domain.tld\"\
+                  \ }"
 
         - validatePassword:
             if: ${ .input.password.length < 8 }
@@ -197,7 +200,7 @@ do:
 
 ```yaml
 document:
-  dsl: '1.0.0'
+  dsl: '1.0.3'
   namespace: examples
   name: business-rule-validation
   version: '1.0.0'
@@ -221,16 +224,20 @@ do:
                 type: "https://open-workflow-specification.org/errors/validation/failed-precondition"
                 status: 412
                 title: "Insufficient inventory"
-                detail: "${ \"Product '\" + .input.productId + \"' has insufficient inventory. Requested: \" + .input.quantity + \", Available: \" + .inventoryData.quantityAvailable + \". Next restock date: \" + .inventoryData.nextDeliveryDate }"
+                detail: "${ \"Product '\" + .input.productId + \"' has insufficient inventory. Requested: \" + .input.quantity
+                  + \", Available: \" + .inventoryData.quantityAvailable + \". Next restock date: \" + .inventoryData.nextDeliveryDate
+                  }"
 
         - checkOrderLimit:
-            if: ${ .input.quantity > 10 && .input.customerType != "wholesale" }
+            if: ${ .input.quantity > 10 and .input.customerType != "wholesale" }
             raise:
               error:
                 type: "https://open-workflow-specification.org/errors/authorization/permission-denied"
                 status: 403
                 title: "Retail customers are limited to 10 units per order"
-                detail: "${ \"Customer type '\" + .input.customerType + \"' is limited to \" + 10 + \" units per order. Requested quantity: \" + .input.quantity + \". Resolution: Apply for a wholesale account or reduce order quantity.\" }"
+                detail: "${ \"Customer type '\" + .input.customerType + \"' is limited to \" + 10 + \" units per order. Requested
+                  quantity: \" + .input.quantity + \". Resolution: Apply for a wholesale account or reduce order quantity.\"\
+                  \ }"
 ```
 
 ## Combining Try and Raise
@@ -239,138 +246,34 @@ A powerful pattern is combining Try and Raise tasks for comprehensive error hand
 
 ```yaml
 document:
-  dsl: '1.0.0'
+  dsl: '1.0.3'
   namespace: examples
   name: comprehensive-error-handling
   version: '1.0.0'
-use:
-  secrets:
-    - pass
-  functions:
-    - logger:
-      ### ... logger implementation
-    - supportSystem:
-      ### ... support system implementation
 do:
   - processOrder:
       try:
-        - validateOrder:
-            do:
-              - checkOrderData:
-                  if: ${ !.input.order.items || .input.order.items.length == 0 }
-                  raise:
-                    error:
-                      type: "https://open-workflow-specification.org/errors/validation/invalid-argument"
-                      status: 400
-                      title: "Order must contain at least one item"
-                      detail: "The order must contain at least one item to be processed"
-
-              - verifyPaymentInfo:
-                  if: ${ !.input.paymentMethod || !.input.paymentMethod.type }
-                  raise:
-                    error:
-                      type: "https://open-workflow-specification.org/errors/validation/invalid-argument"
-                      status: 400
-                      title: "Payment validation failed"
-                      detail: "Payment information is required"
-
+        - validateItems:
+            if: '${ (.items // []) | length == 0 }'
+            raise:
+              error:
+                type: https://example.com/errors/invalid-order
+                status: 400
+                title: Order must contain at least one item
         - processPayment:
             call: http
             with:
-              method: "POST"
-                endpoint:
-                  uri: "https://api.example.com/payments/process"
-                  authentication:
-                    basic:
-                      username: "${ .user }"
-                      password: "${ $secrets.pass }"
-              headers:
-                Content-Type: "application/json"
-              body: ${ .input }
-
-        - verifyPaymentSuccess:
-            if: ${ !.paymentResult.success }
-            raise:
-              error:
-                type: "https://api.example.com/payments/process/errors/ABORTED""
-                status: 503
-                detail: ${ "Payment failed: " + .paymentResult.reason }
-        
+              method: post
+              endpoint: https://payments.example.com/orders
+              body: '${ . }'
       catch:
         as: orderError
         do:
-          - handleOrderError:
-              switch:
-                - condition: ${ .orderError.error == "INVALID_ARGUMENT" }
-                                                                                                                             then: handleValidationError
-                            - condition: ${ .orderError.error == "ABORTED" }
-                              then: handlePaymentError
-                            - condition: true
-                              then: handleGenericError
-
-            - handleValidationError:
-                set:
-                  result:
-                    success: false
-                    type: "VALIDATION_ERROR"
-                    message: ${ .orderError.message }
-                    details: ${ .orderError.details || {} }
-                then: exit
-
-            - handlePaymentError:
-                do:
-                  - logPaymentIssue:
-                      call: function
-                      with:
-                        function: logger
-                        args:
-                          level: "WARNING"
-                          message:
-                            ${ "Payment processing failed for order: " + .input.order.id }
-                        data: ${ .orderError }
-                
-                - suggestAlternativePayment:
-                    set:
-                      result:
-                        success: false
-                        type: "PAYMENT_ERROR"
-                          message: ${ .orderError.message }
-                          suggestedActions: [
-                            "Try a different payment method",
-                            "Verify your payment details",
-                            "Contact your payment provider"
-                          ]
-                then: exit
-
-            - handleGenericError:
-                do:
-                  - logError:
-                      call: logger
-                      with:
-                        args:
-                          level: "ERROR"
-                          message:
-                            ${ "Unexpected error processing order: " + .input.order.id }
-                        error: ${ .orderError }
-                
-                - createSupportTicket:
-                    call: supportSystem
-                    with:
-                      args:
-                        issueType: "ORDER_PROCESSING_FAILURE"
-                          orderId: ${ .input.order.id }
-                          customerEmail: ${ .input.order.customerEmail }
-                          errorDetails: ${ .orderError }
-
-                  - setErrorResponse:
-                      set:
-                        result:
-                          success: false
-                          type: "SYSTEM_ERROR"
-                          message: "We encountered an unexpected issue processing your order"
-                          supportTicket: ${ .ticketInfo.ticketId }
-                          supportEmail: "support@example.com"
-              then: exit
+          - reportFailure:
+              set:
+                success: false
+                reason: '${ $orderError.title }'
+                status: '${ $orderError.status }'
 ```
 
 Error handling tasks are essential for building robust, production-ready workflows. The Try and Raise tasks work

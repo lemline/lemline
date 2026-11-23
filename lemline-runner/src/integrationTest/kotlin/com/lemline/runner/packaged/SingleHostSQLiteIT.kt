@@ -333,7 +333,7 @@ internal class SingleHostSQLiteIT {
             val workflow = root.resolve("$namespace-$name.yaml")
             Files.writeString(workflow, """
                 document:
-                  dsl: '1.0.0'
+                  dsl: '1.0.3'
                   namespace: $namespace
                   name: $name
                   version: '1.0.0'

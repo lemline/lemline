@@ -18,7 +18,7 @@ Here's a simple example of waiting for 5 seconds:
 
 ```yaml
 document:
-  dsl: '1.0.0'
+  dsl: '1.0.3'
   namespace: examples
   name: wait-basic
   version: '1.0.0'
@@ -27,8 +27,7 @@ do:
       call: startLongRunningJob
       # ...
   - waitForCompletion:
-      wait:
-        duration: PT5S # Wait for 5 seconds
+      wait: PT5S # Wait for 5 seconds
   - checkStatus:
       call: getJobStatus
       # Input to checkStatus is the output of startProcess,
@@ -41,15 +40,7 @@ seconds before the `checkStatus` task is executed.
 
 ## Configuration Options
 
-### `wait` (Object, Required)
-
-This mandatory object defines the duration of the pause.
-
-* **`duration` ** (String, Required):
-  A [duration string](https://docs.oracle.com/javase/8/docs/api/java/time/Duration.html) that specifies
-  the length of time to wait. It must be in the ISO-8601 duration format (e.g., `PT5S` for 5 seconds, `PT1H30M` for 1
-  hour
-  and 30 minutes).
+Use an ISO 8601 duration such as `wait: PT5S`, an object such as `wait: { seconds: 5 }`, or an expression that produces a duration.
 
 ## Data Flow
 
@@ -66,271 +57,230 @@ This mandatory object defines the duration of the pause.
 
 ```yaml
 document:
-  dsl: '1.0.0'
+  dsl: '1.0.3'
   namespace: examples
   name: basic-delay
   version: '1.0.0'
 do:
   - sendNotification:
-      call: function
+      call: notificationService
       with:
-        function: notificationService
-        args:
-          user: ${ .input.userId }
-          message: "Your account verification process has started"
-  
+        user: ${ .input.userId }
+        message: "Your account verification process has started"
   - waitForProcessing:
-      wait:
-        duration: PT30S
-  
+      wait: PT30S
+
   - checkVerificationStatus:
-      call: function
+      call: verificationService
       with:
-        function: verificationService
-        args:
-          userId: ${ .input.userId }
-      result: verificationStatus
+        userId: ${ .input.userId }
+      output:
+        as: '${ $input + { "verificationStatus": . } }'
 ```
 
 ### Wait Until Specific Time
 
 ```yaml
 document:
-  dsl: '1.0.0'
+  dsl: '1.0.3'
   namespace: examples
   name: scheduled-execution
   version: '1.0.0'
 do:
   - scheduleMaintenanceWindow:
       set:
-        maintenanceWindowStart: ${ .input.maintenanceTime || "2023-12-15T02:00:00Z" }
-  
+        maintenanceWindowStart: ${ .input.maintenanceTime // "2023-12-15T02:00:00Z" }
+
   - notifyUsersAboutMaintenance:
-      call: function
+      call: notificationService
       with:
-        function: notificationService
-        args:
-          type: "MAINTENANCE_NOTIFICATION"
-          message: ${ "System maintenance scheduled for " + .maintenanceWindowStart }
-          users: ${ .input.affectedUsers }
-  
+        type: "MAINTENANCE_NOTIFICATION"
+        message: ${ "System maintenance scheduled for " + .maintenanceWindowStart }
+        users: ${ .input.affectedUsers }
+
   - waitUntilMaintenanceWindow:
-      wait:
-        timestamp: ${ .maintenanceWindowStart }
-  
+      wait: '${ {seconds: ([0, ((.maintenanceWindowStart | fromdateiso8601) - now | ceil)] | max)} }'
   - performMaintenance:
-      call: function
+      call: maintenanceService
       with:
-        function: maintenanceService
-        args:
-          systems: ${ .input.targetSystems }
-          operationType: "SCHEDULED_MAINTENANCE"
+        systems: ${ .input.targetSystems }
+        operationType: "SCHEDULED_MAINTENANCE"
 ```
 
 ### Dynamic Wait Duration
 
 ```yaml
 document:
-  dsl: '1.0.0'
+  dsl: '1.0.3'
   namespace: examples
   name: dynamic-delay
   version: '1.0.0'
 do:
   - determineWaitTime:
       set:
-        waitTime: ${
-          if (.input.priority == "high") {
-            "PT5S"  // 5 seconds for high priority
-          } else if (.input.priority == "medium") {
-            "PT1M"  // 1 minute for medium priority
-          } else {
-            "PT5M"  // 5 minutes for low priority
-          }
-        }
-  
+        waitTime: '${ if .input.priority == "high" then "PT5S" elif .input.priority == "medium" then "PT1M" else "PT5M" end
+          }'
   - waitBasedOnPriority:
-      wait:
-        duration: ${ .waitTime }
-  
+      wait: '${ .waitTime }'
   - processItem:
-      call: function
+      call: itemProcessor
       with:
-        function: itemProcessor
-        args:
-          itemId: ${ .input.itemId }
-          processingType: ${ .input.processingType }
+        itemId: '${ .input.itemId }'
+        processingType: '${ .input.processingType }'
 ```
 
 ### Implementing Polling Pattern
 
 ```yaml
 document:
-  dsl: '1.0.0'
+  dsl: '1.0.3'
   namespace: examples
   name: polling-pattern
   version: '1.0.0'
 do:
   - startLongRunningProcess:
-      call: function
+      call: batchProcessor
       with:
-        function: batchProcessor
-        args:
-          batchId: ${ .input.batchId }
-          operationType: "START"
-      result: processStatus
-  
+        batchId: ${ .input.batchId }
+        operationType: "START"
+      output:
+        as: '${ $input + { "processStatus": . } }'
   - initializePolling:
       set:
         maxAttempts: 10
         currentAttempt: 0
         complete: false
-  
+
   - pollForCompletion:
-      while: ${ !.complete && .currentAttempt < .maxAttempts }
       do:
-        - waitForNextPoll:
-            wait:
-              duration: PT10S
-        
-        - incrementAttempt:
-            set:
-              currentAttempt: ${ .currentAttempt + 1 }
-        
-        - checkStatus:
-            call: function
-            with:
-              function: batchProcessor
-              args:
-                batchId: ${ .input.batchId }
-                operationType: "STATUS"
-            result: processStatus
-        
-        - updateCompletionStatus:
-            set:
-              complete: ${ .processStatus.status == "COMPLETED" || .processStatus.status == "FAILED" }
-  
+        - iterate:
+            do:
+              - waitForNextPoll:
+                  wait: PT10S
+
+              - incrementAttempt:
+                  set:
+                    currentAttempt: ${ .currentAttempt + 1 }
+
+              - checkStatus:
+                  call: batchProcessor
+                  with:
+                    batchId: ${ .input.batchId }
+                    operationType: "STATUS"
+                  output:
+                    as: '${ $input + { "processStatus": . } }'
+              - updateCompletionStatus:
+                  set:
+                    complete: ${ .processStatus.status == "COMPLETED" or .processStatus.status == "FAILED" }
+
+        - repeat:
+            switch:
+              - more:
+                  when: ${ (.complete | not) and .currentAttempt < .maxAttempts }
+                  then: iterate
+              - done:
+                  then: exit
   - handleProcessResults:
-      if: ${ .complete }
-      then:
-        - returnResults:
-            set:
-              result:
-                batchId: ${ .input.batchId }
-                status: ${ .processStatus.status }
-                details: ${ .processStatus.details }
-      else:
-        - handleTimeout:
-            set:
-              result:
-                batchId: ${ .input.batchId }
-                status: "TIMED_OUT"
-                message: "Process did not complete within the maximum polling attempts"
+      do:
+        - choose:
+            switch:
+              - yes:
+                  when: ${ .complete }
+                  then: onTrue
+              - no:
+                  then: onFalse
+        - onTrue:
+            do:
+              - returnResults:
+                  set:
+                    result:
+                      batchId: ${ .input.batchId }
+                      status: ${ .processStatus.status }
+                      details: ${ .processStatus.details }
+            then: exit
+        - onFalse:
+            do:
+              - handleTimeout:
+                  set:
+                    result:
+                      batchId: ${ .input.batchId }
+                      status: "TIMED_OUT"
+                      message: "Process did not complete within the maximum polling attempts"
 ```
 
 ### Cooldown Period
 
 ```yaml
 document:
-  dsl: '1.0.0'
+  dsl: '1.0.3'
   namespace: examples
   name: rate-limiting
   version: '1.0.0'
 do:
   - processFirstBatch:
-      call: function
+      call: dataProcessor
       with:
-        function: dataProcessor
-        args:
-          batchId: ${ .input.batchIds[0] }
-          data: ${ .input.batches[0] }
-      result: firstBatchResult
-  
+        batchId: '${ .input.batchIds[0] }'
+        data: '${ .input.batches[0] }'
+      output:
+        as: '${ $input + { "firstBatchResult": . } }'
   - implementCooldown:
-      wait:
-        duration: PT30S
+      wait: PT30S
+      metadata:
         description: "API rate limiting cooldown period"
-  
   - processSecondBatch:
-      call: function
+      call: dataProcessor
       with:
-        function: dataProcessor
-        args:
-          batchId: ${ .input.batchIds[1] }
-          data: ${ .input.batches[1] }
-      result: secondBatchResult
-  
+        batchId: '${ .input.batchIds[1] }'
+        data: '${ .input.batches[1] }'
+      output:
+        as: '${ $input + { "secondBatchResult": . } }'
   - finalizeResults:
       set:
         result:
           processedBatches: 2
-          results: [
-            ${ .firstBatchResult },
-            ${ .secondBatchResult }
-          ]
+          results: ['${ .firstBatchResult }', '${ .secondBatchResult }']
           timing:
-            started: ${ .execution.startTime }
-            completed: ${ new Date().toISOString() }
+            started: '${ .execution.startTime }'
+            completed: '${ (now | todateiso8601) }'
 ```
 
 ### Business Hours Scheduling
 
 ```yaml
 document:
-  dsl: '1.0.0'
+  dsl: '1.0.3'
   namespace: examples
   name: business-hours-scheduling
   version: '1.0.0'
 do:
   - receiveRequest:
       set:
-        currentTime: ${ new Date() }
-        targetTime: ${
-          function getNextBusinessHourTime() {
-            const now = new Date();
-            const hour = now.getHours();
-            const isWeekend = now.getDay() === 0 || now.getDay() === 6;
-            
-            if (isWeekend) {
-              // Move to Monday 9 AM
-              const monday = new Date(now);
-              monday.setDate(now.getDate() + (8 - now.getDay()) % 7);
-              monday.setHours(9, 0, 0, 0);
-              return monday.toISOString();
-            } else if (hour < 9) {
-              // Before business hours, schedule for 9 AM
-              const today9am = new Date(now);
-              today9am.setHours(9, 0, 0, 0);
-              return today9am.toISOString();
-            } else if (hour >= 17) {
-              // After business hours, schedule for next day 9 AM
-              const tomorrow9am = new Date(now);
-              tomorrow9am.setDate(now.getDate() + 1);
-              tomorrow9am.setHours(9, 0, 0, 0);
-              return tomorrow9am.toISOString();
-            } else {
-              // Within business hours, process now
-              return now.toISOString();
-            }
-          }
-          getNextBusinessHourTime()
-        }
-  
+        currentTime: '${ (now | todateiso8601) }'
+        targetTime: '${ now as $now | ($now | gmtime) as $utc | ($now - ($now % 86400) + 32400) as $opening | (if $utc[6]
+          == 6 then $opening + 172800 elif $utc[6] == 0 then $opening + 86400 elif $utc[3] < 9 then $opening elif $utc[3]
+          < 17 then $now elif $utc[6] == 5 then $opening + 259200 else $opening + 86400 end) | todateiso8601 }'
   - scheduleForBusinessHours:
-      if: ${ .targetTime != .currentTime }
-      then:
-        - waitUntilBusinessHours:
-            wait:
-              timestamp: ${ .targetTime }
-              description: "Waiting until business hours to process request"
-  
+      do:
+        - choose:
+            switch:
+              - yes:
+                  when: '${ .targetTime != .currentTime }'
+                  then: onTrue
+              - no:
+                  then: exit
+        - onTrue:
+            do:
+              - waitUntilBusinessHours:
+                  wait: '${ {seconds: ([0, ((.targetTime | fromdateiso8601) - now | ceil)] | max)} }'
+            then: exit
   - processRequest:
-      call: function
+      call: requestProcessor
       with:
-        function: requestProcessor
-        args:
-          requestId: ${ .input.requestId }
-          data: ${ .input.requestData }
-      result: processingResult
+        requestId: '${ .input.requestId }'
+        data: '${ .input.requestData }'
+      output:
+        as: '${ $input + { "processingResult": . } }'
 ```
 
 ## Combining Wait with Other Tasks
@@ -339,74 +289,26 @@ Time tasks are often combined with other task types to create more complex tempo
 
 ```yaml
 document:
-  dsl: '1.0.0'
+  dsl: '1.0.3'
   namespace: examples
-  name: comprehensive-retry-with-backoff
+  name: exponential-backoff
   version: '1.0.0'
 do:
-  - initializeState:
-      set:
-        retryCount: 0
-        maxRetries: 5
-        backoffFactor: 2
-        initialDelay: 1
-  
-  - processWithRetries:
+  - submit:
       try:
-        do:
-          - callExternalService:
-              call: function
-              with:
-                function: externalService
-                args:
-                  requestData: ${ .input.data }
-              result: serviceResponse
-        catch:
-          as: error
-          do:
-            - incrementRetryCount:
-                set:
-                  retryCount: ${ .retryCount + 1 }
-                  currentDelay: ${ .initialDelay * Math.pow(.backoffFactor, .retryCount - 1) }
-            
-            - checkRetryLimit:
-                if: ${ .retryCount <= .maxRetries }
-                then:
-                  - logRetryAttempt:
-                      call: function
-                      with:
-                        function: logger
-                        args:
-                          level: "INFO"
-                          message: ${ "Retrying operation (attempt " + .retryCount + " of " + .maxRetries + ")" }
-                          error: ${ .error }
-                          nextDelaySeconds: ${ .currentDelay }
-                  
-                  - implementBackoff:
-                      wait:
-                        duration: ${ "PT" + .currentDelay + "S" }
-                        description: ${ "Exponential backoff delay before retry attempt " + .retryCount }
-                  
-                  - retry:
-                      try:
-                        do:
-                          - callExternalServiceAgain:
-                              call: function
-                              with:
-                                function: externalService
-                                args:
-                                  requestData: ${ .input.data }
-                                  retryAttempt: ${ .retryCount }
-                              result: serviceResponse
-                else:
-                  - handleMaxRetriesExceeded:
-                      set:
-                        result:
-                          success: false
-                          error: "MAX_RETRIES_EXCEEDED"
-                          message: "Operation failed after maximum retry attempts"
-                          details: {
-                            "originalError": ${ .error },
-                            "retryAttempts": ${ .retryCount }
-                          }
+        - sendRequest:
+            call: http
+            with:
+              method: post
+              endpoint: https://api.example.com/jobs
+              body: '${ . }'
+      catch:
+        errors:
+          with:
+            type: https://open-workflow-specification.org/spec/1.0.0/errors/communication
+        retry:
+          delay: { seconds: 1 }
+          backoff: { exponential: {} }
+          limit:
+            attempt: { count: 4 }
 ```

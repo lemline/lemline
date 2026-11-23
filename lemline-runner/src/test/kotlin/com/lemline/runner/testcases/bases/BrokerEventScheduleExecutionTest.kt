@@ -35,7 +35,7 @@ internal abstract class BrokerEventScheduleExecutionTest {
             val name = "event-schedule-${IDV7.random()}"
             val definition = DefinitionModel.from("""
                 document:
-                  dsl: '1.0.0'
+                  dsl: '1.0.3'
                   namespace: test
                   name: $name
                   version: '1.0.0'

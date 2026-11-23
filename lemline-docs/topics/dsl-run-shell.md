@@ -6,73 +6,26 @@ title: Run Shell Command
 
 ## Purpose
 
-The `run: shell` task allows a workflow to execute a command line instruction using the host system's default shell (e.g., bash, sh, cmd, powershell). This is useful for simple system interactions, invoking command-line tools, or file system operations.
+The worker starts an executable and passes the evaluated arguments to it in order. To use shell operators, invoke a shell explicitly.
 
 ## Usage Example
 
+On a host with `wc`, this workflow counts the bytes in a string passed on standard input.
+
 ```yaml
 document:
-  dsl: '1.0.0'
-  namespace: shell-runs
-  name: run-simple-shell
+  dsl: '1.0.3'
+  namespace: examples
+  name: count-bytes
   version: '1.0.0'
 do:
-  - executeShellCommand:
+  - count:
       run:
         shell:
-          command: 'echo "Processing file: ${fileName}" && grep -c "ERROR" "${filePath}"' 
-          # Pass arguments as environment variables
-          environment: 
-            fileName: "${ .inputFile.name }"
-            filePath: "${ .inputFile.path }"
-        # `await: true` (default) waits for completion
-        # `return: stdout` (default) captures the standard output
-        return: stdout 
-      then: processShellOutput
-  - processShellOutput:
-      # Input might be "Processing file: data.log\n3" (if 3 errors found)
-      set:
-        # Example: extract the error count (implementation depends on shell/tools)
-        errorCount: "${ parseInteger(split(. , '\n')[1]) }"
-
-## Additional Examples
-
-### Example: Capturing Standard Error
-
-```yaml
-do:
-  - attemptRiskyOperation:
-      run:
-        shell:
-          # Command might succeed (stdout) or fail (stderr)
-          command: "/opt/tools/do-something --input /data/input.txt || echo 'Fallback value'"
-        # Capture stderr instead of stdout
-        return: stderr 
-      then: handleOperationError
-  - handleOperationError:
-      # Input is the content sent to stderr, or empty if none
-      set:
-        errorMessage: "${ . }"
-```
-
-### Example: Capturing All Outputs
-
-```yaml
-do:
-  - executeUtility:
-      run:
-        shell:
-          command: "utility-tool --process ${ .fileId } --verbose"
-        # Get exit code, stdout, and stderr together
-        return: all 
-      then: processUtilityResult
-  - processUtilityResult:
-      # Input: { "code": 0, "stdout": "...", "stderr": "..." }
-      set:
-        exitCode: "${ .code }"
-        outputLog: "${ .stdout }"
-        # Use stderr only if exit code was non-zero
-        errorLog: "${ if .code != 0 then .stderr else null end }"
+          command: wc
+          arguments: ["-c"]
+          stdin: "${ .text }"
+        return: stdout
 ```
 
 ## Configuration Options
@@ -82,7 +35,7 @@ The configuration is provided under the `run` property, specifically within the 
 ### `run` (Object, Required)
 
 *   **`shell`** (Object, Required): Defines the shell command process configuration.
-    *   **`command`** (String, Required): The shell command line to execute. This string is typically passed directly to the system's shell interpreter.
+    *   **`command`** (String, Required): The shell command line to execute. Lemline splits the command into tokens and starts the executable on the worker.
     *   **`arguments`** (List<String>, Optional): An ordered list appended to the command, for example `["-n", "Hello world"]`. Entries can use [Runtime Expressions](dsl-runtime-expressions.md). Duplicate arguments, empty strings, and spaces within an entry are preserved. Older definitions using argument maps must be converted to lists.
     *   **`stdin`** (String, Optional): Standard input passed to the process, either a literal string or a runtime expression. Input is closed after the supplied content, including when no content is supplied.
     *   **`environment`** (Map<String, String>, Optional): A key/value map of environment variables to set specifically for the execution of this shell command. Values can be static strings or evaluated from [Runtime Expressions](dsl-runtime-expressions.md). This is a common way to pass dynamic data to the command.

@@ -21,7 +21,7 @@ Here's a simple example of using `Set` to create a new object:
 
 ```yaml
 document:
-  dsl: '1.0.0'
+  dsl: '1.0.3'
   namespace: examples
   name: set-basic
   version: '1.0.0'
@@ -96,7 +96,7 @@ set:
 
 ```yaml
 document:
-  dsl: '1.0.0'
+  dsl: '1.0.3'
   namespace: examples
   name: basic-variable-assignment
   version: '1.0.0'
@@ -104,54 +104,44 @@ do:
   - setOrderDefaults:
       set:
         orderData:
-          id: ${ .input.orderId || uuid() }
-          createdAt: ${ new Date().toISOString() }
+          id: ${ .input.orderId // $workflow.id }
+          createdAt: ${ (now | todateiso8601) }
           status: "PENDING"
           customerName: ${ .input.customer.firstName + " " + .input.customer.lastName }
-          priority: ${ .input.priority || "normal" }
+          priority: ${ .input.priority // "normal" }
 ```
 
 ### Data Transformation
 
 ```yaml
 document:
-  dsl: '1.0.0'
+  dsl: '1.0.3'
   namespace: examples
   name: data-transformation
   version: '1.0.0'
 do:
   - retrieveUserData:
-      call: function
+      call: userService
       with:
-        function: userService
-        args:
-          userId: ${ .input.userId }
-      result: userData
-
+        userId: '${ .input.userId }'
+      output:
+        as: '${ $input + { "userData": . } }'
   - transformUserProfile:
       set:
         profile:
-          displayName: ${ .userData.firstName + " " + .userData.lastName }
-          email: ${ .userData.email }
-          joined: ${ new Date(.userData.createdTimestamp).toLocaleDateString() }
-          membershipLevel: ${ 
-            if(.userData.totalPurchases > 10000) 
-              "platinum" 
-            else if(.userData.totalPurchases > 5000) 
-              "gold" 
-            else if(.userData.totalPurchases > 1000) 
-              "silver" 
-            else 
-              "bronze" 
-          }
-          tags: ${ .userData.interests || [] }
+          displayName: '${ .userData.firstName + " " + .userData.lastName }'
+          email: '${ .userData.email }'
+          joined: '${ .userData.createdTimestamp | fromdateiso8601 | strftime("%Y-%m-%d") }'
+          membershipLevel: '${ if .userData.totalPurchases > 10000 then "platinum" elif .userData.totalPurchases > 5000 then
+            "gold" elif .userData.totalPurchases > 1000 then "silver" else "bronze" end }'
+          tags: '${ .userData.interests // [] }'
 ```
 
 ### Conditional Data Preparation
 
 ```yaml
 document:
-  dsl: '1.0.0'
+  dsl: '1.0.3'
   namespace: examples
   name: conditional-data-preparation
   version: '1.0.0'
@@ -159,120 +149,81 @@ do:
   - prepareApiRequest:
       set:
         apiRequest:
-          endpoint: ${ .input.environment == "production" ? "https://api.example.com" : "https://staging-api.example.com" }
+          endpoint: '${ if .input.environment == "production" then "https://api.example.com" else "https://staging-api.example.com"
+            end }'
           headers:
-            Authorization: ${ "Bearer " + .input.authToken }
+            Authorization: '${ "Bearer " + .input.authToken }'
             Content-Type: "application/json"
             Accept: "application/json"
-          body: ${
-            {
-              "userId": .input.userId,
-              "operation": .input.operation,
-              "parameters": .input.parameters || {},
-              "tracingId": uuid(),
-              "timestamp": new Date().toISOString()
-            }
-          }
+          body: '${ { "userId": (.input.userId), "operation": (.input.operation), "parameters": (.input.parameters // {}),
+            "tracingId": ($workflow.id), "timestamp": ((now | todateiso8601))} }'
 ```
 
 ### Aggregating Results
 
 ```yaml
 document:
-  dsl: '1.0.0'
+  dsl: '1.0.3'
   namespace: examples
   name: result-aggregation
   version: '1.0.0'
 do:
   - retrieveProductData:
-      call: function
+      call: productService
       with:
-        function: productService
-        args:
-          productId: ${ .input.productId }
-      result: productData
-      
+        productId: '${ .input.productId }'
+      output:
+        as: '${ $input + { "productData": . } }'
   - retrievePricing:
-      call: function
+      call: pricingService
       with:
-        function: pricingService
-        args:
-          productId: ${ .input.productId }
-          region: ${ .input.region }
-      result: pricingData
-      
+        productId: '${ .input.productId }'
+        region: '${ .input.region }'
+      output:
+        as: '${ $input + { "pricingData": . } }'
   - retrieveInventory:
-      call: function
+      call: inventoryService
       with:
-        function: inventoryService
-        args:
-          productId: ${ .input.productId }
-          warehouseId: ${ .input.warehouseId }
-      result: inventoryData
-      
+        productId: '${ .input.productId }'
+        warehouseId: '${ .input.warehouseId }'
+      output:
+        as: '${ $input + { "inventoryData": . } }'
   - aggregateProductInfo:
       set:
-        enrichedProduct: ${
-          {
-            "id": .productData.id,
-            "name": .productData.name,
-            "description": .productData.description,
-            "category": .productData.category,
-            "pricing": {
-              "basePrice": .pricingData.basePrice,
-              "currency": .pricingData.currency,
-              "discountPercentage": .pricingData.discountPercentage || 0,
-              "finalPrice": .pricingData.finalPrice,
-              "taxRate": .pricingData.taxRate
-            },
-            "inventory": {
-              "available": .inventoryData.quantityAvailable > 0,
-              "quantity": .inventoryData.quantityAvailable,
-              "location": .inventoryData.warehouseLocation,
-              "estimatedRestockDate": .inventoryData.quantityAvailable <= 0 ? .inventoryData.nextDeliveryDate : null
-            },
-            "lastUpdated": new Date().toISOString()
-          }
-        }
+        enrichedProduct: '${ { "id": (.productData.id), "name": (.productData.name), "description": (.productData.description),
+          "category": (.productData.category), "pricing": ({ "basePrice": (.pricingData.basePrice), "currency": (.pricingData.currency),
+          "discountPercentage": (.pricingData.discountPercentage // 0), "finalPrice": (.pricingData.finalPrice), "taxRate":
+          (.pricingData.taxRate)}), "inventory": ({ "available": (.inventoryData.quantityAvailable > 0), "quantity": (.inventoryData.quantityAvailable),
+          "location": (.inventoryData.warehouseLocation), "estimatedRestockDate": (if .inventoryData.quantityAvailable <=
+          0 then .inventoryData.nextDeliveryDate else null end)}), "lastUpdated": ((now | todateiso8601))} }'
 ```
 
 ### Error Response Formatting
 
 ```yaml
 document:
-  dsl: '1.0.0'
+  dsl: '1.0.3'
   namespace: examples
   name: error-response-formatting
   version: '1.0.0'
 do:
   - try:
-      do:
-        - processOrder:
-            call: function
-            with:
-              function: orderProcessor
-              args:
-                order: ${ .input.order }
-            result: processingResult
       catch:
         as: error
         do:
           - formatErrorResponse:
               set:
-                errorResponse: ${
-                  {
-                    "success": false,
-                    "errorCode": .error.code || "UNKNOWN_ERROR",
-                    "message": .error.message || "An unexpected error occurred",
-                    "details": .error.details || null,
-                    "timestamp": new Date().toISOString(),
-                    "requestId": .input.requestId || uuid(),
-                    "suggestions": [
-                      "Try again later",
-                      "Contact support if the issue persists"
-                    ]
-                  }
-                }
+                errorResponse: '${ { "success": (false), "errorCode": (.error.code // "UNKNOWN_ERROR"), "message": (.error.message
+                  // "An unexpected error occurred"), "details": (.error.details // null), "timestamp": ((now | todateiso8601)),
+                  "requestId": (.input.requestId // $workflow.id), "suggestions": ([ "Try again later", "Contact support if
+                  the issue persists" ])} }'
+      try:
+        - processOrder:
+            call: orderProcessor
+            with:
+              order: '${ .input.order }'
+            output:
+              as: '${ $input + { "processingResult": . } }'
 ```
 
 ## Working with JSON Paths
@@ -281,7 +232,7 @@ The Set task leverages JQ-style JSON path expressions for powerful data manipula
 
 ```yaml
 document:
-  dsl: '1.0.0'
+  dsl: '1.0.3'
   namespace: examples
   name: json-path-examples
   version: '1.0.0'
@@ -290,26 +241,26 @@ do:
       set:
         # Access nested properties
         customerEmail: ${ .input.order.customer.contactInfo.email }
-        
+
         # Array operations
         firstItem: ${ .input.items[0] }
         itemCount: ${ .input.items | length }
-        
+
         # Filtering arrays
         expensiveItems: ${ .input.products[.price > 100] }
-        
+
         # Mapping arrays
         productNames: ${ .input.products[].name }
-        
+
         # Combining data
         combinedList: ${ .list1 + .list2 }
-        
+
         # Conditional assignment
-        status: ${ if(.input.approved) "APPROVED" else "PENDING" }
-        
+        status: ${ if .input.approved then "APPROVED" else "PENDING" end }
+
         # String operations
-        upperCaseName: ${ .input.name | upper }
-        formattedId: ${ .input.id | pad_left(10, "0") }
+        upperCaseName: ${ .input.name | ascii_upcase }
+        formattedId: ${ .input.id | tostring | if length < 10 then ("0000000000" + .)[-10:] else . end }
 ```
 
 Data tasks are essential for maintaining clean data flow throughout your workflows and preparing data in exactly the right format for each subsequent task. The Set task in particular offers significant flexibility in how you transform and manipulate data within your workflow's execution. 

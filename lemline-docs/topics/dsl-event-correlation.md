@@ -50,7 +50,7 @@ Imagine a workflow processing an order needs to wait for a specific payment conf
 
 ```yaml
 document:
-  dsl: '1.0.0'
+  dsl: '1.0.3'
   namespace: order-processing
   name: wait-for-payment
   version: '1.0.0'
@@ -60,7 +60,7 @@ do:
         # Assume input contains orderId, store it in context
         orderId: "${ .initialOrder.id }"
       export:
-         as: "${ $context + { currentOrderId: .orderId } }"
+        as: "${ $context + { currentOrderId: .orderId } }"
   - waitForPaymentEvent:
       listen:
         to:
@@ -68,20 +68,20 @@ do:
             with: # Basic filtering on event type
               type: com.payment.processed.v1
               # Correlation based on data
-              correlate:
+            correlate:
                 # Name this correlation check 'matchOrderId'
-                matchOrderId:
+              matchOrderId:
                   # Extract 'transaction.orderRef' from the incoming event's data
-                  from: "${ .data.transaction.orderRef }"
+                from: "${ .data.transaction.orderRef }"
                   # Expect it to match the 'currentOrderId' stored in workflow context
-                  expect: "${ $context.currentOrderId }"
+                expect: "${ $context.currentOrderId }"
         # Optional: Timeout if the event doesn't arrive
       timeout:
         after:
           minutes: 30
       # Output contains the received event if successful
   - processPaymentConfirmation:
-      # ... task input is the matched payment event ...
+      set: ${ . }
 ```
 
 In this example, the `waitForPaymentEvent` task will only proceed if it receives an event with `type: com.payment.processed.v1` AND the value of `data.transaction.orderRef` inside that event matches the `currentOrderId` currently stored in the workflow's context.
@@ -92,7 +92,7 @@ Suppose a workflow needs to wait for a system status update event indicating tha
 
 ```yaml
 document:
-  dsl: '1.0.0'
+  dsl: '1.0.3'
   namespace: system-monitor
   name: wait-for-component-ready
   version: '1.0.0'
@@ -104,14 +104,14 @@ do:
             with:
               type: com.system.status.update.v1
               source: http://systems/monitoring/component-abc # Filter by source
-              correlate:
-                matchComponentStatus:
+            correlate:
+              matchComponentStatus:
                   # Extract the status field from the event data
-                  from: "${ .data.status }"
+                from: "${ .data.status }"
                   # Expect the status to be the exact string 'Ready'
-                  expect: "Ready"
+                expect: "Ready"
   - componentIsReady:
-      # ... task to execute now that the component is ready ...
+      set: ${ . }
 ```
 
 Here, the correlation `matchComponentStatus` checks if the `status` field within the event's data payload is exactly equal to the static string `"Ready"`.
@@ -122,8 +122,8 @@ Consider a scenario where a workflow orchestrates a travel booking and needs to 
 
 ```yaml
 document:
-  dsl: '1.0.0'
-  namespace: travel-booking 
+  dsl: '1.0.3'
+  namespace: travel-booking
   name: wait-for-flight-confirmation
   version: '1.0.0'
 do:
@@ -141,18 +141,18 @@ do:
             with:
               type: com.travel.confirmation.flight.v1
               # Requires BOTH correlations to succeed
-              correlate:
-                matchBookingId:
-                  from: "${ .data.confirmation.bookingRef }"
-                  expect: "${ $context.currentBookingId }"
-                matchProvider:
-                  from: "${ .data.confirmation.providerName }"
-                  expect: "${ $context.currentProvider }" # Or could be expect: "AcmeAir"
+            correlate:
+              matchBookingId:
+                from: "${ .data.confirmation.bookingRef }"
+                expect: "${ $context.currentBookingId }"
+              matchProvider:
+                from: "${ .data.confirmation.providerName }"
+                expect: "${ $context.currentProvider }"   # Or could be expect: "AcmeAir"
       timeout:
         after:
           hours: 1
   - processFlightConfirmation:
-      # ... task input is the confirmation event matching both criteria ...
+      set: ${ . }
 ```
 
 In this case, the `listen` task will only be satisfied by an event of the correct type where `data.confirmation.bookingRef` matches the `$context.currentBookingId` **AND** `data.confirmation.providerName` matches `$context.currentProvider`.

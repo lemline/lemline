@@ -10,7 +10,7 @@ The fundamental error handling mechanism in Open Workflow DSL is the try-catch b
 
 ```yaml
 document:
-  dsl: '1.0.0'
+  dsl: '1.0.3'
   namespace: default
   name: try-catch
   version: '0.1.0'
@@ -47,7 +47,7 @@ When an error occurs, you often need to perform specific actions in response, su
 
 ```yaml
 document:
-  dsl: '1.0.0'
+  dsl: '1.0.3'
   namespace: default
   name: try-catch
   version: '0.1.0'
@@ -102,7 +102,7 @@ For transient failures, retry mechanisms allow workflows to automatically attemp
 
 ```yaml
 document:
-  dsl: '1.0.0'
+  dsl: '1.0.3'
   namespace: default
   name: try-catch-retry
   version: '0.1.0'
@@ -146,7 +146,7 @@ For consistent retry policies across multiple operations, define reusable retry 
 
 ```yaml
 document:
-  dsl: '1.0.0'
+  dsl: '1.0.3'
   namespace: default
   name: try-catch-retry
   version: '0.1.0'
@@ -189,7 +189,7 @@ Sometimes you want to retry only under specific conditions, rather than for all 
 
 ```yaml
 document:
-  dsl: '1.0.0'
+  dsl: '1.0.3'
   namespace: examples
   name: conditional-retry
   version: '0.1.0'
@@ -232,7 +232,7 @@ The DSL supports hierarchical error types, allowing for more flexible error matc
 
 ```yaml
 document:
-  dsl: '1.0.0'
+  dsl: '1.0.3'
   namespace: examples
   name: error-hierarchy
   version: '0.1.0'
@@ -246,33 +246,41 @@ do:
               endpoint: https://api.example.com/resource
               body: ${ .requestData }
       catch:
-        - errors:
-            with:
-              type: https://example.com/errors/api/validation
-          as: validationError
-          do:
-            - handleValidation:
-                set:
-                  errorType: "validation"
-                  errorDetails: ${ $validationError }
-        - errors:
-            with:
-              type: https://example.com/errors/api
-          as: apiError
-          do:
-            - handleGenericApiError:
-                set:
-                  errorType: "api"
-                  errorDetails: ${ $apiError }
-        - errors:
-            with:
-              type: https://example.com/errors
-          as: genericError
-          do:
-            - handleGenericError:
-                set:
-                  errorType: "generic"
-                  errorDetails: ${ $genericError }
+        as: failure
+        when: ${ ($failure.type == "https://example.com/errors/api/validation") or ($failure.type == "https://example.com/errors/api") or ($failure.type == "https://example.com/errors") }
+        do:
+          - selectHandler:
+              switch:
+                - case1:
+                    then: handle1
+                    when: ${ $failure.type == "https://example.com/errors/api/validation" }
+                - case2:
+                    then: handle2
+                    when: ${ $failure.type == "https://example.com/errors/api" }
+                - case3:
+                    then: handle3
+                    when: ${ $failure.type == "https://example.com/errors" }
+          - handle1:
+              do:
+                - handleValidation:
+                    set:
+                      errorType: validation
+                      errorDetails: ${ $failure }
+              then: exit
+          - handle2:
+              do:
+                - handleGenericApiError:
+                    set:
+                      errorType: api
+                      errorDetails: ${ $failure }
+              then: exit
+          - handle3:
+              do:
+                - handleGenericError:
+                    set:
+                      errorType: generic
+                      errorDetails: ${ $failure }
+              then: exit
 ```
 
 This example demonstrates:
@@ -289,7 +297,7 @@ In some workflows, you need to perform cleanup actions when an error occurs afte
 
 ```yaml
 document:
-  dsl: '1.0.0'
+  dsl: '1.0.3'
   namespace: examples
   name: compensating-transaction
   version: '0.1.0'
@@ -302,7 +310,8 @@ do:
               method: post
               endpoint: https://inventory.example.com/api/reserve
               body: ${ .orderItems }
-              output: inventoryReservation
+            output:
+              as: '${ $input + { "inventoryReservation": . } }'
         - processPayment:
             call: http
             with:
@@ -346,7 +355,7 @@ The circuit breaker pattern prevents repeated calls to a failing service, reduci
 
 ```yaml
 document:
-  dsl: '1.0.0'
+  dsl: '1.0.3'
   namespace: examples
   name: circuit-breaker
   version: '0.1.0'
@@ -360,10 +369,6 @@ use:
       limit:
         attempt:
           count: 3
-      breaker:
-        failureThreshold: 5
-        recoveryTime:
-          minutes: 2
 do:
   - callExternalService:
       try:
@@ -393,7 +398,7 @@ Timeouts prevent workflows from hanging indefinitely when external systems are u
 
 ```yaml
 document:
-  dsl: '1.0.0'
+  dsl: '1.0.3'
   namespace: examples
   name: timeout-handling
   version: '0.1.0'
@@ -406,7 +411,8 @@ do:
               method: post
               endpoint: https://api.example.com/long-process
               body: ${ .processData }
-              timeout:
+            timeout:
+              after:
                 seconds: 30
       catch:
         errors:
@@ -435,7 +441,7 @@ Combining these patterns creates a comprehensive error handling strategy:
 
 ```yaml
 document:
-  dsl: '1.0.0'
+  dsl: '1.0.3'
   namespace: examples
   name: comprehensive-error-handling
   version: '0.1.0'
@@ -457,8 +463,9 @@ do:
             with:
               method: post
               endpoint: https://validation.example.com/api/orders/validate
-              body: ${ .order }
-              timeout:
+              body: '${ .order }'
+            timeout:
+              after:
                 seconds: 10
         - reserveInventory:
             try:
@@ -467,8 +474,9 @@ do:
                   with:
                     method: post
                     endpoint: https://inventory.example.com/api/reserve
-                    body: ${ .order.items }
-                    output: inventoryReservation
+                    body: '${ .order.items }'
+                  output:
+                    as: '${ $input + { "inventoryReservation": . } }'
             catch:
               errors:
                 with:
@@ -481,66 +489,73 @@ do:
                       method: post
                       endpoint: https://notifications.example.com/api/send
                       body:
-                        customerId: ${ .order.customerId }
+                        customerId: '${ .order.customerId }'
                         message: "Some items in your order are out of stock"
-                then: exit
+              then: exit
         - processPayment:
             call: http
             with:
               method: post
               endpoint: https://payments.example.com/api/charge
-              body: ${ .order.payment }
+              body: '${ .order.payment }'
       catch:
-        - errors:
-            with:
-              type: https://open-workflow-specification.org/spec/1.0.0/errors/validation
-          as: validationError
-          do:
-            - handleValidationError:
-                set:
-                  status: "rejected"
-                  reason: ${ $validationError.message }
-                then: exit
-        - errors:
-            with:
-              type: https://open-workflow-specification.org/spec/1.0.0/errors/timeout
-          as: timeoutError
-          do:
-            - logTimeout:
-                call: http
-                with:
-                  method: post
-                  endpoint: https://logging.example.com/api/log
-                  body:
-                    level: "warning"
-                    message: "Operation timed out"
-                    data: ${ $timeoutError }
-            then: exit
-        - errors:
-            with:
-              type: https://example.com/errors/payment
-          as: paymentError
-          do:
-            - cancelReservation:
-                call: http
-                with:
-                  method: post
-                  endpoint: https://inventory.example.com/api/cancel-reservation
-                  body: ${ .inventoryReservation.id }
-            - notifyCustomer:
-                call: http
-                with:
-                  method: post
-                  endpoint: https://notifications.example.com/api/send
-                  body:
-                    customerId: ${ .order.customerId }
-                    message: "Payment failed: ${ $paymentError.message }"
-            then: exit
-        - errors:
-            with:
-              type: https://open-workflow-specification.org/spec/1.0.0/errors/communication
-          as: communicationError
-          retry: transientFailure
+        as: failure
+        when: ${ ($failure.type == "https://open-workflow-specification.org/spec/1.0.0/errors/validation") or ($failure.type == "https://open-workflow-specification.org/spec/1.0.0/errors/timeout") or ($failure.type == "https://example.com/errors/payment") or ($failure.type == "https://open-workflow-specification.org/spec/1.0.0/errors/communication") }
+        do:
+          - selectHandler:
+              switch:
+                - case1:
+                    then: handle1
+                    when: ${ $failure.type == "https://open-workflow-specification.org/spec/1.0.0/errors/validation" }
+                - case2:
+                    then: handle2
+                    when: ${ $failure.type == "https://open-workflow-specification.org/spec/1.0.0/errors/timeout" }
+                - case3:
+                    then: handle3
+                    when: ${ $failure.type == "https://example.com/errors/payment" }
+                - case4:
+                    then: handle4
+                    when: ${ $failure.type == "https://open-workflow-specification.org/spec/1.0.0/errors/communication" }
+          - handle1:
+              do:
+                - handleValidationError:
+                    set:
+                      status: rejected
+                      reason: ${ $failure.message }
+                    then: exit
+              then: exit
+          - handle2:
+              do:
+                - logTimeout:
+                    call: http
+                    with:
+                      method: post
+                      endpoint: https://logging.example.com/api/log
+                      body:
+                        level: warning
+                        message: Operation timed out
+                        data: ${ $failure }
+              then: exit
+          - handle3:
+              do:
+                - cancelReservation:
+                    call: http
+                    with:
+                      method: post
+                      endpoint: https://inventory.example.com/api/cancel-reservation
+                      body: ${ .inventoryReservation.id }
+                - notifyCustomer:
+                    call: http
+                    with:
+                      method: post
+                      endpoint: https://notifications.example.com/api/send
+                      body:
+                        customerId: ${ .order.customerId }
+                        message: 'Payment failed: ${ $failure.message }'
+              then: exit
+          - handle4:
+              set: ${ . }
+              then: exit
 ```
 
 This comprehensive example demonstrates:

@@ -14,14 +14,14 @@ scheduling information (if any), and the core execution logic.
 
 ## Top-Level Properties
 
-An Open Workflow definition document consists of the following top-level properties:
+The required `document` header contains the following fields:
 
 * **`dsl`** (String, Required): Specifies the version of the Open Workflow DSL specification the document conforms
-  to (e.g., `'1.0.0'`). This ensures the workflow engine interprets the syntax correctly.
+  to. Use `'1.0.3'` for new definitions.
 
 * **`namespace`** (String, Required): Provides a logical grouping for the workflow, often used for organization,
   identification, and potentially scoping of resources or events within a runtime environment (e.g.,
-  `'com.example.billing'`).
+  `'billing'`).
 
 * **`name`** (String, Required): The unique name of the workflow within its namespace (e.g., `'process-invoice'`).
   `namespace` + `name` typically forms a unique workflow identifier.
@@ -32,7 +32,9 @@ An Open Workflow definition document consists of the following top-level propert
 * **`title`** (String, Optional): A short, human-readable title for the workflow (e.g.,
   `'Invoice Processing Workflow'`).
 
-* **`description`** (String, Optional): A more detailed human-readable description of the workflow's purpose.
+* **`summary`** (String, Optional): A more detailed human-readable description of the workflow's purpose.
+
+The following properties are siblings of `document` at the root of the definition.
 
 * **`use`** (Optional): Defines reusable resources and definitions used throughout the workflow. This includes
   things like function definitions, event definitions, authentication configurations, etc.
@@ -52,36 +54,21 @@ An Open Workflow definition document consists of the following top-level propert
     * **Event-based Schedule**: Specifies an event that triggers the workflow.
       ```yaml
       schedule:
-        - when:
-            event: EventName  # References an event defined in use.events
-          start: firstTaskName  # Optional: specifies which task to start with
-      ```
-    * **Multiple Trigger Schedules**: An array of scheduling conditions.
-      ```yaml
-      schedule:
-        - cron: '0 0 * * *'  # Time-based trigger
-        - when:               # Event-based trigger
-            event: EventName
+        on:
+          one:
+            with:
+              type: OrderCreated
       ```
 
-  > **Multiple Workflow Instances and Scheduling**
-  >
-  > When a workflow definition includes a `schedule` property and multiple instances of this workflow are started:
-  >
-  > - Each workflow instance maintains its own independent schedule
-  > - For time-based schedules with `cron` or `every`, each instance will execute at the specified times, potentially
-      resulting in parallel executions
-  > - For event-based schedules, each instance will independently listen for and react to the specified events
-  > - When using `after` scheduling (which runs the workflow again after completion), each instance manages its own
-      restart cycle
-  
+  A time or event trigger starts a new instance of the registered definition. Select one trigger per schedule.
 
 * **`timeout`** (Optional): Defines the maximum duration the entire workflow instance is allowed to execute *(Lemline does not enforce workflow-level timeouts yet.)*
   before being timed out. This can prevent runaway workflows, resource leaks, or deadlock situations.
   ```yaml
   timeout:
-    hours: 1
-    minutes: 30  # Total timeout of 1 hour and 30 minutes
+    after:
+      hours: 1
+      minutes: 30
   ```
   See [Timeouts](dsl-timeouts.md) for more details on timeout configurations.
 
@@ -130,12 +117,13 @@ An Open Workflow definition document consists of the following top-level propert
   ```yaml
   input:
     schema: # JSON Schema for validating incoming data
-      type: object
-      required: ["orderId", "customerId"]
-      properties:
-        orderId: { type: string }
-        customerId: { type: string }
-        items: { type: array }
+      document: # JSON Schema for validating incoming data
+        type: object
+        required: ["orderId", "customerId"]
+        properties:
+          orderId: {type: string}
+          customerId: {type: string}
+          items: {type: array}
     from: "${ . | select(.items != null) }"  # Transform the input before processing
   ```
 

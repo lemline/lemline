@@ -7,108 +7,49 @@ This page provides a comprehensive reference for the Open Workflow DSL syntax as
 
 ## Format and Structure
 
-Lemline implements the Open Workflow Specification, which supports both YAML and JSON formats. YAML is recommended for human readability. The basic structure of a workflow definition includes:
+A workflow has a `document` header and a `do` list. This complete definition accepts an order and returns its status.
 
 ```yaml
-# Basic workflow structure
-version: "1.0.0"
-namespace: "com.example"
-name: "orderProcessing"
-description: "Process customer orders"
-
-# Metadata (optional)
-metadata:
-  version: "1.0.0"
-  tags:
-    - "order"
-    - "processing"
-
-# Shared resources (optional)
-use:
-  authentications: [...]
-  errors: [...]
-  retries: [...]
-  timeouts: [...]
-  catalogs: [...]
-  functions: [...]
-
-# Data specification (optional)
-input:
-  schema:
-    type: "object"
-    properties:
-      orderId:
-        type: "string"
-      items:
-        type: "array"
-      customer:
-        type: "object"
-    required: ["orderId", "items"]
-
-output:
-  schema:
-    type: "object"
-    properties:
-      orderStatus:
-        type: "string"
-      trackingId:
-        type: "string"
-
-# Workflow tasks (required)
+document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: order-processing
+  version: '1.0.0'
+  summary: Process customer orders
+  metadata:
+    tags: [order, processing]
 do:
-  - validateOrder:
-      # Task definition...
-
-  - processPayment:
-      # Task definition...
-
-  - shipOrder:
-      # Task definition...
+  - acceptOrder:
+      set:
+        status: accepted
 ```
 
 ## Core Components
 
 ### Workflow Identification
 
-```yaml
-version: "1.0.0"     # Workflow specification version (required)
-namespace: "com.example"   # Logical namespace (optional)
-name: "orderProcessing"    # Workflow name (required)
-description: "Process customer orders"  # Human-readable description (optional)
-```
-
-### Metadata
-
-```yaml
-metadata:
-  version: "1.0.0"       # Workflow implementation version
-  annotations:
-    monitoring.level: "detailed"  # Custom annotations
-  tags:                 # Categorization tags
-    - "order"
-    - "processing"
-```
+`document.dsl` identifies the DSL version. The required fields `document.namespace`, `document.name` and `document.version` identify a particular version of your workflow. Use `document.metadata` for optional application-specific annotations.
 
 ### Input/Output Schema
 
 ```yaml
 input:
   schema:
-    # JSON Schema definition for input data
-    type: "object"
-    properties:
-      orderId:
-        type: "string"
-    required: ["orderId"]
+    document:
+      type: "object"
+      properties:
+        orderId:
+          type: "string"
+      required: ["orderId"]
   from: "${ .data }"  # Optional path to extract input from
 
 output:
   schema:
-    # JSON Schema definition for output data
-    type: "object"
-    properties:
-      result:
-        type: "string"
+    document:
+      type: "object"
+      properties:
+        result:
+          type: "string"
   as: "orderResult"  # Optional variable name for the output
 ```
 
@@ -119,16 +60,16 @@ output:
 ```yaml
 use:
   authentications:
-    - name: "apiAuth"
+    "apiAuth":
       bearer:
         token: "your-token"
-        
-    - name: "serviceAuth"
+    "serviceAuth":
       oauth2:
-        grantType: "client_credentials"
-        tokenUrl: "https://auth.example.com/token"
-        clientId: "client-id"
-        clientSecret: "client-secret"
+        authority: "https://auth.example.com/token"
+        grant: "client_credentials"
+        client:
+          id: "client-id"
+          secret: "client-secret"
 ```
 
 ### Error Definitions
@@ -136,7 +77,7 @@ use:
 ```yaml
 use:
   errors:
-    - name: "outOfStock"
+    "outOfStock":
       type: "https://example.com/errors/out-of-stock"
       status: 409
       title: "Item Out of Stock"
@@ -147,16 +88,16 @@ use:
 ```yaml
 use:
   retries:
-    - name: "standardRetry"
-      policy:
-        strategy: backoff
-        backoff:
-          delay: PT1S
-          multiplier: 2
-          jitter: 0.1
-        limit:
-          attempt:
-            count: 3
+    "standardRetry":
+      limit:
+        attempt:
+          count: 3
+      delay: PT1S
+      backoff:
+        exponential: {}
+      jitter:
+        from: PT0S
+        to: PT0.1S
 ```
 
 ### Timeout Definitions
@@ -164,11 +105,10 @@ use:
 ```yaml
 use:
   timeouts:
-    - name: "shortTimeout"
-      duration: PT10S
-    
-    - name: "longTimeout"
-      duration: PT2M
+    "shortTimeout":
+      after: PT10S
+    "longTimeout":
+      after: PT2M
 ```
 
 ### Function Catalogs
@@ -176,15 +116,10 @@ use:
 ```yaml
 use:
   catalogs:
-    - name: "payments"
-      functions:
-        - name: "processPayment"
-          operation: "https://functions.example.com/payments#Process"
-    
-    - name: "shipping"
-      functions:
-        - name: "calculateShipping"
-          operation: "https://functions.example.com/shipping#Calculate"
+    "payments":
+      endpoint: https://functions.example.com/payments
+    "shipping":
+      endpoint: https://functions.example.com/shipping
 ```
 
 ## Task Syntax
@@ -212,83 +147,86 @@ use:
 #### Do Task
 
 ```yaml
-- processingStep:
-    do:
-      - task1:
-          # Subtask definition...
-      
-      - task2:
-          # Subtask definition...
+  - processingStep:
+      do:
+        - task1:
+            set: ${ . }
+        - task2:
+            set: ${ . }
 ```
 
 #### Switch Task
 
 ```yaml
-- routeRequest:
-    switch:
-      - condition: "${ .type == 'standard' }"
-        do:
-          - standardProcessing:
-              # Task definition...
-      
-      - condition: "${ .type == 'express' }"
-        do:
-          - expressProcessing:
-              # Task definition...
-      
-      - otherwise:
-          do:
-            - defaultProcessing:
-                # Task definition...
+  - routeRequest:
+      do:
+        - choose:
+            switch:
+              - branch1:
+                  when: ${ .type == "standard" }
+                  then: branch1
+              - branch2:
+                  when: ${ .type == "express" }
+                  then: branch2
+              - branch3:
+                  then: branch3
+        - branch1:
+            do:
+              - standardProcessing:
+                  set: ${ . }
+            then: exit
+        - branch2:
+            do:
+              - expressProcessing:
+                  set: ${ . }
+            then: exit
+        - branch3:
+            do:
+              - defaultProcessing:
+                  set: ${ . }
+            then: exit
 ```
 
 #### For Task
 
 ```yaml
-- processItems:
-    for:
-      iterator: "${ .items }"
-      as: "item"
+  - processItems:
+      for:
+        in: "${ .items }"
+        each: "item"
       do:
         - processItem:
-            # Task definition using .item
-      output:
-        collect: true  # Collect all iteration results
+            set: ${ $item }
 ```
 
 #### Fork Task
 
 ```yaml
-- parallelProcessing:
-    fork:
-      branches:
-        - processPayment:
-            # Payment processing tasks...
-        
-        - prepareShipment:
-            # Shipment preparation tasks...
-      
-      output: "*"  # Merge outputs from all branches
+  - parallelProcessing:
+      fork:
+        branches:
+          - processPayment:
+              set: ${ . }
+          - prepareShipment:
+              set: ${ . }
 ```
 
 #### Try-Catch Task
 
 ```yaml
-- secureOperation:
-    try:
-      retry: "standardRetry"  # Reference to a retry policy
-      do:
+  - secureOperation:
+      try:
         - riskyTask:
-            # Task that might fail...
-      
+            set: ${ . }
       catch:
-        - error:
-            with:
-              type: "https://open-workflow-specification.org/spec/1.0.0/errors/timeout"
-            as: "timeoutError"
-          do:
-            - handleTimeout:
-                # Error handling tasks...
+        as: "timeoutError"
+        do:
+          - handleTimeout:
+              set: ${ . }
+        errors:
+          with:
+            type: "https://open-workflow-specification.org/spec/1.0.0/errors/timeout"
+        retry: "standardRetry"
 ```
 
 ### Activity Tasks
@@ -296,18 +234,21 @@ use:
 #### Call HTTP
 
 ```yaml
-- fetchData:
-    callHTTP:
-      url: "https://api.example.com/data"
-      method: "GET"
-      query:
-        param1: "value1"
-        param2: "${ .dynamicValue }"
-      headers:
-        Content-Type: "application/json"
-        Authorization: "Bearer ${ .token }"
-      auth: "apiAuth"  # Reference to an authentication
-      body: "${ .requestBody }"
+  - fetchData:
+      call: http
+      with:
+        method: "GET"
+        query:
+          param1: "value1"
+          param2: "${ .dynamicValue }"
+        headers:
+          Content-Type: "application/json"
+          Authorization: "Bearer ${ .token }"
+        body: "${ .requestBody }"
+        endpoint:
+          uri: "https://api.example.com/data"
+          authentication:
+            use: "apiAuth"
 ```
 
 #### Call OpenAPI
@@ -360,47 +301,56 @@ use:
 #### Emit Task
 
 ```yaml
-- notifyShipping:
-    emit:
-      event: "OrderProcessed"
-      data: "${ .order }"
-      context:
-        source: "order-service"
-        type: "com.example.order.processed"
-        subject: "${ .order.id }"
+  - notifyShipping:
+      emit:
+        event:
+          with:
+            type: "com.example.order.processed"
+            source: "order-service"
+            subject: "${ .order.id }"
+            data: "${ .order }"
 ```
 
 #### Wait Task
 
 ```yaml
-- delayProcessing:
-    wait:
-      duration: PT1H
+  - delayProcessing:
+      wait: PT1H
 ```
 
 #### Listen Task
 
 ```yaml
-- waitForApproval:
-    listen:
-      to: "any"
-      events:
-        - event: "OrderApproved"
-          filter: "${ .orderId == .currentOrder.id }"
-        - event: "OrderRejected"
-          filter: "${ .orderId == .currentOrder.id }"
-      timeout: PT24H
+  - waitForApproval:
+      listen:
+        to:
+          "any":
+            - with:
+                type: "OrderApproved"
+              correlate:
+                orderId:
+                  from: ${ .data.orderId }
+                  expect: ${ .currentOrder.id }
+            - with:
+                type: "OrderRejected"
+              correlate:
+                orderId:
+                  from: ${ .data.orderId }
+                  expect: ${ .currentOrder.id }
+      timeout:
+        after: PT24H
 ```
 
 #### Raise Task
 
 ```yaml
-- reportError:
-    if: "${ .inventory.quantity < .order.quantity }"
-    raise:
-      error: "outOfStock"
-      with:
-        details: "Requested ${ .order.quantity }, available ${ .inventory.quantity }"
+  - reportError:
+      if: "${ .inventory.quantity < .order.quantity }"
+      raise:
+        error:
+          type: https://example.com/errors/out-of-stock
+          status: 409
+          detail: ${ "Requested \(.order.quantity), available \(.inventory.quantity)" }
 ```
 
 ## Expression Syntax
@@ -456,150 +406,118 @@ Custom extensions are defined using the `extension` property:
 ## Full Example
 
 ```yaml
-version: "1.0.0"
-namespace: "com.example"
-name: "orderProcessing"
-description: "Process customer orders with payment and shipping"
-
-metadata:
-  version: "1.0.0"
-  tags:
-    - "order"
-    - "e-commerce"
-
+document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: order-processing
+  version: '1.0.0'
+  summary: Verify an order, charge the customer and prepare the shipment
 use:
+  secrets: [paymentToken]
   authentications:
-    - name: "paymentAuth"
-      oauth2:
-        grantType: "client_credentials"
-        tokenUrl: "https://auth.payment.com/token"
-        clientId: "client-id"
-        clientSecret:
-          secret: "payment_secret"
-  
-  errors:
-    - name: "paymentFailed"
-      type: "https://example.com/errors/payment-failed"
-      status: 400
-    
-    - name: "outOfStock"
-      type: "https://example.com/errors/out-of-stock"
-      status: 409
-  
-  retries:
-    - name: "paymentRetry"
-      policy:
-        strategy: backoff
-        backoff:
-          delay: PT1S
-          multiplier: 2
-        limit:
-          attempt:
-            count: 3
-
+    paymentAuth:
+      bearer:
+        token: ${ $secrets.paymentToken }
 input:
   schema:
-    type: "object"
-    properties:
-      orderId:
-        type: "string"
-      items:
-        type: "array"
-      customer:
-        type: "object"
-    required: ["orderId", "items", "customer"]
-
-output:
-  schema:
-    type: "object"
-    properties:
-      orderStatus:
-        type: "string"
-      trackingId:
-        type: "string"
-
+    document:
+      type: object
+      required: [orderId, items, customer, totalAmount]
+      properties:
+        orderId: { type: string }
+        items: { type: array, minItems: 1 }
+        totalAmount: { type: number }
+        customer:
+          type: object
+          required: [id, address]
 do:
-  - validateOrder:
-      do:
-        - checkInventory:
-            callHTTP:
-              url: "https://inventory.example.com/check"
-              method: "POST"
-              body: "${ .items }"
-            if: "${ .items | length > 0 }"
-        
-        - verifyCustomer:
-            callHTTP:
-              url: "https://customers.example.com/verify/${ .customer.id }"
-              method: "GET"
-  
+  - checkInventory:
+      call: http
+      with:
+        method: post
+        endpoint: https://inventory.example.com/check
+        body: ${ .items }
+      output:
+        as: ${ $input }
+  - verifyCustomer:
+      call: http
+      with:
+        method: get
+        endpoint: '${ "https://customers.example.com/verify/\(.customer.id | @uri)" }'
+      output:
+        as: ${ $input }
   - processPayment:
       try:
-        retry: "paymentRetry"
+        - chargeCustomer:
+            try:
+              - charge:
+                  call: http
+                  with:
+                    method: post
+                    endpoint:
+                      uri: https://payments.example.com/charge
+                      authentication: { use: paymentAuth }
+                    headers:
+                      Idempotency-Key: ${ .orderId }
+                    body:
+                      customerId: ${ .customer.id }
+                      amount: ${ .totalAmount }
+                      currency: USD
+            catch:
+              errors:
+                with:
+                  status: 503
+              retry:
+                delay: PT1S
+                backoff: { exponential: {} }
+                limit: { attempt: { count: 3 } }
+      catch:
+        as: paymentError
         do:
-          - chargeCustomer:
-              callHTTP:
-                url: "https://payments.example.com/charge"
-                method: "POST"
-                auth: "paymentAuth"
-                body: 
-                  customerId: "${ .customer.id }"
-                  amount: "${ .totalAmount }"
-                  currency: "USD"
-        catch:
-          - error:
-              with:
-                type: "https://open-workflow-specification.org/spec/1.0.0/errors/communication"
-              as: "comError"
-            do:
-              - logError:
-                  set:
-                    paymentError: "${ .comError }"
-                    orderStatus: "PAYMENT_FAILED"
-  
+          - notifyFailure:
+              emit:
+                event:
+                  with:
+                    source: https://orders.example.com
+                    type: OrderFailed
+                    data:
+                      orderId: ${ $workflow.input.orderId }
+                      reason: ${ $paymentError.title }
+              then: end
   - prepareShipment:
-      if: "${ .orderStatus != 'PAYMENT_FAILED' }"
+      input:
+        from: ${ $workflow.input }
       fork:
         branches:
           - allocateInventory:
-              callHTTP:
-                url: "https://inventory.example.com/allocate"
-                method: "POST"
-                body: "${ .items }"
-          
+              call: http
+              with:
+                method: post
+                endpoint: https://inventory.example.com/allocate
+                body: ${ .items }
           - generateLabels:
-              callHTTP:
-                url: "https://shipping.example.com/labels"
-                method: "POST"
+              call: http
+              with:
+                method: post
+                endpoint: https://shipping.example.com/labels
                 body:
-                  orderId: "${ .orderId }"
-                  address: "${ .customer.address }"
-        
-        output: "*"
-  
-  - finalizeOrder:
-      switch:
-        - condition: "${ .orderStatus == 'PAYMENT_FAILED' }"
-          do:
-            - notifyFailure:
-                emit:
-                  event: "OrderFailed"
-                  data: "${ . }"
-        
-        - otherwise:
-            do:
-              - completeOrder:
-                  callHTTP:
-                    url: "https://orders.example.com/complete/${ .orderId }"
-                    method: "PUT"
-                    body:
-                      status: "COMPLETED"
-                      trackingId: "${ .shipment.trackingId }"
-              
-              - notifySuccess:
-                  emit:
-                    event: "OrderCompleted"
-                    data: "${ . }"
+                  orderId: ${ .orderId }
+                  address: ${ .customer.address }
+  - completeOrder:
+      call: http
+      with:
+        method: put
+        endpoint: '${ "https://orders.example.com/complete/\($workflow.input.orderId | @uri)" }'
+        body:
+          status: COMPLETED
+  - notifySuccess:
+      emit:
+        event:
+          with:
+            source: https://orders.example.com
+            type: OrderCompleted
+            data:
+              orderId: ${ $workflow.input.orderId }
 ```
 
 ## Related Resources

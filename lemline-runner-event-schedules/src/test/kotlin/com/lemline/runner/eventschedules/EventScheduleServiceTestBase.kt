@@ -62,7 +62,7 @@ abstract class EventScheduleServiceTestBase {
     private suspend fun define(on: String, name: String = "trigger", ns: WorkflowNamespace = namespace, mode: String? = null, read: String? = "envelope"): DefinitionModel {
         val definition = DefinitionModel.from("""
             document:
-              dsl: '1.0.0'
+              dsl: '1.0.3'
               namespace: $ns
               name: $name
               version: '1.0.0'

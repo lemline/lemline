@@ -2,6 +2,7 @@
 package com.lemline.runner.cli.config
 
 import com.lemline.runner.cli.GlobalMixin
+import com.lemline.runner.common.config.AnalyticsType
 import com.lemline.runner.common.config.DatabaseType
 import com.lemline.runner.common.config.MessagingType
 import io.quarkus.arc.Unremovable
@@ -36,6 +37,13 @@ class ConfigCreateCommand : Runnable {
         converter = [DatabaseTypeConverter::class]
     )
     var database: DatabaseType? = null
+
+    @Option(
+        names = ["--analytics"],
+        description = ["Analytics database type (postgresql, sqlite)"],
+        converter = [AnalyticsTypeConverter::class]
+    )
+    var analytics: AnalyticsType? = null
 
     @Option(
         names = ["-o", "--output"],
@@ -74,10 +82,23 @@ class ConfigCreateCommand : Runnable {
             if (database == null) {
                 database = promptDatabase(console)
             }
+            if (analytics == null) {
+                val default = defaultAnalytics(messaging!!, database!!)
+                println("? Select analytics database (default: ${default?.configValue ?: "omit analytics section"})")
+                println("  1) postgresql")
+                println("  2) sqlite")
+                print("> ")
+                analytics = when (console.readLine()?.trim()?.lowercase()) {
+                    "" -> null
+                    "1", "postgresql" -> AnalyticsType.POSTGRESQL
+                    "2", "sqlite" -> AnalyticsType.SQLITE
+                    else -> throw ParameterException(picocli.CommandLine(this), "Expected postgresql or sqlite")
+                }
+            }
         }
 
         // Generate configuration
-        val config = generator.generate(messaging!!, database!!)
+        val config = generator.generate(messaging!!, database!!, analytics)
 
         // Dry run: print to stdout and exit
         if (dryRun) {
@@ -104,7 +125,7 @@ class ConfigCreateCommand : Runnable {
             if (messaging == MessagingType.SQLITE) {
                 // An all-SQLite configuration has no service to start.
                 var step = 2
-                if (database != DatabaseType.SQLITE) {
+                if (database != DatabaseType.SQLITE || analytics == AnalyticsType.POSTGRESQL) {
                     println("  ${step++}. Start the database services using the command in the generated file")
                 }
                 println("  ${step++}. Apply database migrations: LEMLINE_CONFIG=$output lemline migrate --force")
@@ -162,6 +183,14 @@ class ConfigCreateCommand : Runnable {
                     "Invalid selection. Please choose 1, 2, or 3."
                 )
             }
+        }
+    }
+
+    private class AnalyticsTypeConverter : ITypeConverter<AnalyticsType> {
+        override fun convert(value: String): AnalyticsType = when (value.lowercase()) {
+            "postgresql" -> AnalyticsType.POSTGRESQL
+            "sqlite" -> AnalyticsType.SQLITE
+            else -> throw IllegalArgumentException("Invalid analytics type: '$value'. Allowed values: postgresql, sqlite")
         }
     }
 

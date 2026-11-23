@@ -55,7 +55,8 @@ Each command turns on only what it needs, whatever the configuration says:
 
 | Property | Type | Default | Description |
 |----------|------|---------|-------------|
-| `lemline.database.type` | String | inferred | `postgresql`, `mysql` or `in-memory`. When unset, Lemline uses `postgresql` if any `lemline.database.postgresql.*` property is set, `mysql` if any `lemline.database.mysql.*` property is set, and the in-memory H2 database otherwise. Setting both families without a type is an error. The in-memory database is only available in Lemline's test suite, not in the released binaries and jar: configure `postgresql` or `mysql`. |
+| `lemline.database.type` | String | inferred | Choose `postgresql`, `mysql` or `sqlite`. SQLite requires an explicit type. When the type is omitted, PostgreSQL or MySQL settings select the corresponding database. Configuring both requires an explicit type. With neither, the runtime selects its test-only in-memory H2 database. |
+| `lemline.database.sqlite.path` | String | `orchestration.db` | Local file for definitions and durable operations. Relative paths resolve against the process working directory. |
 | `lemline.database.migrate-at-start` | Boolean | `false` | Apply database migrations when the runner starts |
 | `lemline.database.baseline-on-migrate` | Boolean | `false` | Baseline an existing, non-empty schema before migrating |
 | `lemline.database.enabled` | Boolean | `true` | Set by the command line; commands that need no database turn it off |

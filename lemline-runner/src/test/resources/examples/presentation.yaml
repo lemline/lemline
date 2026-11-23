@@ -1,5 +1,5 @@
 document:
-  dsl: 1.0.0-alpha2
+  dsl: 1.0.3
   namespace: examples
   name: order-fulfillment
   version: 1.0.0-alpha2

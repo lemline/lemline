@@ -13,22 +13,21 @@ Lemline provides powerful, configurable retry capabilities that can be tailored 
 A basic retry configuration can be added to a `try` block:
 
 ```yaml
-- fetchDataTask:
-    try:
-      retry:
-        policy:
-          strategy: backoff
-          backoff:
-            delay: PT1S
-            multiplier: 2
+  - fetchDataTask:
+      try:
+        - getData:
+            call: http
+            with:
+              method: "GET"
+              endpoint: "http://api.example.com/data"
+      catch:
+        retry:
           limit:
             attempt:
               count: 3
-      do:
-        - getData:
-            callHTTP:
-              url: "http://api.example.com/data"
-              method: "GET"
+          delay: PT1S
+          backoff:
+            exponential: {}
 ```
 
 In this example:
@@ -171,32 +170,22 @@ Define reusable retry policies:
 ```yaml
 use:
   retries:
-    - name: "standardRetry"
-      policy:
-        strategy: backoff
-        backoff:
-          delay: PT1S
-          multiplier: 2
-          jitter: 0.1
-        limit:
-          attempt:
-            count: 3
-    - name: "aggressiveRetry"
-      policy:
-        strategy: backoff
-        backoff:
-          delay: PT0.1S
-          multiplier: 1.5
-        limit:
-          attempt:
-            count: 10
-
-# Using the reusable policy
-- fetchDataTask:
-    try:
-      retry: "standardRetry"
-      do:
-        # ...
+    standardRetry:
+      delay: PT1S
+      backoff: { exponential: {} }
+      limit: { attempt: { count: 3 } }
+    aggressiveRetry:
+      delay: PT0.1S
+      backoff: { exponential: {} }
+      limit: { attempt: { count: 10 } }
+do:
+  - fetchDataTask:
+      try:
+        - getData:
+            call: http
+            with: { method: get, endpoint: 'https://api.example.com/data' }
+      catch:
+        retry: standardRetry
 ```
 
 This approach promotes consistent retry behavior across your workflow and simplifies maintenance.

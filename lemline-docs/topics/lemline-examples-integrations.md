@@ -13,7 +13,7 @@ HTTP/REST is one of the most common integration methods for connecting workflows
 
 ```yaml
 document:
-  dsl: '1.0.0'
+  dsl: '1.0.3'
   namespace: examples
   name: call-http-shorthand-endpoint
   version: '0.1.0'
@@ -33,7 +33,7 @@ This example demonstrates:
 
 ```yaml
 document:
-  dsl: '1.0.0'
+  dsl: '1.0.3'
   namespace: examples
   name: http-query-params
   version: '1.0.0'
@@ -66,7 +66,7 @@ This example shows:
 
 ```yaml
 document:
-  dsl: '1.0.0'
+  dsl: '1.0.3'
   namespace: examples
   name: oauth2-authentication
   version: '0.1.0'
@@ -108,7 +108,7 @@ OpenAPI integration allows workflows to interact with services described by Open
 
 ```yaml
 document:
-  dsl: '1.0.0'
+  dsl: '1.0.3'
   namespace: test
   name: openapi-example
   version: '0.1.0'
@@ -142,7 +142,7 @@ gRPC integration enables workflows to communicate with gRPC services.
 
 ```yaml
 document:
-  dsl: '1.0.0'
+  dsl: '1.0.3'
   namespace: test
   name: grpc-example
   version: '0.1.0'
@@ -181,7 +181,7 @@ AsyncAPI integration allows workflows to interact with event-driven and message-
 
 ```yaml
 document:
-  dsl: '1.0.0'
+  dsl: '1.0.3'
   namespace: examples
   name: bearer-auth
   version: '0.1.0'
@@ -212,7 +212,7 @@ This example demonstrates:
 
 ```yaml
 document:
-  dsl: '1.0.0'
+  dsl: '1.0.3'
   namespace: examples
   name: bearer-auth
   version: '0.1.0'
@@ -288,7 +288,7 @@ Custom functions allow reusing integration patterns across workflows.
 
 ```yaml
 document:
-  dsl: '1.0.0'
+  dsl: '1.0.3'
   namespace: samples
   name: call-custom-function-inline
   version: '0.1.0'
@@ -325,13 +325,14 @@ Custom functions can also be defined in a separate catalog and referenced across
 
 ```yaml
 document:
-  dsl: '1.0.0'
+  dsl: '1.0.3'
   namespace: samples
   name: call-custom-function-cataloged
   version: '0.1.0'
 use:
   catalogs:
-    - endpoint: file://catalog.json
+    default:
+      endpoint: file://catalog.json
 do:
   - getPet:
       call: petstore.getPetById
@@ -362,18 +363,19 @@ This example combines multiple integration patterns:
 
 ```yaml
 document:
-  dsl: '1.0.0'
+  dsl: '1.0.3'
   namespace: examples
   name: complex-integration
   version: '1.0.0'
 use:
   catalogs:
-    - endpoint: file://catalog.json
+    default:
+      endpoint: file://catalog.json
 do:
   - getCustomerData:
       call: crm.getCustomerById
       with:
-        customerId: ${ .customerId }
+        customerId: '${ .customerId }'
   - processPurchaseOrder:
       try:
         - validateInventory:
@@ -383,7 +385,7 @@ do:
                 endpoint: https://inventory.example.com/api/openapi.json
               operationId: checkItemsAvailability
               parameters:
-                items: ${ .orderItems }
+                items: '${ .orderItems }'
         - processPayment:
             call: http
             with:
@@ -392,7 +394,7 @@ do:
               headers:
                 Content-Type: application/json
                 Authorization: Bearer ${ .paymentToken }
-              body: ${ { customerId: .customerId, amount: .totalAmount, items: .orderItems } }
+              body: '${ { customerId: .customerId, amount: .totalAmount, items: .orderItems } }'
         - notifyShipping:
             call: asyncapi
             with:
@@ -403,25 +405,30 @@ do:
                 name: production
               message:
                 payload:
-                  orderId: ${ .orderId }
-                  customer: ${ .customerData }
-                  items: ${ .orderItems }
+                  orderId: '${ .orderId }'
+                  customer: '${ .customerData }'
+                  items: '${ .orderItems }'
       catch:
-        - when: ${ $error.type == "https://example.com/errors/payment-declined" }
-          do:
-            - notifyCustomer:
-                call: crm.sendNotification
-                with:
-                  customerId: ${ .customerId }
-                  message: "Your payment was declined. Please update payment information."
-        - default:
-            do:
-              - logError:
-                  call: http
-                  with:
-                    method: post
-                    endpoint: https://logging.example.com/api/errors
-                    body: ${ $error }
+        as: failure
+        do:
+          - selectHandler:
+              switch:
+                - case1:
+                    then: handle1
+                    when: ${ $failure.type == "https://example.com/errors/payment-declined" }
+                - case2:
+                    then: handle2
+          - handle1:
+              do:
+                - notifyCustomer:
+                    call: crm.sendNotification
+                    with:
+                      customerId: ${ .customerId }
+                      message: Your payment was declined. Please update payment information.
+              then: exit
+          - handle2:
+              set: ${ . }
+              then: exit
 ```
 
 This complex example demonstrates:

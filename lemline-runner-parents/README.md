@@ -11,7 +11,7 @@ This module implements parent-child workflow relationships from the `run` task:
 
 ## Open Workflow DSL Reference
 
-See [Run Task](https://github.com/open-workflow-specification/specification/blob/v1.0.0/dsl-reference.md#run) in the Open Workflow Specification:
+See [Run Task](https://github.com/open-workflow-specification/specification/blob/v1.0.3/dsl-reference.md#run) in the Open Workflow Specification:
 
 ```yaml
 do:

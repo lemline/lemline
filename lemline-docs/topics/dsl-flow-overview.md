@@ -29,41 +29,50 @@ Use the **Do** task when you need to:
 
 ```yaml
 document:
-  dsl: '1.0.0'
+  dsl: '1.0.3'
   namespace: examples
   name: order-processing
   version: '1.0.0'
 use:
   functions:
     orderValidator:
+      call: http
+      with:
+        method: post
+        endpoint: https://services.example.com/orderValidator
+        body: ${ . }
       ## define function here...
     paymentProcessor:
+      call: http
+      with:
+        method: post
+        endpoint: https://services.example.com/paymentProcessor
+        body: ${ . }
       ## define function here...
     inventoryManager:
+      call: http
+      with:
+        method: post
+        endpoint: https://services.example.com/inventoryManager
+        body: ${ . }
       ## define function here...
 do:
   - validateOrder:
-      call: function
+      call: orderValidator
       with:
-        function: orderValidator
-        args:
-          order: ${ .input.order }
+        order: ${ .input.order }
 
   - processPayment:
-      call: function
+      call: paymentProcessor
       with:
-        function: paymentProcessor
-        args:
-          amount: ${ .input.order.totalAmount }
-          paymentDetails: ${ .input.paymentInfo }
+        amount: ${ .input.order.totalAmount }
+        paymentDetails: ${ .input.paymentInfo }
 
   - updateInventory:
-      call: function
+      call: inventoryManager
       with:
-        function: inventoryManager
-        args:
-          items: ${ .input.order.items }
-          operation: "reserve"
+        items: ${ .input.order.items }
+        operation: "reserve"
 ```
 
 ### Iterative Processing with For
@@ -77,15 +86,25 @@ Use the **For** task when you need to:
 
 ```yaml
 document:
-  dsl: '1.0.0'
+  dsl: '1.0.3'
   namespace: examples
   name: process-order-items
   version: '1.0.0'
 use:
   functions:
     inventoryUpdater:
+      call: http
+      with:
+        method: post
+        endpoint: https://services.example.com/inventoryUpdater
+        body: ${ . }
       ## define function here...
     orderItemTracker:
+      call: http
+      with:
+        method: post
+        endpoint: https://services.example.com/orderItemTracker
+        body: ${ . }
       ## define function here...
 do:
   - processItems:
@@ -121,36 +140,51 @@ Use the **Switch** task when you need to:
 
 ```yaml
 document:
-  dsl: '1.0.0'
+  dsl: '1.0.3'
   namespace: examples
   name: payment-processor
   version: '1.0.0'
 use:
   functions:
     creditCardProcessor:
+      call: http
+      with:
+        method: post
+        endpoint: https://services.example.com/creditCardProcessor
+        body: ${ . }
       ## define function here...
     paypalProcessor:
+      call: http
+      with:
+        method: post
+        endpoint: https://services.example.com/paypalProcessor
+        body: ${ . }
       ## define function here...
     bankTransferProcessor:
+      call: http
+      with:
+        method: post
+        endpoint: https://services.example.com/bankTransferProcessor
+        body: ${ . }
       ## define function here...
 do:
   - determinePaymentMethod:
       switch:
         - creditCard:
-            when: ${ .input.paymentMethod == 'creditCard' }
+            when: ${ .input.paymentMethod == "creditCard" }
             then: processCreditCard
 
         - paypal:
-            when: ${ .input.paymentMethod == 'paypal' }
+            when: ${ .input.paymentMethod == "paypal" }
             then: processPayPal
 
         - bankTransfer:
-            when: ${ .input.paymentMethod == 'bankTransfer' }
+            when: ${ .input.paymentMethod == "bankTransfer" }
             then: processBankTransfer
 
         - default:
             then: handleUnsupportedPaymentMethod
-            
+
   - processCreditCard:
       call: creditCardProcessor
       with:
@@ -196,17 +230,32 @@ Use the **Fork** task when you need to:
 
 ```yaml
 document:
-  dsl: '1.0.0'
+  dsl: '1.0.3'
   namespace: examples
   name: product-data-enrichment
   version: '1.0.0'
 use:
   functions:
     pricingService:
+      call: http
+      with:
+        method: post
+        endpoint: https://services.example.com/pricingService
+        body: ${ . }
       ## define function here...
     inventoryService:
+      call: http
+      with:
+        method: post
+        endpoint: https://services.example.com/inventoryService
+        body: ${ . }
       ## define function here...
     reviewService:
+      call: http
+      with:
+        method: post
+        endpoint: https://services.example.com/reviewService
+        body: ${ . }
       ## define function here...
 do:
   - enrichProductData:
@@ -238,72 +287,76 @@ Flow tasks are often combined to create sophisticated workflows that accurately 
 
 ```yaml
 document:
-  dsl: '1.0.0'
+  dsl: '1.0.3'
   namespace: examples
   name: order-fulfillment-workflow
   version: '1.0.0'
 do:
   - validateOrder:
-      call: function
+      call: orderValidator
       with:
-        function: orderValidator
-        args:
-          order: ${ .input.order }
-      result: validationResult
-
+        order: ${ .input.order }
+      output:
+        as: '${ $input + { "validationResult": . } }'
   - checkOrderValidity:
       switch:
-        - when: ${ .validationResult.valid == false }
-          do:
-            - handleInvalidOrder:
-                set:
-                  result:
-                    success: false
+        - case1:
+            when: ${ .validationResult.valid == false }
+            then: checkOrderValidity-case1
+  - checkOrderValidity-case1:
+      do:
+        - handleInvalidOrder:
+            set:
+              result:
+                success: false
+                message: ${ .validationResult.reason }
+                code: "INVALID_ORDER"
+        - notifyCustomer:
+            try:
+              - notifyCustomerOperation:
+                  call: emailService
+                  with:
+                    to: ${ .input.customer.email }
+                    subject: "Order Validation Failed"
                     message: ${ .validationResult.reason }
-                    code: "INVALID_ORDER"
-            - notifyCustomer:
-                call: emailService
+            catch:
+              errors:
                 with:
-                  to: ${ .input.customer.email }
-                  subject: "Order Validation Failed"
-                  message: ${ .validationResult.reason }
-                catch:
-                  errors:
+                  type: "email-service-error"
+              do:
+                - logEmailFailure:
+                    call: logger
                     with:
-                      type: "email-service-error"
-                  do:
-                    - logEmailFailure:
-                        call: logger
-                        with:
-                          level: "WARNING"
-                          message: "Failed to send validation failure email"
-                          orderId: ${ .input.order.id }
+                      level: "WARNING"
+                      message: "Failed to send validation failure email"
+                      orderId: ${ .input.order.id }
 
+      then: checkOrderValidity-done
+  - checkOrderValidity-done:
+      set: ${ . }
   - processValidOrder:
       fork:
         compete: false
         branches:
           - handlePayment:
-              call: function
+              call: paymentProcessor
               with:
-                function: paymentProcessor
-                args:
-                  amount: ${ .input.order.totalAmount }
-                  currency: ${ .input.order.currency }
-                  paymentMethod: ${ .input.paymentInfo }
-              result: paymentResult
-
+                amount: ${ .input.order.totalAmount }
+                currency: ${ .input.order.currency }
+                paymentMethod: ${ .input.paymentInfo }
+              output:
+                as: '${ $input + { "paymentResult": . } }'
           - reserveInventory:
               for:
                 in: ${ .input.order.items }
                 each: item
-                do:
-                  - reserveItem:
-                      call: inventoryManager
-                      with:
-                        productId: ${ .item.productId }
-                        quantity: ${ .item.quantity }
-                        operation: "reserve"
+              do:
+                - reserveItem:
+                    call: inventoryManager
+                    with:
+                      productId: ${ .item.productId }
+                      quantity: ${ .item.quantity }
+                      operation: "reserve"
 
   - prepareOrderResponse:
       set:
@@ -312,7 +365,7 @@ do:
           status: "PROCESSING"
           paymentStatus: ${ .processingResults.handlePayment.paymentResult.status }
           inventoryStatus: ${ .processingResults.reserveInventory.inventoryReservations }
-          estimatedShipDate: ${ new Date(Date.now() + 86400000 * 2).toISOString() }
+          estimatedShipDate: ${ (now + 172800) | todateiso8601 }
 ```
 
 Flow tasks are the building blocks of workflow orchestration, 

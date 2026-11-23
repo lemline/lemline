@@ -158,11 +158,9 @@ While Lemline minimizes database usage, it still leverages databases for specifi
 When a workflow needs to pause execution for a period of time:
 
 ```yaml
-- name: WaitForPaymentWindow
-  type: wait
-  data:
-    duration: PT24H
-  next: CheckPaymentStatus
+  - WaitForPaymentWindow:
+      wait: PT24H
+      then: CheckPaymentStatus
 ```
 
 This wait operation is stored in the database with:
@@ -178,15 +176,18 @@ A dedicated outbox processor periodically checks for expired waits and resumes t
 When workflows need to correlate incoming events:
 
 ```yaml
-- name: WaitForShipmentEvents
-  type: listen
-  events:
-    - name: ShipmentUpdates
-      type: "ShipmentStatusUpdate"
-      correlations:
-        - orderId = .orderId
-      consume: 3
-  next: ProcessShipmentUpdates
+  - WaitForShipmentEvents:
+      listen:
+        to:
+          any:
+            - with:
+                type: "ShipmentStatusUpdate"
+              correlate:
+                orderId:
+                  from: ${ .data.orderId }
+                  expect: ${ .orderId }
+          until: ${ length >= 3 }
+      then: ProcessShipmentUpdates
 ```
 
 The correlation criteria are stored in the database to match against incoming events.

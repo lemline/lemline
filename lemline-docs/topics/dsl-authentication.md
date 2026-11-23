@@ -28,7 +28,7 @@ potentially using secrets) from the task logic.
 
 ```yaml
 document:
-  dsl: '1.0.0'
+  dsl: '1.0.3'
   namespace: auth-examples
   name: reusable-auth-workflow
   version: '1.0.0'
@@ -51,7 +51,7 @@ use:
         client:
           id: workflow-client-id
           secret: ${ $secrets.myOauthClientSecret }
-        scopes: [ read:data, write:data ]
+        scopes: [read:data, write:data]
     # Simple Bearer Token (potentially from context)
     userBearerTokenAuth:
       bearer:
@@ -69,19 +69,7 @@ use:
         client:
           id: workflow-oidc-client
           secret: ${ $secrets.oidcClientSecret }
-        scopes: [ openid, profile, email ]
-    # Certificate Auth (Conceptual - structure highly runtime dependent)
-    # Runtimes might expect paths to cert/key files, or references to secrets
-    # containing the certificate/key data.
-    myCertAuth:
-      certificate:
-        # Example: Reference secrets containing PEM-encoded cert/key
-        clientCertSecret: clientCertificatePem
-        clientKeySecret: clientPrivateKeyPem
-        # Example: Or maybe file paths accessible to the runtime
-        # clientCertPath: /etc/certs/client.crt
-        # clientKeyPath: /etc/certs/client.key
-        # caCertPath: /etc/certs/ca.crt # Optional CA cert path
+        scopes: [openid, profile, email]
 do:
   - getData:
       call: http
@@ -90,17 +78,19 @@ do:
         endpoint:
           uri: https://api.example.com/data
           # Reference the named authentication policy
-          authentication: myApiClientOAuth
+          authentication:
+            use: myApiClientOAuth
       then: processData
   - updateSystem:
       call: http
       with:
         method: post
-        endpoint: https://internalsystem.example.com/update
+        endpoint:
         # Reference another named policy
-        authentication: mySystemBasicAuth
-        body:
-        # ...
+          uri: https://internalsystem.example.com/update
+          authentication:
+            use: mySystemBasicAuth
+        body: null
 ```
 
 **Key Properties (`use.authentications`):**

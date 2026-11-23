@@ -21,7 +21,7 @@ class SecretsTest {
     fun `resolves only declared secrets from the process environment`() {
         val workflow = WorkflowCache.parseYamlAndPut("""
             document:
-              dsl: '1.0.0'
+              dsl: '1.0.3'
               namespace: test
               name: secrets-test
               version: '1.0.0'

@@ -55,200 +55,26 @@ The DSL enables composition of serverless functions and microservices:
 - **Parallel execution**: Run functions concurrently
 - **Conditional execution**: Apply business logic to function invocation
 
-## Core Components
+## A workflow in Lemline
 
-### Workflow Definition
-
-The root structure contains metadata about the workflow:
+The `document` header identifies the workflow and declares its DSL version. The `do` list defines tasks in execution order. Each task receives the preceding task's output as its input by default.
 
 ```yaml
-id: orderProcessing
-version: '1.0.0'
-specVersion: '0.8'
-name: Order Processing Workflow
-description: Processes customer orders
-```
-
-### States
-
-States define steps in the workflow execution:
-
-```yaml
-states:
-  - name: Validate Order
-    type: operation
-    actions:
-      - functionRef:
-          refName: validateOrder
-    transition: Process Payment
-```
-
-### Events
-
-Event definitions describe events consumed or produced:
-
-```yaml
-events:
-  - name: PaymentProcessed
-    type: payment.processed
-    source: paymentService
-```
-
-### Functions
-
-Function definitions describe service invocations:
-
-```yaml
-functions:
-  - name: validateOrder
-    operation: http://validationservice/validate
-```
-
-### Transitions
-
-Transitions define the flow between states:
-
-```yaml
-transition: Process Payment  # Direct transition
-transition:
-  nextState: Process Payment  # Conditional transition
-  condition: ${ .order.total > 0 }
-```
-
-## Lemline Implementation
-
-Lemline implements the Open Workflow DSL version 1.0.0 with:
-
-### YAML-First Approach
-
-While the specification supports both JSON and YAML, Lemline uses YAML as the primary format for enhanced readability:
-
-```yaml
-# Lemline workflow definition example
-version: "1.0.0"
-name: orderProcessing
+document:
+  dsl: '1.0.3'
+  namespace: orders
+  name: price-order
+  version: '1.0.0'
 do:
-  - validateOrder:
-      callHTTP:
-        url: "http://validate-service/orders/validate"
-        method: "POST"
-        body: "${ .order }"
-  - processPayment:
-      callHTTP:
-        url: "http://payment-service/payments"
-        method: "POST"
-        body:
-          orderId: "${ .order.id }"
-          amount: "${ .order.total }"
+  - price:
+      set:
+        total: '${ .quantity * .unitPrice }'
+  - receipt:
+      set:
+        amountDue: '${ .total }'
 ```
 
-### Enhanced Expression Support
-
-Lemline enhances the expression capabilities with JQ support:
-
-```yaml
-set:
-  totalWithTax: "${ .order.total * (1 + .taxRate) }"
-  discountedItems: "${ .order.items[] | select(.discount > 0) }"
-  itemCount: "${ .order.items | length }"
-```
-
-### Node-Based Execution Model
-
-Internally, Lemline translates the DSL into a node graph:
-
-```
-┌───────────┐     ┌───────────┐     ┌───────────┐
-│ Validate  │     │ Process   │     │ Ship      │
-│ Order     │ ──> │ Payment   │ ──> │ Order     │
-└───────────┘     └───────────┘     └───────────┘
-```
-
-Each node represents a task in the workflow, with its own:
-- Input/output data
-- Execution state
-- Error handling capabilities
-- Position tracking for resumability
-
-### Extension Mechanism
-
-Lemline supports extensions to the standard DSL:
-
-```yaml
-extension:
-  monitoring:
-    level: "detailed"
-    metrics:
-      - name: "processing_time"
-        unit: "milliseconds"
-```
-
-## DSL Structure in Lemline
-
-Lemline organizes workflow definitions into these main sections:
-
-### Metadata
-
-Basic workflow information:
-
-```yaml
-version: "1.0.0"
-namespace: "com.example"
-name: "orderProcessing"
-description: "Process customer orders"
-```
-
-### Resources
-
-Shared resources used throughout the workflow:
-
-```yaml
-use:
-  authentications:
-    - name: "serviceAuth"
-      oauth2:
-        # OAuth2 configuration
-  errors:
-    - name: "paymentFailed"
-      # Error definition
-  retries:
-    - name: "standardRetry"
-      # Retry policy
-```
-
-### Input/Output Schema
-
-Data schemas for workflow inputs and outputs:
-
-```yaml
-input:
-  schema:
-    type: "object"
-    properties:
-      orderId:
-        type: "string"
-      items:
-        type: "array"
-
-output:
-  schema:
-    type: "object"
-    properties:
-      orderStatus:
-        type: "string"
-```
-
-### Workflow Tasks
-
-The actual steps to execute:
-
-```yaml
-do:
-  - validateOrder:
-      # Task definition
-  - processPayment:
-      # Task definition
-```
+With input `{"quantity":3,"unitPrice":4}`, this workflow returns `{"amountDue":12}`. Lemline validates the definition with the Java SDK schema and uses JQ to evaluate the expressions. See the [supported features and SDK differences](lemline-ref-supported-features.md) for the execution capabilities of the runtime.
 
 ## Comparison to Other Workflow Languages
 
@@ -303,15 +129,6 @@ do:
 2. **Data Transformation**: Minimize unnecessary data transformations
 3. **Service Integration**: Use appropriate integration patterns (sync/async)
 4. **Checkpoint Frequency**: Balance persistence and performance
-
-## DSL Evolution
-
-The Open Workflow Specification continues to evolve:
-
-- **Version 0.8**: Initial public release
-- **Version 0.9**: Enhanced event correlation and function definition
-- **Version 1.0**: Stable release with core functionality
-- **Future Versions**: Advanced features for monitoring, management, versioning
 
 ## Related Resources
 

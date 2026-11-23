@@ -21,7 +21,7 @@ Here's an example of routing based on an input status field:
 
 ```yaml
 document:
-  dsl: '1.0.0'
+  dsl: '1.0.3'
   namespace: examples
   name: switch-basic
   version: '1.0.0'
@@ -38,13 +38,13 @@ do:
         - caseDefault: # Default case (no 'when')
             then: handleOtherStatus # Go to 'handleOtherStatus' if neither matched
   - processApproved:
-      # ... task definition ...
-      then: continue # Or specify next step
+      set: ${ . }
+      then: continue
   - processRejected:
-      # ... task definition ...
+      set: ${ . }
       then: continue
   - handleOtherStatus:
-      # ... task definition ...
+      set: ${ . }
       then: continue
 ```
 
@@ -73,24 +73,28 @@ Each case contains:
 
 ```yaml
 do:
-  - switch:
-      - checkHighPriority:
-          when: "${ .priority > 5 }"
-          then: handleHighPriority
-      - checkMediumPriority:
-          when: "${ .priority > 2 }" # Only checked if priority <= 5
-          then: handleMediumPriority
-      - defaultCase: # No 'when', acts as default
-          then: handleLowPriority
+  - route:
+      switch:
+        - checkHighPriority:
+            when: "${ .priority > 5 }"
+            then: handleHighPriority
+        - checkMediumPriority:
+            when: "${ .priority > 2 }" # Only checked if priority <= 5
+            then: handleMediumPriority
+        - defaultCase: # No 'when', acts as default
+            then: handleLowPriority
   - handleHighPriority:
       # ... task definition ...
       then: exit
+      set: ${ . }
   - handleMediumPriority:
       # ... task definition ...
       then: exit
+      set: ${ . }
   - handleLowPriority:
       # ... task definition ...
       then: exit
+      set: ${ . }
 ```
 
 **Important**: Only the *first* `when` condition that evaluates to `true` is selected. Subsequent cases are ignored. If

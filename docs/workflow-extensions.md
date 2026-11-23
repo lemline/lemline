@@ -53,12 +53,12 @@ The extension logic stays grouped in a controller rather than scattered across e
 Lemline already reads `use.extensions`, but its engine does not execute it yet. A targeted task must be able
 to run steps before and after its body, or be short-circuited by an extension.
 
-The reference for this implementation is DSL **1.0.0**, consistent with the embedded schemas.
+Lemline validates definitions against DSL **1.0.3** as packaged by the Java SDK.
 Links are pinned to that version, because the specification's `main` branch evolves independently.
 
-- [DSL reference: extensions](https://github.com/open-workflow-specification/specification/blob/v1.0.0/dsl-reference.md#extension)
-- [DSL overview: extensions](https://github.com/open-workflow-specification/specification/blob/v1.0.0/dsl.md#extensions)
-- [DSL 1.0.0 schema](https://github.com/open-workflow-specification/specification/blob/v1.0.0/schema/workflow.yaml)
+- [DSL reference: extensions](https://github.com/open-workflow-specification/specification/blob/v1.0.3/dsl-reference.md#extension)
+- [DSL overview: extensions](https://github.com/open-workflow-specification/specification/blob/v1.0.3/dsl.md#extensions)
+- [DSL 1.0.3 schema](https://github.com/open-workflow-specification/specification/blob/v1.0.3/schema/workflow.yaml)
 - [Lemline execution model](adr/0002-workflow-execution-model.md)
 - [Fork error boundaries](adr/0008-fork-error-management.md)
 - [Protobuf contracts](protobuf-messaging.md)

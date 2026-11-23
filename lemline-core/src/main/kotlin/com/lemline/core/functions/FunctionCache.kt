@@ -102,7 +102,7 @@ object FunctionCache {
         // Create the function's root node (analogous to workflow root)
         val fnRootTask = RootTask(
             Document().apply {
-                dsl = "1.0.0"
+                dsl = "1.0.3"
                 namespace = "_function"
                 name = "inline"
                 version = "1.0.0"

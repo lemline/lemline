@@ -13,7 +13,7 @@ This example demonstrates a simple workflow that interacts with multiple REST en
 
 ```yaml
 document:
-  dsl: 1.0.0
+  dsl: 1.0.3
   namespace: examples
   name: user-registration
   version: 1.0.0
@@ -43,50 +43,57 @@ do:
         endpoint: https://validation.example/api/verify-email
         body:
           email: ${ .email }
-        output: emailValidation
-  
+      output:
+        as: '${ $input + { "emailValidation": . } }'
   - createUserAccount:
       switch:
         - validEmail:
             when: ${ .emailValidation.valid == true }
-            then:
-              do:
-                - registerUser:
-                    call: http
-                    with:
-                      method: post
-                      endpoint: https://accounts.example/api/users
-                      headers:
-                        Content-Type: application/json
-                        X-API-Key: ${ $secrets.API_KEY }
-                      body:
-                        email: ${ .email }
-                        name: ${ .name }
-                        verificationStatus: "verified"
-                      output: userAccount
-                - sendWelcomeEmail:
-                    call: http
-                    with:
-                      method: post
-                      endpoint: https://notifications.example/api/emails
-                      headers:
-                        Content-Type: application/json
-                        Authorization: Bearer ${ $secrets.EMAIL_SERVICE_TOKEN }
-                      body:
-                        template: "welcome"
-                        recipient: ${ .email }
-                        data:
-                          name: ${ .name }
-                          accountId: ${ .userAccount.id }
+            then: createUserAccount-validEmail
         - default:
-            then:
-              do:
-                - notifyInvalidEmail:
-                    set:
-                      result:
-                        success: false
-                        reason: "Invalid email address"
-                        details: ${ .emailValidation.reason }
+            then: createUserAccount-default
+  - createUserAccount-validEmail:
+      do:
+        - registerUser:
+            call: http
+            with:
+              method: post
+              endpoint: https://accounts.example/api/users
+              headers:
+                Content-Type: application/json
+                X-API-Key: ${ $secrets.API_KEY }
+              body:
+                email: ${ .email }
+                name: ${ .name }
+                verificationStatus: "verified"
+            output:
+              as: '${ $input + { "userAccount": . } }'
+        - sendWelcomeEmail:
+            call: http
+            with:
+              method: post
+              endpoint: https://notifications.example/api/emails
+              headers:
+                Content-Type: application/json
+                Authorization: Bearer ${ $secrets.EMAIL_SERVICE_TOKEN }
+              body:
+                template: "welcome"
+                recipient: ${ .email }
+                data:
+                  name: ${ .name }
+                  accountId: ${ .userAccount.id }
+      then: createUserAccount-done
+  - createUserAccount-default:
+      do:
+        - notifyInvalidEmail:
+            set:
+              result:
+                success: false
+                reason: "Invalid email address"
+                details: ${ .emailValidation.reason }
+      then: createUserAccount-done
+  - createUserAccount-done:
+      set: ${ . }
 ```
 
 ### Pagination Handling
@@ -95,7 +102,7 @@ This example shows how to handle paginated API responses.
 
 ```yaml
 document:
-  dsl: 1.0.0
+  dsl: 1.0.3
   namespace: examples
   name: list-all-users
   version: 1.0.0
@@ -106,32 +113,42 @@ do:
         nextPage: 1
         hasMorePages: true
       export:
-        as: '$context + { allUsers: [], nextPage: 1, hasMorePages: true }'
+        as: '${ $context + { allUsers: [], nextPage: 1, hasMorePages: true } }'
 
   - fetchAllPages:
-      while: ${ $context.hasMorePages }
       do:
-        - fetchNextUserPage:
-            call: http
-            with:
-              method: get
-              endpoint: https://api.example/users
-              query:
-                page: ${ $context.nextPage }
-                limit: '100'
-              output: pageResult
-        - processPage:
-            set:
-              allUsers: ${ $context.allUsers + .pageResult.users }
-              nextPage: ${ $context.nextPage + 1 }
-              hasMorePages: ${ .pageResult.hasMore }
-            export:
-              as: '$context + { allUsers: $context.allUsers + .pageResult.users, nextPage: $context.nextPage + 1, hasMorePages: .pageResult.hasMore }'
+        - iterate:
+            do:
+              - fetchNextUserPage:
+                  call: http
+                  with:
+                    method: get
+                    endpoint: https://api.example/users
+                    query:
+                      page: ${ $context.nextPage }
+                      limit: '100'
+                  output:
+                    as: '${ $input + { "pageResult": . } }'
+              - processPage:
+                  set:
+                    allUsers: ${ $context.allUsers + .pageResult.users }
+                    nextPage: ${ $context.nextPage + 1 }
+                    hasMorePages: ${ .pageResult.hasMore }
+                  export:
+                    as: '${ $context + { allUsers: ($context.allUsers + .pageResult.users), nextPage: ($context.nextPage +
+                      1), hasMorePages: (.pageResult.hasMore)} }'
 
+        - repeat:
+            switch:
+              - more:
+                  when: ${ $context.hasMorePages }
+                  then: iterate
+              - done:
+                  then: exit
   - processFinalResult:
       set:
         result:
-          totalUsers: ${ length($context.allUsers) }
+          totalUsers: ${ ($context.allUsers | length) }
           users: ${ $context.allUsers }
 ```
 
@@ -141,7 +158,7 @@ This example demonstrates how to implement API request throttling to respect rat
 
 ```yaml
 document:
-  dsl: 1.0.0
+  dsl: 1.0.3
   namespace: examples
   name: api-throttling
   version: 1.0.0
@@ -166,11 +183,11 @@ do:
         processedItems: []
         failures: []
       export:
-        as: '$context + { processedItems: [], failures: [] }'
+        as: '${ $context + { processedItems: [], failures: [] } }'
 
   - processBatches:
       for:
-        in: ${ chunk(.items, 5) }  # Process in batches of 5 items
+        in: ${ .items as $items | [range(0; ($items | length); 5) as $i | $items[$i:$i+5]] } # Process in batches of 5 items
         each: batch
       do:
         - processBatch:
@@ -184,41 +201,45 @@ do:
                         call: http
                         with:
                           method: get
-                          endpoint: https://rate-limited-api.example/items/${$item}
+                          endpoint: ${ "https://rate-limited-api.example/items/\($item)" }
                           headers:
                             Authorization: Bearer ${ $secrets.API_TOKEN }
-                          output: itemResult
                         export:
-                          as: '$context + { processedItems: $context.processedItems + [.itemResult] }'
+                          as: '${ $context + { processedItems: ($context.processedItems + [.itemResult])} }'
+                        output:
+                          as: '${ $input + { "itemResult": . } }'
                   catch:
-                    - errors:
-                        with:
-                          type: https://open-workflow-specification.org/spec/1.0.0/errors/communication
-                          status: 429  # Too Many Requests
-                      retry:
-                        delay:
-                          seconds: 10
-                        backoff:
-                          exponential: {}
-                        limit:
-                          attempt:
-                            count: 3
-                    - errors:
-                        with:
-                          type: https://open-workflow-specification.org/spec/1.0.0/errors/communication
-                      as: apiError
-                      export:
-                        as: '$context + { failures: $context.failures + [{ item: $item, error: $apiError }] }'
+                    as: failure
+                    when: ${ ($failure.type == "https://open-workflow-specification.org/spec/1.0.0/errors/communication"
+                      and $failure.status == 429) or ($failure.type ==
+                      "https://open-workflow-specification.org/spec/1.0.0/errors/communication") }
+                    do:
+                      - selectHandler:
+                          switch:
+                            - case1:
+                                then: handle1
+                                when: ${ $failure.type ==
+                                  "https://open-workflow-specification.org/spec/1.0.0/errors/communication" and
+                                  $failure.status == 429 }
+                            - case2:
+                                then: handle2
+                                when: ${ $failure.type ==
+                                  "https://open-workflow-specification.org/spec/1.0.0/errors/communication" }
+                      - handle1:
+                          set: ${ . }
+                          then: exit
+                      - handle2:
+                          set: ${ . }
+                          then: exit
         - throttleBetweenBatches:
             wait:
-              duration:
-                seconds: 2  # Wait 2 seconds between batches
+              seconds: 2    # Wait 2 seconds between batches
 
   - summarizeResults:
       set:
         result:
-          succeeded: ${ length($context.processedItems) }
-          failed: ${ length($context.failures) }
+          succeeded: ${ ($context.processedItems | length) }
+          failed: ${ ($context.failures | length) }
           processedItems: ${ $context.processedItems }
           failures: ${ $context.failures }
 ```
@@ -231,7 +252,7 @@ This example demonstrates how to use an OpenAPI specification for API integratio
 
 ```yaml
 document:
-  dsl: 1.0.0
+  dsl: 1.0.3
   namespace: examples
   name: pet-store-integration
   version: 1.0.0
@@ -244,8 +265,8 @@ do:
         operationId: findPetsByStatus
         parameters:
           status: available
-        output: availablePets
-
+      output:
+        as: '${ $input + { "availablePets": . } }'
   - addNewPet:
       call: openapi
       with:
@@ -262,8 +283,8 @@ do:
             tags:
               - id: 1
                 name: "friendly"
-        output: newPet
-
+      output:
+        as: '${ $input + { "newPet": . } }'
   - retrievePet:
       call: openapi
       with:
@@ -272,7 +293,8 @@ do:
         operationId: getPetById
         parameters:
           petId: ${ .newPet.id }
-        output: retrievedPet
+      output:
+        as: '${ $input + { "retrievedPet": . } }'
 ```
 
 ### OpenAPI with Authentication
@@ -281,7 +303,7 @@ This example shows OpenAPI integration with different authentication methods.
 
 ```yaml
 document:
-  dsl: 1.0.0
+  dsl: 1.0.3
   namespace: examples
   name: openapi-auth
   version: 1.0.0
@@ -299,13 +321,10 @@ do:
         document:
           endpoint: https://api.example/openapi.json
         operationId: getResources
-        authentication:
-          apiKey:
-            name: "X-API-Key"
-            in: "header"
-            key: ${ $secrets.API_KEY }
-        output: apiKeyResult
-
+        parameters:
+          "X-API-Key": ${ $secrets.API_KEY }
+      output:
+        as: '${ $input + { "apiKeyResult": . } }'
   - callWithOAuth2:
       call: openapi
       with:
@@ -324,8 +343,8 @@ do:
           body:
             name: "Example Resource"
             type: "test"
-        output: oauth2Result
-
+      output:
+        as: '${ $input + { "oauth2Result": . } }'
   - callWithBasicAuth:
       call: openapi
       with:
@@ -338,7 +357,8 @@ do:
             password: ${ $secrets.PASSWORD }
         parameters:
           resourceId: ${ .oauth2Result.id }
-        output: basicAuthResult
+      output:
+        as: '${ $input + { "basicAuthResult": . } }'
 ```
 
 ## GraphQL Integration Examples
@@ -349,7 +369,7 @@ This example demonstrates a basic GraphQL query using HTTP integration.
 
 ```yaml
 document:
-  dsl: 1.0.0
+  dsl: 1.0.3
   namespace: examples
   name: graphql-query
   version: 1.0.0
@@ -394,12 +414,12 @@ do:
             }
           variables:
             id: ${ .userId }
-        output: graphqlResponse
-
+      output:
+        as: '${ $input + { "graphqlResponse": . } }'
   - processUserData:
       set:
         userData: ${ .graphqlResponse.data.user }
-        totalPosts: ${ length(.graphqlResponse.data.user.posts) }
+        totalPosts: ${ (.graphqlResponse.data.user.posts | length) }
         followerCount: ${ .graphqlResponse.data.user.followers.totalCount }
 ```
 
@@ -409,7 +429,7 @@ This example demonstrates a GraphQL mutation.
 
 ```yaml
 document:
-  dsl: 1.0.0
+  dsl: 1.0.3
   namespace: examples
   name: graphql-mutation
   version: 1.0.0
@@ -458,27 +478,34 @@ do:
             input:
               title: ${ .postData.title }
               content: ${ .postData.content }
-        output: graphqlResponse
-
+      output:
+        as: '${ $input + { "graphqlResponse": . } }'
   - processResult:
       switch:
         - hasErrors:
-            when: ${ .graphqlResponse.data.createPost.errors != null and length(.graphqlResponse.data.createPost.errors) > 0 }
-            then:
-              do:
-                - handleErrors:
-                    set:
-                      result:
-                        success: false
-                        errors: ${ .graphqlResponse.data.createPost.errors }
+            when: ${ .graphqlResponse.data.createPost.errors != null and (.graphqlResponse.data.createPost.errors |
+              length) > 0 }
+            then: processResult-hasErrors
         - default:
-            then:
-              do:
-                - handleSuccess:
-                    set:
-                      result:
-                        success: true
-                        post: ${ .graphqlResponse.data.createPost.post }
+            then: processResult-default
+  - processResult-hasErrors:
+      do:
+        - handleErrors:
+            set:
+              result:
+                success: false
+                errors: ${ .graphqlResponse.data.createPost.errors }
+      then: processResult-done
+  - processResult-default:
+      do:
+        - handleSuccess:
+            set:
+              result:
+                success: true
+                post: ${ .graphqlResponse.data.createPost.post }
+      then: processResult-done
+  - processResult-done:
+      set: ${ . }
 ```
 
 ## gRPC Integration Examples
@@ -489,7 +516,7 @@ This example demonstrates integrating with a gRPC service.
 
 ```yaml
 document:
-  dsl: 1.0.0
+  dsl: 1.0.3
   namespace: examples
   name: grpc-integration
   version: 1.0.0
@@ -516,8 +543,8 @@ do:
         method: SayHello
         arguments:
           name: ${ .username }
-        output: greeting
-
+      output:
+        as: '${ $input + { "greeting": . } }'
   - getUserProfile:
       call: grpc
       with:
@@ -530,8 +557,8 @@ do:
         method: GetUserProfile
         arguments:
           username: ${ .username }
-        output: userProfile
-
+      output:
+        as: '${ $input + { "userProfile": . } }'
   - combineResults:
       set:
         result:
@@ -549,7 +576,7 @@ This example demonstrates gRPC integration with TLS and JWT authentication.
 
 ```yaml
 document:
-  dsl: 1.0.0
+  dsl: 1.0.3
   namespace: examples
   name: secure-grpc
   version: 1.0.0
@@ -567,8 +594,8 @@ do:
           clientId: ${ $secrets.CLIENT_ID }
           clientSecret: ${ $secrets.CLIENT_SECRET }
           scope: "api:access"
-        output: authResponse
-
+      output:
+        as: '${ $input + { "authResponse": . } }'
   - secureGrpcCall:
       call: grpc
       with:
@@ -578,20 +605,22 @@ do:
           name: SecureService
           host: api.example
           port: 443
-          tls: true
+          authentication:
+            bearer:
+              token: ${ .authResponse.access_token }
         method: GetSecureData
         arguments:
-          requestId: ${ uuidv4() }
-          timestamp: ${ now() }
-        metadata:
-          authorization: Bearer ${ .authResponse.access_token }
-        output: secureData
-
+          requestId: ${ $workflow.id }
+          timestamp: ${ now }
+      output:
+        as: '${ $input + { "secureData": . } }'
+      metadata:
+        transport: Configure TLS at the service endpoint.
   - processSecureData:
       set:
         result:
           data: ${ .secureData.items }
-          count: ${ length(.secureData.items) }
+          count: ${ (.secureData.items | length) }
           timestamp: ${ .secureData.timestamp }
 ```
 
@@ -603,7 +632,7 @@ This example demonstrates AsyncAPI integration for event-driven architectures.
 
 ```yaml
 document:
-  dsl: 1.0.0
+  dsl: 1.0.3
   namespace: examples
   name: event-driven-workflow
   version: 1.0.0
@@ -618,18 +647,18 @@ do:
           filter: '${ .type == "new-order" }'
           consume:
             amount: 1
-        output: order
-
+      output:
+        as: '${ $input + { "order": . } }'
   - processOrder:
       call: http
       with:
         method: post
         endpoint: https://inventory.example/api/check-availability
         body:
-          orderId: ${ .order.id }
-          items: ${ .order.items }
-        output: availabilityCheck
-
+          orderId: '${ .order.id }'
+          items: '${ .order.items }'
+      output:
+        as: '${ $input + { "availabilityCheck": . } }'
   - publishOrderStatus:
       call: asyncapi
       with:
@@ -638,10 +667,10 @@ do:
         operation: publishOrderStatus
         message:
           payload:
-            orderId: ${ .order.id }
-            status: ${ .availabilityCheck.allItemsAvailable ? "confirmed" : "backorder" }
-            availableItems: ${ .availabilityCheck.availableItems }
-            unavailableItems: ${ .availabilityCheck.unavailableItems }
+            orderId: '${ .order.id }'
+            status: '${ if .availabilityCheck.allItemsAvailable then "confirmed" else "backorder" end }'
+            availableItems: '${ .availabilityCheck.availableItems }'
+            unavailableItems: '${ .availabilityCheck.unavailableItems }'
 ```
 
 ### Message Streaming with AsyncAPI
@@ -650,7 +679,7 @@ This example shows how to process streams of messages with AsyncAPI.
 
 ```yaml
 document:
-  dsl: 1.0.0
+  dsl: 1.0.3
   namespace: examples
   name: stream-processing
   version: 1.0.0
@@ -664,47 +693,52 @@ do:
         subscription:
           filter: '${ .deviceType == "sensor" }'
           consume:
-            forever:
-              foreach:
-                do:
-                  - processTelemetryItem:
-                      try:
-                        - analyzeTelemetry:
-                            call: http
-                            with:
-                              method: post
-                              endpoint: https://analytics.example/api/analyze
-                              body: ${ . }
-                              output: analysis
-                        - checkForAlert:
-                            switch:
-                              - alertCondition:
-                                  when: ${ .analysis.alertRequired == true }
-                                  then:
-                                    do:
-                                      - triggerAlert:
-                                          call: asyncapi
-                                          with:
-                                            document:
-                                              endpoint: file:///apis/telemetry.asyncapi.json
-                                            operation: publishAlert
-                                            message:
-                                              payload:
-                                                deviceId: ${ .deviceId }
-                                                alertType: ${ .analysis.alertType }
-                                                severity: ${ .analysis.severity }
-                                                value: ${ .value }
-                                                timestamp: ${ .timestamp }
-                      catch:
-                        errors:
-                          with:
-                            type: https://open-workflow-specification.org/spec/1.0.0/errors/communication
-                        retry:
-                          delay:
-                            seconds: 2
-                          limit:
-                            attempt:
-                              count: 3
+            while: ${ true }
+          foreach:
+            do:
+              - processTelemetryItem:
+                  try:
+                    - analyzeTelemetry:
+                        call: http
+                        with:
+                          method: post
+                          endpoint: https://analytics.example/api/analyze
+                          body: ${ . }
+                        output:
+                          as: '${ $input + { "analysis": . } }'
+                    - checkForAlert:
+                        switch:
+                          - alertCondition:
+                              when: ${ .analysis.alertRequired == true }
+                              then: checkForAlert-alertCondition
+                    - checkForAlert-alertCondition:
+                        do:
+                          - triggerAlert:
+                              call: asyncapi
+                              with:
+                                document:
+                                  endpoint: file:///apis/telemetry.asyncapi.json
+                                operation: publishAlert
+                                message:
+                                  payload:
+                                    deviceId: ${ .deviceId }
+                                    alertType: ${ .analysis.alertType }
+                                    severity: ${ .analysis.severity }
+                                    value: ${ .value }
+                                    timestamp: ${ .timestamp }
+                        then: checkForAlert-done
+                    - checkForAlert-done:
+                        set: ${ . }
+                  catch:
+                    errors:
+                      with:
+                        type: https://open-workflow-specification.org/spec/1.0.0/errors/communication
+                    retry:
+                      delay:
+                        seconds: 2
+                      limit:
+                        attempt:
+                          count: 3
 ```
 
 ## API Integration Best Practices

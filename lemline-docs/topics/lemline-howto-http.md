@@ -24,27 +24,26 @@ To make an HTTP call in Lemline, you need to:
 Here's a basic example:
 
 ```yaml
-functions:
-  - name: getWeather
-    type: http
-    operation: GET
-    url: https://api.weather.com/forecast?location={location}
-
-tasks:
-  - name: FetchWeather
-    type: call
-    function: getWeather
-    data:
-      location: "New York"
-    next: ProcessWeatherData
-  
-  - name: ProcessWeatherData
-    type: set
-    data:
-      temperature: ".temperature"
-      conditions: ".conditions"
-      message: "The temperature in New York is .temperature°C with .conditions"
-    next: NextTask
+use:
+  functions:
+    getWeather:
+      call: http
+      with:
+        method: get
+        endpoint: https://api.weather.com/forecast?location={location}
+        query: ${ . }
+do:
+  - FetchWeather:
+      call: getWeather
+      with:
+        location: "New York"
+      then: ProcessWeatherData
+  - ProcessWeatherData:
+      set:
+        temperature: ${ .temperature }
+        conditions: ${ .conditions }
+        message: ${ "The temperature in New York is \(.temperature)\u00b0C with \(.conditions)" }
+      then: NextTask
 ```
 
 ## HTTP Function Definition
@@ -52,11 +51,14 @@ tasks:
 The HTTP function definition includes the following elements:
 
 ```yaml
-functions:
-  - name: userService              # Unique function name
-    type: http                     # Function type (http)
-    operation: GET                 # HTTP method
-    url: https://api.example.com/users/{userId}  # URL with path parameters
+use:
+  functions:
+    userService:
+      call: http
+      with:
+        method: get
+        endpoint: https://api.example.com/users/{userId}
+        query: ${ . }
 ```
 
 ### Supported HTTP Methods
@@ -86,41 +88,43 @@ These parameters are replaced with actual values from the task's `data` section 
 ### Simple GET Request
 
 ```yaml
-functions:
-  - name: getUserProfile
-    type: http
-    operation: GET
-    url: https://api.example.com/users/{userId}
-
-tasks:
-  - name: FetchUserProfile
-    type: call
-    function: getUserProfile
-    data:
-      userId: ".userId"
-    next: ProcessProfile
+use:
+  functions:
+    getUserProfile:
+      call: http
+      with:
+        method: get
+        endpoint: https://api.example.com/users/{userId}
+        query: ${ . }
+do:
+  - FetchUserProfile:
+      call: getUserProfile
+      with:
+        userId: ${ .userId }
+      then: ProcessProfile
 ```
 
 ### POST Request with JSON Body
 
 ```yaml
-functions:
-  - name: createOrder
-    type: http
-    operation: POST
-    url: https://api.example.com/orders
-
-tasks:
-  - name: SubmitOrder
-    type: call
-    function: createOrder
-    data:
-      body:
-        customerId: ".customerId"
-        items: ".items"
-        shippingAddress: ".shippingAddress"
-        paymentMethod: ".paymentMethod"
-    next: ProcessOrderResponse
+use:
+  functions:
+    createOrder:
+      call: http
+      with:
+        method: post
+        endpoint: https://api.example.com/orders
+        body: ${ . }
+do:
+  - SubmitOrder:
+      call: createOrder
+      with:
+        body:
+          customerId: ${ .customerId }
+          items: ${ .items }
+          shippingAddress: ${ .shippingAddress }
+          paymentMethod: ${ .paymentMethod }
+      then: ProcessOrderResponse
 ```
 
 The `body` field automatically gets serialized as JSON and sent as the request body.
@@ -128,43 +132,45 @@ The `body` field automatically gets serialized as JSON and sent as the request b
 ### PUT Request to Update a Resource
 
 ```yaml
-functions:
-  - name: updateUser
-    type: http
-    operation: PUT
-    url: https://api.example.com/users/{userId}
-
-tasks:
-  - name: UpdateUserProfile
-    type: call
-    function: updateUser
-    data:
-      userId: ".userId"
-      body:
-        name: ".updatedName"
-        email: ".updatedEmail"
-        preferences: ".updatedPreferences"
-    next: HandleUpdateResponse
+use:
+  functions:
+    updateUser:
+      call: http
+      with:
+        method: put
+        endpoint: https://api.example.com/users/{userId}
+        body: ${ . }
+do:
+  - UpdateUserProfile:
+      call: updateUser
+      with:
+        userId: ${ .userId }
+        body:
+          name: ${ .updatedName }
+          email: ${ .updatedEmail }
+          preferences: ${ .updatedPreferences }
+      then: HandleUpdateResponse
 ```
 
 ### DELETE Request
 
 ```yaml
-functions:
-  - name: cancelOrder
-    type: http
-    operation: DELETE
-    url: https://api.example.com/orders/{orderId}
-
-tasks:
-  - name: CancelExistingOrder
-    type: call
-    function: cancelOrder
-    data:
-      orderId: ".orderId"
-      query:
-        reason: ".cancellationReason"
-    next: HandleCancellationResponse
+use:
+  functions:
+    cancelOrder:
+      call: http
+      with:
+        method: delete
+        endpoint: https://api.example.com/orders/{orderId}
+        body: ${ . }
+do:
+  - CancelExistingOrder:
+      call: cancelOrder
+      with:
+        orderId: ${ .orderId }
+        query:
+          reason: ${ .cancellationReason }
+      then: HandleCancellationResponse
 ```
 
 ## Request Configuration Options
@@ -174,17 +180,16 @@ tasks:
 You can add query parameters using the `query` field:
 
 ```yaml
-- name: SearchProducts
-  type: call
-  function: productSearch
-  data:
-    query:
-      category: ".productCategory"
-      minPrice: ".priceRange.min"
-      maxPrice: ".priceRange.max"
-      sortBy: "price"
-      order: "asc"
-  next: ProcessSearchResults
+  - SearchProducts:
+      call: productSearch
+      with:
+        query:
+          category: ${ .productCategory }
+          minPrice: ${ .priceRange.min }
+          maxPrice: ${ .priceRange.max }
+          sortBy: "price"
+          order: "asc"
+      then: ProcessSearchResults
 ```
 
 These will be appended to the URL as `?category=...&minPrice=...&maxPrice=...&sortBy=price&order=asc`.
@@ -194,16 +199,15 @@ These will be appended to the URL as `?category=...&minPrice=...&maxPrice=...&so
 You can set custom headers using the `headers` field:
 
 ```yaml
-- name: MakeApiCall
-  type: call
-  function: apiService
-  data:
-    headers:
-      Content-Type: "application/json"
-      Accept: "application/json"
-      X-API-Key: ".apiKey"
-      X-Request-ID: "$WORKFLOW.id"
-  next: ProcessResponse
+  - MakeApiCall:
+      call: apiService
+      with:
+        headers:
+          Content-Type: "application/json"
+          Accept: "application/json"
+          X-API-Key: ${ .apiKey }
+          X-Request-ID: ${ $context.id }
+      then: ProcessResponse
 ```
 
 ### Request Body Formats
@@ -213,46 +217,43 @@ By default, JSON bodies are sent with `Content-Type: application/json`. You can 
 #### Form Data
 
 ```yaml
-- name: SubmitForm
-  type: call
-  function: formProcessor
-  data:
-    headers:
-      Content-Type: "application/x-www-form-urlencoded"
-    body:
-      name: ".user.name"
-      email: ".user.email"
-      subscribe: "true"
-  next: ProcessFormResponse
+  - SubmitForm:
+      call: formProcessor
+      with:
+        headers:
+          Content-Type: "application/x-www-form-urlencoded"
+        body:
+          name: ${ .user.name }
+          email: ${ .user.email }
+          subscribe: "true"
+      then: ProcessFormResponse
 ```
 
 #### Multipart Form Data
 
 ```yaml
-- name: UploadFile
-  type: call
-  function: fileUpload
-  data:
-    headers:
-      Content-Type: "multipart/form-data"
-    body:
-      file: ".fileContent"
-      filename: ".fileName"
-      description: ".fileDescription"
-  next: ProcessUploadResponse
+  - UploadFile:
+      call: fileUpload
+      with:
+        headers:
+          Content-Type: "multipart/form-data"
+        body:
+          file: ${ .fileContent }
+          filename: ${ .fileName }
+          description: ${ .fileDescription }
+      then: ProcessUploadResponse
 ```
 
 #### Raw Text
 
 ```yaml
-- name: SendPlainText
-  type: call
-  function: textProcessor
-  data:
-    headers:
-      Content-Type: "text/plain"
-    body: ".textContent"
-  next: ProcessTextResponse
+  - SendPlainText:
+      call: textProcessor
+      with:
+        headers:
+          Content-Type: "text/plain"
+        body: ${ .textContent }
+      then: ProcessTextResponse
 ```
 
 ## Handling Responses
@@ -267,16 +268,15 @@ The HTTP response is available in the task's output. You can access:
 - Other metadata
 
 ```yaml
-- name: ProcessApiResponse
-  type: set
-  data:
-    responseData: "."  # The full response
-    statusCode: ".statusCode"
-    responseBody: ".body"  # Already parsed if JSON
-    responseHeaders: ".headers"
-    contentType: ".headers['content-type']"
-    result: ".body.data.result"
-  next: NextTask
+  - ProcessApiResponse:
+      set:
+        responseData: ${ . }
+        statusCode: ${ .statusCode }
+        responseBody: ${ .body }
+        responseHeaders: ${ .headers }
+        contentType: ${ .headers["content-type"] }
+        result: ${ .body.data.result }
+      then: NextTask
 ```
 
 ### Status Code Handling
@@ -284,17 +284,19 @@ The HTTP response is available in the task's output. You can access:
 You can conditionally process responses based on status code:
 
 ```yaml
-- name: CheckApiResponse
-  type: switch
-  conditions:
-    - condition: ".statusCode >= 200 && .statusCode < 300"
-      next: HandleSuccess
-    - condition: ".statusCode == 404"
-      next: HandleNotFound
-    - condition: ".statusCode == 401 || .statusCode == 403"
-      next: HandleAuthError
-    - condition: true
-      next: HandleOtherError
+  - CheckApiResponse:
+      switch:
+        - case1:
+            then: HandleSuccess
+            when: ${ .statusCode >= 200 and .statusCode < 300 }
+        - case2:
+            then: HandleNotFound
+            when: ${ .statusCode == 404 }
+        - case3:
+            then: HandleAuthError
+            when: ${ .statusCode == 401 // .statusCode == 403 }
+        - default:
+            then: HandleOtherError
 ```
 
 ## Error Handling
@@ -304,27 +306,31 @@ You can conditionally process responses based on status code:
 Wrap HTTP calls in a `try` task to handle errors:
 
 ```yaml
-- name: AttemptApiCall
-  type: try
-  retry:
-    maxAttempts: 3
-    interval: PT2S
-    multiplier: 2
-    jitter: 0.5
-  catch:
-    - error: "HTTP_ERROR"
-      next: HandleHttpError
-    - error: "TIMEOUT"
-      next: HandleTimeout
-    - error: "*"
-      next: HandleGenericError
-  do:
-    - name: MakeApiCall
-      type: call
-      function: apiService
-      data:
-        userId: ".userId"
-  next: ProcessSuccessResponse
+  - AttemptApiCall:
+      try:
+        - MakeApiCall:
+            call: apiService
+            with:
+              userId: ${ .userId }
+      catch:
+        as: failure
+        do:
+          - routeError:
+              switch:
+                - case1:
+                    then: HandleHttpError
+                    when: ${ $failure.type == "HTTP_ERROR" }
+                - case2:
+                    then: HandleTimeout
+                    when: ${ $failure.type == "TIMEOUT" }
+                - case3:
+                    then: HandleGenericError
+        retry:
+          limit:
+            attempt:
+              count: 3
+          delay: PT2S
+      then: ProcessSuccessResponse
 ```
 
 This example includes retry configuration for transient errors.
@@ -334,27 +340,29 @@ This example includes retry configuration for transient errors.
 You can catch specific HTTP errors:
 
 ```yaml
-- name: AttemptApiCall
-  type: try
-  catch:
-    - error: "HTTP_ERROR"
-      status: 404
-      next: HandleNotFound
-    - error: "HTTP_ERROR"
-      status: 429
-      next: HandleRateLimited
-    - error: "HTTP_ERROR"
-      status: 500
-      next: HandleServerError
-    - error: "*"
-      next: HandleOtherError
-  do:
-    - name: MakeApiCall
-      type: call
-      function: apiService
-      data:
-        userId: ".userId"
-  next: ProcessSuccessResponse
+  - AttemptApiCall:
+      try:
+        - MakeApiCall:
+            call: apiService
+            with:
+              userId: ${ .userId }
+      catch:
+        as: failure
+        do:
+          - routeError:
+              switch:
+                - case1:
+                    then: HandleNotFound
+                    when: ${ $failure.status == 404 }
+                - case2:
+                    then: HandleRateLimited
+                    when: ${ $failure.status == 429 }
+                - case3:
+                    then: HandleServerError
+                    when: ${ $failure.status == 500 }
+                - case4:
+                    then: HandleOtherError
+      then: ProcessSuccessResponse
 ```
 
 ## Advanced HTTP Features
@@ -364,21 +372,18 @@ You can catch specific HTTP errors:
 You can dynamically construct URLs based on workflow data:
 
 ```yaml
-- name: PrepareApiCall
-  type: set
-  data:
-    apiEnvironment: ".environment == 'production' ? 'api' : 'api-dev'"
-    apiVersion: ".useNewApi ? 'v2' : 'v1'"
-    apiUrl: "https://" + .apiEnvironment + ".example.com/" + .apiVersion + "/users"
-  next: MakeApiCall
-
-- name: MakeApiCall
-  type: call
-  function: dynamicApi
-  data:
-    url: ".apiUrl"
-    method: "GET"
-  next: ProcessResponse
+  - PrepareApiCall:
+      set:
+        apiEnvironment: ${ if .environment == "production" then "api" else "api-dev" end }
+        apiVersion: ${ if .useNewApi then "v2" else "v1" end }
+        apiUrl: ${ "https://" + .apiEnvironment + ".example.com/" + .apiVersion + "/users" }
+      then: MakeApiCall
+  - MakeApiCall:
+      call: dynamicApi
+      with:
+        url: ${ .apiUrl }
+        method: "GET"
+      then: ProcessResponse
 ```
 
 ### Timeouts
@@ -386,12 +391,12 @@ You can dynamically construct URLs based on workflow data:
 You can set custom timeouts for HTTP calls:
 
 ```yaml
-- name: LongRunningCall
-  type: call
-  function: slowApi
-  data:
-    timeout: "PT30S"  # 30 second timeout
-  next: ProcessResponse
+  - LongRunningCall:
+      call: slowApi
+      with: {}
+      then: ProcessResponse
+      timeout:
+        after: "PT30S"
 ```
 
 > **Lemline runtime:** only `listen` task timeouts are enforced. Workflow-level timeouts and timeouts on other tasks are accepted but ignored for now. HTTP calls use fixed client limits instead: 15 seconds to connect, 30 seconds per request.
@@ -401,13 +406,12 @@ You can set custom timeouts for HTTP calls:
 Control redirect behavior:
 
 ```yaml
-- name: ApiCallWithRedirects
-  type: call
-  function: apiService
-  data:
-    followRedirects: true
-    maxRedirects: 5
-  next: ProcessResponse
+  - ApiCallWithRedirects:
+      call: apiService
+      with:
+        followRedirects: true
+        maxRedirects: 5
+      then: ProcessResponse
 ```
 
 ### Connection Pooling
@@ -415,15 +419,14 @@ Control redirect behavior:
 Configure connection pooling:
 
 ```yaml
-- name: ApiCallWithPooling
-  type: call
-  function: apiService
-  data:
-    connection:
-      poolSize: 10
-      keepAlive: true
-      keepAliveDuration: "PT30S"
-  next: ProcessResponse
+  - ApiCallWithPooling:
+      call: apiService
+      with:
+        connection:
+          poolSize: 10
+          keepAlive: true
+          keepAliveDuration: "PT30S"
+      then: ProcessResponse
 ```
 
 ## Authentication Methods
@@ -431,15 +434,19 @@ Configure connection pooling:
 ### Basic Authentication
 
 ```yaml
-functions:
-  - name: secureApi
-    type: http
-    operation: GET
-    url: https://api.example.com/secure
-    auth:
-      type: basic
-      username: "${username}"
-      password: "${password}"
+use:
+  functions:
+    secureApi:
+      call: http
+      with:
+        method: get
+        endpoint:
+          uri: https://api.example.com/secure
+          authentication:
+            basic:
+              username: ${ $secrets.username }
+              password: ${ $secrets.password }
+        query: ${ . }
 ```
 
 The `${username}` syntax references secrets that should be provided at runtime.
@@ -447,47 +454,57 @@ The `${username}` syntax references secrets that should be provided at runtime.
 ### Bearer Token
 
 ```yaml
-functions:
-  - name: secureApi
-    type: http
-    operation: GET
-    url: https://api.example.com/secure
-    auth:
-      type: bearer
-      token: "${api_token}"
+use:
+  functions:
+    secureApi:
+      call: http
+      with:
+        method: get
+        endpoint:
+          uri: https://api.example.com/secure
+          authentication:
+            bearer:
+              token: ${ $secrets.api_token }
+        query: ${ . }
 ```
 
 ### OAuth2
 
 ```yaml
-functions:
-  - name: secureApi
-    type: http
-    operation: GET
-    url: https://api.example.com/secure
-    auth:
-      type: oauth2
-      tokenUrl: "https://auth.example.com/token"
-      clientId: "${client_id}"
-      clientSecret: "${client_secret}"
-      scopes:
-        - "user.read"
-        - "orders.write"
+use:
+  functions:
+    secureApi:
+      call: http
+      with:
+        method: get
+        endpoint:
+          uri: https://api.example.com/secure
+          authentication:
+            oauth2:
+              authority: "https://auth.example.com/token"
+              grant: client_credentials
+              client:
+                id: ${ $secrets.client_id }
+                secret: ${ $secrets.client_secret }
+              scopes:
+                - "user.read"
+                - "orders.write"
+        query: ${ . }
 ```
 
 ### API Key
 
 ```yaml
-functions:
-  - name: secureApi
-    type: http
-    operation: GET
-    url: https://api.example.com/secure
-    auth:
-      type: apiKey
-      name: "X-API-Key"
-      in: "header"
-      value: "${api_key}"
+use:
+  functions:
+    secureApi:
+      call: http
+      with:
+        method: get
+        endpoint: https://api.example.com/secure
+        query: ${ . }
+        headers:
+          "X-API-Key": ${ $secrets.api_key }
 ```
 
 The `in` field can be either `header` or `query`.
@@ -497,206 +514,184 @@ The `in` field can be either `header` or `query`.
 Here's a complete example that processes an order through multiple API calls:
 
 ```yaml
-id: order-processing
-name: Order Processing Workflow
-version: '1.0'
-specVersion: '1.0'
-start: ValidateOrder
-functions:
-  - name: validateCustomer
-    type: http
-    operation: GET
-    url: https://api.example.com/customers/{customerId}/validate
-    auth:
-      type: bearer
-      token: "${api_token}"
-  
-  - name: checkInventory
-    type: http
-    operation: POST
-    url: https://api.example.com/inventory/check
-    auth:
-      type: bearer
-      token: "${api_token}"
-  
-  - name: processPayment
-    type: http
-    operation: POST
-    url: https://api.example.com/payments/process
-    auth:
-      type: bearer
-      token: "${api_token}"
-  
-  - name: createShipment
-    type: http
-    operation: POST
-    url: https://api.example.com/shipments
-    auth:
-      type: bearer
-      token: "${api_token}"
-tasks:
-  - name: ValidateOrder
-    type: set
-    data:
-      orderId: "$WORKFLOW.input.orderId"
-      customerId: "$WORKFLOW.input.customerId"
-      items: "$WORKFLOW.input.items"
-      shippingAddress: "$WORKFLOW.input.shippingAddress"
-      paymentMethod: "$WORKFLOW.input.paymentMethod"
-    next: ValidateCustomer
-  
-  - name: ValidateCustomer
-    type: try
-    retry:
-      maxAttempts: 3
-      interval: PT2S
-    catch:
-      - error: "HTTP_ERROR"
-        status: 404
-        next: HandleInvalidCustomer
-      - error: "*"
-        next: HandleValidationError
-    do:
-      - name: CheckCustomer
-        type: call
-        function: validateCustomer
-        data:
-          customerId: ".customerId"
-          query:
-            checkCredit: "true"
-    next: CheckInventory
-  
-  - name: CheckInventory
-    type: try
-    retry:
-      maxAttempts: 2
-    catch:
-      - error: "*"
-        next: HandleInventoryError
-    do:
-      - name: VerifyInventory
-        type: call
-        function: checkInventory
-        data:
-          body:
-            items: ".items"
-    next: EvaluateInventory
-  
-  - name: EvaluateInventory
-    type: switch
-    conditions:
-      - condition: ".body.available == true"
-        next: ProcessPayment
-      - condition: true
-        next: HandleUnavailableInventory
-  
-  - name: ProcessPayment
-    type: try
-    retry:
-      maxAttempts: 2
-    catch:
-      - error: "HTTP_ERROR"
-        status: 402
-        next: HandlePaymentRejected
-      - error: "*"
-        next: HandlePaymentError
-    do:
-      - name: ChargePayment
-        type: call
-        function: processPayment
-        data:
-          body:
-            customerId: ".customerId"
-            orderId: ".orderId"
-            amount: ".body.totalPrice"
-            method: ".paymentMethod"
-    next: CreateShipment
-  
-  - name: CreateShipment
-    type: try
-    retry:
-      maxAttempts: 3
-    catch:
-      - error: "*"
-        next: HandleShipmentError
-    do:
-      - name: ArrangeShipment
-        type: call
-        function: createShipment
-        data:
-          body:
-            orderId: ".orderId"
-            customerId: ".customerId"
-            items: ".items"
-            shippingAddress: ".shippingAddress"
-            trackingInfo:
-              carrier: "preferred"
-    next: CompleteOrder
-  
-  - name: CompleteOrder
-    type: set
-    data:
-      status: "COMPLETED"
-      message: "Order processed successfully"
-      paymentId: ".ChargePayment.body.paymentId"
-      trackingNumber: ".ArrangeShipment.body.trackingNumber"
-      estimatedDelivery: ".ArrangeShipment.body.estimatedDelivery"
-    end: true
-  
-  - name: HandleInvalidCustomer
-    type: set
-    data:
-      status: "REJECTED"
-      reason: "Invalid customer account"
-    end: true
-  
-  - name: HandleValidationError
-    type: set
-    data:
-      status: "ERROR"
-      reason: "Customer validation failed"
-      error: "$WORKFLOW.error"
-    end: true
-  
-  - name: HandleInventoryError
-    type: set
-    data:
-      status: "ERROR"
-      reason: "Inventory check failed"
-      error: "$WORKFLOW.error"
-    end: true
-  
-  - name: HandleUnavailableInventory
-    type: set
-    data:
-      status: "REJECTED"
-      reason: "Some items are unavailable"
-      unavailableItems: ".body.unavailableItems"
-    end: true
-  
-  - name: HandlePaymentRejected
-    type: set
-    data:
-      status: "REJECTED"
-      reason: "Payment was rejected"
-      details: ".body.declineReason"
-    end: true
-  
-  - name: HandlePaymentError
-    type: set
-    data:
-      status: "ERROR"
-      reason: "Payment processing failed"
-      error: "$WORKFLOW.error"
-    end: true
-  
-  - name: HandleShipmentError
-    type: set
-    data:
-      status: "ERROR"
-      reason: "Shipment creation failed"
-      error: "$WORKFLOW.error"
-    end: true
+document:
+  dsl: 1.0.3
+  namespace: examples
+  name: order-processing
+  version: 1.0.0
+  title: Order Processing Workflow
+do:
+  - ValidateOrder:
+      set:
+        orderId: ${ $workflow.input.orderId }
+        customerId: ${ $workflow.input.customerId }
+        items: ${ $workflow.input.items }
+        shippingAddress: ${ $workflow.input.shippingAddress }
+        paymentMethod: ${ $workflow.input.paymentMethod }
+      then: ValidateCustomer
+  - ValidateCustomer:
+      try:
+        - CheckCustomer:
+            call: http
+            with:
+              method: get
+              endpoint:
+                uri: https://api.example.com/customers/{customerId}/validate
+                authentication:
+                  bearer:
+                    token: ${ $secrets.api_token }
+              query:
+                checkCredit: "true"
+      catch:
+        as: failure
+        do:
+          - routeError:
+              switch:
+                - case1:
+                    then: HandleInvalidCustomer
+                    when: ${ $failure.status == 404 }
+                - case2:
+                    then: HandleValidationError
+        retry:
+          limit:
+            attempt:
+              count: 3
+          delay: PT2S
+      then: CheckInventory
+  - CheckInventory:
+      try:
+        - VerifyInventory:
+            call: http
+            with:
+              method: post
+              endpoint:
+                uri: https://api.example.com/inventory/check
+                authentication:
+                  bearer:
+                    token: ${ $secrets.api_token }
+              body:
+                items: ${ .items }
+      catch:
+        as: failure
+        then: HandleInventoryError
+        retry:
+          limit:
+            attempt:
+              count: 2
+      then: EvaluateInventory
+  - EvaluateInventory:
+      switch:
+        - case1:
+            then: ProcessPayment
+            when: ${ .body.available == true }
+        - default:
+            then: HandleUnavailableInventory
+  - ProcessPayment:
+      try:
+        - ChargePayment:
+            call: http
+            with:
+              method: post
+              endpoint:
+                uri: https://api.example.com/payments/process
+                authentication:
+                  bearer:
+                    token: ${ $secrets.api_token }
+              body:
+                customerId: ${ .customerId }
+                orderId: ${ .orderId }
+                amount: ${ .body.totalPrice }
+                method: ${ .paymentMethod }
+      catch:
+        as: failure
+        do:
+          - routeError:
+              switch:
+                - case1:
+                    then: HandlePaymentRejected
+                    when: ${ $failure.status == 402 }
+                - case2:
+                    then: HandlePaymentError
+        retry:
+          limit:
+            attempt:
+              count: 2
+      then: CreateShipment
+  - CreateShipment:
+      try:
+        - ArrangeShipment:
+            call: http
+            with:
+              method: post
+              endpoint:
+                uri: https://api.example.com/shipments
+                authentication:
+                  bearer:
+                    token: ${ $secrets.api_token }
+              body:
+                orderId: ${ .orderId }
+                customerId: ${ .customerId }
+                items: ${ .items }
+                shippingAddress: ${ .shippingAddress }
+                trackingInfo:
+                  carrier: "preferred"
+      catch:
+        as: failure
+        then: HandleShipmentError
+        retry:
+          limit:
+            attempt:
+              count: 3
+      then: CompleteOrder
+  - CompleteOrder:
+      set:
+        status: "COMPLETED"
+        message: "Order processed successfully"
+        paymentId: ${ .ChargePayment.body.paymentId }
+        trackingNumber: ${ .ArrangeShipment.body.trackingNumber }
+        estimatedDelivery: ${ .ArrangeShipment.body.estimatedDelivery }
+      then: end
+  - HandleInvalidCustomer:
+      set:
+        status: "REJECTED"
+        reason: "Invalid customer account"
+      then: end
+  - HandleValidationError:
+      set:
+        status: "ERROR"
+        reason: "Customer validation failed"
+        error: ${ $context.error }
+      then: end
+  - HandleInventoryError:
+      set:
+        status: "ERROR"
+        reason: "Inventory check failed"
+        error: ${ $context.error }
+      then: end
+  - HandleUnavailableInventory:
+      set:
+        status: "REJECTED"
+        reason: "Some items are unavailable"
+        unavailableItems: ${ .body.unavailableItems }
+      then: end
+  - HandlePaymentRejected:
+      set:
+        status: "REJECTED"
+        reason: "Payment was rejected"
+        details: ${ .body.declineReason }
+      then: end
+  - HandlePaymentError:
+      set:
+        status: "ERROR"
+        reason: "Payment processing failed"
+        error: ${ $context.error }
+      then: end
+  - HandleShipmentError:
+      set:
+        status: "ERROR"
+        reason: "Shipment creation failed"
+        error: ${ $context.error }
+      then: end
 ```
 
 This workflow makes multiple HTTP calls with proper error handling to process an order from validation to shipment.

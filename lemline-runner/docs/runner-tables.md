@@ -28,7 +28,7 @@ All tables are prefixed with `lemline_` and created via Flyway migrations.
 
 ## `lemline_definitions`
 
-**Purpose:** Stores immutable workflow definitions (Open Workflow DSL v1.0 YAML).
+**Purpose:** Stores immutable workflow definitions (Open Workflow DSL v1.0.3 YAML).
 
 **Key files:**
 - Model: [DefinitionModel.kt](../src/main/kotlin/com/lemline/runner/models/DefinitionModel.kt)

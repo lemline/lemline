@@ -51,7 +51,7 @@ class DefinitionListenServiceTest {
         val filter = "with: { type: order, tenant: acme }"
         WorkflowCache.parseYamlAndPut("""
             document:
-              dsl: '1.0.0'
+              dsl: '1.0.3'
               namespace: default
               name: shared-filters
               version: '1.0.0'
@@ -97,7 +97,7 @@ class DefinitionListenServiceTest {
             // Given: A workflow with ONE strategy (no until condition)
             val yaml = """
                 document:
-                  dsl: '1.0.0'
+                  dsl: '1.0.3'
                   name: test-workflow
                   version: '1.0.0'
                   namespace: default
@@ -125,7 +125,7 @@ class DefinitionListenServiceTest {
             // Given: A workflow with ANY + until expression (not event filter)
             val yaml = $$"""
                 document:
-                  dsl: '1.0.0'
+                  dsl: '1.0.3'
                   name: test-workflow
                   version: '1.0.0'
                   namespace: default
@@ -154,7 +154,7 @@ class DefinitionListenServiceTest {
             // Given: A workflow with ANY + until event filter
             val yaml = """
                 document:
-                  dsl: '1.0.0'
+                  dsl: '1.0.3'
                   name: test-workflow
                   version: '1.0.0'
                   namespace: default
@@ -187,7 +187,7 @@ class DefinitionListenServiceTest {
             // Given: A workflow with ANY + until event filter for different type
             val yaml = """
                 document:
-                  dsl: '1.0.0'
+                  dsl: '1.0.3'
                   name: test-workflow
                   version: '1.0.0'
                   namespace: default
@@ -219,7 +219,7 @@ class DefinitionListenServiceTest {
             // Given: A workflow with until filter matching type AND source
             val yaml = """
                 document:
-                  dsl: '1.0.0'
+                  dsl: '1.0.3'
                   name: test-workflow
                   version: '1.0.0'
                   namespace: default
@@ -256,7 +256,7 @@ class DefinitionListenServiceTest {
             // Given: A workflow with until filter matching subject
             val yaml = """
                 document:
-                  dsl: '1.0.0'
+                  dsl: '1.0.3'
                   name: test-workflow
                   version: '1.0.0'
                   namespace: default
@@ -292,7 +292,7 @@ class DefinitionListenServiceTest {
             // Given: Multiple workflows with same until event type
             val yaml1 = """
                 document:
-                  dsl: '1.0.0'
+                  dsl: '1.0.3'
                   name: workflow-one
                   version: '1.0.0'
                   namespace: default
@@ -311,7 +311,7 @@ class DefinitionListenServiceTest {
 
             val yaml2 = """
                 document:
-                  dsl: '1.0.0'
+                  dsl: '1.0.3'
                   name: workflow-two
                   version: '1.0.0'
                   namespace: default
@@ -345,7 +345,7 @@ class DefinitionListenServiceTest {
             // Given: Multiple workflows, only one matches
             val yaml1 = """
                 document:
-                  dsl: '1.0.0'
+                  dsl: '1.0.3'
                   name: workflow-matches
                   version: '1.0.0'
                   namespace: default
@@ -364,7 +364,7 @@ class DefinitionListenServiceTest {
 
             val yaml2 = """
                 document:
-                  dsl: '1.0.0'
+                  dsl: '1.0.3'
                   name: workflow-no-match
                   version: '1.0.0'
                   namespace: default
@@ -399,7 +399,7 @@ class DefinitionListenServiceTest {
             // Given: A workflow with specific info
             val yaml = """
                 document:
-                  dsl: '1.0.0'
+                  dsl: '1.0.3'
                   name: my-workflow
                   version: '2.0.0'
                   namespace: production
@@ -435,7 +435,7 @@ class DefinitionListenServiceTest {
             // Given: A workflow with foreach enabled
             val yaml = """
                 document:
-                  dsl: '1.0.0'
+                  dsl: '1.0.3'
                   name: test-workflow
                   version: '1.0.0'
                   namespace: default
@@ -473,7 +473,7 @@ class DefinitionListenServiceTest {
             // Given: A workflow with until filter
             val yaml = """
                 document:
-                  dsl: '1.0.0'
+                  dsl: '1.0.3'
                   name: test-workflow
                   version: '1.0.0'
                   namespace: default
@@ -524,7 +524,7 @@ class DefinitionListenServiceTest {
             // Given: A workflow with ONE strategy
             val yaml = """
                 document:
-                  dsl: '1.0.0'
+                  dsl: '1.0.3'
                   name: test-workflow
                   version: '1.0.0'
                   namespace: default
@@ -554,7 +554,7 @@ class DefinitionListenServiceTest {
             // Given: A workflow listening for different event type
             val yaml = """
                 document:
-                  dsl: '1.0.0'
+                  dsl: '1.0.3'
                   name: test-workflow
                   version: '1.0.0'
                   namespace: default
@@ -582,7 +582,7 @@ class DefinitionListenServiceTest {
             // Given: A workflow with subject filter
             val yaml = """
                 document:
-                  dsl: '1.0.0'
+                  dsl: '1.0.3'
                   name: test-workflow
                   version: '1.0.0'
                   namespace: default
@@ -611,7 +611,7 @@ class DefinitionListenServiceTest {
             // Given: A workflow with subject filter
             val yaml = """
                 document:
-                  dsl: '1.0.0'
+                  dsl: '1.0.3'
                   name: test-workflow
                   version: '1.0.0'
                   namespace: default
@@ -640,7 +640,7 @@ class DefinitionListenServiceTest {
             // Given: A workflow with ALL strategy (multiple filters)
             val yaml = """
                 document:
-                  dsl: '1.0.0'
+                  dsl: '1.0.3'
                   name: test-workflow
                   version: '1.0.0'
                   namespace: default
@@ -672,7 +672,7 @@ class DefinitionListenServiceTest {
             // Given: A workflow with ALL strategy where same event type appears multiple times
             val yaml = """
                 document:
-                  dsl: '1.0.0'
+                  dsl: '1.0.3'
                   name: test-workflow
                   version: '1.0.0'
                   namespace: default
@@ -704,7 +704,7 @@ class DefinitionListenServiceTest {
             // Given: Two workflows listening for the same event
             val yaml1 = """
                 document:
-                  dsl: '1.0.0'
+                  dsl: '1.0.3'
                   name: workflow-one
                   version: '1.0.0'
                   namespace: default
@@ -719,7 +719,7 @@ class DefinitionListenServiceTest {
 
             val yaml2 = """
                 document:
-                  dsl: '1.0.0'
+                  dsl: '1.0.3'
                   name: workflow-two
                   version: '1.0.0'
                   namespace: default
@@ -750,7 +750,7 @@ class DefinitionListenServiceTest {
             // Given: Multiple workflows, only some match
             val yaml1 = """
                 document:
-                  dsl: '1.0.0'
+                  dsl: '1.0.3'
                   name: workflow-matches
                   version: '1.0.0'
                   namespace: default
@@ -765,7 +765,7 @@ class DefinitionListenServiceTest {
 
             val yaml2 = """
                 document:
-                  dsl: '1.0.0'
+                  dsl: '1.0.3'
                   name: workflow-no-match
                   version: '1.0.0'
                   namespace: default
@@ -796,7 +796,7 @@ class DefinitionListenServiceTest {
             // Given: A workflow with specific info
             val yaml = """
                 document:
-                  dsl: '1.0.0'
+                  dsl: '1.0.3'
                   name: my-workflow
                   version: '2.0.0'
                   namespace: production
@@ -828,7 +828,7 @@ class DefinitionListenServiceTest {
             // Given: A workflow with ANY strategy
             val yaml = """
                 document:
-                  dsl: '1.0.0'
+                  dsl: '1.0.3'
                   name: test-workflow
                   version: '1.0.0'
                   namespace: default
@@ -857,7 +857,7 @@ class DefinitionListenServiceTest {
             // Given: A workflow with correlation defined
             val yaml = """
                 document:
-                  dsl: '1.0.0'
+                  dsl: '1.0.3'
                   name: test-workflow
                   version: '1.0.0'
                   namespace: default
@@ -892,7 +892,7 @@ class DefinitionListenServiceTest {
             // Given: A workflow with correlation
             val yaml = """
                 document:
-                  dsl: '1.0.0'
+                  dsl: '1.0.3'
                   name: test-workflow
                   version: '1.0.0'
                   namespace: default
@@ -930,7 +930,7 @@ class DefinitionListenServiceTest {
             // Given: A workflow without correlation
             val yaml = """
                 document:
-                  dsl: '1.0.0'
+                  dsl: '1.0.3'
                   name: test-workflow
                   version: '1.0.0'
                   namespace: default
@@ -959,7 +959,7 @@ class DefinitionListenServiceTest {
             // Given: A workflow with ANY + until event filter
             val yaml = """
                 document:
-                  dsl: '1.0.0'
+                  dsl: '1.0.3'
                   name: test-workflow
                   version: '1.0.0'
                   namespace: default
@@ -995,7 +995,7 @@ class DefinitionListenServiceTest {
             // Given: A workflow with id filter
             val yaml = """
                 document:
-                  dsl: '1.0.0'
+                  dsl: '1.0.3'
                   name: test-workflow
                   version: '1.0.0'
                   namespace: default
@@ -1028,7 +1028,7 @@ class DefinitionListenServiceTest {
             // Given: A workflow with id filter
             val yaml = """
                 document:
-                  dsl: '1.0.0'
+                  dsl: '1.0.3'
                   name: test-workflow
                   version: '1.0.0'
                   namespace: default
@@ -1061,7 +1061,7 @@ class DefinitionListenServiceTest {
             // Given: A workflow with datacontenttype filter
             val yaml = """
                 document:
-                  dsl: '1.0.0'
+                  dsl: '1.0.3'
                   name: test-workflow
                   version: '1.0.0'
                   namespace: default
@@ -1095,7 +1095,7 @@ class DefinitionListenServiceTest {
             // Given: A workflow with datacontenttype filter
             val yaml = """
                 document:
-                  dsl: '1.0.0'
+                  dsl: '1.0.3'
                   name: test-workflow
                   version: '1.0.0'
                   namespace: default
@@ -1129,7 +1129,7 @@ class DefinitionListenServiceTest {
             // Given: A workflow with source filter
             val yaml = """
                 document:
-                  dsl: '1.0.0'
+                  dsl: '1.0.3'
                   name: test-workflow
                   version: '1.0.0'
                   namespace: default
@@ -1161,7 +1161,7 @@ class DefinitionListenServiceTest {
             // Given: A workflow with source filter
             val yaml = """
                 document:
-                  dsl: '1.0.0'
+                  dsl: '1.0.3'
                   name: test-workflow
                   version: '1.0.0'
                   namespace: default
@@ -1193,7 +1193,7 @@ class DefinitionListenServiceTest {
             // Given: A workflow with source expression filter
             val yaml = """
                 document:
-                  dsl: '1.0.0'
+                  dsl: '1.0.3'
                   name: test-workflow
                   version: '1.0.0'
                   namespace: default
@@ -1225,7 +1225,7 @@ class DefinitionListenServiceTest {
             // Given: A workflow with source expression
             val yaml = """
                 document:
-                  dsl: '1.0.0'
+                  dsl: '1.0.3'
                   name: test-workflow
                   version: '1.0.0'
                   namespace: default
@@ -1257,7 +1257,7 @@ class DefinitionListenServiceTest {
             // Given: A workflow with data expression filter
             val yaml = """
                 document:
-                  dsl: '1.0.0'
+                  dsl: '1.0.3'
                   name: test-workflow
                   version: '1.0.0'
                   namespace: default
@@ -1289,7 +1289,7 @@ class DefinitionListenServiceTest {
             // Given: A workflow with data expression filter
             val yaml = """
                 document:
-                  dsl: '1.0.0'
+                  dsl: '1.0.3'
                   name: test-workflow
                   version: '1.0.0'
                   namespace: default
@@ -1321,7 +1321,7 @@ class DefinitionListenServiceTest {
             // Given: A workflow with literal data filter
             val yaml = """
                 document:
-                  dsl: '1.0.0'
+                  dsl: '1.0.3'
                   name: test-workflow
                   version: '1.0.0'
                   namespace: default
@@ -1353,7 +1353,7 @@ class DefinitionListenServiceTest {
             // Given: A workflow with literal data filter
             val yaml = """
                 document:
-                  dsl: '1.0.0'
+                  dsl: '1.0.3'
                   name: test-workflow
                   version: '1.0.0'
                   namespace: default
@@ -1385,7 +1385,7 @@ class DefinitionListenServiceTest {
             // Given: A workflow with invalid literal JSON in data filter
             val yaml = """
                 document:
-                  dsl: '1.0.0'
+                  dsl: '1.0.3'
                   name: test-workflow
                   version: '1.0.0'
                   namespace: default
@@ -1417,7 +1417,7 @@ class DefinitionListenServiceTest {
             // Given: A workflow with multiple filter attributes
             val yaml = """
                 document:
-                  dsl: '1.0.0'
+                  dsl: '1.0.3'
                   name: test-workflow
                   version: '1.0.0'
                   namespace: default
@@ -1454,7 +1454,7 @@ class DefinitionListenServiceTest {
             // Given: A workflow with multiple filter attributes
             val yaml = """
                 document:
-                  dsl: '1.0.0'
+                  dsl: '1.0.3'
                   name: test-workflow
                   version: '1.0.0'
                   namespace: default
@@ -1492,7 +1492,7 @@ class DefinitionListenServiceTest {
             // Given: A workflow with multiple correlation keys
             val yaml = """
                 document:
-                  dsl: '1.0.0'
+                  dsl: '1.0.3'
                   name: test-workflow
                   version: '1.0.0'
                   namespace: default
@@ -1531,7 +1531,7 @@ class DefinitionListenServiceTest {
             // Given: A workflow with correlation keys in non-alphabetical order
             val yaml = """
                 document:
-                  dsl: '1.0.0'
+                  dsl: '1.0.3'
                   name: test-workflow
                   version: '1.0.0'
                   namespace: default
@@ -1570,7 +1570,7 @@ class DefinitionListenServiceTest {
             // Given: A workflow with JQ expression in correlation
             val yaml = """
                 document:
-                  dsl: '1.0.0'
+                  dsl: '1.0.3'
                   name: test-workflow
                   version: '1.0.0'
                   namespace: default
@@ -1605,7 +1605,7 @@ class DefinitionListenServiceTest {
             // Given: A workflow with complex JQ expression
             val yaml = """
                 document:
-                  dsl: '1.0.0'
+                  dsl: '1.0.3'
                   name: test-workflow
                   version: '1.0.0'
                   namespace: default
@@ -1640,7 +1640,7 @@ class DefinitionListenServiceTest {
             // Given: A workflow with correlation expression that will fail
             val yaml = $$"""
                 document:
-                  dsl: '1.0.0'
+                  dsl: '1.0.3'
                   name: test-workflow
                   version: '1.0.0'
                   namespace: default
@@ -1672,7 +1672,7 @@ class DefinitionListenServiceTest {
             // Given: A workflow with correlation on potentially null field
             val yaml = """
                 document:
-                  dsl: '1.0.0'
+                  dsl: '1.0.3'
                   name: test-workflow
                   version: '1.0.0'
                   namespace: default
@@ -1709,7 +1709,7 @@ class DefinitionListenServiceTest {
             // Given: A workflow with correlation on numeric field
             val yaml = """
                 document:
-                  dsl: '1.0.0'
+                  dsl: '1.0.3'
                   name: test-workflow
                   version: '1.0.0'
                   namespace: default
@@ -1746,7 +1746,7 @@ class DefinitionListenServiceTest {
             // Given: A workflow with correlation on missing fields
             val yaml = """
                 document:
-                  dsl: '1.0.0'
+                  dsl: '1.0.3'
                   name: test-workflow
                   version: '1.0.0'
                   namespace: default
@@ -1785,7 +1785,7 @@ class DefinitionListenServiceTest {
             // Given: A workflow listening for any event
             val yaml = """
                 document:
-                  dsl: '1.0.0'
+                  dsl: '1.0.3'
                   name: test-workflow
                   version: '1.0.0'
                   namespace: default
@@ -1817,7 +1817,7 @@ class DefinitionListenServiceTest {
             // Given: A workflow without subject filter
             val yaml = """
                 document:
-                  dsl: '1.0.0'
+                  dsl: '1.0.3'
                   name: test-workflow
                   version: '1.0.0'
                   namespace: default
@@ -1845,7 +1845,7 @@ class DefinitionListenServiceTest {
             // Given: A workflow with invalid data expression
             val yaml = $$"""
                 document:
-                  dsl: '1.0.0'
+                  dsl: '1.0.3'
                   name: test-workflow
                   version: '1.0.0'
                   namespace: default
@@ -1874,7 +1874,7 @@ class DefinitionListenServiceTest {
             // Given: A workflow listening for a different event type
             val yaml = """
                 document:
-                  dsl: '1.0.0'
+                  dsl: '1.0.3'
                   name: test-workflow
                   version: '1.0.0'
                   namespace: default
@@ -1909,7 +1909,7 @@ class DefinitionListenServiceTest {
             // Given: A workflow with data filter
             val yaml = """
                 document:
-                  dsl: '1.0.0'
+                  dsl: '1.0.3'
                   name: test-workflow
                   version: '1.0.0'
                   namespace: default
@@ -1945,7 +1945,7 @@ class DefinitionListenServiceTest {
             // Given: A workflow with correlation
             val yaml = """
                 document:
-                  dsl: '1.0.0'
+                  dsl: '1.0.3'
                   name: test-workflow
                   version: '1.0.0'
                   namespace: default
@@ -1983,7 +1983,7 @@ class DefinitionListenServiceTest {
             // Given: A workflow with source expression returning a string
             val yaml = """
                 document:
-                  dsl: '1.0.0'
+                  dsl: '1.0.3'
                   name: test-workflow
                   version: '1.0.0'
                   namespace: default
@@ -2012,7 +2012,7 @@ class DefinitionListenServiceTest {
             // Given: Multiple workflows cached
             val yaml1 = """
                 document:
-                  dsl: '1.0.0'
+                  dsl: '1.0.3'
                   name: workflow-1
                   version: '1.0.0'
                   namespace: default
@@ -2027,7 +2027,7 @@ class DefinitionListenServiceTest {
 
             val yaml2 = """
                 document:
-                  dsl: '1.0.0'
+                  dsl: '1.0.3'
                   name: workflow-2
                   version: '2.0.0'
                   namespace: production
@@ -2042,7 +2042,7 @@ class DefinitionListenServiceTest {
 
             val yaml3 = """
                 document:
-                  dsl: '1.0.0'
+                  dsl: '1.0.3'
                   name: workflow-3
                   version: '1.0.0'
                   namespace: default
@@ -2076,7 +2076,7 @@ class DefinitionListenServiceTest {
         fun `toQueryKey should use filterIndex 0 for ONE strategy`() {
             val yaml = """
                 document:
-                  dsl: '1.0.0'
+                  dsl: '1.0.3'
                   name: test-workflow
                   version: '1.0.0'
                   namespace: default
@@ -2103,7 +2103,7 @@ class DefinitionListenServiceTest {
         fun `toQueryKey should use filterIndex 0 for ANY strategy`() {
             val yaml = """
                 document:
-                  dsl: '1.0.0'
+                  dsl: '1.0.3'
                   name: test-workflow
                   version: '1.0.0'
                   namespace: default
@@ -2132,7 +2132,7 @@ class DefinitionListenServiceTest {
         fun `toQueryKey should use actual filterIndex for ALL strategy - first filter`() {
             val yaml = """
                 document:
-                  dsl: '1.0.0'
+                  dsl: '1.0.3'
                   name: test-workflow
                   version: '1.0.0'
                   namespace: default
@@ -2163,7 +2163,7 @@ class DefinitionListenServiceTest {
         fun `toQueryKey should use actual filterIndex for ALL strategy - second filter`() {
             val yaml = """
                 document:
-                  dsl: '1.0.0'
+                  dsl: '1.0.3'
                   name: test-workflow
                   version: '1.0.0'
                   namespace: default
@@ -2194,7 +2194,7 @@ class DefinitionListenServiceTest {
         fun `toQueryKey should use actual filterIndex for ALL strategy - third filter`() {
             val yaml = """
                 document:
-                  dsl: '1.0.0'
+                  dsl: '1.0.3'
                   name: test-workflow
                   version: '1.0.0'
                   namespace: default
@@ -2225,7 +2225,7 @@ class DefinitionListenServiceTest {
         fun `toQueryKey should use null filterIndex for ANY_UNTIL_EVENT strategy`() {
             val yaml = """
                 document:
-                  dsl: '1.0.0'
+                  dsl: '1.0.3'
                   name: test-workflow
                   version: '1.0.0'
                   namespace: default
@@ -2256,7 +2256,7 @@ class DefinitionListenServiceTest {
         fun `toQueryKey should use null filterIndex for ANY_UNTIL_EXPR strategy`() {
             val yaml = """
                 document:
-                  dsl: '1.0.0'
+                  dsl: '1.0.3'
                   name: test-workflow
                   version: '1.0.0'
                   namespace: default
@@ -2284,7 +2284,7 @@ class DefinitionListenServiceTest {
         fun `toQueryKey should preserve correlation values`() {
             val yaml = """
                 document:
-                  dsl: '1.0.0'
+                  dsl: '1.0.3'
                   name: test-workflow
                   version: '1.0.0'
                   namespace: default
@@ -2324,7 +2324,7 @@ class DefinitionListenServiceTest {
         fun `toQueryKey should have null correlation when no correlation defined`() {
             val yaml = """
                 document:
-                  dsl: '1.0.0'
+                  dsl: '1.0.3'
                   name: test-workflow
                   version: '1.0.0'
                   namespace: default
@@ -2350,7 +2350,7 @@ class DefinitionListenServiceTest {
         fun `toQueryKey should preserve workflow info`() {
             val yaml = """
                 document:
-                  dsl: '1.0.0'
+                  dsl: '1.0.3'
                   name: my-workflow
                   version: '2.0.0'
                   namespace: production
@@ -2380,7 +2380,7 @@ class DefinitionListenServiceTest {
         val namespace = WorkflowNamespace("hydration")
         fun definition(name: String, reference: String) = WorkflowCache.parseYamlAndPut("""
             document:
-              dsl: '1.0.0'
+              dsl: '1.0.3'
               namespace: hydration
               name: $name
               version: '1.0.0'
@@ -2392,7 +2392,7 @@ class DefinitionListenServiceTest {
         // Published elsewhere only to obtain the remote function body.
         val function = WorkflowCache.parseYamlAndPut("""
             document:
-              dsl: '1.0.0'
+              dsl: '1.0.3'
               namespace: functions
               name: function
               version: '1.0.0'

@@ -306,7 +306,7 @@ class InstanceStartServiceTest {
         WorkflowCache.parseYaml(
             """
             document:
-              dsl: '1.0.0'
+              dsl: '1.0.3'
               namespace: team-a
               name: orders
               version: '$version'
@@ -322,7 +322,7 @@ class InstanceStartServiceTest {
         WorkflowCache.parseYaml(
             """
             document:
-              dsl: '1.0.0'
+              dsl: '1.0.3'
               namespace: team-a
               name: orders
               version: '1.0.0'

@@ -12,7 +12,7 @@ This module implements the `fork` task from Open Workflow DSL:
 
 ## Open Workflow DSL Reference
 
-See [Fork Task](https://github.com/open-workflow-specification/specification/blob/v1.0.0/dsl-reference.md#fork) in the Open Workflow Specification:
+See [Fork Task](https://github.com/open-workflow-specification/specification/blob/v1.0.3/dsl-reference.md#fork) in the Open Workflow Specification:
 
 ```yaml
 do:

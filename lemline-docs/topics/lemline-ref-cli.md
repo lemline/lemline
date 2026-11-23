@@ -171,18 +171,29 @@ Prints the configuration Lemline will use, after merging the file, environment v
 ### `config create`
 
 ```
-lemline config create -m <broker> -d <database> [-o <path>] [--force] [--dry-run]
+lemline config create [-m <broker>] [-d <database>] [--analytics <type>] [-o <path>] [--force] [--dry-run]
 ```
 
-Generates a configuration file. In a terminal, missing choices are asked interactively. The default output name `lemline.yaml` is not searched automatically: pass it with `--config`, or write `-o .lemline.yaml`.
+Run `lemline config create -o .lemline.yaml` in a terminal to choose messaging, orchestration and analytics in order. Press Enter at the analytics prompt to accept the displayed default. Lemline reads `.lemline.yaml` automatically from the current directory.
+
+For scripts, supply both `--messaging` and `--database`. With both options present, the command runs without prompts. Use `--analytics` to select the history database explicitly. If you use the default output name, pass `--config lemline.yaml` to subsequent commands.
 
 | Option | Description | Default |
 |--------|-------------|---------|
 | `-m`, `--messaging` | `kafka`, `rabbitmq`, `pgmq` or `sqlite` | asked |
-| `-d`, `--database` | `postgresql` or `mysql` | asked |
+| `-d`, `--database` | Orchestration database: `postgresql`, `mysql` or `sqlite` | asked |
+| `--analytics` | Workflow history database: `postgresql` or `sqlite` | See defaults below. |
 | `-o`, `--output <path>` | File to write | `lemline.yaml` |
 | `--force` | Overwrite an existing file | off |
 | `--dry-run` | Print the file instead of writing it | off |
+
+With `--analytics` omitted, the generated YAML follows these defaults.
+
+| Messaging | Orchestration | Generated analytics section |
+|-----------|---------------|-----------------------------|
+| SQLite | SQLite | SQLite file at `analytics.db` |
+| SQLite | PostgreSQL or MySQL | PostgreSQL |
+| Kafka, RabbitMQ or PGMQ | Any | Section omitted |
 
 ### `migrate`
 

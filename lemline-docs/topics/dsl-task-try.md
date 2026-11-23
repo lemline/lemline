@@ -19,7 +19,7 @@ Here's a simple example of trying to call an external service and catching a pot
 
 ```yaml
 document:
-  dsl: '1.0.0'
+  dsl: '1.0.3'
   namespace: examples
   name: try-catch-basic
   version: '1.0.0'
@@ -31,8 +31,7 @@ do:
             call: http  # See [HTTP Call Task](dsl-call-http.md) for details
             with:
               method: get
-              uri: https://api.unreliable.com/data
-            # This call might fail with a communication error
+              endpoint: https://api.unreliable.com/data
       catch:
         # Define how to handle errors caught from the 'try' block
         errors:
@@ -51,10 +50,8 @@ do:
               set: # Provide a default output if the try block failed
                 data: null
                 status: "failed"
-  - continueProcessing: # Executes after attemptServiceCall (either success or caught error)
-    # Input is the output of 'callMyApi' if successful,
-    # or the output of 'setDefaultValue' if an error was caught.
-    # ...
+  - continueProcessing:
+      set: ${ . }
 ```
 
 In this example, if `callMyApi` fails with a standard `communication` error, the `catch` block is activated. The error
@@ -72,6 +69,8 @@ do:
             call: http
             with: # ... service details ...
             # Might temporarily fail with 503
+              endpoint: https://api.example.com/data
+              method: get
       catch:
         errors:
           with:
@@ -79,13 +78,13 @@ do:
         retry:
           delay: PT2S    # Initial delay 2 seconds
           backoff:
-            exponential: { } # Exponential backoff (2s, 4s, 8s...)
+            exponential: {}  # Exponential backoff (2s, 4s, 8s...)
           limit:
             attempt:
               count: 4   # Max 1 initial attempt + 3 retries = 4 total
         # No 'catch.do' means if all retries fail, the error is re-thrown
-  - processData: # Only reached if fetchCrucialData succeeds eventually
-    # ...
+  - processData:
+      set: ${ . }
 ```
 
 This example attempts `fetchCrucialData`. If it fails with a 503 status, it waits 2 seconds and retries. If it fails

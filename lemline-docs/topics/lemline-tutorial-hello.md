@@ -27,7 +27,7 @@ Create a file named `hello.yaml` with the following content:
 
 ```yaml
 document:
-  dsl: '1.0.0'
+  dsl: '1.0.3'
   namespace: tutorial
   name: hello-workflow
   version: '0.1.0'
@@ -201,7 +201,7 @@ Update `hello.yaml` to the following:
 
 ```yaml
 document:
-  dsl: '1.0.0'
+  dsl: '1.0.3'
   namespace: tutorial
   name: hello-workflow
   version: '0.1.0'
@@ -275,16 +275,17 @@ Update your workflow to use this input:
 
 ```yaml
 document:
-  dsl: '1.0.0'
+  dsl: '1.0.3'
   namespace: tutorial
   name: hello-workflow
   version: '0.1.0'
 input:
   schema:
-    type: object
-    properties:
-      name:
-        type: string
+    document:
+      type: object
+      properties:
+        name:
+          type: string
 do:
   - createGreeting:
       set:
@@ -338,39 +339,44 @@ Let's add a conditional greeting based on the time of day using a `switch` task:
 
 ```yaml
 document:
-  dsl: '1.0.0'
+  dsl: '1.0.3'
   namespace: tutorial
   name: hello-workflow
   version: '0.1.0'
 input:
   schema:
-    type: object
-    properties:
-      name:
-        type: string
-      hour:
-        type: integer
+    document:
+      type: object
+      properties:
+        name:
+          type: string
+        hour:
+          type: integer
 do:
   - chooseGreeting:
       switch:
-        - when: ${ .hour < 12 }
-          then: setMorningGreeting
-        - when: ${ .hour < 18 }
-          then: setAfternoonGreeting
-        - otherwise:
-          then: setEveningGreeting
+        - morning:
+            when: ${ .hour < 12 }
+            then: setMorningGreeting
+        - afternoon:
+            when: ${ .hour < 18 }
+            then: setAfternoonGreeting
+        - evening:
+            then: setEveningGreeting
   - setMorningGreeting:
       set:
         greeting: Good morning
+      then: createMessage
   - setAfternoonGreeting:
       set:
         greeting: Good afternoon
+      then: createMessage
   - setEveningGreeting:
       set:
         greeting: Good evening
   - createMessage:
       set:
-        message: ${ .greeting + ", " + .name + "!" }
+        message: ${ .greeting + ", " + $workflow.input.name + "!" }
   - logMessage:
       call: https://raw.githubusercontent.com/open-workflow-specification/catalog/main/functions/log/1.0.0/function.yaml
       with:
@@ -418,7 +424,7 @@ java -jar lemline.jar instance start tutorial hello-workflow --input '{"name": "
 
 In this tutorial, you've learned how to:
 
-- Create workflow definitions using the Open Workflow DSL v1.0
+- Create workflow definitions using the Open Workflow DSL v1.0.3
 - Register workflow definitions with `definition post`
 - Start workflow instances with `instance start`
 - Use the `set` task to create and manipulate variables

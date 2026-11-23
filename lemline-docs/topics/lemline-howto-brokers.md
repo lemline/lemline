@@ -136,7 +136,7 @@ The broker-independent `lemline.messaging.<channel>.consumer.concurrency` only a
 
 ```yaml
 document:
-  dsl: '1.0.0'
+  dsl: '1.0.3'
   namespace: examples
   name: order-workflow
   version: '0.1.0'
@@ -157,7 +157,7 @@ do:
 
 ```yaml
 document:
-  dsl: '1.0.0'
+  dsl: '1.0.3'
   namespace: examples
   name: shipping-workflow
   version: '0.1.0'

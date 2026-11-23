@@ -61,7 +61,7 @@ class DefinitionDeleteCommandTest {
             version = workflowVersion,
             definition = """
                 document:
-                  dsl: 1.0.0
+                  dsl: 1.0.3
                   namespace: $workflowNamespace
                   name: $workflowName
                   version: '$workflowVersion'
@@ -77,7 +77,7 @@ class DefinitionDeleteCommandTest {
             version = WorkflowVersion("2.0.0"),
             definition = """
                 document:
-                  dsl: 1.0.0
+                  dsl: 1.0.3
                   namespace: $workflowNamespace
                   name: $workflowName
                   version: '2.0.0'

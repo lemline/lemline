@@ -20,7 +20,7 @@ This allows workflows to publish messages to channels or subscribe to messages f
 
 ```yaml
 document:
-  dsl: '1.0.0' # Assuming alpha5 or later based on reference example
+  dsl: '1.0.3'
   namespace: test
   name: asyncapi-publish-example
   version: '0.1.0'
@@ -31,7 +31,7 @@ do:
         # Reference to the AsyncAPI document
         document:
           endpoint: https://broker.example.com/docs/asyncapi.json
-        operation: sendGreeting  
+        operation: sendGreeting
         server:
           name: productionBroker
           variables:
@@ -44,14 +44,14 @@ do:
             traceId: "${ $context.traceId }"
       # Output typically confirms publish success/failure, specifics vary
   - afterPublish:
-      # ... 
+      set: ${ . }
 ```
 
 ### Example: Subscribing to Messages
 
 ```yaml
 document:
-  dsl: '1.0.0'    # Workflow DSL version
+  dsl: '1.0.3'    # Workflow DSL version
   namespace: test  # Namespace for the workflow
   name: asyncapi-subscribe-example  # Name of the workflow
   version: '0.1.0'  # Version of this workflow
@@ -62,22 +62,20 @@ do:
         # Reference to the AsyncAPI specification document
         document:
           endpoint: https://chat.example.com/api/asyncapi.yaml
-        
+
         # Operation ID for subscribing (must match one defined in the AsyncAPI doc)
         operation: receiveChatMessages
-        
+
         # Specify protocol to select appropriate server
         protocol: ws  # WebSocket protocol
-        
         subscription:
           # Optional: Filter messages based on payload content
           filter: '${ .roomId == $context.targetRoomId }'
-          
+
           # Define consumption limits
           consume:
             amount: 10          # Max 10 messages
-            for: { minutes: 5 } # Or max 5 minutes, whichever comes first
-          
+            for: {minutes: 5}   # Or max 5 minutes, whichever comes first
           # Process each consumed message
           foreach:
             item: msg  # Variable name for the current message
@@ -87,20 +85,19 @@ do:
                   call: logMessage
                   with:
                     message: "Received order update: ${ .msg.payload.orderId }"
-              
+
               # Conditionally notify shipping if status is SHIPPED
               - checkStatus:
                   call: notifyShipping
-                  if: "${ .msg.payload.status == 'SHIPPED' }"
-            
+                  if: "${ .msg.payload.status == \"SHIPPED\" }"
+
             # Define the output of the foreach loop (and thus the task)
             output:
               as:
-                processedCount: "${ count(.) }"          # Total messages processed
+                processedCount: "${ length }"            # Total messages processed
                 lastOrderId: "${ .[-1]?.msg.payload.orderId }"  # Last order ID
-  
   - afterSubscription:
-      # ...
+      set: ${ . }
 ```
 
 ## Configuration Options

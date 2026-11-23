@@ -9,7 +9,7 @@ reliable way to orchestrate tasks and services in distributed environments.
 
 ## Core Features
 
-* **Open Workflow DSL Implementation**: Implements the Open Workflow DSL 1.0 standard, a
+* **Open Workflow DSL Implementation**: Implements the Open Workflow DSL 1.0.3 standard, a
   CNCF project for workflow definitions (see [Supported Features](lemline-ref-supported-features.md) for details)
 * **Event-Driven Architecture**: Built from the ground up with event-driven principles
 * **Database-Optional Design**: Can operate without a central database for many workflow types
