@@ -16,7 +16,7 @@ decision-making, and reactive behavior based on external systems consuming these
 
 ```yaml
 document:
-  dsl: '1.0.3'
+  dsl: '1.0.0' # Assuming alpha5 or later based on reference example
   namespace: test
   name: emit-example
   version: '0.1.0'

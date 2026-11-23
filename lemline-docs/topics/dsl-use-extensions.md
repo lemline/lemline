@@ -1,6 +1,6 @@
 # Workflow extensions
 
-DSL 1.0.3 `use.extensions` adds tasks before and after selected tasks without moving the original task's execution position.
+DSL 1.0.0 `use.extensions` adds tasks before and after selected tasks without moving the original task's execution position.
 
 ```yaml
 use:

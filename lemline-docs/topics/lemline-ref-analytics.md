@@ -57,7 +57,7 @@ Use a database dedicated to analytics. Its Flyway history is separate from the w
 
 ### Configure SQLite
 
-For a new configuration, pass `--analytics sqlite` to `lemline config create` to store history in `analytics.db`. To configure an existing runner, set the analytics path in its YAML file:
+Add this analytics block to the runner configuration alongside your workflow database and messaging settings. Use the JVM package for SQLite analytics.
 
 ```yaml
 lemline:

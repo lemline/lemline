@@ -40,7 +40,12 @@ architecture makes it particularly suitable for IoT use cases.
 
 ## 2. Setting Up Your Project
 
-Work in the `lemline-project` directory from [Setting Up a Local Environment](lemline-tutorial-setup.md). Keep the worker running with the `examples` namespace enabled.
+Create a new directory for this tutorial:
+
+```bash
+mkdir iot-monitoring
+cd iot-monitoring
+```
 
 ## 3. Creating the Sensor Data Processing Workflow
 
@@ -48,18 +53,37 @@ Let's create a workflow that processes temperature sensor data from multiple roo
 alerts. Create a file named `temperature-monitoring.yaml`:
 
 ```yaml
-document:
-  dsl: 1.0.3
-  namespace: examples
-  name: temperature-monitoring
-  version: 1.0.0
-  title: Temperature Monitoring System
-do:
-  - configure:
-      set:
-        temperature: { low: 16, high: 28 }
-        humidity: { low: 30, high: 70 }
-      export: { as: '${ $context + {thresholds: .} }' }
+id: temperature-monitoring
+name: Temperature Monitoring System
+version: '1.0'
+specVersion: '1.0'
+start: InitializeMonitoring
+functions:
+    -   name: logFunction
+        type: custom
+        operation: log
+    -   name: alertFunction
+        type: http
+        operation: POST
+        url: https://alerts-api.example.com/api/v1/alerts
+tasks:
+    -   name: InitializeMonitoring
+        type: set
+        data:
+            buildingId: "BLDG-123"
+            temperatureThresholdHigh: 28
+            temperatureThresholdLow: 16
+            humidityThresholdHigh: 70
+            humidityThresholdLow: 30
+            message: "Initializing temperature monitoring for building BLDG-123"
+        next: LogInitialization
+
+    -   name: LogInitialization
+        type: call
+        function: logFunction
+        data:
+            log: ".message"
+        next: MonitorTemperatures
 ```
 
 ## 4. Implementing Continuous Monitoring
@@ -67,41 +91,100 @@ do:
 Let's add the continuous monitoring logic by processing sensor events:
 
 ```yaml
-  - MonitorTemperatures:
-      listen:
-        to:
-          one:
-            with: { type: SensorReading }
-            correlate:
-              buildingId:
-                from: ${ .data.buildingId }
-                expect: ${ $workflow.input.buildingId }
-        read: data
-  - routeReading:
-      switch:
-        - temperature: { when: '${ .type == "temperature" }', then: ProcessTemperatureReading }
-        - humidity: { when: '${ .type == "humidity" }', then: ProcessHumidityReading }
-        - ignore: { then: MonitorTemperatures }
+  -   name: MonitorTemperatures
+      type: listen
+      events:
+          -   name: TemperatureEvents
+              type: SensorReading
+              correlations:
+                  - buildingId = .buildingId
+              consume: forever
+              foreach:
+                  as: "sensorReading"
+                  next: ProcessSensorReading
+      next: EndMonitoring
+
+  -   name: ProcessSensorReading
+      type: switch
+      conditions:
+          -   condition: ".sensorReading.type == 'temperature'"
+              next: ProcessTemperatureReading
+          -   condition: ".sensorReading.type == 'humidity'"
+              next: ProcessHumidityReading
+          -   condition: true
+              next: IgnoreReading
+
+  -   name: IgnoreReading
+      type: set
+      data:
+          message: "Ignoring unknown sensor reading type: .sensorReading.type"
+      next: LogIgnoredReading
+
+  -   name: LogIgnoredReading
+      type: call
+      function: logFunction
+      data:
+          log: ".message"
+      end: false
 ```
 
-Each pass waits for one matching sensor reading. The switch routes its data to the temperature or humidity handler. Each handler returns to `MonitorTemperatures` to receive the next event.
+This pattern uses the `consume: forever` with `foreach` to continuously process each incoming sensor reading. The key
+points are:
+
+- Using `end: false` to return to the listener task
+- Using `consume: forever` to continuously listen for events
+- Using `foreach` to process each event individually
+- Using a switch task to route different types of readings
 
 ## 5. Processing Temperature Readings
 
 Now let's add the temperature processing logic:
 
 ```yaml
-  - ProcessTemperatureReading:
-      if: '${ .value < $context.thresholds.temperature.low or .value > $context.thresholds.temperature.high }'
-      emit:
-        event:
-          with:
-            source: https://example.com/sensors
-            type: TemperatureAnomaly
-            data: ${ . }
-  - resumeAfterTemperature:
-      set: ${ . }
-      then: MonitorTemperatures
+  -   name: ProcessTemperatureReading
+      type: set
+      data:
+          roomId: ".sensorReading.roomId"
+          temperature: ".sensorReading.value"
+          timestamp: ".sensorReading.timestamp"
+          isTooHigh: ".temperature > .temperatureThresholdHigh"
+          isTooLow: ".temperature < .temperatureThresholdLow"
+          isOutOfRange: ".isTooHigh || .isTooLow"
+      next: CheckTemperatureRange
+
+  -   name: CheckTemperatureRange
+      type: switch
+      conditions:
+          -   condition: ".isOutOfRange == true"
+              next: RecordTemperatureAnomaly
+          -   condition: true
+              next: LogNormalTemperature
+
+  -   name: LogNormalTemperature
+      type: call
+      function: logFunction
+      data:
+          log: "Normal temperature reading: .temperature°C in room .roomId"
+      end: false
+
+  -   name: RecordTemperatureAnomaly
+      type: emit
+      data:
+          eventType: "TemperatureAnomaly"
+          payload:
+              roomId: ".roomId"
+              temperature: ".temperature"
+              timestamp: ".timestamp"
+              threshold: ".isTooHigh ? .temperatureThresholdHigh : .temperatureThresholdLow"
+              type: ".isTooHigh ? 'TOO_HIGH' : 'TOO_LOW'"
+      next: LogTemperatureAnomaly
+
+  -   name: LogTemperatureAnomaly
+      type: call
+      function: logFunction
+      data:
+          log: "Anomaly detected: Temperature .temperature°C in room .roomId is .isTooHigh ? 'too high' : 'too low'"
+      end: false
 ```
 
 ## 6. Processing Humidity Readings
@@ -109,17 +192,63 @@ Now let's add the temperature processing logic:
 Similarly, let's add humidity processing:
 
 ```yaml
-  - ProcessHumidityReading:
-      if: '${ .value < $context.thresholds.humidity.low or .value > $context.thresholds.humidity.high }'
-      emit:
-        event:
-          with:
-            source: https://example.com/sensors
-            type: HumidityAnomaly
-            data: ${ . }
-  - resumeAfterHumidity:
-      set: ${ . }
-      then: MonitorTemperatures
+  -   name: ProcessHumidityReading
+      type: set
+      data:
+          roomId: ".sensorReading.roomId"
+          humidity: ".sensorReading.value"
+          timestamp: ".sensorReading.timestamp"
+          isTooHigh: ".humidity > .humidityThresholdHigh"
+          isTooLow: ".humidity < .humidityThresholdLow"
+          isOutOfRange: ".isTooHigh || .isTooLow"
+      next: CheckHumidityRange
+
+  -   name: CheckHumidityRange
+      type: switch
+      conditions:
+          -   condition: ".isOutOfRange == true"
+              next: RecordHumidityAnomaly
+          -   condition: true
+              next: LogNormalHumidity
+
+  -   name: LogNormalHumidity
+      type: call
+      function: logFunction
+      data:
+          log: "Normal humidity reading: .humidity% in room .roomId"
+      end: false
+
+  -   name: RecordHumidityAnomaly
+      type: emit
+      data:
+          eventType: "HumidityAnomaly"
+          payload:
+              roomId: ".roomId"
+              humidity: ".humidity"
+              timestamp: ".timestamp"
+              threshold: ".isTooHigh ? .humidityThresholdHigh : .humidityThresholdLow"
+              type: ".isTooHigh ? 'TOO_HIGH' : 'TOO_LOW'"
+      next: LogHumidityAnomaly
+
+  -   name: LogHumidityAnomaly
+      type: call
+      function: logFunction
+      data:
+          log: "Anomaly detected: Humidity .humidity% in room .roomId is .isTooHigh ? 'too high' : 'too low'"
+      end: false
+
+  -   name: EndMonitoring
+      type: set
+      data:
+          message: "Monitoring ended for building .buildingId"
+      next: LogMonitoringEnd
+
+  -   name: LogMonitoringEnd
+      type: call
+      function: logFunction
+      data:
+          log: ".message"
+      end: true
 ```
 
 ## 7. Adding Anomaly Pattern Detection
@@ -128,45 +257,101 @@ Now let's add a parallel workflow that aggregates anomalies and detects patterns
 `anomaly-detector.yaml`:
 
 ```yaml
-document:
-  dsl: 1.0.3
-  namespace: examples
-  name: anomaly-detector
-  version: 1.0.0
-  title: Anomaly Pattern Detector
-do:
-  - receive:
-      listen:
-        to:
-          one:
-            with: { type: TemperatureAnomaly }
-            correlate:
-              buildingId:
-                from: ${ .data.buildingId }
-                expect: ${ $workflow.input.buildingId }
-        read: data
-  - updateWindow:
-      set: >-
-        ${ . as $reading | now as $received |
-        [($context.recent // [])[] | select(.received >= ($received - 300))] +
-        [{roomId: $reading.roomId, received: $received}] }
-      export: { as: '${ $context + {recent: .} }' }
-  - identifyRooms:
-      set:
-        rooms: ${ group_by(.roomId) | map(select(length >= 3) | .[0].roomId) }
-  - raiseAlert:
-      if: ${ .rooms | length > 0 }
-      emit:
-        event:
-          with:
-            source: https://example.com/sensors
-            type: TemperaturePatternAlert
-            data:
-              buildingId: ${ $workflow.input.buildingId }
-              rooms: ${ .rooms }
-  - resume:
-      set: ${ . }
-      then: receive
+id: anomaly-detector
+name: Anomaly Pattern Detector
+version: '1.0'
+specVersion: '1.0'
+start: InitializeDetector
+functions:
+    -   name: logFunction
+        type: custom
+        operation: log
+    -   name: alertFunction
+        type: http
+        operation: POST
+        url: https://alerts-api.example.com/api/v1/alerts
+tasks:
+    -   name: InitializeDetector
+        type: set
+        data:
+            buildingId: "BLDG-123"
+            anomalyThreshold: 3
+            timeWindowMinutes: 5
+            message: "Initializing anomaly pattern detector for building BLDG-123"
+        next: LogInitialization
+
+    -   name: LogInitialization
+        type: call
+        function: logFunction
+        data:
+            log: ".message"
+        next: WatchForTemperatureAnomalies
+
+    -   name: WatchForTemperatureAnomalies
+        type: listen
+        events:
+            -   name: TemperatureAnomalies
+                type: TemperatureAnomaly
+                correlations:
+                    - buildingId = .buildingId
+                timeouts:
+                    eventTimeout: PT5M
+                    eventTimeoutNext: CheckAnomalyPatterns
+                consume:
+                    while: "elapsed < toMillis(minutes(.timeWindowMinutes))"
+        next: CheckAnomalyPatterns
+
+    -   name: CheckAnomalyPatterns
+        type: set
+        data:
+            anomalies: ".events.TemperatureAnomalies || []"
+            anomalyCount: ".anomalies | length"
+            roomCounts: "group_by(.roomId) | map({roomId: .[0].roomId, count: length})"
+            roomsWithMultipleAnomalies: "[.roomCounts[] | select(.count >= .anomalyThreshold)] | map(.roomId)"
+            hasPattern: ".roomsWithMultipleAnomalies | length > 0"
+            message: ".anomalyCount temperature anomalies detected in the last .timeWindowMinutes minutes"
+        next: LogAnomalyCheck
+
+    -   name: LogAnomalyCheck
+        type: call
+        function: logFunction
+        data:
+            log: ".message"
+        next: CheckForPatterns
+
+    -   name: CheckForPatterns
+        type: switch
+        conditions:
+            -   condition: ".hasPattern == true"
+                next: TriggerTemperatureAlert
+            -   condition: true
+                next: WatchForTemperatureAnomalies
+
+    -   name: TriggerTemperatureAlert
+        type: call
+        function: alertFunction
+        data:
+            alertType: "TEMPERATURE_PATTERN"
+            buildingId: ".buildingId"
+            rooms: ".roomsWithMultipleAnomalies"
+            anomalyCount: ".anomalyCount"
+            message: "Multiple temperature anomalies detected in rooms: .roomsWithMultipleAnomalies | join(', ')"
+            timestamp: "$WORKFLOW.currentTime"
+            severity: "HIGH"
+        next: LogAlertSent
+
+    -   name: LogAlertSent
+        type: call
+        function: logFunction
+        data:
+            log: "Alert sent for temperature anomaly pattern in rooms: .roomsWithMultipleAnomalies | join(', ')"
+        next: WaitBeforeNextWindow
+
+    -   name: WaitBeforeNextWindow
+        type: wait
+        data:
+            duration: PT1M
+        next: WatchForTemperatureAnomalies
 ```
 
 This pattern detection workflow:
@@ -183,48 +368,48 @@ You can test these workflows by:
 1. Start both workflows in separate terminals:
 
 ```bash
-bin/lemline definition post -f temperature-monitoring.yaml
-bin/lemline instance start examples temperature-monitoring --input '{"buildingId": "BLDG-123"}'
-bin/lemline definition post -f anomaly-detector.yaml
-bin/lemline instance start examples anomaly-detector --input '{"buildingId": "BLDG-123"}'
+java -jar lemline-runner.jar workflow run temperature-monitoring.yaml --data '{"buildingId": "BLDG-123"}'
+java -jar lemline-runner.jar workflow run anomaly-detector.yaml --data '{"buildingId": "BLDG-123"}'
 ```
 
 2. Simulate sensor readings by publishing events:
 
-Save the following helper as `publish-event.yaml`. Each instance emits one CloudEvent in the tutorial namespace.
-
-```yaml
-document:
-  dsl: '1.0.3'
-  namespace: examples
-  name: publish-event
-  version: '1.0.0'
-do:
-  - publish:
-      emit:
-        event:
-          with:
-            source: https://example.com/tutorial
-            type: ${ .type }
-            data: ${ .data }
-```
-
-```bash
-bin/lemline definition post -f publish-event.yaml
-```
-
 ```bash
 # Normal temperature reading
-bin/lemline instance start examples publish-event --input '{"type": "SensorReading", "data": {"buildingId": "BLDG-123", "roomId": "ROOM-101", "type": "temperature", "value": 22.5, "timestamp": "2023-09-10T14:30:00Z"}}'
+java -jar lemline-runner.jar events publish SensorReading '{
+  "buildingId": "BLDG-123",
+  "roomId": "ROOM-101",
+  "type": "temperature",
+  "value": 22.5,
+  "timestamp": "2023-09-10T14:30:00Z"
+}'
 
 # High temperature reading
-bin/lemline instance start examples publish-event --input '{"type": "SensorReading", "data": {"buildingId": "BLDG-123", "roomId": "ROOM-101", "type": "temperature", "value": 30.2, "timestamp": "2023-09-10T14:31:00Z"}}'
+java -jar lemline-runner.jar events publish SensorReading '{
+  "buildingId": "BLDG-123",
+  "roomId": "ROOM-101",
+  "type": "temperature",
+  "value": 30.2,
+  "timestamp": "2023-09-10T14:31:00Z"
+}'
 
 # Another high temperature reading for the same room
-bin/lemline instance start examples publish-event --input '{"type": "SensorReading", "data": {"buildingId": "BLDG-123", "roomId": "ROOM-101", "type": "temperature", "value": 31.5, "timestamp": "2023-09-10T14:32:00Z"}}'
+java -jar lemline-runner.jar events publish SensorReading '{
+  "buildingId": "BLDG-123",
+  "roomId": "ROOM-101",
+  "type": "temperature",
+  "value": 31.5,
+  "timestamp": "2023-09-10T14:32:00Z"
+}'
 
 # A third high temperature reading for the same room - should trigger alert
-bin/lemline instance start examples publish-event --input '{"type": "SensorReading", "data": {"buildingId": "BLDG-123", "roomId": "ROOM-101", "type": "temperature", "value": 32.1, "timestamp": "2023-09-10T14:33:00Z"}}'
+java -jar lemline-runner.jar events publish SensorReading '{
+  "buildingId": "BLDG-123",
+  "roomId": "ROOM-101",
+  "type": "temperature",
+  "value": 32.1,
+  "timestamp": "2023-09-10T14:33:00Z"
+}'
 ```
 
 ## 9. Scaling for Production

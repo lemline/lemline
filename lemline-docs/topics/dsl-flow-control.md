@@ -19,18 +19,17 @@ block within a `Do` task) execute in the order they are declared in the YAML fil
 
 ```yaml
 document:
-  dsl: '1.0.3'
+  dsl: '1.0.0'
   # ...
-  namespace: examples
-  name: dsl-flow-control
-  version: 1.0.0
 do:
   - validateOrder:
-      set: ${ . }
+      # ...
+
   - checkInventory:
-      set: ${ . }
+      # ...
+
   - processPayment:
-      set: ${ . }
+      # ...
 ```
 
 In this example, `validateOrder`, `checkInventory`, and `processPayment` run one after the other.
@@ -55,7 +54,7 @@ boolean (`true` or `false`).
 ```yaml
 ```yaml
 document:
-  dsl: '1.0.3'
+  dsl: '1.0.0'
   # ...
 do:
   - checkInput:
@@ -114,13 +113,13 @@ do:
   - outerTask1:
       do: # Inner Scope 1
         - innerTaskA:
-            set: ${ . }
+          # ...
+          # then: outerTask2 # INVALID: Cannot target task outside inner scope
         - innerTaskB:
             # ...
             then: exit # VALID: Exits Inner Scope 1
-            set: ${ . }
   - outerTask2:
-      set: ${ . }
+    # ...
 ```
 
 To achieve jumps across scopes, you typically use `exit` to return control to the parent scope, which can then direct
@@ -150,21 +149,17 @@ Instead of a task name, `then` can use specific keywords (Flow Directives) to co
       often based on its *own* `then` directive or sequence).
     * **Usage**: Useful for early termination of a sub-flow or loop based on a condition met within it.
        ```yaml
-         - parentTask:
-             do:
-               - checkCondition:
-                   if: "${ .status == \"done\" }"
-                   then: exit # Exit this inner 'do' block
-                   set: ${ . }
-               - processNormally: # Skipped if condition was 'done'
+       - parentTask:
+          do:
+            - checkCondition:
+                if: "${ .status == 'done' }"
+                then: exit # Exit this inner 'do' block
+            - processNormally: # Skipped if condition was 'done'
                 # ...
-                   set: ${ . }
-               - taskAfterExit: # Skipped if condition was 'done'
+            - taskAfterExit: # Skipped if condition was 'done'
                 # ...
-                   set: ${ . }
-             then: finalStep # Parent continues here if inner block exited or completed normally
-         - finalStep:
-             set: ${ . }
+          then: finalStep # Parent continues here if inner block exited or completed normally
+       - finalStep:
            # ...
        ```
     * **Data Flow**: The `raw output` of the parent task is set to the `transformed output` of the task that called
@@ -175,15 +170,13 @@ Instead of a task name, `then` can use specific keywords (Flow Directives) to co
     * **Usage**: Used for scenarios where processing should stop completely based on a certain condition or outcome,
       without executing any further tasks.
       ```yaml
-        - criticalCheck:
-            call: getSystemStatus
-        - decideTermination:
-            if: "${ .status == \"FATAL\" }"
-            then: end # Stop the whole workflow
-            set: ${ . }
-        - continueNormalProcessing: # Skipped if status was FATAL
+      - criticalCheck:
+          call: getSystemStatus
+      - decideTermination:
+          if: "${ .status == 'FATAL' }"
+          then: end # Stop the whole workflow
+      - continueNormalProcessing: # Skipped if status was FATAL
           # ...
-            set: ${ . }
       ```
     * **Data Flow**: the `raw output` of the workflow instance is set to the `transformed output` of the task that
       called

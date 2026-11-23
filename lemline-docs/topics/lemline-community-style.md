@@ -172,7 +172,7 @@ Lemline documentation uses Markdown with these conventions:
 ```yaml
 # This is a YAML example
 document:
-  dsl: '1.0.3'
+  dsl: '1.0.0'
   namespace: examples
   name: hello-world
   version: '0.1.0'

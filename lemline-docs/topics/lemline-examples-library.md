@@ -36,7 +36,7 @@ Example: `do-nested.yaml` - Demonstrates nested task execution with multiple HTT
 
 ```yaml
 document:
-  dsl: '1.0.3'
+  dsl: '1.0.0-alpha5'
   namespace: examples
   name: call-http-shorthand-endpoint
   version: '0.1.0'
@@ -75,7 +75,7 @@ Example: `star-wars-homeworld.yaml` - Shows HTTP endpoint calls with dynamic par
 
 ```yaml
 document:
-  dsl: 1.0.3
+  dsl: 1.0.0
   namespace: examples
   name: star-wars-homeplanet
   version: 1.0.0
@@ -111,7 +111,7 @@ Example: `try-catch-retry-inline.yaml` - Shows error handling with retry logic:
 
 ```yaml
 document:
-  dsl: 1.0.3
+  dsl: 1.0.0-alpha2
   namespace: examples
   name: star-wars-planets-batch
   version: 1.0.0-alpha2
@@ -152,7 +152,7 @@ Example: `set.yaml` - Shows how to set and transform variables:
 
 ```yaml
 document:
-  dsl: '1.0.3'
+  dsl: '1.0.0'
   namespace: examples
   name: set-example
   version: '0.1.0'
@@ -164,7 +164,7 @@ do:
           role: "admin"
   - transformData:
       set:
-        transformedUser: '${ .user + { lastAccess: now } }'
+        transformedUser: ${ .user + { lastAccess: now() } }
 ```
 
 ## Event Processing
@@ -180,7 +180,7 @@ Example: `listen-to-any.yaml` - Shows how to listen for events:
 
 ```yaml
 document:
-  dsl: '1.0.3'
+  dsl: '1.0.0'
   namespace: examples
   name: listen-to-any-example
   version: '0.1.0'
@@ -189,12 +189,9 @@ do:
       listen:
         to:
           any:
-            - with:
-                type: order.created
-            - with:
-                type: order.cancelled
-      timeout:
-        after:
+            - event: order.created
+            - event: order.cancelled
+        for:
           seconds: 30
 ```
 
@@ -211,7 +208,7 @@ Example: `presentation.yaml` - A complex order fulfillment workflow:
 
 ```yaml
 document:
-  dsl: 1.0.3
+  dsl: 1.0.0-alpha2
   namespace: examples
   name: order-fulfillment
   version: 1.0.0-alpha2

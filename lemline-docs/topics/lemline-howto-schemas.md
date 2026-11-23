@@ -55,45 +55,38 @@ This schema validates an object with:
 To validate data passed to your workflow, define an input schema:
 
 ```yaml
-document:
-  dsl: 1.0.3
-  namespace: examples
-  name: customer-onboarding
-  version: 1.0.0
-  title: Customer Onboarding Workflow
+id: customer-onboarding
+name: Customer Onboarding Workflow
+version: '1.0'
+specVersion: '1.0'
+start: ValidateCustomer
 input:
   schema:
-    document:
-      type: object
-      required: ["name", "email", "address"]
-      properties:
-        name:
-          type: string
-          minLength: 1
-        email:
-          type: string
-          format: email
-        address:
-          type: object
-          required: ["street", "city", "zipCode"]
-          properties:
-            street:
-              type: string
-            city:
-              type: string
-            state:
-              type: string
-            zipCode:
-              type: string
-              pattern: "^\\d{5}(-\\d{4})?$"
-        phoneNumber:
-          type: string
-          pattern: "^\\+?[1-9]\\d{1,14}$"
-use:
-  functions: {}
-do:
-  - receiveOrder:
-      set: ${ . }
+    type: object
+    required: ["name", "email", "address"]
+    properties:
+      name:
+        type: string
+        minLength: 1
+      email:
+        type: string
+        format: email
+      address:
+        type: object
+        required: ["street", "city", "zipCode"]
+        properties:
+          street:
+            type: string
+          city:
+            type: string
+          state:
+            type: string
+          zipCode:
+            type: string
+            pattern: "^\\d{5}(-\\d{4})?$"
+      phoneNumber:
+        type: string
+        pattern: "^\\+?[1-9]\\d{1,14}$"
 ```
 
 ### Providing Default Values
@@ -102,7 +95,12 @@ You can specify default values for optional fields:
 
 ```yaml
 input:
-  from: '${ {"preferredContact": "email", "marketingOptIn": false, "accountType": "STANDARD"} + . }'
+  schema:
+    # Schema definition as above
+  defaults:
+    preferredContact: "email"
+    marketingOptIn: false
+    accountType: "STANDARD"
 ```
 
 These defaults are applied when the input doesn't contain the specified fields.
@@ -112,15 +110,17 @@ These defaults are applied when the input doesn't contain the specified fields.
 After validation, you can access the input data in your workflow:
 
 ```yaml
-  - ProcessCustomer:
-      set:
-        customer:
-          name: ${ $workflow.input.name }
-          email: ${ $workflow.input.email }
-          address: ${ $workflow.input.address }
-          phone: ${ $workflow.input.phoneNumber // "Not provided" }
-          preferredContact: ${ $workflow.input.preferredContact }
-      then: CreateAccount
+- name: ProcessCustomer
+  type: set
+  data:
+    customer: {
+      name: "$WORKFLOW.input.name",
+      email: "$WORKFLOW.input.email",
+      address: "$WORKFLOW.input.address",
+      phone: "$WORKFLOW.input.phoneNumber || 'Not provided'",
+      preferredContact: "$WORKFLOW.input.preferredContact"
+    }
+  next: CreateAccount
 ```
 
 ## Task Input Validation
@@ -130,34 +130,34 @@ After validation, you can access the input data in your workflow:
 To validate data before a task executes:
 
 ```yaml
-  - ProcessPayment:
-      call: paymentService
-      with:
-        amount: ${ .cart.total }
-        currency: ${ .cart.currency }
-        paymentMethod: ${ .payment }
-      then: HandlePaymentResult
-      input:
-        schema:
-          document:
-            type: object
-            required: ["amount", "currency", "paymentMethod"]
-            properties:
-              amount:
-                type: number
-                exclusiveMinimum: 0
-              currency:
-                type: string
-                enum: ["USD", "EUR", "GBP"]
-              paymentMethod:
-                type: object
-                required: ["type", "token"]
-                properties:
-                  type:
-                    type: string
-                    enum: ["CREDIT_CARD", "PAYPAL", "BANK_TRANSFER"]
-                  token:
-                    type: string
+- name: ProcessPayment
+  type: call
+  function: paymentService
+  input:
+    schema:
+      type: object
+      required: ["amount", "currency", "paymentMethod"]
+      properties:
+        amount:
+          type: number
+          exclusiveMinimum: 0
+        currency:
+          type: string
+          enum: ["USD", "EUR", "GBP"]
+        paymentMethod:
+          type: object
+          required: ["type", "token"]
+          properties:
+            type:
+              type: string
+              enum: ["CREDIT_CARD", "PAYPAL", "BANK_TRANSFER"]
+            token:
+              type: string
+  data:
+    amount: ".cart.total"
+    currency: ".cart.currency"
+    paymentMethod: ".payment"
+  next: HandlePaymentResult
 ```
 
 If the input doesn't match the schema, a validation error is raised before the task executes.
@@ -167,38 +167,39 @@ If the input doesn't match the schema, a validation error is raised before the t
 You can combine transformation with validation:
 
 ```yaml
-  - FormatUserData:
-      set:
-        userProfile: ${ .formattedUser }
-        isAdult: ${ .formattedUser.age >= 18 }
-      then: NextTask
-      input:
-        schema:
-          document:
-            type: object
-            required: ["formattedUser"]
-            properties:
-              formattedUser:
-                type: object
-                required: ["id", "fullName", "email"]
-                properties:
-                  id:
-                    type: string
-                  fullName:
-                    type: string
-                    minLength: 3
-                  email:
-                    type: string
-                    format: email
-                  age:
-                    type: integer
-                    minimum: 13
-        from:
-          formattedUser:
-            id: ${ .userId }
-            fullName: ${ .firstName + " " + .lastName }
-            email: ${ .email | ascii_downcase }
-            age: ${ .age | tonumber }
+- name: FormatUserData
+  type: set
+  input:
+    transform:
+      formattedUser: {
+        id: ".userId",
+        fullName: ".firstName + ' ' + .lastName",
+        email: ".email | ascii_downcase",
+        age: ".age | tonumber"
+      }
+    schema:
+      type: object
+      required: ["formattedUser"]
+      properties:
+        formattedUser:
+          type: object
+          required: ["id", "fullName", "email"]
+          properties:
+            id:
+              type: string
+            fullName:
+              type: string
+              minLength: 3
+            email:
+              type: string
+              format: email
+            age:
+              type: integer
+              minimum: 13
+  data:
+    userProfile: ".formattedUser"
+    isAdult: ".formattedUser.age >= 18"
+  next: NextTask
 ```
 
 This example transforms the input data and then validates the transformed structure.
@@ -210,48 +211,55 @@ This example transforms the input data and then validates the transformed struct
 To validate data produced by a task:
 
 ```yaml
-  - GenerateOrderSummary:
-      set:
+- name: GenerateOrderSummary
+  type: set
+  data:
+    orderSummary: {
+      id: ".orderId",
+      customer: {
+        id: ".customerId",
+        name: ".customerName"
+      },
+      items: ".items | map({
+        id: .productId,
+        name: .productName,
+        quantity: .quantity,
+        price: .price
+      })",
+      subtotal: ".items | map(.price * .quantity) | add",
+      tax: ".items | map(.price * .quantity) | add * 0.08",
+      total: ".items | map(.price * .quantity) | add * 1.08"
+    }
+  output:
+    schema:
+      type: object
+      required: ["orderSummary"]
+      properties:
         orderSummary:
-          id: ${ .orderId }
-          customer:
-            id: ${ .customerId }
-            name: ${ .customerName }
-          items: '${ .items | map({ id: .productId, name: .productName, quantity: .quantity, price: .price }) }'
-          subtotal: ${ .items | map(.price * .quantity) | add }
-          tax: ${ .items | map(.price * .quantity) | add * 0.08 }
-          total: ${ .items | map(.price * .quantity) | add * 1.08 }
-      then: NextTask
-      output:
-        schema:
-          document:
-            type: object
-            required: ["orderSummary"]
-            properties:
-              orderSummary:
+          type: object
+          required: ["id", "customer", "items", "subtotal", "tax", "total"]
+          properties:
+            id:
+              type: string
+            customer:
+              type: object
+              required: ["id", "name"]
+            items:
+              type: array
+              minItems: 1
+              items:
                 type: object
-                required: ["id", "customer", "items", "subtotal", "tax", "total"]
-                properties:
-                  id:
-                    type: string
-                  customer:
-                    type: object
-                    required: ["id", "name"]
-                  items:
-                    type: array
-                    minItems: 1
-                    items:
-                      type: object
-                      required: ["id", "name", "quantity", "price"]
-                  subtotal:
-                    type: number
-                    minimum: 0
-                  tax:
-                    type: number
-                    minimum: 0
-                  total:
-                    type: number
-                    minimum: 0
+                required: ["id", "name", "quantity", "price"]
+            subtotal:
+              type: number
+              minimum: 0
+            tax:
+              type: number
+              minimum: 0
+            total:
+              type: number
+              minimum: 0
+  next: NextTask
 ```
 
 If the output doesn't match the schema, a validation error is raised after the task executes.
@@ -261,45 +269,45 @@ If the output doesn't match the schema, a validation error is raised after the t
 Combine transformation with validation:
 
 ```yaml
-  - ProcessAPIResponse:
-      call: externalAPI
-      with:
-        endpoint: "/data"
-        parameters: ${ .queryParams }
-      then: HandleResult
-      output:
-        schema:
-          document:
-            type: object
-            required: ["status"]
+- name: ProcessAPIResponse
+  type: call
+  function: externalAPI
+  data:
+    endpoint: "/data"
+    parameters: ".queryParams"
+  output:
+    transform:
+      status: ".code == 200 ? 'SUCCESS' : 'ERROR'"
+      data: ".code == 200 ? .body.data : null"
+      error: ".code != 200 ? .body.error : null"
+    schema:
+      type: object
+      required: ["status"]
+      properties:
+        status:
+          type: string
+          enum: ["SUCCESS", "ERROR"]
+        data:
+          type: object
+          # Only require data structure if status is SUCCESS
+          if:
             properties:
               status:
-                type: string
-                enum: ["SUCCESS", "ERROR"]
-              data:
-                type: object
-          # Only require data structure if status is SUCCESS
-                if:
-                  properties:
-                    status:
-                      const: "SUCCESS"
-                  required: ["status"]
-                then:
-                  required: ["data"]
-              error:
-                type: object
+                const: "SUCCESS"
+            required: ["status"]
+          then:
+            required: ["data"]
+        error:
+          type: object
           # Only require error structure if status is ERROR
-                if:
-                  properties:
-                    status:
-                      const: "ERROR"
-                  required: ["status"]
-                then:
-                  required: ["error"]
-        as:
-          status: ${ if .code == 200 then "SUCCESS" else "ERROR" end }
-          data: ${ if .code == 200 then .body.data else null end }
-          error: ${ if .code != 200 then .body.error else null end }
+          if:
+            properties:
+              status:
+                const: "ERROR"
+            required: ["status"]
+          then:
+            required: ["error"]
+  next: HandleResult
 ```
 
 This transforms the API response into a standardized format and validates the structure.
@@ -311,33 +319,33 @@ This transforms the API response into a standardized format and validates the st
 To validate data being exported to the global context:
 
 ```yaml
-  - FetchCustomerData:
-      call: customerService
-      with:
-        customerId: ${ .customerId }
-      then: NextTask
-      export:
-        as:
-          customer: ${ .data }
-        schema:
-          document:
-            type: object
-            required: ["customer"]
-            properties:
-              customer:
-                type: object
-                required: ["id", "name", "email", "status"]
-                properties:
-                  id:
-                    type: string
-                  name:
-                    type: string
-                  email:
-                    type: string
-                    format: email
-                  status:
-                    type: string
-                    enum: ["ACTIVE", "INACTIVE", "PENDING"]
+- name: FetchCustomerData
+  type: call
+  function: customerService
+  data:
+    customerId: ".customerId"
+  export:
+    as:
+      customer: ".data"
+    schema:
+      type: object
+      required: ["customer"]
+      properties:
+        customer:
+          type: object
+          required: ["id", "name", "email", "status"]
+          properties:
+            id:
+              type: string
+            name:
+              type: string
+            email:
+              type: string
+              format: email
+            status:
+              type: string
+              enum: ["ACTIVE", "INACTIVE", "PENDING"]
+  next: NextTask
 ```
 
 This ensures that only valid customer data is exported to the global context.
@@ -520,377 +528,399 @@ schema:
 Here's a comprehensive example showing schema validation throughout an order processing workflow:
 
 ```yaml
-document:
-  dsl: 1.0.3
-  namespace: examples
-  name: order-processing
-  version: 1.0.0
-  title: Order Processing Workflow
+id: order-processing
+name: Order Processing Workflow
+version: '1.0'
+specVersion: '1.0'
+start: ValidateOrder
 input:
   schema:
-    document:
-      type: object
-      required: ["orderId", "customerId", "items", "shippingAddress", "paymentMethod"]
-      properties:
-        orderId:
-          type: string
-          pattern: "^ORD-[0-9]{8}$"
-        customerId:
-          type: string
+    type: object
+    required: ["orderId", "customerId", "items", "shippingAddress", "paymentMethod"]
+    properties:
+      orderId:
+        type: string
+        pattern: "^ORD-[0-9]{8}$"
+      customerId:
+        type: string
+      items:
+        type: array
+        minItems: 1
         items:
-          type: array
-          minItems: 1
-          items:
+          type: object
+          required: ["productId", "quantity"]
+          properties:
+            productId:
+              type: string
+            quantity:
+              type: integer
+              minimum: 1
+      shippingAddress:
+        type: object
+        required: ["street", "city", "state", "zipCode", "country"]
+        properties:
+          street:
+            type: string
+          city:
+            type: string
+          state:
+            type: string
+          zipCode:
+            type: string
+          country:
+            type: string
+            default: "US"
+      paymentMethod:
+        type: object
+        required: ["type"]
+        properties:
+          type:
+            type: string
+            enum: ["CREDIT_CARD", "PAYPAL", "BANK_TRANSFER"]
+          cardToken:
+            type: string
+          paypalEmail:
+            type: string
+          accountInfo:
             type: object
-            required: ["productId", "quantity"]
-            properties:
-              productId:
-                type: string
-              quantity:
-                type: integer
-                minimum: 1
-        shippingAddress:
-          type: object
-          required: ["street", "city", "state", "zipCode", "country"]
-          properties:
-            street:
-              type: string
-            city:
-              type: string
-            state:
-              type: string
-            zipCode:
-              type: string
-            country:
-              type: string
-              default: "US"
-        paymentMethod:
-          type: object
-          required: ["type"]
-          properties:
-            type:
-              type: string
-              enum: ["CREDIT_CARD", "PAYPAL", "BANK_TRANSFER"]
-            cardToken:
-              type: string
-            paypalEmail:
-              type: string
-            accountInfo:
-              type: object
-  from: '${ {"currency": "USD", "notes": ""} + . }'
-do:
-  - ValidateOrder:
-      set:
-        orderId: ${ $workflow.input.orderId }
-        customerId: ${ $workflow.input.customerId }
-        items: ${ $workflow.input.items }
-        shippingAddress: ${ $workflow.input.shippingAddress }
-        paymentMethod: ${ $workflow.input.paymentMethod }
-        currency: ${ $workflow.input.currency }
-        notes: ${ $workflow.input.notes }
-      then: FetchCustomer
-  - FetchCustomer:
-      call: customerService
-      with:
-        customerId: ${ .customerId }
-      then: CheckCustomerStatus
-      output:
-        schema:
-          document:
+  defaults:
+    currency: "USD"
+    notes: ""
+tasks:
+  - name: ValidateOrder
+    type: set
+    data:
+      orderId: "$WORKFLOW.input.orderId"
+      customerId: "$WORKFLOW.input.customerId"
+      items: "$WORKFLOW.input.items"
+      shippingAddress: "$WORKFLOW.input.shippingAddress"
+      paymentMethod: "$WORKFLOW.input.paymentMethod"
+      currency: "$WORKFLOW.input.currency"
+      notes: "$WORKFLOW.input.notes"
+    next: FetchCustomer
+  
+  - name: FetchCustomer
+    type: call
+    function: customerService
+    data:
+      customerId: ".customerId"
+    output:
+      schema:
+        type: object
+        required: ["id", "name", "email", "status"]
+        properties:
+          id:
+            type: string
+          name:
+            type: string
+          email:
+            type: string
+            format: email
+          status:
+            type: string
+            enum: ["ACTIVE", "INACTIVE", "SUSPENDED"]
+          membershipTier:
+            type: string
+    export:
+      as:
+        customer: "."
+      schema:
+        type: object
+        required: ["customer"]
+        properties:
+          customer:
             type: object
             required: ["id", "name", "email", "status"]
-            properties:
-              id:
-                type: string
-              name:
-                type: string
-              email:
-                type: string
-                format: email
-              status:
-                type: string
-                enum: ["ACTIVE", "INACTIVE", "SUSPENDED"]
-              membershipTier:
-                type: string
-      export:
-        as:
-          customer: ${ . }
-        schema:
-          document:
+    next: CheckCustomerStatus
+  
+  - name: CheckCustomerStatus
+    type: switch
+    conditions:
+      - condition: "$WORKFLOW.customer.status != 'ACTIVE'"
+        next: RejectInactiveCustomer
+      - condition: true
+        next: CheckInventory
+  
+  - name: CheckInventory
+    type: call
+    function: inventoryService
+    input:
+      transform:
+        productRequests: ".items | map({
+          productId: .productId,
+          quantity: .quantity
+        })"
+      schema:
+        type: object
+        required: ["productRequests"]
+        properties:
+          productRequests:
+            type: array
+            minItems: 1
+            items:
+              type: object
+              required: ["productId", "quantity"]
+    data:
+      items: ".productRequests"
+    output:
+      schema:
+        type: object
+        required: ["available", "unavailableItems", "items"]
+        properties:
+          available:
+            type: boolean
+          unavailableItems:
+            type: array
+            items:
+              type: object
+              required: ["productId", "requestedQuantity", "availableQuantity"]
+          items:
+            type: array
+            items:
+              type: object
+              required: ["productId", "name", "price", "availableQuantity"]
+    next: CheckInventoryResult
+  
+  - name: CheckInventoryResult
+    type: switch
+    conditions:
+      - condition: ".available == false"
+        next: HandleUnavailableItems
+      - condition: true
+        next: CalculateOrderTotal
+  
+  - name: CalculateOrderTotal
+    type: set
+    input:
+      transform:
+        products: ".items"
+        orderItems: ".items | map({
+          productId: .productId,
+          name: .name,
+          unitPrice: .price,
+          quantity: (.productId as $pid | $WORKFLOW.input.items[] | select(.productId == $pid) | .quantity)
+        })"
+      schema:
+        type: object
+        required: ["orderItems"]
+        properties:
+          orderItems:
+            type: array
+            minItems: 1
+            items:
+              type: object
+              required: ["productId", "name", "unitPrice", "quantity"]
+    data:
+      items: ".orderItems"
+      subtotal: ".orderItems | map(.unitPrice * .quantity) | add"
+      discountRate: "$WORKFLOW.customer.membershipTier == 'GOLD' ? 0.05 : ($WORKFLOW.customer.membershipTier == 'PLATINUM' ? 0.1 : 0)"
+      discount: ".subtotal * .discountRate"
+      taxRate: 0.08
+      tax: "(.subtotal - .discount) * .taxRate"
+      total: ".subtotal - .discount + .tax"
+      orderSummary: {
+        orderId: ".orderId",
+        customerId: ".customerId",
+        customerName: "$WORKFLOW.customer.name",
+        items: ".items",
+        pricing: {
+          subtotal: ".subtotal",
+          discount: ".discount",
+          tax: ".tax",
+          total: ".total"
+        },
+        currency: ".currency"
+      }
+    output:
+      schema:
+        type: object
+        required: ["orderSummary", "total"]
+        properties:
+          orderSummary:
             type: object
-            required: ["customer"]
-            properties:
-              customer:
-                type: object
-                required: ["id", "name", "email", "status"]
-  - CheckCustomerStatus:
-      switch:
-        - case1:
-            then: RejectInactiveCustomer
-            when: ${ $context.customer.status != "ACTIVE" }
-        - default:
-            then: CheckInventory
-  - CheckInventory:
-      call: inventoryService
-      with:
-        items: ${ .productRequests }
-      then: CheckInventoryResult
-      input:
-        schema:
-          document:
-            type: object
-            required: ["productRequests"]
-            properties:
-              productRequests:
-                type: array
-                minItems: 1
-                items:
-                  type: object
-                  required: ["productId", "quantity"]
-        from:
-          productRequests: '${ .items | map({ productId: .productId, quantity: .quantity }) }'
-      output:
-        schema:
-          document:
-            type: object
-            required: ["available", "unavailableItems", "items"]
-            properties:
-              available:
-                type: boolean
-              unavailableItems:
-                type: array
-                items:
-                  type: object
-                  required: ["productId", "requestedQuantity", "availableQuantity"]
-              items:
-                type: array
-                items:
-                  type: object
-                  required: ["productId", "name", "price", "availableQuantity"]
-  - CheckInventoryResult:
-      switch:
-        - case1:
-            then: HandleUnavailableItems
-            when: ${ .available == false }
-        - default:
-            then: CalculateOrderTotal
-  - CalculateOrderTotal:
-      set:
-        items: ${ .orderItems }
-        subtotal: ${ .orderItems | map(.unitPrice * .quantity) | add }
-        discountRate: '${ if $context.customer.membershipTier == "GOLD" then 0.05 elif $context.customer.membershipTier ==
-          "PLATINUM" then 0.1 else 0 end }'
-        discount: ${ .subtotal * .discountRate }
-        taxRate: 0.08
-        tax: ${ "(\(.subtotal) - \(.discount)) * \(.taxRate)" }
-        total: ${ .subtotal - .discount + .tax }
-        orderSummary:
-          orderId: ${ .orderId }
-          customerId: ${ .customerId }
-          customerName: ${ $context.customer.name }
-          items: ${ .items }
-          pricing:
-            subtotal: ${ .subtotal }
-            discount: ${ .discount }
-            tax: ${ .tax }
-            total: ${ .total }
-          currency: ${ .currency }
-      then: ProcessPayment
-      input:
-        schema:
-          document:
-            type: object
-            required: ["orderItems"]
-            properties:
-              orderItems:
-                type: array
-                minItems: 1
-                items:
-                  type: object
-                  required: ["productId", "name", "unitPrice", "quantity"]
-        from:
-          products: ${ .items }
-          orderItems: '${ .items | map({ productId: .productId, name: .name, unitPrice: .price, quantity: (.productId as $pid
-            | $workflow.input.items[] | select(.productId == $pid) | .quantity) }) }'
-      output:
-        schema:
-          document:
-            type: object
-            required: ["orderSummary", "total"]
-            properties:
-              orderSummary:
-                type: object
-                required: ["orderId", "customerId", "customerName", "items", "pricing"]
-              total:
-                type: number
-                minimum: 0
-      export:
-        as:
-          orderDetails: ${ .orderSummary }
-          orderTotal: ${ .total }
-        schema:
-          document:
-            type: object
-            required: ["orderDetails", "orderTotal"]
-  - ProcessPayment:
-      call: paymentService
-      with:
-        payment: ${ .paymentRequest }
-      then: CheckPaymentResult
-      input:
-        schema:
-          document:
-            type: object
-            required: ["paymentRequest"]
-            properties:
-              paymentRequest:
-                type: object
-                required: ["orderId", "customerId", "amount", "currency", "method"]
-                if:
-                  properties:
-                    method:
-                      enum: ["CREDIT_CARD"]
-                  required: ["method"]
-                then:
-                  required: ["token"]
-                else:
-                  if:
-                    properties:
-                      method:
-                        enum: ["PAYPAL"]
-                    required: ["method"]
-                  then:
-                    required: ["email"]
-                  else:
-                    required: ["accountInfo"]
-        from:
+            required: ["orderId", "customerId", "customerName", "items", "pricing"]
+          total:
+            type: number
+            minimum: 0
+    export:
+      as:
+        orderDetails: ".orderSummary"
+        orderTotal: ".total"
+      schema:
+        type: object
+        required: ["orderDetails", "orderTotal"]
+    next: ProcessPayment
+  
+  - name: ProcessPayment
+    type: call
+    function: paymentService
+    input:
+      transform:
+        paymentRequest: {
+          orderId: ".orderId",
+          customerId: ".customerId",
+          amount: ".total",
+          currency: ".currency",
+          method: ".paymentMethod.type",
+          token: ".paymentMethod.cardToken",
+          email: ".paymentMethod.paypalEmail",
+          accountInfo: ".paymentMethod.accountInfo"
+        }
+      schema:
+        type: object
+        required: ["paymentRequest"]
+        properties:
           paymentRequest:
-            orderId: ${ .orderId }
-            customerId: ${ .customerId }
-            amount: ${ .total }
-            currency: ${ .currency }
-            method: ${ .paymentMethod.type }
-            token: ${ .paymentMethod.cardToken }
-            email: ${ .paymentMethod.paypalEmail }
-            accountInfo: ${ .paymentMethod.accountInfo }
-      output:
-        schema:
-          document:
             type: object
-            required: ["success", "transactionId", "status"]
-            properties:
-              success:
-                type: boolean
-              transactionId:
-                type: string
-              status:
-                type: string
-              errorCode:
-                type: string
-              errorMessage:
-                type: string
+            required: ["orderId", "customerId", "amount", "currency", "method"]
             if:
               properties:
-                success:
-                  enum: [false]
-              required: ["success"]
+                method:
+                  enum: ["CREDIT_CARD"]
+              required: ["method"]
             then:
-              required: ["errorCode", "errorMessage"]
-  - CheckPaymentResult:
-      switch:
-        - case1:
-            then: CreateShipment
-            when: ${ .success == true }
-        - default:
-            then: HandlePaymentFailure
-  - CreateShipment:
-      call: shippingService
-      with:
-        orderId: ${ .orderId }
-        items: ${ .items }
-        shippingAddress: ${ .shippingAddress }
-        customerEmail: ${ $context.customer.email }
-      then: CompleteOrder
-      input:
-        schema:
-          document:
+              required: ["token"]
+            else:
+              if:
+                properties:
+                  method:
+                    enum: ["PAYPAL"]
+                required: ["method"]
+              then:
+                required: ["email"]
+              else:
+                required: ["accountInfo"]
+    data:
+      payment: ".paymentRequest"
+    output:
+      schema:
+        type: object
+        required: ["success", "transactionId", "status"]
+        properties:
+          success:
+            type: boolean
+          transactionId:
+            type: string
+          status:
+            type: string
+          errorCode:
+            type: string
+          errorMessage:
+            type: string
+        if:
+          properties:
+            success:
+              enum: [false]
+          required: ["success"]
+        then:
+          required: ["errorCode", "errorMessage"]
+    next: CheckPaymentResult
+  
+  - name: CheckPaymentResult
+    type: switch
+    conditions:
+      - condition: ".success == true"
+        next: CreateShipment
+      - condition: true
+        next: HandlePaymentFailure
+  
+  - name: CreateShipment
+    type: call
+    function: shippingService
+    input:
+      schema:
+        type: object
+        required: ["orderId", "items", "shippingAddress", "customerEmail"]
+        properties:
+          orderId:
+            type: string
+          items:
+            type: array
+            minItems: 1
+          shippingAddress:
             type: object
-            required: ["orderId", "items", "shippingAddress", "customerEmail"]
-            properties:
-              orderId:
-                type: string
-              items:
-                type: array
-                minItems: 1
-              shippingAddress:
-                type: object
-                required: ["street", "city", "state", "zipCode", "country"]
-              customerEmail:
-                type: string
-                format: email
-      output:
-        schema:
-          document:
+            required: ["street", "city", "state", "zipCode", "country"]
+          customerEmail:
+            type: string
+            format: email
+    data:
+      orderId: ".orderId"
+      items: ".items"
+      shippingAddress: ".shippingAddress"
+      customerEmail: "$WORKFLOW.customer.email"
+    output:
+      schema:
+        type: object
+        required: ["shipmentId", "trackingNumber", "estimatedDelivery", "carrier"]
+        properties:
+          shipmentId:
+            type: string
+          trackingNumber:
+            type: string
+          estimatedDelivery:
+            type: string
+            format: date
+          carrier:
+            type: string
+    export:
+      as:
+        shipment: "."
+    next: CompleteOrder
+  
+  - name: CompleteOrder
+    type: set
+    data:
+      orderConfirmation: {
+        orderId: ".orderId",
+        customer: {
+          id: ".customerId",
+          name: "$WORKFLOW.customer.name",
+          email: "$WORKFLOW.customer.email"
+        },
+        items: ".items",
+        summary: {
+          subtotal: "$WORKFLOW.orderDetails.pricing.subtotal",
+          discount: "$WORKFLOW.orderDetails.pricing.discount",
+          tax: "$WORKFLOW.orderDetails.pricing.tax",
+          total: "$WORKFLOW.orderDetails.pricing.total",
+          currency: ".currency"
+        },
+        payment: {
+          transactionId: ".transactionId",
+          method: ".paymentMethod.type"
+        },
+        shipping: {
+          shipmentId: "$WORKFLOW.shipment.shipmentId",
+          trackingNumber: "$WORKFLOW.shipment.trackingNumber",
+          estimatedDelivery: "$WORKFLOW.shipment.estimatedDelivery",
+          carrier: "$WORKFLOW.shipment.carrier",
+          address: ".shippingAddress"
+        },
+        status: "CONFIRMED",
+        createdAt: "$WORKFLOW.startTime",
+        completedAt: "$WORKFLOW.currentTime"
+      }
+    output:
+      schema:
+        type: object
+        required: ["orderConfirmation"]
+        properties:
+          orderConfirmation:
             type: object
-            required: ["shipmentId", "trackingNumber", "estimatedDelivery", "carrier"]
-            properties:
-              shipmentId:
-                type: string
-              trackingNumber:
-                type: string
-              estimatedDelivery:
-                type: string
-                format: date
-              carrier:
-                type: string
-      export:
-        as:
-          shipment: ${ . }
-  - CompleteOrder:
-      set:
-        orderConfirmation:
-          orderId: ${ .orderId }
-          customer:
-            id: ${ .customerId }
-            name: ${ $context.customer.name }
-            email: ${ $context.customer.email }
-          items: ${ .items }
-          summary:
-            subtotal: ${ $context.orderDetails.pricing.subtotal }
-            discount: ${ $context.orderDetails.pricing.discount }
-            tax: ${ $context.orderDetails.pricing.tax }
-            total: ${ $context.orderDetails.pricing.total }
-            currency: ${ .currency }
-          payment:
-            transactionId: ${ .transactionId }
-            method: ${ .paymentMethod.type }
-          shipping:
-            shipmentId: ${ $context.shipment.shipmentId }
-            trackingNumber: ${ $context.shipment.trackingNumber }
-            estimatedDelivery: ${ $context.shipment.estimatedDelivery }
-            carrier: ${ $context.shipment.carrier }
-            address: ${ .shippingAddress }
-          status: "CONFIRMED"
-          createdAt: ${ $workflow.startedAt }
-          completedAt: ${ $context.currentTime }
-      then: SendConfirmation
-      output:
-        schema:
-          document:
-            type: object
-            required: ["orderConfirmation"]
-            properties:
-              orderConfirmation:
-                type: object
-                required: ["orderId", "customer", "items", "summary", "payment", "shipping", "status"]
-  - SendConfirmation:
-      call: notificationService
-      with:
-        to: ${ $context.customer.email }
-        subject: '${ "Order Confirmed: \(.orderId)" }'
-        template: "order_confirmation"
-        data: ${ .orderConfirmation }
-      then: end
+            required: ["orderId", "customer", "items", "summary", "payment", "shipping", "status"]
+    next: SendConfirmation
+  
+  - name: SendConfirmation
+    type: call
+    function: notificationService
+    data:
+      to: "$WORKFLOW.customer.email"
+      subject: "Order Confirmed: .orderId"
+      template: "order_confirmation"
+      data: ".orderConfirmation"
+    end: true
+  
+  # Error handling tasks with similar schema validations...
 ```
 
 This workflow demonstrates schema validation at multiple points:
@@ -905,49 +935,53 @@ This workflow demonstrates schema validation at multiple points:
 For complex schemas that are used in multiple places, you can use references:
 
 ```yaml
-do:
-  - ValidateCustomer:
-      set:
-        customer:
-          id: ${ .customerId }
-          name: ${ .fullName }
-          email: ${ .emailAddress }
-          address: ${ .shippingAddress }
-      then: NextTask
-      output:
-        schema:
-          document:
-            type: object
-            required:
-              - "id"
-              - "name"
-              - "email"
-            properties:
-              id:
-                type: string
-              name:
-                type: string
-              email:
-                type: string
-                format: email
-              address:
-                type: object
-                required:
-                  - "street"
-                  - "city"
-                  - "zipCode"
-                properties:
-                  street:
-                    type: string
-                  city:
-                    type: string
-                  state:
-                    type: string
-                  zipCode:
-                    type: string
-                  country:
-                    type: string
-                    default: "US"
+# Define schema components at the workflow level
+schemas:
+  addressSchema:
+    type: object
+    required: ["street", "city", "zipCode"]
+    properties:
+      street:
+        type: string
+      city:
+        type: string
+      state:
+        type: string
+      zipCode:
+        type: string
+      country:
+        type: string
+        default: "US"
+  
+  customerSchema:
+    type: object
+    required: ["id", "name", "email"]
+    properties:
+      id:
+        type: string
+      name:
+        type: string
+      email:
+        type: string
+        format: email
+      address:
+        $ref: "#/schemas/addressSchema"
+
+# Reference them in tasks
+tasks:
+  - name: ValidateCustomer
+    type: set
+    data:
+      customer: {
+        id: ".customerId",
+        name: ".fullName",
+        email: ".emailAddress",
+        address: ".shippingAddress"
+      }
+    output:
+      schema:
+        $ref: "#/schemas/customerSchema"
+    next: NextTask
 ```
 
 ## Best Practices for Schema Validation

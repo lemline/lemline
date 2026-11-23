@@ -24,18 +24,23 @@ These mechanisms allow you to create complex execution paths through your workfl
 The most common way to control workflow flow is using the `next` property:
 
 ```yaml
-  - FirstTask:
-      set:
-        message: "Hello, World!"
-      then: SecondTask
-  - SecondTask:
-      set:
-        message: "This is the second task"
-      then: FinalTask
-  - FinalTask:
-      set:
-        message: "This is the final task"
-      then: end
+- name: FirstTask
+  type: set
+  data:
+    message: "Hello, World!"
+  next: SecondTask
+
+- name: SecondTask
+  type: set
+  data:
+    message: "This is the second task"
+  next: FinalTask
+
+- name: FinalTask
+  type: set
+  data:
+    message: "This is the final task"
+  end: true
 ```
 
 Each task specifies which task to execute next, creating a simple chain of execution.
@@ -45,11 +50,12 @@ Each task specifies which task to execute next, creating a simple chain of execu
 To end the workflow execution, use the `end: true` property:
 
 ```yaml
-  - CompleteTask:
-      set:
-        status: "COMPLETED"
-        message: "Workflow completed successfully"
-      then: end
+- name: CompleteTask
+  type: set
+  data:
+    status: "COMPLETED"
+    message: "Workflow completed successfully"
+  end: true
 ```
 
 When a task with `end: true` is executed, the workflow terminates, and its output becomes the workflow's final output.
@@ -59,32 +65,39 @@ When a task with `end: true` is executed, the workflow terminates, and its outpu
 The `switch` task allows you to implement conditional jumping:
 
 ```yaml
-  - EvaluateCondition:
-      switch:
-        - case1:
-            then: HandleHotWeather
-            when: ${ .temperature > 30 }
-        - case2:
-            then: HandleColdWeather
-            when: ${ .temperature < 10 }
-        - default:
-            then: HandleMildWeather
-  - HandleHotWeather:
-      set:
-        message: "It's hot outside!"
-      then: PrepareResponse
-  - HandleColdWeather:
-      set:
-        message: "It's cold outside!"
-      then: PrepareResponse
-  - HandleMildWeather:
-      set:
-        message: "The weather is mild."
-      then: PrepareResponse
-  - PrepareResponse:
-      set:
-        response: "Weather notification: .message"
-      then: end
+- name: EvaluateCondition
+  type: switch
+  conditions:
+    - condition: ".temperature > 30"
+      next: HandleHotWeather
+    - condition: ".temperature < 10"
+      next: HandleColdWeather
+    - condition: true
+      next: HandleMildWeather
+
+- name: HandleHotWeather
+  type: set
+  data:
+    message: "It's hot outside!"
+  next: PrepareResponse
+
+- name: HandleColdWeather
+  type: set
+  data:
+    message: "It's cold outside!"
+  next: PrepareResponse
+
+- name: HandleMildWeather
+  type: set
+  data:
+    message: "The weather is mild."
+  next: PrepareResponse
+
+- name: PrepareResponse
+  type: set
+  data:
+    response: "Weather notification: .message"
+  end: true
 ```
 
 Based on the condition evaluation, the workflow jumps to one of the specified tasks.
@@ -94,23 +107,29 @@ Based on the condition evaluation, the workflow jumps to one of the specified ta
 The `then` directive is used to specify where execution should continue after completing a complex branch task like `do` or `for`:
 
 ```yaml
-  - ProcessData:
-      do:
-        - DoTask1:
-            set:
-              result1: "Step 1 complete"
-        - DoTask2:
-            set:
-              result2: "Step 2 complete"
-      then: FinalizeProcess
-  - AlternativeProcess:
-      set:
-        message: "Alternative process"
-      then: FinalizeProcess
-  - FinalizeProcess:
-      set:
-        message: "Process finalized"
-      then: end
+- name: ProcessData
+  type: do
+    - name: DoTask1
+      type: set
+      data:
+        result1: "Step 1 complete"
+    - name: DoTask2
+      type: set
+      data:
+        result2: "Step 2 complete"
+  then: FinalizeProcess  # Jump here after completing the do tasks
+
+- name: AlternativeProcess
+  type: set
+  data:
+    message: "Alternative process"
+  next: FinalizeProcess
+
+- name: FinalizeProcess
+  type: set
+  data:
+    message: "Process finalized"
+  end: true
 ```
 
 In this example, after completing `DoTask1` and `DoTask2`, execution jumps to `FinalizeProcess` due to the `then` directive.
@@ -120,32 +139,38 @@ In this example, after completing `DoTask1` and `DoTask2`, execution jumps to `F
 You can use the `exit` directive to terminate a branch early and continue execution elsewhere:
 
 ```yaml
-  - ProcessItems:
-      for:
-        each: "item"
-        in: ${ .items }
-      do:
-        - CheckItem:
-            switch:
-              - case1:
-                  then: HandleCriticalItem
-                  when: ${ .item.status == "CRITICAL" }
-              - default:
-                  then: ProcessNormalItem
-        - ProcessNormalItem:
-            set:
-              processed: true
-      then: FinalizeProcessing
-  - HandleCriticalItem:
-      set:
-        status: "CRITICAL"
-        message: "Critical item detected"
-      then: end
-  - FinalizeProcessing:
-      set:
-        status: "COMPLETED"
-        message: "All items processed"
-      then: end
+- name: ProcessItems
+  type: for
+  iterator:
+    collect: ".items"
+    as: "item"
+  do:
+    - name: CheckItem
+      type: switch
+      conditions:
+        - condition: ".item.status == 'CRITICAL'"
+          exit: HandleCriticalItem  # Exit the loop on critical items
+        - condition: true
+          next: ProcessNormalItem
+    - name: ProcessNormalItem
+      type: set
+      data:
+        processed: true
+  next: FinalizeProcessing
+
+- name: HandleCriticalItem
+  type: set
+  data:
+    status: "CRITICAL"
+    message: "Critical item detected"
+  end: true
+
+- name: FinalizeProcessing
+  type: set
+  data:
+    status: "COMPLETED"
+    message: "All items processed"
+  end: true
 ```
 
 In this example, if a critical item is found during iteration, the loop is terminated early with `exit` and execution jumps to `HandleCriticalItem`.
@@ -155,73 +180,98 @@ In this example, if a critical item is found during iteration, the loop is termi
 For complex workflows, you often need to jump between different logical sections:
 
 ```yaml
-  - StartProcess:
-      set:
-        orderType: ${ .orderType }
-      then: RouteOrder
-  - RouteOrder:
-      switch:
-        - case1:
-            then: StandardOrderProcess
-            when: ${ .orderType == "STANDARD" }
-        - case2:
-            then: ExpeditedOrderProcess
-            when: ${ .orderType == "EXPEDITED" }
-        - case3:
-            then: ReturnProcess
-            when: ${ .orderType == "RETURN" }
-        - default:
-            then: HandleUnknownOrderType
-  - StandardOrderProcess:
-      set:
-        processingTime: "3-5 days"
-      then: VerifyInventory
-  - ExpeditedOrderProcess:
-      set:
-        processingTime: "1-2 days"
-        rushFee: 15.00
-      then: VerifyInventory
-  - ReturnProcess:
-      set:
-        returnType: ${ .returnReason }
-      then: HandleReturn
-  - VerifyInventory:
-      call: inventoryService
-      with:
-        items: ${ .items }
-      then: CheckInventoryResult
-  - CheckInventoryResult:
-      switch:
-        - case1:
-            then: ProcessPayment
-            when: ${ .available == true }
-        - default:
-            then: HandleOutOfStock
-  - ProcessPayment:
-      call: paymentService
-      with:
-        amount: ${ .total + (.rushFee // 0) }
-      then: FinalizeOrder
-  - FinalizeOrder:
-      set:
-        status: "COMPLETED"
-        message: "Order processed successfully"
-      then: end
-  - HandleOutOfStock:
-      set:
-        status: "FAILED"
-        reason: "Items out of stock"
-      then: end
-  - HandleReturn:
-      set:
-        status: "RETURN_INITIATED"
-        returnId: ${ "RTN-" + (.orderId) }
-      then: end
-  - HandleUnknownOrderType:
-      set:
-        status: "FAILED"
-        reason: '${ "Unknown order type: \(.orderType)" }'
-      then: end
+- name: StartProcess
+  type: set
+  data:
+    orderType: ".orderType"
+  next: RouteOrder
+
+- name: RouteOrder
+  type: switch
+  conditions:
+    - condition: ".orderType == 'STANDARD'"
+      next: StandardOrderProcess
+    - condition: ".orderType == 'EXPEDITED'"
+      next: ExpeditedOrderProcess
+    - condition: ".orderType == 'RETURN'"
+      next: ReturnProcess
+    - condition: true
+      next: HandleUnknownOrderType
+
+# Standard Order Section
+- name: StandardOrderProcess
+  type: set
+  data:
+    processingTime: "3-5 days"
+  next: VerifyInventory
+
+# Expedited Order Section
+- name: ExpeditedOrderProcess
+  type: set
+  data:
+    processingTime: "1-2 days"
+    rushFee: 15.00
+  next: VerifyInventory
+
+# Return Section
+- name: ReturnProcess
+  type: set
+  data:
+    returnType: ".returnReason"
+  next: HandleReturn
+
+# Common Inventory Section
+- name: VerifyInventory
+  type: call
+  function: inventoryService
+  data:
+    items: ".items"
+  next: CheckInventoryResult
+
+- name: CheckInventoryResult
+  type: switch
+  conditions:
+    - condition: ".available == true"
+      next: ProcessPayment
+    - condition: true
+      next: HandleOutOfStock
+
+# Payment Section
+- name: ProcessPayment
+  type: call
+  function: paymentService
+  data:
+    amount: ".total + (.rushFee || 0)"
+  next: FinalizeOrder
+
+# Various End States
+- name: FinalizeOrder
+  type: set
+  data:
+    status: "COMPLETED"
+    message: "Order processed successfully"
+  end: true
+
+- name: HandleOutOfStock
+  type: set
+  data:
+    status: "FAILED"
+    reason: "Items out of stock"
+  end: true
+
+- name: HandleReturn
+  type: set
+  data:
+    status: "RETURN_INITIATED"
+    returnId: "RTN-" + (.orderId)
+  end: true
+
+- name: HandleUnknownOrderType
+  type: set
+  data:
+    status: "FAILED"
+    reason: "Unknown order type: .orderType"
+  end: true
 ```
 
 This example shows how a workflow can jump between different sections based on order type, with each section potentially leading to different end states.
@@ -231,24 +281,23 @@ This example shows how a workflow can jump between different sections based on o
 You can implement dynamic jumping by combining expressions with switch conditions:
 
 ```yaml
-  - DecideNextStep:
-      set:
-        nextTaskName: "${ if .orderValue > 1000 then 'HighValueProcess' else (.customerTier == 'PREMIUM' ? 'PremiumProcess'
-          : 'StandardProcess') end }"
-      then: RouteByName
-  - RouteByName:
-      switch:
-        - case1:
-            then: HighValueProcess
-            when: ${ .nextTaskName == 'HighValueProcess' }
-        - case2:
-            then: PremiumProcess
-            when: ${ .nextTaskName == 'PremiumProcess' }
-        - case3:
-            then: StandardProcess
-            when: ${ .nextTaskName == 'StandardProcess' }
-        - default:
-            then: DefaultProcess
+- name: DecideNextStep
+  type: set
+  data:
+    nextTaskName: ".orderValue > 1000 ? 'HighValueProcess' : (.customerTier == 'PREMIUM' ? 'PremiumProcess' : 'StandardProcess')"
+  next: RouteByName
+
+- name: RouteByName
+  type: switch
+  conditions:
+    - condition: ".nextTaskName == 'HighValueProcess'"
+      next: HighValueProcess
+    - condition: ".nextTaskName == 'PremiumProcess'"
+      next: PremiumProcess
+    - condition: ".nextTaskName == 'StandardProcess'"
+      next: StandardProcess
+    - condition: true
+      next: DefaultProcess
 ```
 
 This approach lets you calculate the next task name dynamically based on complex criteria.
@@ -258,107 +307,113 @@ This approach lets you calculate the next task name dynamically based on complex
 You can implement state machine patterns by tracking current state and transitioning between states:
 
 ```yaml
-  - InitializeStateMachine:
-      set:
-        currentState: "STARTED"
-        availableTransitions:
-          STARTED:
-            - "VALIDATING"
-            - "REJECTED"
-          VALIDATING:
-            - "PROCESSING"
-            - "REJECTED"
-          PROCESSING:
-            - "COMPLETED"
-            - "FAILED"
-          FAILED:
-            - "RETRY"
-            - "REJECTED"
-          RETRY:
-            - "PROCESSING"
-            - "REJECTED"
-        event: ${ .event }
-      then: ProcessStateTransition
-  - ProcessStateTransition:
-      set:
-        targetState: ${ .event.targetState }
-        isValidTransition: ${ .availableTransitions[.currentState] | contains([.targetState]) }
-        previousState: ${ .currentState }
-      then: ValidateTransition
-  - ValidateTransition:
-      switch:
-        - case1:
-            then: RejectTransition
-            when: ${ .isValidTransition == false }
-        - case2:
-            then: EnterValidatingState
-            when: ${ .targetState == 'VALIDATING' }
-        - case3:
-            then: EnterProcessingState
-            when: ${ .targetState == 'PROCESSING' }
-        - case4:
-            then: EnterCompletedState
-            when: ${ .targetState == 'COMPLETED' }
-        - case5:
-            then: EnterFailedState
-            when: ${ .targetState == 'FAILED' }
-        - case6:
-            then: EnterRetryState
-            when: ${ .targetState == 'RETRY' }
-        - case7:
-            then: EnterRejectedState
-            when: ${ .targetState == 'REJECTED' }
-        - default:
-            then: RejectTransition
-  - EnterValidatingState:
-      set:
-        currentState: "VALIDATING"
-        stateData:
-          enteredAt: ${ $context.currentTime }
-          transition: ${ .previousState + ' -> VALIDATING' }
-      then: PerformValidation
-  - PerformValidation:
-      call: validationService
-      with:
-        orderId: ${ .orderId }
-      then: CheckValidationResult
-  - CheckValidationResult:
-      switch:
-        - case1:
-            then: TransitionToProcessing
-            when: ${ .isValid == true }
-        - default:
-            then: TransitionToRejected
-  - TransitionToProcessing:
-      set:
-        event:
-          targetState: "PROCESSING"
-      then: ProcessStateTransition
-  - TransitionToRejected:
-      set:
-        event:
-          targetState: "REJECTED"
-          reason: ${ .validationErrors }
-      then: ProcessStateTransition
-  - EnterCompletedState:
-      set:
-        currentState: "COMPLETED"
-        stateData:
-          completedAt: ${ $context.currentTime }
-          transition: ${ .previousState + ' -> COMPLETED' }
-      then: end
-  - EnterRejectedState:
-      set:
-        currentState: "REJECTED"
-        stateData:
-          rejectedAt: ${ $context.currentTime }
-          transition: ${ .previousState + ' -> REJECTED' }
-          reason: ${ .event.reason }
-      then: end
-  - RejectTransition:
-      set:
-        error: "Invalid state transition from .currentState to .targetState"
-      then: end
+- name: InitializeStateMachine
+  type: set
+  data:
+    currentState: "STARTED"
+    availableTransitions:
+      STARTED: ["VALIDATING", "REJECTED"]
+      VALIDATING: ["PROCESSING", "REJECTED"]
+      PROCESSING: ["COMPLETED", "FAILED"]
+      FAILED: ["RETRY", "REJECTED"]
+      RETRY: ["PROCESSING", "REJECTED"]
+    event: ".event"
+  next: ProcessStateTransition
+
+- name: ProcessStateTransition
+  type: set
+  data:
+    targetState: ".event.targetState"
+    isValidTransition: ".availableTransitions[.currentState] | contains([.targetState])"
+    previousState: ".currentState"
+  next: ValidateTransition
+
+- name: ValidateTransition
+  type: switch
+  conditions:
+    - condition: ".isValidTransition == false"
+      next: RejectTransition
+    - condition: ".targetState == 'VALIDATING'"
+      next: EnterValidatingState
+    - condition: ".targetState == 'PROCESSING'"
+      next: EnterProcessingState
+    - condition: ".targetState == 'COMPLETED'"
+      next: EnterCompletedState
+    - condition: ".targetState == 'FAILED'"
+      next: EnterFailedState
+    - condition: ".targetState == 'RETRY'"
+      next: EnterRetryState
+    - condition: ".targetState == 'REJECTED'"
+      next: EnterRejectedState
+    - condition: true
+      next: RejectTransition
+
+# State handler tasks
+- name: EnterValidatingState
+  type: set
+  data:
+    currentState: "VALIDATING"
+    stateData:
+      enteredAt: "$WORKFLOW.currentTime"
+      transition: ".previousState + ' -> VALIDATING'"
+  next: PerformValidation
+
+- name: PerformValidation
+  type: call
+  function: validationService
+  data:
+    orderId: ".orderId"
+  next: CheckValidationResult
+
+- name: CheckValidationResult
+  type: switch
+  conditions:
+    - condition: ".isValid == true"
+      next: TransitionToProcessing
+    - condition: true
+      next: TransitionToRejected
+
+- name: TransitionToProcessing
+  type: set
+  data:
+    event:
+      targetState: "PROCESSING"
+  next: ProcessStateTransition
+
+- name: TransitionToRejected
+  type: set
+  data:
+    event:
+      targetState: "REJECTED"
+      reason: ".validationErrors"
+  next: ProcessStateTransition
+
+# Similar patterns for other states...
+
+- name: EnterCompletedState
+  type: set
+  data:
+    currentState: "COMPLETED"
+    stateData:
+      completedAt: "$WORKFLOW.currentTime"
+      transition: ".previousState + ' -> COMPLETED'"
+  end: true
+
+- name: EnterRejectedState
+  type: set
+  data:
+    currentState: "REJECTED"
+    stateData:
+      rejectedAt: "$WORKFLOW.currentTime"
+      transition: ".previousState + ' -> REJECTED'"
+      reason: ".event.reason"
+  end: true
+
+- name: RejectTransition
+  type: set
+  data:
+    error: "Invalid state transition from .currentState to .targetState"
+  end: true
 ```
 
 This complex example implements a state machine with defined transitions between states.
@@ -379,28 +434,32 @@ This complex example implements a state machine with defined transitions between
 ### Early Exit Pattern
 
 ```yaml
-  - ValidateInput:
-      switch:
-        - case1:
-            then: RejectMissingInput
-            when: ${ .input == null }
-        - case2:
-            then: RejectInvalidAmount
-            when: ${ .input.amount <= 0 }
-        - default:
-            then: ProcessValidInput
-  - RejectMissingInput:
-      set:
-        status: "REJECTED"
-        reason: "Missing input"
-      then: end
-  - RejectInvalidAmount:
-      set:
-        status: "REJECTED"
-        reason: "Invalid amount"
-      then: end
-  - ProcessValidInput:
-      set: ${ . }
+- name: ValidateInput
+  type: switch
+  conditions:
+    - condition: ".input == null"
+      next: RejectMissingInput
+    - condition: ".input.amount <= 0"
+      next: RejectInvalidAmount
+    - condition: true
+      next: ProcessValidInput
+
+- name: RejectMissingInput
+  type: set
+  data:
+    status: "REJECTED"
+    reason: "Missing input"
+  end: true
+
+- name: RejectInvalidAmount
+  type: set
+  data:
+    status: "REJECTED"
+    reason: "Invalid amount"
+  end: true
+
+- name: ProcessValidInput
+  # Continue with normal processing
 ```
 
 This pattern checks preconditions and exits early if they aren't met.
@@ -449,67 +508,83 @@ This pattern allows different callback tasks to be specified dynamically.
 ### Conditional Exit from Loops
 
 ```yaml
-  - InitializeLoop:
-      set:
-        items: ${ .items }
-        processedItems: []
-        errorCount: 0
-      then: ProcessItems
-  - ProcessItems:
-      for:
-        each: "item"
-        in: ${ .items }
+- name: InitializeLoop
+  type: set
+  data:
+    items: ".items"
+    processedItems: []
+    errorCount: 0
+  next: ProcessItems
+
+- name: ProcessItems
+  type: for
+  iterator:
+    collect: ".items"
+    as: "item"
+  do:
+    - name: ProcessItem
+      type: try
+      retry:
+        maxAttempts: 3
+      catch:
+        - error: "*"
+          next: HandleItemError
       do:
-        - ProcessItem:
-            try:
-              - AttemptProcessing:
-                  call: processItem
-                  with:
-                    itemId: ${ .item.id }
-            catch:
-              as: failure
-              then: HandleItemError
-              retry:
-                limit:
-                  attempt:
-                    count: 3
-        - SaveProcessedItem:
-            set:
-              processedItem:
-                id: ${ .item.id }
-                result: "SUCCESS"
-        - HandleItemError:
-            set:
-              processedItem:
-                id: ${ .item.id }
-                result: "ERROR"
-                error: ${ $context.error }
-        - UpdateCounts:
-            set:
-              errorCount: ${ if .errorCount + (.processedItem.result == "ERROR" then 1 else 0) end }
-        - CheckErrorThreshold:
-            switch:
-              - case1:
-                  then: AbortProcessing
-                  when: ${ .errorCount >= 3 }
-              - default:
-                  then: ContinueProcessing
-        - ContinueProcessing:
-            set:
-              processedItems: ${ .processedItems + [.processedItem] }
-      then: CompleteProcessing
-  - AbortProcessing:
-      set:
-        status: "ABORTED"
-        reason: "Too many errors encountered"
-        processedItems: ${ .processedItems }
-      then: end
-  - CompleteProcessing:
-      set:
-        status: "COMPLETED"
-        processedItems: ${ .processedItems }
-        errorCount: ${ .errorCount }
-      then: end
+        - name: AttemptProcessing
+          type: call
+          function: processItem
+          data:
+            itemId: ".item.id"
+      
+    - name: SaveProcessedItem
+      type: set
+      data:
+        processedItem:
+          id: ".item.id"
+          result: "SUCCESS"
+      
+    - name: HandleItemError
+      type: set
+      data:
+        processedItem:
+          id: ".item.id"
+          result: "ERROR"
+          error: "$WORKFLOW.error"
+      
+    - name: UpdateCounts
+      type: set
+      data:
+        errorCount: ".errorCount + (.processedItem.result == 'ERROR' ? 1 : 0)"
+      
+    - name: CheckErrorThreshold
+      type: switch
+      conditions:
+        - condition: ".errorCount >= 3"
+          exit: AbortProcessing
+        - condition: true
+          next: ContinueProcessing
+      
+    - name: ContinueProcessing
+      type: set
+      data:
+        processedItems: ".processedItems + [.processedItem]"
+  next: CompleteProcessing
+
+- name: AbortProcessing
+  type: set
+  data:
+    status: "ABORTED"
+    reason: "Too many errors encountered"
+    processedItems: ".processedItems"
+  end: true
+
+- name: CompleteProcessing
+  type: set
+  data:
+    status: "COMPLETED"
+    processedItems: ".processedItems"
+    errorCount: ".errorCount"
+  end: true
 ```
 
 This pattern exits a loop early if too many errors are encountered.

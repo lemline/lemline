@@ -13,12 +13,13 @@ Custom errors are defined in the `use.errors` section of your workflow:
 ```yaml
 use:
   errors:
-    "paymentDeclined":
+    - name: "paymentDeclined"
       type: "https://example.com/errors/payment-declined"
       status: 400
       title: "Payment Method Declined"
-      detail: "The payment processor rejected the transaction"
-    "inventoryShortage":
+      details: "The payment processor rejected the transaction"
+    
+    - name: "inventoryShortage"
       type: "https://example.com/errors/inventory-shortage"
       status: 409
       title: "Insufficient Inventory"
@@ -39,13 +40,12 @@ Each error definition includes:
 You can raise custom errors using the `raise` task:
 
 ```yaml
-  - checkInventory:
-      if: "${ .availableStock < .requestedQuantity }"
-      raise:
-        error:
-          type: https://example.com/errors/inventory-shortage
-          status: 409
-          detail: ${ "Requested \(.requestedQuantity) items, but only \(.availableStock) available" }
+- checkInventory:
+    if: "${ .availableStock < .requestedQuantity }"
+    raise:
+      error: "inventoryShortage"
+      with:
+        details: "Requested ${ .requestedQuantity } items, but only ${ .availableStock } available"
 ```
 
 The `with` property allows you to override default properties or provide dynamic values.
@@ -55,34 +55,27 @@ The `with` property allows you to override default properties or provide dynamic
 Catch your custom errors in `try` blocks:
 
 ```yaml
-  - processOrder:
-      try:
+- processOrder:
+    try:
+      do:
         - verifyInventory:
-            set: ${ . }
+            # This task might raise inventoryShortage
         - processPayment:
-            set: ${ . }
+            # This task might raise paymentDeclined
       catch:
-        as: failure
-        do:
-          - route:
-              switch:
-                - handle1:
-                    when: ${ $failure.type == "https://example.com/errors/inventory-shortage" }
-                    then: handle1
-                - handle2:
-                    when: ${ $failure.type == "https://example.com/errors/payment-declined" }
-                    then: handle2
-          - handle1:
-              do:
-                - handleInventoryError:
-                    set: ${ . }
-              then: exit
-          - handle2:
-              do:
-                - handlePaymentError:
-                    set: ${ . }
-              then: exit
-        when: ${ ($failure.type == "https://example.com/errors/inventory-shortage") or ($failure.type == "https://example.com/errors/payment-declined") }
+        - error:
+            with:
+              type: "https://example.com/errors/inventory-shortage"
+          do:
+            - handleInventoryError:
+                # Logic for handling inventory shortages
+        
+        - error:
+            with:
+              type: "https://example.com/errors/payment-declined"
+          do:
+            - handlePaymentError:
+                # Logic for handling payment issues
 ```
 
 ## Error Hierarchies
@@ -92,13 +85,15 @@ You can create hierarchical error types by using consistent URI patterns:
 ```yaml
 use:
   errors:
-    "validationError":
+    - name: "validationError"
       type: "https://example.com/errors/validation"
       status: 400
-    "requiredFieldMissing":
+    
+    - name: "requiredFieldMissing"
       type: "https://example.com/errors/validation/required-field"
       status: 400
-    "invalidFormat":
+    
+    - name: "invalidFormat"
       type: "https://example.com/errors/validation/format"
       status: 400
 ```
@@ -120,36 +115,23 @@ catch:
 You can create errors dynamically within your workflow:
 
 ```yaml
-  - validateUserInput:
-      do:
-        - choose:
-            switch:
-              - branch1:
-                  when: ${ .username == null }
-                  then: branch1
-              - branch2:
-                  when: ${ .email and !contains(.email, "@") }
-                  then: branch2
-        - branch1:
-            do:
-              - handle:
-                  raise:
-                    error:
-                      type: "https://example.com/errors/validation/required-field"
-                      status: 400
-                      title: "Required Field Missing"
-                      detail: "Username is required"
-            then: exit
-        - branch2:
-            do:
-              - handle:
-                  raise:
-                    error:
-                      type: "https://example.com/errors/validation/format"
-                      status: 400
-                      title: "Invalid Format"
-                      detail: "Email address is invalid"
-            then: exit
+- validateUserInput:
+    switch:
+      - condition: "${ .username == null }"
+        raise:
+          error:
+            type: "https://example.com/errors/validation/required-field"
+            status: 400
+            title: "Required Field Missing"
+            details: "Username is required"
+      
+      - condition: "${ .email && !contains(.email, '@') }"
+        raise:
+          error:
+            type: "https://example.com/errors/validation/format"
+            status: 400
+            title: "Invalid Format"
+            details: "Email address is invalid"
 ```
 
 This allows you to generate specific errors without pre-defining them.
@@ -159,50 +141,31 @@ This allows you to generate specific errors without pre-defining them.
 Map external system errors to your custom errors:
 
 ```yaml
-  - callExternalService:
-      try:
+- callExternalService:
+    try:
+      do:
         - makeApiCall:
-            call: http
-            with:
-              endpoint: "https://api.example.com/process"
-              method: get
+            callHTTP:
+              url: "https://api.example.com/process"
       catch:
-        as: "apiError"
-        do:
-          - mapError:
-              do:
-                - choose:
-                    switch:
-                      - branch1:
-                          when: ${ .apiError.status == 429 }
-                          then: branch1
-                      - branch2:
-                          when: ${ .apiError.status == 401 }
-                          then: branch2
-                      - branch3:
-                          when: ${ .apiError.status >= 500 }
-                          then: branch3
-                - branch1:
-                    do:
-                      - handle:
-                          raise:
-                            error: "rateLimitExceeded"
-                    then: exit
-                - branch2:
-                    do:
-                      - handle:
-                          raise:
-                            error: "authenticationFailed"
-                    then: exit
-                - branch3:
-                    do:
-                      - handle:
-                          raise:
-                            error: "serviceUnavailable"
-                    then: exit
-        errors:
-          with:
-            type: "https://open-workflow-specification.org/spec/1.0.0/errors/communication"
+        - error:
+            with:
+              type: "https://open-workflow-specification.org/spec/1.0.0/errors/communication"
+            as: "apiError"
+          do:
+            - mapError:
+                switch:
+                  - condition: "${ .apiError.status == 429 }"
+                    raise:
+                      error: "rateLimitExceeded"
+                  
+                  - condition: "${ .apiError.status == 401 }"
+                    raise:
+                      error: "authenticationFailed"
+                  
+                  - condition: "${ .apiError.status >= 500 }"
+                    raise:
+                      error: "serviceUnavailable"
 ```
 
 This pattern translates generic communication errors into more specific business domain errors.

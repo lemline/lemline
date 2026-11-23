@@ -75,9 +75,8 @@ The Lemline runtime automatically generates errors for common failure scenarios:
   ```yaml
   input:
     schema:
-      document:
-        type: object
-        required: [orderId]
+      type: "object"
+      required: ["orderId"]
       # If input missing orderId, ValidationError is raised
   ```
 
@@ -90,19 +89,17 @@ The Lemline runtime automatically generates errors for common failure scenarios:
 
 - **HTTP Communication**: When API calls fail
   ```yaml
-  call: http
-  with:
-    method: get
-    endpoint: "https://api.example.com/data"
+  callHTTP:
+    url: "https://api.example.com/data"
     # If API returns 500, CommunicationError is raised
   ```
 
 - **Timeout Violations**: When operations exceed their timeouts
   ```yaml
-  listen:
-    to:
-      one: { with: { type: OrderApproved } }
-  timeout: { after: PT1M }
+  wait:
+    duration: PT30S
+    timeout: PT1M
+    # If wait exceeds 1 minute, TimeoutError is raised
   ```
 
   > **Lemline runtime:** only `listen` task timeouts are enforced. Workflow-level timeouts and timeouts on other tasks are accepted but ignored for now. HTTP calls use fixed client limits instead: 15 seconds to connect, 30 seconds per request.
@@ -112,13 +109,12 @@ The Lemline runtime automatically generates errors for common failure scenarios:
 Workflows can explicitly raise errors using the `raise` task:
 
 ```yaml
-  - checkInventory:
-      if: "${ .stock < .quantity }"
-      raise:
-        error:             # Reference to a defined error
-          type: https://example.com/errors/out-of-stock
-          status: 409
-          detail: ${ "Requested \(.quantity), only \(.stock) available" }
+- checkInventory:
+    if: "${ .stock < .quantity }"
+    raise:
+      error: "outOfStock"  # Reference to a defined error
+      with:
+        details: "Requested ${ .quantity }, only ${ .stock } available"
 ```
 
 This allows for domain-specific error conditions.
@@ -162,23 +158,23 @@ Lemline provides several mechanisms for handling errors:
 The primary error handling mechanism:
 
 ```yaml
-  - processPayment:
-      try:
+- processPayment:
+    try:
+      do:
         - chargeCard:
-            call: http
-            with:
+            callHTTP:
+              url: "https://payment.example.com/charge"
               method: "POST"
-              endpoint: "https://payment.example.com/charge"
       catch:
-        as: "paymentError"
-        do:
-          - logError:
-              set:
-                errorMessage: "Payment service unavailable: ${ .paymentError.details }"
-        errors:
-          with:
-            type: "https://open-workflow-specification.org/spec/1.0.0/errors/communication"
-            status: 503
+        - error:
+            with:
+              type: "https://open-workflow-specification.org/spec/1.0.0/errors/communication"
+              status: 503
+            as: "paymentError"
+          do:
+            - logError:
+                set:
+                  errorMessage: "Payment service unavailable: ${ .paymentError.details }"
 ```
 
 Key components:
@@ -193,18 +189,20 @@ Key components:
 Automated retry for transient failures:
 
 ```yaml
-  - processPayment:
-      try:
-        - chargeCard:
-            set: ${ . }
-      catch:
-        retry:
+- processPayment:
+    try:
+      retry:
+        policy:
+          strategy: backoff
+          backoff:
+            delay: PT1S
+            multiplier: 2
           limit:
             attempt:
               count: 3
-          delay: PT1S
-          backoff:
-            exponential: {}
+      do:
+        - chargeCard:
+            # Task that might fail temporarily
 ```
 
 When an error occurs:
@@ -218,24 +216,22 @@ When an error occurs:
 Define explicit fallback behavior:
 
 ```yaml
-  - getUserProfile:
-      try:
+- getUserProfile:
+    try:
+      do:
         - fetchFromApi:
-            call: http
-            with:
-              endpoint: ${ "https://api.example.com/users/\(.userId)" }
-              method: get
+            callHTTP:
+              url: "https://api.example.com/users/${ .userId }"
       catch:
-        do:
-          - useCachedData:
-              call: http
-              with:
-                endpoint: ${ "https://cache.example.com/users/\(.userId)" }
-                method: get
-          - markStale:
-              set:
-                dataSource: "cache"
-                isFresh: false
+        - error:
+            do:
+              - useCachedData:
+                  callHTTP:
+                    url: "https://cache.example.com/users/${ .userId }"
+              - markStale:
+                  set:
+                    dataSource: "cache"
+                    isFresh: false
 ```
 
 This pattern allows graceful degradation when preferred data sources fail.
@@ -255,11 +251,12 @@ Explicitly define expected error conditions:
 ```yaml
 use:
   errors:
-    "paymentDeclined":
+    - name: "paymentDeclined"
       type: "https://example.com/errors/payment-declined"
       status: 400
       title: "Payment Method Declined"
-    "insufficientInventory":
+
+    - name: "insufficientInventory"
       type: "https://example.com/errors/insufficient-inventory"
       status: 409
       title: "Insufficient Inventory"
@@ -273,24 +270,27 @@ Structure your workflow with proper error handling:
 do:
   - mainFlow:
       try:
-        - validateInput:
-            set: ${ . }
-        - processOrder:
-            try:
-              - reserveInventory:
-                  set: ${ . }
-              - processPayment:
-                  set: ${ . }
-            catch:
-              do:
-                - passInput:
-                    set: ${ . }
-              errors:
-                with:
-                  type: https://example.com/errors/payment-declined
-        - fulfillOrder:
-            set: ${ . }
-      catch: {}
+        do:
+          - validateInput:
+              # Input validation
+          - processOrder:
+              try:
+                do:
+                  - reserveInventory:
+                      # Inventory check
+                  - processPayment:
+                      # Payment processing
+                catch:
+                  - error:
+                      with:
+                        name: "paymentDeclined"
+                      do:
+                        # Payment-specific handling
+          - fulfillOrder:
+              # Order fulfillment
+        catch:
+          - error:
+              # Global error handling
 ```
 
 ### 3. Use Appropriate Retry Strategies
@@ -307,25 +307,29 @@ Choose retry strategies based on error types:
 Design workflows to handle partial failures:
 
 ```yaml
-  - userDashboard:
-      fork:
-        branches:
-          - loadProfile:
-              try:
+- userDashboard:
+    fork:
+      branches:
+        - loadProfile:
+            try:
+              do:
                 - fetchUserProfile:
-                    set: ${ . }
+                    # Profile loading
               catch:
-                do:
-                  - setDefaultProfile:
-                      set: ${ . }
-          - loadRecommendations:
-              try:
+                - error:
+                    do:
+                      - setDefaultProfile:
+                          # Use default profile
+        - loadRecommendations:
+            try:
+              do:
                 - fetchRecommendations:
-                    set: ${ . }
+                    # Load recommendations
               catch:
-                do:
-                  - setEmptyRecommendations:
-                      set: ${ . }
+                - error:
+                    do:
+                      - setEmptyRecommendations:
+                          # Skip recommendations
 ```
 
 ### 5. Provide Comprehensive Error Context
@@ -333,14 +337,14 @@ Design workflows to handle partial failures:
 Ensure errors contain useful diagnostic information:
 
 ```yaml
-  - processRecord:
-      if: "${ .recordType == 'invalid' }"
-      raise:
-        error:
-          type: "https://example.com/errors/validation"
-          status: 400
-          title: "Invalid Record Type"
-          detail: "${ \"Record ID \\(.recordId) has invalid type '\\(.recordType)'\" }"
+- processRecord:
+    if: "${ .recordType == 'invalid' }"
+    raise:
+      error:
+        type: "https://example.com/errors/validation"
+        status: 400
+        title: "Invalid Record Type"
+        details: "Record ID ${ .recordId } has invalid type '${ .recordType }'"
 ```
 
 ## Debugging and Monitoring Errors

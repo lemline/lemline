@@ -35,50 +35,43 @@ For this tutorial, we'll build an order processing workflow that demonstrates th
 
 ## 2. Setting Up Your Project
 
-Work in the `lemline-project` directory from [Setting Up a Local Environment](lemline-tutorial-setup.md). Keep the worker running with the `examples` namespace enabled.
+Create a new directory for your order processing project:
+
+```bash
+mkdir order-processing
+cd order-processing
+```
 
 Create a workflow file named `order-processing.yaml`:
 
 ```yaml
-document:
-  dsl: 1.0.3
-  namespace: examples
-  name: order-processing
-  version: 1.0.0
-  title: Order Processing Workflow
-use:
-  functions:
-    checkInventory:
-      call: http
-      with:
-        method: get
-        endpoint: https://inventory-api.example.com/check
-        query:
-          order: ${ . }
-    processPayment:
-      call: http
-      with:
-        method: post
-        endpoint: https://payments-api.example.com/process
-        body:
-          order: ${ . }
-    createShipment:
-      call: http
-      with:
-        method: post
-        endpoint: https://shipping-api.example.com/shipments
-        body:
-          order: ${ . }
-    sendNotification:
-      call: http
-      with:
-        method: post
-        endpoint: https://notification-api.example.com/send
-        body:
-          order: ${ . }
-do:
-  - receiveOrder:
-      set: ${ . }
+id: order-processing
+name: Order Processing Workflow
+version: '1.0'
+specVersion: '1.0'
+start: ValidateOrder
+input:
+  - $WORKFLOW.input
+functions:
+  - name: validateOrderSchema
+    type: custom
+    operation: jsonSchemaValidation
+  - name: checkInventory
+    type: http
+    operation: GET
+    url: https://inventory-api.example.com/check
+  - name: processPayment
+    type: http
+    operation: POST 
+    url: https://payments-api.example.com/process
+  - name: createShipment
+    type: http
+    operation: POST
+    url: https://shipping-api.example.com/shipments
+  - name: sendNotification
+    type: http
+    operation: POST
+    url: https://notification-api.example.com/send
 ```
 
 ## 3. Implementing Order Validation
@@ -86,57 +79,51 @@ do:
 Add the order validation task to your workflow:
 
 ```yaml
-do:
-  - ValidateOrder:
-      try:
-        - ValidateOrderSchema:
-            call: validateOrderSchema
-            with:
-              schema:
-                type: object
-                required:
-                  - "orderId"
-                  - "customerId"
-                  - "items"
-                  - "shippingAddress"
-                properties:
-                  orderId:
-                    type: string
-                  customerId:
-                    type: string
-                  total:
-                    type: number
-                    minimum: 0.01
-                  items:
-                    type: array
-                    items:
-                      type: object
-                      required:
-                        - "productId"
-                        - "quantity"
-                        - "price"
-              data: ${ $workflow.input }
-      catch:
+tasks:
+  - name: ValidateOrder
+    type: try
+    retry:
+      maxAttempts: 1
+    catch:
+      - error: "*"
         as: validationError
-        then: HandleValidationError
-        retry:
-          limit:
-            attempt:
-              count: 1
-      then: CalculateTotal
-  - HandleValidationError:
-      set:
-        status: "REJECTED"
-        reason: ${ $context.validationError.message }
-        orderId: ${ $workflow.input.orderId }
-      then: SendRejectionNotification
-  - SendRejectionNotification:
-      call: sendNotification
-      with:
-        to: ${ $workflow.input.customerId }
-        subject: "Order Rejected"
-        message: '${ "Your order \($context.orderId) was rejected: \($context.reason)" }'
-      then: end
+        next: HandleValidationError
+    do:
+      - name: ValidateOrderSchema
+        type: call
+        function: validateOrderSchema
+        data:
+          schema:
+            type: object
+            required: ["orderId", "customerId", "items", "shippingAddress"]
+            properties:
+              orderId: { type: string }
+              customerId: { type: string }
+              total: { type: number, minimum: 0.01 }
+              items:
+                type: array
+                items:
+                  type: object
+                  required: ["productId", "quantity", "price"]
+          data: "$WORKFLOW.input"
+    next: CalculateTotal
+  
+  - name: HandleValidationError
+    type: set
+    data:
+      status: "REJECTED"
+      reason: "$WORKFLOW.validationError.message"
+      orderId: "$WORKFLOW.input.orderId"
+    next: SendRejectionNotification
+  
+  - name: SendRejectionNotification
+    type: call
+    function: sendNotification
+    data:
+      to: "$WORKFLOW.input.customerId"
+      subject: "Order Rejected"
+      message: "Your order $WORKFLOW.orderId was rejected: $WORKFLOW.reason"
+    end: true
 ```
 
 ## 4. Adding Business Logic and Payment Processing
@@ -144,96 +131,114 @@ do:
 Next, add the calculation and payment processing steps:
 
 ```yaml
-  - CalculateTotal:
-      set:
-        calculatedTotal: ${ { .items[] | .price * .quantity } | add }
-        isValid: ${ .calculatedTotal == .total }
-      then: CheckTotal
-  - CheckTotal:
-      switch:
-        - case1:
-            then: CheckInventory
-            when: ${ .isValid == true }
-        - default:
-            then: HandlePriceDiscrepancy
-  - HandlePriceDiscrepancy:
-      set:
-        status: "REJECTED"
-        reason: "Price discrepancy detected"
-        orderId: ${ .orderId }
-      then: SendRejectionNotification
-  - CheckInventory:
-      try:
-        - InventoryCheck:
-            call: checkInventory
-            with:
-              items: ${ .items[].productId }
-      catch:
-        as: failure
-        then: HandleInventoryError
-        retry:
-          limit:
-            attempt:
-              count: 3
-          delay: PT3S
-      then: CheckInventoryResult
-  - CheckInventoryResult:
-      switch:
-        - case1:
-            then: ProcessPayment
-            when: ${ .result.available == true }
-        - default:
-            then: HandleUnavailableInventory
-  - HandleUnavailableInventory:
-      set:
-        status: "REJECTED"
-        reason: "Some items are unavailable"
-        orderId: ${ .orderId }
-        unavailableItems: ${ .result.unavailableItems }
-      then: SendRejectionNotification
-  - HandleInventoryError:
-      set:
-        status: "ERROR"
-        reason: "Inventory service error"
-        orderId: ${ .orderId }
-      then: SendRejectionNotification
-  - ProcessPayment:
-      try:
-        - PaymentProcessing:
-            call: processPayment
-            with:
-              orderId: ${ .orderId }
-              customerId: ${ .customerId }
-              amount: ${ .total }
-              currency: "USD"
-      catch:
-        as: failure
-        then: HandlePaymentError
-        retry:
-          limit:
-            attempt:
-              count: 2
-          delay: PT5S
-      then: CheckPaymentResult
-  - CheckPaymentResult:
-      switch:
-        - case1:
-            then: CreateShipment
-            when: ${ .result.status == "APPROVED" }
-        - default:
-            then: HandlePaymentRejection
-  - HandlePaymentRejection:
-      set:
-        status: "PAYMENT_REJECTED"
-        reason: ${ .result.reason // "Payment was declined" }
-        orderId: ${ .orderId }
-      then: SendRejectionNotification
-  - HandlePaymentError:
-      set:
-        status: "ERROR"
-        reason: "Payment processing error"
-        orderId: ${ .orderId }
-      then: SendRejectionNotification
+  - name: CalculateTotal
+    type: set
+    data:
+      calculatedTotal: "{ .items[] | .price * .quantity } | add"
+      isValid: ".calculatedTotal == .total"
+    next: CheckTotal
+  
+  - name: CheckTotal
+    type: switch
+    conditions:
+      - condition: ".isValid == true"
+        next: CheckInventory
+      - condition: true
+        next: HandlePriceDiscrepancy
+  
+  - name: HandlePriceDiscrepancy
+    type: set
+    data:
+      status: "REJECTED"
+      reason: "Price discrepancy detected"
+      orderId: ".orderId"
+    next: SendRejectionNotification
+  
+  - name: CheckInventory
+    type: try
+    retry:
+      maxAttempts: 3
+      interval: PT3S
+      multiplier: 2
+      jitter: 0.3
+    catch:
+      - error: "*"
+        next: HandleInventoryError
+    do:
+      - name: InventoryCheck
+        type: call
+        function: checkInventory
+        data:
+          items: ".items[].productId"
+    next: CheckInventoryResult
+  
+  - name: CheckInventoryResult
+    type: switch
+    conditions:
+      - condition: ".result.available == true"
+        next: ProcessPayment
+      - condition: true
+        next: HandleUnavailableInventory
+  
+  - name: HandleUnavailableInventory
+    type: set
+    data:
+      status: "REJECTED"
+      reason: "Some items are unavailable"
+      orderId: ".orderId"
+      unavailableItems: ".result.unavailableItems"
+    next: SendRejectionNotification
+  
+  - name: HandleInventoryError
+    type: set
+    data:
+      status: "ERROR"
+      reason: "Inventory service error"
+      orderId: ".orderId"
+    next: SendRejectionNotification
+  
+  - name: ProcessPayment
+    type: try
+    retry:
+      maxAttempts: 2
+      interval: PT5S
+    catch:
+      - error: "*"
+        next: HandlePaymentError
+    do:
+      - name: PaymentProcessing
+        type: call
+        function: processPayment
+        data:
+          orderId: ".orderId"
+          customerId: ".customerId"
+          amount: ".total"
+          currency: "USD"
+    next: CheckPaymentResult
+  
+  - name: CheckPaymentResult
+    type: switch
+    conditions:
+      - condition: ".result.status == 'APPROVED'"
+        next: CreateShipment
+      - condition: true
+        next: HandlePaymentRejection
+  
+  - name: HandlePaymentRejection
+    type: set
+    data:
+      status: "PAYMENT_REJECTED"
+      reason: ".result.reason || 'Payment was declined'"
+      orderId: ".orderId"
+    next: SendRejectionNotification
+  
+  - name: HandlePaymentError
+    type: set
+    data:
+      status: "ERROR"
+      reason: "Payment processing error"
+      orderId: ".orderId"
+    next: SendRejectionNotification
 ```
 
 ## 5. Implementing Shipment and Notification
@@ -241,37 +246,41 @@ Next, add the calculation and payment processing steps:
 Finally, add the shipment and notification tasks:
 
 ```yaml
-  - CreateShipment:
-      try:
-        - ShipmentCreation:
-            call: createShipment
-            with:
-              orderId: ${ .orderId }
-              customerId: ${ .customerId }
-              items: ${ .items }
-              shippingAddress: ${ .shippingAddress }
-      catch:
-        as: failure
-        then: HandleShipmentError
-        retry:
-          limit:
-            attempt:
-              count: 3
-          delay: PT3S
-      then: SendConfirmationNotification
-  - HandleShipmentError:
-      set:
-        status: "ERROR"
-        reason: "Shipment creation error"
-        orderId: ${ .orderId }
-      then: SendRejectionNotification
-  - SendConfirmationNotification:
-      call: sendNotification
-      with:
-        to: ${ .customerId }
-        subject: "Order Confirmed"
-        message: ${ "Your order \(.orderId) has been confirmed and will be shipped to \(.shippingAddress)" }
-      then: end
+  - name: CreateShipment
+    type: try
+    retry:
+      maxAttempts: 3
+      interval: PT3S
+    catch:
+      - error: "*"
+        next: HandleShipmentError
+    do:
+      - name: ShipmentCreation
+        type: call
+        function: createShipment
+        data:
+          orderId: ".orderId"
+          customerId: ".customerId"
+          items: ".items"
+          shippingAddress: ".shippingAddress"
+    next: SendConfirmationNotification
+  
+  - name: HandleShipmentError
+    type: set
+    data:
+      status: "ERROR"
+      reason: "Shipment creation error"
+      orderId: ".orderId"
+    next: SendRejectionNotification
+  
+  - name: SendConfirmationNotification
+    type: call
+    function: sendNotification
+    data:
+      to: ".customerId"
+      subject: "Order Confirmed"
+      message: "Your order .orderId has been confirmed and will be shipped to .shippingAddress"
+    end: true
 ```
 
 ## 6. Testing the Workflow
@@ -312,8 +321,7 @@ Since this tutorial assumes external services, you can either:
 Run the workflow:
 
 ```bash
-bin/lemline definition post -f order-processing.yaml
-bin/lemline instance start examples order-processing --input "$(cat order.json)"
+java -jar lemline-runner.jar workflow run order-processing.yaml --input order.json
 ```
 
 ## 7. Database-Less Operation Analysis
@@ -342,57 +350,54 @@ In contrast, Lemline uses:
 Let's add an event correlation example to our workflow by modifying the shipment step to wait for a shipment confirmation:
 
 ```yaml
-  - CreateShipment:
-      try:
-        - ShipmentCreation:
-            call: createShipment
-            with:
-              orderId: ${ .orderId }
-              customerId: ${ .customerId }
-              items: ${ .items }
-              shippingAddress: ${ .shippingAddress }
-      catch:
-        as: failure
-        then: HandleShipmentError
-        retry:
-          limit:
-            attempt:
-              count: 3
-          delay: PT3S
-      then: WaitForShipmentConfirmation
-  - WaitForShipmentConfirmation:
-      try:
-        - WaitForShipmentConfirmationEvents:
-            listen:
-              to:
-                one:
-                  with:
-                    type: ShipmentConfirmed
-                  correlate:
-                    orderId:
-                      from: ${ .data.orderId }
-                      expect: ${ .orderId }
-            timeout:
-              after: PT1H
-      catch:
-        errors:
-          with:
-            status: 408
-        then: HandleShipmentTimeout
-      then: SendConfirmationNotification
-  - HandleShipmentTimeout:
-      set:
-        status: "PENDING"
-        reason: "Shipment is taking longer than expected, but will be processed"
-        orderId: ${ .orderId }
-      then: SendDelayNotification
-  - SendDelayNotification:
-      call: sendNotification
-      with:
-        to: ${ .customerId }
-        subject: "Order Processing Delayed"
-        message: ${ "Your order \(.orderId) is being processed, but shipment may take longer than expected" }
-      then: end
+  - name: CreateShipment
+    type: try
+    retry:
+      maxAttempts: 3
+      interval: PT3S
+    catch:
+      - error: "*"
+        next: HandleShipmentError
+    do:
+      - name: ShipmentCreation
+        type: call
+        function: createShipment
+        data:
+          orderId: ".orderId"
+          customerId: ".customerId"
+          items: ".items"
+          shippingAddress: ".shippingAddress"
+    next: WaitForShipmentConfirmation
+  
+  - name: WaitForShipmentConfirmation
+    type: listen
+    events:
+      - name: ShipmentConfirmed
+        type: ShipmentConfirmed
+        correlations:
+          - orderId = .orderId
+        consume: 1
+        timeouts:
+          eventTimeout: PT1H
+          eventTimeoutNext: HandleShipmentTimeout
+    next: SendConfirmationNotification
+  
+  - name: HandleShipmentTimeout
+    type: set
+    data:
+      status: "PENDING"
+      reason: "Shipment is taking longer than expected, but will be processed"
+      orderId: ".orderId"
+    next: SendDelayNotification
+  
+  - name: SendDelayNotification
+    type: call
+    function: sendNotification
+    data:
+      to: ".customerId"
+      subject: "Order Processing Delayed"
+      message: "Your order .orderId is being processed, but shipment may take longer than expected"
+    end: true
 ```
 
 This example demonstrates how Lemline handles event correlation - one of the few cases where a small amount of database state is actually beneficial.

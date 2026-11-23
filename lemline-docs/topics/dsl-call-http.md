@@ -13,7 +13,7 @@ The HTTP Call task enables workflows to interact with external services and APIs
 
 ```yaml
 document:
-  dsl: '1.0.3'
+  dsl: '1.0.0' # Assuming alpha5 or later based on reference example
   namespace: test
   name: http-example
   version: '0.1.0'
@@ -23,8 +23,8 @@ do:
       with:
         method: get
         # URI Template used here for dynamic petId
-        endpoint:
-          uri: https://petstore.swagger.io/v2/pet/{petId}
+        endpoint: 
+          uri: https://petstore.swagger.io/v2/pet/{petId} 
         headers:
           Accept: "application/json"
         # Assume petId is available in the task input or context
@@ -32,7 +32,7 @@ do:
       # Output by default is the deserialized response body 
       then: processPetData
   - processPetData:
-      set: ${ . }
+      # ... uses the pet data received in the response body ...
 ```
 
 ## Additional Examples

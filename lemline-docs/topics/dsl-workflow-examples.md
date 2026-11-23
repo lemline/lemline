@@ -26,48 +26,46 @@ This example demonstrates a straightforward workflow with minimal properties and
 
 ```yaml
 document:
-  dsl: '1.0.3'
-  namespace: com-example-orders
+  dsl: '1.0.0'
+  namespace: com.example.orders
   name: process-new-order
   version: '1.1.0'
   title: Process New Customer Order
-  summary: Workflow to validate, reserve inventory, and initiate payment for new orders.
+  description: Workflow to validate, reserve inventory, and initiate payment for new orders.
+
+# Define reusable function definitions
 use:
   functions:
-    validateOrderFunc:
-      call: http
-      with:
-        method: post
-        endpoint: https://order-service/validate
-        body: ${ .arguments }
-    checkInventoryFunc:
-      call: http
-      with:
-        method: post
-        endpoint: https://inventory-service/check
-        body: ${ .arguments }
-    processPaymentFunc:
-      call: http
-      with:
-        method: post
-        endpoint: https://payment-service/process
-        body: ${ .arguments }
+    - name: validateOrderFunc
+      operation: https://order-service/validate
+      type: rest
+    - name: checkInventoryFunc
+      operation: https://inventory-service/check
+      type: rest
+    - name: processPaymentFunc
+      operation: https://payment-service/process
+      type: rest
+
+# Main execution block with sequential tasks
 do:
   - validateOrder:
-      call: validateOrderFunc
+      call: function
       with:
+        function: validateOrderFunc
         arguments:
           order: "${ .inputOrder }"
       then: checkInventory
   - checkInventory:
-      call: checkInventoryFunc
+      call: function
       with:
+        function: checkInventoryFunc
         arguments:
           items: "${ .order.items }"
       then: processPayment
   - processPayment:
-      call: processPaymentFunc
+      call: function
       with:
+        function: processPaymentFunc
         arguments:
           amount: "${ .order.total }"
           customerId: "${ .order.customerId }"
@@ -88,52 +86,48 @@ This example shows a more sophisticated workflow that leverages the resource cat
 
 ```yaml
 document:
-  dsl: '1.0.3'
-  namespace: com-example-notifications
+  dsl: '1.0.0'
+  namespace: com.example.notifications
   name: customer-communication
   version: '2.0.0'
 
 # Reusable definitions in the resource catalog
-  metadata:
-    owner: "Customer Engagement Team"
-    reviewedDate: "2023-09-15"
-    priority: "high"
 use:
   secrets:
     - EMAIL_SERVICE_CLIENT_ID
     - EMAIL_SERVICE_CLIENT_SECRET
   # Function definitions
   functions:
-    sendEmailFunc:
-      call: http
-      with:
-        method: post
-        endpoint:
-          uri: https://email-service/send
-          authentication:
-            use: emailServiceAuth
-        body: ${ .arguments }
-    sendSmsFunc:
-      call: http
-      with:
-        method: post
-        endpoint: https://sms-service/send
-        body: ${ .arguments }
-  authentications:
-    emailServiceAuth:
-      oauth2:
-        authority: https://auth.example.com/token
-        grant: client_credentials
-        client:
-          id: "${ $secrets.EMAIL_SERVICE_CLIENT_ID }"
-          secret: "${ $secrets.EMAIL_SERVICE_CLIENT_SECRET }"
+    - name: sendEmailFunc
+      operation: https://email-service/send
+      type: rest
+    - name: sendSmsFunc
+      operation: https://sms-service/send
+      type: rest
+  
+  # Authentication definitions  
+  auth:
+    - name: emailServiceAuth
+      scheme: oauth2
+      properties:
+        grantType: client_credentials
+        tokenUrl: https://auth.example.com/token
+        clientId: "${ $secrets.EMAIL_SERVICE_CLIENT_ID }"
+        clientSecret: "${ $secrets.EMAIL_SERVICE_CLIENT_SECRET }"
+  
+  # Event definitions
+  events:
+    - name: CustomerSignupEvent
+      source: /customers/signup
+      type: com.example.customer.signup.v1
+
+# Event-based scheduling
 schedule:
-  on:
-    one:
-      with:
-        type: com.example.customer.signup.v1
-        source: /customers/signup
-  read: envelope
+  - when:
+      event: CustomerSignupEvent
+    start: sendWelcomePackage
+
+# Main execution block
 do:
   - sendWelcomePackage:
       set:
@@ -141,17 +135,16 @@ do:
       then: determineChannel
   - determineChannel:
       switch:
-        - case1:
-            when: "${ .customer.preferences.contactMethod == \"email\" }"
-            then: sendEmail
-        - case2:
-            when: "${ .customer.preferences.contactMethod == \"sms\" }"
-            then: sendSms
-        - default:
-            then: sendEmail
+        conditions:
+          - condition: "${ .customer.preferences.contactMethod == 'email' }"
+            transition: sendEmail
+          - condition: "${ .customer.preferences.contactMethod == 'sms' }"
+            transition: sendSms
+        default: sendEmail
   - sendEmail:
-      call: sendEmailFunc
+      call: function
       with:
+        function: sendEmailFunc
         auth: emailServiceAuth
         arguments:
           to: "${ .customer.email }"
@@ -160,13 +153,18 @@ do:
             name: "${ .customer.name }"
             accountType: "${ .customer.accountType }"
   - sendSms:
-      call: sendSmsFunc
+      call: function
       with:
+        function: sendSmsFunc
         arguments:
           to: "${ .customer.phone }"
           message: "Welcome to our service, ${ .customer.name }!"
 
 # Custom metadata
+metadata:
+  owner: "Customer Engagement Team"
+  reviewedDate: "2023-09-15"
+  priority: "high"
 ```
 
 ## Example 3: Workflow with Parallel Execution and Error Handling
@@ -185,87 +183,85 @@ This example illustrates a data processing workflow with parallel execution, com
 
 ```yaml
 document:
-  dsl: '1.0.3'
-  namespace: com-example-dataprocessing
+  dsl: '1.0.0'
+  namespace: com.example.dataprocessing
   name: batch-data-processor
   version: '1.0.0'
 
 # Define overall workflow timeout to ensure it doesn't run indefinitely
-timeout:
-  after:
-    minutes: 30
+timeout: 
+  minutes: 30
 
 do:
   - fetchData:
       call: http
       with:
         method: GET
-        endpoint: ${ "https://api.example.com/data/batch/\(.batchId)" }
+        url: https://api.example.com/data/batch/${ .batchId }
       then: processBatch
   - processBatch:
       # Process multiple data items concurrently
-      then: aggregateResults
-      for:
-        each: record
-        in: "${ .records }"
-      do:
-        - perform:
-            try:
-              - performAttempt:
-                  call: http
-                  with:
-                    method: POST
-                    body: "${ .record }"
-                    endpoint: https://processing-service.example.com/process
-            catch:
-              retry:
-                limit:
-                  attempt:
-                    count: 3
-                backoff:
-                  exponential: {}
-                delay:
-                  seconds: 1
-  - aggregateResults:
-      then: storeFinalResults
-      try:
-        - perform:
-            call: aggregateResultsFunc
-            with:
-              results: "${ .forkedResults }"
-        - cleanup:
-            call: cleanupTempDataFunc
-            with: {}
-      catch:
+      fork:
+        items: "${ .records }"
+        as: record
         do:
-          - perform:
-              call: logValidationErrorFunc
-              with:
-                error: "${ $error }"
-          - cleanup:
-              call: cleanupTempDataFunc
-              with: {}
-        then: notifyFailure
-        errors:
+          call: http
           with:
-            type: https://open-workflow-specification.org/spec/1.0.0/errors/validation
+            method: POST
+            url: https://processing-service.example.com/process
+            body: "${ .record }"
+          retry:
+            limit:
+              attempt.count: 3
+            backoff:
+              exponential:
+                initial: 
+                  seconds: 1
+                multiplier: 2
+                max:
+                  seconds: 8
+      then: aggregateResults
+  - aggregateResults:
+      try:
+        do:
+          call: function
+          with:
+            function: aggregateResultsFunc
+            arguments:
+              results: "${ .forkedResults }"
+        catch:
+          - error:
+              type: https://open-workflow-specification.org/spec/1.0.0/errors/validation
+            do:
+              call: function
+              with:
+                function: logValidationErrorFunc
+                arguments:
+                  error: "${ $error }"
+            then: notifyFailure
+        finally:
+          do:
+            call: function
+            with:
+              function: cleanupTempDataFunc
+      then: storeFinalResults
   - storeFinalResults:
-      call: storeResultsFunc
+      call: function
       with:
+        function: storeResultsFunc
         arguments:
           data: "${ .aggregatedData }"
           metadata:
             batchId: "${ .batchId }"
-            processedAt: "${ (now | todateiso8601) }"
+            processedAt: "${ $now() }"
   - notifyFailure:
       emit:
         event:
-          with:
-            type: com.example.batch.processing.failed
-            source: /data/processing
-            data:
-              batchId: "${ .batchId }"
-              error: "${ $error }"
+          type: com.example.batch.processing.failed
+          source: /data/processing
+          data: 
+            batchId: "${ .batchId }"
+            error: "${ $error }"
 ```
 
 > **Lemline runtime:** only `listen` task timeouts are enforced. Workflow-level timeouts and timeouts on other tasks are accepted but ignored for now. HTTP calls use fixed client limits instead: 15 seconds to connect, 30 seconds per request.
@@ -283,8 +279,8 @@ This example shows a simple maintenance workflow that runs on a time-based sched
 
 ```yaml
 document:
-  dsl: '1.0.3'
-  namespace: com-example-maintenance
+  dsl: '1.0.0'
+  namespace: com.example.maintenance
   name: daily-cleanup
   version: '1.0.0'
 
@@ -294,19 +290,15 @@ schedule:
 
 do:
   - cleanupTempFiles:
-      run:
-        container:
-          image: maintenance-tools:v1.2
-          command: "/bin/cleanup.sh"
-          arguments:
-            - "--older-than"
-            - "7d"
-            - "--dir"
-            - "/tmp"
+      run: container
+      with:
+        image: maintenance-tools:v1.2
+        command: ["/bin/cleanup.sh", "--older-than", "7d", "--dir", "/tmp"]
       then: sendReport
   - sendReport:
-      call: sendReportEmailFunc
+      call: function
       with:
+        function: sendReportEmailFunc
         arguments:
           report: "${ .result }"
           recipients: ["admin@example.com"]
@@ -325,30 +317,29 @@ This example demonstrates a workflow with input validation, transformation, and 
 
 ```yaml
 document:
-  dsl: '1.0.3'
-  namespace: com-example-payments
+  dsl: '1.0.0'
+  namespace: com.example.payments
   name: process-payment
   version: '1.0.0'
 
 # Input validation and transformation
 input:
   schema:
-    document:
-      type: object
-      required: ["paymentId", "amount", "currency"]
-      properties:
-        paymentId:
-          type: string
-          pattern: "^PAY-[A-Z0-9]{12}$"
-        amount:
-          type: number
-          minimum: 0.01
-        currency:
-          type: string
-          enum: ["USD", "EUR", "GBP"]
-        metadata:
-          type: object
-  from: "${ {paymentId: .paymentId, amount: .amount, currency: .currency, timestamp: (now | todateiso8601)} }"
+    type: object
+    required: ["paymentId", "amount", "currency"]
+    properties:
+      paymentId:
+        type: string
+        pattern: "^PAY-[A-Z0-9]{12}$"
+      amount:
+        type: number
+        minimum: 0.01
+      currency:
+        type: string
+        enum: ["USD", "EUR", "GBP"]
+      metadata:
+        type: object
+  from: "${ {paymentId: .paymentId, amount: .amount, currency: .currency, timestamp: $now()} }"
 
 # Output transformation
 output:
@@ -356,39 +347,39 @@ output:
 
 do:
   - validatePayment:
-      then: processPayment
       try:
-        - perform:
-            call: validatePaymentFunc
-            with:
-              payment: "${ . }"
-      catch:
         do:
-          - perform:
+          call: function
+          with:
+            function: validatePaymentFunc
+            arguments:
+              payment: "${ . }"
+        catch:
+          - error:
+              type: https://open-workflow-specification.org/spec/1.0.0/errors/validation
+            do:
               set:
                 status: "REJECTED"
                 reason: "${ $error.detail }"
               then: end
-        errors:
-          with:
-            type: https://open-workflow-specification.org/spec/1.0.0/errors/validation
+      then: processPayment
   - processPayment:
-      call: processPaymentFunc
+      call: function
       with:
+        function: processPaymentFunc
         arguments:
           paymentId: "${ .paymentId }"
           amount: "${ .amount }"
           currency: "${ .currency }"
       then: generateReceipt
   - generateReceipt:
-      do:
-        - invoke:
-            call: generateReceiptFunc
-            with:
-              arguments:
-                payment: "${ . }"
-        - finish:
-            set:
-              status: "COMPLETED"
-              receiptUrl: "${ .receiptUrl }"
+      call: function
+      with:
+        function: generateReceiptFunc
+        arguments:
+          payment: "${ . }"
+      then:
+        set:
+          status: "COMPLETED"
+          receiptUrl: "${ .receiptUrl }"
 ```

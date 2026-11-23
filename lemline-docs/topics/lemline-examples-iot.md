@@ -11,7 +11,7 @@ This example demonstrates a workflow for provisioning new IoT devices, including
 
 ```yaml
 document:
-  dsl: 1.0.3
+  dsl: 1.0.0
   namespace: iot
   name: device-provisioning
   version: 1.0.0
@@ -42,9 +42,8 @@ do:
             call: http
             with:
               method: get
-              endpoint: ${ "https://iot-registry.example/api/devices/\(.deviceId)" }
-            timeout:
-              after:
+              endpoint: https://iot-registry.example/api/devices/${.deviceId}
+              timeout:
                 seconds: 5
       catch:
         errors:
@@ -63,11 +62,10 @@ do:
                   deviceType: ${ .deviceType }
                   location: ${ .location }
                   status: "provisioning"
+                output: deviceRegistry
               export:
-                as: '${ $context + { deviceRegistry: .deviceRegistry } }'
+                as: '$context + { deviceRegistry: .deviceRegistry }'
 
-              output:
-                as: '${ $input + { "deviceRegistry": . } }'
   - generateCredentials:
       try:
         - createCredentials:
@@ -78,10 +76,9 @@ do:
               body:
                 deviceId: ${ .deviceId }
                 deviceType: ${ .deviceType }
+              output: credentials
             export:
-              as: '${ $context + { credentials: .credentials } }'
-            output:
-              as: '${ $input + { "credentials": . } }'
+              as: '$context + { credentials: .credentials }'
       catch:
         errors:
           with:
@@ -104,8 +101,7 @@ do:
                 deviceId: ${ .deviceId }
                 deviceType: ${ .deviceType }
                 location: ${ .location }
-            output:
-              as: '${ $input + { "deviceConfig": . } }'
+              output: deviceConfig
         - createDigitalTwin:
             call: http
             with:
@@ -118,8 +114,8 @@ do:
                   location: ${ .location }
                   firmware: "1.0.0"
                   status: "provisioning"
-            output:
-              as: '${ $input + { "digitalTwin": . } }'
+              output: digitalTwin
+
   - activateDevice:
       call: asyncapi
       with:
@@ -141,17 +137,16 @@ do:
             with:
               type: com.example.iot.device.activated
               correlationId: ${ .deviceId }
+        for:
+          minutes: 15
       output:
         as: activationResult
 
-      timeout:
-        after:
-          minutes: 15
   - finalizeProvisioning:
       call: http
       with:
         method: patch
-        endpoint: ${ "https://iot-registry.example/api/devices/\(.deviceId)" }
+        endpoint: https://iot-registry.example/api/devices/${.deviceId}
         body:
           status: "active"
           lastPing: ${ .activationResult.timestamp }
@@ -165,7 +160,7 @@ This example shows how to implement real-time telemetry processing from IoT devi
 
 ```yaml
 document:
-  dsl: 1.0.3
+  dsl: 1.0.0
   namespace: iot
   name: telemetry-processing
   version: 1.0.0
@@ -187,27 +182,26 @@ do:
                   with:
                     method: post
                     endpoint: https://iot-validator.example/api/validate
-                    body: '${ $telemetry }'
-                  output:
-                    as: '${ $input + { "validationResult": . } }'
+                    body: ${ $telemetry }
+                    output: validationResult
             catch:
-              errors:
-                with:
-                  type: https://example.com/errors/validation
-              as: validationError
-              do:
-                - logInvalidTelemetry:
-                    call: http
-                    with:
-                      method: post
-                      endpoint: https://logging.example/api/log
-                      body:
-                        level: "warning"
-                        message: "Invalid telemetry received"
-                        deviceId: '${ $telemetry.deviceId }'
-                        error: '${ $validationError }'
-              then: exit
-
+              - errors:
+                  with:
+                    type: https://example.com/errors/validation
+                as: validationError
+                do:
+                  - logInvalidTelemetry:
+                      call: http
+                      with:
+                        method: post
+                        endpoint: https://logging.example/api/log
+                        body:
+                          level: "warning"
+                          message: "Invalid telemetry received"
+                          deviceId: ${ $telemetry.deviceId }
+                          error: ${ $validationError }
+                  then: exit
+        
         - processValidTelemetry:
             do:
               - transformTelemetry:
@@ -215,27 +209,25 @@ do:
                   with:
                     method: post
                     endpoint: https://iot-transformer.example/api/transform
-                    body: '${ $telemetry }'
-                  output:
-                    as: '${ $input + { "transformedData": . } }'
+                    body: ${ $telemetry }
+                    output: transformedData
               - updateTwin:
                   call: http
                   with:
                     method: patch
-                    endpoint: ${ "https://digital-twins.example/api/twins/\($telemetry.deviceId)/state" }
-                    body: '${ .transformedData.state }'
+                    endpoint: https://digital-twins.example/api/twins/${$telemetry.deviceId}/state
+                    body: ${ .transformedData.state }
               - detectAnomalies:
                   call: http
                   with:
                     method: post
                     endpoint: https://iot-analytics.example/api/anomaly-detection
-                    body: '${ .transformedData }'
-                  output:
-                    as: '${ $input + { "anomalyResult": . } }'
+                    body: ${ .transformedData }
+                    output: anomalyResult
               - processAnomaly:
                   switch:
                     - anomalyDetected:
-                        when: '${ .anomalyResult.anomalyDetected == true }'
+                        when: ${ .anomalyResult.anomalyDetected == true }
                         then: handleAnomaly
                     - default:
                         then: storeTelemetry
@@ -248,45 +240,39 @@ do:
               method: post
               endpoint: https://alerts.example/api/alerts
               body:
-                deviceId: '${ $telemetry.deviceId }'
-                severity: '${ .anomalyResult.severity }'
-                type: '${ .anomalyResult.type }'
-                value: '${ .anomalyResult.value }'
-                threshold: '${ .anomalyResult.threshold }'
-                timestamp: '${ $telemetry.timestamp }'
+                deviceId: ${ $telemetry.deviceId }
+                severity: ${ .anomalyResult.severity }
+                type: ${ .anomalyResult.type }
+                value: ${ .anomalyResult.value }
+                threshold: ${ .anomalyResult.threshold }
+                timestamp: ${ $telemetry.timestamp }
         - notifyOperators:
             switch:
               - criticalAnomaly:
-                  when: '${ .anomalyResult.severity == "critical" }'
-                  then: notifyOperators-criticalAnomaly
+                  when: ${ .anomalyResult.severity == "critical" }
+                  then:
+                    do:
+                      - sendUrgentNotification:
+                          call: http
+                          with:
+                            method: post
+                            endpoint: https://notifications.example/api/notify
+                            body:
+                              channel: "sms"
+                              recipients: ${ .anomalyResult.responsibleOperators }
+                              message: "CRITICAL ALERT: Device ${$telemetry.deviceId} reported anomalous value ${.anomalyResult.value}"
               - default:
-                  then: notifyOperators-default
-        - notifyOperators-criticalAnomaly:
-            do:
-              - sendUrgentNotification:
-                  call: http
-                  with:
-                    method: post
-                    endpoint: https://notifications.example/api/notify
-                    body:
-                      channel: "sms"
-                      recipients: '${ .anomalyResult.responsibleOperators }'
-                      message: "CRITICAL ALERT: Device ${$telemetry.deviceId} reported anomalous value ${.anomalyResult.value}"
-            then: notifyOperators-done
-        - notifyOperators-default:
-            do:
-              - sendStandardNotification:
-                  call: http
-                  with:
-                    method: post
-                    endpoint: https://notifications.example/api/notify
-                    body:
-                      channel: "email"
-                      recipients: '${ .anomalyResult.responsibleOperators }'
-                      message: "ALERT: Device ${$telemetry.deviceId} reported anomalous value ${.anomalyResult.value}"
-            then: notifyOperators-done
-        - notifyOperators-done:
-            set: ${ . }
+                  then:
+                    do:
+                      - sendStandardNotification:
+                          call: http
+                          with:
+                            method: post
+                            endpoint: https://notifications.example/api/notify
+                            body:
+                              channel: "email"
+                              recipients: ${ .anomalyResult.responsibleOperators }
+                              message: "ALERT: Device ${$telemetry.deviceId} reported anomalous value ${.anomalyResult.value}"
       then: storeTelemetry
 
   - storeTelemetry:
@@ -294,7 +280,7 @@ do:
       with:
         method: post
         endpoint: https://iot-storage.example/api/telemetry
-        body: '${ .transformedData }'
+        body: ${ .transformedData }
 ```
 
 ## Firmware Update Workflow
@@ -303,7 +289,7 @@ This example demonstrates a workflow for managing firmware updates across a flee
 
 ```yaml
 document:
-  dsl: 1.0.3
+  dsl: 1.0.0
   namespace: iot
   name: firmware-update
   version: 1.0.0
@@ -325,17 +311,17 @@ do:
       call: http
       with:
         method: get
-        endpoint: ${ "https://firmware.example/api/firmware/\(.firmwareVersion)" }
-      output:
-        as: '${ $input + { "firmwareDetails": . } }'
+        endpoint: https://firmware.example/api/firmware/${.firmwareVersion}
+        output: firmwareDetails
+
   - findEligibleDevices:
       call: http
       with:
         method: post
         endpoint: https://iot-registry.example/api/devices/query
         body: ${ .deviceQuery }
-      output:
-        as: '${ $input + { "eligibleDevices": . } }'
+        output: eligibleDevices
+
   - createUpdateCampaign:
       call: http
       with:
@@ -346,17 +332,15 @@ do:
           description: "Deploying firmware version ${.firmwareVersion} to ${length(.eligibleDevices.devices)} devices"
           firmwareId: ${ .firmwareDetails.id }
           devices: ${ .eligibleDevices.devices }
+        output: campaign
       export:
-        as: '${ $context + { campaignId: .campaign.id } }'
+        as: '$context + { campaignId: .campaign.id }'
 
-      output:
-        as: '${ $input + { "campaign": . } }'
   - scheduleBatchedUpdates:
       do:
         - createBatches:
             set:
-              batches: ${ .eligibleDevices.devices as $items | [range(0; ($items | length); 50) as $i |
-                $items[$i:$i+50]] }
+              batches: ${ chunk(.eligibleDevices.devices, 50) }
         - processBatches:
             for:
               in: "${ .batches }"
@@ -382,22 +366,20 @@ do:
                     - waitForBatchCompletion:
                         listen:
                           to:
-                            any:
-                              - with:
-                                  type: com.example.iot.firmware.status
-                                  data: '${ .campaignId == $context.campaignId and (.deviceId as $id | $batch | index($id)
-                                    != null) }'
-                            until: ${ length >= (($batch | length)) }
+                            all:
+                              with:
+                                type: com.example.iot.firmware.status
+                                filter: '${ .campaignId == $context.campaignId and $batch contains .deviceId }'
+                              expect: ${ length($batch) }
+                          for:
+                            hours: 2
                         output:
                           as: batchResults
-                        timeout:
-                          after:
-                            hours: 2
                     - updateCampaignProgress:
                         call: http
                         with:
                           method: patch
-                          endpoint: ${ "https://iot-campaigns.example/api/campaigns/\($context.campaignId)/progress" }
+                          endpoint: https://iot-campaigns.example/api/campaigns/${$context.campaignId}/progress
                           body:
                             batchIndex: ${ $batchIndex }
                             results: ${ .batchResults }
@@ -406,10 +388,10 @@ do:
       call: http
       with:
         method: patch
-        endpoint: ${ "https://iot-campaigns.example/api/campaigns/\($context.campaignId)" }
+        endpoint: https://iot-campaigns.example/api/campaigns/${$context.campaignId}
         body:
           status: "completed"
-          completedAt: ${ now }
+          completedAt: ${ now() }
 ```
 
 ## Predictive Maintenance Workflow
@@ -418,7 +400,7 @@ This example shows a workflow for implementing predictive maintenance based on I
 
 ```yaml
 document:
-  dsl: 1.0.3
+  dsl: 1.0.0
   namespace: iot
   name: predictive-maintenance
   version: 1.0.0
@@ -432,10 +414,10 @@ do:
         endpoint: https://iot-analytics.example/api/health-metrics
         body:
           timeRange:
-            from: '${ (now - 604800) | todateiso8601 }'
-            to: '${ now }'
-      output:
-        as: '${ $input + { "deviceHealthData": . } }'
+            from: ${ dateTimeSubtract(now(), { days: 7 }) }
+            to: ${ now() }
+        output: deviceHealthData
+
   - analyzeMaintenance:
       for:
         in: "${ .deviceHealthData.devices }"
@@ -446,16 +428,15 @@ do:
             with:
               method: post
               endpoint: https://iot-ml.example/api/predict-maintenance
-              body: '${ $device }'
-            output:
-              as: '${ $input + { "prediction": . } }'
+              body: ${ $device }
+              output: prediction
         - handlePrediction:
             switch:
               - maintenanceNeeded:
-                  when: '${ .prediction.probabilityOfFailure > 0.7 }'
+                  when: ${ .prediction.probabilityOfFailure > 0.7 }
                   then: scheduleMaintenance
               - maintenanceWarning:
-                  when: '${ .prediction.probabilityOfFailure > 0.4 }'
+                  when: ${ .prediction.probabilityOfFailure > 0.4 }
                   then: issueMaintanenceWarning
               - default:
                   then: log
@@ -468,13 +449,12 @@ do:
               method: post
               endpoint: https://maintenance.example/api/tickets
               body:
-                deviceId: '${ $device.id }'
-                priority: '${ if .prediction.probabilityOfFailure > 0.9 then "high" else "medium" end }'
-                estimatedFailureDate: '${ .prediction.estimatedFailureDate }'
-                components: '${ .prediction.affectedComponents }'
-                recommendation: '${ .prediction.recommendedAction }'
-            output:
-              as: '${ $input + { "ticket": . } }'
+                deviceId: ${ $device.id }
+                priority: ${ .prediction.probabilityOfFailure > 0.9 ? "high" : "medium" }
+                estimatedFailureDate: ${ .prediction.estimatedFailureDate }
+                components: ${ .prediction.affectedComponents }
+                recommendation: ${ .prediction.recommendedAction }
+              output: ticket
         - notifyMaintenance:
             call: http
             with:
@@ -483,13 +463,13 @@ do:
               body:
                 channel: "email"
                 template: "maintenance_required"
-                recipients: '${ $device.responsibleParties }'
+                recipients: ${ $device.responsibleParties }
                 data:
-                  deviceId: '${ $device.id }'
-                  deviceName: '${ $device.name }'
-                  location: '${ $device.location }'
-                  failureProbability: '${ "\(.prediction.probabilityOfFailure * 100)%" }'
-                  ticketId: '${ .ticket.id }'
+                  deviceId: ${ $device.id }
+                  deviceName: ${ $device.name }
+                  location: ${ $device.location }
+                  failureProbability: ${ formatPercent(.prediction.probabilityOfFailure) }
+                  ticketId: ${ .ticket.id }
 
   - issueMaintanenceWarning:
       call: http
@@ -499,13 +479,13 @@ do:
         body:
           channel: "email"
           template: "maintenance_warning"
-          recipients: '${ $device.responsibleParties }'
+          recipients: ${ $device.responsibleParties }
           data:
-            deviceId: '${ $device.id }'
-            deviceName: '${ $device.name }'
-            location: '${ $device.location }'
-            failureProbability: '${ "\(.prediction.probabilityOfFailure * 100)%" }'
-            recommendation: '${ .prediction.recommendedAction }'
+            deviceId: ${ $device.id }
+            deviceName: ${ $device.name }
+            location: ${ $device.location }
+            failureProbability: ${ formatPercent(.prediction.probabilityOfFailure) }
+            recommendation: ${ .prediction.recommendedAction }
 
   - log:
       call: http
@@ -515,8 +495,8 @@ do:
         body:
           level: "info"
           message: "Device health check completed"
-          deviceId: '${ $device.id }'
-          failureProbability: '${ .prediction.probabilityOfFailure }'
+          deviceId: ${ $device.id }
+          failureProbability: ${ .prediction.probabilityOfFailure }
 ```
 
 ## Energy Optimization Workflow
@@ -525,7 +505,7 @@ This example demonstrates a workflow for optimizing energy usage in smart buildi
 
 ```yaml
 document:
-  dsl: 1.0.3
+  dsl: 1.0.0
   namespace: iot
   name: energy-optimization
   version: 1.0.0
@@ -542,34 +522,32 @@ do:
               query:
                 lat: ${ .buildingLocation.latitude }
                 lng: ${ .buildingLocation.longitude }
-            output:
-              as: '${ $input + { "weatherForecast": . } }'
+              output: weatherForecast
         - getBuildingOccupancy:
             call: http
             with:
               method: get
-              endpoint: ${ "https://occupancy.example/api/buildings/\(.buildingId)/current" }
-            output:
-              as: '${ $input + { "occupancyData": . } }'
+              endpoint: https://occupancy.example/api/buildings/${.buildingId}/current
+              output: occupancyData
         - getEnergyPricing:
             call: http
             with:
               method: get
               endpoint: https://energy.example/api/pricing/forecast
               query:
-                hours: '24'
-            output:
-              as: '${ $input + { "energyPricing": . } }'
+                hours: 24
+              output: energyPricing
+
   - retrieveSensorReadings:
       call: http
       with:
         method: get
-        endpoint: ${ "https://iot-platform.example/api/buildings/\(.buildingId)/sensors" }
+        endpoint: https://iot-platform.example/api/buildings/${.buildingId}/sensors
         query:
           types: "temperature,humidity,co2,motion"
-          minutes: '30'
-      output:
-        as: '${ $input + { "sensorReadings": . } }'
+          minutes: 30
+        output: sensorReadings
+
   - optimizeEnergyUsage:
       call: http
       with:
@@ -581,8 +559,8 @@ do:
           occupancy: ${ .occupancyData }
           energyPricing: ${ .energyPricing }
           sensorReadings: ${ .sensorReadings }
-      output:
-        as: '${ $input + { "optimizationPlan": . } }'
+        output: optimizationPlan
+
   - applyOptimizations:
       do:
         - updateHVACSettings:
@@ -615,17 +593,16 @@ do:
   - monitorEnergyImpact:
       listen:
         to:
-          any:
-            - with:
-                type: com.example.iot.settings.applied
-                data: '${ .buildingId == $context.buildingId }'
-          until: ${ length >= (2) }
+          all:
+            with:
+              type: com.example.iot.settings.applied
+              filter: '${ .buildingId == $context.buildingId }'
+            expect: 2  # HVAC and lighting confirmations
+        for:
+          minutes: 5
       output:
         as: confirmations
 
-      timeout:
-        after:
-          minutes: 5
   - recordOptimizationResults:
       call: http
       with:
@@ -633,7 +610,7 @@ do:
         endpoint: https://energy-analytics.example/api/optimizations
         body:
           buildingId: ${ .buildingId }
-          timestamp: ${ now }
+          timestamp: ${ now() }
           optimizationPlan: ${ .optimizationPlan }
           estimatedSavings: ${ .optimizationPlan.estimatedSavings }
           confirmations: ${ .confirmations }

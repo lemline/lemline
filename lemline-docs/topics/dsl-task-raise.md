@@ -20,7 +20,7 @@ Here's an example of raising a custom error based on input data:
 
 ```yaml
 document:
-  dsl: '1.0.3'
+  dsl: '1.0.0'
   namespace: examples
   name: raise-basic
   version: '1.0.0'
@@ -36,8 +36,8 @@ do:
       if: "${ .value < 0 }" # Check if input value is negative
       raise:
         error: invalidInputError # Reference the defined error
-  - processValue:
-      set: ${ . }
+  - processValue: # Only executed if value >= 0
+    # ...
 ```
 
 In this example, if the `validateInput` task receives an input object where `.value` is less than 0, it raises the
@@ -75,7 +75,8 @@ do:
           title: "Item Processing Failed"
           status: 500
           # Construct detail dynamically using workflow context/input
-          detail: "${ \"Failed to process item ID \\(.itemId). Error code: \\($context.errorCodeFromPreviousStep)\" }"
+          detail: "Failed to process item ID ${ .itemId }. Error code: ${ $context.errorCodeFromPreviousStep }"
+          instance: "${ $task.reference }" # Include task path for context
 ```
 
 This example shows how to define an error completely inline, using runtime expressions within the `detail` and `instance` fields to provide context-specific information when the error is raised.
@@ -91,17 +92,17 @@ do:
             # This error will be caught by the 'catch' block below
             raise:
               error: specialHandlingRequiredError # Defined in workflow.use.errors
-        - normalProcessing:
-            set: ${ . }
+        - normalProcessing: # Skipped if error was raised
+            # ...
       catch:
         errors:
-          with: {type: "https://myapp.com/errors/special-handling"}   # Matches the type from specialHandlingRequiredError
+          with: { type: "https://myapp.com/errors/special-handling" } # Matches the type from specialHandlingRequiredError
         do:
           - handleSpecialCase:
-              set: ${ . }
+              # ... logic for the special case ...
       then: continueAfterTry
   - continueAfterTry:
-      set: ${ . }
+      # ... 
 ```
 
 Here, the `riskyOperation` might raise a specific error. The surrounding `Try` task is configured to `catch` errors of that specific type (`specialHandlingRequiredError` presumably has the type `https://myapp.com/errors/special-handling`). Instead of faulting the workflow, control transfers to the `catch.do` block (`handleSpecialCase`).

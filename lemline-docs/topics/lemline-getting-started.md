@@ -88,7 +88,7 @@ Create a file named `hello.yaml` with the following content:
 
 ```yaml
 document:
-  dsl: '1.0.3'
+  dsl: '1.0.0'
   namespace: examples
   name: hello-workflow
   version: '0.1.0'
@@ -136,7 +136,7 @@ For a more useful example, try creating a workflow that makes an HTTP request:
 
 ```yaml
 document:
-  dsl: '1.0.3'
+  dsl: '1.0.0'
   namespace: examples
   name: http-workflow
   version: '0.1.0'

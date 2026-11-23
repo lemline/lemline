@@ -84,12 +84,13 @@ Custom error types can be defined in workflow definitions:
 ```yaml
 use:
   errors:
-    "paymentDeclined":
+    - name: "paymentDeclined"
       type: "https://example.com/errors/payment-declined"
       status: 400
       title: "Payment Method Declined"
-      detail: "The payment processor rejected the transaction"
-    "inventoryShortage":
+      details: "The payment processor rejected the transaction"
+    
+    - name: "inventoryShortage"
       type: "https://example.com/errors/inventory-shortage"
       status: 409
       title: "Insufficient Inventory"
@@ -100,18 +101,19 @@ use:
 ### Basic Try-Catch
 
 ```yaml
-  - secureOperation:
-      try:
+- secureOperation:
+    try:
+      do:
         - riskyTask:
-            set: ${ . }
+            # Task that might fail
       catch:
-        as: "timeoutError"
-        do:
-          - handleTimeout:
-              set: ${ . }
-        errors:
-          with:
-            type: "https://open-workflow-specification.org/spec/1.0.0/errors/timeout"
+        - error:
+            with:
+              type: "https://open-workflow-specification.org/spec/1.0.0/errors/timeout"
+            as: "timeoutError"
+          do:
+            - handleTimeout:
+                # Error handling tasks
 ```
 
 ### Matching Multiple Error Types
@@ -137,16 +139,17 @@ catch:
 
 ```yaml
 try:
-  - passInput:
-      set: ${ . }
-catch:
   retry:
-    limit:
-      attempt:
-        count: 3
-    delay: PT1S
-    backoff:
-      exponential: {}
+    policy:
+      strategy: backoff
+      backoff:
+        delay: PT1S
+        multiplier: 2
+      limit:
+        attempt:
+          count: 3
+      when: "${ .error.status >= 500 }"
+  do:
     # Tasks that might temporarily fail
 ```
 

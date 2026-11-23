@@ -41,27 +41,27 @@ To use an OpenAPI-defined service in Lemline, you need to:
 Here's a basic example:
 
 ```yaml
-use:
-  functions:
-    petStoreService:
-      call: openapi
-      with:
-        document:
-          endpoint: https://petstore3.swagger.io/api/v3/openapi.json
-        operationId: getPetById
-        parameters: {}
-do:
-  - GetPet:
-      call: petStoreService
-      with:
-        petId: 123
-      then: ProcessPetData
-  - ProcessPetData:
-      set:
-        petName: ${ .name }
-        petStatus: ${ .status }
-        message: ${ "Pet \(.name) is currently \(.status)" }
-      then: NextTask
+functions:
+  - name: petStoreService
+    type: openapi
+    specification: https://petstore3.swagger.io/api/v3/openapi.json
+    operation: getPetById
+
+tasks:
+  - name: GetPet
+    type: call
+    function: petStoreService
+    data:
+      petId: 123
+    next: ProcessPetData
+  
+  - name: ProcessPetData
+    type: set
+    data:
+      petName: ".name"
+      petStatus: ".status"
+      message: "Pet .name is currently .status"
+    next: NextTask
 ```
 
 ## Referencing OpenAPI Specifications
@@ -71,15 +71,11 @@ do:
 You can reference an external OpenAPI specification using a URL:
 
 ```yaml
-use:
-  functions:
-    weatherService:
-      call: openapi
-      with:
-        document:
-          endpoint: https://api.weather.com/openapi.json
-        operationId: getCurrentWeather
-        parameters: {}
+functions:
+  - name: weatherService
+    type: openapi
+    specification: https://api.weather.com/openapi.json
+    operation: getCurrentWeather
 ```
 
 ### Local Specification Files
@@ -87,40 +83,41 @@ use:
 You can also reference a local file containing the OpenAPI specification:
 
 ```yaml
-use:
-  functions:
-    internalService:
-      call: openapi
-      with:
-        document:
-          endpoint: file:///path/to/api-spec.yaml
-        operationId: getStatus
-        parameters: {}
+functions:
+  - name: internalService
+    type: openapi
+    specification: file:///path/to/api-spec.yaml
+    operation: getStatus
 ```
 
-### OpenAPI Document
+### Embedded Specifications
 
-Save the OpenAPI document as a separate resource and reference it through `with.document.endpoint`. For example, the following OpenAPI document defines the `getStatus` operation.
+For smaller APIs or testing, you can embed the specification directly:
 
 ```yaml
-openapi: "3.0.0"
-info:
-  title: "Simple API"
-  version: "1.0.0"
-paths:
-  /status:
-    get:
-      operationId: getStatus
-      responses:
-        '200':
-          description: "Status response"
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  status:
-                    type: string
+functions:
+  - name: simpleService
+    type: openapi
+    specification:
+      openapi: "3.0.0"
+      info:
+        title: "Simple API"
+        version: "1.0.0"
+      paths:
+        /status:
+          get:
+            operationId: getStatus
+            responses:
+              '200':
+                description: "Status response"
+                content:
+                  application/json:
+                    schema:
+                      type: object
+                      properties:
+                        status:
+                          type: string
+    operation: getStatus
 ```
 
 ## Selecting Operations
@@ -130,32 +127,25 @@ paths:
 The preferred way to select an operation is using the `operationId` from the specification:
 
 ```yaml
-use:
-  functions:
-    userService:
-      call: openapi
-      with:
-        document:
-          endpoint: https://api.example.com/openapi.json
-        operationId: getUserById
-        parameters: {}
+functions:
+  - name: userService
+    type: openapi
+    specification: https://api.example.com/openapi.json
+    operation: getUserById
 ```
 
-### Identifying a Product Operation
+### By Path and Method
 
-Give the operation an ID in the OpenAPI document and pass the path parameter by name.
+If `operationId` is not available, you can specify the path and method:
 
 ```yaml
-use:
-  functions:
-    productService:
-      call: openapi
-      with:
-        document:
-          endpoint: https://api.example.com/openapi.json
-        operationId: getProduct
-        parameters:
-          productId: ${ .productId }
+functions:
+  - name: productService
+    type: openapi
+    specification: https://api.example.com/openapi.json
+    operation:
+      path: /products/{productId}
+      method: GET
 ```
 
 ## Making API Calls with Parameters
@@ -165,11 +155,12 @@ use:
 Path parameters are specified directly in the `data` section:
 
 ```yaml
-  - GetUserDetails:
-      call: userService
-      with:
-        userId: ${ .userId }
-      then: ProcessUserData
+- name: GetUserDetails
+  type: call
+  function: userService
+  data:
+    userId: ".userId"  # Matches {userId} in the path
+  next: ProcessUserData
 ```
 
 ### Query Parameters
@@ -177,15 +168,16 @@ Path parameters are specified directly in the `data` section:
 Query parameters are specified in the `query` field:
 
 ```yaml
-  - SearchProducts:
-      call: productSearch
-      with:
-        query:
-          category: ${ .productCategory }
-          minPrice: ${ .priceRange.min }
-          maxPrice: ${ .priceRange.max }
-          sort: "price"
-      then: ProcessSearchResults
+- name: SearchProducts
+  type: call
+  function: productSearch
+  data:
+    query:
+      category: ".productCategory"
+      minPrice: ".priceRange.min"
+      maxPrice: ".priceRange.max"
+      sort: "price"
+  next: ProcessSearchResults
 ```
 
 ### Request Body
@@ -193,21 +185,22 @@ Query parameters are specified in the `query` field:
 For operations that require a request body:
 
 ```yaml
-  - CreateOrder:
-      call: orderService
-      with:
-        body:
-          customerId: ${ .customerId }
-          items:
-            - productId: ${ .items[0].id }
-              quantity: ${ .items[0].quantity }
-            - productId: ${ .items[1].id }
-              quantity: ${ .items[1].quantity }
-          shippingAddress:
-            street: ${ .shippingAddress.street }
-            city: ${ .shippingAddress.city }
-            zipCode: ${ .shippingAddress.zipCode }
-      then: ProcessOrderResponse
+- name: CreateOrder
+  type: call
+  function: orderService
+  data:
+    body:
+      customerId: ".customerId"
+      items:
+        - productId: ".items[0].id"
+          quantity: ".items[0].quantity"
+        - productId: ".items[1].id"
+          quantity: ".items[1].quantity"
+      shippingAddress:
+        street: ".shippingAddress.street"
+        city: ".shippingAddress.city"
+        zipCode: ".shippingAddress.zipCode"
+  next: ProcessOrderResponse
 ```
 
 ### Headers
@@ -215,14 +208,15 @@ For operations that require a request body:
 Custom headers can be set in the `headers` field:
 
 ```yaml
-  - GetResource:
-      call: resourceService
-      with:
-        resourceId: ${ .resourceId }
-        headers:
-          X-Request-ID: ${ .requestId }
-          Accept-Language: "en-US"
-      then: ProcessResource
+- name: GetResource
+  type: call
+  function: resourceService
+  data:
+    resourceId: ".resourceId"
+    headers:
+      X-Request-ID: ".requestId"
+      Accept-Language: "en-US"
+  next: ProcessResource
 ```
 
 ## Handling Authentication
@@ -232,57 +226,47 @@ Lemline supports all authentication methods defined in the OpenAPI specification
 ### API Key Authentication
 
 ```yaml
-use:
-  functions:
-    secureService:
-      call: openapi
-      with:
-        document:
-          endpoint: https://api.example.com/openapi.json
-        operationId: getSecureResource
-        parameters:
-          "X-API-Key": ${ $secrets.api_key }
+functions:
+  - name: secureService
+    type: openapi
+    specification: https://api.example.com/openapi.json
+    operation: getSecureResource
+    auth:
+      type: apiKey
+      name: "X-API-Key"
+      value: "${api_key}"  # Reference to a secret
 ```
 
 ### OAuth2 Authentication
 
 ```yaml
-use:
-  functions:
-    oauthService:
-      call: openapi
-      with:
-        document:
-          endpoint: https://api.example.com/openapi.json
-        operationId: getProtectedResource
-        parameters: {}
-        authentication:
-          oauth2:
-            authority: "https://auth.example.com/token"
-            grant: client_credentials
-            client:
-              id: ${ $secrets.client_id }
-              secret: ${ $secrets.client_secret }
-            scopes:
-              - "read:resources"
+functions:
+  - name: oauthService
+    type: openapi
+    specification: https://api.example.com/openapi.json
+    operation: getProtectedResource
+    auth:
+      type: oauth2
+      flow: clientCredentials
+      tokenUrl: "https://auth.example.com/token"
+      clientId: "${client_id}"
+      clientSecret: "${client_secret}"
+      scopes:
+        - "read:resources"
 ```
 
 ### Basic Authentication
 
 ```yaml
-use:
-  functions:
-    basicAuthService:
-      call: openapi
-      with:
-        document:
-          endpoint: https://api.example.com/openapi.json
-        operationId: getAuthenticatedResource
-        parameters: {}
-        authentication:
-          basic:
-            username: ${ $secrets.username }
-            password: ${ $secrets.password }
+functions:
+  - name: basicAuthService
+    type: openapi
+    specification: https://api.example.com/openapi.json
+    operation: getAuthenticatedResource
+    auth:
+      type: basic
+      username: "${username}"
+      password: "${password}"
 ```
 
 ## Request and Response Validation
@@ -294,14 +278,17 @@ One of the key benefits of using OpenAPI integration is automatic validation:
 Lemline validates your request against the schema before sending:
 
 ```yaml
-  - CreateUser:
-      call: userService
-      with:
-        body:
-          username: ${ .username }
-          email: ${ .email }
-          age: -5
-      then: ProcessResponse
+- name: CreateUser
+  type: call
+  function: userService
+  data:
+    body:
+      username: ".username"
+      email: ".email"
+      # If the schema requires age to be a positive integer
+      # and you provide a negative value, validation will fail
+      age: -5  # This would fail validation if age must be positive
+  next: ProcessResponse
 ```
 
 If the request doesn't match the schema, a `VALIDATION_ERROR` will be raised.
@@ -311,11 +298,12 @@ If the request doesn't match the schema, a `VALIDATION_ERROR` will be raised.
 Responses are also validated against the schema:
 
 ```yaml
-  - GetWeather:
-      call: weatherService
-      with:
-        location: ${ .location }
-      then: ProcessWeather
+- name: GetWeather
+  type: call
+  function: weatherService
+  data:
+    location: ".location"
+  next: ProcessWeather
 ```
 
 If the service returns a response that doesn't match the schema, a `VALIDATION_ERROR` will be raised, indicating a potential problem with the service.
@@ -327,31 +315,25 @@ If the service returns a response that doesn't match the schema, a `VALIDATION_E
 Wrap OpenAPI calls in a `try` task to handle errors:
 
 ```yaml
-  - AttemptApiCall:
-      try:
-        - GetProduct:
-            call: productService
-            with:
-              productId: ${ .productId }
-      catch:
-        as: failure
-        do:
-          - routeError:
-              switch:
-                - case1:
-                    then: HandleValidationError
-                    when: ${ $failure.type == "VALIDATION_ERROR" }
-                - case2:
-                    then: HandleHttpError
-                    when: ${ $failure.type == "HTTP_ERROR" }
-                - case3:
-                    then: HandleGenericError
-        retry:
-          limit:
-            attempt:
-              count: 3
-          delay: PT2S
-      then: ProcessProduct
+- name: AttemptApiCall
+  type: try
+  retry:
+    maxAttempts: 3
+    interval: PT2S
+  catch:
+    - error: "VALIDATION_ERROR"
+      next: HandleValidationError
+    - error: "HTTP_ERROR"
+      next: HandleHttpError
+    - error: "*"
+      next: HandleGenericError
+  do:
+    - name: GetProduct
+      type: call
+      function: productService
+      data:
+        productId: ".productId"
+  next: ProcessProduct
 ```
 
 ### Handling Specific Status Codes
@@ -359,26 +341,24 @@ Wrap OpenAPI calls in a `try` task to handle errors:
 Handle specific status codes defined in the OpenAPI spec:
 
 ```yaml
-  - AttemptUserLookup:
-      try:
-        - GetUser:
-            call: userService
-            with:
-              userId: ${ .userId }
-      catch:
-        as: failure
-        do:
-          - routeError:
-              switch:
-                - case1:
-                    then: HandleUserNotFound
-                    when: ${ $failure.status == 404 }
-                - case2:
-                    then: HandleForbidden
-                    when: ${ $failure.status == 403 }
-                - case3:
-                    then: HandleOtherError
-      then: ProcessUser
+- name: AttemptUserLookup
+  type: try
+  catch:
+    - error: "HTTP_ERROR"
+      status: 404
+      next: HandleUserNotFound
+    - error: "HTTP_ERROR"
+      status: 403
+      next: HandleForbidden
+    - error: "*"
+      next: HandleOtherError
+  do:
+    - name: GetUser
+      type: call
+      function: userService
+      data:
+        userId: ".userId"
+  next: ProcessUser
 ```
 
 ## Advanced OpenAPI Features
@@ -388,15 +368,14 @@ Handle specific status codes defined in the OpenAPI spec:
 If the OpenAPI specification defines server variables, you can set them:
 
 ```yaml
-use:
-  functions:
-    multiRegionService:
-      call: openapi
-      with:
-        document:
-          endpoint: https://api.example.com/openapi.json
-        operationId: getResource
-        parameters: {}
+functions:
+  - name: multiRegionService
+    type: openapi
+    specification: https://api.example.com/openapi.json
+    operation: getResource
+    server:
+      variables:
+        region: "eu-west-1"
 ```
 
 ### Selecting Specific Servers
@@ -404,15 +383,13 @@ use:
 If the specification defines multiple servers, you can select one:
 
 ```yaml
-use:
-  functions:
-    environmentSpecificService:
-      call: openapi
-      with:
-        document:
-          endpoint: https://api.example.com/openapi.json
-        operationId: getResource
-        parameters: {}
+functions:
+  - name: environmentSpecificService
+    type: openapi
+    specification: https://api.example.com/openapi.json
+    operation: getResource
+    server:
+      url: "https://staging-api.example.com/v1"
 ```
 
 ### Content Type Selection
@@ -420,13 +397,14 @@ use:
 You can specify which content type to use when multiple are available:
 
 ```yaml
-  - GetResourceWithFormat:
-      call: resourceService
-      with:
-        resourceId: ${ .resourceId }
-        headers:
-          Accept: "application/xml"
-      then: ProcessResourceXml
+- name: GetResourceWithFormat
+  type: call
+  function: resourceService
+  data:
+    resourceId: ".resourceId"
+    headers:
+      Accept: "application/xml"  # Request XML instead of JSON
+  next: ProcessResourceXml
 ```
 
 ## Real-World Example: E-Commerce API Integration
@@ -434,261 +412,215 @@ You can specify which content type to use when multiple are available:
 Here's a complete example that integrates with an e-commerce API defined via OpenAPI:
 
 ```yaml
-document:
-  dsl: 1.0.3
-  namespace: examples
-  name: order-processing
-  version: 1.0.0
-  title: E-Commerce Order Processing
-do:
-  - ReceiveOrder:
-      set:
-        orderId: ${ $workflow.input.orderId }
-        customerId: ${ $workflow.input.customerId }
-        items: ${ $workflow.input.items }
-      then: ValidateCustomer
-  - ValidateCustomer:
-      try:
-        - GetCustomer:
-            call: openapi
-            with:
-              document:
-                endpoint: https://api.ecommerce-example.com/openapi.json
-              operationId: ecommerceAPI
-              parameters:
-                operation: getCustomerById
-                customerId: ${ .customerId }
-              authentication:
-                oauth2:
-                  authority: "https://auth.ecommerce-example.com/token"
-                  grant: client_credentials
-                  client:
-                    id: ${ $secrets.ecommerce_client_id }
-                    secret: ${ $secrets.ecommerce_client_secret }
-                  scopes:
-                    - "orders:read"
-                    - "orders:write"
-                    - "inventory:read"
-                    - "payments:write"
-      catch:
-        as: failure
-        do:
-          - routeError:
-              switch:
-                - case1:
-                    then: HandleInvalidCustomer
-                    when: ${ $failure.status == 404 }
-                - case2:
-                    then: HandleValidationError
-        retry:
-          limit:
-            attempt:
-              count: 3
-          delay: PT2S
-      then: CheckInventory
-  - CheckInventory:
-      try:
-        - VerifyInventory:
-            call: openapi
-            with:
-              document:
-                endpoint: https://api.ecommerce-example.com/openapi.json
-              operationId: ecommerceAPI
-              parameters:
-                operation: checkInventoryAvailability
-                body:
-                  items: '${ .items | map({productId: .productId, quantity: .quantity}) }'
-              authentication:
-                oauth2:
-                  authority: "https://auth.ecommerce-example.com/token"
-                  grant: client_credentials
-                  client:
-                    id: ${ $secrets.ecommerce_client_id }
-                    secret: ${ $secrets.ecommerce_client_secret }
-                  scopes:
-                    - "orders:read"
-                    - "orders:write"
-                    - "inventory:read"
-                    - "payments:write"
-      catch:
-        as: failure
-        then: HandleInventoryError
-        retry:
-          limit:
-            attempt:
-              count: 2
-      then: EvaluateInventory
-  - EvaluateInventory:
-      switch:
-        - case1:
-            then: CalculateTotal
-            when: ${ .available == true }
-        - default:
-            then: HandleUnavailableInventory
-  - CalculateTotal:
-      try:
-        - GetPricing:
-            call: openapi
-            with:
-              document:
-                endpoint: https://api.ecommerce-example.com/openapi.json
-              operationId: ecommerceAPI
-              parameters:
-                operation: calculateOrderTotal
-                body:
-                  customerId: ${ .customerId }
-                  items: '${ .items | map({productId: .productId, quantity: .quantity}) }'
-                  applyCoupons: true
-              authentication:
-                oauth2:
-                  authority: "https://auth.ecommerce-example.com/token"
-                  grant: client_credentials
-                  client:
-                    id: ${ $secrets.ecommerce_client_id }
-                    secret: ${ $secrets.ecommerce_client_secret }
-                  scopes:
-                    - "orders:read"
-                    - "orders:write"
-                    - "inventory:read"
-                    - "payments:write"
-      catch:
-        as: failure
-        then: HandlePricingError
-      then: ProcessPayment
-  - ProcessPayment:
-      try:
-        - ChargePayment:
-            call: openapi
-            with:
-              document:
-                endpoint: https://api.ecommerce-example.com/openapi.json
-              operationId: ecommerceAPI
-              parameters:
-                operation: processPayment
-                body:
-                  customerId: ${ .customerId }
-                  orderId: ${ .orderId }
-                  amount: ${ .total }
-                  paymentMethod: ${ .paymentMethod }
-              authentication:
-                oauth2:
-                  authority: "https://auth.ecommerce-example.com/token"
-                  grant: client_credentials
-                  client:
-                    id: ${ $secrets.ecommerce_client_id }
-                    secret: ${ $secrets.ecommerce_client_secret }
-                  scopes:
-                    - "orders:read"
-                    - "orders:write"
-                    - "inventory:read"
-                    - "payments:write"
-      catch:
-        as: failure
-        do:
-          - routeError:
-              switch:
-                - case1:
-                    then: HandlePaymentRejected
-                    when: ${ $failure.status == 402 }
-                - case2:
-                    then: HandlePaymentError
-        retry:
-          limit:
-            attempt:
-              count: 2
-      then: CreateOrder
-  - CreateOrder:
-      try:
-        - SubmitOrder:
-            call: openapi
-            with:
-              document:
-                endpoint: https://api.ecommerce-example.com/openapi.json
-              operationId: ecommerceAPI
-              parameters:
-                operation: createOrder
-                body:
-                  customerId: ${ .customerId }
-                  orderItems: ${ .items }
-                  shippingAddress: ${ .GetCustomer.defaultShippingAddress }
-                  billingAddress: ${ .GetCustomer.defaultBillingAddress }
-                  total: ${ .total }
-                  paymentId: ${ .ChargePayment.paymentId }
-              authentication:
-                oauth2:
-                  authority: "https://auth.ecommerce-example.com/token"
-                  grant: client_credentials
-                  client:
-                    id: ${ $secrets.ecommerce_client_id }
-                    secret: ${ $secrets.ecommerce_client_secret }
-                  scopes:
-                    - "orders:read"
-                    - "orders:write"
-                    - "inventory:read"
-                    - "payments:write"
-      catch:
-        as: failure
-        then: HandleOrderCreationError
-        retry:
-          limit:
-            attempt:
-              count: 3
-      then: CompleteOrder
-  - CompleteOrder:
-      set:
-        status: "COMPLETED"
-        message: "Order processed successfully"
-        orderId: ${ .SubmitOrder.orderId }
-        trackingNumber: ${ .SubmitOrder.trackingNumber }
-        estimatedDelivery: ${ .SubmitOrder.estimatedDelivery }
-      then: end
-  - HandleInvalidCustomer:
-      set:
-        status: "REJECTED"
-        reason: "Invalid customer account"
-      then: end
-  - HandleValidationError:
-      set:
-        status: "ERROR"
-        reason: "Customer validation failed"
-        error: ${ $context.error }
-      then: end
-  - HandleInventoryError:
-      set:
-        status: "ERROR"
-        reason: "Inventory check failed"
-        error: ${ $context.error }
-      then: end
-  - HandleUnavailableInventory:
-      set:
-        status: "REJECTED"
-        reason: "Some items are unavailable"
-        unavailableItems: ${ .unavailableItems }
-      then: end
-  - HandlePricingError:
-      set:
-        status: "ERROR"
-        reason: "Failed to calculate pricing"
-        error: ${ $context.error }
-      then: end
-  - HandlePaymentRejected:
-      set:
-        status: "REJECTED"
-        reason: "Payment was rejected"
-        details: ${ .declineReason }
-      then: end
-  - HandlePaymentError:
-      set:
-        status: "ERROR"
-        reason: "Payment processing failed"
-        error: ${ $context.error }
-      then: end
-  - HandleOrderCreationError:
-      set:
-        status: "ERROR"
-        reason: "Order creation failed"
-        error: ${ $context.error }
-      then: end
+id: order-processing
+name: E-Commerce Order Processing
+version: '1.0'
+specVersion: '1.0'
+start: ReceiveOrder
+functions:
+  - name: ecommerceAPI
+    type: openapi
+    specification: https://api.ecommerce-example.com/openapi.json
+    auth:
+      type: oauth2
+      flow: clientCredentials
+      tokenUrl: "https://auth.ecommerce-example.com/token"
+      clientId: "${ecommerce_client_id}"
+      clientSecret: "${ecommerce_client_secret}"
+      scopes:
+        - "orders:read"
+        - "orders:write"
+        - "inventory:read"
+        - "payments:write"
+tasks:
+  - name: ReceiveOrder
+    type: set
+    data:
+      orderId: "$WORKFLOW.input.orderId"
+      customerId: "$WORKFLOW.input.customerId"
+      items: "$WORKFLOW.input.items"
+    next: ValidateCustomer
+  
+  - name: ValidateCustomer
+    type: try
+    retry:
+      maxAttempts: 3
+      interval: PT2S
+    catch:
+      - error: "HTTP_ERROR"
+        status: 404
+        next: HandleInvalidCustomer
+      - error: "*"
+        next: HandleValidationError
+    do:
+      - name: GetCustomer
+        type: call
+        function: ecommerceAPI
+        data:
+          operation: getCustomerById
+          customerId: ".customerId"
+    next: CheckInventory
+  
+  - name: CheckInventory
+    type: try
+    retry:
+      maxAttempts: 2
+    catch:
+      - error: "*"
+        next: HandleInventoryError
+    do:
+      - name: VerifyInventory
+        type: call
+        function: ecommerceAPI
+        data:
+          operation: checkInventoryAvailability
+          body:
+            items: ".items | map({productId: .productId, quantity: .quantity})"
+    next: EvaluateInventory
+  
+  - name: EvaluateInventory
+    type: switch
+    conditions:
+      - condition: ".available == true"
+        next: CalculateTotal
+      - condition: true
+        next: HandleUnavailableInventory
+  
+  - name: CalculateTotal
+    type: try
+    catch:
+      - error: "*"
+        next: HandlePricingError
+    do:
+      - name: GetPricing
+        type: call
+        function: ecommerceAPI
+        data:
+          operation: calculateOrderTotal
+          body:
+            customerId: ".customerId"
+            items: ".items | map({productId: .productId, quantity: .quantity})"
+            applyCoupons: true
+    next: ProcessPayment
+  
+  - name: ProcessPayment
+    type: try
+    retry:
+      maxAttempts: 2
+    catch:
+      - error: "HTTP_ERROR"
+        status: 402
+        next: HandlePaymentRejected
+      - error: "*"
+        next: HandlePaymentError
+    do:
+      - name: ChargePayment
+        type: call
+        function: ecommerceAPI
+        data:
+          operation: processPayment
+          body:
+            customerId: ".customerId"
+            orderId: ".orderId"
+            amount: ".total"
+            paymentMethod: ".paymentMethod"
+    next: CreateOrder
+  
+  - name: CreateOrder
+    type: try
+    retry:
+      maxAttempts: 3
+    catch:
+      - error: "*"
+        next: HandleOrderCreationError
+    do:
+      - name: SubmitOrder
+        type: call
+        function: ecommerceAPI
+        data:
+          operation: createOrder
+          body:
+            customerId: ".customerId"
+            orderItems: ".items"
+            shippingAddress: ".GetCustomer.defaultShippingAddress"
+            billingAddress: ".GetCustomer.defaultBillingAddress"
+            total: ".total"
+            paymentId: ".ChargePayment.paymentId"
+    next: CompleteOrder
+  
+  - name: CompleteOrder
+    type: set
+    data:
+      status: "COMPLETED"
+      message: "Order processed successfully"
+      orderId: ".SubmitOrder.orderId"
+      trackingNumber: ".SubmitOrder.trackingNumber"
+      estimatedDelivery: ".SubmitOrder.estimatedDelivery"
+    end: true
+  
+  # Error handling tasks...
+  - name: HandleInvalidCustomer
+    type: set
+    data:
+      status: "REJECTED"
+      reason: "Invalid customer account"
+    end: true
+  
+  - name: HandleValidationError
+    type: set
+    data:
+      status: "ERROR"
+      reason: "Customer validation failed"
+      error: "$WORKFLOW.error"
+    end: true
+  
+  - name: HandleInventoryError
+    type: set
+    data:
+      status: "ERROR"
+      reason: "Inventory check failed"
+      error: "$WORKFLOW.error"
+    end: true
+  
+  - name: HandleUnavailableInventory
+    type: set
+    data:
+      status: "REJECTED"
+      reason: "Some items are unavailable"
+      unavailableItems: ".unavailableItems"
+    end: true
+  
+  - name: HandlePricingError
+    type: set
+    data:
+      status: "ERROR"
+      reason: "Failed to calculate pricing"
+      error: "$WORKFLOW.error"
+    end: true
+  
+  - name: HandlePaymentRejected
+    type: set
+    data:
+      status: "REJECTED"
+      reason: "Payment was rejected"
+      details: ".declineReason"
+    end: true
+  
+  - name: HandlePaymentError
+    type: set
+    data:
+      status: "ERROR"
+      reason: "Payment processing failed"
+      error: "$WORKFLOW.error"
+    end: true
+  
+  - name: HandleOrderCreationError
+    type: set
+    data:
+      status: "ERROR"
+      reason: "Order creation failed"
+      error: "$WORKFLOW.error"
+    end: true
 ```
 
 This workflow uses a single OpenAPI-defined e-commerce service for all operations, with appropriate error handling for each step.
@@ -696,7 +628,7 @@ This workflow uses a single OpenAPI-defined e-commerce service for all operation
 ## Best Practices for OpenAPI Integration
 
 1. **Use OpenAPI 3.0+ Specifications**: Ensure you're using modern OpenAPI specifications (3.0 or later)
-2. **Prefer operationId**: Use the operation ID declared by the OpenAPI document
+2. **Prefer operationId**: Use operation IDs instead of path/method combinations when available
 3. **Validate Specifications**: Ensure your OpenAPI spec is valid before integrating
 4. **Handle Schema Validation Errors**: Implement proper error handling for validation failures
 5. **Prefer Spec-Defined Auth**: Use authentication methods defined in the spec

@@ -10,28 +10,113 @@ The `run: script` task allows a workflow to execute a script written in a suppor
 
 ## Usage Example
 
-The pinned SDK accepts script arguments as a map. Lemline passes each key and its nonblank value as command-line arguments. The official 1.0.3 tag describes an argument array and optional script `stdin`; the SDK rejects those forms. See [Supported Features](lemline-ref-supported-features.md).
-
 ```yaml
 document:
-  dsl: '1.0.3'
-  namespace: examples
-  name: greet
+  dsl: '1.0.0'
+  namespace: script_runs
+  name: run-simple-script
   version: '1.0.0'
 do:
-  - greet:
+  - executeScript:
+      run:
+        script:
+          language: js # Specify the script language
+          code: |
+            // Multi-line JavaScript code
+            function process(input) {
+              let message = `Processed item: ${input.id}`;
+              console.log('Processing done.'); // Goes to stderr usually
+              return { result: message, status: 'complete' };
+            }
+            process($input); // Use $input argument
+          # Pass arguments to the script environment
+          arguments: 
+             input: "${ . }" # Pass the entire task input
+        # `await: true` (default) waits for completion
+        # `return: stdout` (default) - Note: Script return value is often stdout
+        return: stdout # Explicitly get script return value via stdout
+      then: processScriptOutput
+  - processScriptOutput:
+      # Input might be { result: "Processed item: 123", status: "complete" }
+      set:
+        finalMessage: "${ .result }"
+
+## Additional Examples
+
+### Example: Loading Script from External Source
+
+```yaml
+# Assume 'scriptRepo' external resource is defined
+use:
+  resources:
+    scriptRepo: 
+      endpoint: file:///etc/workflow-scripts/
+
+do:
+  - runExternalScript:
+      run:
+        script:
+          language: python
+          # Load code from a file defined by the resource
+          source:
+             resource: scriptRepo
+             path: /validators/email_validator.py
+          arguments:
+            email: "${ .userEmail }"
+        return: stdout # Expect script to print JSON result
+      then: processValidation
+```
+
+### Example: Using Python with Environment Variables
+
+```yaml
+do:
+  - processWithPython:
+      run:
+        script:
+          language: python
+          code: |
+            import os
+            import json
+            
+            api_key = os.environ.get('API_KEY')
+            input_data = json.loads(os.environ.get('INPUT_JSON'))
+            
+            # ... process data using api_key and input_data ...
+            result = { "status": "processed", "items_count": len(input_data['items']) }
+            
+            print(json.dumps(result)) # Return JSON via stdout
+          # Pass data via environment variables
+          environment:
+            API_KEY: "${ $secrets.pythonServiceKey }"
+            INPUT_JSON: "${ toJsonString(.) }" # Assume toJsonString function
+        return: stdout
+      then: handlePythonResult
+```
+
+### Example: Returning Exit Code
+
+```yaml
+do:
+  - checkDataIntegrity:
       run:
         script:
           language: js
-          arguments:
-            --name: "${ .name }"
           code: |
-            const index = process.argv.indexOf('--name');
-            console.log('Hello, ' + process.argv[index + 1]);
-        return: stdout
+            // Script exits with 0 on success, 1 on failure
+            const isValid = checkData($input.data);
+            process.exit(isValid ? 0 : 1);
+          arguments: { input: "${ . }" }
+        # Capture the script's exit code
+        return: code 
+      then: handleIntegrityCheck
+  - handleIntegrityCheck:
+      # Input will be 0 or 1
+      switch:
+        - if: "${ . == 0 }"
+          then: dataIsValid
+        - then: dataIsInvalid
 ```
-
-For input `{"name":"Ada"}`, the script writes `Hello, Ada`. In Python scripts, use `sys.argv` to read the same arguments.
 
 ## Configuration Options
 
@@ -46,7 +131,7 @@ The configuration is provided under the `run` property, specifically within the 
         *   `endpoint` (Object, Required): Defines the location of the script file.
             *   `uri` (String | Object, Required): The URI (string or URI template object) pointing to the script file.
             *   `authentication` (String | Object, Optional): Authentication details (inline or reference) needed to access the script file URI.
-    *   **`arguments`** (Map<String, Any>, Optional): Arguments passed to the script process. Keys and values can use [runtime expressions](dsl-runtime-expressions.md).
+    *   **`arguments`** (Map<String, Any>, Optional): A key/value map defining arguments or variables made available to the script's execution environment. Values can be static or derived using [Runtime Expressions](dsl-runtime-expressions.md). How these are exposed depends on the language (e.g., global variables in JS, injected context in Python).
     *   **`environment`** (Map<String, String>, Optional): A key/value map of environment variables to set for the script execution process. Values can be static strings or evaluated from [Runtime Expressions](dsl-runtime-expressions.md).
 *   **`await`** (Boolean, Optional, Default: `true`):
     *   `true`: The workflow task waits for the script process to complete before proceeding. The task's output is determined by the `return` property.

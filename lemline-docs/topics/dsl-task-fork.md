@@ -11,13 +11,13 @@ independent tasks simultaneously.
 
 ```yaml
 document:
-  dsl: '1.0.3'
+  dsl: '1.0.0' # Assuming alpha5 or later based on reference example
   namespace: test
   name: fork-example
   version: '0.1.0'
 do:
   - getData:
-      set: ${ . }
+      # ... task to fetch initial data ...
       then: processConcurrently
   - processConcurrently:
       fork:
@@ -38,7 +38,7 @@ do:
       # Output is an array: [output_of_processUserData, output_of_processProductData]
       then: combineResults
   - combineResults:
-      set: ${ . }
+    # ... task that uses the array output from the fork ...
 ```
 
 In this example, after `getData`, the tasks `processUserData` and `processProductData` are executed in parallel. Since
@@ -58,20 +58,20 @@ do:
           - getQuoteSourceA:
               call: http
               with:
+                uri: https://api.sourceA.com/quote
                 method: get
                 # Assume returns { "provider": "A", "price": 100 }
-                endpoint: https://api.sourceA.com/quote
           - getQuoteSourceB:
               call: http
               with:
+                uri: https://api.sourceB.com/quote
                 method: get
                 # Assume returns { "provider": "B", "price": 105 }
       # Output is the result of whichever branch finished first
       # e.g., { "provider": "A", "price": 100 } if Source A was faster
-                endpoint: https://api.sourceB.com/quote
       then: processBestQuote
   - processBestQuote:
-      set: ${ . }
+    # ... task uses the single quote object from the winner ...
 ```
 
 Here, `getQuoteSourceA` and `getQuoteSourceB` run concurrently. Because `compete: true`, the `Fork` task finishes as

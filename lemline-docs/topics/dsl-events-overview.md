@@ -55,7 +55,7 @@ Leveraging events in your workflows unlocks several powerful patterns:
 
 ```yaml
 document:
-  dsl: '1.0.3'
+  dsl: '1.0.0'
   namespace: examples
   name: event-driven-order-processing
   version: '1.0.0'
@@ -77,13 +77,14 @@ do:
               source: "http://order-service"
               type: "com.example.order.created"
         read: "data"
+        
   - reserveInventoryItems:
       call: "reserveInventory"
       with:
         args:
           orderId: ${ .waitForNewOrder.data.orderId }
           items: ${ .waitForNewOrder.data.items }
-
+        
   - waitForPayment:
       listen:
         to:
@@ -98,7 +99,7 @@ do:
         read: "data"
       timeout:
         after: PT1H
-
+        
   - checkPaymentStatus:
       switch:
         - case:
@@ -106,6 +107,7 @@ do:
             then: "confirmOrder"
         - default:
             then: "handleFailedPayment"
+            
   - confirmOrder:
       emit:
         event:
@@ -116,9 +118,9 @@ do:
               orderId: ${ .waitForNewOrder.data.orderId }
               status: "CONFIRMED"
               paymentId: ${ .waitForPayment.data.paymentId }
-              confirmedAt: ${ (now | todateiso8601) }
+              confirmedAt: ${ new Date().toISOString() }
       then: exit
-
+      
   - handleFailedPayment:
       emit:
         event:
@@ -129,8 +131,8 @@ do:
               orderId: ${ .waitForNewOrder.data.orderId }
               status: "PAYMENT_FAILED"
               reason: "Payment processing failed"
-              failedAt: ${ (now | todateiso8601) }
-      then: exit
+              failedAt: ${ new Date().toISOString() }
+      then: exit                    
 ```
 
 
@@ -142,7 +144,7 @@ do:
 
 ```yaml
 document:
-  dsl: '1.0.3'
+  dsl: '1.0.0'
   namespace: examples
   name: microservice-coordination
   version: '1.0.0'
@@ -183,7 +185,7 @@ do:
         read: data
       timeout:
         after: PT30M
-
+        
   - processNewUser:
       fork:
         branches:
@@ -196,7 +198,7 @@ do:
                         userId: ${ .waitForNewUser.data.userId }
                         email: ${ .waitForNewUser.data.email }
                         username: ${ .waitForNewUser.data.username }
-
+                
                 - notifyProfileCreated:
                     emit:
                       event:
@@ -206,8 +208,8 @@ do:
                           data:
                             userId: ${ .waitForNewUser.data.userId }
                             profileId: ${ .initiateProfileCreation.profileId }
-                            createdAt: ${ (now | todateiso8601) }
-
+                            createdAt: ${ new Date().toISOString() }
+                
           - sendWelcome:
               do:
                 - initiateWelcomeEmail:
@@ -216,8 +218,8 @@ do:
                       args:
                         to: ${ .waitForNewUser.data.email }
                         name: ${ .waitForNewUser.data.firstName }
-                        language: ${ .waitForNewUser.data.preferences.language // "en" }
-
+                        language: ${ .waitForNewUser.data.preferences.language || "en" }
+                      
                 - notifyEmailSent:
                     emit:
                       event:
@@ -227,8 +229,8 @@ do:
                           data:
                             userId: ${ .waitForNewUser.data.userId }
                             emailId: ${ .initiateWelcomeEmail.emailId }
-                            sentAt: ${ (now | todateiso8601) }
-
+                            sentAt: ${ new Date().toISOString() }
+                
   - completeOnboarding:
       listen:
         to:
@@ -250,7 +252,7 @@ do:
         read: data
       timeout:
         after: PT30M
-
+        
   - notifyOnboardingCompletion:
       emit:
         event:
@@ -262,7 +264,7 @@ do:
               status: "COMPLETE"
               profileId: ${ .completeOnboarding.data[0].profileId }
               emailSent: true
-              completedAt: ${ (now | todateiso8601) }
+              completedAt: ${ new Date().toISOString() }
 ```
 
 Event tasks form the foundation of event-driven architecture within workflows, 

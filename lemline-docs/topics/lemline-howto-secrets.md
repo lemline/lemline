@@ -14,7 +14,7 @@ Secret values are resolved on the runner each time it executes a step. `$secrets
 
 ```yaml
 document:
-  dsl: '1.0.3'
+  dsl: '1.0.0'
   namespace: billing
   name: charge-customer
   version: '1.0.0'

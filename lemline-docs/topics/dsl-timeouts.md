@@ -38,20 +38,31 @@ In both cases, the `timeout` property takes an object with the following structu
 ```yaml
 # Workflow-level timeout
 document:
-  dsl: '1.0.3'
+  dsl: '1.0.0'
   namespace: examples
   name: workflow-with-timeout
   version: '1.0.0'
-timeout:
-  after: { minutes: 30 }
+  timeout: # Applies to the entire workflow execution
+    after:
+      minutes: 30 # Workflow will fault if it runs longer than 30 minutes
+do:
+  - step1:
+    # ...
+
+---
+# Task-level timeout
 do:
   - callExternalService:
       call: http
       with:
-        endpoint: https://api.externalservice.com/data
+        uri: https://api.externalservice.com/data
         method: get
-      timeout:
-        after: { seconds: 15 }
+      timeout: # Applies only to the callExternalService task
+        after:
+          seconds: 15 # Task will fault if it takes longer than 15 seconds
+      then: processResult
+  - processResult:
+    # ...
 ```
 
 ## Timeout Error Details

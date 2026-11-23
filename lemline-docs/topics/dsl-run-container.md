@@ -4,8 +4,6 @@ title: Run Container
 
 # Run Container Task (`run: container`)
 
-The Java SDK parses `run.container` definitions, including `arguments`, `stdin`, and `pullPolicy`. Lemline currently has no container executor. The options on this page describe the DSL schema.
-
 ## Purpose
 
 The `run: container` task allows a workflow to execute an external process encapsulated within a containerized environment (e.g., Docker). This is useful for running complex applications, specific versions of tools, or any process that benefits from isolation and reproducible environments.
@@ -14,8 +12,8 @@ The `run: container` task allows a workflow to execute an external process encap
 
 ```yaml
 document:
-  dsl: '1.0.3'
-  namespace: container-runs
+  dsl: '1.0.0'
+  namespace: container_runs
   name: run-simple-container
   version: '1.0.0'
 do:

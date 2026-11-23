@@ -20,7 +20,7 @@ code or configurations.
 
 ```yaml
 document:
-  dsl: '1.0.3'
+  dsl: '1.0.0' # Assuming alpha5 or later based on reference example
   namespace: test
   name: openapi-example
   version: '0.1.0'
@@ -40,7 +40,7 @@ do:
       # Output by default is the deserialized response body
       then: processAvailablePets
   - processAvailablePets:
-      set: ${ . }
+    # ... uses the list of available pets from the response ...
 ```
 
 ## Additional Examples

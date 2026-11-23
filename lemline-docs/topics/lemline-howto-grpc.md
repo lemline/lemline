@@ -41,31 +41,29 @@ To call a gRPC service in Lemline, you need to:
 Here's a basic example:
 
 ```yaml
-use:
-  functions:
-    userService:
-      call: grpc
-      with:
-        proto:
-          endpoint: file:///path/to/users.proto
-        service:
-          name: users.UserService
-          host: grpc.example.com
-          port: 443
-        method: GetUser
-        arguments: {}
-do:
-  - GetUserDetails:
-      call: userService
-      with:
-        userId: "12345"
-      then: ProcessUserData
-  - ProcessUserData:
-      set:
-        username: ${ .user.username }
-        email: ${ .user.email }
-        message: ${ "Retrieved user \(.username) with email \(.email)" }
-      then: NextTask
+functions:
+  - name: userService
+    type: grpc
+    service: users.UserService
+    proto: file:///path/to/users.proto
+    operation: GetUser
+    host: grpc.example.com:443
+
+tasks:
+  - name: GetUserDetails
+    type: call
+    function: userService
+    data:
+      userId: "12345"
+    next: ProcessUserData
+  
+  - name: ProcessUserData
+    type: set
+    data:
+      username: ".user.username"
+      email: ".user.email"
+      message: "Retrieved user .username with email .email"
+    next: NextTask
 ```
 
 ## gRPC Function Definition
@@ -73,19 +71,13 @@ do:
 The gRPC function definition includes the following elements:
 
 ```yaml
-use:
-  functions:
-    productService:
-      call: grpc
-      with:
-        proto:
-          endpoint: https://example.com/protos/products.proto
-        service:
-          name: products.Products
-          host: grpc.example.com
-          port: 443
-        method: GetProduct
-        arguments: {}
+functions:
+  - name: productService         # Unique function name
+    type: grpc                   # Function type (grpc)
+    service: products.Products   # Fully qualified service name (package.Service)
+    proto: https://example.com/protos/products.proto  # Proto file location
+    operation: GetProduct        # Method name to call
+    host: grpc.example.com:443   # gRPC server hostname and port
 ```
 
 ### Proto File Specification
@@ -137,11 +129,12 @@ proto: |
 For simple request/response gRPC calls:
 
 ```yaml
-  - GetProductInfo:
-      call: productService
-      with:
-        product_id: ${ .productId }
-      then: ProcessProductInfo
+- name: GetProductInfo
+  type: call
+  function: productService
+  data:
+    product_id: ".productId"  # Matches the field in GetProductRequest
+  next: ProcessProductInfo
 ```
 
 The input data should match the request message structure defined in the Protocol Buffer.
@@ -151,21 +144,22 @@ The input data should match the request message structure defined in the Protoco
 For more complex request structures:
 
 ```yaml
-  - CreateOrder:
-      call: orderService
-      with:
-        customer_id: ${ .customerId }
-        items:
-          - product_id: ${ .items[0].id }
-            quantity: ${ .items[0].quantity }
-          - product_id: ${ .items[1].id }
-            quantity: ${ .items[1].quantity }
-        shipping_address:
-          street: ${ .address.street }
-          city: ${ .address.city }
-          postal_code: ${ .address.zip }
-          country: ${ .address.country }
-      then: ProcessOrderResponse
+- name: CreateOrder
+  type: call
+  function: orderService
+  data:
+    customer_id: ".customerId"
+    items:                   # Nested repeated field
+      - product_id: ".items[0].id"
+        quantity: ".items[0].quantity"
+      - product_id: ".items[1].id"
+        quantity: ".items[1].quantity"
+    shipping_address:        # Nested message
+      street: ".address.street"
+      city: ".address.city"
+      postal_code: ".address.zip"
+      country: ".address.country"
+  next: ProcessOrderResponse
 ```
 
 ### Handling Responses
@@ -173,13 +167,14 @@ For more complex request structures:
 gRPC responses are automatically deserialized and made available as structured data:
 
 ```yaml
-  - ProcessProductInfo:
-      set:
-        productName: ${ .name }
-        productPrice: ${ .price }
-        isAvailable: ${ .in_stock }
-        formattedPrice: ${ "$" + (.price | tostring) }
-      then: NextTask
+- name: ProcessProductInfo
+  type: set
+  data:
+    productName: ".name"             # Access response fields directly
+    productPrice: ".price"
+    isAvailable: ".in_stock"
+    formattedPrice: "$" + (.price | tostring)
+  next: NextTask
 ```
 
 ## Server-Streaming Calls
@@ -187,35 +182,37 @@ gRPC responses are automatically deserialized and made available as structured d
 For gRPC methods that return a stream of responses:
 
 ```yaml
-use:
-  functions:
-    stockService:
-      call: grpc
-      with:
-        proto:
-          endpoint: file:///path/to/finance.proto
-        service:
-          name: finance.StockService
-          host: finance-api.example.com
-          port: 443
-        method: WatchStockPrice
-        arguments: {}
-do:
-  - MonitorStock:
-      call: stockService
-      with:
-        symbol: ${ .stockSymbol }
-        interval_seconds: 5
-      then: ProcessStockData
-  - ProcessStockData:
-      set:
-        pricePoints: ${ . }
-        count: ${ . | length }
-        latestPrice: ${ .[.length-1].price }
-        highestPrice: ${ . | max_by(.price).price }
-        lowestPrice: ${ . | min_by(.price).price }
-        averagePrice: ${ . | map(.price) | add / .length }
-      then: GenerateReport
+functions:
+  - name: stockService
+    type: grpc
+    service: finance.StockService
+    proto: file:///path/to/finance.proto
+    operation: WatchStockPrice
+    host: finance-api.example.com:443
+
+tasks:
+  - name: MonitorStock
+    type: call
+    function: stockService
+    data:
+      symbol: ".stockSymbol"
+      interval_seconds: 5
+    streaming:
+      mode: "server"
+      collect: "all"
+      timeout: PT2M
+    next: ProcessStockData
+  
+  - name: ProcessStockData
+    type: set
+    data:
+      pricePoints: "."  # Array of all streamed responses
+      count: ". | length"
+      latestPrice: ".[.length-1].price"
+      highestPrice: ". | max_by(.price).price"
+      lowestPrice: ". | min_by(.price).price"
+      averagePrice: ". | map(.price) | add / .length"
+    next: GenerateReport
 ```
 
 ### Streaming Options
@@ -236,19 +233,17 @@ The `streaming` property supports these options:
 Enable secure communication with TLS:
 
 ```yaml
-use:
-  functions:
-    secureService:
-      call: grpc
-      with:
-        proto:
-          endpoint: file:///path/to/secure.proto
-        service:
-          name: secure.SecureService
-          host: secure-api.example.com
-          port: 443
-        method: GetSecureData
-        arguments: {}
+functions:
+  - name: secureService
+    type: grpc
+    service: secure.SecureService
+    proto: file:///path/to/secure.proto
+    operation: GetSecureData
+    host: secure-api.example.com:443
+    tls:
+      enabled: true
+      verify: true
+      ca_cert: "${ca_certificate}"  # Reference to a CA certificate secret
 ```
 
 ### Authentication
@@ -256,22 +251,16 @@ use:
 Add authentication metadata:
 
 ```yaml
-use:
-  functions:
-    authenticatedService:
-      call: grpc
-      with:
-        proto:
-          endpoint: file:///path/to/auth.proto
-        service:
-          name: auth.AuthService
-          host: auth-api.example.com
-          port: 443
-          authentication:
-            bearer:
-              token: ${ $secrets.api_token }
-        method: GetProtectedResource
-        arguments: {}
+functions:
+  - name: authenticatedService
+    type: grpc
+    service: auth.AuthService
+    proto: file:///path/to/auth.proto
+    operation: GetProtectedResource
+    host: auth-api.example.com:443
+    auth:
+      type: bearer
+      token: "${api_token}"  # Reference to a secret
 ```
 
 Authentication options include:
@@ -310,34 +299,28 @@ auth:
 Wrap gRPC calls in a `try` task to handle errors:
 
 ```yaml
-  - AttemptGrpcCall:
-      try:
-        - GetUserData:
-            call: userService
-            with:
-              userId: ${ .userId }
-      catch:
-        as: failure
-        do:
-          - routeError:
-              switch:
-                - case1:
-                    then: HandleUnavailable
-                    when: ${ $failure.type == "UNAVAILABLE" }
-                - case2:
-                    then: HandleTimeout
-                    when: ${ $failure.type == "DEADLINE_EXCEEDED" }
-                - case3:
-                    then: HandleNotFound
-                    when: ${ $failure.type == "NOT_FOUND" }
-                - case4:
-                    then: HandleGenericError
-        retry:
-          limit:
-            attempt:
-              count: 3
-          delay: PT2S
-      then: ProcessUserData
+- name: AttemptGrpcCall
+  type: try
+  retry:
+    maxAttempts: 3
+    interval: PT2S
+    multiplier: 2
+  catch:
+    - error: "UNAVAILABLE"
+      next: HandleUnavailable
+    - error: "DEADLINE_EXCEEDED"
+      next: HandleTimeout
+    - error: "NOT_FOUND"
+      next: HandleNotFound
+    - error: "*"
+      next: HandleGenericError
+  do:
+    - name: GetUserData
+      type: call
+      function: userService
+      data:
+        userId: ".userId"
+  next: ProcessUserData
 ```
 
 ### gRPC-Specific Error Codes
@@ -380,13 +363,14 @@ catch:
 Set timeouts for gRPC calls:
 
 ```yaml
-  - TimeboxedCall:
-      call: userService
-      with:
-        userId: ${ .userId }
-      then: ProcessUserData
-      timeout:
-        after: PT5S
+- name: TimeboxedCall
+  type: call
+  function: userService
+  data:
+    userId: ".userId"
+  timeout: PT5S  # 5-second timeout
+  timeoutNext: HandleTimeout
+  next: ProcessUserData
 ```
 
 ### Deadlines
@@ -394,11 +378,14 @@ Set timeouts for gRPC calls:
 Set absolute deadlines:
 
 ```yaml
-  - DeadlinedCall:
-      call: userService
-      with:
-        userId: ${ .userId }
-      then: ProcessUserData
+- name: DeadlinedCall
+  type: call
+  function: userService
+  data:
+    userId: ".userId"
+  deadline: "2023-12-31T23:59:59Z"  # Call must complete by this time
+  timeoutNext: HandleDeadlineExceeded
+  next: ProcessUserData
 ```
 
 ### Custom Metadata
@@ -406,11 +393,16 @@ Set absolute deadlines:
 Add custom metadata to the call:
 
 ```yaml
-  - CallWithMetadata:
-      call: userService
-      with:
-        userId: ${ .userId }
-      then: ProcessUserData
+- name: CallWithMetadata
+  type: call
+  function: userService
+  data:
+    userId: ".userId"
+  metadata:
+    x-client-id: "lemline-workflow"
+    x-request-id: "$WORKFLOW.id"
+    x-correlation-id: ".correlationId"
+  next: ProcessUserData
 ```
 
 ## Real-World Example: Order Processing with gRPC
@@ -418,249 +410,263 @@ Add custom metadata to the call:
 Here's a complete example that processes an order using gRPC services:
 
 ```yaml
-document:
-  dsl: 1.0.3
-  namespace: examples
-  name: order-processing
-  version: 1.0.0
-  title: Order Processing with gRPC
-do:
-  - ReceiveOrder:
-      set:
-        orderId: ${ $workflow.input.orderId }
-        customerId: ${ $workflow.input.customerId }
-        items: ${ $workflow.input.items }
-        shippingAddress: ${ $workflow.input.shippingAddress }
-        paymentMethod: ${ $workflow.input.paymentMethod }
-      then: ValidateCustomer
-  - ValidateCustomer:
-      try:
-        - CheckCustomer:
-            call: grpc
-            with:
-              proto:
-                endpoint: file:///protos/customer.proto
-              service:
-                name: ecommerce.CustomerService
-                host: customer-api.example.com
-                port: 443
-                authentication:
-                  bearer:
-                    token: ${ $secrets.api_token }
-              method: ValidateCustomer
-              arguments:
-                customer_id: ${ .customerId }
-      catch:
-        as: failure
-        do:
-          - routeError:
-              switch:
-                - case1:
-                    then: HandleInvalidCustomer
-                    when: ${ $failure.type == "GRPC_NOT_FOUND" }
-                - case2:
-                    then: HandleValidationError
-        retry:
-          limit:
-            attempt:
-              count: 3
-          delay: PT2S
-      then: CheckInventory
-  - CheckInventory:
-      try:
-        - VerifyInventory:
-            call: grpc
-            with:
-              proto:
-                endpoint: file:///protos/inventory.proto
-              service:
-                name: ecommerce.InventoryService
-                host: inventory-api.example.com
-                port: 443
-                authentication:
-                  bearer:
-                    token: ${ $secrets.api_token }
-              method: CheckAvailability
-              arguments:
-                items:
-                  - product_id: ${ .items[0].productId }
-                    quantity: ${ .items[0].quantity }
-                  - product_id: ${ .items[1].productId }
-                    quantity: ${ .items[1].quantity }
-      catch:
-        as: failure
-        then: HandleInventoryError
-        retry:
-          limit:
-            attempt:
-              count: 2
-      then: EvaluateInventory
-  - EvaluateInventory:
-      switch:
-        - case1:
-            then: CalculateTotal
-            when: ${ .available == true }
-        - default:
-            then: HandleUnavailableInventory
-  - CalculateTotal:
-      try:
-        - ComputePrice:
-            call: grpc
-            with:
-              proto:
-                endpoint: file:///protos/pricing.proto
-              service:
-                name: ecommerce.PricingService
-                host: pricing-api.example.com
-                port: 443
-                authentication:
-                  bearer:
-                    token: ${ $secrets.api_token }
-              method: CalculateTotal
-              arguments:
-                customer_id: ${ .customerId }
-                items:
-                  - product_id: ${ .items[0].productId }
-                    quantity: ${ .items[0].quantity }
-                  - product_id: ${ .items[1].productId }
-                    quantity: ${ .items[1].quantity }
-                coupon_code: ${ .couponCode }
-      catch:
-        as: failure
-        then: HandlePricingError
-      then: ProcessPayment
-  - ProcessPayment:
-      try:
-        - ChargePayment:
-            call: grpc
-            with:
-              proto:
-                endpoint: file:///protos/payment.proto
-              service:
-                name: ecommerce.PaymentService
-                host: payment-api.example.com
-                port: 443
-                authentication:
-                  bearer:
-                    token: ${ $secrets.api_token }
-              method: ProcessPayment
-              arguments:
-                customer_id: ${ .customerId }
-                order_id: ${ .orderId }
-                amount: ${ .total.amount }
-                currency: ${ .total.currency }
-                payment_method:
-                  type: ${ .paymentMethod.type }
-                  card_token: ${ .paymentMethod.cardToken }
-      catch:
-        as: failure
-        do:
-          - routeError:
-              switch:
-                - case1:
-                    then: HandlePaymentRejected
-                    when: ${ $failure.type == "GRPC_FAILED_PRECONDITION" }
-                - case2:
-                    then: HandlePaymentError
-        retry:
-          limit:
-            attempt:
-              count: 2
-      then: CreateOrder
-  - CreateOrder:
-      try:
-        - SubmitOrder:
-            call: grpc
-            with:
-              proto:
-                endpoint: file:///protos/order.proto
-              service:
-                name: ecommerce.OrderService
-                host: order-api.example.com
-                port: 443
-                authentication:
-                  bearer:
-                    token: ${ $secrets.api_token }
-              method: CreateOrder
-              arguments:
-                order_id: ${ .orderId }
-                customer_id: ${ .customerId }
-                items:
-                  - product_id: ${ .items[0].productId }
-                    quantity: ${ .items[0].quantity }
-                    price: ${ .ComputePrice.item_prices[0].price }
-                  - product_id: ${ .items[1].productId }
-                    quantity: ${ .items[1].quantity }
-                    price: ${ .ComputePrice.item_prices[1].price }
-                total: ${ .total }
-                payment:
-                  transaction_id: ${ .ChargePayment.transaction_id }
-                  status: ${ .ChargePayment.status }
-      catch:
-        as: failure
-        then: HandleOrderCreationError
-        retry:
-          limit:
-            attempt:
-              count: 3
-      then: ScheduleShipment
-  - ScheduleShipment:
-      try:
-        - ArrangeShipment:
-            call: grpc
-            with:
-              proto:
-                endpoint: file:///protos/shipping.proto
-              service:
-                name: ecommerce.ShippingService
-                host: shipping-api.example.com
-                port: 443
-                authentication:
-                  bearer:
-                    token: ${ $secrets.api_token }
-              method: ScheduleShipment
-              arguments:
-                order_id: ${ .orderId }
-                items:
-                  - product_id: ${ .items[0].productId }
-                    quantity: ${ .items[0].quantity }
-                  - product_id: ${ .items[1].productId }
-                    quantity: ${ .items[1].quantity }
-                shipping_address:
-                  name: ${ .shippingAddress.name }
-                  street: ${ .shippingAddress.street }
-                  city: ${ .shippingAddress.city }
-                  state: ${ .shippingAddress.state }
-                  postal_code: ${ .shippingAddress.postalCode }
-                  country: ${ .shippingAddress.country }
-                shipping_method: "STANDARD"
-      catch:
-        as: failure
-        then: HandleShippingError
-        retry:
-          limit:
-            attempt:
-              count: 3
-      then: CompleteOrder
-  - CompleteOrder:
-      set:
-        status: "COMPLETED"
-        message: "Order processed successfully"
-        order_id: ${ .orderId }
-        tracking_number: ${ .ArrangeShipment.tracking_number }
-        estimated_delivery: ${ .ArrangeShipment.estimated_delivery }
-      then: end
-  - HandleInvalidCustomer:
-      set:
-        status: "REJECTED"
-        reason: "Invalid customer account"
-      then: end
-  - HandleValidationError:
-      set:
-        status: "ERROR"
-        reason: "Customer validation failed"
-        error: ${ $context.error }
-      then: end
+id: order-processing
+name: Order Processing with gRPC
+version: '1.0'
+specVersion: '1.0'
+start: ReceiveOrder
+functions:
+  - name: customerService
+    type: grpc
+    service: ecommerce.CustomerService
+    proto: file:///protos/customer.proto
+    operation: ValidateCustomer
+    host: customer-api.example.com:443
+    tls:
+      enabled: true
+    auth:
+      type: bearer
+      token: "${api_token}"
+  
+  - name: inventoryService
+    type: grpc
+    service: ecommerce.InventoryService
+    proto: file:///protos/inventory.proto
+    operation: CheckAvailability
+    host: inventory-api.example.com:443
+    tls:
+      enabled: true
+    auth:
+      type: bearer
+      token: "${api_token}"
+  
+  - name: pricingService
+    type: grpc
+    service: ecommerce.PricingService
+    proto: file:///protos/pricing.proto
+    operation: CalculateTotal
+    host: pricing-api.example.com:443
+    tls:
+      enabled: true
+    auth:
+      type: bearer
+      token: "${api_token}"
+  
+  - name: paymentService
+    type: grpc
+    service: ecommerce.PaymentService
+    proto: file:///protos/payment.proto
+    operation: ProcessPayment
+    host: payment-api.example.com:443
+    tls:
+      enabled: true
+    auth:
+      type: bearer
+      token: "${api_token}"
+  
+  - name: orderService
+    type: grpc
+    service: ecommerce.OrderService
+    proto: file:///protos/order.proto
+    operation: CreateOrder
+    host: order-api.example.com:443
+    tls:
+      enabled: true
+    auth:
+      type: bearer
+      token: "${api_token}"
+  
+  - name: shippingService
+    type: grpc
+    service: ecommerce.ShippingService
+    proto: file:///protos/shipping.proto
+    operation: ScheduleShipment
+    host: shipping-api.example.com:443
+    tls:
+      enabled: true
+    auth:
+      type: bearer
+      token: "${api_token}"
+tasks:
+  - name: ReceiveOrder
+    type: set
+    data:
+      orderId: "$WORKFLOW.input.orderId"
+      customerId: "$WORKFLOW.input.customerId"
+      items: "$WORKFLOW.input.items"
+      shippingAddress: "$WORKFLOW.input.shippingAddress"
+      paymentMethod: "$WORKFLOW.input.paymentMethod"
+    next: ValidateCustomer
+  
+  - name: ValidateCustomer
+    type: try
+    retry:
+      maxAttempts: 3
+      interval: PT2S
+    catch:
+      - error: "GRPC_NOT_FOUND"
+        next: HandleInvalidCustomer
+      - error: "*"
+        next: HandleValidationError
+    do:
+      - name: CheckCustomer
+        type: call
+        function: customerService
+        data:
+          customer_id: ".customerId"
+    next: CheckInventory
+  
+  - name: CheckInventory
+    type: try
+    retry:
+      maxAttempts: 2
+    catch:
+      - error: "*"
+        next: HandleInventoryError
+    do:
+      - name: VerifyInventory
+        type: call
+        function: inventoryService
+        data:
+          items:
+            - product_id: ".items[0].productId"
+              quantity: ".items[0].quantity"
+            - product_id: ".items[1].productId"
+              quantity: ".items[1].quantity"
+    next: EvaluateInventory
+  
+  - name: EvaluateInventory
+    type: switch
+    conditions:
+      - condition: ".available == true"
+        next: CalculateTotal
+      - condition: true
+        next: HandleUnavailableInventory
+  
+  - name: CalculateTotal
+    type: try
+    catch:
+      - error: "*"
+        next: HandlePricingError
+    do:
+      - name: ComputePrice
+        type: call
+        function: pricingService
+        data:
+          customer_id: ".customerId"
+          items:
+            - product_id: ".items[0].productId"
+              quantity: ".items[0].quantity"
+            - product_id: ".items[1].productId"
+              quantity: ".items[1].quantity"
+          coupon_code: ".couponCode"
+    next: ProcessPayment
+  
+  - name: ProcessPayment
+    type: try
+    retry:
+      maxAttempts: 2
+    catch:
+      - error: "GRPC_FAILED_PRECONDITION"
+        next: HandlePaymentRejected
+      - error: "*"
+        next: HandlePaymentError
+    do:
+      - name: ChargePayment
+        type: call
+        function: paymentService
+        data:
+          customer_id: ".customerId"
+          order_id: ".orderId"
+          amount: ".total.amount"
+          currency: ".total.currency"
+          payment_method:
+            type: ".paymentMethod.type"
+            card_token: ".paymentMethod.cardToken"
+    next: CreateOrder
+  
+  - name: CreateOrder
+    type: try
+    retry:
+      maxAttempts: 3
+    catch:
+      - error: "*"
+        next: HandleOrderCreationError
+    do:
+      - name: SubmitOrder
+        type: call
+        function: orderService
+        data:
+          order_id: ".orderId"
+          customer_id: ".customerId"
+          items:
+            - product_id: ".items[0].productId"
+              quantity: ".items[0].quantity"
+              price: ".ComputePrice.item_prices[0].price"
+            - product_id: ".items[1].productId"
+              quantity: ".items[1].quantity"
+              price: ".ComputePrice.item_prices[1].price"
+          total: ".total"
+          payment:
+            transaction_id: ".ChargePayment.transaction_id"
+            status: ".ChargePayment.status"
+    next: ScheduleShipment
+  
+  - name: ScheduleShipment
+    type: try
+    retry:
+      maxAttempts: 3
+    catch:
+      - error: "*"
+        next: HandleShippingError
+    do:
+      - name: ArrangeShipment
+        type: call
+        function: shippingService
+        data:
+          order_id: ".orderId"
+          items:
+            - product_id: ".items[0].productId"
+              quantity: ".items[0].quantity"
+            - product_id: ".items[1].productId"
+              quantity: ".items[1].quantity"
+          shipping_address:
+            name: ".shippingAddress.name"
+            street: ".shippingAddress.street"
+            city: ".shippingAddress.city"
+            state: ".shippingAddress.state"
+            postal_code: ".shippingAddress.postalCode"
+            country: ".shippingAddress.country"
+          shipping_method: "STANDARD"
+    next: CompleteOrder
+  
+  - name: CompleteOrder
+    type: set
+    data:
+      status: "COMPLETED"
+      message: "Order processed successfully"
+      order_id: ".orderId"
+      tracking_number: ".ArrangeShipment.tracking_number"
+      estimated_delivery: ".ArrangeShipment.estimated_delivery"
+    end: true
+  
+  # Error handling tasks
+  - name: HandleInvalidCustomer
+    type: set
+    data:
+      status: "REJECTED"
+      reason: "Invalid customer account"
+    end: true
+  
+  - name: HandleValidationError
+    type: set
+    data:
+      status: "ERROR"
+      reason: "Customer validation failed"
+      error: "$WORKFLOW.error"
+    end: true
+  
+  # Additional error handlers for other steps...
 ```
 
 This workflow uses gRPC services to process an order from validation to shipment, with appropriate error handling at each step.

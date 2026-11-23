@@ -12,8 +12,8 @@ The `run: workflow` task allows a workflow to invoke and execute another Open Wo
 
 ```yaml
 document:
-  dsl: '1.0.3'
-  namespace: main-orchestration
+  dsl: '1.0.0'
+  namespace: main_orchestration
   name: order-processing
   version: '1.1.0'
 # Assume 'inventory-check' workflow exists in 'shared_services' namespace
@@ -25,22 +25,20 @@ do:
           name: inventory-check      # Name of the workflow to run
           version: '1.0.0'           # Specific version to run
           # Pass required input to the sub-workflow
-          input:
+          input: 
             productId: "${ .order.itemId }"
             quantity: "${ .order.quantity }"
         # `await: true` (default) waits for the sub-workflow to complete
         # `return: stdout` (default) captures the sub-workflow's final output
-        return: stdout
+        return: stdout 
       # Output of this task is the final output of 'inventory-check'
       then: processInventoryResult
   - processInventoryResult:
       # Input might be { available: true, stockLevel: 150 }
       switch:
-        - case1:
-            then: proceedToPayment
-            when: "${ .available == true }"
-        - case2:
-            then: notifyOutOfStock
+        - if: "${ .available == true }"
+          then: proceedToPayment
+        - then: notifyOutOfStock # Default case
 ```
 
 ## Additional Examples
@@ -52,11 +50,10 @@ do:
   - runLatestUtility:
       run:
         workflow:
-          namespace: shared-utilities
+          namespace: shared_utilities
           name: data-cleanup
           # version: 'latest' # Implicitly defaults to latest
-          input: {targetDir: "${ .tempDirectory }"}
-          version: latest
+          input: { targetDir: "${ .tempDirectory }" }
         return: stdout # Get the output of the latest cleanup workflow
       then: processCleanupResult
 ```
@@ -84,20 +81,18 @@ do:
 do:
   - trySubWorkflow:
       try:
-        - attempt:
-            run:
-              workflow:
-                namespace: experimental
-                name: potentially-failing-job
-                version: '0.1-beta'
-                input:
+        run:
+          workflow:
+            namespace: experimental
+            name: potentially-failing-job
+            version: '0.1-beta'
+            input: "${ . }"
           # `await: true` is default
           # `return: stdout` is default, but will fail if sub-workflow faults
-                  data: "${ . }"
       catch:
         # Catch any error from the sub-workflow execution itself
-        errors:
-          with: {type: "https://open-workflow-specification.org/spec/1.0.0/errors/runtime"}
+        errors: 
+          with: { type: "https://open-workflow-specification.org/spec/1.0.0/errors/runtime" }
         as: runtimeError
         do:
           - logSubWorkflowFailure:
@@ -105,7 +100,7 @@ do:
               with:
                 message: "Sub-workflow experimental/potentially-failing-job faulted"
                 # Note: Accessing the sub-workflow's specific error might require `return: all` or `return: stderr` in the `run` task and inspecting the result within the catch block.
-                details: "${ $runtimeError }"
+                details: "${ $runtimeError }" 
 
 ```
 
@@ -116,25 +111,22 @@ do:
   - executeSubflowAndCheck:
       run:
         workflow:
-          namespace: validation-service
+          namespace: validation_service
           name: input-validator
           version: '1.3'
-          input: {data: "${ .rawData }"}
+          input: { data: "${ .rawData }" }
         # Get status code, stdout (if completed), and stderr (if faulted)
-        return: all
+        return: all 
       then: routeBasedOnSubflowResult
   - routeBasedOnSubflowResult:
       # Input: { "code": 0, "stdout": { "isValid": true }, "stderr": null } OR
       # Input: { "code": 1, "stdout": null, "stderr": { "type": "...", "title": "Validation Failed", ... } }
       switch:
-        - case1:
-            then: processValidData
-            when: ${ .code == 0 and .stdout.isValid == true }
-        - case2:
-            then: handleInvalidData
-            when: ${ .code == 0 and .stdout.isValid == false }
-        - case3:
-            then: handleSubflowError
+        - if: "${ .code == 0 and .stdout.isValid == true }"
+          then: processValidData
+        - if: "${ .code == 0 and .stdout.isValid == false }"
+          then: handleInvalidData
+        - then: handleSubflowError # If .code is non-zero
 ```
 
 ## Configuration Options

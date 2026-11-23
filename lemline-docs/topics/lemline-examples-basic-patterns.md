@@ -10,7 +10,7 @@ The simplest workflow pattern is a sequence of tasks executed one after another.
 
 ```yaml
 document:
-  dsl: '1.0.3'
+  dsl: '1.0.0'
   namespace: examples
   name: call-http-shorthand-endpoint
   version: '0.1.0'
@@ -28,7 +28,7 @@ In this example, a single HTTP GET request is made to retrieve pet data. The wor
 
 ```yaml
 document:
-  dsl: '1.0.3'
+  dsl: '1.0.0'
   namespace: examples
   name: call-http-shorthand-endpoint
   version: '0.1.0'
@@ -58,7 +58,7 @@ Tasks can be nested to group related operations and create hierarchical structur
 
 ```yaml
 document:
-  dsl: '1.0.3'
+  dsl: '1.0.0-alpha5'
   namespace: examples
   name: call-http-shorthand-endpoint
   version: '0.1.0'
@@ -110,7 +110,7 @@ The `switch` construct allows workflows to implement conditional logic, executin
 
 ```yaml
 document:
-  dsl: '1.0.3'
+  dsl: '1.0.0'
   namespace: test
   name: sample-workflow
   version: 0.1.0
@@ -162,7 +162,7 @@ Workflows often need to iterate over collections of data or repeat tasks until c
 
 ```yaml
 document:
-  dsl: '1.0.3'
+  dsl: '1.0.0'
   namespace: test
   name: for-example
   version: '0.1.0'
@@ -206,7 +206,7 @@ The `set` construct allows workflows to create or modify variables.
 
 ```yaml
 document:
-  dsl: '1.0.3'
+  dsl: '1.0.0'
   namespace: test
   name: set
   version: '0.1.0'
@@ -234,7 +234,7 @@ Additional `set` capabilities:
 
 ```yaml
 document:
-  dsl: '1.0.3'
+  dsl: '1.0.0'
   namespace: examples
   name: advanced-set
   version: '0.1.0'
@@ -245,11 +245,14 @@ do:
           name: "John Doe"
           role: "admin"
           permissions: ["read", "write"]
-        timestamp: '${ now }'
+        timestamp: ${ now() }
   - transformData:
       set:
-        enrichedUser: '${ .user + { lastAccess: (.timestamp), isAdmin: (.user.role == "admin"), permissionCount: ((.user.permissions
-          | length))} }'
+        enrichedUser: ${ .user + { 
+          lastAccess: .timestamp,
+          isAdmin: .user.role == "admin",
+          permissionCount: length(.user.permissions)
+        } }
 ```
 
 This advanced example shows:
@@ -266,15 +269,18 @@ These basic patterns can be combined to create more complex workflows.
 
 ```yaml
 document:
-  dsl: '1.0.3'
+  dsl: '1.0.0'
   namespace: examples
   name: combined-patterns
   version: '0.1.0'
 do:
   - initialize:
       set:
-        items: [{"id": 1, "type": "digital", "name": "E-book"}, {"id": 2, "type": "physical", "name": "Notebook"}, {"id":
-                3, "type": "digital", "name": "Software"}]
+        items: [
+          { "id": 1, "type": "digital", "name": "E-book" },
+          { "id": 2, "type": "physical", "name": "Notebook" },
+          { "id": 3, "type": "digital", "name": "Software" }
+        ]
   - processItems:
       for:
         each: item
@@ -284,30 +290,24 @@ do:
             switch:
               - digitalItem:
                   when: $item.type == "digital"
-                  then: determineProcessingType-digitalItem
+                  then:
+                    do:
+                      - processDigital:
+                          set:
+                            processed: ${ $item + { "status": "processed", "downloadReady": true } }
               - physicalItem:
                   when: $item.type == "physical"
-                  then: determineProcessingType-physicalItem
-        - determineProcessingType-digitalItem:
-            do:
-              - processDigital:
-                  set:
-                    processed: '${ $item + { "status": "processed", "downloadReady": true } }'
-            then: determineProcessingType-done
-        - determineProcessingType-physicalItem:
-            do:
-              - processPhysical:
-                  set:
-                    processed: '${ $item + { "status": "processed", "shippingRequired": true } }'
-            then: determineProcessingType-done
-        - determineProcessingType-done:
-            set: ${ . }
+                  then:
+                    do:
+                      - processPhysical:
+                          set:
+                            processed: ${ $item + { "status": "processed", "shippingRequired": true } }
         - logResult:
             call: http
             with:
               method: post
               endpoint: https://example.com/log
-              body: '${ $processed }'
+              body: ${ $processed }
 ```
 
 This complex example demonstrates:

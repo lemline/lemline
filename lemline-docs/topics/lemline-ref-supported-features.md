@@ -1,10 +1,10 @@
 # Open Workflow DSL Supported Features
 
-This reference documents which features of the [Open Workflow DSL v1.0.3](https://github.com/open-workflow-specification/specification/tree/v1.0.3) are currently supported in Lemline, and any implementation-specific details or limitations.
+This reference documents which features of the [Open Workflow DSL v1.0](https://github.com/open-workflow-specification/specification/tree/v1.0.0) are currently supported in Lemline, and any implementation-specific details or limitations.
 
 ## Implementation Status Overview
 
-Lemline implements a subset of the Open Workflow DSL 1.0.3 specification, with more features being added in each release. This document provides a comprehensive view of what's currently supported and what's planned for future releases.
+Lemline implements a subset of the Open Workflow DSL 1.0 specification, with more features being added in each release. This document provides a comprehensive view of what's currently supported and what's planned for future releases.
 
 ## Core Features Support
 
@@ -43,8 +43,8 @@ Lemline implements a subset of the Open Workflow DSL 1.0.3 specification, with m
 | gRPC Calls | ❌ Not supported | Parsed, but no runtime executor |
 | GraphQL | ⚠️ Planned | On roadmap for future release |
 | Expression Evaluation | ✅ Supported | Via `set` construct |
-| Container Execution | ❌ Not supported | The SDK parses `run.container`; Lemline has no container executor |
-| Script Execution | ⚠️ Partial | JavaScript and Python. See the SDK differences below. |
+| Container Execution | ⚠️ Partial | Basic support via `run` construct |
+| Script Execution | ⚠️ Partial | Basic JavaScript support |
 | Event Emission | ✅ Supported | Via `emit` construct |
 | Wait/Delay | ✅ Supported | Via `wait` construct |
 | Custom Function Calls | ✅ Supported | Via function catalog |
@@ -94,18 +94,25 @@ Lemline implements a subset of the Open Workflow DSL 1.0.3 specification, with m
 | Tracing Integration | ✅ Supported | OpenTelemetry support |
 | Kubernetes Integration | ✅ Supported | Native Kubernetes support |
 
-## SDK schema and version support
+## Specification Deviations
 
-Use `document.dsl: '1.0.3'` for new definitions. Lemline validates YAML and JSON with the [schema shipped by Java SDK 7.35.3.Final](https://github.com/open-workflow-specification/sdk-java/blob/7.35.3.Final/types/src/main/resources/schema/workflow.yaml). An existing workflow declaring `1.0.0` goes through the same validator.
+In some areas, Lemline introduces minor deviations from the Open Workflow Specification to enhance usability or performance:
 
-| Feature | Official 1.0.3 tag | Lemline with the pinned SDK |
-|---------|--------------------|-----------------------------|
-| `run.script.arguments` | Ordered array of strings | Map of argument names to values |
-| `run.script.stdin` | Optional string | Rejected during validation |
-| `run.shell.arguments` and `stdin` | Ordered array and optional string | Both supported |
-| `evaluate`, `schedule.read`, `catch.then` | Absent from the tagged schema | Supported |
+1. **Enhanced JQ Support**: Extended JQ features for more powerful expressions
+2. **Simplified Control Flow**: More intuitive control flow constructs
+3. **Expanded Error Types**: More granular error type hierarchy
+4. **Additional Timeout Options**: More flexible timeout configurations
+5. **Expanded Authentication Options**: Additional authentication mechanisms
 
-The SDK also accepts a literal array in `for.in` and makes the source optional for emitted events. The tag accepts an expression for `for.in` and requires an explicit event source. In error filters, use `catch.errors.with.detail` (singular) with Lemline; the tagged schema uses `details`.
+These deviations maintain compatibility with the core specification while providing additional capabilities.
+
+## Version Support
+
+Lemline currently supports these versions of the Open Workflow Specification:
+
+- 1.0 (partial support)
+- 0.8 (better coverage)
+- 0.7 (extensive coverage)
 
 ## Implementation Roadmap
 
@@ -137,4 +144,4 @@ Lemline has no standalone validation command. `lemline definition post` parses e
 - [DSL Syntax Reference](lemline-ref-dsl-syntax.md)
 - [Task Types Reference](lemline-ref-task-types.md)
 - [Configuration Reference](lemline-ref-config.md)
-- [Open Workflow Specification v1.0.3](https://github.com/open-workflow-specification/specification/tree/v1.0.3)
+- [Open Workflow Specification v1.0](https://github.com/open-workflow-specification/specification/tree/v1.0.0)
