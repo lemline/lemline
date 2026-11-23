@@ -137,7 +137,7 @@ Lemline documentation uses Markdown with these conventions:
 
 #### Links
 
-- Use descriptive link text: [Creating a workflow](workflow-creation.md) instead of [click here](workflow-creation.md)
+- Use descriptive link text: `[Creating a workflow](workflow-creation.md)` instead of `[click here](workflow-creation.md)`
 - For external links, indicate when they open outside the documentation
 - Use relative links for internal documentation
 
@@ -181,12 +181,12 @@ the pull request checks can validate the same definition Writerside displays.
 - Separate command from output
 - Use backslashes for line continuation
 
-```markdown
+````markdown
 ```bash
 $ lemline instance start examples hello-world 0.1.0
 Instance 0190a5d2-7c3e-7b4a-9f0e-3d2c1b0a9f8e started successfully (name: hello-world, version: 0.1.0, input: {})
 ```
-```
+````
 
 ### Example Best Practices
 
@@ -230,8 +230,6 @@ Maintain consistency with these key terms:
 - **Node** - An individual step within a workflow
 - **Token** - A marker representing execution position
 - **Task** - A unit of work within a workflow
-
-For a complete list, refer to the [Lemline Glossary](glossary.md).
 
 ### Abbreviations and Acronyms
 

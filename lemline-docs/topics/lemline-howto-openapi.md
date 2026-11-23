@@ -15,5 +15,5 @@ Set `with.document.endpoint` to the OpenAPI document, select an operation using
 
 <code-block lang="yaml" src="workflows/lemline-examples-integrations/basic-openapi-call.yaml"/>
 
-See the [OpenAPI Task](dsl-call-openapi.md) for configuration options. With Lemline,
+See the [OpenAPI Task](https://github.com/open-workflow-specification/specification/blob/v1.0.0/dsl-reference.md#openapi-call) for configuration options. With Lemline,
 call the specific service operation using [an HTTP task](lemline-howto-http.md).

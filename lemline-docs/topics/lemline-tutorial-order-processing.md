@@ -35,5 +35,5 @@ lemline instance start examples compensate-reservation --input '{"orderId":"ORD-
 Test a successful charge and a failed charge. Inspect the payment and inventory
 services to verify that the reservation is released on the failure path.
 
-See [Event Correlation](dsl-event-correlation.md) to extend the pattern with a
+See [Event Correlation](https://github.com/open-workflow-specification/specification/blob/v1.0.0/dsl-reference.md#correlation) to extend the pattern with a
 payment confirmation event.

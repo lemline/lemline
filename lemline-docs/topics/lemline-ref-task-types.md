@@ -6,18 +6,18 @@ for which configuration variants Lemline can execute.
 
 | Task | Purpose |
 | --- | --- |
-| [`do`](dsl-task-do.md) | Group tasks in a nested list |
-| [`set`](dsl-task-set.md) | Construct a value from literal data and expressions |
-| [`switch`](dsl-task-switch.md) | Choose a flow directive using conditions |
-| [`for`](dsl-task-for.md) | Iterate over a collection |
-| [`fork`](dsl-task-fork.md) | Run independent branches concurrently |
-| [`wait`](dsl-task-wait.md) | Pause an instance for a duration |
-| [`try`](dsl-task-try.md) | Catch errors, retry or run a fallback |
-| [`raise`](dsl-task-raise.md) | Raise a defined or inline workflow error |
-| [`emit`](dsl-task-emit.md) | Publish a CloudEvent |
-| [`listen`](dsl-task-listen.md) | Wait for matching CloudEvents |
-| [`call`](dsl-call-overview.md) | Invoke a service or workflow function |
-| [`run`](dsl-run-overview.md) | Invoke a child workflow or other process |
+| [`do`](https://github.com/open-workflow-specification/specification/blob/v1.0.0/dsl-reference.md#do) | Group tasks in a nested list |
+| [`set`](https://github.com/open-workflow-specification/specification/blob/v1.0.0/dsl-reference.md#set) | Construct a value from literal data and expressions |
+| [`switch`](https://github.com/open-workflow-specification/specification/blob/v1.0.0/dsl-reference.md#switch) | Choose a flow directive using conditions |
+| [`for`](https://github.com/open-workflow-specification/specification/blob/v1.0.0/dsl-reference.md#for) | Iterate over a collection |
+| [`fork`](https://github.com/open-workflow-specification/specification/blob/v1.0.0/dsl-reference.md#fork) | Run independent branches concurrently |
+| [`wait`](https://github.com/open-workflow-specification/specification/blob/v1.0.0/dsl-reference.md#wait) | Pause an instance for a duration |
+| [`try`](https://github.com/open-workflow-specification/specification/blob/v1.0.0/dsl-reference.md#try) | Catch errors, retry or run a fallback |
+| [`raise`](https://github.com/open-workflow-specification/specification/blob/v1.0.0/dsl-reference.md#raise) | Raise a defined or inline workflow error |
+| [`emit`](https://github.com/open-workflow-specification/specification/blob/v1.0.0/dsl-reference.md#emit) | Publish a CloudEvent |
+| [`listen`](https://github.com/open-workflow-specification/specification/blob/v1.0.0/dsl-reference.md#listen) | Wait for matching CloudEvents |
+| [`call`](https://github.com/open-workflow-specification/specification/blob/v1.0.0/dsl-reference.md#call) | Invoke a service or workflow function |
+| [`run`](https://github.com/open-workflow-specification/specification/blob/v1.0.0/dsl-reference.md#run) | Invoke a child workflow or other process |
 
 ## Connect tasks
 

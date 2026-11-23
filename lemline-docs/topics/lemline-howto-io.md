@@ -52,7 +52,7 @@ By default, each task receives the output of the previous task as its input:
 
 You can transform the input data before task execution:
 
-<code-block lang="yaml" src="workflows/lemline-howto-io/input-transformation.yaml" include-lines="7-21"/>
+<code-block lang="yaml" src="workflows/lemline-howto-io/input-transformation.yaml" include-lines="7-20"/>
 
 The `input.from` field lets you reshape the incoming data before it's used in the task.
 
@@ -78,7 +78,7 @@ This task produces an output object with `status`, `result`, and `timestamp` fie
 
 You can transform the output data before passing it to the next task:
 
-<code-block lang="yaml" src="workflows/lemline-howto-io/output-transformation.yaml" include-lines="7-15"/>
+<code-block lang="yaml" src="workflows/lemline-howto-io/output-transformation.yaml" include-lines="7-14"/>
 
 The `output.as` field reshapes the task result before it's passed to the next task.
 

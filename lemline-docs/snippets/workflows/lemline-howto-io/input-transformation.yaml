@@ -13,9 +13,8 @@ do:
           phone: ${ .contactInfo.phone }
       input:
         from:
-          transform:
-            user: ${ .userProfile }
-            contactInfo:
-              email: ${ .userProfile.email | ascii_downcase }
-              phone: ${ .userProfile.phone | gsub("[^0-9]"; "") }
+          user: ${ .userProfile }
+          contactInfo:
+            email: ${ .userProfile.email | ascii_downcase }
+            phone: ${ .userProfile.phone | gsub("[^0-9]"; "") }
       then: NextTask

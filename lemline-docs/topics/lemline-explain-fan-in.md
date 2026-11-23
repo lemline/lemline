@@ -31,4 +31,4 @@ branch, place the handler in that branch.
 
 <code-block lang="yaml" src="workflows/reference/parallel-checks-with-fallback.yaml"/>
 
-See [Parallel Tasks](lemline-howto-parallel.md) and [Event Correlation](dsl-event-correlation.md).
+See [Parallel Tasks](lemline-howto-parallel.md) and [Event Correlation](https://github.com/open-workflow-specification/specification/blob/v1.0.0/dsl-reference.md#correlation).

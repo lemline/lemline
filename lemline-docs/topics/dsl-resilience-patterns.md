@@ -8,11 +8,11 @@ Lemline does not provide circuit breakers, bulkheads, rate limiting or per-call 
 
 ## Retry Pattern
 
-### Purpose
+### Purpose {id="retry-pattern-purpose"}
 
 Retry an operation automatically when a transient failure occurs.
 
-### Implementation
+### Implementation {id="retry-pattern-implementation"}
 
 Retries are declared in the `catch` clause of a `try` task:
 
@@ -46,11 +46,11 @@ Catch an error and continue with a default value or an alternative path:
 
 ## Timeout Pattern
 
-### Purpose
+### Purpose {id="timeout-pattern-purpose"}
 
 Avoid waiting forever.
 
-### Implementation
+### Implementation {id="timeout-pattern-implementation"}
 
 - **Event waits**: a `listen` task accepts a `timeout`. When it expires, the task raises a `timeout` error that can be caught.
 - **HTTP calls**: the runner's HTTP client stops a request after 30 seconds (15 seconds to connect). This limit is fixed.

@@ -29,4 +29,4 @@ to supply named values for the child workflow.
 
 <code-block lang="yaml" src="workflows/reference/invoke-order-workflow.yaml"/>
 
-See [Run Workflow](dsl-run-workflow.md) for awaiting completion and handling results.
+See [Run Workflow](https://github.com/open-workflow-specification/specification/blob/v1.0.0/dsl-reference.md#workflow-process) for awaiting completion and handling results.

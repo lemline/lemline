@@ -9,21 +9,21 @@ where you fit in these personas can help you navigate our documentation more eff
 
 ## Back-end Developers
 
-### Profile
+### Profile {id="developers-profile"}
 
 - Implement business logic and services
 - Connect systems and handle data flow
 - Work with APIs, events, and messaging
 - Care about code quality and maintainability
 
-### How Lemline Helps
+### How Lemline Helps {id="developers-how-lemline-helps"}
 
 - Declarative workflow definitions that are easy to read and maintain
 - Simple integration with HTTP, gRPC, and other service types
 - Built-in error handling and retry mechanisms
 - Clear separation between workflow logic and implementation details
 
-### Documentation Path
+### Documentation Path {id="developers-documentation-path"}
 
 1. Start with the [Hello Workflow Tutorial](lemline-tutorial-hello.md)
 2. Explore how-to guides for [defining workflows](lemline-howto-define-workflow.md)
@@ -34,21 +34,21 @@ where you fit in these personas can help you navigate our documentation more eff
 
 ## Architects Designing Event-Driven Systems
 
-### Profile
+### Profile {id="architects-profile"}
 
 - Design system architecture and integration patterns
 - Make technology and framework selections
 - Balance technical debt, performance, and maintainability
 - Establish best practices and standards
 
-### How Lemline Helps
+### How Lemline Helps {id="architects-how-lemline-helps"}
 
 - Database-optional design reduces infrastructure requirements
 - Event-driven architecture aligns with modern system design
 - Flexible deployment options from single instance to clustered
 - Standards-based approach with the Open Workflow DSL
 
-### Documentation Path
+### Documentation Path {id="architects-documentation-path"}
 
 1. Start with [Why Lemline Exists](lemline-why-exists.md)
 2. Understand [How Lemline Executes Workflows](lemline-explain-execution.md)
@@ -58,14 +58,14 @@ where you fit in these personas can help you navigate our documentation more eff
 
 ## Platform Engineers
 
-### Profile
+### Profile {id="platform-engineers-profile"}
 
 - Build and maintain platforms for development teams
 - Focus on reliability, observability, and scalability
 - Manage infrastructure and operational concerns
 - Implement CI/CD pipelines and monitoring
 
-### How Lemline Helps
+### How Lemline Helps {id="platform-engineers-how-lemline-helps"}
 
 - Reduced database overhead means lower operational costs
 - Horizontally scalable to handle varying workloads
@@ -73,7 +73,7 @@ where you fit in these personas can help you navigate our documentation more eff
 - Consistent logging and observability patterns
 - Native support for containerization and cloud deployment
 
-### Documentation Path
+### Documentation Path {id="platform-engineers-documentation-path"}
 
 1. Begin with [Runner Configuration](lemline-howto-config.md)
 2. Learn about [connecting to brokers](lemline-howto-brokers.md)
@@ -83,21 +83,21 @@ where you fit in these personas can help you navigate our documentation more eff
 
 ## Integration Specialists
 
-### Profile
+### Profile {id="integration-specialists-profile"}
 
 - Connect disparate systems and services
 - Work with multiple protocols and data formats
 - Handle authentication and security concerns
 - Build reliable and maintainable integrations
 
-### How Lemline Helps
+### How Lemline Helps {id="integration-specialists-how-lemline-helps"}
 
 - First-class support for HTTP, OpenAPI, gRPC, and AsyncAPI
 - Consistent authentication across different protocols
 - Built-in retry and error handling for unreliable services
 - Simplified event correlation for complex integration scenarios
 
-### Documentation Path
+### Documentation Path {id="integration-specialists-documentation-path"}
 
 1. Start with task-specific guides for [HTTP](lemline-howto-http.md), [OpenAPI](lemline-howto-openapi.md),
    and [gRPC](lemline-howto-grpc.md)

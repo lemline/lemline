@@ -114,6 +114,6 @@ HTTP calls are not retried automatically. Use `try` with `retry`:
 
 ## Related Resources
 
-- [Call HTTP task](dsl-call-http.md)
-- [Error Handling](dsl-error-handling.md)
+- [Call HTTP task](https://github.com/open-workflow-specification/specification/blob/v1.0.0/dsl-reference.md#http-call)
+- [Error Handling](https://github.com/open-workflow-specification/specification/blob/v1.0.0/dsl.md#fault-tolerance)
 - [Understanding Security in Lemline](lemline-explain-security.md)

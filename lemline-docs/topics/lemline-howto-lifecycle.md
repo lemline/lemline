@@ -32,7 +32,7 @@ Lemline does not enforce workflow-level timeouts yet, nor timeouts on tasks othe
 
 <code-block lang="yaml" src="workflows/lemline-howto-lifecycle/bounding-how-long-a-workflow-waits.yaml" include-lines="6-15"/>
 
-When the timeout expires, the task faults with a `timeout` error, which a `try` task can catch. See [Timeouts](dsl-timeouts.md).
+When the timeout expires, the task faults with a `timeout` error, which a `try` task can catch. See [Timeouts](https://github.com/open-workflow-specification/specification/blob/v1.0.0/dsl.md#timeouts).
 
 ## Pausing Until an External Signal
 
@@ -62,7 +62,7 @@ Lemline emits lifecycle CloudEvents that external systems can consume:
 | `org.open-workflow-specification.task.faulted.v1` | A task faults |
 | `org.open-workflow-specification.task.retried.v1` | A task is retried |
 
-They are published on the lifecycle events channel and shown in the dashboard. See [Lifecycle Events](dsl-lifecycle-events.md).
+They are published on the lifecycle events channel and shown in the dashboard. See [Lifecycle Events](https://github.com/open-workflow-specification/specification/blob/v1.0.0/dsl-reference.md#lifecycle-events).
 
 ## Next Steps
 

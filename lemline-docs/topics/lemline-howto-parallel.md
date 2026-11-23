@@ -23,6 +23,6 @@ A `listen` task can collect events produced by independent services. In this exa
 
 <code-block lang="yaml" src="workflows/reference/listen-for-all-results.yaml"/>
 
-Use a [For Task](dsl-task-for.md) to iterate over a collection at runtime. See
+Use a [For Task](https://github.com/open-workflow-specification/specification/blob/v1.0.0/dsl-reference.md#for) to iterate over a collection at runtime. See
 [Fan-Out and Fan-In](lemline-explain-fan-in.md) for the difference between iteration,
 forking tasks and waiting for events.

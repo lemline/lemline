@@ -29,4 +29,4 @@ Here a missing order ID exits the inner `do` list. The outer list resumes at `fi
 
 <code-block lang="yaml" src="workflows/reference/exit-nested-scope.yaml"/>
 
-See [Flow Control](dsl-flow-control.md) for task and workflow completion behavior.
+See [Flow Control](https://github.com/open-workflow-specification/specification/blob/v1.0.0/dsl.md#task-flow) for task and workflow completion behavior.

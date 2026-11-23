@@ -88,4 +88,4 @@ Because `$secrets` is resolved again for each step, instances already in progres
 ## Related Resources
 
 - [Secrets Reference](lemline-ref-secrets.md)
-- [Secrets in the Open Workflow DSL](dsl-secrets.md)
+- [Secrets in the Open Workflow DSL](https://github.com/open-workflow-specification/specification/blob/v1.0.0/dsl.md#secret)

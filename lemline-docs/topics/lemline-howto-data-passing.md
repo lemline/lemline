@@ -23,4 +23,4 @@ values supplied when the workflow started.
 
 <code-block lang="yaml" src="workflows/reference/share-order-context.yaml"/>
 
-See [Data Flow](dsl-data-flow.md) for validation order and expression scopes.
+See [Data Flow](https://github.com/open-workflow-specification/specification/blob/v1.0.0/dsl.md#data-flow) for validation order and expression scopes.

@@ -14,4 +14,4 @@ a fallback result.
 
 To use the same policy in one place, put the policy object directly under `catch.retry`.
 Use the `when` or `exceptWhen` predicates to limit retries further. See the
-[Try Task reference](dsl-task-try.md) for error matching and fallback behavior.
+[Try Task reference](https://github.com/open-workflow-specification/specification/blob/v1.0.0/dsl-reference.md#try) for error matching and fallback behavior.
