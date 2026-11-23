@@ -12,16 +12,19 @@ use:
       with:
         method: post
         endpoint: https://order-service/validate
+        body: ${ . }
     checkInventoryFunc:
       call: http
       with:
         method: post
         endpoint: https://inventory-service/check
+        body: ${ . }
     processPaymentFunc:
       call: http
       with:
         method: post
         endpoint: https://payment-service/process
+        body: ${ . }
 do:
   - validateOrder:
       call: validateOrderFunc
