@@ -14,7 +14,7 @@ do:
         headers:
           Content-Type: "application/json"
       output:
-        as: '${ $input + { inventoryData: . } }'
+        as: '${ { inventoryData: . } }'
 
   - validateOrder:
       do:

@@ -11,6 +11,8 @@ do:
         hasFulfillableItems: true
       output:
         as: '${ $input + . }'
+      export:
+        as: '${ $context + { order: . } }'
       then: CheckOrderValidity
   - CheckOrderValidity:
       switch:
@@ -27,7 +29,9 @@ do:
         body:
           items: '${ .items | map({id: .productId, quantity: .quantity}) }'
       output:
-        as: '${ $input + . }'
+        as: '${ $context.order + . }'
+      export:
+        as: '${ $context + { order: . } }'
       then: EvaluateInventory
   - EvaluateInventory:
       switch:
@@ -44,7 +48,9 @@ do:
         items: ${ .availableItems as $available | .items | map(select(.productId as $id | $available | map(.id) | contains([$id]))) }
         message: Some items were unavailable and have been removed from your order.
       output:
-        as: '${ $input + . }'
+        as: '${ $context.order + . }'
+      export:
+        as: '${ $context + { order: . } }'
       then: CalculateShipping
   - CalculateShipping:
       call: http
@@ -55,7 +61,9 @@ do:
           destination: ${ .shippingAddress }
           items: ${ .items }
       output:
-        as: '${ $input + . }'
+        as: '${ $context.order + . }'
+      export:
+        as: '${ $context + { order: . } }'
       then: DetermineShippingMethod
   - DetermineShippingMethod:
       switch:
@@ -73,7 +81,9 @@ do:
         shippingCost: ${ .rates.express }
         estimatedDelivery: ${ .deliveryEstimates.express }
       output:
-        as: '${ $input + . }'
+        as: '${ $context.order + . }'
+      export:
+        as: '${ $context + { order: . } }'
       then: CalculateTotals
   - ApplyFreightShipping:
       set:
@@ -81,7 +91,9 @@ do:
         shippingCost: ${ .rates.freight }
         estimatedDelivery: ${ .deliveryEstimates.freight }
       output:
-        as: '${ $input + . }'
+        as: '${ $context.order + . }'
+      export:
+        as: '${ $context + { order: . } }'
       then: CalculateTotals
   - ApplyStandardShipping:
       set:
@@ -89,7 +101,9 @@ do:
         shippingCost: ${ .rates.standard }
         estimatedDelivery: ${ .deliveryEstimates.standard }
       output:
-        as: '${ $input + . }'
+        as: '${ $context.order + . }'
+      export:
+        as: '${ $context + { order: . } }'
       then: CalculateTotals
   - CalculateTotals:
       set:
@@ -97,7 +111,9 @@ do:
         tax: ${ (.items | map(.price * .quantity) | add) * 0.08 }
         total: ${ (.items | map(.price * .quantity) | add) * 1.08 + .shippingCost }
       output:
-        as: '${ $input + . }'
+        as: '${ $context.order + . }'
+      export:
+        as: '${ $context + { order: . } }'
       then: ProcessPayment
   - ProcessPayment:
       call: http
@@ -109,7 +125,9 @@ do:
           method: ${ .paymentMethod }
           currency: USD
       output:
-        as: '${ $input + . }'
+        as: '${ $context.order + . }'
+      export:
+        as: '${ $context + { order: . } }'
       then: EvaluatePayment
   - EvaluatePayment:
       switch:

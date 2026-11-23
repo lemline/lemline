@@ -104,6 +104,8 @@ Here's a complete example of an order processing workflow with multiple decision
 
 <code-block lang="yaml" src="workflows/lemline-howto-conditional/real-world-example-order-processing.yaml"/>
 
+A task replaces the data it received with its own result. To keep the order available to later tasks, each task that produces data merges its result into the order kept in `$context.order`.
+
 ## Best Practices for Switch Tasks
 
 1. **Order conditions from specific to general**: Put more specific conditions first
