@@ -14,10 +14,10 @@ do:
         itemCount: ${ .input.items | length }
 
         # Filtering arrays
-        expensiveItems: ${ .input.products[.price > 100] }
+        expensiveItems: '${ [.input.products[] | select(.price > 100)] }'
 
         # Mapping arrays
-        productNames: ${ .input.products[].name }
+        productNames: '${ [.input.products[].name] }'
 
         # Combining data
         combinedList: ${ .list1 + .list2 }
@@ -26,5 +26,5 @@ do:
         status: '${ if .input.approved then "APPROVED" else "PENDING" end }'
 
         # String operations
-        upperCaseName: ${ .input.name | upper }
-        formattedId: ${ .input.id | pad_left(10, "0") }
+        upperCaseName: ${ .input.name | ascii_upcase }
+        formattedId: '${ .input.id | tostring | ("0" * (10 - length)) + . }'

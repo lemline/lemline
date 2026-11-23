@@ -11,6 +11,6 @@ do:
           name: data-cleanup
           input:
             targetDir: ${ .tempDirectory }
-          version: 1.0.0
+          version: latest
         return: stdout
       then: processCleanupResult

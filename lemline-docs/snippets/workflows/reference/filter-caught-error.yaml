@@ -15,7 +15,7 @@ do:
         errors:
           with: { type: "https://open-workflow-specification.org/spec/1.0.0/errors/validation" }
         # Uses default 'error' variable -> $error
-        exceptWhen: "${ $error.detail | contains(\"userEmail\") }" # Don't catch if details mention userEmail
+        exceptWhen: "${ $error.details | contains(\"userEmail\") }" # Don't catch if details mention userEmail
         do:
           - rejectInput:
               set:

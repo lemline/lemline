@@ -17,5 +17,5 @@ do:
           status: "pending"
         authentication:
           bearer:
-            token: "${secrets.petstore_auth}"
+            token: "${ $secrets.petstore_auth }"
       then: checkUpdateStatus

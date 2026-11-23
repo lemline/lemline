@@ -7,7 +7,7 @@ do:
   - ValidatePaymentInfo:
       set:
         validPayment: true
-        formattedAmount: '"$" + (.amount | tostring)'
+        formattedAmount: '${ "$" + (.amount | tostring) }'
       input:
         schema:
           document:

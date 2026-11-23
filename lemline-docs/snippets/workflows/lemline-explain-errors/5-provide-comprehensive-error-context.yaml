@@ -10,4 +10,5 @@ do:
           type: https://example.com/errors/validation
           status: 400
           title: Invalid Record Type
+          detail: ${ "Record ID \(.recordId) has invalid type '\(.recordType)'" }
       if: '${ .recordType == "invalid" }'

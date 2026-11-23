@@ -96,7 +96,7 @@ Controls processing of data produced by a specific task.
   available as `$output` for `export.as`. Defaults to identity (`${. }`)
 * **`schema`** (Schema Definition, Optional): Validates the *transformed output* (after `output.as` is applied)
 
-<code-block lang="yaml" src="workflows/dsl-data-flow/output-object-optional-task-output.yaml" include-lines="7-20"/>
+<code-block lang="yaml" src="workflows/dsl-data-flow/output-object-optional-task-output.yaml" include-lines="7-19"/>
 
 ### `export` (Object, Optional)
 

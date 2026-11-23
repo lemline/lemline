@@ -19,7 +19,7 @@ is an array containing the results from both branches in the order they were def
 
 #### Example: Competing Branches (`compete: true`)
 
-<code-block lang="yaml" src="workflows/dsl-task-fork/example-competing-branches-compete-true.yaml" include-lines="7-24"/>
+<code-block lang="yaml" src="workflows/dsl-task-fork/example-competing-branches-compete-true.yaml" include-lines="6-24"/>
 
 Here, `getQuoteSourceA` and `getQuoteSourceB` run concurrently. Because `compete: true`, the `Fork` task finishes as
 soon as *one* of them completes successfully. The output passed to `processBestQuote` will be the result object from

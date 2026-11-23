@@ -10,7 +10,7 @@ do:
           image: my-data-processor:latest
           # Pass dynamic data via environment variables
           environment:
-            INPUT_FILE: "/data/${ .inputFile }"
+            INPUT_FILE: '${ "/data/" + .inputFile }'
             OUTPUT_DIR: "/results"
             API_KEY: "${ $secrets.processorApiKey }"
           # Mount host volumes into the container

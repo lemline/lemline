@@ -12,20 +12,35 @@ use:
         token: ${ $secrets.orderServiceApiKey }
 do:
   - placeOrder:
-      call: http
-      with:
-        method: post
-        endpoint:
-          uri: http://orders-service/api/v1/orders
-          authentication:
-            use: orderServiceAuth
-        headers:
-          Content-Type: application/json
-        body:
-          customerId: ${ .customerId }
-          items: ${ .items }
-      output:
-        as: orderResult
+      try:
+        - callOrderService:
+            call: http
+            with:
+              method: post
+              endpoint:
+                uri: http://orders-service/api/v1/orders
+                authentication:
+                  use: orderServiceAuth
+              headers:
+                Content-Type: application/json
+              body:
+                customerId: ${ .customerId }
+                items: ${ .items }
+            output:
+              as: '${ { orderResult: . } }'
+      catch:
+        do:
+          - handleOrderError:
+              emit:
+                event:
+                  with:
+                    source: https://petstore.com/orders
+                    type: com.petstore.order.error.v1
+                    subject: order-error
+                    data:
+                      error: ${ $error.details }
+                      customerId: ${ .customerId }
+              then: end
       then: emitOrderPlacedEvent
   - emitOrderPlacedEvent:
       emit:
@@ -41,14 +56,4 @@ do:
               orderId: ${ .orderResult.orderId }
               items: ${ .orderResult.items }
       output:
-        as: eventResult
-  - handleOrderError:
-      emit:
-        event:
-          with:
-            source: https://petstore.com/orders
-            type: com.petstore.order.error.v1
-            subject: order-error
-            data:
-              error: ${ .error.message }
-              customerId: ${ .customerId }
+        as: '${ { eventResult: . } }'

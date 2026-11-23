@@ -48,4 +48,4 @@ do:
             with:
               method: post
               endpoint: https://example.com/log
-              body: ${ $processed }
+              body: ${ .processed }

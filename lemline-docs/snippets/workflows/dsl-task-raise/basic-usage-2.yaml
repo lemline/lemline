@@ -13,4 +13,4 @@ do:
           type: https://mycompany.com/errors/out-of-stock
           title: "Insufficient Stock"
           status: 409 # Conflict
-          detail: "Requested ${ .requestedAmount }, but only ${ .stockCount } available."
+          detail: '${ "Requested \(.requestedAmount), but only \(.stockCount) available." }'

@@ -51,8 +51,8 @@ do:
                       Content-Type: application/json
                       X-API-Key: ${ $secrets.API_KEY }
                     body:
-                      email: ${ .email }
-                      name: ${ .name }
+                      email: ${ $workflow.input.email }
+                      name: ${ $workflow.input.name }
                       verificationStatus: verified
                   export:
                     as: '${ $context + { userAccount: . } }'
@@ -66,9 +66,9 @@ do:
                       Authorization: Bearer ${ $secrets.EMAIL_SERVICE_TOKEN }
                     body:
                       template: welcome
-                      recipient: ${ .email }
+                      recipient: ${ $workflow.input.email }
                       data:
-                        name: ${ .name }
+                        name: ${ $workflow.input.name }
                         accountId: ${ $context.userAccount.id }
             then: exit
         - defaultAction:

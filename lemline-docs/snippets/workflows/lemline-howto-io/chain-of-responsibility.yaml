@@ -6,7 +6,7 @@ document:
 do:
   - Step1:
       set:
-        intermediateResult: ${ .rawData | parse_json }
+        intermediateResult: ${ .rawData | fromjson }
       then: Step2
   - Step2:
       set:

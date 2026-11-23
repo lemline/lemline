@@ -12,3 +12,6 @@ do:
                 type: order.created
             - with:
                 type: order.cancelled
+      timeout:
+        after:
+          seconds: 30

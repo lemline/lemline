@@ -59,7 +59,7 @@ A critical rule is that a `then` directive specifying a task name **can only tar
 scope (level)**. You cannot use `then` to jump *into* or *out of* nested `Do` blocks or other flow constructs directly
 by name.
 
-<code-block lang="yaml" src="workflows/dsl-flow-control/targeting-a-specific-task-2.yaml" include-lines="7-18"/>
+<code-block lang="yaml" src="workflows/dsl-flow-control/targeting-a-specific-task-2.yaml" include-lines="7-19"/>
 
 To achieve jumps across scopes, you typically use `exit` to return control to the parent scope, which can then direct
 the flow using its own sequence or `then` directives.

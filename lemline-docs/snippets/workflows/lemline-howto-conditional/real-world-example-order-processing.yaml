@@ -9,6 +9,8 @@ do:
       set:
         isValid: ${ .items | length > 0 }
         hasFulfillableItems: true
+      output:
+        as: '${ $input + . }'
       then: CheckOrderValidity
   - CheckOrderValidity:
       switch:
@@ -24,6 +26,8 @@ do:
         endpoint: https://inventory-api.example.com/check
         body:
           items: '${ .items | map({id: .productId, quantity: .quantity}) }'
+      output:
+        as: '${ $input + . }'
       then: EvaluateInventory
   - EvaluateInventory:
       switch:
@@ -31,15 +35,16 @@ do:
             when: ${ .allAvailable == true }
             then: CalculateShipping
         - case2:
-            when: ${ .partiallyAvailable == true and .order.allowPartial == true }
+            when: ${ .partiallyAvailable == true and .allowPartial == true }
             then: AdjustForPartialInventory
         - case3:
             then: HandleOutOfStock
   - AdjustForPartialInventory:
       set:
-        items: ${ .items | map(select(.productId as $id | .availableItems | map(.id) | contains([$id])))
-          }
+        items: ${ .availableItems as $available | .items | map(select(.productId as $id | $available | map(.id) | contains([$id]))) }
         message: Some items were unavailable and have been removed from your order.
+      output:
+        as: '${ $input + . }'
       then: CalculateShipping
   - CalculateShipping:
       call: http
@@ -49,6 +54,8 @@ do:
         body:
           destination: ${ .shippingAddress }
           items: ${ .items }
+      output:
+        as: '${ $input + . }'
       then: DetermineShippingMethod
   - DetermineShippingMethod:
       switch:
@@ -65,24 +72,32 @@ do:
         shippingMethod: EXPRESS
         shippingCost: ${ .rates.express }
         estimatedDelivery: ${ .deliveryEstimates.express }
+      output:
+        as: '${ $input + . }'
       then: CalculateTotals
   - ApplyFreightShipping:
       set:
         shippingMethod: FREIGHT
         shippingCost: ${ .rates.freight }
         estimatedDelivery: ${ .deliveryEstimates.freight }
+      output:
+        as: '${ $input + . }'
       then: CalculateTotals
   - ApplyStandardShipping:
       set:
         shippingMethod: STANDARD
         shippingCost: ${ .rates.standard }
         estimatedDelivery: ${ .deliveryEstimates.standard }
+      output:
+        as: '${ $input + . }'
       then: CalculateTotals
   - CalculateTotals:
       set:
         subtotal: ${ .items | map(.price * .quantity) | add }
-        tax: ${ .subtotal * 0.08 }
-        total: ${ .subtotal + .tax + .shippingCost }
+        tax: ${ (.items | map(.price * .quantity) | add) * 0.08 }
+        total: ${ (.items | map(.price * .quantity) | add) * 1.08 + .shippingCost }
+      output:
+        as: '${ $input + . }'
       then: ProcessPayment
   - ProcessPayment:
       call: http
@@ -93,6 +108,8 @@ do:
           amount: ${ .total }
           method: ${ .paymentMethod }
           currency: USD
+      output:
+        as: '${ $input + . }'
       then: EvaluatePayment
   - EvaluatePayment:
       switch:
@@ -111,7 +128,7 @@ do:
       set:
         orderStatus: CONFIRMED
         confirmationNumber: ${ .transactionId }
-        message: Your order has been confirmed and will ship via .shippingMethod.
+        message: ${ "Your order has been confirmed and will ship via " + .shippingMethod + "." }
       then: end
   - RejectOrder:
       set:

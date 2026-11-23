@@ -34,11 +34,11 @@ You can also define the error inline:
 
 <code-block lang="yaml" src="workflows/reference/raise-order-error.yaml"/>
 
-This example shows how to define an error completely inline, using runtime expressions within the `detail` and `instance` fields to provide context-specific information when the error is raised.
+This example shows how to define an error completely inline, using a runtime expression within the `detail` field to provide context-specific information when the error is raised.
 
 ### Example: Raising Error to be Caught by Try
 
-<code-block lang="yaml" src="workflows/dsl-task-raise/example-raising-error-to-be-caught-by-try.yaml" include-lines="7-27"/>
+<code-block lang="yaml" src="workflows/dsl-task-raise/example-raising-error-to-be-caught-by-try.yaml" include-lines="11-32"/>
 
 Here, the `riskyOperation` might raise a specific error. The surrounding `Try` task is configured to `catch` errors of that specific type (`specialHandlingRequiredError` presumably has the type `https://myapp.com/errors/special-handling`). Instead of faulting the workflow, control transfers to the `catch.do` block (`handleSpecialCase`).
 

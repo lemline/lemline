@@ -15,7 +15,7 @@ This example demonstrates a workflow for provisioning new IoT devices, including
 
 ## Telemetry Processing Workflow
 
-This example shows how to implement real-time telemetry processing from IoT devices, including data validation, transformation, and anomaly detection.
+This workflow starts on each telemetry event received from a device and emits an alert event when the reported temperature is above 80.
 
 <code-block lang="yaml" src="workflows/reference/device-telemetry.yaml"/>
 

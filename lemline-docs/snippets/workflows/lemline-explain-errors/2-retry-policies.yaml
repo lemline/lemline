@@ -7,6 +7,16 @@ do:
   - processPayment:
       try:
         - chargeCard:
-            set:
-              processed: true
-      catch: {}
+            call: http
+            with:
+              method: post
+              endpoint: https://payment.example.com/charge
+      catch:
+        retry:
+          delay:
+            seconds: 1
+          backoff:
+            exponential: {}
+          limit:
+            attempt:
+              count: 3

@@ -27,11 +27,11 @@ do:
                     data: ${ $error }
           - setError:
               set:
-                error: $error
+                error: ${ $error }
               export:
                 as: '$context + { error: $error }'
   - buyPet:
-      if: $context.error == null
+      if: ${ $context.error == null }
       call: http
       with:
         method: put

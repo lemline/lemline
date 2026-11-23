@@ -17,5 +17,5 @@ do:
           email: ${ $context.userData.email }
           joined: '${ ($context.userData.createdTimestamp | split("T")[0]) }'
           membershipLevel: '${ if $context.userData.totalPurchases > 10000 then "platinum" elif $context.userData.totalPurchases
-            > 5000 then "gold" elif $context.userData.totalPurchases > 1000 then "silver" else "standard" end }'
+            > 5000 then "gold" elif $context.userData.totalPurchases > 1000 then "silver" else "bronze" end }'
           tags: '${ $context.userData.interests // [] }'

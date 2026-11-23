@@ -49,5 +49,5 @@ do:
   - processUserData:
       set:
         userData: ${ $context.graphqlResponse.data.user }
-        totalPosts: ${ length($context.graphqlResponse.data.user.posts) }
+        totalPosts: ${ $context.graphqlResponse.data.user.posts | length }
         followerCount: ${ $context.graphqlResponse.data.user.followers.totalCount }

@@ -56,7 +56,7 @@ do:
             switch:
               - hasErrors:
                   when: ${ $context.graphqlResponse.data.createPost.errors != null and
-                    length($context.graphqlResponse.data.createPost.errors) > 0 }
+                    ($context.graphqlResponse.data.createPost.errors | length) > 0 }
                   then: hasErrorsAction
               - default:
                   then: defaultAction

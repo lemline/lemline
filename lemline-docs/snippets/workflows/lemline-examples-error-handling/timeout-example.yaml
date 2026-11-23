@@ -12,6 +12,9 @@ do:
               method: post
               endpoint: https://api.example.com/long-process
               body: ${ .processData }
+            timeout:
+              after:
+                seconds: 30
       catch:
         errors:
           with:

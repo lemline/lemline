@@ -7,9 +7,9 @@ do:
   - ProcessPayment:
       call: paymentService
       with:
-        amount: ${ .cart.total }
-        currency: ${ .cart.currency }
-        paymentMethod: ${ .payment }
+        amount: ${ .amount }
+        currency: ${ .currency }
+        paymentMethod: ${ .paymentMethod }
       input:
         schema:
           document:

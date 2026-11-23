@@ -13,7 +13,7 @@ do:
               endpoint: https://api.example.com/data
       catch:
         retry:
-          when: "${ $error.detail | contains(\"timeout\") }" # Only retry on timeouts
+          when: "${ $error.details | contains(\"timeout\") }" # Only retry on timeouts
           delay: { seconds: 10 }
           limit:
             attempt:

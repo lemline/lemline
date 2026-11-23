@@ -117,10 +117,10 @@ The circuit breaker pattern prevents repeated calls to a failing service, reduci
 <code-block lang="yaml" src="workflows/lemline-examples-error-handling/circuit-breaker-example.yaml"/>
 
 This example demonstrates:
-- A retry configuration with circuit breaker settings
-- `failureThreshold`: Number of failures before the circuit opens
-- `recoveryTime`: How long to wait before allowing attempts again
-- The workflow will stop retrying after the threshold and wait for recovery
+- A reusable retry policy named `circuitBreaker` that bounds the calls to a failing service
+- Exponential backoff starting at 1 second, so each retry waits longer than the previous one
+- `limit.attempt.count`: at most 3 retries, after which the workflow stops calling the service
+- The DSL has no dedicated circuit breaker settings (failure threshold, recovery time): the retry limit is what stops the calls
 
 ## Timeout Handling
 

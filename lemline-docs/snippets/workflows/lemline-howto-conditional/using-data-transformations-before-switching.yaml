@@ -6,7 +6,7 @@ document:
 do:
   - PrepareDecisionData:
       set:
-        isNewCustomer: ${ .customer.joinDate > now - duration("P30D") }
+        isNewCustomer: ${ (.customer.joinDate | fromdateiso8601) > (now - 30 * 24 * 3600) }
         isHighValue: ${ .order.total > 1000 }
         hasRiskyItems: ${ .order.items | map(select(.category == "restricted")) | length > 0 }
       then: RouteOrder

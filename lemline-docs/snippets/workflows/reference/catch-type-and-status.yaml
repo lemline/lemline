@@ -17,5 +17,5 @@ do:
             # Only catch errors of this specific type AND status
             type: "https://open-workflow-specification.org/spec/1.0.0/errors/communication"
             status: 503
-            # instance: /do/0/callApi # Optionally match instance too
+            # instance: /do/0/request/try/0/callApi # Optionally match instance too
         # ... other catch properties (as, when, retry, do) ...

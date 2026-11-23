@@ -12,6 +12,8 @@ do:
       call: crm.getCustomerById
       with:
         customerId: ${ .customerId }
+      export:
+        as: '${ $context + { customerData: . } }'
   - processPurchaseOrder:
       try:
         - validateInventory:
@@ -21,7 +23,7 @@ do:
                 endpoint: https://inventory.example.com/api/openapi.json
               operationId: checkItemsAvailability
               parameters:
-                items: ${ .orderItems }
+                items: ${ $workflow.input.orderItems }
         - processPayment:
             call: http
             with:
@@ -29,8 +31,8 @@ do:
               endpoint: https://payments.example.com/api/transactions
               headers:
                 Content-Type: application/json
-                Authorization: Bearer ${ .paymentToken }
-              body: '${ { customerId: .customerId, amount: .totalAmount, items: .orderItems } }'
+                Authorization: Bearer ${ $workflow.input.paymentToken }
+              body: '${ $workflow.input | { customerId: .customerId, amount: .totalAmount, items: .orderItems } }'
         - notifyShipping:
             call: asyncapi
             with:
@@ -41,9 +43,9 @@ do:
                 name: production
               message:
                 payload:
-                  orderId: ${ .orderId }
-                  customer: ${ .customerData }
-                  items: ${ .orderItems }
+                  orderId: ${ $workflow.input.orderId }
+                  customer: ${ $context.customerData }
+                  items: ${ $workflow.input.orderItems }
       catch:
         as: error
         do:
@@ -57,7 +59,7 @@ do:
           - notifyCustomer:
               call: crm.sendNotification
               with:
-                customerId: ${ .customerId }
+                customerId: ${ $workflow.input.customerId }
                 message: Your payment was declined. Please update payment information.
               then: exit
           - logError:

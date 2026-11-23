@@ -12,4 +12,4 @@ do:
       then: processContainerOutput
   - processContainerOutput:
       set:
-        message: '{ trim: . }'
+        message: '${ rtrimstr("\n") }'

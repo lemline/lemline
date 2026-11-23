@@ -15,18 +15,23 @@ do:
           document:
             type: object
             required:
-              - id
-              - name
-              - status
+              - validatedEntity
             properties:
-              id:
-                type: string
-              name:
-                type: string
-              status:
-                type: string
-                enum:
-                  - ACTIVE
-                  - INACTIVE
-                  - PENDING
+              validatedEntity:
+                type: object
+                required:
+                  - id
+                  - name
+                  - status
+                properties:
+                  id:
+                    type: string
+                  name:
+                    type: string
+                  status:
+                    type: string
+                    enum:
+                      - ACTIVE
+                      - INACTIVE
+                      - PENDING
       then: NextTask

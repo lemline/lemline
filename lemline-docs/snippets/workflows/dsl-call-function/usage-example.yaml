@@ -28,18 +28,18 @@ do:
   - processValidationResult:
       switch:
         - caseValid:
-            when: "${ .checkAddress.valid }"
+            when: "${ .valid }"
             then: setNormalizedAddress
         - default:
             then: raiseValidationError
   - setNormalizedAddress:
       set:
-        normalizedAddress: "${ .checkAddress.normalized }"
+        normalizedAddress: "${ .normalized }"
       then: exit
   - raiseValidationError:
       raise:
         error:
           type: "https://example.com/errors/validation"
           status: 400
-          detail: "${ .checkAddress.error }"
+          detail: "${ .error }"
       then: exit

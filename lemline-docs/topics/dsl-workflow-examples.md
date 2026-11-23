@@ -59,7 +59,7 @@ This example shows a simple maintenance workflow that runs on a time-based sched
 - Proper `document` structure with required workflow properties
 - Time-based scheduling with cron syntax
 - Container execution with the `run` task
-- Command parameters as an array
+- Command line with its parameters
 - Result handling from previous task executions
 
 <code-block lang="yaml" src="workflows/dsl-workflow-examples/example-4-time-based-scheduled-workflow.yaml"/>

@@ -21,4 +21,4 @@ do:
                 type: string
   - subsequentTask:
       set:
-        message: 'Processed user: ${ $context.lastUserId }'
+        message: '${ "Processed user: " + $context.lastUserId }'

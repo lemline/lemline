@@ -27,7 +27,7 @@ do:
         as: '${ $context + { processedItems: [], failures: [] } }'
   - processBatches:
       for:
-        in: ${ chunk(.items, 5) }
+        in: '${ $workflow.input.items as $items | [range(0; ($items | length); 5) as $i | $items[$i:$i + 5]] }'
         each: batch
       do:
         - processBatch:
@@ -45,7 +45,7 @@ do:
                           headers:
                             Authorization: Bearer ${ $secrets.API_TOKEN }
                         export:
-                          as: '${ $context + { processedItems: ($context.processedItems + [.itemResult])} }'
+                          as: '${ $context + { processedItems: ($context.processedItems + [.]) } }'
                   catch:
                     errors:
                       with:
@@ -74,7 +74,7 @@ do:
   - summarizeResults:
       set:
         result:
-          succeeded: ${ length($context.processedItems) }
-          failed: ${ length($context.failures) }
+          succeeded: ${ $context.processedItems | length }
+          failed: ${ $context.failures | length }
           processedItems: ${ $context.processedItems }
           failures: ${ $context.failures }

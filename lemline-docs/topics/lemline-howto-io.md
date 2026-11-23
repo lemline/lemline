@@ -68,7 +68,7 @@ If the input doesn't match the schema, a validation error is raised.
 
 ### Basic Output
 
-The output of a task is the value defined in the `data` field:
+The output of a `set` task is the object defined under `set`:
 
 <code-block lang="yaml" src="workflows/lemline-howto-io/basic-output.yaml" include-lines="7-12"/>
 
@@ -120,7 +120,7 @@ This exports the original products array plus derived data structures.
 
 You can validate exported data against a schema:
 
-<code-block lang="yaml" src="workflows/lemline-howto-io/export-schema-validation.yaml" include-lines="7-32"/>
+<code-block lang="yaml" src="workflows/lemline-howto-io/export-schema-validation.yaml" include-lines="7-37"/>
 
 This ensures the exported data meets the specified schema requirements.
 

@@ -9,4 +9,13 @@ do:
         - operation:
             set:
               processed: true
-      catch: {}
+      catch:
+        retry:
+          delay:
+            seconds: 1
+          backoff:
+            exponential: {}
+          limit:
+            attempt:
+              count: 3
+          when: ${ $error.status >= 500 }

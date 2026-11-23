@@ -21,13 +21,13 @@ do:
             call: inventoryUpdater
             with:
               args:
-                productId: ${ .currentItem.productId }
-                quantity: ${ .currentItem.quantity }
+                productId: ${ $currentItem.productId }
+                quantity: ${ $currentItem.quantity }
                 operation: DECREMENT
         - recordItemFulfillment:
             call: orderItemTracker
             with:
               args:
                 orderId: ${ .input.order.id }
-                itemId: ${ .currentItem.id }
+                itemId: ${ $currentItem.id }
                 status: FULFILLED

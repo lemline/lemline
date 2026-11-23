@@ -96,7 +96,7 @@ Custom error types can be defined in workflow definitions:
 
 ### Using Retry Policies
 
-<code-block lang="yaml" src="workflows/lemline-ref-errors/using-retry-policies.yaml" include-lines="8-12"/>
+<code-block lang="yaml" src="workflows/lemline-ref-errors/using-retry-policies.yaml" include-lines="8-21"/>
 
 ## Error Debugging 
 

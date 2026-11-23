@@ -30,7 +30,7 @@ do:
                 endpoint: https://api.example.com/log-error
                 method: post
                 body:
-                  error: ${ .error }
+                  error: ${ $error }
                   context: Order processing
                 headers:
                   Content-Type: application/json
@@ -42,6 +42,6 @@ do:
                 body:
                   to: ${ .input.order.customerEmail }
                   subject: Order Processing Failed
-                  body: '${ "We apologize, but we could not process your order. Error: " + .error.message }'
+                  body: '${ "We apologize, but we could not process your order. Error: " + $error.details }'
                 headers:
                   Content-Type: application/json

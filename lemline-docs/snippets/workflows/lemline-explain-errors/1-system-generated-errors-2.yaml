@@ -6,3 +6,5 @@ document:
 do:
   - example:
       wait: PT30S
+      timeout:
+        after: PT1M

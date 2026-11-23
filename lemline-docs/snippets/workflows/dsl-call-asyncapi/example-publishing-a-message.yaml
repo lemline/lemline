@@ -16,7 +16,7 @@ do:
             environment: prod
         message:
           payload:
-            greeting: Hello from workflow ${ $workflow.id }
+            greeting: '${ "Hello from workflow \($workflow.id)" }'
           headers:
             traceId: ${ $context.traceId }
   - afterPublish:

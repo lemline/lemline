@@ -17,7 +17,7 @@ do:
             # Inside the 'do' block, 'item' and 'index' are available in the scope
             call: log # Assuming a 'log' function exists
             with:
-              message: "Processing item ${ $index }: ${ $item }"
+              message: '${ "Processing item \($index): \($item)" }'
 
 # Workflow output after 'processNumbers' will typically be the output of 'setup':
 # { "numbers": [1, 2, 3, 4, 5] }

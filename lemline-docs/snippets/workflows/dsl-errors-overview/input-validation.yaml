@@ -13,11 +13,11 @@ do:
                 type: "https://open-workflow-specification.org/errors/validation/invalid-argument"
                 status: 400
                 title: "Missing required fields"
-                detail: '${ "Required fields are missing: \([.input | to_entries[] | select(.value == null
-                  or .value == "") | .key] | join(", "))" }'
+                detail: '${ "The following fields are required but missing: " + ([("email", "username", "password")
+                  as $f | select(.input[$f] == null or .input[$f] == "") | $f] | join(", ")) }'
 
         - validateEmail:
-            if: '${ (.input.email | test("^[^@]+@[^@]+[.][^@]+$") | not) }'
+            if: '${ (.input.email | test("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+[.][a-zA-Z]{2,}$") | not) }'
             raise:
               error:
                 type: "https://open-workflow-specification.org/errors/validation/invalid-argument"
@@ -27,11 +27,11 @@ do:
                   \ }"
 
         - validatePassword:
-            if: ${ .input.password.length < 8 }
+            if: ${ (.input.password | length) < 8 }
             raise:
               error:
                 type: "https://open-workflow-specification.org/errors/validation/invalid-argument"
                 status: 400
                 title: "Password too short"
-                detail: "${ \"Password must be at least 8 characters long. Current length: \" + .input.password.length
-                  }"
+                detail: '${ "Password must be at least 8 characters long. Current length: " + (.input.password | length
+                  | tostring) }'

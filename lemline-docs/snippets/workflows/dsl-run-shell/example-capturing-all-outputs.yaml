@@ -7,7 +7,7 @@ do:
   - executeUtility:
       run:
         shell:
-          command: "utility-tool --process ${ .fileId } --verbose"
+          command: '${ "utility-tool --process \(.fileId) --verbose" }'
         # Get exit code, stdout, and stderr together
         return: all
       then: processUtilityResult

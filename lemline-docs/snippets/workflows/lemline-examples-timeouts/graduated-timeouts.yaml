@@ -11,8 +11,11 @@ do:
             with:
               method: get
               endpoint: ${ "https://cache.example/lookup/\(.itemId)" }
+            timeout:
+              after:
+                milliseconds: 500
             export:
-              as: '${ $context + { cacheResult: . } }'
+              as: '${ $context + { cacheResult: ., cacheHit: true } }'
       catch:
         errors:
           with:
@@ -31,9 +34,12 @@ do:
             call: http
             with:
               method: get
-              endpoint: ${ "https://db.example/items/\(.itemId)" }
+              endpoint: ${ "https://db.example/items/\($workflow.input.itemId)" }
+            timeout:
+              after:
+                seconds: 3
             export:
-              as: '${ $context + { dbResult: .dbResult, dbLookupSuccess: true } }'
+              as: '${ $context + { dbResult: ., dbLookupSuccess: true } }'
       catch:
         errors:
           with:
@@ -46,9 +52,12 @@ do:
             call: http
             with:
               method: get
-              endpoint: ${ "https://fallback.example/compute/\(.itemId)" }
+              endpoint: ${ "https://fallback.example/compute/\($workflow.input.itemId)" }
+            timeout:
+              after:
+                seconds: 10
             export:
-              as: '${ $context + { fallbackResult: .fallbackResult, fallbackSuccess: true } }'
+              as: '${ $context + { fallbackResult: ., fallbackSuccess: true } }'
       catch:
         errors:
           with:

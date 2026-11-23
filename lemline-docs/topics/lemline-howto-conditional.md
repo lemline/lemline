@@ -48,7 +48,7 @@ Always include a default condition as the last one in your switch task to ensure
 
 <code-block lang="yaml" src="workflows/lemline-howto-conditional/default-fallback.yaml" include-lines="7-19"/>
 
-The last condition using `true` ensures there's always a matching path, even if none of the explicit conditions match.
+The last case has no `when`, so it always matches: there's always a path, even if none of the explicit conditions match.
 
 ## Working with Arrays and Objects
 
@@ -84,7 +84,7 @@ This pattern improves readability by computing derived values before the switch.
 
 ## Error Handling in Switch Tasks
 
-If an expression in a condition results in an error, Lemline will treat it as `false`:
+If an expression in a condition fails, the switch task raises an expression error. Wrap the expression in jq's `try ... catch false` to treat a failure as `false`:
 
 <code-block lang="yaml" src="workflows/lemline-howto-conditional/error-handling-in-switch-tasks.yaml" include-lines="7-16"/>
 
@@ -107,7 +107,7 @@ Here's a complete example of an order processing workflow with multiple decision
 ## Best Practices for Switch Tasks
 
 1. **Order conditions from specific to general**: Put more specific conditions first
-2. **Always include a default case**: Use `condition: true` as the last condition
+2. **Always include a default case**: End the switch with a case that has no `when`
 3. **Preprocess data when needed**: Use a `set` task before complex switching
 4. **Keep conditions readable**: Break complex conditions into separate variables
 5. **Avoid deep nesting**: Prefer multiple sequential switch tasks over deeply nested logic

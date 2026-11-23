@@ -13,7 +13,7 @@ do:
               endpoint: "https://external-api.example.com/process"
               headers:
                 Content-Type: "application/json"
-                Authorization: ${ "Bearer " + $secret.apiKey }
+                Authorization: ${ "Bearer " + $secrets.apiKey }
               body: ${ .requestData }
       catch:
         as: error
@@ -21,7 +21,7 @@ do:
           with:
             type: "PERMISSION_DENIED"
         retry:
-          when: '${ .error.code == "UNAVAILABLE" // .error.code == "RESOURCE_EXHAUSTED" }'
+          when: '${ $error.code == "UNAVAILABLE" or $error.code == "RESOURCE_EXHAUSTED" }'
           delay: PT2S
           backoff:
             exponential:

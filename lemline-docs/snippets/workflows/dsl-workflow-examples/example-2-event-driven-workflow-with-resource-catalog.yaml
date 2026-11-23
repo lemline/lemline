@@ -7,7 +7,7 @@ schedule:
   on:
     one:
       with:
-        type: CustomerSignupEvent
+        type: com.example.customer.signup.v1
 input:
   from: ${ .[0] }
 do:
@@ -19,8 +19,8 @@ do:
         - smsPreference:
             when: ${ .preferences.contactMethod == "sms" }
             then: sendSms
-        - noPreference:
-            then: end
+        - default:
+            then: sendEmail
   - sendEmail:
       call: http
       with:
@@ -29,7 +29,9 @@ do:
         body:
           to: ${ .email }
           template: welcome_email
-          name: ${ .name }
+          data:
+            name: ${ .name }
+            accountType: ${ .accountType }
       then: end
   - sendSms:
       call: http

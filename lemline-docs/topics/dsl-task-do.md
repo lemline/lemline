@@ -30,7 +30,7 @@ value defines the sub-task to be executed. The sub-tasks are executed sequential
 Each element in the list specifies a unique name for the sub-task and the task definition itself (e.g., `set`,
 `call`, another `do`, etc.). The order in the list determines the execution sequence.
 
-<code-block lang="yaml" src="workflows/dsl-task-do/do-list-string-object-required.yaml" include-lines="7-16"/>
+<code-block lang="yaml" src="workflows/dsl-task-do/do-list-string-object-required.yaml" include-lines="6-16"/>
 
 ## Data Flow
 

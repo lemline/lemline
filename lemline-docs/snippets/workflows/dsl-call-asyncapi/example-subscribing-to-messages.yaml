@@ -23,13 +23,13 @@ do:
               - logUpdate:
                   call: logMessage
                   with:
-                    message: 'Received order update: ${ .msg.payload.orderId }'
+                    message: '${ "Received order update: \($msg.payload.orderId)" }'
               - checkStatus:
                   call: notifyShipping
-                  if: '${ .msg.payload.status == "SHIPPED" }'
+                  if: '${ $msg.payload.status == "SHIPPED" }'
             output:
               as:
-                processedCount: ${ count(.) }
+                processedCount: ${ length }
                 lastOrderId: ${ .[-1]?.msg.payload.orderId }
   - afterSubscription:
       set:

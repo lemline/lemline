@@ -15,5 +15,5 @@ do:
         errors:
           with: { type: "https://open-workflow-specification.org/spec/1.0.0/errors/communication" }
         as: "commErr" # Optional, using 'commErr' instead of default 'error'
-        when: "${ $commErr.instance == \"/do/0/request\" }"
+        when: "${ $commErr.instance == \"/do/0/request/try/0/callApi\" }"
         # ... retry or do ...

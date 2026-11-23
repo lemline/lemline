@@ -11,4 +11,4 @@ do:
             - with:
                 type: com.example.approval
             - with:
-                source: https://events.example.com/-orders-urgent
+                source: https://events.example.com/orders/urgent

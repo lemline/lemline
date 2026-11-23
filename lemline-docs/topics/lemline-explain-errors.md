@@ -86,7 +86,7 @@ The Lemline runtime automatically generates errors for common failure scenarios:
 
 - **Timeout Violations**: When operations exceed their timeouts
 
-  <code-block lang="yaml" src="workflows/lemline-explain-errors/1-system-generated-errors-2.yaml" include-lines="8-8"/>
+  <code-block lang="yaml" src="workflows/lemline-explain-errors/1-system-generated-errors-2.yaml" include-lines="8-10"/>
 
   > **Lemline runtime:** only `listen` task timeouts are enforced. Workflow-level timeouts and timeouts on other tasks are accepted but ignored for now. HTTP calls use fixed client limits instead: 15 seconds to connect, 30 seconds per request.
 
@@ -139,23 +139,23 @@ The primary error handling mechanism:
 <code-block lang="yaml" src="workflows/lemline-explain-errors/1-try-catch-blocks.yaml" include-lines="7-23"/>
 
 Key components:
-- **do block**: Contains tasks that might fail
-- **catch blocks**: Define how to handle specific errors
-- **error.with**: Criteria for matching errors
-- **error.as**: Variable name to store the caught error
+- **try**: Contains tasks that might fail
+- **catch**: Defines how to handle specific errors
+- **errors.with**: Criteria for matching errors
+- **as**: Variable name to store the caught error
 - **do**: Compensation logic when an error is caught
 
 ### 2. Retry Policies
 
 Automated retry for transient failures:
 
-<code-block lang="yaml" src="workflows/lemline-explain-errors/2-retry-policies.yaml" include-lines="7-12"/>
+<code-block lang="yaml" src="workflows/lemline-explain-errors/2-retry-policies.yaml" include-lines="7-22"/>
 
 When an error occurs:
 1. The error is caught
 2. The retry policy is evaluated
 3. If retries remain, the system waits according to the backoff strategy
-4. The entire `do` block is re-executed
+4. The entire `try` block is re-executed
 
 ### 3. Fallback Patterns
 
@@ -204,7 +204,7 @@ Design workflows to handle partial failures:
 
 Ensure errors contain useful diagnostic information:
 
-<code-block lang="yaml" src="workflows/lemline-explain-errors/5-provide-comprehensive-error-context.yaml" include-lines="7-13"/>
+<code-block lang="yaml" src="workflows/lemline-explain-errors/5-provide-comprehensive-error-context.yaml" include-lines="7-14"/>
 
 ## Debugging and Monitoring Errors
 

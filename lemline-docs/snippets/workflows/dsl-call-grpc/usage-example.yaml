@@ -25,4 +25,4 @@ do:
   - processGreeting:
       # Store the greeting response
       set:
-        greeting: "${ .greetUser.response }"
+        greeting: "${ . }"

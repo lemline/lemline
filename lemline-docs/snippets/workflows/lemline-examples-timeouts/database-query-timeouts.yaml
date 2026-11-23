@@ -13,6 +13,9 @@ do:
               endpoint: https://db.example/api/items
               query:
                 limit: "10"
+            timeout:
+              after:
+                seconds: 3
             export:
               as: '${ $context + { queryResult: . } }'
       catch:
@@ -50,6 +53,9 @@ do:
                 sort:
                   - field: date
                     direction: desc
+            timeout:
+              after:
+                seconds: 10
             export:
               as: '${ $context + { complexResult: . } }'
       catch:
@@ -71,6 +77,9 @@ do:
                   sort:
                     - field: date
                       direction: desc
+              timeout:
+                after:
+                  seconds: 5
               export:
                 as: '${ $context + { usedSimplifiedQuery: true, simplifiedResult: . } }'
   - analyticalQuery:
@@ -89,7 +98,10 @@ do:
                   - count
                   - sum
                   - average
-                filters: '${ .additionalFilters // [] }'
+                filters: '${ $workflow.input.additionalFilters // [] }'
+            timeout:
+              after:
+                minutes: 2
             export:
               as: '${ $context + { analyticalResult: . } }'
       catch:
@@ -112,7 +124,7 @@ do:
                       - count
                       - sum
                       - average
-                    filters: '${ .additionalFilters // [] }'
+                    filters: '${ $workflow.input.additionalFilters // [] }'
                   callbackEvent:
                     type: com.example.analytics.complete
                     correlationId: ${ $workflow.id }
@@ -124,9 +136,15 @@ do:
           one:
             with:
               type: com.example.analytics.complete
-              correlationId: ${ $workflow.id }
+            correlate:
+              correlationId:
+                from: ${ .correlationId }
+                expect: ${ .workflow.id }
+      timeout:
+        after:
+          minutes: 15
       export:
-        as: '${ $context + { analyticalResult: .data } }'
+        as: '${ $context + { analyticalResult: .[0] } }'
       if: ${ $context.usedAsyncAnalytics == true }
   - prepareResponse:
       set:

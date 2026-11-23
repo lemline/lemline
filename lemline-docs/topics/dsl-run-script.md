@@ -24,7 +24,7 @@ The `run: script` task allows a workflow to execute a script written in a suppor
 
 ### Example: Returning Exit Code
 
-<code-block lang="yaml" src="workflows/dsl-run-script/example-returning-exit-code.yaml" include-lines="7-25"/>
+<code-block lang="yaml" src="workflows/dsl-run-script/example-returning-exit-code.yaml" include-lines="6-25"/>
 
 ## Configuration Options
 

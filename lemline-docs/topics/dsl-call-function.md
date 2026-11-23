@@ -21,7 +21,7 @@ In this example, the `checkAddress` task calls a function named `validateAddress
 
 ### Example: Calling a Function with No Arguments
 
-<code-block lang="yaml" src="workflows/dsl-call-function/example-calling-a-function-with-no-arguments.yaml" include-lines="7-11"/>
+<code-block lang="yaml" src="workflows/dsl-call-function/example-calling-a-function-with-no-arguments.yaml" include-lines="6-11"/>
 
 ### Example: Calling a Catalog Function
 

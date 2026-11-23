@@ -7,8 +7,8 @@ do:
   - ConditionalExport:
       set:
         status: '${ if .code == 200 then "SUCCESS" else "ERROR" end }'
-        successData: if .code == 200 then .data else null end
-        errorData: if .code != 200 then .error else null end
+        successData: ${ if .code == 200 then .data else null end }
+        errorData: ${ if .code != 200 then .error else null end }
       export:
         as:
           result: '${ if .status == "SUCCESS" then .successData else .errorData end }'

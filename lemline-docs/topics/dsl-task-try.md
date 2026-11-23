@@ -26,7 +26,7 @@ block is skipped entirely.
 
 Here's an example demonstrating automatic retries:
 
-<code-block lang="yaml" src="workflows/dsl-task-try/basic-usage-2.yaml" include-lines="7-27"/>
+<code-block lang="yaml" src="workflows/dsl-task-try/basic-usage-2.yaml" include-lines="6-27"/>
 
 This example attempts `fetchCrucialData`. If it fails with a 503 status, it waits 2 seconds and retries. If it fails
 again, it waits 4 seconds, then 8 seconds. If it still fails after the 4th total attempt, the 503 error is *not*

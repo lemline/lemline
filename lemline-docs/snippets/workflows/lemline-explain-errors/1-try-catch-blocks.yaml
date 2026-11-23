@@ -20,4 +20,4 @@ do:
         do:
           - logError:
               set:
-                errorMessage: 'Payment service unavailable: ${ .paymentError.details }'
+                errorMessage: '${ "Payment service unavailable: \($paymentError.details)" }'

@@ -34,6 +34,9 @@ do:
             with:
               method: get
               endpoint: ${ "https://iot-registry.example/api/devices/\(.deviceId)" }
+            timeout:
+              after:
+                seconds: 5
       catch:
         errors:
           with:
@@ -52,7 +55,7 @@ do:
                   location: ${ .location }
                   status: provisioning
               export:
-                as: '${ $context + { deviceRegistry: .deviceRegistry } }'
+                as: '${ $context + { deviceRegistry: . } }'
   - generateCredentials:
       try:
         - createCredentials:
@@ -61,10 +64,10 @@ do:
               method: post
               endpoint: https://iot-security.example/api/credentials/generate
               body:
-                deviceId: ${ .deviceId }
-                deviceType: ${ .deviceType }
+                deviceId: ${ $workflow.input.deviceId }
+                deviceType: ${ $workflow.input.deviceType }
             export:
-              as: '${ $context + { credentials: .credentials } }'
+              as: '${ $context + { credentials: . } }'
       catch:
         errors:
           with:
@@ -83,9 +86,9 @@ do:
               method: post
               endpoint: https://iot-config.example/api/config/generate
               body:
-                deviceId: ${ .deviceId }
-                deviceType: ${ .deviceType }
-                location: ${ .location }
+                deviceId: ${ $workflow.input.deviceId }
+                deviceType: ${ $workflow.input.deviceType }
+                location: ${ $workflow.input.location }
             export:
               as: '${ $context + { deviceConfig: . } }'
         - createDigitalTwin:
@@ -94,10 +97,10 @@ do:
               method: post
               endpoint: https://digital-twins.example/api/twins
               body:
-                deviceId: ${ .deviceId }
-                deviceType: ${ .deviceType }
+                deviceId: ${ $workflow.input.deviceId }
+                deviceType: ${ $workflow.input.deviceType }
                 attributes:
-                  location: ${ .location }
+                  location: ${ $workflow.input.location }
                   firmware: 1.0.0
                   status: provisioning
             export:
@@ -112,7 +115,7 @@ do:
           name: production
         message:
           payload:
-            deviceId: ${ .deviceId }
+            deviceId: ${ $workflow.input.deviceId }
             config: ${ $context.deviceConfig }
             credentials: ${ $context.credentials }
   - waitForDeviceActivation:
@@ -121,14 +124,18 @@ do:
           one:
             with:
               type: com.example.iot.device.activated
-              correlationId: ${ .deviceId }
-      output:
-        as: activationResult
+            correlate:
+              deviceId:
+                from: ${ .deviceId }
+                expect: ${ .workflow.input.deviceId }
+      timeout:
+        after:
+          minutes: 15
   - finalizeProvisioning:
       call: http
       with:
         method: patch
-        endpoint: ${ "https://iot-registry.example/api/devices/\(.deviceId)" }
+        endpoint: ${ "https://iot-registry.example/api/devices/\($workflow.input.deviceId)" }
         body:
           status: active
-          lastPing: ${ .activationResult.timestamp }
+          lastPing: ${ .[0].timestamp }

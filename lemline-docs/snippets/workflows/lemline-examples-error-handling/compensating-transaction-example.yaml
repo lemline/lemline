@@ -19,7 +19,7 @@ do:
             with:
               method: post
               endpoint: https://payments.example.com/api/charge
-              body: ${ .paymentDetails }
+              body: ${ $workflow.input.paymentDetails }
       catch:
         errors:
           with:
@@ -38,5 +38,5 @@ do:
                 method: post
                 endpoint: https://notifications.example.com/api/send
                 body:
-                  customerId: ${ .customerId }
-                  message: 'Payment failed: ${ $paymentError.message }'
+                  customerId: ${ $workflow.input.customerId }
+                  message: '${ "Payment failed: " + $paymentError.details }'

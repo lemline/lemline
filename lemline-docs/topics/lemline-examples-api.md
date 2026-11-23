@@ -37,7 +37,7 @@ This example demonstrates how to use an OpenAPI specification for API integratio
 
 This example shows OpenAPI integration with different authentication methods.
 
-<code-block lang="yaml" src="workflows/lemline-examples-integrations/basic-openapi-call.yaml"/>
+<code-block lang="yaml" src="workflows/lemline-examples-api/openapi-with-authentication.yaml"/>
 
 ## GraphQL Integration Examples
 
@@ -59,7 +59,7 @@ This example demonstrates a GraphQL mutation.
 
 This example demonstrates integrating with a gRPC service.
 
-<code-block lang="yaml" src="workflows/lemline-examples-integrations/basic-grpc-call.yaml"/>
+<code-block lang="yaml" src="workflows/lemline-examples-api/basic-grpc-service-call.yaml"/>
 
 ### gRPC with TLS and Authentication
 

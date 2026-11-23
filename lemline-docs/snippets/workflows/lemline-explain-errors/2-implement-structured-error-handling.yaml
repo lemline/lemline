@@ -20,7 +20,7 @@ do:
             catch:
               errors:
                 with:
-                  type: https://errors.example.com/payment-declined
+                  type: https://example.com/errors/payment-declined
               do:
                 - handleError:
                     set:

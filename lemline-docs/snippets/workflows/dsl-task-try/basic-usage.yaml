@@ -22,7 +22,7 @@ do:
                 https://raw.githubusercontent.com/open-workflow-specification/catalog/main/functions/log/1.0.0/function.yaml
               with:
                 level: warn
-                message: 'API call failed. Error: ${ $apiError }'
+                message: '${ "API call failed. Error: \($apiError)" }'
           - setDefaultValue:
               set:
                 data:

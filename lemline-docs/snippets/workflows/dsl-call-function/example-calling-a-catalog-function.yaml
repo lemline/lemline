@@ -10,4 +10,4 @@ do:
       call: logMessage:1.0@globalUtils # Function:Version@CatalogName
       with:
         level: INFO
-        message: "Processed item ${ .itemId }"
+        message: '${ "Processed item \(.itemId)" }'
