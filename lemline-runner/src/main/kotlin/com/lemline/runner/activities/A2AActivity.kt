@@ -212,14 +212,19 @@ private fun JsonNode.rpcAuthorization(authorization: String?, isCardResource: Bo
         ?: return authorization.takeUnless { isCardResource }
     require(requirements.isArray) { "Invalid Agent Card security requirements" }
     if (requirements.isEmpty) return null
+    // The requirements are alternatives. Configured credentials that satisfy one are sent
+    // even when the card also allows anonymous calls: skills may require them.
+    var anonymous = false
     for (requirement in requirements) {
         val schemes = requirement.get("schemes") ?: requirement
         require(schemes.isObject) { "Invalid Agent Card security requirement" }
-        if (schemes.isEmpty) return null
-        if (authorization != null && schemes.fieldNames().asSequence().all { name ->
+        if (schemes.isEmpty) {
+            anonymous = true
+        } else if (authorization != null && schemes.fieldNames().asSequence().all { name ->
                 path("securitySchemes").path(name).accepts(authorization)
             }) return authorization
     }
+    if (anonymous) return null
     error("No configured credentials satisfy the Agent Card security requirements")
 }
 

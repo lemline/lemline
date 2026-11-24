@@ -414,6 +414,32 @@ class A2AActivityTest {
         }
     }
 
+    @TestFactory
+    fun `optional card security sends matching credentials and otherwise calls anonymously`() = listOf(
+        "bearer" to listOf("Bearer example", "Bearer example"),
+        "basic" to listOf("Bearer example", ""),
+    ).map { (scheme, expected) ->
+        dynamicTest(scheme) {
+            runBlocking {
+                Agent().use { agent ->
+                    agent.security = ""","security":[{},{"key":[]}],"securitySchemes":{"key":{"type":"http","scheme":"$scheme"}}"""
+                    val yaml = document + """
+                        do:
+                          - ask:
+                              call: a2a
+                              with:
+                                method: tasks/list
+                                server:
+                                  uri: ${agent.base}
+                                  authentication: {bearer: {token: example}}
+                    """.trimIndent()
+                    run(yaml)
+                    assertEquals(expected, agent.credentials)
+                }
+            }
+        }
+    }
+
     @Test
     fun `server without a card is called as the JSON-RPC endpoint`() = runBlocking {
         val server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
