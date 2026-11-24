@@ -153,7 +153,7 @@ jobs:
             -p lemline-runner quarkusBuild \
             -Dquarkus.native.enabled=true \
             -Dquarkus.package.jar.enabled=false \
-            -Dquarkus.native.native-image-xmx=5g
+            -Dquarkus.native.native-image-xmx=8g
 
       # **🪟 Windows**
       - name: Build native image (Windows)
