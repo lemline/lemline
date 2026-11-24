@@ -13,14 +13,16 @@ internal data class A2ARpcEndpoint(val uri: URI, val v1: Boolean, val tenant: St
         fun from(card: JsonNode): A2ARpcEndpoint {
             // A2A 1.0 advertises versioned interfaces. Earlier cards have a primary URL
             // and may advertise other transports under additionalInterfaces.
-            val endpoint = card.get("supportedInterfaces")?.let { interfaces ->
-                interfaces.firstOrNull {
-                    it.path("protocolBinding").asText() == "JSONRPC" && it.path("protocolVersion").asText() == "1.0"
-                } ?: error("Agent Card has no supported JSON-RPC interface")
-            }
-            val legacy = if (card.path("preferredTransport").asText("JSONRPC") == "JSONRPC") card
+            val interfaces = card.get("supportedInterfaces")?.takeIf { it.isArray }
+            val jsonRpc = interfaces?.filter { it.path("protocolBinding").asText() == "JSONRPC" }.orEmpty()
+            val endpoint = jsonRpc.firstOrNull { it.path("protocolVersion").asText().startsWith("1.") }
+            // A 1.0 card may still offer the earlier protocol, in its list or as its primary URL.
+            val legacy = jsonRpc.firstOrNull { it.path("protocolVersion").asText().startsWith("0.") }
+                ?: if (card.path("preferredTransport").asText("JSONRPC") == "JSONRPC") card
                 else card.path("additionalInterfaces").firstOrNull { it.path("transport").asText() == "JSONRPC" }
-            val url = (endpoint ?: legacy)?.get("url")?.textValue() ?: error("Missing Agent Card JSON-RPC URL")
+            val url = (endpoint ?: legacy)?.get("url")?.textValue() ?: error(
+                if (interfaces != null) "Agent Card has no supported JSON-RPC interface" else "Missing Agent Card JSON-RPC URL"
+            )
             val uri = URI.create(url)
             require(uri.host != null && uri.scheme.lowercase() in setOf("http", "https")) { "Invalid Agent Card RPC URL" }
             return A2ARpcEndpoint(uri, endpoint != null, endpoint?.get("tenant")?.textValue())
@@ -30,10 +32,24 @@ internal data class A2ARpcEndpoint(val uri: URI, val v1: Boolean, val tenant: St
     fun methodName(method: WithA2AMethod) = if (v1) method.v1Name() else method.value()
 
     fun parameters(config: CallA2AConfig): ObjectNode {
-        if (!v1) return config.parameters
+        val sendsMessage = config.method == WithA2AMethod.MESSAGE_SEND || config.method == WithA2AMethod.MESSAGE_STREAM
+        if (!v1) {
+            if (!sendsMessage) return config.parameters
+            // A2A 0.3 requires the discriminator on a Message. A2A 1.0 has none.
+            return config.parameters.deepCopy().apply {
+                (get("message") as? ObjectNode)?.takeIf { !it.has("kind") }?.put("kind", "message")
+            }
+        }
         return config.parameters.deepCopy().apply {
             if (tenant != null && !has("tenant")) put("tenant", tenant)
-            if (config.method == WithA2AMethod.MESSAGE_SEND || config.method == WithA2AMethod.MESSAGE_STREAM) {
+            if (sendsMessage) {
+                // A2A 1.0 replaced `blocking` with its opposite and renamed the push configuration.
+                (get("configuration") as? ObjectNode)?.let { configuration ->
+                    configuration.remove("blocking")?.takeIf { it.isBoolean && !configuration.has("returnImmediately") }
+                        ?.let { configuration.put("returnImmediately", !it.booleanValue()) }
+                    configuration.remove("pushNotificationConfig")?.takeIf { !configuration.has("taskPushNotificationConfig") }
+                        ?.let { configuration.set<JsonNode>("taskPushNotificationConfig", it) }
+                }
                 val message = get("message") as ObjectNode
                 when (message.path("role").textValue()) {
                     "user" -> message.put("role", "ROLE_USER")

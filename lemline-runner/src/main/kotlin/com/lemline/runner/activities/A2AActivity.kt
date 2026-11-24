@@ -17,7 +17,8 @@ import io.serverlessworkflow.api.types.A2AArguments.WithA2AMethod
 import io.serverlessworkflow.impl.resources.DefaultResourceLoaderFactory
 import java.net.URI
 import java.util.UUID
-import kotlin.time.Duration.Companion.seconds
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.minutes
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runInterruptible
@@ -25,7 +26,25 @@ import kotlinx.coroutines.withTimeoutOrNull
 import org.a2aproject.sdk.client.http.A2AHttpResponse
 import org.a2aproject.sdk.client.http.JdkA2AHttpClient
 
-internal class A2AActivity(private val streamingClient: HttpClient) {
+/**
+ * Limits for A2A calls. Agents commonly take longer than an ordinary HTTP call,
+ * so these do not reuse the 30 second deadline of the shared HTTP client.
+ */
+internal data class A2ALimits(
+    /** Deadline of one non-streaming request (card download or JSON-RPC call). */
+    val requestTimeout: Duration = 5.minutes,
+    /** Longest silence tolerated on an open stream. */
+    val streamIdleTimeout: Duration = 5.minutes,
+    /** Longest total duration of one stream. */
+    val streamTimeout: Duration = 30.minutes,
+    /** Largest amount of event data accepted from one stream. */
+    val maxStreamChars: Long = 16L * 1024 * 1024,
+)
+
+internal class A2AActivity(
+    private val streamingClient: HttpClient,
+    private val limits: A2ALimits = A2ALimits(),
+) {
     private val transport = JdkA2AHttpClient()
 
     suspend fun execute(event: CallA2AStarted): JsonNode = try {
@@ -46,6 +65,8 @@ internal class A2AActivity(private val streamingClient: HttpClient) {
         val source = URI.create(config.url)
         val credentials = config.authentication?.authorizationHeader()
         val (cardUri, card) = discover(source, config.isCardResource, credentials)
+            // Without a card, `server` is the JSON-RPC endpoint itself.
+            ?: (source to buildJsonObject { put("url", source.toString()) })
         val rpc = A2ARpcEndpoint.from(card)
         val headers = buildMap {
             put(HttpHeaders.ContentType, "application/json")
@@ -63,21 +84,27 @@ internal class A2AActivity(private val streamingClient: HttpClient) {
             put("params", rpc.parameters(config))
         }.toString()
         if (method == WithA2AMethod.MESSAGE_STREAM || method == WithA2AMethod.TASKS_RESUBSCRIBE) {
-            return streamingClient.preparePost(rpc.uri.toString()) {
-                headers.forEach { (name, value) -> header(name, value) }
-                // A healthy stream can outlive the ordinary request deadline. Keep the socket idle timeout.
-                timeout { requestTimeoutMillis = HttpTimeoutConfig.INFINITE_TIMEOUT_MS }
-                accept(ContentType.Text.EventStream)
-                setBody(request)
-            }.execute { response ->
-                check(response.status.isSuccess()) { "HTTP ${response.status.value}: ${response.bodyAsText()}" }
-                if (response.contentType()?.withoutParameters() != ContentType.Text.EventStream) {
-                    // Agents may report JSON-RPC errors as ordinary JSON before opening the stream.
-                    result(response.bodyAsText(), id)
-                    error("Expected text/event-stream")
+            return withTimeoutOrNull(limits.streamTimeout) {
+                streamingClient.preparePost(rpc.uri.toString()) {
+                    headers.forEach { (name, value) -> header(name, value) }
+                    // A healthy stream can outlive the ordinary request deadline: it is bounded
+                    // by its own total duration and by the longest silence between two events.
+                    timeout {
+                        requestTimeoutMillis = HttpTimeoutConfig.INFINITE_TIMEOUT_MS
+                        socketTimeoutMillis = limits.streamIdleTimeout.inWholeMilliseconds
+                    }
+                    accept(ContentType.Text.EventStream)
+                    setBody(request)
+                }.execute { response ->
+                    check(response.status.isSuccess()) { "HTTP ${response.status.value}: ${response.bodyAsText()}" }
+                    if (response.contentType()?.withoutParameters() != ContentType.Text.EventStream) {
+                        // Agents may report JSON-RPC errors as ordinary JSON before opening the stream.
+                        result(response.bodyAsText(), id)
+                        error("Expected text/event-stream")
+                    }
+                    readStream(response.bodyAsChannel(), id)
                 }
-                readStream(response.bodyAsChannel(), id)
-            }
+            } ?: error("A2A stream exceeded ${limits.streamTimeout}")
         }
         val response = transportCall {
             transport.createPost().url(rpc.uri.toString()).addHeaders(headers).body(request).post().checkedBody()
@@ -85,7 +112,8 @@ internal class A2AActivity(private val streamingClient: HttpClient) {
         return result(response, id)
     }
 
-    private suspend fun discover(source: URI, isCardResource: Boolean, credentials: String?): Pair<URI, JsonNode> {
+    /** Returns the Agent Card and where it was found, or null when `server` publishes none. */
+    private suspend fun discover(source: URI, isCardResource: Boolean, credentials: String?): Pair<URI, JsonNode>? {
         if (source.scheme?.lowercase() !in setOf("http", "https")) {
             require(isCardResource) { "A2A server must be an HTTP endpoint" }
             return source to runInterruptible(Dispatchers.IO) {
@@ -94,25 +122,34 @@ internal class A2AActivity(private val streamingClient: HttpClient) {
                 }
             }
         }
-        val card = if (isCardResource || source.path.endsWith("/.well-known/agent-card.json")) source else {
-            val directory = source.rawPath.trimEnd('/') + "/.well-known/agent-card.json"
-            val query = source.rawQuery?.let { "?$it" }.orEmpty()
-            URI.create("${source.scheme}://${source.rawAuthority}$directory$query")
-        }
         suspend fun fetch(uri: URI) = transportCall {
             val get = transport.createGet().url(uri.toString())
             credentials?.let { get.addHeader(HttpHeaders.Authorization, it) }
             get.get()
         }
-        val response = fetch(card)
-        // As in the Java resolver, a server may serve its card directly at its base URL.
-        if (card != source && response.status() == 404) return source to parseJson(fetch(source).checkedBody())
-        return card to parseJson(response.checkedBody())
+        if (isCardResource || source.path.endsWith(WELL_KNOWN_CARD)) {
+            return source to parseJson(fetch(source).checkedBody())
+        }
+        // The card is looked up below the server URL, as the Java resolver does, then at
+        // the root of its host, where RFC 8615 places well-known resources.
+        val query = source.rawQuery?.let { "?$it" }.orEmpty()
+        val origin = "${source.scheme}://${source.rawAuthority}"
+        val candidates = listOf(source.rawPath.trimEnd('/'), "").distinct()
+            .map { URI.create("$origin$it$WELL_KNOWN_CARD$query") }
+        for (candidate in candidates) {
+            val response = fetch(candidate)
+            if (response.status() != 404) return candidate to parseJson(response.checkedBody())
+        }
+        // A server may serve its card directly at its base URL. Anything else answering
+        // there is the JSON-RPC endpoint the workflow asked for.
+        val response = fetch(source)
+        val card = response.takeIf { it.success() }?.let { runCatching { parseJson(it.body()) }.getOrNull() }
+        return card?.takeIf { it.has("url") || it.has("supportedInterfaces") }?.let { source to it }
     }
 
     private suspend fun <T : Any> transportCall(block: () -> T): T =
-        withTimeoutOrNull(30.seconds) { runInterruptible(Dispatchers.IO) { block() } }
-            ?: error("A2A HTTP request timed out")
+        withTimeoutOrNull(limits.requestTimeout) { runInterruptible(Dispatchers.IO) { block() } }
+            ?: error("A2A HTTP request timed out after ${limits.requestTimeout}")
 
     private fun A2AHttpResponse.checkedBody(): String {
         check(success()) { "HTTP ${status()}: ${body()}" }
@@ -122,7 +159,8 @@ internal class A2AActivity(private val streamingClient: HttpClient) {
     private fun result(data: String, id: String): JsonNode {
         val envelope = parseJson(data)
         check(envelope.path("jsonrpc").asText() == "2.0") { "Invalid JSON-RPC version" }
-        envelope.get("error")?.let { error("JSON-RPC error: $it") }
+        // Some servers serialize both members and leave the unused one null.
+        envelope.get("error")?.takeUnless { it.isNull }?.let { error("JSON-RPC error: $it") }
         check(envelope.path("id").textValue() == id) { "Unexpected JSON-RPC response id" }
         return envelope.get("result") ?: error("Missing JSON-RPC result")
     }
@@ -130,22 +168,27 @@ internal class A2AActivity(private val streamingClient: HttpClient) {
     private suspend fun readStream(channel: ByteReadChannel, id: String): JsonNode {
         val results = LemlineJson.jacksonMapper.createArrayNode()
         val data = mutableListOf<String>()
+        var received = 0L
         while (true) {
             val line = channel.readLine(LineEnding.Lenient) ?: break
             when {
                 line.isEmpty() && data.isNotEmpty() -> {
-                    results.add(result(data.joinToString("\n"), id))
+                    val event = result(data.joinToString("\n"), id)
+                    results.add(event)
                     data.clear()
+                    // The final event completes the call, whether or not the agent then closes the connection.
+                    if (event.endsStream()) return results
                 }
                 line == "data" -> data.add("")
-                line.startsWith("data:") -> data.add(line.substring(5).removePrefix(" "))
+                line.startsWith("data:") -> {
+                    received += line.length
+                    check(received <= limits.maxStreamChars) { "A2A stream exceeded ${limits.maxStreamChars} characters" }
+                    data.add(line.substring(5).removePrefix(" "))
+                }
             }
         }
         channel.closedCause?.let { throw it }
-        check(data.isEmpty() && results.lastOrNull()?.endsStream() == true) {
-            "A2A stream ended before its final result"
-        }
-        return results
+        error("A2A stream ended before its final result")
     }
 
     private fun JsonNode.endsStream(): Boolean {
@@ -165,7 +208,7 @@ private fun URI.sameOrigin(other: URI): Boolean {
 }
 
 private fun JsonNode.rpcAuthorization(authorization: String?, isCardResource: Boolean): String? {
-    val requirements = get("securityRequirements") ?: get("security")
+    val requirements = (get("securityRequirements") ?: get("security"))?.takeUnless { it.isNull }
         ?: return authorization.takeUnless { isCardResource }
     require(requirements.isArray) { "Invalid Agent Card security requirements" }
     if (requirements.isEmpty) return null
@@ -174,10 +217,21 @@ private fun JsonNode.rpcAuthorization(authorization: String?, isCardResource: Bo
         require(schemes.isObject) { "Invalid Agent Card security requirement" }
         if (schemes.isEmpty) return null
         if (authorization != null && schemes.fieldNames().asSequence().all { name ->
-                val definition = path("securitySchemes").path(name)
-                val http = definition.get("httpAuthSecurityScheme") ?: definition.takeIf { it.path("type").asText() == "http" }
-                http?.path("scheme")?.asText().equals(authorization.substringBefore(' '), true)
+                path("securitySchemes").path(name).accepts(authorization)
             }) return authorization
     }
     error("No configured credentials satisfy the Agent Card security requirements")
 }
+
+// A security scheme in either card format: A2A 1.0 wraps it, earlier cards tag it with `type`.
+private fun JsonNode.accepts(authorization: String): Boolean {
+    val scheme = authorization.substringBefore(' ')
+    val type = path("type").asText()
+    val http = get("httpAuthSecurityScheme") ?: takeIf { type == "http" }
+    if (http != null) return http.path("scheme").asText().equals(scheme, true)
+    // OAuth 2 and OpenID Connect access tokens are presented as bearer tokens.
+    val token = has("oauth2SecurityScheme") || has("openIdConnectSecurityScheme") || type in setOf("oauth2", "openIdConnect")
+    return token && scheme.equals("Bearer", true)
+}
+
+private const val WELL_KNOWN_CARD = "/.well-known/agent-card.json"

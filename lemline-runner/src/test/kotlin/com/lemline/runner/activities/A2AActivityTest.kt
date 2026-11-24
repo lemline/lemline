@@ -13,17 +13,22 @@ import com.lemline.core.errors.InternalException
 import com.lemline.core.lifecycleevents.LifecycleEventHook
 import com.lemline.core.orchestrator.FullOrchestrator
 import com.lemline.core.orchestrator.StepByStepOrchestrator
+import com.lemline.core.processors.CallA2AConfig
 import com.lemline.core.states.WorkflowCommand
 import com.lemline.core.states.WorkflowEvent
 import com.lemline.core.workflows.WorkflowCache
 import com.lemline.runner.common.messaging.InstanceMessageCodec
 import com.sun.net.httpserver.HttpExchange
 import com.sun.net.httpserver.HttpServer
+import io.serverlessworkflow.api.types.A2AArguments.WithA2AMethod
 import java.io.File
 import java.net.InetSocketAddress
+import java.net.URI
 import java.nio.file.Path
 import java.util.UUID
 import java.util.concurrent.CopyOnWriteArrayList
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 import kotlin.test.*
 import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.DynamicTest.dynamicTest
@@ -104,7 +109,7 @@ class A2AActivityTest {
             assertEquals(listOf("/.well-known/agent-card.json"), agent.cardRequests)
             val request = agent.calls.single()
             val id = UUID.fromString(request.at("/params/message/messageId").textValue())
-            assertEquals(parseJson("""{"message":{"messageId":"$id","role":"user","parts":[{"kind":"text","text":"Generate the Q1 sales report."}]}}"""), request["params"])
+            assertEquals(parseJson("""{"message":{"messageId":"$id","role":"user","kind":"message","parts":[{"kind":"text","text":"Generate the Q1 sales report."}]}}"""), request["params"])
         }
     }
 
@@ -368,6 +373,124 @@ class A2AActivityTest {
             val mock = MockActivityExecutor(MockConfiguration(a2aResults = mapOf("message/send" to jsonValue("mock"))))
             assertEquals(jsonValue("mock"), mock.execute(first))
         }
+    }
+
+    @Test
+    fun `null card members and a null error member are treated as absent`() = runBlocking {
+        Agent().use { agent ->
+            agent.security = ""","security":null,"supportedInterfaces":null"""
+            agent.reply = { exchange, request ->
+                exchange.respond("application/json", """{"jsonrpc":"2.0","id":${request["id"]},"result":{"reply":"ok"},"error":null}""")
+            }
+            val output = run(workflow("tasks/list", agent.base), parseJson("""{"params":{}}"""))
+            assertEquals("ok", output.at("/observed/reply").asText())
+        }
+    }
+
+    @TestFactory
+    fun `a bearer token satisfies OAuth2 and OpenID Connect schemes`() = listOf(
+        """{"type":"oauth2","flows":{}}""",
+        """{"type":"openIdConnect","openIdConnectUrl":"https://example.com/.well-known/openid-configuration"}""",
+        """{"oauth2SecurityScheme":{"flows":{}}}""",
+    ).map { scheme ->
+        dynamicTest(scheme) {
+            runBlocking {
+                Agent().use { agent ->
+                    agent.security = ""","security":[{"login":["read"]}],"securitySchemes":{"login":$scheme}"""
+                    val yaml = document + """
+                        do:
+                          - ask:
+                              call: a2a
+                              with:
+                                method: tasks/list
+                                server:
+                                  uri: ${agent.base}
+                                  authentication: {bearer: {token: example}}
+                    """.trimIndent()
+                    run(yaml)
+                    assertEquals(listOf("Bearer example", "Bearer example"), agent.credentials)
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `server without a card is called as the JSON-RPC endpoint`() = runBlocking {
+        val server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
+        val posts = CopyOnWriteArrayList<JsonNode>()
+        server.createContext("/") { exchange ->
+            exchange.use {
+                if (it.requestMethod != "POST" || it.requestURI.path != "/a2a/v1") {
+                    it.sendResponseHeaders(if (it.requestMethod == "GET" && it.requestURI.path != "/a2a/v1") 404 else 405, -1)
+                } else {
+                    val request = parseJson(it.requestBody.bufferedReader().readText())
+                    posts.add(request)
+                    it.respond("application/json", envelope(request, parseJson("""{"reply":"direct"}""")))
+                }
+            }
+        }
+        server.start()
+        try {
+            val endpoint = "http://127.0.0.1:${server.address.port}/a2a/v1"
+            val output = run(workflow("tasks/list", endpoint), parseJson("""{"params":{}}"""))
+            assertEquals("direct", output.at("/observed/reply").asText())
+            assertEquals(listOf("tasks/list"), posts.map { it["method"].asText() })
+        } finally {
+            server.stop(0)
+        }
+    }
+
+    @Test
+    fun `a stream completes at its final event while the connection stays open`() = runBlocking {
+        Agent().use { agent ->
+            val finished = CountDownLatch(1)
+            val final = parseJson("""{"kind":"status-update","status":{"state":"completed"},"final":true}""")
+            agent.reply = { exchange, request ->
+                exchange.responseHeaders.add("Content-Type", "text/event-stream")
+                exchange.sendResponseHeaders(200, 0)
+                exchange.responseBody.write("data: ${envelope(request, final)}\n\n".toByteArray())
+                exchange.responseBody.flush()
+                finished.await(20, TimeUnit.SECONDS)
+            }
+            try {
+                val output = run(workflow("message/stream", agent.base), parseJson("""{"params":{}}"""))
+                assertEquals(listOf(final), output["observed"].toList())
+            } finally {
+                finished.countDown()
+            }
+        }
+    }
+
+    @Test
+    fun `interface selection accepts later 1x versions and falls back to the earlier protocol`() {
+        fun card(version: String) = parseJson(
+            """{"supportedInterfaces":[{"url":"https://example.com/grpc","protocolBinding":"GRPC","protocolVersion":"1.0"},{"url":"https://example.com/rpc","protocolBinding":"JSONRPC","protocolVersion":"$version"}]}"""
+        )
+        assertTrue(A2ARpcEndpoint.from(card("1.1")).v1)
+        val earlier = A2ARpcEndpoint.from(card("0.3"))
+        assertFalse(earlier.v1)
+        assertEquals("https://example.com/rpc", earlier.uri.toString())
+        assertFailsWith<IllegalStateException> {
+            A2ARpcEndpoint.from(parseJson("""{"supportedInterfaces":[{"url":"https://example.com/grpc","protocolBinding":"GRPC","protocolVersion":"1.0"}],"preferredTransport":"GRPC"}"""))
+        }
+    }
+
+    @Test
+    fun `send configuration is translated for a 1x agent only`() {
+        val parameters = parseJson(
+            """{"message":{"role":"user","parts":[]},"configuration":{"blocking":true,"historyLength":2,"pushNotificationConfig":{"url":"https://example.com/push"}}}"""
+        ) as ObjectNode
+        val config = CallA2AConfig(WithA2AMethod.MESSAGE_SEND, "https://example.com", false, parameters)
+        val uri = URI.create("https://example.com/rpc")
+        assertEquals(
+            parseJson("""{"returnImmediately":false,"historyLength":2,"taskPushNotificationConfig":{"url":"https://example.com/push"}}"""),
+            A2ARpcEndpoint(uri, v1 = true, tenant = null).parameters(config)["configuration"],
+        )
+        val earlier = A2ARpcEndpoint(uri, v1 = false, tenant = null).parameters(config)
+        assertEquals("message", earlier.at("/message/kind").textValue())
+        assertEquals(parameters["configuration"], earlier["configuration"])
+        assertTrue(parameters.at("/configuration/blocking").booleanValue())
+        assertFalse(parameters["message"].has("kind"))
     }
 
     companion object {
