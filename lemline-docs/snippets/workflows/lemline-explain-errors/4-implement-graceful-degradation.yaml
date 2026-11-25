@@ -1,29 +1,37 @@
 document:
-  dsl: 1.0.3
+  dsl: '1.0.3'
   namespace: examples
   name: 4-implement-graceful-degradation
-  version: 1.0.0
+  version: '1.0.0'
 do:
-  - userDashboard:
+  - customerDashboard:
       fork:
         branches:
           - loadProfile:
               try:
-                - fetchUserProfile:
-                    set:
-                      processed: true
+                - fetchCustomerProfile:
+                    call: http
+                    with:
+                      method: get
+                      endpoint: '${ "http://127.0.0.1:8787/customers/\(.customerId)" + (if .profileDown then "?fail=503" else "" end) }'
+                    output:
+                      as: '${ { profile: .name } }'
               catch:
                 do:
                   - setDefaultProfile:
                       set:
-                        processed: true
+                        profile: Guest
           - loadRecommendations:
               try:
                 - fetchRecommendations:
-                    set:
-                      processed: true
+                    call: http
+                    with:
+                      method: get
+                      endpoint: '${ "http://127.0.0.1:8787/products?category=garden" + (if .recommendationsDown then "&fail=503" else "" end) }'
+                    output:
+                      as: '${ { recommendations: [.items[].id] } }'
               catch:
                 do:
                   - setEmptyRecommendations:
                       set:
-                        processed: true
+                        recommendations: []

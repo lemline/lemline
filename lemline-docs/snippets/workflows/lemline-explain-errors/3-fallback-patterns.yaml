@@ -1,24 +1,25 @@
 document:
-  dsl: 1.0.3
+  dsl: '1.0.3'
   namespace: examples
   name: 3-fallback-patterns
-  version: 1.0.0
+  version: '1.0.0'
 do:
-  - getUserProfile:
+  - getCustomerProfile:
       try:
         - fetchFromApi:
             call: http
             with:
-              endpoint: ${ "https://api.example.com/users/\(.userId)" }
+              endpoint: '${ "http://127.0.0.1:8787/customers/\(.customerId)" + (if .apiDown then "?fail=503" else "" end) }'
               method: get
       catch:
         do:
           - useCachedData:
               call: http
               with:
-                endpoint: ${ "https://cache.example.com/users/\(.userId)" }
+                endpoint: ${ "http://127.0.0.1:8787/customers/\($workflow.input.customerId)" }
                 method: get
           - markStale:
               set:
+                name: ${ .name }
                 dataSource: cache
                 isFresh: false

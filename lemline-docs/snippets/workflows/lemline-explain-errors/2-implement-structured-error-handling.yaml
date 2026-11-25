@@ -1,22 +1,27 @@
 document:
-  dsl: 1.0.3
+  dsl: '1.0.3'
   namespace: examples
   name: 2-implement-structured-error-handling
-  version: 1.0.0
+  version: '1.0.0'
 do:
   - mainFlow:
       try:
         - validateInput:
             set:
-              processed: true
+              orderId: ${ .orderId }
+              token: ${ .token }
         - processOrder:
             try:
               - reserveInventory:
                   set:
-                    processed: true
+                    reserved: true
               - processPayment:
-                  set:
-                    processed: true
+                  if: ${ $workflow.input.token == "declined" }
+                  raise:
+                    error:
+                      type: https://example.com/errors/payment-declined
+                      status: 400
+                      title: Payment declined
             catch:
               errors:
                 with:
@@ -24,8 +29,8 @@ do:
               do:
                 - handleError:
                     set:
-                      processed: true
+                      paymentDeclined: true
         - fulfillOrder:
             set:
-              processed: true
+              fulfilled: ${ (.paymentDeclined // false) | not }
       catch: {}

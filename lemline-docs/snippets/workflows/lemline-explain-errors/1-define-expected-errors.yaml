@@ -1,8 +1,8 @@
 document:
-  dsl: 1.0.3
+  dsl: '1.0.3'
   namespace: examples
   name: 1-define-expected-errors
-  version: 1.0.0
+  version: '1.0.0'
 use:
   errors:
     paymentDeclined:
@@ -14,6 +14,15 @@ use:
       status: 409
       title: Insufficient Inventory
 do:
-  - example:
+  - readStock:
+      call: http
+      with:
+        method: get
+        endpoint: http://127.0.0.1:8787/stock
+  - checkInventory:
+      if: ${ .available < $workflow.input.quantity }
+      raise:
+        error: insufficientInventory
+  - accept:
       set:
-        ready: true
+        accepted: ${ $workflow.input.quantity }
