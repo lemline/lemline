@@ -24,6 +24,29 @@ LEMLINE_CONFIG=/etc/lemline/lemline.yaml lemline listen --metrics-port 8081
 
 Stopping a runner is safe: messages it did not acknowledge are delivered to another runner.
 
+### Try it on one machine
+
+On [the SQLite setup](lemline-tutorial-setup.md), two workers started from the same directory share the same files
+and the same work. Stop the setup worker, then start two workers with their own metrics ports, each in its own
+terminal in the setup directory (with the JAR, substitute `java -jar lemline.jar` for `bin/lemline`):
+
+```text
+bin/lemline listen --debug --metrics-port 8081
+bin/lemline listen --debug --metrics-port 8082
+```
+
+From a third terminal, register [the first workflow](lemline-getting-started.md#creating-your-first-workflow) and
+start it a dozen times:
+
+```text
+bin/lemline definition post -f hello.yaml
+for i in $(seq 1 12); do bin/lemline instance start examples shop-receipt; done
+```
+
+Each instance completes once, and both worker terminals show `Workflow completed with output` lines: in one run, one
+worker completed 8 instances and the other 4. SQLite keeps everything on one host; to spread workers over several
+machines, use a shared database and broker.
+
 ### With Kafka
 
 Runners in the same consumer group share a topic's partitions, so a topic needs at least as many partitions as runners. Keep the same group id on every runner:
