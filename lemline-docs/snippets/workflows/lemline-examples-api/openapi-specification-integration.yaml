@@ -1,44 +1,26 @@
 document:
   dsl: 1.0.3
   namespace: examples
-  name: pet-store-integration
+  name: catalog-openapi
   version: 1.0.0
 do:
-  - listAvailablePets:
+  - listGardenProducts:
       call: openapi
       with:
         document:
-          endpoint: https://petstore.swagger.io/v2/swagger.json
-        operationId: findPetsByStatus
+          endpoint: http://127.0.0.1:8787/openapi.json
+        operationId: listProducts
         parameters:
-          status: available
+          category: garden
       export:
-        as: '${ $context + { availablePets: . } }'
-  - addNewPet:
+        as: '${ $context + { gardenProducts: . } }'
+  - retrieveFirstProduct:
       call: openapi
       with:
         document:
-          endpoint: https://petstore.swagger.io/v2/swagger.json
-        operationId: addPet
+          endpoint: http://127.0.0.1:8787/openapi.json
+        operationId: getProduct
         parameters:
-          body:
-            name: Fluffy
-            status: available
-            category:
-              id: 1
-              name: Dogs
-            tags:
-              - id: 1
-                name: friendly
+          productId: ${ $context.gardenProducts.items[0].id }
       export:
-        as: '${ $context + { newPet: . } }'
-  - retrievePet:
-      call: openapi
-      with:
-        document:
-          endpoint: https://petstore.swagger.io/v2/swagger.json
-        operationId: getPetById
-        parameters:
-          petId: ${ $context.newPet.id }
-      export:
-        as: '${ $context + { retrievedPet: . } }'
+        as: '${ $context + { firstProduct: . } }'

@@ -14,11 +14,11 @@ do:
       call: openapi
       with:
         document:
-          endpoint: https://api.example/openapi.json
+          endpoint: http://127.0.0.1:8787/openapi.json
         operationId: createResource
         authentication:
           oauth2:
-            authority: https://auth.example/oauth2
+            authority: http://127.0.0.1:8787/oauth2
             grant: client_credentials
             client:
               id: ${ $secrets.CLIENT_ID }
@@ -35,7 +35,7 @@ do:
       call: openapi
       with:
         document:
-          endpoint: https://api.example/openapi.json
+          endpoint: http://127.0.0.1:8787/openapi.json
         operationId: deleteResource
         authentication:
           basic:

@@ -1,53 +1,45 @@
 document:
-  dsl: 1.0.3
+  dsl: '1.0.3'
   namespace: examples
-  name: graphql-mutation
-  version: 1.0.0
+  name: add-review-mutation
+  version: '1.0.0'
 input:
   schema:
     format: json
     document:
       type: object
       required:
-        - postData
+        - review
       properties:
-        postData:
+        review:
           type: object
           required:
-            - title
-            - content
+            - customerId
+            - productId
+            - rating
 use:
   secrets:
     - API_TOKEN
 do:
-  - createPost:
+  - addReview:
       call: http
       with:
         method: post
-        endpoint: https://api.example/graphql
+        endpoint: http://127.0.0.1:8787/graphql
         headers:
           Content-Type: application/json
           Authorization: Bearer ${ $secrets.API_TOKEN }
         body:
           query: |
-            mutation CreatePost($input: CreatePostInput!) {
-              createPost(input: $input) {
-                post {
-                  id
-                  title
-                  content
-                  createdAt
-                }
-                errors {
-                  field
-                  message
-                }
+            mutation AddReview($review: ReviewInput!) {
+              addReview(review: $review) {
+                id
+                rating
+                title
               }
             }
           variables:
-            input:
-              title: ${ .postData.title }
-              content: ${ .postData.content }
+            review: ${ .review }
       export:
         as: '${ $context + { graphqlResponse: . } }'
   - processResult:
@@ -55,8 +47,7 @@ do:
         - route:
             switch:
               - hasErrors:
-                  when: ${ $context.graphqlResponse.data.createPost.errors != null and
-                    ($context.graphqlResponse.data.createPost.errors | length) > 0 }
+                  when: ${ ($context.graphqlResponse.errors // []) | length > 0 }
                   then: hasErrorsAction
               - default:
                   then: defaultAction
@@ -66,7 +57,7 @@ do:
                   set:
                     result:
                       success: false
-                      errors: ${ $context.graphqlResponse.data.createPost.errors }
+                      errors: ${ [$context.graphqlResponse.errors[].message] }
             then: exit
         - defaultAction:
             do:
@@ -74,5 +65,5 @@ do:
                   set:
                     result:
                       success: true
-                      post: ${ $context.graphqlResponse.data.createPost.post }
+                      review: ${ $context.graphqlResponse.data.addReview }
             then: exit

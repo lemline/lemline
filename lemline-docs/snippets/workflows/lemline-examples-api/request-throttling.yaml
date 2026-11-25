@@ -1,8 +1,8 @@
 document:
-  dsl: 1.0.3
+  dsl: '1.0.3'
   namespace: examples
-  name: api-throttling
-  version: 1.0.0
+  name: request-throttling
+  version: '1.0.0'
 input:
   schema:
     format: json
@@ -41,7 +41,7 @@ do:
                         call: http
                         with:
                           method: get
-                          endpoint: ${ "https://rate-limited-api.example/items/\($item)" }
+                          endpoint: '${ "http://127.0.0.1:8787/products/\($item)?fail=429&failTimes=\(if $item == "SKU-2" then 1 else 0 end)&key=\($workflow.id)" }'
                           headers:
                             Authorization: Bearer ${ $secrets.API_TOKEN }
                         export:
