@@ -343,7 +343,7 @@ class SdkCompatibilityTest {
                       catch:
                         do:
                           - recovered:
-                              set: '§{ {title: §error.title, detail: §error.details} }'
+                              set: '§{ {title: §error.title, detail: §error.detail} }'
             """.trimIndent().prependIndent("      ")
             val workflow = WorkflowDefinitionReader.read(source(body), WorkflowFormat.YAML)
             for ((format, mapper) in listOf(WorkflowFormat.JSON to LemlineJson.jacksonMapper, WorkflowFormat.YAML to LemlineJson.yamlMapper)) {

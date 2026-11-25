@@ -225,7 +225,7 @@ object NodeStackProtobufMapper {
         status = status,
         position = position,
         title = title,
-        details = details
+        details = detail
     )
 
     private fun InternalErrorProto.toDomain() = InternalException.Error(
@@ -233,7 +233,7 @@ object NodeStackProtobufMapper {
         status = status,
         position = position,
         title = title,
-        details = details
+        detail = details
     )
 
     private fun Instant.toProtoInstant() = JavaInstant.ofEpochSecond(epochSeconds, nanosecondsOfSecond.toLong())

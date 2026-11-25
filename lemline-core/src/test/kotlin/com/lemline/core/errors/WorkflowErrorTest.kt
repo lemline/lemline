@@ -13,7 +13,7 @@ class WorkflowErrorTest {
             errorType = WorkflowErrorType.VALIDATION,
             title = "Invalid_input",
             status = 400,
-            details = "The_input_data_does_not_match_the_required_schema",
+            detail = "The_input_data_does_not_match_the_required_schema",
             position = NodePosition("/do/0"),
         )
 
@@ -24,7 +24,7 @@ class WorkflowErrorTest {
                 "status":400,
                 "instance":"/do/0",
                 "title":"Invalid_input",
-                "details":"The_input_data_does_not_match_the_required_schema"
+                "detail":"The_input_data_does_not_match_the_required_schema"
             }
         """.trimIndent().replace("\\s".toRegex(), "")
 
@@ -39,7 +39,7 @@ class WorkflowErrorTest {
                 "status":408,
                 "instance":"/do/1/try",
                 "title":"Operation timed out",
-                "details":"The operation exceeded the maximum allowed time"
+                "detail":"The operation exceeded the maximum allowed time"
             }
         """.trimIndent()
 
@@ -48,7 +48,7 @@ class WorkflowErrorTest {
         assertEquals("https://open-workflow-specification.org/spec/1.0.0/errors/validation", error.type)
         assertEquals("Operation timed out", error.title)
         assertEquals(408, error.status)
-        assertEquals("The operation exceeded the maximum allowed time", error.details)
+        assertEquals("The operation exceeded the maximum allowed time", error.detail)
         assertEquals("/do/1/try", error.position)
     }
 
@@ -57,7 +57,7 @@ class WorkflowErrorTest {
         val error = InternalException.Error(
             errorType = WorkflowErrorType.RUNTIME,
             title = "Internal_error",
-            details = "An_unexpected_error_occurred",
+            detail = "An_unexpected_error_occurred",
             position = NodePosition("/do/2"),
         )
 
@@ -68,7 +68,7 @@ class WorkflowErrorTest {
                 "status":500,
                 "instance":"/do/2",
                 "title":"Internal_error",
-                "details":"An_unexpected_error_occurred"
+                "detail":"An_unexpected_error_occurred"
             }
         """.trimIndent().replace("\\s".toRegex(), "")
 

@@ -733,13 +733,13 @@ abstract class AbstractProcessor<T : TaskBase, S : NodeState>(
     internal open fun raiseError(
         type: WorkflowErrorType,
         title: String?,
-        details: String? = null,
+        detail: String? = null,
         status: Int? = null,
     ): Nothing {
         val error = InternalException.Error(
             errorType = type,
             title = title ?: "Unknown Error",
-            details = details,
+            detail = detail,
             status = status ?: type.defaultStatus,
             position = node.position,
         )

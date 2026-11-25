@@ -146,7 +146,7 @@ class TryProcessor(
             if (filter.status > 0 && filter.status != error.status) return false
             if (filter.instance != null && filter.instance != error.position) return false
             if (filter.title != null && filter.title != error.title) return false
-            if (filter.detail != null && filter.detail != error.details) return false
+            if (filter.detail != null && filter.detail != error.detail) return false
         }
 
         // get transient scope with error

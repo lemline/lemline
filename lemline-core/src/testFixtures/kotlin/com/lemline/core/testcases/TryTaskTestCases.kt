@@ -168,19 +168,58 @@ object TryTaskTestCases {
                               error:
                                 type: https://open-workflow-specification.org/spec/1.0.0/errors/runtime
                                 status: 500
+                                detail: Could not process the order
                       catch:
+                        when: ${ $error.detail == "Could not process the order" }
                         do:
                           - handleError:
                               set:
                                 errorType: ${ $error.type }
                                 errorStatus: ${ $error.status }
+                                errorDetail: ${ $error.detail }
             """.trimIndent(),
             validate = expectOutput(
                 buildJsonObject {
                     put("errorType", "https://open-workflow-specification.org/spec/1.0.0/errors/runtime")
                     put("errorStatus", 500)
+                    put("errorDetail", "Could not process the order")
                 }
             )
+        ),
+
+        WorkflowTestCase(
+            name = "try catch - retry predicate can read the error detail",
+            yaml = $$"""
+                do:
+                  - trySomething:
+                      try:
+                        - checkAttempt:
+                            set:
+                              firstAttempt: ${ $context.attempted != true }
+                            export:
+                              as: '${ {attempted: true} }'
+                        - raiseError:
+                            if: ${ .firstAttempt }
+                            raise:
+                              error:
+                                type: https://open-workflow-specification.org/spec/1.0.0/errors/validation
+                                status: 400
+                                detail: Retry this order
+                        - finish:
+                            set:
+                              retried: true
+                      catch:
+                        as: issue
+                        retry:
+                          when: ${ $issue.detail == "Retry this order" }
+                          delay: { milliseconds: 1 }
+                          limit: { attempt: { count: 1 } }
+                        do:
+                          - fallback:
+                              set:
+                                retried: false
+            """.trimIndent(),
+            validate = expectOutput(buildJsonObject { put("retried", true) })
         ),
 
         WorkflowTestCase(

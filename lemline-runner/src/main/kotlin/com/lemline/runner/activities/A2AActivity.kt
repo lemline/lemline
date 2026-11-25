@@ -69,7 +69,7 @@ internal class A2AActivity(
             status = failure?.status ?: 500,
             position = event.nodePosition.toString(),
             title = "A2A ${event.config.method.value()} failed",
-            details = (failure ?: e).message ?: e.javaClass.simpleName,
+            detail = (failure ?: e).message ?: e.javaClass.simpleName,
         ))
     }
 

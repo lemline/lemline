@@ -83,7 +83,7 @@ data class RetryModel(
                 else -> error.message
             },
             errorStackTrace = when (error) {
-                is InternalException -> error.error.details
+                is InternalException -> error.error.detail
                 else -> error.stackTraceToString()
             },
         )

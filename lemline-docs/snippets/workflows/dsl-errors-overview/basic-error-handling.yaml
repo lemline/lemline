@@ -42,6 +42,6 @@ do:
                 body:
                   to: ${ $workflow.input.order.customerEmail }
                   subject: Order Processing Failed
-                  body: '${ "We apologize, but we could not process your order. Error: " + $error.details }'
+                  body: '${ "We apologize, but we could not process your order. Error: " + $error.detail }'
                 headers:
                   Content-Type: application/json

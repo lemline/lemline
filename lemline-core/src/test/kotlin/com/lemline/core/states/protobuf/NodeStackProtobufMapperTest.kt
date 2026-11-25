@@ -113,7 +113,7 @@ class NodeStackProtobufMapperTest {
                     status = 500,
                     position = "/do/0/task",
                     title = "boom",
-                    details = "stack"
+                    detail = "stack"
                 ),
                 errorAs = "error",
                 hasStarted = true

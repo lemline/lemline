@@ -28,7 +28,7 @@ All errors in Lemline follow the RFC 7807 Problem Details format:
   "status": 400,
   "instance": "/do/0/validateInput",
   "title": "Input Validation Failed",
-  "details": "The 'amount' field must be a positive number"
+  "detail": "The 'amount' field must be a positive number"
 }
 ```
 
@@ -38,19 +38,19 @@ All errors in Lemline follow the RFC 7807 Problem Details format:
 | `status` | Yes | HTTP status code (numeric) corresponding to the error |
 | `instance` | Yes | JSON pointer to the location in the workflow where the error occurred |
 | `title` | No | Short, human-readable summary of the problem |
-| `details` | No | Detailed explanation specific to this error occurrence |
+| `detail` | No | Detailed explanation specific to this error occurrence |
 
 ## Error Titles and Details
 
-Lemline errors carry no numeric or symbolic error code: identify them by `type` (and `status`), and read `title` and `details` for the specific cause. For example:
+Lemline errors carry no numeric or symbolic error code: identify them by `type` (and `status`), and read `title` and `detail` for the specific cause. For example:
 
 | Situation | `type` | `status` | Example message |
 |-----------|--------|----------|-----------------|
 | A declared secret is not set on the runner | `authorization` | 403 | `Required secret 'API_KEY' is unavailable` |
 | An HTTP call returns a non-2xx status | `communication` | the HTTP status (for example 404) | `HTTP 404: <response body>` |
 | An HTTP call gets no response (unknown host, refused connection, timeout) | `communication` | 500 | `Unable to reach https://api.example.com: unresolved host` |
-| An A2A call gets a non-2xx status from the agent | `communication` (see below) | the HTTP status | title `A2A message/send failed`, details `HTTP 503: <response body>` |
-| An A2A call gets no usable answer (unreachable agent, timeout, stream cut before its final result) | `communication` (see below) | 500 | title `A2A message/send failed`, details `Unable to reach https://agent.example.com: ...` |
+| An A2A call gets a non-2xx status from the agent | `communication` (see below) | the HTTP status | title `A2A message/send failed`, `detail` `HTTP 503: <response body>` |
+| An A2A call gets no usable answer (unreachable agent, timeout, stream cut before its final result) | `communication` (see below) | 500 | title `A2A message/send failed`, `detail` `Unable to reach https://agent.example.com: ...` |
 | A `listen` task reaches its timeout | `timeout` | 408 | `Listen task timed out at ...` |
 | An expression fails to evaluate | `expression` | 400 | the evaluation error message |
 | Input or output does not match its schema | `validation` | 400 | the schema validation message |
@@ -85,7 +85,7 @@ java.lang.RuntimeException
 
 An activity reports a failed exchange with an external service by throwing `com.lemline.core.errors.CommunicationException`, which carries the status to report; it becomes a `communication` error. Any other exception thrown by an activity becomes a `runtime` error with status 500.
 
-`InternalException` holds an `InternalException.Error` with the standard error fields (`type`, `status`, `instance`, `title`, `details`). The error type is one of the values of `com.lemline.core.errors.WorkflowErrorType` (`configuration`, `validation`, `expression`, `authentication`, `authorization`, `timeout`, `communication`, `runtime`).
+`InternalException` holds an `InternalException.Error` with the standard error fields (`type`, `status`, `instance`, `title`, `detail`). The error type is one of the values of `com.lemline.core.errors.WorkflowErrorType` (`configuration`, `validation`, `expression`, `authentication`, `authorization`, `timeout`, `communication`, `runtime`).
 
 ## Defining Custom Errors
 

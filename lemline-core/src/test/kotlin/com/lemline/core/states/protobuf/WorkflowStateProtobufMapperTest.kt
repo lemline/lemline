@@ -143,7 +143,7 @@ class WorkflowStateProtobufMapperTest {
                     status = 500,
                     position = taskPosition.toString(),
                     title = null,
-                    details = null
+                    detail = null
                 ),
                 faultedAt = now
             )
@@ -362,7 +362,7 @@ class WorkflowStateProtobufMapperTest {
             status = 500,
             position = taskPosition.toString(),
             title = "boom",
-            details = "stacktrace"
+            detail = "stacktrace"
         )
 
     private companion object {

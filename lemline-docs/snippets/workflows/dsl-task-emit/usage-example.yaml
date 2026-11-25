@@ -38,7 +38,7 @@ do:
                     type: com.petstore.order.error.v1
                     subject: order-error
                     data:
-                      error: ${ $error.details }
+                      error: ${ $error.detail }
                       customerId: ${ .customerId }
               then: end
       then: emitOrderPlacedEvent

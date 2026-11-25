@@ -256,7 +256,7 @@ class ForkService {
             branch.errorReason = branchError.type
             branch.errorClass = branchError.type
             branch.errorMessage = branchError.title
-            branch.errorStackTrace = branchError.details
+            branch.errorStackTrace = branchError.detail
 
             // Save the updated branch in the transaction
             forkRepository.updateBranch(branch, conn)
@@ -278,7 +278,7 @@ class ForkService {
                     fork.errorReason = branchError.type
                     fork.errorClass = branchError.type
                     fork.errorMessage = branchError.title
-                    fork.errorStackTrace = branchError.details
+                    fork.errorStackTrace = branchError.detail
 
                     // Save the updated fork in the transaction
                     forkRepository.update(fork, conn)
