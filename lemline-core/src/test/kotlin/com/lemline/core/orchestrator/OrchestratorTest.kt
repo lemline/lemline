@@ -876,5 +876,84 @@ class OrchestratorTest : FunSpec() {
             // Verify 3 events were emitted
             assertEquals(3, cloudEventHook.emittedEvents.size)
         }
+
+        fun emittedData(hook: InMemoryCloudEventHook): JsonNode =
+            LemlineJson.jacksonMapper.readTree(hook.emittedEvents.single().data!!.toBytes())
+
+        test("should evaluate expressions nested in an object data") {
+            val cloudEventHook = InMemoryCloudEventHook()
+            val yaml = $$"""
+                do:
+                  - notifyShipping:
+                      emit:
+                        event:
+                          with:
+                            source: https://events.example.com/order-service
+                            type: order.shipped
+                            data:
+                              orderId: ${ .orderId }
+                              channel: web
+                              customer:
+                                name: ${ .customer.name }
+                              lines: ${ .items | length }
+            """
+            val input = LemlineJson.jacksonMapper.readTree(
+                """{"orderId":"ORD-1001","customer":{"name":"Ada"},"items":["a","b"]}"""
+            )
+            executeWorkflow(yaml, input, cloudEventHook = cloudEventHook)
+
+            assertEquals(
+                LemlineJson.jacksonMapper.readTree(
+                    """{"orderId":"ORD-1001","channel":"web","customer":{"name":"Ada"},"lines":2}"""
+                ),
+                emittedData(cloudEventHook)
+            )
+        }
+
+        test("should evaluate expressions nested in an array data") {
+            val cloudEventHook = InMemoryCloudEventHook()
+            val yaml = $$"""
+                do:
+                  - notifyShipping:
+                      emit:
+                        event:
+                          with:
+                            source: https://events.example.com/order-service
+                            type: order.shipped
+                            data:
+                              refs:
+                                - ${ .orderId }
+                                - literal
+                                - id: ${ .orderId }
+            """
+            val input = LemlineJson.jacksonMapper.readTree("""{"orderId":"ORD-1001"}""")
+            executeWorkflow(yaml, input, cloudEventHook = cloudEventHook)
+
+            assertEquals(
+                LemlineJson.jacksonMapper.readTree("""{"refs":["ORD-1001","literal",{"id":"ORD-1001"}]}"""),
+                emittedData(cloudEventHook)
+            )
+        }
+
+        test("should evaluate a data written as a single expression") {
+            val cloudEventHook = InMemoryCloudEventHook()
+            val yaml = $$"""
+                do:
+                  - notifyShipping:
+                      emit:
+                        event:
+                          with:
+                            source: https://events.example.com/order-service
+                            type: order.shipped
+                            data: '${ { orderId: .orderId } }'
+            """
+            val input = LemlineJson.jacksonMapper.readTree("""{"orderId":"ORD-1001"}""")
+            executeWorkflow(yaml, input, cloudEventHook = cloudEventHook)
+
+            assertEquals(
+                LemlineJson.jacksonMapper.readTree("""{"orderId":"ORD-1001"}"""),
+                emittedData(cloudEventHook)
+            )
+        }
     }
 }
