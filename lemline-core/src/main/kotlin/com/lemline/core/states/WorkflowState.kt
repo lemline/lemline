@@ -10,6 +10,7 @@ import com.lemline.common.values.WorkflowId
 import com.lemline.core.cloudevents.CloudEventHook
 import com.lemline.core.errors.InternalException
 import com.lemline.core.orchestrator.StepByStepOrchestrator
+import com.lemline.core.processors.CallA2AConfig
 import com.lemline.core.processors.CallHttpConfig
 import com.lemline.core.processors.EmitConfig
 import com.lemline.core.processors.ListenConfig
@@ -518,6 +519,16 @@ sealed class WorkflowEvent : WorkflowState() {
             ", input=$input" +
             ", stack=$nodeStack" +
             ")"
+    }
+
+    data class CallA2AStarted(
+        override val nodeStack: NodeStack,
+        override val input: JsonNode,
+        val config: CallA2AConfig,
+    ) : ActivityStarted() {
+        override val nodePosition = nodeStack.currentPosition
+
+        override fun toString() = "CallA2AStarted(method=${config.method}, nodePosition=$nodePosition)"
     }
 
     // CallFunctionStarted removed - CallFunction is now a control-flow task

@@ -29,6 +29,7 @@ message WorkflowEventProto {
         CallHttpStartedProto call_http_started = 13;
         RunScriptStartedProto run_script_started = 14;
         RunShellStartedProto run_shell_started = 15;
+        CallA2AStartedProto call_a2a_started = 16;
     }
 }
 
@@ -115,6 +116,12 @@ message CallHttpStartedProto {
     NodeStackProto node_stack = 1;
     google.protobuf.Value input_json = 2;
     CallHttpConfigProto config = 3;
+}
+
+message CallA2AStartedProto {
+    NodeStackProto node_stack = 1;
+    google.protobuf.Value input_json = 2;
+    CallA2AConfigProto config = 3;
 }
 
 message RunScriptStartedProto {

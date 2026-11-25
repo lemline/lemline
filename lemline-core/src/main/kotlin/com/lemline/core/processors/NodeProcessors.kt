@@ -5,6 +5,7 @@ import com.lemline.core.nodes.ForeachTask
 import com.lemline.core.nodes.Node
 import com.lemline.core.nodes.RootTask
 import com.lemline.core.states.NodeState
+import io.serverlessworkflow.api.types.CallA2A
 import io.serverlessworkflow.api.types.CallFunction
 import io.serverlessworkflow.api.types.CallHTTP
 import io.serverlessworkflow.api.types.DoTask
@@ -48,6 +49,7 @@ object NodeProcessors {
         is SwitchTask -> SwitchProcessor(node as Node<SwitchTask>)
         is TryTask -> TryProcessor(node as Node<TryTask>)
         is RaiseTask -> RaiseProcessor(node as Node<RaiseTask>)
+        is CallA2A -> CallA2AProcessor(node as Node<CallA2A>)
         is CallHTTP -> CallHttpProcessor(node as Node<CallHTTP>)
         is CallFunction -> CallFunctionProcessor(node as Node<CallFunction>)
         is WaitTask -> WaitProcessor(node as Node<WaitTask>)

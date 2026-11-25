@@ -8,6 +8,7 @@ import com.lemline.common.values.NodePosition
 import com.lemline.core.expressions.EvaluationMode
 import com.lemline.core.processors.NodeProcessors
 import com.lemline.core.workflows.WorkflowParser
+import io.serverlessworkflow.api.types.CallA2A
 import io.serverlessworkflow.api.types.CallAsyncAPI
 import io.serverlessworkflow.api.types.CallFunction
 import io.serverlessworkflow.api.types.CallGRPC
@@ -95,6 +96,7 @@ data class Node<T : TaskBase>(
 
         is CallAsyncAPI,
         is CallGRPC,
+        is CallA2A,
         is CallHTTP,
         is CallOpenAPI,
         is EmitTask,

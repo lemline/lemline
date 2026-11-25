@@ -71,7 +71,9 @@ data class MockConfiguration(
      */
     @SerialName("functionDefinitions")
     @kotlinx.serialization.Transient
-    val functionDefinitions: Map<String, Task> = emptyMap()
+    val functionDefinitions: Map<String, Task> = emptyMap(),
+    @SerialName("a2a")
+    val a2aResults: Map<String, JsonNode> = emptyMap(),
 ) {
     /**
      * Find emit mock matching type and source.

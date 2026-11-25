@@ -149,6 +149,14 @@ message CallHttpConfigProto {
     HttpAuthenticationProto authentication = 8;
 }
 
+message CallA2AConfigProto {
+    string method = 1;
+    string url = 2;
+    bool is_card_resource = 3;
+    google.protobuf.Struct parameters = 4;
+    HttpAuthenticationProto authentication = 5;
+}
+
 message RunScriptConfigProto {
     string language = 1;
     string code = 2;

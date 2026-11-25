@@ -8,6 +8,8 @@ import com.lemline.common.values.WorkflowName
 import com.lemline.common.values.WorkflowNamespace
 import com.lemline.common.values.WorkflowVersion
 import com.lemline.core.errors.InternalException
+import com.lemline.core.processors.CallA2AConfig
+import com.lemline.core.processors.HttpAuthentication
 import com.lemline.core.processors.CallHttpConfig
 import com.lemline.core.processors.CorrelationDef
 import com.lemline.core.processors.EmitConfig
@@ -32,6 +34,7 @@ import com.lemline.core.workflows.CachedEventConsumption
 import com.lemline.core.workflows.CachedEventFilter
 import com.lemline.messages.internal.v1.StringMapProto
 import com.lemline.messages.internal.v1.WorkflowStateProto
+import io.serverlessworkflow.api.types.A2AArguments.WithA2AMethod
 import io.serverlessworkflow.api.types.ListenTaskConfiguration.ListenAndReadAs
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -100,6 +103,15 @@ class WorkflowStateProtobufMapperTest {
             eventForkStarted(),
             eventListenStarted(),
             eventEmitStarted(),
+            WorkflowEvent.CallA2AStarted(
+                nodeStack(), jsonValue("card-input"), CallA2AConfig(
+                    method = WithA2AMethod.TASKS_RESUBSCRIBE,
+                    url = "https://example.org/card",
+                    isCardResource = true,
+                    parameters = buildJsonObject { put("id", "task") },
+                    authentication = HttpAuthentication.Bearer("example"),
+                ),
+            ),
             eventCallHttpStarted(),
             eventRunScriptStarted(),
             eventRunShellStarted()
