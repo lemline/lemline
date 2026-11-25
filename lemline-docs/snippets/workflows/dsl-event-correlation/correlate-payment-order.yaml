@@ -1,0 +1,23 @@
+document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: correlate-payment-order
+  version: '1.0.0'
+do:
+  - rememberOrder:
+      set:
+        orderId: ${ .orderId }
+      export:
+        as: '${ {orderId: .orderId} }'
+  - awaitEvent:
+      listen:
+        to:
+          one:
+            with:
+              type: com.example.payment.processed
+            correlate:
+              currentOrder:
+                from: ${ .transaction.orderRef }
+                expect: ${ $context.orderId }
+      timeout:
+        after: PT2M

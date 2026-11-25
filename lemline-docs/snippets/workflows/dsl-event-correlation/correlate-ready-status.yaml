@@ -1,0 +1,18 @@
+document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: correlate-ready-status
+  version: '1.0.0'
+do:
+  - awaitEvent:
+      listen:
+        to:
+          one:
+            with:
+              type: com.example.component.status
+            correlate:
+              readyStatus:
+                from: ${ .status }
+                expect: Ready
+      timeout:
+        after: PT2M

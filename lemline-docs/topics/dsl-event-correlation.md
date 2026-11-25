@@ -44,35 +44,82 @@ Each `Correlation` object within the `correlate` map defines a single data-based
 
 ## Usage Examples
 
-Run these examples with the Lemline runner connected to a message broker. Add
-`order-processing`, `system-monitor`, and `travel-booking` to `lemline.namespaces`
-and send each CloudEvent to its workflow namespace's CloudEvents destination.
-See [Message Brokers](lemline-howto-brokers.md) for destination naming.
+### Match Dynamic Context Data
 
-### Example 1: Matching Dynamic Context Data (within Listen Task)
+This workflow stores an order ID in context. A payment event matches only when its nested order reference has that value.
 
-Imagine a workflow processing an order needs to wait for a specific payment confirmation event based on the order ID stored in the workflow's context.
+<code-block lang="yaml" src="workflows/dsl-event-correlation/correlate-payment-order.yaml"/>
 
-<code-block lang="yaml" src="workflows/dsl-event-correlation/example-1-matching-dynamic-context-data-within-listen-tas.yaml"/>
+### Match a Static Value
 
-In this example, the `waitForPaymentEvent` task will only proceed if it receives an event with `type: com.payment.processed.v1` AND the value of `data.transaction.orderRef` inside that event matches the `currentOrderId` currently stored in the workflow's context.
+This workflow waits for a warehouse component to report the literal status `Ready`.
 
-### Example 2: Matching a Static Value
+<code-block lang="yaml" src="workflows/dsl-event-correlation/correlate-ready-status.yaml"/>
 
-Suppose a workflow needs to wait for a system status update event indicating that a specific component (`component-abc`) has become 'Ready'.
+### Require Multiple Correlations
 
-<code-block lang="yaml" src="workflows/dsl-event-correlation/example-2-matching-a-static-value.yaml"/>
+This workflow resumes when a carrier confirmation matches both the shipment reference and the expected provider.
 
-Here, the correlation `matchComponentStatus` checks if the `status` field within the event's data payload is exactly equal to the static string `"Ready"`.
+<code-block lang="yaml" src="workflows/dsl-event-correlation/correlate-shipment-provider.yaml"/>
 
-### Example 3: Requiring Multiple Correlations
+### Publish the Events
 
-Consider a scenario where a workflow orchestrates a travel booking and needs to wait for a confirmation event that matches both the specific `bookingId` and the `provider` ('AcmeAir') involved.
+Use this workflow to send each sample CloudEvent.
 
-<code-block lang="yaml" src="workflows/dsl-event-correlation/example-3-requiring-multiple-correlations.yaml"/>
-
-In this case, the `listen` task will only be satisfied by an event of the correct type where `data.confirmation.bookingRef` matches the `$context.currentBookingId` **AND** `data.confirmation.providerName` matches `$context.currentProvider`.
+<code-block lang="yaml" src="workflows/reference/tutorial-publisher.yaml"/>
 
 ## Relationship to Lifecycle Events
 
-When a workflow successfully completes an event correlation (e.g., a `Listen` task receives all required correlated events), the runtime typically emits a `Workflow Correlation Completed Event`. This standard lifecycle event includes a `correlationKeys` map containing the names (e.g., `matchOrderId` from the example above) and the resolved values of the correlations that were successfully matched. This provides visibility into *which* specific data values led to the correlation match.
+The DSL defines [lifecycle events](dsl-lifecycle-events.md) for the start and completion of event correlation.
+
+> **Lemline**
+>
+> The listener records task and workflow completion after matching the event. [Issue #125](https://github.com/lemline/lemline/issues/125) tracks the missing correlation lifecycle events.
+
+## Run the Examples
+
+Complete the [SQLite setup](lemline-tutorial-setup.md) and leave the worker running. Save each workflow in the setup directory under the file name used below.
+
+Run the publisher registration once from the setup directory.
+
+```bash
+bin/lemline definition post -f tutorial-publisher.yaml
+```
+
+Start `correlate-payment-order`, allow the listener to register, then send the nonmatching and matching events in order.
+
+```bash
+bin/lemline definition post -f correlate-payment-order.yaml
+bin/lemline instance start examples correlate-payment-order --input '{"orderId":"O-150"}'
+sleep 12
+bin/lemline instance start examples tutorial-publisher --input '{"type":"com.example.payment.processed","data":{"transaction":{"orderRef":"O-151"}}}'
+bin/lemline instance start examples tutorial-publisher --input '{"type":"com.example.payment.processed","data":{"transaction":{"orderRef":"O-150"}}}'
+```
+
+Start `correlate-ready-status`, allow the listener to register, then send the nonmatching and matching events in order.
+
+```bash
+bin/lemline definition post -f correlate-ready-status.yaml
+bin/lemline instance start examples correlate-ready-status
+sleep 12
+bin/lemline instance start examples tutorial-publisher --input '{"type":"com.example.component.status","data":{"component":"sensor-1","status":"Starting"}}'
+bin/lemline instance start examples tutorial-publisher --input '{"type":"com.example.component.status","data":{"component":"sensor-1","status":"Ready"}}'
+```
+
+Start `correlate-shipment-provider`, allow the listener to register, then send the nonmatching and matching events in order.
+
+```bash
+bin/lemline definition post -f correlate-shipment-provider.yaml
+bin/lemline instance start examples correlate-shipment-provider --input '{"shipment":"S-150","provider":"express"}'
+sleep 12
+bin/lemline instance start examples tutorial-publisher --input '{"type":"com.example.carrier.confirmed","data":{"confirmation":{"shipment":"S-150","provider":"economy"}}}'
+bin/lemline instance start examples tutorial-publisher --input '{"type":"com.example.carrier.confirmed","data":{"confirmation":{"shipment":"S-151","provider":"express"}}}'
+bin/lemline instance start examples tutorial-publisher --input '{"type":"com.example.carrier.confirmed","data":{"confirmation":{"shipment":"S-150","provider":"express"}}}'
+```
+
+| Example | Expected result |
+|---|---|
+| `correlate-payment-order` | Returns the payment for `O-150` and ignores the payment for `O-151`. |
+| `correlate-ready-status` | Returns the status update for `sensor-1` with `status: "Ready"`. |
+| `correlate-shipment-provider` | Returns only the confirmation for `S-150` and provider `express`. |
+| `tutorial-publisher` | Each publisher instance completes after emitting its event. |
