@@ -29,9 +29,6 @@ dependencies {
     // CloudEvents SDK (for CloudEvent type)
     implementation(libs.cloudevents.core)
 
-    // SemVer library (for version comparison)
-    implementation(libs.javaSemver)
-
     // Testing
     testImplementation(kotlin("test"))
     testImplementation(enforcedPlatform(libs.kotest.bom))

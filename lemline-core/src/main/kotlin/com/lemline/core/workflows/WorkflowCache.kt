@@ -254,6 +254,12 @@ object WorkflowCache {
         version: WorkflowVersion
     ): Workflow? = WorkflowInfo(namespace, name, version).getWorkflow()
 
+    internal fun getLatestWorkflow(namespace: WorkflowNamespace, name: WorkflowName): Workflow? =
+        current.entries.asSequence()
+            .filter { (info, _) -> info.namespace == namespace && info.name == name }
+            .maxWithOrNull { first, second -> first.key.version.comparePrecedenceTo(second.key.version) }
+            ?.value?.workflow
+
     /**
      * Retrieves a workflow from the workflow cache using its WorkflowInfo.
      */

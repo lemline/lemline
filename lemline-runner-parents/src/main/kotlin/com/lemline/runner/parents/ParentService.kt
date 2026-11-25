@@ -79,7 +79,7 @@ class ParentService {
                 workflowId = parent.childId,
                 workflowNamespace = instance.workflowState.config.namespace,
                 workflowName = instance.workflowState.config.name,
-                optionalVersion = instance.workflowState.config.version,
+                optionalVersion = instance.workflowState.config.version.takeUnless { it.isLatest },
                 workflowInput = instance.workflowState.config.input,
                 hasWaitingParent = instance.workflowState.config.sync, // <= true only for sync child
                 zoneId = null
