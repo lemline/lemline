@@ -11,11 +11,6 @@ schedule:
 input:
   from: ${ .[0] }
 do:
-  - storeOrder:
-      set:
-        orderId: ${ .orderId }
-      export:
-        as: '${ $context + { orderId: .orderId } }'
   - getPayment:
       try:
         - waitForPayment:
@@ -27,9 +22,9 @@ do:
                   correlate:
                     orderId:
                       from: ${ .orderId }
-                      expect: ${ $context.orderId }
+                      expect: ${ $workflow.input[0].orderId }
             timeout:
-              after: PT1H
+              after: PT30S
             output:
               as: ${ .[0] }
       catch:
@@ -37,15 +32,20 @@ do:
           with:
             type: https://open-workflow-specification.org/spec/1.0.0/errors/timeout
         do:
-          - readStoredPaymentStatus:
+          - inspectShop:
               call: http
               with:
                 method: get
-                endpoint: '${ "https://payments.example/status/\($context.orderId | @uri)" }'
-  - reportPayment:
+                endpoint: http://127.0.0.1:8787/state
+          - findPayment:
+              set:
+                orderId: ${ $workflow.input[0].orderId }
+                status: '${ ([.charges[] | select(.orderId == $workflow.input[0].orderId)][0].status // "manual-review") }'
+  - publishStatus:
       emit:
         event:
           with:
-            source: https://orders.example
+            source: http://127.0.0.1:8787/orders
             type: com.example.order.payment-status
-            data: '${ { orderId: $context.orderId, status: .status } }'
+            subject: ${ .orderId }
+            data: ${ . }
