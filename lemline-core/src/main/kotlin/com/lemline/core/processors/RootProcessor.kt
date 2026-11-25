@@ -3,9 +3,12 @@ package com.lemline.core.processors
 
 import com.fasterxml.jackson.databind.JsonNode
 import com.lemline.common.json.*
+import com.lemline.common.json.LemlineJson
 import com.lemline.core.nodes.Node
 import com.lemline.core.nodes.RootTask
 import com.lemline.core.processors.scope.Scope
+import com.lemline.core.processors.scope.taskScope
+import com.lemline.core.states.NodeStack
 import com.lemline.core.states.RootState
 import kotlin.time.Instant
 
@@ -50,6 +53,19 @@ class RootProcessor(
         scope: Scope,
         startedAt: Instant
     ): RootState = throw IllegalStateException("RootProcessor does not create state")
+
+    /**
+     * Applies the workflow-level `input.from` to the input the workflow was started with.
+     *
+     * The root is never entered from a parent, so the orchestrator calls this once, before the
+     * first task. The result is what `/do` receives; `$workflow.input` keeps the original input.
+     * The input schema is validated earlier, when the instance is admitted.
+     */
+    internal fun transformWorkflowInput(nodeStack: NodeStack, workflowInput: JsonNode): JsonNode {
+        val from = node.task.input?.from ?: return workflowInput
+        val scope = nodeStack.taskScope(node, rawInput = workflowInput)
+        return eval(workflowInput, LemlineJson.encodeToElement(from), scope, true)
+    }
 
     // RootProcessor doesn't need updateState - root never re-enters from a child
     // The default implementation is sufficient

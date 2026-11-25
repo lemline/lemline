@@ -36,5 +36,8 @@ Use a workflow-level schedule for event-triggered instances.
 
 <code-block lang="yaml" src="workflows/reference/order-event-schedule.yaml"/>
 
+An event-started instance receives the matched events as an array. The workflow-level
+`input.from` unwraps the first one, so the tasks read the order directly.
+
 See [Event Correlation](https://github.com/open-workflow-specification/specification/blob/v1.0.3/dsl-reference.md#correlation) for the expression scopes involved
 and the [Listen Task](https://github.com/open-workflow-specification/specification/blob/v1.0.3/dsl-reference.md#listen) for matching strategies and read modes.
