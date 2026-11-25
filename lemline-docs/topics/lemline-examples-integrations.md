@@ -211,7 +211,7 @@ bin/lemline definition post -f cataloged-function.yaml
 bin/lemline instance start examples call-custom-function-cataloged
 ```
 
-Lemline does not load function catalogs yet: the definition registers and the instance faults when it tries to resolve `getProductById:1.0.0@shopCatalog`. Define the function under `use.functions`, as in the inline example, to reuse it within a workflow.
+A catalog function is called as `name:version@catalog`, with lowercase names. Lemline only knows its built-in `global` catalog: a catalog declared under `use.catalogs` is ignored, and the instance faults with `Unknown catalog: 'shop-catalog'` ([issue 111](https://github.com/lemline/lemline/issues/111)). Define the function under `use.functions`, as in the inline example, to reuse it within a workflow.
 
 This enables:
 - Function reuse across multiple workflows

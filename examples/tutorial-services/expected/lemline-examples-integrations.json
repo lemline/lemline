@@ -44,7 +44,10 @@
    }
   },
   {
-   "type": "workflowFaulted"
+   "type": "workflowFaulted",
+   "error": {
+    "title": "~^Unknown catalog: 'shop-catalog'"
+   }
   },
   {
    "type": "workflowCompleted"

@@ -5,10 +5,10 @@ document:
   version: '0.1.0'
 use:
   catalogs:
-    shopCatalog:
-      endpoint: file:///opt/shop/catalog
+    shop-catalog:
+      endpoint: file:///tmp/lemline-catalog
 do:
   - getProduct:
-      call: getProductById:1.0.0@shopCatalog
+      call: get-product:1.0.0@shop-catalog
       with:
         productId: SKU-2
