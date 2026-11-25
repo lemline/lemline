@@ -16,6 +16,7 @@ import com.lemline.common.values.namespace
 import com.lemline.common.values.version
 import com.lemline.core.expressions.EvaluationMode
 import com.lemline.core.functions.FunctionCache
+import com.lemline.core.functions.FunctionResolver
 import com.lemline.core.nodes.Node
 import com.lemline.core.nodes.NodeOrigin
 import com.lemline.core.nodes.RootTask
@@ -431,11 +432,17 @@ object WorkflowCache {
             }
         }
 
-    suspend fun loadFunctionListeners(info: WorkflowInfo, reference: String, resolver: suspend (String) -> Task) {
+    suspend fun loadFunctionListeners(info: WorkflowInfo, reference: String, resolver: suspend (String) -> Task) =
+        loadFunctionListeners(info, reference) { _, ref -> resolver(ref) }
+
+    suspend fun loadFunctionListeners(info: WorkflowInfo, reference: String, resolver: FunctionResolver) =
+        loadFunctionListeners(info, reference) { workflow, ref -> resolver.forWorkflow(workflow)(ref) }
+
+    private suspend fun loadFunctionListeners(info: WorkflowInfo, reference: String, resolver: suspend (Workflow, String) -> Task) {
         val entry = current.entries[info] ?: return
         // Only the unsuppressed tree carries extension listeners; a suppressed one does not stand in for it.
         if (entry.functions.containsKey(reference to false)) return
-        val task = entry.workflow.useFunctions?.get(reference) ?: resolver(reference)
+        val task = entry.workflow.useFunctions?.get(reference) ?: resolver(entry.workflow, reference)
         // A definition replaced during remote resolution must not receive stale templates.
         if (current.entries[info] === entry) functionNodes(entry.workflow, task, reference, false)
     }

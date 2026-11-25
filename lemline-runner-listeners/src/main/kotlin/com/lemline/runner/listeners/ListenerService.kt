@@ -66,7 +66,9 @@ class ListenerService {
         listener.filtersCount = config.filters.size
 
         // The events worker may differ from the worker that executed the function.
-        instanceMessage.workflowInfo.getWorkflow()?.getNode(listenStarted.nodePosition) { functionResolver.resolve(it) }
+        instanceMessage.workflowInfo.getWorkflow()?.let { workflow ->
+            workflow.getNode(listenStarted.nodePosition) { ref -> functionResolver.forWorkflow(workflow)(ref) }
+        }
         listener.filterPosition = WorkflowCache.listenPosition(instanceMessage.workflowInfo, listenStarted.nodePosition)
         val listenTask = WorkflowCache.getListenTask(instanceMessage.workflowInfo, listenStarted.nodePosition)
         listener.hasForeach = listenTask?.hasForeach ?: false

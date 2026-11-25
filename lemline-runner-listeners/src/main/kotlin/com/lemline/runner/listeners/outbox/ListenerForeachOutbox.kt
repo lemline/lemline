@@ -139,7 +139,7 @@ class ListenerForeachOutbox : AbstractOutbox<ListenerEventModel>() {
         ) ?: error("Workflow ${listener.workflowInfo} not found in cache")
 
         @Suppress("UNCHECKED_CAST")
-        val listenNode = workflow.getNode(listenStarted.nodePosition, functionResolver::resolve) as Node<ListenTask>
+        val listenNode = workflow.getNode(listenStarted.nodePosition, functionResolver.forWorkflow(workflow)) as Node<ListenTask>
         val foreachNode = listenNode.foreachBlock
             ?: error("Listen task at ${listenStarted.nodePosition} has no foreach block")
         val foreachTask = foreachNode.task as ForeachTask

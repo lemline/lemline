@@ -2,6 +2,7 @@
 package com.lemline.core.functions
 
 import io.serverlessworkflow.api.types.Task
+import io.serverlessworkflow.api.types.Workflow
 
 /**
  * Resolves remote function references to their task definitions.
@@ -30,6 +31,9 @@ interface FunctionResolver {
      * @throws FunctionResolutionException if the function cannot be resolved
      */
     suspend fun resolve(functionRef: String): Task
+
+    /** Binds the resolver to the workflow whose functions are being executed. */
+    fun forWorkflow(workflow: Workflow): suspend (String) -> Task = ::resolve
 }
 
 /**

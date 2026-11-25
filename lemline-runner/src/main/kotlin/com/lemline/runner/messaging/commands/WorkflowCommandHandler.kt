@@ -302,6 +302,7 @@ internal class WorkflowCommandHandler(
         // Execute using StepByStepOrchestrator
         logger.debug { "resumeFromTask state=$workflowState" }
         val secrets = Secrets.getForWorkflow(workflow)
+        val resolveFunction = functionResolver.forWorkflow(workflow)
 
         val event = when (config.orchestrator().mode()) {
             LemlineConfiguration.OrchestratorMode.ALL -> StepByStepOrchestrator.runByTask(
@@ -309,7 +310,7 @@ internal class WorkflowCommandHandler(
                 workflowState,
                 workflowInfo,
                 lifecycleHook,
-                functionResolver::resolve,
+                resolveFunction,
                 secrets,
             )
 
@@ -318,7 +319,7 @@ internal class WorkflowCommandHandler(
                 workflowState,
                 workflowInfo,
                 lifecycleHook,
-                functionResolver::resolve,
+                resolveFunction,
                 secrets,
             )
         }
@@ -343,7 +344,7 @@ internal class WorkflowCommandHandler(
                     "Activity scheduled node=${event.nodePosition} - ${
                         workflow.getNode(
                             event.nodePosition,
-                            functionResolver::resolve
+                            functionResolver.forWorkflow(workflow)
                         ).task::class.simpleName
                     }(input=${event.rawInput})"
                 }

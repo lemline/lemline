@@ -84,13 +84,12 @@ object FullOrchestrator {
         secretsForWorkflow: (Workflow) -> ObjectNode = { buildJsonObject {} },
     ): WorkflowEvent.Outcome {
         val serdeCommand = validateSerde(command, serde)
-        // Convert FunctionResolver to lambda for StepByStepOrchestrator
         val event = StepByStepOrchestrator.runByTask(
             workflow = workflow,
             command = serdeCommand,
             workflowInfo = workflow.info,
             lifecycleHook = lifecycleHook,
-            functionResolver = functionResolver::resolve,
+            functionResolver = functionResolver.forWorkflow(workflow),
             secrets = secretsForWorkflow(workflow),
         )
         val serdeEvent = validateSerde(event, serde)
@@ -300,7 +299,7 @@ object FullOrchestrator {
         logger.debug { "Listening for CloudEvents: strategy=${listenStarted.config.strategy} filters=${listenStarted.config.filters} until=${listenStarted.config.until}" }
 
         @Suppress("UNCHECKED_CAST")
-        val listenNode = workflow.getNode(listenStarted.nodePosition, functionResolver::resolve) as Node<ListenTask>
+        val listenNode = workflow.getNode(listenStarted.nodePosition, functionResolver.forWorkflow(workflow)) as Node<ListenTask>
 
         val foreachProcessor = listenNode.foreachBlock?.let { foreachBlock ->
             ListenEventCollector.createForeachProcessor(foreachBlock.position, foreachBlock.task) { cmd ->
@@ -410,7 +409,7 @@ object FullOrchestrator {
         lifecycleHook: LifecycleEventHook,
         secretsForWorkflow: (Workflow) -> ObjectNode,
     ): WorkflowCommand {
-        val forkNode = workflow.getNode(event.nodePosition, functionResolver::resolve) as Node<ForkTask>
+        val forkNode = workflow.getNode(event.nodePosition, functionResolver.forWorkflow(workflow)) as Node<ForkTask>
         val branches = forkNode.branches.ifEmpty {
             throw IllegalStateException("Fork node in ${forkNode.position} has no branches")
         }

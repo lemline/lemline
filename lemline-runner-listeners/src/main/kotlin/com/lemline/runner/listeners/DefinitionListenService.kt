@@ -121,7 +121,7 @@ class DefinitionListenService {
         for ((info, position) in listenerRepository.activeFunctionFilters(namespace)) {
             val reference = WorkflowCache.functionReference(position) ?: continue
             try {
-                WorkflowCache.loadFunctionListeners(info, reference) { functionResolver.resolve(it) }
+                WorkflowCache.loadFunctionListeners(info, reference, functionResolver)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
