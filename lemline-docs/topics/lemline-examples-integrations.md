@@ -1,7 +1,7 @@
 # Lemline Integration Examples
 
-> **Runtime support:** some examples on this page use `call: openapi`, `call: asyncapi`, `call: grpc`, catalog
-> functions or OAuth 2.0 authentication. Lemline registers them but does not execute them yet: such a task fails when it
+> **Runtime support:** some examples on this page use `call: openapi`, `call: asyncapi`, `call: grpc` or OAuth 2.0
+> authentication. Lemline registers them but does not execute them yet: such a task fails when it
 > runs, with the error shown under each example. Write those calls with `call: http` and `basic` or `bearer`
 > authentication, as in the HTTP examples, or exchange events with `emit` and `listen`.
 
@@ -211,7 +211,12 @@ bin/lemline definition post -f cataloged-function.yaml
 bin/lemline instance start examples call-custom-function-cataloged
 ```
 
-A catalog function is called as `name:version@catalog`, with lowercase names. Lemline only knows its built-in `global` catalog: a catalog declared under `use.catalogs` is ignored, and the instance faults with `Unknown catalog: 'shop-catalog'` ([issue 111](https://github.com/lemline/lemline/issues/111)). Define the function under `use.functions`, as in the inline example, to reuse it within a workflow.
+A catalog function is called as `name:version@catalog`, with lowercase names. The catalog endpoint is the catalog root:
+Lemline reads `get-product:1.0.0@shop-catalog` from
+`http://127.0.0.1:8787/catalog/functions/get-product/1.0.0/function.yaml`, which the tutorial shop serves. That
+definition is the same as the inline function: it validates `productId`, then calls the shop. Expect the watering can,
+`{"id":"SKU-2","name":"Watering can","category":"garden","price":12,"available":10}`. Catalog endpoints can also be
+`file://` URLs; an endpoint with authentication is not supported yet.
 
 This enables:
 - Function reuse across multiple workflows

@@ -44,9 +44,10 @@
    }
   },
   {
-   "type": "workflowFaulted",
-   "error": {
-    "title": "~^Unknown catalog: 'shop-catalog'"
+   "type": "workflowCompleted",
+   "output": {
+    "id": "SKU-2",
+    "name": "Watering can"
    }
   },
   {

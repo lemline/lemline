@@ -28,6 +28,7 @@ Send JSON objects. Inspect all state with GET /state. Each POST below uses an or
 | DELETE /shipments/{orderId} | — | Shipment marked cancelled, so the reservation can be released |
 | GET /stock (also /inventory/SKU-1) | — | sku, available units and number of active reservations |
 | GET /old-stock | — | HTTP 301 to /stock |
+| GET /catalog/functions/get-product/1.0.0/function.yaml | — | Function catalog entry (as JSON, valid YAML): validates `productId`, then GET /products/{productId} |
 | GET /openapi.json | — | OpenAPI 3.0 description of GET /products (listProducts) and GET /products/{productId} (getProduct) |
 | GET /products | optional page, size (default 3), category, search | items, page, size, total, hasMore, nextPage |
 | GET /products/{id} | — | Product with its price, or HTTP 404 for an unknown ID |

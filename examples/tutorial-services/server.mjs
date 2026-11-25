@@ -32,6 +32,19 @@ const REVIEWS = [
   { id: 'R-2', customerId: 'C-100', productId: 'SKU-4', rating: 4, title: 'Bright enough' },
 ];
 
+/** A function catalog (DSL 1.0.3 layout): GET /catalog/functions/get-product/1.0.0/function.yaml. JSON is valid YAML. */
+const CATALOG_FUNCTIONS = {
+  'get-product/1.0.0': {
+    input: {
+      schema: {
+        document: { type: 'object', properties: { productId: { type: 'string' } }, required: ['productId'] },
+      },
+    },
+    call: 'http',
+    with: { method: 'get', endpoint: '${ "http://127.0.0.1:8787/products/" + .productId }' },
+  },
+};
+
 const OPENAPI = {
   openapi: '3.0.3',
   info: { title: 'Tutorial shop catalog', version: '1.0.0' },
@@ -199,6 +212,12 @@ export function createShop() {
       }
       if (path === '/old-stock') return new Reply(301, { moved: '/stock' }, { Location: '/stock' });
       if (path === '/openapi.json') return OPENAPI;
+      const catalogFunction = path.match(/^\/catalog\/functions\/([^/]+\/[^/]+)\/function\.yaml$/);
+      if (catalogFunction) {
+        const definition = CATALOG_FUNCTIONS[catalogFunction[1]];
+        requireValue(definition, `Unknown catalog function ${catalogFunction[1]}`, 404);
+        return definition;
+      }
       if (path === '/products') {
         const page = integerParameter(query, 'page', 1, 1, 1000);
         const size = integerParameter(query, 'size', 3, 1, 50);

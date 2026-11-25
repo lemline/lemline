@@ -6,7 +6,7 @@ document:
 use:
   catalogs:
     shop-catalog:
-      endpoint: file:///tmp/lemline-catalog
+      endpoint: http://127.0.0.1:8787/catalog/
 do:
   - getProduct:
       call: get-product:1.0.0@shop-catalog
