@@ -1,0 +1,18 @@
+{
+  "settleSeconds": 48,
+  "instances": [
+    {
+      "type": "workflowCompleted",
+      "output": {
+        "status": "expired"
+      }
+    },
+    {
+      "type": "workflowCompleted",
+      "output": {
+        "sku": "SKU-1",
+        "available": 100
+      }
+    }
+  ]
+}
