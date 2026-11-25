@@ -72,6 +72,8 @@ object WorkflowCache {
 
     class Snapshot internal constructor(internal val entries: Map<WorkflowInfo, Entry>)
 
+    class PreparedDefinition internal constructor(internal val entry: Entry)
+
     // Publish a workflow, its nodes and both kinds of event filters together. Writes are
     // infrequent definition changes; event matching only reads the immutable snapshot.
     @Volatile private var current = Snapshot(emptyMap())
@@ -95,9 +97,15 @@ object WorkflowCache {
     }
 
     @JvmStatic
-    fun parseYamlAndPut(definition: String): Workflow = WorkflowDefinitionReader
-        .read(definition, WorkflowFormat.YAML)
-        .also { workflow -> cacheWorkflow(workflow, definition) }
+    fun parseYamlAndPut(definition: String): Workflow = putDefinition(prepareYaml(definition))
+
+    /** Validates a YAML definition and builds its cache data without publishing it. */
+    fun prepareYaml(definition: String): PreparedDefinition = PreparedDefinition(
+        entry(WorkflowDefinitionReader.read(definition, WorkflowFormat.YAML), definition)
+    )
+
+    /** Publishes a definition that has already been validated and parsed. */
+    fun putDefinition(definition: PreparedDefinition): Workflow = publish(definition.entry)
 
     @JvmStatic
     fun parseYamlAndPutNoValidation(definition: String): Workflow = WorkflowDefinitionReader
@@ -129,10 +137,13 @@ object WorkflowCache {
     }
 
     private fun cacheWorkflow(workflow: Workflow, source: String? = null) {
-        val entry = entry(workflow, source)
-        synchronized(this) {
-            current = Snapshot(current.entries + (workflow.info to entry))
-        }
+        publish(entry(workflow, source))
+    }
+
+    @Synchronized
+    private fun publish(entry: Entry): Workflow {
+        current = Snapshot(current.entries + (entry.workflow.info to entry))
+        return entry.workflow
     }
 
     /** Reuse parsed definitions when a locked database read confirms their source is unchanged. */

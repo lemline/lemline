@@ -1,19 +1,22 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.definitions
 
-import com.lemline.core.workflows.WorkflowCache
-import com.lemline.common.values.info
 import com.lemline.common.values.WorkflowName
 import com.lemline.common.values.WorkflowNamespace
 import com.lemline.common.values.WorkflowVersion
+import com.lemline.common.values.info
+import com.lemline.core.workflows.WorkflowCache
 import com.lemline.runner.common.config.DatabaseConfig
 import com.lemline.runner.listeners.DefinitionListenService
+import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.collections.shouldHaveSize
 import io.kotest.matchers.shouldBe
+import io.kotest.matchers.string.shouldContain
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk
 import kotlinx.coroutines.test.runTest
+import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
@@ -66,6 +69,75 @@ class DefinitionServiceTest {
             val dbField = DefinitionService::class.java.getDeclaredField("databaseConfig")
             dbField.isAccessible = true
             dbField.set(this, mockedDatabaseConfig)
+        }
+    }
+
+    @Nested
+    inner class SaveTests {
+        private val valid = DefinitionModel.from(
+            """
+            document:
+              dsl: '1.0.3'
+              namespace: service-tests
+              name: validate-before-save
+              version: '1.0.0'
+            do:
+              - result:
+                  set: { ok: true }
+            """.trimIndent()
+        )
+        private val invalid = valid.copy(definition = valid.definition.replace("- result:", "- call:"))
+
+        private fun cached() = WorkflowCache.getWorkflow(valid.namespace, valid.name, valid.version)
+
+        @AfterEach
+        fun removeCachedDefinition() {
+            WorkflowCache.remove(valid.namespace, valid.name, valid.version)
+        }
+
+        @Test
+        fun `rejects an invalid task name before inserting the workflow`() = runTest {
+            coEvery { mockedRepository.insert(invalid) } returns 1
+
+            shouldThrow<IllegalArgumentException> { service.save(invalid) }.message shouldContain "Task name call"
+
+            coVerify(exactly = 0) { mockedRepository.insert(invalid) }
+            cached() shouldBe null
+        }
+
+        @Test
+        fun `rejects an invalid forced replacement without touching the saved workflow`() = runTest {
+            coEvery { mockedRepository.insert(valid) } returns 1
+            service.save(valid) shouldBe DefinitionService.SaveResult.CREATED
+            val original = cached()
+            coEvery { mockedRepository.insert(invalid) } returns 0
+            coEvery { mockedRepository.update(invalid) } returns 1
+
+            shouldThrow<IllegalArgumentException> { service.save(invalid, force = true) }
+
+            coVerify(exactly = 0) { mockedRepository.update(invalid) }
+            cached() shouldBe original
+        }
+
+        @Test
+        fun `publishes the prepared workflow only after a successful write`() = runTest {
+            coEvery { mockedRepository.insert(valid) } coAnswers {
+                cached() shouldBe null
+                1
+            }
+            service.save(valid) shouldBe DefinitionService.SaveResult.CREATED
+            val original = requireNotNull(cached())
+            val replacement = valid.copy(definition = valid.definition.replace("ok: true", "ok: false"))
+            coEvery { mockedRepository.insert(replacement) } returns 0
+            coEvery { mockedRepository.update(replacement) } coAnswers {
+                cached() shouldBe original
+                1
+            }
+
+            service.save(replacement) shouldBe DefinitionService.SaveResult.ALREADY_EXISTS
+            cached() shouldBe original
+            service.save(replacement, force = true) shouldBe DefinitionService.SaveResult.UPDATED
+            WorkflowCache.getDefinitionJson(requireNotNull(cached())).at("/do/0/result/set/ok").asBoolean(true) shouldBe false
         }
     }
 
