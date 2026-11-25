@@ -1,0 +1,37 @@
+document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: emit-order-result
+  version: '1.0.0'
+do:
+  - tryReservation:
+      try:
+        - reserveStock:
+            call: http
+            with:
+              method: post
+              endpoint: http://127.0.0.1:8787/reservations
+              body:
+                orderId: ${ .orderId }
+                items: ${ .items }
+            output:
+              as: '${ {orderId, status} }'
+      catch:
+        as: failure
+        do:
+          - recordRejection:
+              set:
+                orderId: ${ $workflow.input.orderId }
+                status: rejected
+                httpStatus: ${ $failure.status }
+  - emitResult:
+      emit:
+        event:
+          with:
+            source: http://127.0.0.1:8787/orders
+            type: '${ "com.example.order." + .status }'
+            subject: ${ .orderId }
+            data: ${ . }
+  - confirmPublication:
+      set:
+        sentFor: ${ $workflow.input.orderId }
