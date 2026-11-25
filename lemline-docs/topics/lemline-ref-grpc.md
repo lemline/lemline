@@ -12,7 +12,34 @@ There are no `lemline.grpc.*` runner settings.
 
 Expose the service over HTTP (for example with a gRPC-JSON transcoding proxy) and call it with `call: http`:
 
-<code-block lang="yaml" src="workflows/lemline-ref-grpc/alternative.yaml" include-lines="6-13"/>
+<code-block lang="yaml" src="workflows/lemline-ref-grpc/alternative.yaml"/>
+
+## Run the Examples
+
+Every example on this page is a complete workflow. Complete [the SQLite setup](lemline-tutorial-setup.md), save each example under the file name used below, and run the commands from the setup directory. With the JAR, substitute `java -jar lemline.jar` for `bin/lemline`.
+
+Start the [tutorial shop](lemline-tutorial-order-processing.md#start-the-tutorial-shop) from the root of the Lemline source checkout:
+
+```bash
+docker compose -f examples/tutorial-services/compose.yaml up -d
+```
+
+Keep the setup worker running and use a second terminal in the setup directory.
+
+```bash
+bin/lemline definition post -f alternative.yaml
+bin/lemline instance start examples grpc-alternative --input '{"sku":"SKU-1"}'
+```
+
+| Example | Expected result |
+|---|---|
+| `grpc-alternative` | The garden hose with its stock |
+
+Stop the shop when you are done:
+
+```bash
+docker compose -f examples/tutorial-services/compose.yaml down
+```
 
 ## Related Resources
 
