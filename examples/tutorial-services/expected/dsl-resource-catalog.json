@@ -1,0 +1,37 @@
+{
+  "instances": [
+    {
+      "type": "workflowCompleted",
+      "output": {
+        "id": "SKU-1",
+        "name": "Garden hose"
+      }
+    },
+    {
+      "type": "workflowCompleted",
+      "output": {
+        "id": "SKU-2",
+        "name": "Watering can"
+      }
+    },
+    {
+      "type": "workflowCompleted",
+      "output": {
+        "id": "SKU-3",
+        "name": "Pruning shears"
+      }
+    },
+    {
+      "type": "workflowFaulted",
+      "error": {
+        "title": "~Catalog 'private' endpoint authentication is not supported"
+      }
+    },
+    {
+      "type": "workflowCompleted",
+      "output": {
+        "label": "Product SKU-2"
+      }
+    }
+  ]
+}

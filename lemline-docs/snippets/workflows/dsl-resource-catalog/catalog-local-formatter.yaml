@@ -1,0 +1,14 @@
+document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: catalog-local-formatter
+  version: '1.0.0'
+use:
+  catalogs:
+    local:
+      endpoint: file:///tmp/lemline-dsl-catalog
+do:
+  - format:
+      call: format-product:1.0.0@local
+      with:
+        productId: ${ .productId }
