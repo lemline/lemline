@@ -433,6 +433,30 @@ class LifecycleEventHookTest : FunSpec() {
             )
         }
 
+        test("failing workflow input.from - the workflow starts and faults without any task event") {
+            val hook = CapturingLifecycleHook()
+            val yaml = $$"""
+                input:
+                  from: '${ error("no order") }'
+                do:
+                  - step1:
+                      set:
+                        a: 1
+            """
+
+            try {
+                executeWorkflow(yaml, buildJsonObject { }, hook)
+            } catch (_: Exception) {
+                // Expected to fail
+            }
+
+            hook.events.stripWorkflowIds() shouldBe listOf(
+                "workflow.created",
+                "workflow.started",
+                "workflow.faulted"
+            )
+        }
+
         test("task fault after successful task - complete event sequence") {
             val hook = CapturingLifecycleHook()
             val yaml = """
