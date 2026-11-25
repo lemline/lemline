@@ -15,6 +15,9 @@ lists the event types for workflows. A started event marks the beginning of exec
 event says whether it completed, faulted, or was cancelled. The specification also defines events
 for suspension, resumption, and the beginning and end of event correlation.
 
+See the [correlation lifecycle example](dsl-event-correlation.md#inspect-correlation-lifecycle-events)
+to query the start and completion of a correlated wait.
+
 ## Task Lifecycle Events
 
 At task level, a lifecycle event identifies the task within the workflow. For example, observers can
@@ -33,7 +36,7 @@ transient check once in retry mode and recovers when the attempted check still f
 > With the SQLite setup, the analytics consumer stores lifecycle events in
 > `analytics.db`. The worker emits the `org.open-workflow-specification.*` event types
 > and recognizes the older `io.serverlessworkflow.*` names when reading stored events.
-> The query below lists the event type and selected payload fields. [Issue #125](https://github.com/lemline/lemline/issues/125) tracks the missing correlation lifecycle events.
+> The query below lists the event type and selected payload fields.
 
 ## Run the Examples
 
