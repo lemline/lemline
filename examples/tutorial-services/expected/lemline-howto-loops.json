@@ -1,0 +1,1 @@
+{"instances":[{"type":"workflowCompleted","output":{"itemId":"SKU-2","index":1,"lineTotal":12}},{"type":"workflowCompleted","output":{"lines":[{"id":"SKU-1","amount":50},{"id":"SKU-2","amount":12}]}}]}

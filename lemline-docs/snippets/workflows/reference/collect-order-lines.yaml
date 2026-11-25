@@ -3,10 +3,10 @@ document:
   namespace: examples
   name: collect-order-lines
   version: '1.0.0'
-input:
-  from: '${ { lines: [] } }'
 do:
   - calculateLines:
+      input:
+        from: '${ { lines: [] } }'
       for:
         each: item
         in: ${ $workflow.input.items }
