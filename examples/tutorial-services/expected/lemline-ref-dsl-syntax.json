@@ -1,0 +1,33 @@
+{
+ "settleSeconds": 60,
+ "instances": [
+  {
+   "type": "workflowCompleted",
+   "output": {
+    "orderId": "ORD-301",
+    "status": "accepted"
+   }
+  },
+  {
+   "type": "workflowCompleted",
+   "output": {
+    "customerId": "C-100",
+    "itemCount": 2
+   }
+  },
+  {
+   "type": "workflowCompleted",
+   "output": {
+    "sku": "SKU-1"
+   }
+  },
+  {
+   "type": "workflowCompleted",
+   "output": {
+    "itemId": "SKU-2",
+    "index": 1,
+    "lineTotal": 12
+   }
+  }
+ ]
+}
