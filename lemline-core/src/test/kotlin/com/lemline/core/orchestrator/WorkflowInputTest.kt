@@ -15,6 +15,7 @@ import com.lemline.core.lifecycleevents.LifecycleEventHook
 import com.lemline.core.states.WorkflowEvent
 import com.lemline.core.workflows.WorkflowCache
 import io.kotest.core.spec.style.FunSpec
+import java.io.File
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
@@ -45,6 +46,16 @@ class WorkflowInputTest : FunSpec() {
         )
     }
 
+    private suspend fun runDocumentationExample(name: String, input: JsonNode): WorkflowEvent {
+        val workflow = WorkflowCache.parseYamlAndPut(File("../lemline-docs/snippets/workflows/reference/$name").readText())
+        return StepByStepOrchestrator.runByActivity(
+            workflow = workflow,
+            command = StepByStepOrchestrator.initCmd(workflowInput = input),
+            workflowInfo = workflow.info,
+            lifecycleHook = LifecycleEventHook.NOOP,
+        )
+    }
+
     private val orchestrators: List<Pair<String, suspend (String, JsonNode) -> WorkflowEvent>> = listOf(
         "FullOrchestrator" to ::runFull,
         "StepByStepOrchestrator" to ::runStepByStep,
@@ -55,6 +66,32 @@ class WorkflowInputTest : FunSpec() {
     init {
         afterEach {
             WorkflowCache.clear()
+        }
+
+        test("the documented default-workflow-input example returns the defaults merged with the input") {
+            val outcome = assertIs<WorkflowEvent.WorkflowCompleted>(runDocumentationExample("default-workflow-input.yaml", order))
+
+            assertEquals(
+                buildJsonObject {
+                    put("orderId", "ORD-1")
+                    put("priority", "NORMAL")
+                    put("currency", "USD")
+                },
+                outcome.output,
+            )
+        }
+
+        test("the documented order-event-schedule example reads the order from the event array") {
+            val events = ArrayNode(listOf(buildJsonObject { put("orderId", "ORD-1001") }))
+            val outcome = assertIs<WorkflowEvent.WorkflowCompleted>(runDocumentationExample("order-event-schedule.yaml", events))
+
+            assertEquals(
+                buildJsonObject {
+                    put("orderId", "ORD-1001")
+                    put("status", "received")
+                },
+                outcome.output,
+            )
         }
 
         orchestrators.forEach { (orchestrator, run) ->
