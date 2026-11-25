@@ -1,0 +1,16 @@
+{
+ "settleSeconds": 8,
+ "instances": [
+  {
+   "type": "workflowCompleted",
+   "output": [
+    {
+     "orderId": "ORD-1701"
+    }
+   ]
+  },
+  {
+   "type": "workflowCompleted"
+  }
+ ]
+}

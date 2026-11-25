@@ -12,7 +12,28 @@ There are no `lemline.asyncapi.*` runner settings.
 
 Exchange messages as CloudEvents with `emit` and `listen` tasks. They travel on the broker Lemline is configured with (see [Message Brokers](lemline-howto-brokers.md)):
 
-<code-block lang="yaml" src="workflows/lemline-ref-asyncapi/alternative.yaml" include-lines="7-19"/>
+<code-block lang="yaml" src="workflows/lemline-ref-asyncapi/alternative.yaml"/>
+
+## Run the Examples
+
+Every example on this page is a complete workflow. Complete [the SQLite setup](lemline-tutorial-setup.md), save each example under the file name used below, and run the commands from the setup directory. With the JAR, substitute `java -jar lemline.jar` for `bin/lemline`.
+
+The event examples need the tutorial publisher. Save it as `tutorial-publisher.yaml`:
+
+<code-block lang="yaml" src="workflows/reference/tutorial-publisher.yaml"/>
+
+Keep the setup worker running and use a second terminal in the setup directory.
+
+```bash
+bin/lemline definition post -f tutorial-publisher.yaml
+bin/lemline definition post -f alternative.yaml
+bin/lemline instance start examples asyncapi-alternative --input '{"order":{"orderId":"ORD-1701"}}'
+bin/lemline instance start examples tutorial-publisher --input '{"type":"com.example.payment.received","data":{"orderId":"ORD-1701"}}'
+```
+
+| Example | Expected result |
+|---|---|
+| `asyncapi-alternative` | Emits `com.example.order.created`, waits, then completes with `[{"orderId":"ORD-1701"}]` after the payment event |
 
 ## Related Resources
 
