@@ -54,6 +54,9 @@ import kotlinx.coroutines.withContext
  * - `version`: Semantic version (e.g., `1.0.0`)
  * - `catalog`: Catalog name, resolved from the workflow's `use.catalogs` or the built-in catalogs
  *
+ * A workflow catalog's endpoint is the catalog root: `log:1.0.0@my-catalog` with endpoint
+ * `file:///opt/catalog` resolves to `file:///opt/catalog/functions/log/1.0.0/function.yaml`.
+ *
  * Default catalog URLs:
  * - `global` → `https://raw.githubusercontent.com/open-workflow-specification/catalog/main/functions`
  */
@@ -207,7 +210,10 @@ class FunctionResolver : CoreFunctionResolver {
 
         val (name, version, catalog) = match.destructured
 
-        val baseUrl = catalogs[catalog]?.let { catalogEndpoint(catalog, it) } ?: defaultCatalogUrls[catalog]
+        // A workflow catalog endpoint is the catalog root (DSL 1.0.3), which keeps functions under `functions/`;
+        // the built-in URLs already point at that directory.
+        val baseUrl = catalogs[catalog]?.let { "${catalogEndpoint(catalog, it).trimEnd('/')}/functions" }
+            ?: defaultCatalogUrls[catalog]
             ?: throw FunctionResolutionException(
                 "Unknown catalog: '$catalog'. Available catalogs: ${defaultCatalogUrls.keys + catalogs.keys}"
             )

@@ -37,7 +37,7 @@ class CatalogFunctionExecutionTest {
     @Test
     fun `downloads a function from the configured HTTP catalog root`() = runBlocking {
         val server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
-        server.createContext("/catalog/get-product/1.0.0/function.yaml") { exchange ->
+        server.createContext("/catalog/functions/get-product/1.0.0/function.yaml") { exchange ->
             exchange.use {
                 val body = "set: {source: http}".toByteArray()
                 it.sendResponseHeaders(200, body.size.toLong())
@@ -55,7 +55,7 @@ class CatalogFunctionExecutionTest {
 
     private fun fileCatalog(directory: String, source: String): String {
         val root = tmp.resolve(directory)
-        val definition = root.resolve("get-product/1.0.0/function.yaml")
+        val definition = root.resolve("functions/get-product/1.0.0/function.yaml")
         Files.createDirectories(definition.parent)
         Files.writeString(definition, "set: {source: $source}")
         return root.toUri().toString()
