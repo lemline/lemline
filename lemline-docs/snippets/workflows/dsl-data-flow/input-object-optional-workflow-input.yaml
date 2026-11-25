@@ -1,25 +1,24 @@
 document:
-  dsl: 1.0.3
+  dsl: '1.0.3'
   namespace: examples
   name: input-object-optional-workflow-input
-  version: 1.0.0
+  version: '1.0.0'
 input:
-  from: '${ { userId: .user.id, orderDetails: .payload } }'
+  from: '${ {customerId: .customer.id, count: .quantity} }'
   schema:
+    format: json
     document:
       type: object
-      required:
-        - user
-        - payload
+      required: [customer, quantity]
       properties:
-        user:
+        customer:
           type: object
+          required: [id]
           properties:
-            id:
-              type: string
-        payload:
-          type: object
+            id: { type: string }
+        quantity: { type: integer, minimum: 1 }
 do:
-  - firstTask:
+  - acknowledge:
       set:
-        processed: true
+        customerId: ${ .customerId }
+        units: ${ .count }

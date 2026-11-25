@@ -1,0 +1,36 @@
+{
+  "instances": [
+    {
+      "type": "workflowCompleted",
+      "output": {
+        "customerId": "C-100",
+        "units": 2
+      }
+    },
+    {
+      "type": "workflowCompleted",
+      "output": {
+        "confirmationId": "ABC-123"
+      }
+    },
+    {
+      "type": "workflowCompleted",
+      "output": {
+        "doubled": 14
+      }
+    },
+    {
+      "type": "workflowCompleted",
+      "output": {
+        "identifiedCustomer": "C-100"
+      }
+    },
+    {
+      "type": "workflowCompleted",
+      "output": {
+        "action": "processed",
+        "customerId": "C-200"
+      }
+    }
+  ]
+}
