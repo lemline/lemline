@@ -1,19 +1,19 @@
 document:
-  dsl: 1.0.3
+  dsl: '1.0.3'
   namespace: examples
   name: targeting-a-specific-task-2
-  version: 1.0.0
+  version: '1.0.0'
 do:
-  - outerTask1:
-      do: # Inner Scope 1
-        - innerTaskA:
+  - parent:
+      do:
+        - finishInner:
             set:
-              processed: true
-            # then: outerTask2 # INVALID: Cannot target task outside inner scope
-        - innerTaskB:
+              inner: complete
+            then: exit
+        - skippedInner:
             set:
-              processed: true
-            then: exit # VALID: Exits Inner Scope 1
-  - outerTask2:
+              inner: unexpected
+  - finishOuter:
       set:
-        processed: true
+        inner: ${ .inner }
+        outer: complete

@@ -1,0 +1,68 @@
+{
+  "instances": [
+    {
+      "type": "workflowCompleted",
+      "output": {
+        "orderId": "O-100",
+        "paid": true
+      }
+    },
+    {
+      "type": "workflowCompleted",
+      "output": {
+        "carrier": "express"
+      }
+    },
+    {
+      "type": "workflowCompleted",
+      "output": {
+        "carrier": "economy"
+      }
+    },
+    {
+      "type": "workflowCompleted",
+      "output": {
+        "result": 10
+      }
+    },
+    {
+      "type": "workflowCompleted",
+      "output": {
+        "inner": "complete",
+        "outer": "complete"
+      }
+    },
+    {
+      "type": "workflowCompleted",
+      "output": {
+        "value": 2
+      }
+    },
+    {
+      "type": "workflowCompleted",
+      "output": {
+        "route": "already-done",
+        "reachedParent": true
+      }
+    },
+    {
+      "type": "workflowCompleted",
+      "output": {
+        "route": "processed",
+        "reachedParent": true
+      }
+    },
+    {
+      "type": "workflowCompleted",
+      "output": {
+        "result": "halted"
+      }
+    },
+    {
+      "type": "workflowCompleted",
+      "output": {
+        "result": "continued"
+      }
+    }
+  ]
+}
