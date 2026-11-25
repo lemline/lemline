@@ -28,3 +28,21 @@ and `export`, or change the default sequence with `then`.
 
 See [DSL Syntax Reference](lemline-ref-dsl-syntax.md) for workflow-level sections
 and expression scopes.
+
+## Run the Examples
+
+Every example on this page is a complete workflow. Complete [the SQLite setup](lemline-tutorial-setup.md), save each example under the file name used below, and run the commands from the setup directory. With the JAR, substitute `java -jar lemline.jar` for `bin/lemline`.
+
+Keep the setup worker running and use a second terminal in the setup directory.
+
+```bash
+bin/lemline definition post -f validate-and-route-order.yaml
+bin/lemline instance start examples validate-and-route-order --input '{"orderId":"ORD-301","total":250}'
+bin/lemline instance start examples validate-and-route-order --input '{"orderId":"ORD-302","total":1500}'
+```
+
+| Example | Expected result |
+|---|---|
+| ORD-301 | `{"orderId":"ORD-301","status":"accepted"}` |
+| ORD-302 | `{"orderId":"ORD-302","status":"needs-review"}` |
+
