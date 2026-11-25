@@ -7,7 +7,7 @@ do:
   - initData:
       set:
         user:
-          name: "John Doe"
+          name: "Ada Lovelace"
           role: "admin"
           permissions: ["read", "write"]
         timestamp: '${ now }'
