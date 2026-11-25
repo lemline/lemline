@@ -1,0 +1,26 @@
+document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: call-address-function
+  version: '1.0.0'
+use:
+  functions:
+    validateAddress:
+      call: http
+      with:
+        method: post
+        endpoint: http://127.0.0.1:8787/addresses/validate
+        body:
+          street: ${ .street }
+          city: ${ .city }
+          country: ${ .country }
+do:
+  - checkAddress:
+      call: validateAddress
+      with:
+        street: ${ .address.street }
+        city: ${ .address.city }
+        country: ${ .address.country }
+  - recordResult:
+      set:
+        valid: ${ .valid }

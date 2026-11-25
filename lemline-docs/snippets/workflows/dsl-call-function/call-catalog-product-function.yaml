@@ -1,0 +1,14 @@
+document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: call-catalog-product-function
+  version: '1.0.0'
+use:
+  catalogs:
+    shop-catalog:
+      endpoint: http://127.0.0.1:8787/catalog/
+do:
+  - getProduct:
+      call: get-product:1.0.0@shop-catalog
+      with:
+        productId: ${ .productId }
