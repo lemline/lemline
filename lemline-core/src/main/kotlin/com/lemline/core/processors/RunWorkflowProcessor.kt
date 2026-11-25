@@ -12,7 +12,9 @@ import com.lemline.core.states.NodeStack
 import com.lemline.core.states.RunState
 import com.lemline.core.states.WorkflowEvent
 import com.lemline.core.states.WorkflowEvent.RunWorkflowStarted
+import com.lemline.core.tasks.runs.ProcessResult
 import io.serverlessworkflow.api.types.RunTask
+import io.serverlessworkflow.api.types.RunTaskConfiguration.ProcessReturnType.ALL
 import kotlin.time.Instant
 
 /**
@@ -102,6 +104,14 @@ class RunWorkflowProcessor(
             rawInput = transformedInput,
             config = childWorkflowConfig,
         )
+    }
+
+    internal fun completedOutput(childOutput: JsonNode): JsonNode {
+        val run = node.task.run.runWorkflow
+        if (!run.isAwait || run.`return` != ALL) return childOutput
+
+        val stdout = childOutput.textValue() ?: LemlineJson.encodeToString(childOutput)
+        return ProcessResult(code = 0, stdout = stdout, stderr = "").get(ALL)
     }
 }
 

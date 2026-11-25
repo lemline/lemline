@@ -44,6 +44,98 @@ object RunWorkflowTestCases {
         ),
 
         WorkflowTestCase(
+            name = "awaited sub-workflow returns a process result for structured output",
+            yaml = """
+                do:
+                  - callChild:
+                      run:
+                        workflow:
+                          namespace: test
+                          name: structured-child
+                          version: '0.1.0'
+                        return: all
+            """.trimIndent(),
+            dependencies = listOf(
+                WorkflowDependency(
+                    name = "structured-child",
+                    yaml = """
+                        do:
+                          - report:
+                              set:
+                                value: 1
+                    """.trimIndent()
+                )
+            ),
+            validate = expectOutput(buildJsonObject {
+                put("code", 0)
+                put("stdout", """{"value":1}""")
+                put("stderr", "")
+            })
+        ),
+
+        WorkflowTestCase(
+            name = "awaited sub-workflow preserves plain text in process stdout",
+            yaml = """
+                do:
+                  - callChild:
+                      run:
+                        workflow:
+                          namespace: test
+                          name: text-child
+                          version: '0.1.0'
+                        return: all
+            """.trimIndent(),
+            dependencies = listOf(
+                WorkflowDependency(
+                    name = "text-child",
+                    yaml = $$"""
+                        do:
+                          - report:
+                              set:
+                                message: Hello
+                        output:
+                          as: ${ .message }
+                    """.trimIndent()
+                )
+            ),
+            validate = expectOutput(buildJsonObject {
+                put("code", 0)
+                put("stdout", "Hello")
+                put("stderr", "")
+            })
+        ),
+
+        WorkflowTestCase(
+            name = "unawaited sub-workflow with return all passes through transformed input",
+            input = buildJsonObject { put("input", 5) },
+            yaml = $$"""
+                do:
+                  - callChild:
+                      input:
+                        from: '${ {processed: .input + 1} }'
+                      run:
+                        workflow:
+                          namespace: test
+                          name: async-child
+                          version: '0.1.0'
+                        await: false
+                        return: all
+            """.trimIndent(),
+            dependencies = listOf(
+                WorkflowDependency(
+                    name = "async-child",
+                    yaml = """
+                        do:
+                          - report:
+                              set:
+                                value: 1
+                    """.trimIndent()
+                )
+            ),
+            validate = expectOutput(buildJsonObject { put("processed", 6) })
+        ),
+
+        WorkflowTestCase(
             name = "workflow can pass input to sub-workflow",
             yaml = $$"""
                 do:
