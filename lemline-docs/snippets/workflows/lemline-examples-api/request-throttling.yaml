@@ -49,10 +49,10 @@ do:
                   catch:
                     errors:
                       with:
-                        type: https://open-workflow-specification.org/spec/1.0.0/errors/runtime
+                        type: https://open-workflow-specification.org/spec/1.0.0/errors/communication
                     as: apiError
                     retry:
-                      when: ${ $apiError.title | startswith("HTTP 429") }
+                      when: ${ $apiError.status == 429 }
                       delay:
                         seconds: 10
                       backoff:

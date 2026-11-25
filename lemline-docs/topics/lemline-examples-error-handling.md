@@ -2,7 +2,7 @@
 
 This document provides examples of error handling and resilience patterns in Lemline workflows. Robust error handling is essential for building reliable workflows that can gracefully recover from failures when interacting with external systems, processing data, or executing business logic.
 
-> **Lemline runtime:** a failed HTTP call raises a `runtime` error with status 500, whatever the HTTP status. The HTTP status is the start of the error title, for example `HTTP 404: ...`. The examples on this page therefore match HTTP failures on the title of the caught error. See [Error Reference](lemline-ref-errors.md).
+> **Lemline runtime:** a failed HTTP call raises a `communication` error whose `status` is the HTTP status, and whose title starts with it, for example `HTTP 404: ...`. The examples on this page match HTTP failures on that type and status. See [Error Reference](lemline-ref-errors.md).
 
 ## Run the Examples
 
@@ -35,11 +35,11 @@ bin/lemline instance start examples catch-missing-product --input '{"productId":
 bin/lemline instance start examples catch-missing-product --input '{"productId":"SKU-1","failStatus":500}'
 ```
 
-The first instance returns the garden hose. For `SKU-404` the shop answers HTTP 404: the error is caught and the workflow completes with the task input, `{"productId":"SKU-404"}`. The HTTP 500 does not match the condition: the instance faults with a `runtime` error titled `HTTP 500`.
+The first instance returns the garden hose. For `SKU-404` the shop answers HTTP 404: the error is caught and the workflow completes with the task input, `{"productId":"SKU-404"}`. The HTTP 500 does not match the condition: the instance faults with a `communication` error, status 500.
 
 This example demonstrates:
 - Wrapping a potentially failing HTTP call in a `try` block
-- Catching only the HTTP 404 response, with a `when` condition on the error title
+- Catching only the HTTP 404 response, with `catch.errors.with` on the `communication` type and status 404
 - Building the request URI from the `productId` workflow input
 - The workflow continues after the error is caught
 
@@ -163,7 +163,7 @@ bin/lemline instance start examples error-hierarchy --input '{"email":"not-an-em
 bin/lemline instance start examples error-hierarchy --input '{"email":"ada@example.com","serviceDown":true}'
 ```
 
-A valid email completes with the shop's answer. An invalid one raises the typed error, which the `switch` routes to `handleValidation`: `errorType` is `validation`. When the shop answers HTTP 503, the error is a `runtime` error outside `https://example.com/errors`: the `catch` ignores it and the instance faults.
+A valid email completes with the shop's answer. An invalid one raises the typed error, which the `switch` routes to `handleValidation`: `errorType` is `validation`. When the shop answers HTTP 503, the error is a `communication` error outside `https://example.com/errors`: the `catch` ignores it and the instance faults.
 
 This example demonstrates:
 - A task that raises a typed error when the shop reports an invalid email

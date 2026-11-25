@@ -1,8 +1,64 @@
-{ "settleSeconds": 90, "instances": [
-  { "type": "workflowCompleted", "output": { "sku": "SKU-1", "available": 100 } },
-  { "type": "workflowCompleted", "output": { "inventory": [], "stale": true } },
-  { "type": "workflowCompleted", "output": { "orderId": "ORD-901", "quantity": 1, "status": "reserved" } },
-  { "type": "workflowCompleted", "output": { "success": false, "status": 500, "errorType": "~errors/runtime$", "reason": "~^HTTP 400: \\{\"error\":\"Invalid items\"" } },
-  { "type": "workflowCompleted", "output": { "success": false, "status": 500, "errorType": "~errors/runtime$", "reason": "~^HTTP 409: \\{\"error\":\"Out of stock\"" } },
-  { "type": "workflowFaulted", "error": { "status": 502, "title": "Order completion failed" } }
-], "state": { "reservations": [ { "orderId": "ORD-901", "status": "reserved" }, { "orderId": "ORD-904", "status": "released" } ] } }
+{
+ "settleSeconds": 90,
+ "instances": [
+  {
+   "type": "workflowCompleted",
+   "output": {
+    "sku": "SKU-1",
+    "available": 100
+   }
+  },
+  {
+   "type": "workflowCompleted",
+   "output": {
+    "inventory": [],
+    "stale": true
+   }
+  },
+  {
+   "type": "workflowCompleted",
+   "output": {
+    "orderId": "ORD-901",
+    "quantity": 1,
+    "status": "reserved"
+   }
+  },
+  {
+   "type": "workflowCompleted",
+   "output": {
+    "success": false,
+    "status": 400,
+    "errorType": "~errors/communication$",
+    "reason": "~^HTTP 400: \\{\"error\":\"Invalid items\""
+   }
+  },
+  {
+   "type": "workflowCompleted",
+   "output": {
+    "success": false,
+    "status": 409,
+    "errorType": "~errors/communication$",
+    "reason": "~^HTTP 409: \\{\"error\":\"Out of stock\""
+   }
+  },
+  {
+   "type": "workflowFaulted",
+   "error": {
+    "status": 502,
+    "title": "Order completion failed"
+   }
+  }
+ ],
+ "state": {
+  "reservations": [
+   {
+    "orderId": "ORD-901",
+    "status": "reserved"
+   },
+   {
+    "orderId": "ORD-904",
+    "status": "released"
+   }
+  ]
+ }
+}

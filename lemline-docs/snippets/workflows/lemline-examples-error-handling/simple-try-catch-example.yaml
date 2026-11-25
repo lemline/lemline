@@ -12,4 +12,7 @@ do:
               method: get
               endpoint: '${ "http://127.0.0.1:8787/products/" + $workflow.input.productId + (if $workflow.input.failStatus then "?fail=\($workflow.input.failStatus)" else "" end) }'
       catch:
-        when: ${ $error.title | startswith("HTTP 404") }
+        errors:
+          with:
+            type: https://open-workflow-specification.org/spec/1.0.0/errors/communication
+            status: 404

@@ -87,7 +87,7 @@ bin/lemline listen --debug
 bin/lemline instance start examples http-request-with-api-key
 ```
 
-The shop answers HTTP 403 and the instance faults with a `runtime` error titled
+The shop answers HTTP 403 and the instance faults with a `communication` error, status 403, titled
 `HTTP 403: {"error":"Invalid credentials for api-key-header"`. Stop the shop when you are done:
 
 ```bash

@@ -49,7 +49,7 @@ bin/lemline instance start examples dynamic-http-endpoint --input '{"productId":
 
 The first instance returns the watering can, `{"id":"SKU-2","name":"Watering can","category":"garden","price":12,"available":10}`.
 For the second, `@uri` sends `/products/SKU%20404`; the shop answers HTTP 404 and the workflow faults with a
-`runtime` error whose title starts with `HTTP 404`. Write path templates such as `{productId}` as an expression like
+`communication` error, status 404, whose title starts with `HTTP 404`. Write path templates such as `{productId}` as an expression like
 this one: Lemline does not expand URI templates.
 
 ## Authenticate
@@ -60,9 +60,9 @@ Use an endpoint authentication policy for [basic or bearer authentication](lemli
 ## Recover from an HTTP error
 
 Wrap the call in a `try` task, select the errors to handle in `catch`, and add a retry policy or a fallback list
-where appropriate. On the current build, a failed HTTP call raises a `runtime` error with status 500, and the HTTP
-status is only in the title, `HTTP <code>: <body>` ([issue 97](https://github.com/lemline/lemline/issues/97)).
-Match it with `catch.when` on `$error.title`, as here, rather than with `catch.errors.with.status`.
+where appropriate. A failed HTTP call raises a `communication` error whose `status` is the HTTP status and whose title
+is `HTTP <code>: <body>`.
+Match it with `catch.errors.with`, as here.
 
 <code-block lang="yaml" src="workflows/reference/retry-and-fallback.yaml"/>
 

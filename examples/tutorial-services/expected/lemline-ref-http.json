@@ -91,10 +91,10 @@
    }
   },
   {
-   "type": "workflowCompleted",
-   "output": {
-    "sku": "SKU-1",
-    "available": 100
+   "type": "workflowFaulted",
+   "error": {
+    "type": "~errors/communication$",
+    "status": 301
    }
   },
   {

@@ -15,9 +15,8 @@ docker compose -f examples/tutorial-services/compose.yaml up -d
 ## Filter an error and retry
 
 Set `catch.errors.with` to match predefined fields such as the error type or status.
-Use `catch.when` for a jq predicate over the error when the field filter is insufficient. A failed HTTP call needs
-`when` on the current build: it is a `runtime` error with status 500 whose title starts with the HTTP status
-([issue 97](https://github.com/lemline/lemline/issues/97)).
+Use `catch.when` for a jq predicate over the error when the field filter is insufficient. A failed HTTP call is a
+`communication` error whose `status` is the HTTP status, so the example below filters on both.
 
 <code-block lang="yaml" src="workflows/reference/retry-and-fallback.yaml"/>
 
@@ -49,10 +48,8 @@ bin/lemline instance start examples format-error-result --input '{"orderId":"ORD
 ```
 
 The first instance returns the reservation. The shop answers HTTP 400 to the second and HTTP 409 to the third; both
-complete with `success: false`, `status: 500`, the `runtime` error type, and a `reason` that starts with
-`HTTP 400: {"error":"Invalid items"` and `HTTP 409: {"error":"Out of stock"` respectively. On the current build a
-failed HTTP call is always a `runtime` error with status 500, and the HTTP status is only in the title
-([issue 97](https://github.com/lemline/lemline/issues/97)).
+complete with `success: false`, the `communication` error type, the HTTP status (`400`, then `409`) and a `reason`
+that starts with `HTTP 400: {"error":"Invalid items"` and `HTTP 409: {"error":"Out of stock"` respectively.
 
 ## Propagate failures
 

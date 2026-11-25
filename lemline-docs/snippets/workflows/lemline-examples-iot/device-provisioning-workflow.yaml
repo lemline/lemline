@@ -35,7 +35,10 @@ do:
               method: get
               endpoint: ${ "http://127.0.0.1:8787/devices/\(.deviceId)" }
       catch:
-        when: ${ $notFoundError.title | startswith("HTTP 404") }
+        errors:
+          with:
+            type: https://open-workflow-specification.org/spec/1.0.0/errors/communication
+            status: 404
         as: notFoundError
         do:
           - createDeviceRecord:
@@ -62,7 +65,7 @@ do:
       catch:
         errors:
           with:
-            type: https://open-workflow-specification.org/spec/1.0.0/errors/runtime
+            type: https://open-workflow-specification.org/spec/1.0.0/errors/communication
         retry:
           delay:
             seconds: 5

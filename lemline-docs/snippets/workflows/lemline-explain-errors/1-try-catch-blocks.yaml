@@ -14,7 +14,10 @@ do:
               body:
                 orderId: ${ .orderId }
       catch:
-        when: ${ $paymentError.title | startswith("HTTP 503") }
+        errors:
+          with:
+            type: https://open-workflow-specification.org/spec/1.0.0/errors/communication
+            status: 503
         as: paymentError
         do:
           - logError:

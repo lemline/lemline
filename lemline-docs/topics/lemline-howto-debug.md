@@ -61,8 +61,7 @@ bin/lemline definition get examples shop-receipt 0.1.0
 ```
 
 The second command prints the stored YAML. Without arguments, `bin/lemline definition get` lists the registered
-definitions and lets you pick one; do not use that form in a script, where it loops forever on the current build
-([issue 109](https://github.com/lemline/lemline/issues/109)).
+definitions and lets you pick one.
 
 ## Following Workflow Execution
 
@@ -142,8 +141,7 @@ When debugging event-based tasks:
 
 To run workflows without calling real services, start a runner in test mode with a file of mocked activity
 responses. Each `http` rule matches a URL (a `*` wildcard is allowed) and a method, and returns the given body.
-Write the file in JSON: on the current build, a YAML mock file cannot set a response body
-([issue 108](https://github.com/lemline/lemline/issues/108)). Create `mocks.json` with a rule for the shop's stock:
+The file can be YAML or JSON. Create `mocks.json` with a rule for the shop's stock:
 
 ```bash
 cat > mocks.json <<'EOF'
@@ -217,7 +215,7 @@ bin/lemline instance start examples slow-http-call --input '{"delayMs":40000}'
 ```
 
 The first instance returns the stock after one second. The second faults after 30 seconds, before the shop
-answers, with a `runtime` error titled `Socket timeout has expired [url=http://127.0.0.1:8787/stock?delayMs=40000,
+answers, with a `communication` error titled `Socket timeout has expired [url=http://127.0.0.1:8787/stock?delayMs=40000,
 socket_timeout=30000] ms`. Stop the shop when you are done:
 
 ```bash

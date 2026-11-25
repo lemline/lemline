@@ -114,7 +114,7 @@ bin/lemline definition post -f error-handling-and-resilience.yaml
 bin/lemline instance start examples stock-with-retry --input '{"failures":2}'
 ```
 
-The shop answers HTTP 503 twice; the catch matches the `runtime` error that a failed HTTP call raises on the current build ([issue 97](https://github.com/lemline/lemline/issues/97)), retries after about 1 and 2 seconds, and the workflow returns the stock. Allow about 30 seconds: the worker picks up retries every 10 seconds.
+The shop answers HTTP 503 twice; the catch matches the `communication` error that a failed HTTP call raises, retries after about 1 and 2 seconds, and the workflow returns the stock. Allow about 30 seconds: the worker picks up retries every 10 seconds.
 
 For more error handling examples, see the [Error Handling Examples](lemline-examples-error-handling.md) document.
 

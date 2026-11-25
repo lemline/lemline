@@ -52,7 +52,7 @@ do:
           - routeByErrorType:
               switch:
                 - paymentDeclined:
-                    when: ${ $error.title | startswith("HTTP 402") }
+                    when: ${ $error.status == 402 }
                     then: notifyCustomer
                 - default:
                     then: logError

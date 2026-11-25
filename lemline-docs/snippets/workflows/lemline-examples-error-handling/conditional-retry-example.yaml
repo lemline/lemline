@@ -18,10 +18,10 @@ do:
       catch:
         errors:
           with:
-            type: https://open-workflow-specification.org/spec/1.0.0/errors/runtime
+            type: https://open-workflow-specification.org/spec/1.0.0/errors/communication
         as: stockError
         retry:
-          when: '${ $stockError.title | test("^HTTP (5[0-9][0-9]|429)") }'
+          when: '${ $stockError.status >= 500 or $stockError.status == 429 }'
           delay:
             seconds: 2
           backoff:

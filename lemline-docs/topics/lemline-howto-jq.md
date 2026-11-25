@@ -53,9 +53,8 @@ printf '%s\n' '{"items":[{"quantity":2,"price":12.5}]}' |
   jq '[.items[] | .quantity * .price] | add // 0'
 ```
 
-It prints `25`. Lemline evaluates expressions with a Java implementation of jq, so check functions in a workflow too:
-some built-ins are missing, for example `todate`, which fails with an `expression` error
-([issue 110](https://github.com/lemline/lemline/issues/110)). Use `todateiso8601` instead.
+It prints `25`. Lemline evaluates expressions with a Java implementation of jq, so check functions that are new in
+recent jq versions in a workflow too.
 
 See [Runtime Expressions](https://github.com/open-workflow-specification/specification/blob/v1.0.3/dsl.md#runtime-expressions) for evaluation scopes and
 [Debugging Workflows](lemline-howto-debug.md) for logging task input.

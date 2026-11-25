@@ -22,5 +22,8 @@ do:
               method: get
               endpoint: '${ "http://127.0.0.1:8787/products/" + $workflow.input.productId + "?fail=503&failTimes=\($workflow.input.failures // 0)&key=\($workflow.id)" }'
       catch:
-        when: ${ $error.title | startswith("HTTP 503") }
+        errors:
+          with:
+            type: https://open-workflow-specification.org/spec/1.0.0/errors/communication
+            status: 503
         retry: default

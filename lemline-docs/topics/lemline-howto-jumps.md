@@ -34,9 +34,7 @@ bin/lemline instance start examples validate-and-route-order --input '{"orderId"
 Expect `{"orderId":"ORD-301","status":"accepted"}` and `{"orderId":"ORD-302","status":"needs-review"}`.
 
 After setting its status, the manual-review path uses `then: exit` to leave the task list
-instead of falling through to the automatic path. The workflow's `output.as` still runs.
-On the current build, `then: end` skips that final `output.as`
-([issue 104](https://github.com/lemline/lemline/issues/104)), so prefer `exit` at the top level.
+instead of falling through to the automatic path. The workflow's `output.as` still runs, as it does after `then: end`.
 
 ## Exit a nested task list
 

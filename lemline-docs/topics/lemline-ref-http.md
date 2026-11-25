@@ -12,7 +12,7 @@ This reference describes how Lemline executes `call: http` tasks: which argument
 | Request body | JSON, sent for `post`, `put` and `patch` |
 | Authentication | `basic` and `bearer` (inline or via `use.authentications`) |
 | Output | `content` (default), `response` or `raw` |
-| Redirects | Always followed on the current build, whatever `redirect` says ([issue 112](https://github.com/lemline/lemline/issues/112)) |
+| Redirects | `redirect: true` follows redirects |
 
 Not supported: URI template placeholders, connection definitions, form or multipart bodies, OAuth 2.0 and other authentication schemes, per-call timeouts, proxies, cookies, HTTP-level circuit breakers, and runner settings to tune the HTTP client.
 
@@ -90,7 +90,7 @@ An API key can be sent as a regular header. OAuth 2.0 is not supported yet: a ta
 
 <code-block lang="yaml" src="workflows/reference/http-follow-redirects.yaml"/>
 
-Without `redirect: true`, a redirect response (3xx) should not be followed and should fail the task like any other non-2xx status. On the current build, redirects are always followed, with or without `redirect: true` ([issue 112](https://github.com/lemline/lemline/issues/112)): the example below returns the stock.
+Without `redirect: true`, a redirect response (3xx) is not followed and fails the task like any other non-2xx status, as in the example below.
 
 <code-block lang="yaml" src="workflows/reference/http-no-redirect.yaml"/>
 
@@ -184,7 +184,7 @@ bin/lemline instance start examples customer-graphql-lookup --input '{"customerI
 | `http-inline-basic-authentication` | The partner stock with `"authenticatedWith":"basic"` |
 | `http-inline-bearer-token`, `named-authentication` | The partner stock with `"authenticatedWith":"bearer"` |
 | `http-follow-redirects` | The stock, read from `/stock` after the 301 |
-| `http-no-redirect` | The stock too: the redirect is followed anyway (issue 112) |
+| `http-no-redirect` | Faults with a `communication` error, status 301 |
 | `retry-behavior` | The stock after two retries |
 | `json-post-request` | The full response, `statusCode` 200 with the reservation in `content` |
 | `customer-graphql-lookup` | `{"data":{"customer":{…"name":"Ada Lovelace"…}}}` |

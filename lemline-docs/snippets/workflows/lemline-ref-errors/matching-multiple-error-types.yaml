@@ -19,10 +19,10 @@ do:
           - routeByStatus:
               switch:
                 - rateLimited:
-                    when: ${ $error.title | startswith("HTTP 429") }
+                    when: ${ $error.status == 429 }
                     then: handleRateLimit
                 - unavailable:
-                    when: ${ $error.title | startswith("HTTP 503") }
+                    when: ${ $error.status == 503 }
                     then: handleUnavailable
                 - default:
                     then: handleOtherError

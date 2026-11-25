@@ -1,11 +1,75 @@
 {
-  "settleSeconds": 90,
-  "instances": [
-    { "type": "workflowCompleted", "output": { "sku": "SKU-1", "available": 100, "reserved": 0 } },
-    { "type": "workflowCompleted", "output": { "id": "SKU-2", "name": "Watering can", "category": "garden", "price": 12, "available": 10 } },
-    { "type": "workflowFaulted", "error": { "type": "~errors/runtime$", "title": "~^HTTP 404" } },
-    { "type": "workflowCompleted", "output": { "sku": "SKU-1", "available": 100 } },
-    { "type": "workflowCompleted", "output": { "inventory": [], "stale": true } }
-  ],
-  "state": { "requests": [ {}, { "path": "/products/SKU-2" }, { "path": "~/products/SKU(%20| )404", "status": 404 }, { "status": 503 }, { "status": 200 }, { "status": 503 }, { "status": 503 }, { "status": 503 }, { "status": 503 } ] }
+ "settleSeconds": 90,
+ "instances": [
+  {
+   "type": "workflowCompleted",
+   "output": {
+    "sku": "SKU-1",
+    "available": 100,
+    "reserved": 0
+   }
+  },
+  {
+   "type": "workflowCompleted",
+   "output": {
+    "id": "SKU-2",
+    "name": "Watering can",
+    "category": "garden",
+    "price": 12,
+    "available": 10
+   }
+  },
+  {
+   "type": "workflowFaulted",
+   "error": {
+    "type": "~errors/communication$",
+    "status": 404,
+    "title": "~^HTTP 404"
+   }
+  },
+  {
+   "type": "workflowCompleted",
+   "output": {
+    "sku": "SKU-1",
+    "available": 100
+   }
+  },
+  {
+   "type": "workflowCompleted",
+   "output": {
+    "inventory": [],
+    "stale": true
+   }
+  }
+ ],
+ "state": {
+  "requests": [
+   {},
+   {
+    "path": "/products/SKU-2"
+   },
+   {
+    "path": "~/products/SKU(%20| )404",
+    "status": 404
+   },
+   {
+    "status": 503
+   },
+   {
+    "status": 200
+   },
+   {
+    "status": 503
+   },
+   {
+    "status": 503
+   },
+   {
+    "status": 503
+   },
+   {
+    "status": 503
+   }
+  ]
+ }
 }

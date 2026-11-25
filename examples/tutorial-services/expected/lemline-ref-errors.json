@@ -31,7 +31,7 @@
    "type": "workflowCompleted",
    "output": {
     "outcome": "failed",
-    "errorType": "~errors/runtime$"
+    "errorType": "~errors/communication$"
    }
   },
   {

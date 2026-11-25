@@ -14,7 +14,7 @@
    "output": {
     "success": false,
     "orderId": "ORD-1502",
-    "errorType": "~errors/runtime$"
+    "errorType": "~errors/communication$"
    }
   },
   {

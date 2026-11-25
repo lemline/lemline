@@ -140,7 +140,7 @@ Runs a runner until it is stopped. The runner consumes commands, events and Clou
 | Option | Description | Default |
 |--------|-------------|---------|
 | `-m`, `--metrics-port <port>` | Port of the metrics and health endpoints | `lemline.metrics.port` (`8080`) |
-| `--mock-config <file>` | YAML or JSON file of mocked activity responses; turns on test mode. On the current build, a YAML file cannot set an HTTP response body ([issue 108](https://github.com/lemline/lemline/issues/108)): use JSON | - |
+| `--mock-config <file>` | YAML or JSON file of mocked activity responses; turns on test mode | - |
 
 ### `gateway start`
 

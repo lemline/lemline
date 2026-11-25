@@ -43,9 +43,7 @@ lemline definition get
 lemline definition get tutorial acknowledge-order 0.1.3
 ```
 
-Without arguments the command asks which definition to print. In a script, always pass the namespace, name and
-version: without a terminal, the prompt repeats forever on the current build
-([issue 109](https://github.com/lemline/lemline/issues/109)).
+Without arguments the command asks which definition to print. In a script, pass the namespace, name and version.
 
 The gRPC gateway also exposes per-definition counters (`ListDefinitionStats`, `WatchDefinitionStats`), shown in the dashboard.
 

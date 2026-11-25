@@ -40,7 +40,7 @@ bin/lemline instance start examples http-error-fallback --input '{"delayMs":0}'
 bin/lemline instance start examples http-error-fallback --input '{"delayMs":40000}'
 ```
 
-The first instance returns the stock. In the second, the shop waits 40 seconds; the HTTP client gives up after 30 and the catch returns `success: false` with the `runtime` error titled `Socket timeout has expired …`.
+The first instance returns the stock. In the second, the shop waits 40 seconds; the HTTP client gives up after 30 and the catch returns `success: false` with the `communication` error titled `Socket timeout has expired …`.
 
 ### Graduated Timeouts
 
@@ -57,7 +57,7 @@ bin/lemline instance start examples graduated-timeouts --input '{"itemId":"SKU-2
 bin/lemline instance start examples graduated-timeouts --input '{"itemId":"SKU-2","cacheMiss":true,"databaseDelayMs":4000}'
 ```
 
-The first instance answers from the cache (`source: cache`), the second from the database after a cache miss (`source: database`). In the third, the database takes 4 seconds: the 3-second timeout is not applied, so the call waits and still answers with `source: database`. Only the failure of a call, not its duration, reaches the next fallback on the current build.
+The first instance answers from the cache (`source: cache`), the second from the database after a cache miss (`source: database`). In the third, the database takes 4 seconds: the 3-second timeout is not applied, so the call waits and still answers with `source: database`. Only the failure of a call, not its duration, reaches the next fallback.
 
 ## Timeouts with Event Waiting
 

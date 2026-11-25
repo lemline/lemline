@@ -156,10 +156,9 @@ bin/lemline instance start examples using-retry-policies
 |---|---|
 | `typed-error` | Faults with `invalid-order`, status 422 |
 | `basic-try-catch` | After 5 to 15 seconds, `{"processed":false,"reason":"Listen task timed out"}` |
-| `matching-multiple-error-types` | `{"outcome":"rate-limited"}`, `{"outcome":"unavailable"}`, then `{"outcome":"failed"}` with the `runtime` error type |
-| `using-retry-policies` | The stock after one retry: every failed HTTP call has status 500 on the current build, so `when` holds |
+| `matching-multiple-error-types` | `{"outcome":"rate-limited"}`, `{"outcome":"unavailable"}`, then `{"outcome":"failed"}` with the `communication` error type |
+| `using-retry-policies` | The stock after one retry: the HTTP 503 has status 503, so `when` holds |
 
-`matching-multiple-error-types` reads the HTTP status from the error title, because a failed HTTP call carries status 500 on the current build ([issue 97](https://github.com/lemline/lemline/issues/97)).
 
 Stop the shop when you are done:
 

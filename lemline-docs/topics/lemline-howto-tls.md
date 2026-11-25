@@ -85,7 +85,7 @@ Use an `https://` URI in the endpoint:
 <code-block lang="yaml" src="workflows/lemline-howto-tls/calling-https-services-from-workflows.yaml"/>
 
 The server certificate must be trusted by the Java runtime that runs Lemline. A call to a server with an untrusted or
-invalid certificate fails before any request is sent: the task faults with a `runtime` error whose title starts with
+invalid certificate fails before any request is sent: the task faults with an error whose title starts with
 `PKIX path building failed`. A `try` task can catch it like any other failed call. To call a service whose
 certificate comes from a private authority, add that authority to the trust store of the Java runtime that runs the
 worker.

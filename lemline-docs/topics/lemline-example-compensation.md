@@ -37,7 +37,7 @@ bin/lemline instance start examples simple-compensation --input '{"orderId":"ORD
 bin/lemline instance start examples simple-compensation --input '{"orderId":"ORD-1502","items":[{"id":"SKU-1","quantity":1}],"paymentInfo":{"token":"declined"}}'
 ```
 
-ORD-1501 returns `success: true` with its reservation and the charge ID. For ORD-1502 the charge answers HTTP 402: the catch releases the reservation and returns `success: false` with the `runtime` error type.
+ORD-1501 returns `success: true` with its reservation and the charge ID. For ORD-1502 the charge answers HTTP 402: the catch releases the reservation and returns `success: false` with the `communication` error type.
 
 ## Multi-Step Transaction Compensation
 
