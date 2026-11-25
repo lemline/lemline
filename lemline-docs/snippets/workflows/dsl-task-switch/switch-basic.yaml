@@ -16,13 +16,12 @@ do:
             then: handleOtherStatus
   - processApproved:
       set:
-        processed: true
-      then: continue
+        route: approved
+      then: exit
   - processRejected:
       set:
-        processed: true
-      then: continue
+        route: rejected
+      then: exit
   - handleOtherStatus:
       set:
-        processed: true
-      then: continue
+        route: manual-review
