@@ -4,8 +4,8 @@ document:
   name: dynamic-http-endpoint
   version: '1.0.0'
 do:
-  - getOrder:
+  - getProduct:
       call: http
       with:
         method: get
-        endpoint: '${ "https://api.example.com/orders/\(.orderId | @uri)" }'
+        endpoint: '${ "http://127.0.0.1:8787/products/\(.productId | @uri)" }'
