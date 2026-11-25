@@ -1,0 +1,24 @@
+{
+ "settleSeconds": 25,
+ "instances": [
+  {
+   "type": "workflowCompleted",
+   "output": {
+    "windowClosed": true
+   }
+  },
+  {
+   "type": "workflowCompleted",
+   "output": {
+    "orderId": "ORD-1801",
+    "status": "delivered"
+   }
+  },
+  {
+   "type": "workflowCompleted"
+  },
+  {
+   "type": "workflowCompleted"
+  }
+ ]
+}

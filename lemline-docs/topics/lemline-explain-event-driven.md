@@ -157,7 +157,7 @@ While Lemline minimizes database usage, it still leverages databases for specifi
 
 When a workflow needs to pause execution for a period of time:
 
-<code-block lang="yaml" src="workflows/lemline-explain-event-driven/wait-states-and-timers.yaml" include-lines="7-9"/>
+<code-block lang="yaml" src="workflows/lemline-explain-event-driven/wait-states-and-timers.yaml"/>
 
 This wait operation is stored in the database with:
 - Workflow instance ID
@@ -171,7 +171,7 @@ A dedicated outbox processor periodically checks for expired waits and resumes t
 
 When workflows need to correlate incoming events:
 
-<code-block lang="yaml" src="workflows/lemline-explain-event-driven/event-correlation.yaml" include-lines="7-17"/>
+<code-block lang="yaml" src="workflows/lemline-explain-event-driven/event-correlation.yaml"/>
 
 The correlation criteria are stored in the database to match against incoming events.
 
@@ -289,6 +289,31 @@ With distributed processing, observability becomes critical:
 - **Centralized Logging**: Aggregate logs for comprehensive visibility
 - **Correlation IDs**: Use consistent correlation IDs for tracking
 - **Health Monitoring**: Monitor the health of all components
+
+## Run the Examples
+
+Every example on this page is a complete workflow. Complete [the SQLite setup](lemline-tutorial-setup.md), save each example under the file name used below, and run the commands from the setup directory. With the JAR, substitute `java -jar lemline.jar` for `bin/lemline`.
+
+The event examples need the tutorial publisher. Save it as `tutorial-publisher.yaml`:
+
+<code-block lang="yaml" src="workflows/reference/tutorial-publisher.yaml"/>
+
+Keep the setup worker running and use a second terminal in the setup directory.
+
+```bash
+bin/lemline definition post -f tutorial-publisher.yaml
+bin/lemline definition post -f wait-states-and-timers.yaml
+bin/lemline instance start examples wait-states-and-timers
+bin/lemline definition post -f event-correlation.yaml
+bin/lemline instance start examples event-correlation --input '{"orderId":"ORD-1801"}'
+bin/lemline instance start examples tutorial-publisher --input '{"type":"com.example.shipment.updated","data":{"orderId":"OTHER","status":"in-transit"}}'
+bin/lemline instance start examples tutorial-publisher --input '{"type":"com.example.shipment.updated","data":{"orderId":"ORD-1801","status":"delivered"}}'
+```
+
+| Example | Expected result |
+|---|---|
+| `wait-states-and-timers` | `{"windowClosed":true}` 10 to 20 seconds later: the worker picks up timers every 10 seconds |
+| `event-correlation` | Ignores the update for `OTHER`, then completes with `{"orderId":"ORD-1801","status":"delivered"}` |
 
 ## Conclusion
 
