@@ -1,0 +1,30 @@
+{
+  "instances": [
+    {
+      "type": "workflowCompleted",
+      "output": "Received O-100"
+    },
+    {
+      "type": "workflowCompleted",
+      "output": "valid"
+    },
+    {
+      "type": "workflowCompleted",
+      "output": "invalid"
+    },
+    {
+      "type": "workflowCompleted",
+      "output": {
+        "count": 2
+      }
+    },
+    {
+      "type": "workflowCompleted",
+      "output": 0
+    },
+    {
+      "type": "workflowCompleted",
+      "output": 1
+    }
+  ]
+}

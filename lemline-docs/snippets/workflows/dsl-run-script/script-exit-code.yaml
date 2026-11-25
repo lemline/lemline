@@ -1,0 +1,16 @@
+document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: script-exit-code
+  version: '1.0.0'
+do:
+  - checkOrder:
+      run:
+        script:
+          language: js
+          code: |
+            const [, , name, orderId] = process.argv;
+            process.exit(name === "orderId" && /^O-[0-9]+$/.test(orderId) ? 0 : 1);
+          arguments:
+            orderId: ${ .orderId }
+        return: code

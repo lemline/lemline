@@ -10,23 +10,29 @@ The `run: script` task allows a workflow to execute a script written in a suppor
 
 ## Usage Example
 
-<code-block lang="yaml" src="workflows/dsl-run-script/usage-example.yaml"/>
+The script prints the order ID passed by the workflow.
+
+<code-block lang="yaml" src="workflows/dsl-run-script/run-simple-script.yaml"/>
 
 ## Additional Examples
 
 ### Example: Loading Script from External Source
 
-Lemline loads an external script from the runner's file system only: the endpoint must be a `file://` URI.
+Use `source.endpoint` to load a script outside the definition.
+
+> **Lemline**
+>
+> Place the file at the same absolute path on every worker that runs the task. Lemline accepts a `file://` URI for the source.
 
 <code-block lang="yaml" src="workflows/reference/load-external-script.yaml"/>
 
 ### Example: Using Python with Environment Variables
 
-<code-block lang="yaml" src="workflows/dsl-run-script/example-using-python-with-environment-variables.yaml" include-lines="6-27"/>
+<code-block lang="yaml" src="workflows/dsl-run-script/script-read-environment.yaml"/>
 
 ### Example: Returning Exit Code
 
-<code-block lang="yaml" src="workflows/dsl-run-script/example-returning-exit-code.yaml" include-lines="6-25"/>
+<code-block lang="yaml" src="workflows/dsl-run-script/script-exit-code.yaml"/>
 
 ## Configuration Options
 
@@ -64,6 +70,55 @@ The configuration is provided under the `run` property, specifically within the 
 *   The `rawOutput` depends on the `run.await` and `run.return` settings.
 *   Standard `output.as` and `export.as` process this resulting `rawOutput`.
 
+> **Lemline**
+>
+> The worker passes each named argument followed by its value on the command line. Node.js 22+ and Python 3.8+ must be available on the worker for the respective languages.
+
 ### Flow Control
 <include from="_common-task-flow_control.md" element-id="common-flow-control"/>
-**Note**: If `await` is `true` and the script process exits with a non-zero status code or throws an unhandled exception, a `Runtime` error is typically raised, and the `then` directive is *not* followed (unless caught by `Try`). 
+With `return: code`, downstream tasks can use the exit status to decide how to proceed.
+
+## Run the Examples
+
+Complete the [SQLite setup](lemline-tutorial-setup.md) and leave the worker running. Save each workflow in the setup directory under the file name used below.
+
+Run the worker on Linux or macOS with Node.js 22+ and Python 3.8+ on its path. On that machine, save
+the Python file where `load-external-script` can find it.
+
+```bash
+mkdir -p /tmp/lemline-scripts
+cat > /tmp/lemline-scripts/email-validator.py <<'EOF'
+import re
+import sys
+
+args = dict(zip(sys.argv[1::2], sys.argv[2::2]))
+valid = re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", args["email"])
+print("valid" if valid else "invalid")
+EOF
+```
+
+Run these registration and start commands from the setup directory.
+
+```bash
+bin/lemline definition post -f run-simple-script.yaml
+bin/lemline instance start examples run-simple-script --input '{"orderId":"O-100"}'
+bin/lemline definition post -f load-external-script.yaml
+bin/lemline instance start examples load-external-script --input '{"email":"ada@example.com"}'
+bin/lemline instance start examples load-external-script --input '{"email":"not-an-email"}'
+bin/lemline definition post -f script-read-environment.yaml
+bin/lemline instance start examples script-read-environment --input '{"items":["SKU-1","SKU-2"]}'
+bin/lemline definition post -f script-exit-code.yaml
+bin/lemline instance start examples script-exit-code --input '{"orderId":"O-100"}'
+bin/lemline instance start examples script-exit-code --input '{"orderId":"bad-id"}'
+```
+
+Check the individual results in the worker terminal.
+
+| Example | Expected result |
+|---|---|
+| `run-simple-script` | `"Received O-100"` |
+| `load-external-script` with `{"email":"ada@example.com"}` | `"valid"` |
+| `load-external-script` with `{"email":"not-an-email"}` | `"invalid"` |
+| `script-read-environment` | `{"count":2}` |
+| `script-exit-code` with `{"orderId":"O-100"}` | `0` |
+| `script-exit-code` with `{"orderId":"bad-id"}` | `1` |
