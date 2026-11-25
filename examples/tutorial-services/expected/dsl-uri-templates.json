@@ -3,10 +3,6 @@
     "requests": {
       "$contains": [
         {
-          "path": "/products/%7BproductId%7D",
-          "status": 404
-        },
-        {
           "path": "/products/SKU-1",
           "status": 200
         }
@@ -15,11 +11,10 @@
   },
   "instances": [
     {
-      "type": "workflowFaulted",
-      "error": {
-        "type": "https://open-workflow-specification.org/spec/1.0.0/errors/communication",
-        "status": 404,
-        "title": "~Unknown product \\{productId\\}"
+      "type": "workflowCompleted",
+      "output": {
+        "id": "SKU-1",
+        "name": "Garden hose"
       }
     },
     {

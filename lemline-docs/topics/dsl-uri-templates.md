@@ -11,20 +11,19 @@ of `{variableName}` where a field accepts a URI template.
 
 The template reads a top-level value with the same name as the text inside the braces.
 For the example below, input `productId` selects the variable in the product path.
-A missing name expands to an empty string. A scalar value can be used for substitution.
+A missing or null value expands to an empty string. Strings, numbers, and booleans are
+percent-encoded. An object or array faults with an expression error and status `400`.
 
 <code-block lang="yaml" src="workflows/dsl-uri-templates/uri-template-product.yaml"/>
 
 > **Lemline**
 >
-> The HTTP task sends the literal placeholder. For the example input below, the shop
-> receives `/products/%7BproductId%7D` and returns HTTP 404. Use a runtime expression for expansion.
-> [Issue #124](https://github.com/lemline/lemline/issues/124) tracks template substitution.
+> HTTP calls expand templates in both `endpoint` and `endpoint.uri` using the task’s transformed input.
 
 ## Build a URI with an Expression
 
-Use a [runtime expression](dsl-runtime-expressions.md) for nested data, workflow context, or when
-a value needs explicit encoding. Here jq’s `@uri` encodes the product ID before it is inserted
+Use a [runtime expression](dsl-runtime-expressions.md) for nested data, workflow context, or
+custom URL construction. Here jq’s `@uri` encodes the product ID before it is inserted
 into the URL.
 
 <code-block lang="yaml" src="workflows/reference/dynamic-http-endpoint.yaml"/>
@@ -55,10 +54,10 @@ Check the individual results in the worker terminal.
 
 | Example | Expected result |
 |---|---|
-| `uri-template-product` | The task faults with HTTP `404` for the literal placeholder. |
+| `uri-template-product` | The garden hose, product `SKU-1`. |
 | `dynamic-http-endpoint` | The garden hose, product `SKU-1`. |
 
-Compare the request paths once both workflows have finished. Use the worker terminal to confirm the outcomes.
+After both workflows finish, check that both sent a request to `/products/SKU-1`.
 
 ```bash
 sleep 6
