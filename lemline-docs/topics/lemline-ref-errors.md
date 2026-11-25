@@ -49,11 +49,15 @@ Lemline errors carry no numeric or symbolic error code: identify them by `type` 
 | A declared secret is not set on the runner | `authorization` | 403 | `Required secret 'API_KEY' is unavailable` |
 | An HTTP call returns a non-2xx status | `communication` | the HTTP status (for example 404) | `HTTP 404: <response body>` |
 | An HTTP call gets no response (unknown host, refused connection, timeout) | `communication` | 500 | `Unable to reach https://api.example.com: unresolved host` |
+| An A2A call gets a non-2xx status from the agent | `communication` (see below) | the HTTP status | title `A2A message/send failed`, details `HTTP 503: <response body>` |
+| An A2A call gets no usable answer (unreachable agent, timeout, stream cut before its final result) | `communication` (see below) | 500 | title `A2A message/send failed`, details `Unable to reach https://agent.example.com: ...` |
 | A `listen` task reaches its timeout | `timeout` | 408 | `Listen task timed out at ...` |
 | An expression fails to evaluate | `expression` | 400 | the evaluation error message |
 | Input or output does not match its schema | `validation` | 400 | the schema validation message |
 
 A failed HTTP call can therefore be caught by type and by status, for example `catch.errors.with: { type: https://open-workflow-specification.org/spec/1.0.0/errors/communication, status: 503 }`. The `Unable to reach` title names the server only, never the path or the query of the URL.
+
+Errors raised by `call: a2a` use the base URI `https://serverlessworkflow.io/spec/1.0.0/errors/` instead: catch `https://serverlessworkflow.io/spec/1.0.0/errors/communication` for the failures above, and `https://serverlessworkflow.io/spec/1.0.0/errors/runtime` for the others, such as an error returned by the agent in its JSON-RPC answer.
 
 Lemline only raises `timeout` errors for `listen` tasks: workflow-level timeouts and timeouts on other tasks are not enforced yet.
 
