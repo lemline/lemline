@@ -1,33 +1,37 @@
 document:
   dsl: '1.0.3'
-  namespace: iot
+  namespace: examples
   name: firmware-update
   version: '1.0.0'
 input:
   schema:
     document:
       type: object
-      required: [firmwareVersion, deviceQuery]
+      required: [firmwareVersion, campaignId, zone]
       properties:
         firmwareVersion:
           type: string
-        deviceQuery:
-          type: object
+        campaignId:
+          type: string
+        zone:
+          type: string
 do:
   - findEligibleDevices:
       call: http
       with:
-        method: post
-        endpoint: https://iot-registry.example/api/devices/query
-        body: ${ .deviceQuery }
+        method: get
+        endpoint: http://127.0.0.1:8787/devices
+        query:
+          zone: ${ .zone }
+          firmwareBelow: ${ .firmwareVersion }
   - updateDevices:
       for:
-        in: ${ .devices }
+        in: ${ .items }
         each: device
       do:
         - rememberDevice:
             set:
-              deviceId: ${ $device.id }
+              deviceId: ${ $device.deviceId }
             export:
               as: '${ $context + { deviceId: .deviceId } }'
         - dispatchUpdate:
@@ -35,8 +39,11 @@ do:
               event:
                 with:
                   type: com.example.iot.firmware.requested
-                  source: https://iot-campaigns.example
-                  data: '${ { campaignId: $workflow.id, deviceId: $device.id, firmwareVersion: $workflow.input.firmwareVersion } }'
+                  source: https://events.example.com/warehouse
+                  data:
+                    campaignId: ${ $workflow.input.campaignId }
+                    deviceId: ${ $device.deviceId }
+                    firmwareVersion: ${ $workflow.input.firmwareVersion }
         - awaitStatus:
             try:
               - waitForStatus:
@@ -48,12 +55,13 @@ do:
                         correlate:
                           campaignId:
                             from: ${ .campaignId }
-                            expect: ${ $workflow.id }
+                            expect: ${ $workflow.input.campaignId }
                           deviceId:
                             from: ${ .deviceId }
                             expect: ${ $context.deviceId }
                   timeout:
-                    after: PT2H
+                    after:
+                      seconds: 60
                   output:
                     as: ${ .[0] }
             catch:
@@ -65,10 +73,11 @@ do:
                     call: http
                     with:
                       method: get
-                      endpoint:  '${ "https://iot-campaigns.example/api/status/\($workflow.id)/\($context.deviceId | @uri)" }'
+                      endpoint: '${ "http://127.0.0.1:8787/devices/\($context.deviceId | @uri)" }'
         - recordStatus:
             call: http
             with:
-              method: post
-              endpoint: https://iot-campaigns.example/api/status
-              body: ${ . }
+              method: patch
+              endpoint: '${ "http://127.0.0.1:8787/devices/\($context.deviceId | @uri)" }'
+              body:
+                firmware: ${ .version // .firmware }

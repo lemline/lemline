@@ -1,8 +1,8 @@
 document:
-  dsl: 1.0.3
-  namespace: iot
+  dsl: '1.0.3'
+  namespace: examples
   name: device-provisioning
-  version: 1.0.0
+  version: '1.0.0'
 input:
   schema:
     format: json
@@ -33,22 +33,16 @@ do:
             call: http
             with:
               method: get
-              endpoint: ${ "https://iot-registry.example/api/devices/\(.deviceId)" }
-            timeout:
-              after:
-                seconds: 5
+              endpoint: ${ "http://127.0.0.1:8787/devices/\(.deviceId)" }
       catch:
-        errors:
-          with:
-            type: https://open-workflow-specification.org/spec/1.0.0/errors/communication
-            status: 404
+        when: ${ $notFoundError.title | startswith("HTTP 404") }
         as: notFoundError
         do:
           - createDeviceRecord:
               call: http
               with:
                 method: post
-                endpoint: https://iot-registry.example/api/devices
+                endpoint: http://127.0.0.1:8787/devices
                 body:
                   deviceId: ${ .deviceId }
                   deviceType: ${ .deviceType }
@@ -62,16 +56,13 @@ do:
             call: http
             with:
               method: post
-              endpoint: https://iot-security.example/api/credentials/generate
-              body:
-                deviceId: ${ $workflow.input.deviceId }
-                deviceType: ${ $workflow.input.deviceType }
+              endpoint: ${ "http://127.0.0.1:8787/devices/\($workflow.input.deviceId)/credentials" }
             export:
               as: '${ $context + { credentials: . } }'
       catch:
         errors:
           with:
-            type: https://open-workflow-specification.org/spec/1.0.0/errors/communication
+            type: https://open-workflow-specification.org/spec/1.0.0/errors/runtime
         retry:
           delay:
             seconds: 5
@@ -79,45 +70,25 @@ do:
             attempt:
               count: 3
   - configureDevice:
-      do:
-        - generateConfig:
-            call: http
-            with:
-              method: post
-              endpoint: https://iot-config.example/api/config/generate
-              body:
-                deviceId: ${ $workflow.input.deviceId }
-                deviceType: ${ $workflow.input.deviceType }
-                location: ${ $workflow.input.location }
-            export:
-              as: '${ $context + { deviceConfig: . } }'
-        - createDigitalTwin:
-            call: http
-            with:
-              method: post
-              endpoint: https://digital-twins.example/api/twins
-              body:
-                deviceId: ${ $workflow.input.deviceId }
-                deviceType: ${ $workflow.input.deviceType }
-                attributes:
-                  location: ${ $workflow.input.location }
-                  firmware: 1.0.0
-                  status: provisioning
-            export:
-              as: '${ $context + { digitalTwin: . } }'
-  - activateDevice:
-      call: asyncapi
+      call: http
       with:
-        document:
-          endpoint: https://iot-messaging.example/asyncapi.json
-        operation: activateDevice
-        server:
-          name: production
-        message:
-          payload:
-            deviceId: ${ $workflow.input.deviceId }
-            config: ${ $context.deviceConfig }
-            credentials: ${ $context.credentials }
+        method: patch
+        endpoint: ${ "http://127.0.0.1:8787/devices/\($workflow.input.deviceId)" }
+        body:
+          config:
+            reportingIntervalSeconds: 60
+            zone: ${ $workflow.input.location.zone }
+      export:
+        as: '${ $context + { deviceConfig: .config } }'
+  - activateDevice:
+      emit:
+        event:
+          with:
+            type: com.example.iot.device.activation.requested
+            source: https://events.example.com/warehouse
+            data:
+              deviceId: ${ $workflow.input.deviceId }
+              config: ${ $context.deviceConfig }
   - waitForDeviceActivation:
       listen:
         to:
@@ -135,7 +106,7 @@ do:
       call: http
       with:
         method: patch
-        endpoint: ${ "https://iot-registry.example/api/devices/\($workflow.input.deviceId)" }
+        endpoint: ${ "http://127.0.0.1:8787/devices/\($workflow.input.deviceId)" }
         body:
           status: active
           lastPing: ${ .[0].timestamp }

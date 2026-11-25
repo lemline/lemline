@@ -1,29 +1,26 @@
 document:
   dsl: '1.0.3'
-  namespace: iot
+  namespace: examples
   name: energy-optimization
   version: '1.0.0'
 schedule:
-  cron: '*/15 * * * *'
+  every:
+    minutes: 15
 input:
-  from: '${ { buildingId: "building-42" } + (. // {}) }'
+  from: '${ { zone: "dock" } + (. // {}) }'
 do:
-  - rememberBuilding:
+  - rememberZone:
       set:
-        buildingId: ${ .buildingId }
+        zone: ${ .zone }
       export:
-        as: '${ $context + { buildingId: .buildingId } }'
-  - getSensorReadings:
-      call: http
-      with:
-        method: get
-        endpoint: '${ "https://iot-platform.example/api/buildings/\(.buildingId | @uri)/sensors" }'
+        as: '${ $context + { zone: .zone } }'
   - calculateSettings:
       call: http
       with:
         method: post
-        endpoint: https://energy-optimizer.example/api/optimize
-        body: ${ . }
+        endpoint: http://127.0.0.1:8787/energy-plans
+        body:
+          zone: ${ .zone }
       export:
         as: '${ $context + { settings: . } }'
   - updateHvac:
@@ -31,15 +28,23 @@ do:
         event:
           with:
             type: com.example.iot.settings.requested
-            source: https://energy-optimizer.example
-            data: '${ { requestId: $workflow.id, buildingId: $context.buildingId, deviceType: "hvac", settings: $context.settings.hvac } }'
+            source: https://events.example.com/energy
+            data:
+              requestId: ${ $workflow.input.requestId }
+              zone: ${ $context.zone }
+              deviceType: hvac
+              setpoint: ${ $context.settings.hvacSetpoint }
   - updateLighting:
       emit:
         event:
           with:
             type: com.example.iot.settings.requested
-            source: https://energy-optimizer.example
-            data: '${ { requestId: $workflow.id, buildingId: $context.buildingId, deviceType: "lighting", settings: $context.settings.lighting } }'
+            source: https://events.example.com/energy
+            data:
+              requestId: ${ $workflow.input.requestId }
+              zone: ${ $context.zone }
+              deviceType: lighting
+              level: ${ $context.settings.lightingLevel }
   - getConfirmations:
       try:
         - waitForConfirmations:
@@ -52,14 +57,14 @@ do:
                     correlate:
                       requestId:
                         from: ${ .requestId }
-                        expect: ${ $workflow.id }
+                        expect: ${ $workflow.input.requestId }
                   - with:
                       type: com.example.iot.settings.applied
                       data: ${ .deviceType == "lighting" }
                     correlate:
                       requestId:
                         from: ${ .requestId }
-                        expect: ${ $workflow.id }
+                        expect: ${ $workflow.input.requestId }
             timeout:
               after: PT5M
       catch:
@@ -67,14 +72,14 @@ do:
           with:
             type: https://open-workflow-specification.org/spec/1.0.0/errors/timeout
         do:
-          - readDurableStatus:
-              call: http
-              with:
-                method: get
-                endpoint:  '${ "https://energy-optimizer.example/api/requests/\($workflow.id)/confirmations" }'
+          - markUnconfirmed:
+              set:
+                confirmations: []
   - recordOptimization:
       call: http
       with:
         method: post
-        endpoint: https://energy-analytics.example/api/optimizations
-        body: '${ { buildingId: $context.buildingId, requestId: $workflow.id, confirmations: . } }'
+        endpoint: http://127.0.0.1:8787/audit
+        body:
+          reference: ${ $context.zone }
+          message: '${ "Optimization applied: hvac \($context.settings.hvacSetpoint), lighting \($context.settings.lightingLevel), \(if type == "array" then length else 0 end) confirmations" }'
