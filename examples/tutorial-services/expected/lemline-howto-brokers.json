@@ -1,0 +1,1 @@
+{"instances":[{"type":"workflowCompleted"}],"others":[{"workflow":"examples/shipping-workflow:0.1.0","type":"workflowCompleted","output":{"received":[{"orderId":"ORD-1001"}]}}],"settleSeconds":15}
