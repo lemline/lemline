@@ -12,15 +12,19 @@ do:
                 - inventory:
                     call: http
                     with:
-                      method: post
-                      endpoint: https://inventory.example.com/check
-                      body: ${ . }
+                      method: get
+                      endpoint: http://127.0.0.1:8787/stock
+                      query:
+                        fail: '503'
+                        failTimes: ${ .inventoryFailures // 0 | tostring }
+                        key: ${ .orderId }
                 - shipping:
                     call: http
                     with:
                       method: post
-                      endpoint: https://shipping.example.com/quote
-                      body: ${ . }
+                      endpoint: http://127.0.0.1:8787/quotes/express
+                      body:
+                        orderId: ${ .orderId }
       catch:
         do:
           - requestManualReview:

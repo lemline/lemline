@@ -11,9 +11,9 @@ do:
               call: http
               with:
                 method: get
-                endpoint: http://127.0.0.1:8787/state
+                endpoint: http://127.0.0.1:8787/stock
               output:
-                as: '${ { available: .stock } }'
+                as: '${ { available: .available } }'
           - checkShipping:
               call: http
               with:
