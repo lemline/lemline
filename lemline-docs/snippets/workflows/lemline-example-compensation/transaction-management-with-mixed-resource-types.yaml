@@ -10,24 +10,24 @@ do:
             call: http
             with:
               method: post
-              endpoint: https://records.example/records
-              body: '${ { name: $workflow.input.name } }'
+              endpoint: http://127.0.0.1:8787/documents
+              body: '${ { reference: $workflow.input.name, title: "Record", content: $workflow.input.name } }'
             export:
               as: '${ $context + { recordId: .id } }'
         - allocateFile:
             call: http
             with:
               method: post
-              endpoint: https://files.example/files
-              body: '${ { content: $workflow.input.content } }'
+              endpoint: http://127.0.0.1:8787/documents
+              body: '${ { reference: $workflow.input.name, title: "File", content: $workflow.input.content } }'
             export:
               as: '${ $context + { fileId: .id } }'
         - attachFile:
             call: http
             with:
               method: patch
-              endpoint: '${ "https://records.example/records/\($context.recordId | @uri)" }'
-              body: '${ { fileId: $context.fileId } }'
+              endpoint: '${ "http://127.0.0.1:8787/documents/\($context.recordId | @uri)" + (if $workflow.input.attachFails then "?fail=503" else "" end) }'
+              body: '${ { attachmentId: $context.fileId } }'
       catch:
         as: allocationError
         do:
@@ -38,7 +38,7 @@ do:
                     call: http
                     with:
                       method: delete
-                      endpoint: '${ "https://files.example/files/\($context.fileId | @uri)" }'
+                      endpoint: '${ "http://127.0.0.1:8787/documents/\($context.fileId | @uri)" }'
               catch:
                 do:
                   - recordCleanupFailure:
@@ -53,7 +53,7 @@ do:
                     call: http
                     with:
                       method: delete
-                      endpoint: '${ "https://records.example/records/\($context.recordId | @uri)" }'
+                      endpoint: '${ "http://127.0.0.1:8787/documents/\($context.recordId | @uri)" }'
               catch:
                 do:
                   - recordCleanupFailure:

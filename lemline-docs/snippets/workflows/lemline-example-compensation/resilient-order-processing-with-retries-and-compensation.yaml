@@ -8,7 +8,7 @@ do:
       call: http
       with:
         method: post
-        endpoint: https://inventory.example/reservations
+        endpoint: http://127.0.0.1:8787/reservations
         body:
           orderId: ${ $workflow.input.orderId }
           items: ${ $workflow.input.items }
@@ -20,9 +20,12 @@ do:
             call: http
             with:
               method: post
-              endpoint: https://payments.example/charges
+              endpoint: http://127.0.0.1:8787/charges
               headers:
                 Idempotency-Key: ${ $workflow.id }
+              query:
+                fail: '503'
+                failTimes: ${ $workflow.input.paymentFailures // 0 | tostring }
               body:
                 orderId: ${ $workflow.input.orderId }
                 paymentInfo: ${ $workflow.input.paymentInfo }
@@ -38,7 +41,7 @@ do:
               call: http
               with:
                 method: delete
-                endpoint: '${ "https://inventory.example/reservations/\($context.reservationId | @uri)" }'
+                endpoint: '${ "http://127.0.0.1:8787/reservations/\($context.reservationId | @uri)" }'
           - reportFailure:
               set:
                 success: false

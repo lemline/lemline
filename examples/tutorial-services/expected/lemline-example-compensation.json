@@ -1,0 +1,144 @@
+{
+ "settleSeconds": 10,
+ "timeoutSeconds": 400,
+ "instances": [
+  {
+   "type": "workflowCompleted",
+   "output": {
+    "success": true,
+    "orderId": "ORD-1501"
+   }
+  },
+  {
+   "type": "workflowCompleted",
+   "output": {
+    "success": false,
+    "orderId": "ORD-1502",
+    "errorType": "~errors/runtime$"
+   }
+  },
+  {
+   "type": "workflowCompleted",
+   "output": {
+    "orderId": "ORD-1503",
+    "carrier": "express"
+   }
+  },
+  {
+   "type": "workflowCompleted",
+   "output": {
+    "success": false,
+    "cleanupFailed": []
+   }
+  },
+  {
+   "type": "workflowCompleted",
+   "output": {
+    "success": false,
+    "cleanupFailed": [
+     "refundPayment"
+    ]
+   }
+  },
+  {
+   "type": "workflowCompleted",
+   "output": {
+    "success": false,
+    "cleanupFailed": []
+   }
+  },
+  {
+   "type": "workflowCompleted"
+  },
+  {
+   "type": "workflowCompleted",
+   "output": {
+    "success": false
+   }
+  },
+  {
+   "type": "workflowCompleted"
+  },
+  {
+   "type": "workflowCompleted",
+   "output": {
+    "success": false,
+    "cleanupFailed": []
+   }
+  },
+  {
+   "type": "workflowCompleted",
+   "output": {
+    "status": "confirmed"
+   }
+  },
+  {
+   "type": "workflowCompleted"
+  },
+  {
+   "type": "workflowCompleted",
+   "output": {
+    "status": "expired"
+   }
+  }
+ ],
+ "state": {
+  "refunds": [
+   {
+    "orderId": "ORD-1504"
+   }
+  ],
+  "reservations": [
+   {
+    "orderId": "ORD-1501",
+    "status": "reserved"
+   },
+   {
+    "orderId": "ORD-1502",
+    "status": "released"
+   },
+   {
+    "orderId": "ORD-1503",
+    "status": "reserved"
+   },
+   {
+    "orderId": "ORD-1504",
+    "status": "released"
+   },
+   {
+    "orderId": "ORD-1505",
+    "status": "released"
+   },
+   {
+    "orderId": "ORD-1506",
+    "status": "released"
+   },
+   {
+    "orderId": "ORD-1507",
+    "status": "reserved"
+   },
+   {
+    "orderId": "ORD-1508",
+    "status": "released"
+   },
+   {
+    "orderId": "ORD-1511",
+    "status": "reserved"
+   },
+   {
+    "orderId": "ORD-1512",
+    "status": "released"
+   }
+  ],
+  "requests": {
+   "$contains": [
+    {
+     "path": "/charges",
+     "headers": {
+      "idempotency-key": "~."
+     }
+    }
+   ]
+  }
+ }
+}

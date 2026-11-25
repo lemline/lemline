@@ -15,7 +15,7 @@ do:
             call: http
             with:
               method: post
-              endpoint: https://inventory.example/api/reserve
+              endpoint: http://127.0.0.1:8787/reservations
               body:
                 orderId: ${ .orderId }
                 items: ${ .items }
@@ -25,10 +25,9 @@ do:
             call: http
             with:
               method: post
-              endpoint: https://payments.example/api/charge
+              endpoint: http://127.0.0.1:8787/charges
               body:
                 orderId: ${ $workflow.input.orderId }
-                amount: ${ .totalAmount }
                 paymentInfo: ${ $workflow.input.paymentInfo }
         - returnSuccess:
             set:
@@ -43,10 +42,8 @@ do:
               if: ${ $context.reservationId != null }
               call: http
               with:
-                method: post
-                endpoint: https://inventory.example/api/cancel-reservation
-                body:
-                  reservationId: ${ $context.reservationId }
+                method: delete
+                endpoint: '${ "http://127.0.0.1:8787/reservations/\($context.reservationId | @uri)" }'
           - returnFailure:
               set:
                 success: false
