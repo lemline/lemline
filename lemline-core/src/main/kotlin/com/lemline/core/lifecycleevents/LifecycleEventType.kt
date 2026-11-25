@@ -16,6 +16,12 @@ enum class LifecycleEventType(val type: String) {
     /** Workflow has started execution */
     WORKFLOW_STARTED("org.open-workflow-specification.workflow.started.v1"),
 
+    /** A workflow has begun waiting for correlated events */
+    WORKFLOW_CORRELATION_STARTED("org.open-workflow-specification.workflow.correlation-started.v1"),
+
+    /** A workflow has received the events required by a correlated wait */
+    WORKFLOW_CORRELATION_COMPLETED("org.open-workflow-specification.workflow.correlation-completed.v1"),
+
     /** Workflow has completed successfully */
     WORKFLOW_COMPLETED("org.open-workflow-specification.workflow.completed.v1"),
 
@@ -43,7 +49,10 @@ enum class LifecycleEventType(val type: String) {
 
     companion object {
         /** All workflow-level event types */
-        val workflowEvents = listOf(WORKFLOW_CREATED, WORKFLOW_STARTED, WORKFLOW_COMPLETED, WORKFLOW_FAULTED)
+        val workflowEvents = listOf(
+            WORKFLOW_CREATED, WORKFLOW_STARTED, WORKFLOW_CORRELATION_STARTED, WORKFLOW_CORRELATION_COMPLETED,
+            WORKFLOW_COMPLETED, WORKFLOW_FAULTED,
+        )
 
         /** All task-level event types */
         val taskEvents = listOf(TASK_CREATED, TASK_STARTED, TASK_COMPLETED, TASK_FAULTED, TASK_RETRIED)

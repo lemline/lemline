@@ -178,4 +178,9 @@ data class ListenConfig(
     val readAs: ListenAndReadAs = ListenAndReadAs.DATA,
     @Contextual val timeoutAt: Instant? = null,
     val correlationContext: JsonNode? = null
-)
+) {
+    val correlatesEvents: Boolean
+        get() = filters.any { !it.correlations.isNullOrEmpty() } ||
+            (until as? UntilCondition.Event)?.consumption?.allFilters()
+                ?.any { !it.standard.correlations.isNullOrEmpty() } == true
+}

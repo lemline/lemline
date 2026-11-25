@@ -68,6 +68,22 @@ interface LifecycleEventHook {
         startedAt: Instant,
     )
 
+    /** Called when a listen task begins waiting with correlation filters. */
+    suspend fun onWorkflowCorrelationStarted(
+        workflowInfo: WorkflowInfo,
+        nodeStack: NodeStack,
+        nodePosition: NodePosition,
+        startedAt: Instant,
+    ) = Unit
+
+    /** Called when a correlated listen resumes successfully. */
+    suspend fun onWorkflowCorrelationCompleted(
+        workflowInfo: WorkflowInfo,
+        nodeStack: NodeStack,
+        nodePosition: NodePosition,
+        completedAt: Instant,
+    ) = Unit
+
     /**
      * Called when a workflow completes successfully.
      *

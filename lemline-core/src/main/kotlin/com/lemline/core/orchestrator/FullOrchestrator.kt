@@ -311,6 +311,11 @@ object FullOrchestrator {
             (it - Clock.System.now()).inWholeMilliseconds.coerceAtLeast(0)
         } ?: Long.MAX_VALUE
 
+        if (listenStarted.config.correlatesEvents) {
+            lifecycleHook.onWorkflowCorrelationStarted(
+                workflow.info, listenStarted.nodeStack, listenStarted.nodePosition, Clock.System.now(),
+            )
+        }
         return try {
             when (val result = withTimeout(timeoutMillis) {
                 ListenEventCollector.collect(listenStarted, cloudEventHook.receive(), foreachProcessor)

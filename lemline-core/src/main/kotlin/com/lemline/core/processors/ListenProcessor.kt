@@ -66,6 +66,18 @@ class ListenProcessor(
 
     override val isAsync = true
 
+    private val listenConfig
+        get() = node.task.listen ?: raiseError(CONFIGURATION, "Listen task missing 'listen' configuration")
+
+    private val consumption by lazy {
+        val listenTo = listenConfig.to ?: raiseError(CONFIGURATION, "Listen task missing 'listen.to' configuration")
+        CachedEventConsumption.from(listenTo.get(), node.evaluationMode)
+    }
+
+    internal val correlatesEvents by lazy {
+        consumption.allFilters().any { !it.standard.correlations.isNullOrEmpty() }
+    }
+
     override fun stateWhenEnteringFromParent(transformedInput: JsonNode, scope: Scope, startedAt: Instant) = ListenState(startedAt = startedAt)
 
     /**
@@ -82,13 +94,6 @@ class ListenProcessor(
         transformedInput: JsonNode,
         scope: Scope,
     ): WorkflowEvent {
-        val listenConfig = node.task.listen
-            ?: raiseError(CONFIGURATION, "Listen task missing 'listen' configuration")
-
-        val listenTo = listenConfig.to
-            ?: raiseError(CONFIGURATION, "Listen task missing 'listen.to' configuration")
-
-        val consumption = CachedEventConsumption.from(listenTo.get(), node.evaluationMode)
         val strategy = consumption.strategy
         val filters = consumption.filters.map { it.standard }
         val until = consumption.untilExpression?.let { UntilCondition.Expression(it) }
