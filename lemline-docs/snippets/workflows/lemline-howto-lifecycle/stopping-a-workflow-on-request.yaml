@@ -17,6 +17,13 @@ do:
       switch:
         - cancelled:
             when: ${ .[0].type == "com.example.order.cancelled" }
-            then: end
+            then: markCancelled
         - default:
             then: continue
+  - markPaid:
+      set:
+        status: paid
+      then: exit
+  - markCancelled:
+      set:
+        status: cancelled

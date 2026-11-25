@@ -10,3 +10,6 @@ do:
           one:
             with:
               type: com.example.order.approved
+  - recordApproval:
+      set:
+        approvedBy: ${ .[0].approver }
