@@ -1,0 +1,33 @@
+{
+ "settleSeconds": 50,
+ "instances": [
+  {
+   "type": "workflowCompleted",
+   "output": {
+    "overdue": true
+   }
+  },
+  {
+   "type": "workflowCompleted",
+   "output": {
+    "deadline": "2999-01-01T00:00:00Z"
+   }
+  },
+  {
+   "type": "workflowCompleted",
+   "output": {
+    "state": "resumed"
+   }
+  },
+  {
+   "type": "workflowCompleted",
+   "output": {
+    "status": "expired"
+   }
+  },
+  {
+   "type": "running"
+  }
+ ],
+ "timeoutSeconds": 90
+}
