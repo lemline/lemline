@@ -1,0 +1,32 @@
+{
+  "instances": [
+    {
+      "type": "workflowFaulted",
+      "error": {
+        "title": "~Unknown run task type: RunContainer"
+      }
+    },
+    {
+      "type": "workflowFaulted",
+      "error": {
+        "title": "~Unknown run task type: RunContainer"
+      }
+    },
+    {
+      "type": "workflowFaulted",
+      "error": {
+        "title": "~Unknown run task type: RunContainer"
+      }
+    },
+    {
+      "type": "workflowFaulted",
+      "error": {
+        "title": "~Unknown run task type: RunContainer"
+      }
+    },
+    {
+      "type": "workflowCompleted",
+      "output": "O-100"
+    }
+  ]
+}

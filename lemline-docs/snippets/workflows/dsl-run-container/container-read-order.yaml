@@ -1,0 +1,16 @@
+document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: container-read-order
+  version: '1.0.0'
+do:
+  - readOrder:
+      run:
+        container:
+          image: node:22-alpine
+          command: 'node -p "require(''fs'').readFileSync(process.env.ORDER_FILE, ''utf8'').trim()"'
+          environment:
+            ORDER_FILE: /data/order.txt
+          volumes:
+            ./container-data: /data:ro
+        return: stdout
