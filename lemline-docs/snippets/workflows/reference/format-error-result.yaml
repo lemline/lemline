@@ -10,7 +10,7 @@ do:
             call: http
             with:
               method: post
-              endpoint: https://api.example.com/orders
+              endpoint: http://127.0.0.1:8787/reservations
               body: ${ . }
       catch:
         as: orderError
@@ -20,3 +20,4 @@ do:
                 success: false
                 status: ${ $orderError.status }
                 errorType: ${ $orderError.type }
+                reason: ${ $orderError.title }
