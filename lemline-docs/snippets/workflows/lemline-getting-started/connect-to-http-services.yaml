@@ -1,12 +1,12 @@
 document:
   dsl: '1.0.3'
   namespace: examples
-  name: http-workflow
+  name: check-stock
   version: '0.1.0'
-  title: HTTP Request Workflow
+  title: Check the shop stock
 do:
-  - makeRequest:
+  - getStock:
       call: http
       with:
-        method: GET
-        endpoint: http://127.0.0.1:8787/state
+        method: get
+        endpoint: http://127.0.0.1:8787/stock

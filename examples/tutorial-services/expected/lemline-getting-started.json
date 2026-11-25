@@ -1,0 +1,6 @@
+{
+  "instances": [
+    { "type": "workflowCompleted", "output": { "message": "Order received" } },
+    { "type": "workflowCompleted", "output": { "sku": "SKU-1", "available": 100, "reserved": 0 } }
+  ]
+}
