@@ -15,7 +15,7 @@ do:
       catch:
         errors:
           with:
-            type: https://open-workflow-specification.org/spec/1.0.0/errors/runtime
+            type: https://open-workflow-specification.org/spec/1.0.0/errors/communication
         retry:
           backoff:
             exponential: {}
