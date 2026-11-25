@@ -25,6 +25,10 @@ object JQExpression : ExpressionEvaluator {
     private val rootScope: JQScope by lazy {
         JQScope.newEmptyScope().also { scope ->
             BuiltinFunctionLoader.getInstance().loadFunctions(jqVersion, scope)
+            // jackson-jq 1.2.0 omits jq's todate alias.
+            if (scope.getFunction("todate", 0) == null) {
+                scope.getFunction("todateiso8601", 0)?.let { scope.addFunction("todate", 0, it) }
+            }
         }
     }
 
