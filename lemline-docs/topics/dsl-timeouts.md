@@ -10,7 +10,7 @@ duration inline or reference a timeout declared in `use.timeouts`.
 ## Handle a listen timeout
 
 Lemline enforces listen timeouts. In this example, if an approval event fails to arrive
-within five minutes, the surrounding `try` task handles the timeout.
+within 30 seconds, the surrounding `try` task handles the timeout.
 
 <code-block lang="yaml" src="workflows/reference/timeout-listen-fallback.yaml"/>
 
