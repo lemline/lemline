@@ -1,0 +1,25 @@
+document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: grpc-stock-authenticated
+  version: '1.0.0'
+use:
+  authentications:
+    inventoryAuth:
+      bearer:
+        token: demo-token
+do:
+  - getStock:
+      call: grpc
+      with:
+        proto:
+          endpoint: http://127.0.0.1:8787/inventory.proto
+        service:
+          name: shop.Inventory
+          host: 127.0.0.1
+          port: 8787
+          authentication:
+            use: inventoryAuth
+        method: GetStock
+        arguments:
+          sku: ${ .sku }

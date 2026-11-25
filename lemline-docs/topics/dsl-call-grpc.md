@@ -5,8 +5,9 @@ title: gRPC Call
 
 # gRPC Call Task (`call: grpc`)
 
-> **Lemline runtime:** `call: grpc` is not executed by Lemline yet.
-
+> **Lemline**
+>
+> Lemline accepts these workflow definitions at registration. Starting an instance that reaches `call: grpc` faults with `Unknown task type: CallGRPC`. The tutorial shop serves the Protobuf contract over HTTP. It has no gRPC server.
 
 ## Purpose
 
@@ -14,13 +15,24 @@ The gRPC Call task enables workflows to interact with external systems using the
 
 ## Usage Example
 
-<code-block lang="yaml" src="workflows/dsl-call-grpc/usage-example.yaml"/>
+The Protobuf file declares the `shop.Inventory` service and its `GetStock` request and response messages.
+
+<code-block lang="yaml" src="workflows/dsl-call-grpc/grpc-stock.yaml"/>
 
 ## Additional Examples
 
 ### Example: Using Authentication
 
-<code-block lang="yaml" src="workflows/dsl-call-grpc/example-using-authentication.yaml"/>
+A named bearer policy supplies credentials to the RPC service definition.
+
+<code-block lang="yaml" src="workflows/dsl-call-grpc/grpc-stock-authenticated.yaml"/>
+
+### Use an HTTP Endpoint
+
+When a service exposes the same operation over HTTP, use `call: http`. The shop exposes this product lookup directly.
+
+<code-block lang="yaml" src="workflows/dsl-call-grpc/grpc-http-product.yaml"/>
+
 ## Configuration Options
 
 The configuration for a gRPC call is provided within the `with` property of the `call: grpc` task.
@@ -54,4 +66,45 @@ See the main [Authentication](dsl-authentication.md) page for details on support
 
 ### Flow Control
 <include from="_common-task-flow_control.md" element-id="common-flow-control"/>
-**Note**: If the gRPC call fails (e.g., connection error, method not found, server error), a `Communication` error is typically raised, and the `then` directive is *not* followed (unless caught by `Try`). 
+**Note**: If the gRPC call fails (e.g., connection error, method not found, server error), a `Communication` error is typically raised, and the `then` directive is *not* followed (unless caught by `Try`).
+
+## Run the Examples
+
+Complete the [SQLite setup](lemline-tutorial-setup.md) and leave the worker running. Save each workflow in the setup directory under the file name used below.
+
+Use this command from the root of the source checkout to [start the tutorial shop](lemline-tutorial-setup.md#use-the-tutorial-shop).
+
+```bash
+docker compose -f examples/tutorial-services/compose.yaml up -d --wait
+```
+
+Fetch the protobuf contract from the shop to inspect the inventory service definition.
+
+```bash
+curl --retry 10 --retry-connrefused --retry-delay 1 -fsS http://127.0.0.1:8787/inventory.proto
+```
+
+Run these registration and start commands from the setup directory.
+
+```bash
+bin/lemline definition post -f grpc-stock.yaml
+bin/lemline instance start examples grpc-stock --input '{"sku":"SKU-1"}'
+bin/lemline definition post -f grpc-stock-authenticated.yaml
+bin/lemline instance start examples grpc-stock-authenticated --input '{"sku":"SKU-1"}'
+bin/lemline definition post -f grpc-http-product.yaml
+bin/lemline instance start examples grpc-http-product --input '{"sku":"SKU-1"}'
+```
+
+Check the individual results in the worker terminal.
+
+| Example | Expected result |
+|---|---|
+| `grpc-stock` | Registration succeeds. The instance faults with `Unknown task type: CallGRPC`. |
+| `grpc-stock-authenticated` | Registration succeeds. The instance faults with `Unknown task type: CallGRPC`. |
+| `grpc-http-product` | The garden hose, `SKU-1`, with `100` available units. |
+
+When the instances finish, use the command below in the source checkout to stop the shop.
+
+```bash
+docker compose -f examples/tutorial-services/compose.yaml down
+```
