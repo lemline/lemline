@@ -132,7 +132,7 @@ class RunExternalScriptExecutionTest : FunSpec({
         }
 
         error.error.type shouldContain "configuration"
-        error.error.title.orEmpty() + error.error.details.orEmpty() shouldContain "Script file not found"
+        error.error.title.orEmpty() + error.error.detail.orEmpty() shouldContain "Script file not found"
         configs.shouldBeEmpty()
     }
 
@@ -152,6 +152,6 @@ class RunExternalScriptExecutionTest : FunSpec({
         }
 
         error.error.type shouldContain "configuration"
-        error.error.title.orEmpty() + error.error.details.orEmpty() shouldContain "Unsupported scheme"
+        error.error.title.orEmpty() + error.error.detail.orEmpty() shouldContain "Unsupported scheme"
     }
 })

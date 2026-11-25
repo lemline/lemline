@@ -763,7 +763,7 @@ object WorkflowStateProtobufMapper {
         status = status,
         position = position,
         title = title,
-        details = details
+        details = detail
     )
 
     private fun InternalErrorProto.toDomain() = InternalException.Error(
@@ -771,7 +771,7 @@ object WorkflowStateProtobufMapper {
         status = status,
         position = position,
         title = title,
-        details = details
+        detail = details
     )
 
     private fun Instant.toProtoInstant(): JavaInstant =

@@ -124,7 +124,7 @@ class ListenerScheduledTimeout : AbstractScheduledTask() {
             errorType = WorkflowErrorType.TIMEOUT,
             position = listenStarted.nodePosition,
             title = "Listen task timed out",
-            details = "Listener at position ${listenStarted.nodePosition} timed out while waiting for events. " +
+            detail = "Listener at position ${listenStarted.nodePosition} timed out while waiting for events. " +
                 "Timeout was set to ${listener.timeoutAt}."
         )
 

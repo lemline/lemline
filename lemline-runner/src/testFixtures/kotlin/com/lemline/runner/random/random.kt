@@ -80,7 +80,7 @@ fun randomWorkflowFailedEvent() = WorkflowEvent.WorkflowFaulted(
         status = 500,
         position = "test-instance",
         title = "Test error",
-        details = "Test error details"
+        detail = "Test error detail"
     ),
     faultedAt = Clock.System.now()
 )

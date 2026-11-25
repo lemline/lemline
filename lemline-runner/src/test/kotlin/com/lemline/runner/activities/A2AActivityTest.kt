@@ -267,7 +267,7 @@ class A2AActivityTest {
                         assertEquals(communication, e.error.type)
                         assertEquals(503, e.error.status)
                         assertEquals("/do/0/ask", e.error.position)
-                        assertContains(e.error.details.orEmpty(), """HTTP 503: {"error":"busy"}""")
+                        assertContains(e.error.detail.orEmpty(), """HTTP 503: {"error":"busy"}""")
                     }
                 }
             }
@@ -282,7 +282,7 @@ class A2AActivityTest {
         }
         assertEquals(communication, e.error.type)
         assertEquals(500, e.error.status)
-        assertContains(e.error.details.orEmpty(), "Unable to reach http://127.0.0.1:$port")
+        assertContains(e.error.detail.orEmpty(), "Unable to reach http://127.0.0.1:$port")
     }
 
     @Test
@@ -363,7 +363,7 @@ class A2AActivityTest {
     }
 
     @Test
-    fun `DSL catch sees the specified error type remote details and call position`() = runBlocking {
+    fun `DSL catch sees the specified error type remote detail and call position`() = runBlocking {
         Agent().use { agent ->
             agent.reply = { e, req ->
                 e.respond("application/json", """{"jsonrpc":"2.0","id":${req["id"]},"error":{"code":-32001,"message":"Unknown task","data":{"task":"missing"}}}""")
@@ -383,9 +383,9 @@ class A2AActivityTest {
             """.trimIndent())
             assertEquals(runtime, output.at("/caught/type").textValue())
             assertEquals("/do/0/guarded/try/0/ask", output.at("/caught/instance").textValue())
-            assertContains(output.at("/caught/details").asText(), "-32001")
-            assertContains(output.at("/caught/details").asText(), "Unknown task")
-            assertContains(output.at("/caught/details").asText(), "missing")
+            assertContains(output.at("/caught/detail").asText(), "-32001")
+            assertContains(output.at("/caught/detail").asText(), "Unknown task")
+            assertContains(output.at("/caught/detail").asText(), "missing")
         }
     }
 

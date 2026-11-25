@@ -38,7 +38,7 @@ class RaiseExecutionTest : FunSpec({
         error.error.type shouldBe "https://open-workflow-specification.org/errors/not-implemented"
         error.error.status shouldBe 501
         error.error.title shouldBe "Not implemented for yet"
-        error.error.details shouldBe "Workflow 'raise-reusable:0.1.0' cannot run yet"
+        error.error.detail shouldBe "Workflow 'raise-reusable:0.1.0' cannot run yet"
     }
 
     test("inline error also evaluates its detail") {
@@ -57,7 +57,7 @@ class RaiseExecutionTest : FunSpec({
 
         val error = (result as WorkflowTestResult.Failure).exception as InternalException
         error.error.type shouldBe "https://open-workflow-specification.org/errors/inline"
-        error.error.details shouldBe "Bad value: x"
+        error.error.detail shouldBe "Bad value: x"
     }
 
     test("fault lifecycle event preserves error instance and detail") {
@@ -77,7 +77,7 @@ class RaiseExecutionTest : FunSpec({
             status = 400,
             position = "/do/0/raiseError",
             title = "Bad input",
-            details = "Bad value: x"
+            detail = "Bad value: x"
         )
         lateinit var emitted: CloudEvent
         val hook = CloudEventLifecycleHook(object : LifecycleEventEmitter {
@@ -93,6 +93,6 @@ class RaiseExecutionTest : FunSpec({
         eventError.getValue("type").jsonPrimitive.content shouldBe error.type
         eventError.getValue("status").jsonPrimitive.content shouldBe "400"
         eventError.getValue("instance").jsonPrimitive.content shouldBe error.position
-        eventError.getValue("detail").jsonPrimitive.content shouldBe error.details
+        eventError.getValue("detail").jsonPrimitive.content shouldBe error.detail
     }
 })

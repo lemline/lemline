@@ -48,7 +48,7 @@ class RaiseProcessor(
             status = errorDef.status,
             position = node.position.toString(),
             title = errorDef.title?.let { evalString(transformedInput, it.get() as String, "raise.error.title", scope) },
-            details = errorDef.detail?.let { evalString(transformedInput, it.get() as String, "raise.error.detail", scope) }
+            detail = errorDef.detail?.let { evalString(transformedInput, it.get() as String, "raise.error.detail", scope) }
         )
 
         // Throw WorkflowException - this will be caught by CompleteOrchestrator

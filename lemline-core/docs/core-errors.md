@@ -24,7 +24,7 @@ AsyncTaskException (orchestration signals - not errors)
 └── ForkStartedException(state, transformedInput)
 
 InternalException (domain errors)
-└── Error(errorType, title, details?, status, position)
+└── Error(errorType, title, detail?, status, position)
 ```
 
 ---
@@ -49,7 +49,7 @@ InternalException (domain errors)
 throw InternalException(InternalException.Error(
     errorType = WorkflowErrorType.COMMUNICATION,
     title = "HTTP request failed",
-    details = responseBody,
+    detail = responseBody,
     status = 503,
     position = node.position
 ))

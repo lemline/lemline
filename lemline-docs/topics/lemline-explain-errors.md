@@ -23,7 +23,7 @@ Lemline implements the RFC 7807 Problem Details specification for consistent err
   "status": 400,
   "instance": "/do/0/validateInput",
   "title": "Input Validation Failed",
-  "details": "The 'amount' field must be a positive number"
+  "detail": "The 'amount' field must be a positive number"
 }
 ```
 
@@ -33,7 +33,7 @@ This structure provides:
 - **status**: Numeric code similar to HTTP status codes
 - **instance**: JSON pointer to the location in the workflow where the error occurred
 - **title**: Short human-readable error summary
-- **details**: Detailed explanation specific to this occurrence
+- **detail**: Detailed explanation specific to this occurrence
 
 ## Error Type Hierarchy
 

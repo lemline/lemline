@@ -140,7 +140,7 @@ fun InternalException.Error.Companion.random() = InternalException.Error(
         true -> String.random()
         false -> null
     },
-    details = when (Random.nextBoolean()) {
+    detail = when (Random.nextBoolean()) {
         true -> String.random()
         false -> null
     },

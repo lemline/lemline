@@ -165,7 +165,7 @@ internal class WorkflowCommandHandler(
             status = 500,
             position = workflowId.toString(),
             title = exception.message,
-            details = exception.stackTraceToString()
+            detail = exception.stackTraceToString()
         )
 
         return InstanceMessage(
