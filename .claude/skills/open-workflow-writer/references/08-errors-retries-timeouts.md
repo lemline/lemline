@@ -6,6 +6,6 @@ Lemline’s HTTP executor currently reports an unsuccessful response with a runt
 
 Use inline `timeout.after` on a `listen` task for an enforced deadline. The current listener does not resolve a named timeout reference. Workflow-level and HTTP task timeouts can be expressed in the DSL but do not override the runner’s fixed HTTP limits. State this limitation when a deadline is required.
 
-After a retry budget is exhausted, check how the catch body terminates. When the workflow must fault, include a `catch.do` with an explicit `raise` in the very catch that owns the retry. An empty catch completes after exhaustion, so an outer catch cannot see the exhausted error. Verify the fault and assert that no later success action runs.
+When a retry policy declines another attempt and the catch has no recovery tasks or `then` directive, the original error propagates. An enclosing catch can handle the error. Use `catch.do` to run a fallback. When the workflow must fault, verify that no later success action runs.
 
 [Lemline documentation](../../../../lemline-docs/topics/dsl-timeouts.md)
