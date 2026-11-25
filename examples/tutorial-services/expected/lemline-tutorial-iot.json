@@ -1,0 +1,10 @@
+{
+  "instances": [{ "type": "workflowCompleted" }, { "type": "workflowCompleted" }],
+  "others": [
+    { "workflow": "~device-telemetry", "type": "workflowCompleted" },
+    { "workflow": "~device-telemetry", "type": "workflowCompleted" },
+    { "workflow": "~warehouse-alert", "type": "workflowCompleted" }
+  ],
+  "state": { "inbox": [{ "reference": "sensor-1", "recipient": "warehouse-manager", "message": "High temperature: 90" }] },
+  "settleSeconds": 30
+}

@@ -58,3 +58,19 @@ A reservation belongs to one order. Use a fresh order ID for a new purchase. Dup
 ## Verify the complete checkout and sensor journey
 
 From this directory, run `node verify.mjs /absolute/path/to/lemline.jar` with Node.js 22.13 or later, Java and Docker Compose. Use a SQLite-capable Lemline JAR. Port 8787 must be free for the test's own container. The test creates a fresh SQLite project, registers the published YAML files, starts a worker, exercises both payments and both temperatures twice, and checks the stock, retries, shipments and inbox. Its temporary directory retains the command and worker logs.
+
+## Replay a documentation page
+
+`node check-page.mjs /absolute/path/to/lemline.jar ../../lemline-docs/topics/<page>.md [--out <dir>]` follows one page as a reader would. It creates a fresh SQLite project with the commands of the setup tutorial, starts a worker with its own metrics port, then runs every `bash` block of the page in order. Before each `definition post -f NAME.yaml` it saves the workflow the page shows under that name. `bin/lemline` becomes `java -jar <jar>`, a `listen` command restarts the worker, and the shop is started and stopped through the page's own `docker compose` commands.
+
+The results are compared with `expected/<page>.json`:
+
+| Field | Meaning |
+|---|---|
+| instances | One entry per `instance start` of the page, in order: expected `type` (`workflowCompleted`, `workflowFaulted`) and a partial `output` or `error`. `null` skips one. A string starting with `~` is a regular expression. |
+| others | Instances started by events, in completion order, with their `workflow`, `type` and `output`. |
+| state | Partial match of the shop's `/state` before the shop stops or at the end. |
+| settleSeconds, timeoutSeconds | How long to wait for each instance before the next command (default 20) and for all of them at the end (default 240). |
+| skip, allowFailure | Regular expressions of commands to skip or whose failure is expected. |
+
+Without an expectations file, every instance must complete. The output directory keeps `commands.log`, `results.json` and the compressed worker logs. Run it outside any sandbox that blocks Docker.

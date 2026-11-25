@@ -1,0 +1,34 @@
+{
+  "instances": [
+    {
+      "type": "workflowCompleted",
+      "output": {
+        "reference": "ORD-201",
+        "recipient": "customer",
+        "message": "Shipment booked with economy"
+      }
+    },
+    {
+      "type": "workflowFaulted",
+      "error": {
+        "title": "Order completion failed"
+      }
+    }
+  ],
+  "state": {
+    "stock": 98,
+    "shipments": [
+      {
+        "orderId": "ORD-201",
+        "carrier": "economy"
+      }
+    ],
+    "inbox": [
+      {
+        "reference": "ORD-201",
+        "recipient": "customer",
+        "message": "Shipment booked with economy"
+      }
+    ]
+  }
+}
