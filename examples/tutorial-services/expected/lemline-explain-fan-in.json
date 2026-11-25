@@ -1,0 +1,52 @@
+{
+ "settleSeconds": 8,
+ "instances": [
+  {
+   "type": "workflowCompleted",
+   "output": {
+    "checks": [
+     {
+      "available": 100
+     },
+     {
+      "orderId": "QUOTE-1",
+      "price": 9
+     }
+    ]
+   }
+  },
+  {
+   "type": "workflowCompleted",
+   "output": {
+    "itemId": "SKU-2",
+    "index": 1,
+    "lineTotal": 12
+   }
+  },
+  {
+   "type": "workflowCompleted",
+   "output": {
+    "checks": [
+     {
+      "stock": 2
+     },
+     {
+      "price": 15
+     }
+    ]
+   }
+  },
+  {
+   "type": "workflowCompleted"
+  },
+  {
+   "type": "workflowCompleted"
+  },
+  {
+   "type": "workflowCompleted",
+   "output": {
+    "status": "needs-review"
+   }
+  }
+ ]
+}
