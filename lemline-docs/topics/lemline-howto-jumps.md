@@ -20,8 +20,10 @@ wins. A final case without a condition provides a fallback.
 
 <code-block lang="yaml" src="workflows/reference/validate-and-route-order.yaml"/>
 
-After setting its status, the manual-review path uses `then: end` to avoid falling
-through to the automatic path.
+After setting its status, the manual-review path uses `then: exit` to leave the task list
+instead of falling through to the automatic path. The workflow's `output.as` still runs.
+On the current build, `then: end` skips that final `output.as`
+([issue 104](https://github.com/lemline/lemline/issues/104)), so prefer `exit` at the top level.
 
 ## Exit a nested task list
 

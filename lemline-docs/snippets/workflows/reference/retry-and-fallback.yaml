@@ -19,7 +19,11 @@ do:
             call: http
             with:
               method: get
-              endpoint: https://api.example.com/inventory
+              endpoint: http://127.0.0.1:8787/stock
+              query:
+                fail: '503'
+                failTimes: ${ .failures // 0 | tostring }
+                key: ${ $workflow.id }
       catch:
         when: ${ $error.title | startswith("HTTP 503") }
         retry: transient
