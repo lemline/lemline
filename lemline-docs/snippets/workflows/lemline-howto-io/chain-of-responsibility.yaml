@@ -1,21 +1,21 @@
 document:
-  dsl: 1.0.3
+  dsl: '1.0.3'
   namespace: examples
   name: chain-of-responsibility
-  version: 1.0.0
+  version: '1.0.0'
 do:
-  - Step1:
+  - step1:
       set:
         intermediateResult: ${ .rawData | fromjson }
-      then: Step2
-  - Step2:
+  - step2:
       set:
         processedData: ${ .intermediateResult | map(.value) }
-      then: Step3
-  - Step3:
+  - step3:
       set:
         finalResult: ${ .processedData | add }
       export:
         as:
           result: ${ .finalResult }
-      then: end
+  - showContext:
+      set:
+        context: ${ $context }

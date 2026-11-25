@@ -1,16 +1,18 @@
 document:
-  dsl: 1.0.3
+  dsl: '1.0.3'
   namespace: examples
   name: exporting-selected-fields
-  version: 1.0.0
+  version: '1.0.0'
 do:
-  - ProcessOrder:
-      call: orderService
+  - getProduct:
+      call: http
       with:
-        orderId: ${ .orderId }
+        method: get
+        endpoint: ${ "http://127.0.0.1:8787/products/" + .productId }
       export:
         as:
-          orderItems: ${ .items }
-          orderTotal: ${ .total }
-          shippingAddress: ${ .shippingAddress }
-      then: end
+          productName: ${ .name }
+          unitPrice: ${ .price }
+  - showContext:
+      set:
+        context: ${ $context }

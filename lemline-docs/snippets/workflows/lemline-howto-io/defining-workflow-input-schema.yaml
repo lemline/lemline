@@ -1,8 +1,8 @@
 document:
-  dsl: 1.0.3
+  dsl: '1.0.3'
   namespace: examples
-  name: order-processing
-  version: 1.0.0
+  name: io-input-schema
+  version: '1.0.0'
   title: Order Processing Workflow
 input:
   schema:
@@ -33,6 +33,6 @@ input:
                 type: integer
                 minimum: 1
 do:
-  - example:
+  - acceptOrder:
       set:
-        ready: true
+        accepted: ${ .orderId }

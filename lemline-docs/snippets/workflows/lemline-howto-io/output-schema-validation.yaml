@@ -1,8 +1,8 @@
 document:
-  dsl: 1.0.3
+  dsl: '1.0.3'
   namespace: examples
   name: output-schema-validation
-  version: 1.0.0
+  version: '1.0.0'
 do:
   - GenerateUserProfile:
       set:
@@ -32,4 +32,3 @@ do:
                   email:
                     type: string
                     format: email
-      then: end

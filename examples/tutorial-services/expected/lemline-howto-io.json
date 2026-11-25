@@ -1,0 +1,191 @@
+{
+ "allowFailure": [
+  "\"orderId\":\"ORD-1\",\"customerId\":\"C-100\",\"items\":\\[\\{\"productId\":\"SKU-1\",\"quantity\":2\\}\\]\\}'$"
+ ],
+ "instances": [
+  {
+   "type": "workflowCompleted",
+   "output": {
+    "accepted": "ORD-000123"
+   }
+  },
+  {
+   "type": "workflowCompleted",
+   "output": {
+    "orderId": "ORD-1",
+    "customerId": "C-100",
+    "itemCount": 2
+   }
+  },
+  {
+   "type": "workflowCompleted",
+   "output": {
+    "orderId": "ORD-2",
+    "priority": "NORMAL",
+    "currency": "USD"
+   }
+  },
+  {
+   "type": "workflowCompleted",
+   "output": {
+    "orderId": "ORD-3",
+    "priority": "NORMAL",
+    "currency": "EUR"
+   }
+  },
+  {
+   "type": "workflowCompleted",
+   "output": {
+    "originalValue": 42,
+    "newMessage": "Hello, World!"
+   }
+  },
+  {
+   "type": "workflowCompleted",
+   "output": {
+    "formattedUser": {
+     "id": "C-100",
+     "name": "Ada Lovelace",
+     "email": "ada@example.com",
+     "phone": "442079460000"
+    }
+   }
+  },
+  {
+   "type": "workflowCompleted",
+   "output": {
+    "validPayment": true,
+    "formattedAmount": "$25"
+   }
+  },
+  {
+   "type": "workflowFaulted",
+   "error": {
+    "type": "~errors/validation$"
+   }
+  },
+  {
+   "type": "workflowCompleted",
+   "output": {
+    "status": "SUCCESS",
+    "result": 42
+   }
+  },
+  {
+   "type": "workflowCompleted",
+   "output": {
+    "customer": "Ada Lovelace",
+    "tier": "gold",
+    "isGold": true
+   }
+  },
+  {
+   "type": "workflowCompleted",
+   "output": {
+    "profile": {
+     "id": "C-100",
+     "name": "Ada Lovelace",
+     "email": "ada@example.com"
+    }
+   }
+  },
+  {
+   "type": "workflowFaulted",
+   "error": {
+    "type": "~errors/validation$"
+   }
+  },
+  {
+   "type": "workflowCompleted",
+   "output": {
+    "greeting": "Hello Ada Lovelace"
+   }
+  },
+  {
+   "type": "workflowCompleted",
+   "output": {
+    "context": {
+     "productName": "Watering can",
+     "unitPrice": 12
+    }
+   }
+  },
+  {
+   "type": "workflowCompleted",
+   "output": {
+    "context": {
+     "categories": [
+      "clothing",
+      "garden",
+      "home"
+     ]
+    }
+   }
+  },
+  {
+   "type": "workflowCompleted",
+   "output": {
+    "context": {
+     "validatedProduct": {
+      "id": "SKU-1"
+     }
+    }
+   }
+  },
+  {
+   "type": "workflowFaulted",
+   "error": {
+    "type": "~errors/validation$"
+   }
+  },
+  {
+   "type": "workflowCompleted",
+   "output": {
+    "orderId": "ORD-301",
+    "status": "accepted"
+   }
+  },
+  {
+   "type": "workflowCompleted",
+   "output": {
+    "orderId": "ORD-302",
+    "status": "needs-review"
+   }
+  },
+  {
+   "type": "workflowCompleted",
+   "output": {
+    "context": {
+     "result": 6
+    }
+   }
+  },
+  {
+   "type": "workflowCompleted",
+   "output": {
+    "context": {
+     "result": {
+      "orderId": "ORD-1"
+     },
+     "isError": false
+    }
+   }
+  },
+  {
+   "type": "workflowCompleted",
+   "output": {
+    "context": {
+     "result": "Payment service unavailable",
+     "isError": true
+    }
+   }
+  },
+  {
+   "type": "workflowCompleted",
+   "output": {
+    "orderId": "ORD-803",
+    "customerId": "C-100"
+   }
+  }
+ ]
+}
