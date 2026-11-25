@@ -30,8 +30,10 @@ bin/lemline definition post --file acknowledge-order.yaml
 ```
 
 The CLI answers `Workflow successfully created: 'acknowledge-order' (version '0.1.3')`. The namespace, name and
-version come from the `document` section of the file. Lemline parses the definition before storing it and rejects
-invalid files.
+version come from the `document` section of the file. Lemline rejects a file that is not a readable definition.
+Some invalid definitions, such as a task named after a task type, are stored anyway: the CLI prints an `ERROR processing
+file` line but exits with code 0, and `instance start` then fails ([issue 107](https://github.com/lemline/lemline/issues/107)).
+Read the output of `definition post` rather than relying on its exit code.
 
 ### Publishing Multiple Workflows
 
