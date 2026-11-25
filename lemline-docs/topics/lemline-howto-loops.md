@@ -30,7 +30,7 @@ loop result. Here the body adds a line total for each input item.
 
 <code-block lang="yaml" src="workflows/reference/collect-order-lines.yaml"/>
 
-The task's `input.from` starts the loop with an empty `lines` array. Each iteration receives the previous one's
+The workflow's `input.from` starts the loop with an empty `lines` array. Each iteration receives the previous one's
 result and appends a line.
 
 ```bash
@@ -38,9 +38,7 @@ bin/lemline definition post -f collect-order-lines.yaml
 bin/lemline instance start examples collect-order-lines --input '{"items":[{"id":"SKU-1","quantity":2,"price":25},{"id":"SKU-2","quantity":1,"price":12}]}'
 ```
 
-Expect `{"lines":[{"id":"SKU-1","amount":50},{"id":"SKU-2","amount":12}]}`. Initialize the accumulator on the
-`for` task itself: on the current build, a workflow-level `input.from` is ignored
-([issue 98](https://github.com/lemline/lemline/issues/98)).
+Expect `{"lines":[{"id":"SKU-1","amount":50},{"id":"SKU-2","amount":12}]}`.
 
 ## Stop a loop early
 
