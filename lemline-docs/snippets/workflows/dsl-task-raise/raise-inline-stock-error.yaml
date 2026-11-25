@@ -1,0 +1,16 @@
+document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: raise-inline-stock-error
+  version: '1.0.0'
+do:
+  - checkInventory:
+      if: ${ .stockCount < .requestedAmount }
+      raise:
+        error:
+          type: https://errors.example.com/out-of-stock
+          title: Insufficient stock
+          status: 409
+  - accept:
+      set:
+        accepted: true

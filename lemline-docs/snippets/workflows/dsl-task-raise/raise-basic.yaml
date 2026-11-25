@@ -6,7 +6,7 @@ document:
 use:
   errors:
     invalidInputError:
-      type: https://mycompany.com/errors/invalid-input
+      type: https://errors.example.com/invalid-input
       title: Invalid Input Received
       status: 400
 do:
