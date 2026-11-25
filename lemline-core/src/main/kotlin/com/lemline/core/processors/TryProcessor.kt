@@ -173,15 +173,14 @@ class TryProcessor(
     }
 
     /**
-     * Handles an error that occurred during the execution of the workflow and determines the next step.
-     * Depending on the state and retry policy, it either retries by re-entering the try block or
-     * moves to the catch block.
+     * Schedules a retry or runs the configured recovery.
+     * Returns null when the original error should propagate to an enclosing scope.
      */
     internal fun handleError(
         error: InternalException.Error,
         state: TryState,
         nodeStack: NodeStack
-    ): WorkflowEvent {
+    ): WorkflowEvent? {
 
         val retryScope = buildJsonObject {
             filterScope(state, nodeStack).withTransformedInput(state.transformedInput).properties().forEach { (key, value) -> put(key, value) }
@@ -204,15 +203,17 @@ class TryProcessor(
                     retryAt = Clock.System.now() + retryPolicy!!.getRetryDelay(updatedState.attemptIndex, state.transformedInput, retryScope)
                 )
             }
-            // Otherwise, enter the catch block
             false -> {
+                val recovery = node.task.catch
+                if (recovery.`do`.isNullOrEmpty() && recovery.then == null) return null
+                val catchNode = node.catchBlock ?: return null
                 val updatedState = state.copy(
                     runningCatch = true,
                     lastError = error
                 )
                 TaskScheduled(
                     nodeStack = cleanStateStack(updatedState, nodeStack),
-                    nodePosition = getCatchNode().position,
+                    nodePosition = catchNode.position,
                     rawInput = state.transformedInput,
                     flowDirective = null,
                 )
@@ -245,13 +246,6 @@ class TryProcessor(
      * @see com.lemline.core.workflows.tryBlock
      */
     private fun getDoTry(): Node<*> = node.tryBlock
-
-    /**
-     * Retrieves the "catch" child node from the current node's children.
-     * @see com.lemline.core.workflows.catchBlock
-     */
-    private fun getCatchNode(): Node<*> = node.catchBlock
-        ?: throw IllegalStateException("No catch child found in TryTask ${node.position}")
 
     private fun cleanStateStack(updatedState: TryState, nodeStack: NodeStack): NodeStack =
         nodeStack.popUntil(node.position).incrementTopCounter().updateTopState(updatedState)

@@ -12,6 +12,34 @@ import com.lemline.core.testcases.impl.WorkflowTestValidators.expectOutput
  */
 object TryTaskTestCases {
 
+    private fun retryWithoutRecovery(shouldRetry: Boolean) = WorkflowTestCase(
+        name = if (shouldRetry) "retry without recovery faults after exhausting retries"
+            else "retry without recovery faults when retry is declined",
+        yaml = $$"""
+            do:
+              - check:
+                  try:
+                    - countAttempt:
+                        set:
+                          attempt: ${ ($context.attempt // 0) + 1 }
+                        export:
+                          as: ${ . }
+                    - reject:
+                        raise:
+                          error:
+                            type: https://open-workflow-specification.org/spec/1.0.0/errors/validation
+                            status: 400
+                            title: '${ "Invalid order on attempt " + (.attempt | tostring) }'
+                  catch:
+                    retry:
+                      when: ${ .shouldRetry }
+                      delay: { milliseconds: 1 }
+                      limit: { attempt: { count: 1 } }
+        """.trimIndent(),
+        input = buildJsonObject { put("shouldRetry", shouldRetry) },
+        validate = expectErrorContaining("Invalid order on attempt ${if (shouldRetry) 2 else 1}")
+    )
+
     val cases = listOf(
         WorkflowTestCase(
             name = "try catch - named error type filtering matches",
@@ -220,6 +248,45 @@ object TryTaskTestCases {
                                 retried: false
             """.trimIndent(),
             validate = expectOutput(buildJsonObject { put("retried", true) })
+        ),
+
+        retryWithoutRecovery(shouldRetry = false),
+        retryWithoutRecovery(shouldRetry = true),
+
+        WorkflowTestCase(
+            name = "retry without recovery passes the original error to an enclosing catch",
+            yaml = $$"""
+                do:
+                  - outer:
+                      try:
+                        - inner:
+                            try:
+                              - reject:
+                                  raise:
+                                    error:
+                                      type: https://open-workflow-specification.org/spec/1.0.0/errors/validation
+                                      status: 400
+                                      title: Invalid order
+                                      detail: Missing order reference
+                            catch:
+                              retry:
+                                when: ${ false }
+                                delay: { milliseconds: 1 }
+                      catch:
+                        do:
+                          - report:
+                              set:
+                                error: ${ $error }
+            """.trimIndent(),
+            validate = expectOutput(buildJsonObject {
+                put("error", buildJsonObject {
+                    put("type", "https://open-workflow-specification.org/spec/1.0.0/errors/validation")
+                    put("status", 400)
+                    put("instance", "/do/0/outer/try/0/inner/try/0/reject")
+                    put("title", "Invalid order")
+                    put("detail", "Missing order reference")
+                })
+            })
         ),
 
         WorkflowTestCase(

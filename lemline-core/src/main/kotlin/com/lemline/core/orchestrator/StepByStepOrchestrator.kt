@@ -485,13 +485,15 @@ object StepByStepOrchestrator {
                 (frame.extension == null || frame.extension.phase == ExtensionPhase.BODY) && current != failingNode) {
                 val tryState = frame.state
                 val processor = current.processor as TryProcessor
-                // check that this node actually can handle this error
-                if (processor.isCatching(exception.error, tryState, processor.filterScope(tryState, nodeStack))) {
-                    val event = processor.handleError(
+                val filterScope = processor.filterScope(tryState, nodeStack)
+                val event = if (processor.isCatching(exception.error, tryState, filterScope)) {
+                    processor.handleError(
                         error = exception.error,
                         state = tryState,
                         nodeStack = nodeStack
                     )
+                } else null
+                if (event != null) {
                     // Close abandoned invocations before their frames disappear, including extension owners.
                     for (abandoned in nodeStack.toList().asReversed().takeWhile { it.position != current.position }) {
                         if (abandoned.position == failingNode.position) continue
