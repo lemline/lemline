@@ -13,5 +13,3 @@ do: # This is the main 'Do'
             set:
               # Input to taskB is the output of taskA
               resultB: '${ .result + " and Task B" }'
-
-# Workflow output will be { "resultB": "Value from Task A and Task B" }

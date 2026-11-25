@@ -1,7 +1,7 @@
 document:
   dsl: 1.0.3
   namespace: examples
-  name: do-list-string-object-required
+  name: read-product-and-format
   version: 1.0.0
 do:
   - myDoTask:
@@ -10,7 +10,7 @@ do:
             call: http
             with:
               method: get
-              endpoint: https://api.example.com/data
+              endpoint: http://127.0.0.1:8787/products/SKU-1
         - secondSubTask:
             set:
-              processedData: ${ .body }
+              productId: ${ .id }
