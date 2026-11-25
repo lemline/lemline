@@ -17,6 +17,7 @@ import com.lemline.core.orchestrator.StepByStepOrchestrator.processTaskFaulted
 import com.lemline.core.orchestrator.StepByStepOrchestrator.tryCatch
 import com.lemline.core.processors.ListenProcessor
 import com.lemline.core.processors.RootProcessor
+import com.lemline.core.processors.RunWorkflowProcessor
 import com.lemline.core.processors.TryProcessor
 import com.lemline.core.processors.scope.taskScope
 import com.lemline.core.states.ExtensionPhase
@@ -609,18 +610,18 @@ object StepByStepOrchestrator {
         workflowInfo: WorkflowInfo,
         lifecycleHook: LifecycleEventHook,
     ): WorkflowEvent {
+        val processor = node.processor
         val scope = nodeStack.taskScope(node)
+        val output = (processor as? RunWorkflowProcessor)?.completedOutput(rawOutput) ?: rawOutput
 
-        val event = node.processor.completeTask(
-            rawOutput = rawOutput,
-            currentFlowDirective = node.processor.getFlowDirective(),
+        return processor.completeTask(
+            rawOutput = output,
+            currentFlowDirective = processor.getFlowDirective(),
             currentScope = scope,
             nodeStack = nodeStack,
             workflowInfo = workflowInfo,
             lifecycleHook = lifecycleHook
         )
-
-        return event
     }
 
     /**
