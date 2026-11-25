@@ -74,6 +74,10 @@ for (const match of markdown.matchAll(/<code-block\b[^>]*\bsrc="([^"]+\.ya?ml)"[
       pending += line.slice(0, -1) + ' ';
       continue;
     }
+    if (line.endsWith('|') || line.endsWith('&&')) {
+      pending += line + ' ';
+      continue;
+    }
     const command = (pending + line).trim();
     pending = '';
     if (command && !command.startsWith('#')) stream.push({ command });
