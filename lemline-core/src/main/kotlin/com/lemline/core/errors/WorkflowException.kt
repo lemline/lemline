@@ -42,7 +42,11 @@ data class InternalException(
             put("status", status)
             put("instance", position)
             title?.let { put("title", it) }
-            details?.let { put("details", it) }
+            details?.let {
+                put("detail", it)
+                // Keep the original key for existing workflow expressions.
+                put("details", it)
+            }
         }
 
         // Use this constructor for internal use
