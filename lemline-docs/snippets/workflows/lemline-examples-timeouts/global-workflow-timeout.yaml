@@ -6,15 +6,16 @@ document:
 do:
   - recordDeadline:
       set:
-        deadline: ${ now + 1800 }
+        deadline: ${ now + ($workflow.input.deadlineSeconds // 1800) }
       export:
         as: '${ $context + { deadline: .deadline } }'
   - prepareResults:
       call: http
       with:
-        method: post
-        endpoint: https://process.example/prepare
-        body: ${ $workflow.input }
+        method: get
+        endpoint: http://127.0.0.1:8787/stock
+        query:
+          delayMs: '2000'
   - checkDeadline:
       switch:
         - expired:
@@ -31,5 +32,7 @@ do:
       call: http
       with:
         method: post
-        endpoint: https://process.example/finish
-        body: ${ . }
+        endpoint: http://127.0.0.1:8787/audit
+        body:
+          reference: ${ $workflow.input.orderId }
+          message: '${ "Finished with \(.available) units available" }'

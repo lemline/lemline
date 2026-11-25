@@ -10,7 +10,9 @@ do:
             call: http
             with:
               method: get
-              endpoint: https://api.example/data
+              endpoint: http://127.0.0.1:8787/stock
+              query:
+                delayMs: ${ .delayMs // 0 | tostring }
       catch:
         as: requestError
         do:
@@ -19,4 +21,4 @@ do:
                 success: false
                 reason: External HTTP request failed
                 errorType: ${ $requestError.type }
-                status: ${ $requestError.status }
+                title: ${ $requestError.title }
