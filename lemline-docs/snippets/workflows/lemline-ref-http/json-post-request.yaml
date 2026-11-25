@@ -4,11 +4,11 @@ document:
   name: json-post-request
   version: '1.0.0'
 do:
-  - createOrder:
+  - createReservation:
       call: http
       with:
         method: post
-        endpoint: https://api.example.com/orders
+        endpoint: http://127.0.0.1:8787/reservations
         headers:
           Idempotency-Key: ${ .orderId }
         body:

@@ -4,11 +4,11 @@ document:
   name: request-body
   version: '1.0.0'
 do:
-  - createUser:
+  - createCustomer:
       call: http
       with:
         method: post
-        endpoint: https://api.example.com/users
+        endpoint: http://127.0.0.1:8787/customers
         body:
           name: ${ .name }
           email: ${ .email }

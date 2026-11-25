@@ -8,7 +8,7 @@ do:
       call: http
       with:
         method: get
-        endpoint: https://api.example.com/users
+        endpoint: http://127.0.0.1:8787/products
         query:
           page: "1"
-          status: ${ .status }
+          category: ${ .category }

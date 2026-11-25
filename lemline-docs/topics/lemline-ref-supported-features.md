@@ -37,7 +37,7 @@ Lemline implements a subset of the Open Workflow DSL 1.0 specification, with mor
 
 | Task Type | Status | Notes |
 |-----------|--------|-------|
-| HTTP Calls | ✅ Supported | Any method, headers, query, JSON body, `basic` and `bearer` authentication, redirects. URI templates such as `{id}` are not expanded: build the URI with an expression |
+| HTTP Calls | ✅ Supported | Any method, headers, query, JSON body, `basic` and `bearer` authentication, redirects (always followed, [issue 112](https://github.com/lemline/lemline/issues/112)). URI templates such as `{id}` are not expanded: build the URI with an expression |
 | OpenAPI Calls | ❌ Not supported | Parsed, but no runtime executor; use `call: http` |
 | AsyncAPI Calls | ❌ Not supported | Parsed, but no runtime executor; use `emit` and `listen` |
 | gRPC Calls | ❌ Not supported | Parsed, but no runtime executor |
@@ -47,7 +47,7 @@ Lemline implements a subset of the Open Workflow DSL 1.0 specification, with mor
 | Script Execution | ⚠️ Partial | Inline `code`, or a `source.endpoint` with an absolute `file://` URI, in JavaScript or Python; other URI schemes are refused |
 | Event Emission | ✅ Supported | Via `emit` construct |
 | Wait/Delay | ✅ Supported | Via `wait` construct |
-| Custom Function Calls | ⚠️ Partial | Functions declared under `use.functions` run; catalog functions are not resolved |
+| Custom Function Calls | ⚠️ Partial | Functions declared under `use.functions` run; catalogs declared under `use.catalogs` are ignored ([issue 111](https://github.com/lemline/lemline/issues/111)) |
 
 ## Event Features Support
 
@@ -88,7 +88,7 @@ Lemline implements a subset of the Open Workflow DSL 1.0 specification, with mor
 | Feature | Status | Notes |
 |---------|--------|-------|
 | Custom Extensions | ⚠️ Partial | Basic extension framework available |
-| Function Catalog | ❌ Not supported | `use.catalogs` is accepted, but a call to a catalog function fails when it runs |
+| Function Catalog | ❌ Not supported | `use.catalogs` is accepted, but a call to one of its functions fails with `Unknown catalog` ([issue 111](https://github.com/lemline/lemline/issues/111)) |
 | Service Discovery | ⚠️ Partial | Basic support via configuration |
 | Metrics Integration | ✅ Supported | Prometheus, JMX, etc. |
 | Tracing Integration | ✅ Supported | OpenTelemetry support |

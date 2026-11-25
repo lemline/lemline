@@ -8,5 +8,5 @@ do:
       call: http
       with:
         method: get
-        endpoint: https://api.example.com/old
+        endpoint: http://127.0.0.1:8787/old-stock
         redirect: true
