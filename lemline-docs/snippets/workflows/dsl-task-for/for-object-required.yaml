@@ -13,3 +13,4 @@ do:
         - processItem:
             set:
               item: ${ $currentUser }
+              index: ${ $userIndex }
