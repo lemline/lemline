@@ -15,7 +15,7 @@ HTTP/REST is one of the most common integration methods for connecting workflows
 
 This example demonstrates:
 - A simple HTTP GET request
-- Path parameter interpolation using `{petId}`
+- A URI built from the `petId` workflow input with a runtime expression
 
 ### HTTP with Query Parameters
 

@@ -63,7 +63,7 @@ You can specify default values for optional fields:
 
 <code-block lang="yaml" src="workflows/reference/default-workflow-input.yaml"/>
 
-The `input.from` expression merges defaults with the input. Values supplied by the caller take precedence.
+The `input.from` expression of the first task merges defaults with the workflow input. Values supplied by the caller take precedence. Lemline does not apply a workflow-level `input.from` yet: put the expression on the first task.
 
 ### Accessing Validated Input
 

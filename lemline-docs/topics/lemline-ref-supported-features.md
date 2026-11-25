@@ -13,7 +13,7 @@ Lemline implements a subset of the Open Workflow DSL 1.0 specification, with mor
 | YAML Definition Format | ✅ Supported | Primary format for workflow definitions |
 | JSON Definition Format | ⚠️ Partial | Basic JSON support available |
 | Workflow Metadata | ✅ Supported | Full support for namespace, name, version |
-| Workflow Input/Output | ✅ Supported | Including schema validation |
+| Workflow Input/Output | ⚠️ Partial | Schema validation and task-level `input`/`output` transformations are applied; a workflow-level `input.from` is not applied yet (put it on the first task) |
 | States Definition | ✅ Supported | Via task constructs |
 | Expression Language | ✅ Supported | JQ expressions fully supported |
 | Workflow Variables | ✅ Supported | Context and scope variables |
@@ -43,8 +43,8 @@ Lemline implements a subset of the Open Workflow DSL 1.0 specification, with mor
 | gRPC Calls | ❌ Not supported | Parsed, but no runtime executor |
 | GraphQL | ⚠️ Planned | On roadmap for future release |
 | Expression Evaluation | ✅ Supported | Via `set` construct |
-| Container Execution | ⚠️ Partial | Basic support via `run` construct |
-| Script Execution | ⚠️ Partial | Basic JavaScript support |
+| Container Execution | ❌ Not supported | Parsed, but no runtime executor: a `run.container` task fails when it runs |
+| Script Execution | ⚠️ Partial | Inline `code` in JavaScript or Python; loading a script from `source.endpoint` fails when the task runs |
 | Event Emission | ✅ Supported | Via `emit` construct |
 | Wait/Delay | ✅ Supported | Via `wait` construct |
 | Custom Function Calls | ✅ Supported | Via function catalog |

@@ -2,6 +2,8 @@
 
 This document provides examples of error handling and resilience patterns in Lemline workflows. Robust error handling is essential for building reliable workflows that can gracefully recover from failures when interacting with external systems, processing data, or executing business logic.
 
+> **Lemline runtime:** a failed HTTP call raises a `runtime` error with status 500, whatever the HTTP status. The HTTP status is the start of the error title, for example `HTTP 404: ...`. The examples on this page therefore match HTTP failures on the title of the caught error. See [Error Reference](lemline-ref-errors.md).
+
 ## Basic Try-Catch Pattern
 
 The fundamental error handling mechanism in Open Workflow DSL is the try-catch block, which allows workflows to catch and handle exceptions.
@@ -12,7 +14,8 @@ The fundamental error handling mechanism in Open Workflow DSL is the try-catch b
 
 This example demonstrates:
 - Wrapping a potentially failing HTTP call in a `try` block
-- Catching a specific error type (communication error with 404 status)
+- Catching only the HTTP 404 response, with a `when` condition on the error title
+- Building the request URI from the `petId` workflow input
 - The workflow continues after the error is caught
 
 Key aspects of basic try-catch:
@@ -44,7 +47,7 @@ For transient failures, retry mechanisms allow workflows to automatically attemp
 <code-block lang="yaml" src="workflows/lemline-examples-error-handling/inline-retry-configuration.yaml"/>
 
 This example demonstrates:
-- Retrying a failed operation with a specific error type (503 Service Unavailable)
+- Retrying a failed operation only for an HTTP 503 response (Service Unavailable)
 - Initial delay of 3 seconds before the first retry
 - Exponential backoff for subsequent retries
 - Maximum of 5 retry attempts
@@ -88,6 +91,7 @@ The DSL supports hierarchical error types, allowing for more flexible error matc
 <code-block lang="yaml" src="workflows/lemline-examples-error-handling/error-type-hierarchy-example.yaml"/>
 
 This example demonstrates:
+- A task that raises a typed error when the service reports an invalid resource
 - A single `catch` that only accepts errors under `https://example.com/errors`
 - Hierarchical error matching with a `switch` on the caught error's type (most specific to most generic)
 - Different handling for each error category
@@ -104,7 +108,7 @@ In some workflows, you need to perform cleanup actions when an error occurs afte
 This example demonstrates:
 - A sequence of operations (inventory reservation, payment processing)
 - Capturing the output of the first operation for later reference
-- When payment fails, executing compensating actions to clean up
+- When a call in the `try` block fails, executing compensating actions to clean up
 - Canceling the inventory reservation to maintain consistency
 - Notifying the customer about the failure
 
@@ -130,7 +134,7 @@ Timeouts prevent workflows from hanging indefinitely when external systems are u
 
 <code-block lang="yaml" src="workflows/lemline-examples-error-handling/timeout-example.yaml"/>
 
-> **Lemline runtime:** only `listen` task timeouts are enforced. Workflow-level timeouts and timeouts on other tasks are accepted but ignored for now. HTTP calls use fixed client limits instead: 15 seconds to connect, 30 seconds per request.
+> **Lemline runtime:** only `listen` task timeouts are enforced. Workflow-level timeouts and timeouts on other tasks are accepted but ignored for now. HTTP calls use fixed client limits instead: 15 seconds to connect, 30 seconds per request. The `catch` branch of this example therefore does not run on Lemline yet.
 
 This example demonstrates:
 - Setting a timeout for an HTTP call
@@ -146,7 +150,7 @@ Several of these patterns combine in a single `try` task:
 
 This example demonstrates:
 - A reusable retry definition declared in `use.retries` and referenced by name
-- Catching only the errors with status 503
+- Catching only the HTTP 503 response
 - Retrying with exponential backoff, up to the attempt limit
 - A fallback result set in `catch.do` once the retries are exhausted
 

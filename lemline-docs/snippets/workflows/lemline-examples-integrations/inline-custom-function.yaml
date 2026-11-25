@@ -17,9 +17,9 @@ use:
       call: http
       with:
         method: get
-        endpoint: https://petstore.swagger.io/v2/pet/{petId}
+        endpoint: '${ "https://petstore.swagger.io/v2/pet/" + .petId }'
 do:
   - getPet:
       call: getPetById
       with:
-        petId: 69
+        petId: '69'

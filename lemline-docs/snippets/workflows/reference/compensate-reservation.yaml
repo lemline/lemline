@@ -8,7 +8,7 @@ do:
       call: http
       with:
         method: post
-        endpoint: https://inventory.example.com/reservations
+        endpoint: http://127.0.0.1:8787/reservations
         body:
           orderId: ${ $workflow.input.orderId }
           items: ${ $workflow.input.items }
@@ -20,7 +20,7 @@ do:
             call: http
             with:
               method: post
-              endpoint: https://payments.example.com/charges
+              endpoint: http://127.0.0.1:8787/charges
               body:
                 orderId: ${ $workflow.input.orderId }
                 paymentInfo: ${ $workflow.input.paymentInfo }
@@ -30,10 +30,55 @@ do:
               call: http
               with:
                 method: delete
-                endpoint: '${ "https://inventory.example.com/reservations/\($context.reservationId | @uri)" }'
+                endpoint: '${ "http://127.0.0.1:8787/reservations/\($context.reservationId | @uri)" }'
           - reportFailure:
               raise:
                 error:
                   type: https://errors.example.com/order-failed
                   status: 502
                   title: Order completion failed
+  - compareCarriers:
+      fork:
+        branches:
+          - economy:
+              try:
+                - quote:
+                    call: http
+                    with:
+                      method: post
+                      endpoint: http://127.0.0.1:8787/quotes/economy
+                      body:
+                        orderId: ${ $workflow.input.orderId }
+                        failTwice: ${ $workflow.input.failTwice // false }
+              catch:
+                retry:
+                  delay: { seconds: 1 }
+                  limit:
+                    attempt: { count: 3 }
+          - express:
+              call: http
+              with:
+                method: post
+                endpoint: http://127.0.0.1:8787/quotes/express
+                body:
+                  orderId: ${ $workflow.input.orderId }
+  - selectCarrier:
+      set:
+        carrier: ${ min_by(.price).carrier }
+  - bookShipment:
+      call: http
+      with:
+        method: post
+        endpoint: http://127.0.0.1:8787/shipments
+        body:
+          orderId: ${ $workflow.input.orderId }
+          carrier: ${ .carrier }
+  - confirmShipment:
+      call: http
+      with:
+        method: post
+        endpoint: http://127.0.0.1:8787/notifications
+        body:
+          reference: ${ .orderId }
+          recipient: customer
+          message: '${ "Shipment booked with " + .carrier }'

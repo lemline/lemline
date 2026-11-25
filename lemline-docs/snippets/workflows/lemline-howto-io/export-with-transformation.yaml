@@ -13,4 +13,4 @@ do:
           products: ${ .products }
           productMap: '${ .products | map({key: .id, value: .}) | from_entries }'
           categories: ${ .products | map(.category) | unique }
-      then: NextTask
+      then: end

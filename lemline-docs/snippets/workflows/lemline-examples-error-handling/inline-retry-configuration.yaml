@@ -10,12 +10,9 @@ do:
             call: http
             with:
               method: get
-              endpoint: https://petstore.swagger.io/v2/pet/{petId}
+              endpoint: '${ "https://petstore.swagger.io/v2/pet/" + ($workflow.input.petId | tostring) }'
       catch:
-        errors:
-          with:
-            type: https://open-workflow-specification.org/spec/1.0.0/errors/communication
-            status: 503
+        when: ${ $error.title | startswith("HTTP 503") }
         retry:
           delay:
             seconds: 3

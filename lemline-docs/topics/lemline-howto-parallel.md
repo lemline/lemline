@@ -9,6 +9,8 @@ task input. By default, a fork waits for all branches.
 
 <code-block lang="yaml" src="workflows/reference/parallel-order-checks.yaml"/>
 
+Start the [shop](lemline-tutorial-order-processing.md#start-the-tutorial-shop) and use `{"orderId":"QUOTE-1"}` as input. The fork returns available stock and an express quote. For a complete checkout, [compare the two carriers](lemline-tutorial-order-processing.md#ship-a-paid-order). Each branch returns its own price and `min_by(.price)` selects the carrier after both branches finish.
+
 ## Handle errors around a fork
 
 Use a surrounding `try` task when the workflow needs a fallback for the whole group.

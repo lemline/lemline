@@ -86,8 +86,10 @@ bin/lemline migrate --force
 Start the worker from `lemline-project`:
 
 ```bash
-bin/lemline listen --info
+bin/lemline listen --debug
 ```
+
+The worker serves its metrics and health endpoints on port 8080. If it stops with `Port 8080 seems to be in use by another process`, start it with `--metrics-port 8081` instead, here and in the later exercises.
 
 Leave the worker running and list the registered definitions from a second terminal in the same directory:
 
@@ -95,4 +97,4 @@ Leave the worker running and list the registered definitions from a second termi
 bin/lemline definition get
 ```
 
-On a fresh project, expect `No workflows found.` Stop the worker with Ctrl+C, then continue with [Hello, Workflow!](lemline-tutorial-hello.md).
+On a fresh project, expect `No workflows found.` Leave the worker running and continue with [Acknowledge the first order](lemline-tutorial-hello.md).

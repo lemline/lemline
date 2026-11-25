@@ -13,4 +13,4 @@ do:
           orderItems: ${ .items }
           orderTotal: ${ .total }
           shippingAddress: ${ .shippingAddress }
-      then: NextTask
+      then: end

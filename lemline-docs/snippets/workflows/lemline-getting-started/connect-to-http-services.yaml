@@ -9,4 +9,4 @@ do:
       call: http
       with:
         method: GET
-        endpoint: https://jsonplaceholder.typicode.com/todos/1
+        endpoint: http://127.0.0.1:8787/state

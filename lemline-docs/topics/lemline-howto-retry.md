@@ -7,7 +7,8 @@ the runner derives subsequent intervals from the configured strategy.
 ## Reuse a retry policy
 
 Put a named policy under `use.retries` and reference it from `catch.retry`. In this example,
-the catch block handles status 503. If retries are exhausted, the catch task list returns
+the catch block handles the HTTP 503 response. Lemline reports a failed HTTP call as a `runtime`
+error whose title starts with the HTTP status, so the `when` condition matches on the title. If retries are exhausted, the catch task list returns
 a fallback result.
 
 <code-block lang="yaml" src="workflows/reference/retry-and-fallback.yaml"/>

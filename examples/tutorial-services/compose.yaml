@@ -1,0 +1,13 @@
+services:
+  shop:
+    image: node:22-alpine
+    user: node
+    environment:
+      SHOP_HOST: 0.0.0.0
+    working_dir: /shop
+    command: ["node", "server.mjs"]
+    volumes:
+      - ./server.mjs:/shop/server.mjs:ro
+      - ./index.html:/shop/index.html:ro
+    ports:
+      - "127.0.0.1:8787:8787"

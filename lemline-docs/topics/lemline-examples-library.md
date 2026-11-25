@@ -2,6 +2,10 @@
 
 This document provides an overview of the examples available in the Lemline project, organized by category and use case. Each example demonstrates key features of the Open Workflow DSL as implemented by Lemline.
 
+## Run the tutorial shop
+
+Start with [an order acknowledgement](lemline-tutorial-hello.md), then [reserve, charge and ship an order](lemline-tutorial-order-processing.md). The same shop displays the customer confirmation and the [warehouse manager's temperature alerts](lemline-tutorial-iot.md). Each tutorial includes its inputs and expected results.
+
 ## Introduction
 
 The examples in this library showcase how to implement various workflow patterns using the Open Workflow DSL. These examples range from simple, focused demonstrations of specific features to complex, real-world scenarios that combine multiple features.
@@ -32,9 +36,9 @@ Basic workflow patterns demonstrate the fundamental building blocks of Open Work
 - Nested task execution
 - Variable setting with `set`
 
-Example: `do-nested.yaml` - Demonstrates nested task execution with multiple HTTP calls and data manipulation:
+Read the available stock in a nested task and pass the result to its parent:
 
-<code-block lang="yaml" src="workflows/lemline-examples-library/basic-workflow-patterns.yaml"/>
+<code-block lang="yaml" src="workflows/lemline-examples-basic-patterns/nested-tasks-example.yaml"/>
 
 For more basic patterns, see the [Basic Patterns Examples](lemline-examples-basic-patterns.md) document.
 
@@ -104,7 +108,7 @@ These examples combine multiple features to demonstrate realistic use cases:
 - Data enrichment pipelines
 - Notification systems
 
-Example: `presentation.yaml` - A complex order fulfillment workflow:
+This smaller example routes a digital or physical order to a different fulfillment method:
 
 <code-block lang="yaml" src="workflows/lemline-examples-library/real-world-examples.yaml"/>
 

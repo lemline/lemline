@@ -38,4 +38,4 @@ do:
             fullName: ${ .firstName + " " + .lastName }
             email: ${ .email | ascii_downcase }
             age: ${ .age }
-      then: NextTask
+      then: end

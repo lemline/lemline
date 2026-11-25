@@ -17,4 +17,4 @@ do:
           contactInfo:
             email: ${ .userProfile.email | ascii_downcase }
             phone: ${ .userProfile.phone | gsub("[^0-9]"; "") }
-      then: NextTask
+      then: end

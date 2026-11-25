@@ -1,11 +1,11 @@
 document:
   dsl: '1.0.3'
   namespace: examples
-  name: call-http-shorthand-endpoint
-  version: '0.1.0'
+  name: read-shop
+  version: '1.0.0'
 do:
-  - getPet:
+  - readShop:
       call: http
       with:
         method: get
-        endpoint: https://petstore.swagger.io/v2/pet/{petId}
+        endpoint: http://127.0.0.1:8787/state

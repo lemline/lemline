@@ -37,4 +37,4 @@ do:
                       - CREDIT
                       - DEBIT
                       - PAYPAL
-      then: ProcessPayment
+      then: end

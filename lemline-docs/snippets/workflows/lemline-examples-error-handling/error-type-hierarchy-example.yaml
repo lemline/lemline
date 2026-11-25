@@ -12,6 +12,13 @@ do:
               method: post
               endpoint: https://api.example.com/resource
               body: ${ .requestData }
+        - rejectInvalidResource:
+            if: ${ .valid == false }
+            raise:
+              error:
+                type: https://example.com/errors/api/validation
+                status: 422
+                title: Invalid resource
       catch:
         when: ${ $error.type | startswith("https://example.com/errors") }
         as: error

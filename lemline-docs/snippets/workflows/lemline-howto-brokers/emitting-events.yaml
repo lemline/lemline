@@ -10,5 +10,4 @@ do:
           with:
             type: order.shipped
             source: https://events.example.com/order-service
-            data:
-              orderId: ${ .orderId }
+            data: '${ { orderId: .orderId } }'

@@ -8,4 +8,4 @@ do:
       call: http
       with:
         method: get
-        endpoint: https://petstore.swagger.io/v2/pet/{petId}
+        endpoint: '${ "https://petstore.swagger.io/v2/pet/" + (.petId | tostring) }'

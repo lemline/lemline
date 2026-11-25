@@ -11,4 +11,4 @@ do:
           user: ${ .data.user }
           permissions: ${ .data.permissions | map(.name) }
           isAdmin: ${ .data.permissions | map(.name) | contains(["ADMIN"]) }
-      then: NextTask
+      then: end

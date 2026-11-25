@@ -42,4 +42,4 @@ do:
                       - BANK_TRANSFER
                   token:
                     type: string
-      then: HandlePaymentResult
+      then: end

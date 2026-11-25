@@ -25,7 +25,7 @@ where you fit in these personas can help you navigate our documentation more eff
 
 ### Documentation Path {id="developers-documentation-path"}
 
-1. Start with the [Hello Workflow Tutorial](lemline-tutorial-hello.md)
+1. Start with the [Acknowledge the first order](lemline-tutorial-hello.md)
 2. Explore how-to guides for [defining workflows](lemline-howto-define-workflow.md)
    and [making HTTP calls](lemline-howto-http.md)
 3. Learn about [passing data between tasks](lemline-howto-data-passing.md)

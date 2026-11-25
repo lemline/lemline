@@ -5,7 +5,7 @@ title: Getting Started Fast
 # Getting Started Fast
 
 This guide will help you quickly set up Lemline and run your first workflow. For more detailed learning, check out
-the [Hello, Workflow! tutorial](lemline-tutorial-hello.md).
+[Acknowledge the first order](lemline-tutorial-hello.md).
 
 ## Set up SQLite
 
@@ -31,10 +31,10 @@ bin/lemline definition post -f hello.yaml
 bin/lemline listen --debug
 
 # Start an instance
-bin/lemline instance start examples hello-workflow
+bin/lemline instance start examples shop-receipt
 ```
 
-`instance start` prints the id of the new instance. With `--debug`, the runner logs the workflow output, including your "Hello, Lemline!" message.
+`instance start` prints the id of the new instance. With `--debug`, the runner logs the workflow output, including your "Order received" message.
 
 ## Exploring Next Steps
 
@@ -50,7 +50,7 @@ Extend the workflow with additional set tasks or try using a different task type
 
 ### Connect to HTTP Services
 
-For a more useful example, try creating a workflow that makes an HTTP request:
+Start the [tutorial shop](lemline-tutorial-order-processing.md#start-the-tutorial-shop). This HTTP request returns the available stock and the shop records:
 
 <code-block lang="yaml" src="workflows/lemline-getting-started/connect-to-http-services.yaml"/>
 
@@ -62,7 +62,7 @@ The repository's `examples/` directory contains Docker Compose setups and config
 
 Now that you've had a quick start with Lemline, you might want to:
 
-- Follow the more detailed [Hello, Workflow! tutorial](lemline-tutorial-hello.md)
+- Follow the more detailed [Acknowledge the first order](lemline-tutorial-hello.md)
 - Learn how to [define workflows](lemline-howto-define-workflow.md) in more depth
 - Explore [HTTP calls](lemline-howto-http.md) and other service integrations
 - Understand [passing data between tasks](lemline-howto-data-passing.md)

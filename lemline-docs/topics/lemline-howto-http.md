@@ -32,3 +32,5 @@ Wrap the call in a `try` task. Match the status in `catch.errors.with` and add a
 retry policy or a fallback list where appropriate.
 
 <code-block lang="yaml" src="workflows/reference/retry-and-fallback.yaml"/>
+
+Run [the checkout workflow](lemline-tutorial-order-processing.md) to see request bodies, HTTP failure handling and idempotent release against a local service.

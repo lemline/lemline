@@ -1,0 +1,35 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tutorial shop</title><style>body{font:1rem/1.5 system-ui;max-width:58rem;margin:2rem auto;padding:0 1rem;color:#203932}input,button{font:inherit}section{border-top:1px solid #acc5b9}li{overflow-wrap:anywhere}</style>
+<h1>Tutorial shop</h1><label>Order or device ID <input id="filter" type="search"></label> <button id="refresh">Refresh</button>
+<p id="stock" role="status"></p><main></main>
+<script type="module">
+const filter = document.querySelector('#filter');
+async function render() {
+  const status = document.querySelector('#stock');
+  try {
+    const response = await fetch('/state', {cache:'no-store'});
+    if (!response.ok) throw Error(response.statusText);
+    const state = await response.json();
+    status.textContent = 'SKU-1 available: ' + state.stock;
+    const main = document.querySelector('main');
+    main.replaceChildren();
+    for (const [name, rows] of Object.entries(state)) {
+      if (!Array.isArray(rows)) continue;
+      const section = document.createElement('section');
+      const title = document.createElement('h2');
+      title.textContent = name[0].toUpperCase() + name.slice(1);
+      const list = document.createElement('ul');
+      for (const row of rows.filter(row => (row.reference ?? row.orderId).includes(filter.value))) {
+        const item = document.createElement('li');
+        item.textContent = Object.entries(row).map(([key, value]) => key + ': ' + value).join(' · ');
+        list.append(item);
+      }
+      section.append(title, list.childElementCount ? list : 'No entries');
+      main.append(section);
+    }
+  } catch (error) { status.textContent = 'Could not load shop: ' + error.message; }
+}
+filter.oninput = render;
+document.querySelector('#refresh').onclick = render;
+render();
+</script></html>

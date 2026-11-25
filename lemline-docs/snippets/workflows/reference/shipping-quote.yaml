@@ -1,0 +1,11 @@
+document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: shipping-quote
+  version: '1.0.0'
+do:
+  - quote:
+      set:
+        orderId: ${ .orderId }
+        amount: 12.5
+        currency: EUR

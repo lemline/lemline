@@ -67,3 +67,5 @@ These examples demonstrate how to implement common IoT patterns as workflows usi
 By leveraging Lemline's workflow capabilities, you can build robust, scalable IoT solutions that handle complex device management and data processing requirements while maintaining reliability and performance.
 
 For more examples of specific integrations, see the [Integration Examples](lemline-examples-integrations.md) document.
+
+Run the [warehouse exercise](lemline-tutorial-iot.md) to deliver a real event to the manager’s inbox.

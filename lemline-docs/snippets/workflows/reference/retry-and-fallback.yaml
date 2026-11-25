@@ -21,9 +21,7 @@ do:
               method: get
               endpoint: https://api.example.com/inventory
       catch:
-        errors:
-          with:
-            status: 503
+        when: ${ $error.title | startswith("HTTP 503") }
         retry: transient
         do:
           - useCachedInventory:

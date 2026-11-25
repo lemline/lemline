@@ -38,4 +38,4 @@ do:
                       - ACTIVE
                       - INACTIVE
                       - PENDING
-      then: NextTask
+      then: end

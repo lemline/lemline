@@ -25,3 +25,5 @@ fallback can also raise an error if the workflow should fault after cleanup.
 <code-block lang="yaml" src="workflows/reference/compensate-reservation.yaml"/>
 
 See [Retry Mechanism](lemline-howto-retry.md) and [Custom Errors](lemline-howto-custom-errors.md).
+
+Run the [shop checkout tutorial](lemline-tutorial-order-processing.md) to observe the release before the workflow faults.

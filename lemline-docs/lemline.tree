@@ -15,7 +15,7 @@
         <toc-element topic="lemline-getting-started.md"/>
         
         <!-- Tutorials section -->
-        <toc-element toc-title="Tutorials">
+        <toc-element toc-title="Tutorials: Run a shop with Lemline">
             <toc-element topic="lemline-tutorial-setup.md"/>
             <toc-element topic="lemline-tutorial-hello.md"/>
             <toc-element topic="lemline-tutorial-order-processing.md"/>

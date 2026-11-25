@@ -44,4 +44,4 @@ do:
                 then:
                   required:
                     - error
-      then: HandleResult
+      then: end

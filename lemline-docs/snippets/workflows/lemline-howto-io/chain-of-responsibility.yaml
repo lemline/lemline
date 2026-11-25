@@ -18,4 +18,4 @@ do:
       export:
         as:
           result: ${ .finalResult }
-      then: FinalStep
+      then: end

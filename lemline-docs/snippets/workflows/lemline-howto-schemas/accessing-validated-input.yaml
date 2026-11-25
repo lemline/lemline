@@ -12,4 +12,4 @@ do:
           address: ${ $workflow.input.address }
           phone: ${ $workflow.input.phoneNumber // "Not provided" }
           preferredContact: ${ $workflow.input.preferredContact }
-      then: CreateAccount
+      then: end

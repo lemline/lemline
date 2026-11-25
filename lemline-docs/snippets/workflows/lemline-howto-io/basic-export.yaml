@@ -11,4 +11,4 @@ do:
       export:
         as:
           customer: ${ .data }
-      then: NextTask
+      then: end

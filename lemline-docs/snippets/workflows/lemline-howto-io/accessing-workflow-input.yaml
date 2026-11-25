@@ -10,4 +10,4 @@ do:
         customerId: ${ $workflow.input.customerId }
         items: ${ $workflow.input.items }
         timestamp: ${ (now | todateiso8601) }
-      then: NextTask
+      then: end

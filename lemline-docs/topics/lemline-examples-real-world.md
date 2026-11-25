@@ -35,3 +35,5 @@ readings above a threshold.
 
 See [Workflow Patterns](lemline-examples-basic-patterns.md) for smaller examples of
 the constructs used here.
+
+The [shop checkout](lemline-tutorial-order-processing.md) and [warehouse monitoring](lemline-tutorial-iot.md) examples include a local service and concrete inputs.

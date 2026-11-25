@@ -10,12 +10,9 @@ do:
             call: http
             with:
               method: get
-              endpoint: https://petstore.swagger.io/v2/pet/{petId}
+              endpoint: '${ "https://petstore.swagger.io/v2/pet/" + ($workflow.input.petId | tostring) }'
       catch:
-        errors:
-          with:
-            type: https://open-workflow-specification.org/spec/1.0.0/errors/communication
-            status: 404
+        when: ${ $error.title | startswith("HTTP 404") }
         as: error
         do:
           - notifySupport:
@@ -35,5 +32,5 @@ do:
       call: http
       with:
         method: put
-        endpoint: https://petstore.swagger.io/v2/pet/{petId}
+        endpoint: '${ "https://petstore.swagger.io/v2/pet/" + ($workflow.input.petId | tostring) }'
         body: '${ . + { status: "sold" } }'

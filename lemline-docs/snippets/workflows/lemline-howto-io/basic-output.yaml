@@ -9,4 +9,4 @@ do:
         status: SUCCESS
         result: 42
         timestamp: ${ (now | todateiso8601) }
-      then: NextTask
+      then: end

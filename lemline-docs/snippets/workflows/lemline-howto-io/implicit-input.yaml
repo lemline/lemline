@@ -13,4 +13,4 @@ do:
       set:
         originalValue: ${ .value }
         newMessage: ${ .message + ", World!" }
-      then: TaskC
+      then: end

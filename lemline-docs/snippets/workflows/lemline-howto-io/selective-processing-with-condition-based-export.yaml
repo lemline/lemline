@@ -13,4 +13,4 @@ do:
         as:
           result: '${ if .status == "SUCCESS" then .successData else .errorData end }'
           isError: ${ .status == "ERROR" }
-      then: NextStep
+      then: end

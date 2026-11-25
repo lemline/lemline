@@ -23,3 +23,19 @@ do:
             then: PriorityProcessing
         - case4:
             then: StandardProcessing
+  - ComplianceReview:
+      set:
+        route: compliance
+      then: end
+  - VerificationProcess:
+      set:
+        route: verification
+      then: end
+  - PriorityProcessing:
+      set:
+        route: priority
+      then: end
+  - StandardProcessing:
+      set:
+        route: standard
+      then: end

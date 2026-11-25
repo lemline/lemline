@@ -6,7 +6,7 @@ ways to model these patterns, depending on where the work happens.
 ## Run independent branches
 
 A `fork` starts its branches concurrently. A non-competing fork joins their results
-after all branches finish.
+after all branches finish. Start the [tutorial shop](lemline-tutorial-order-processing.md#start-the-tutorial-shop) and supply `{"orderId":"QUOTE-1"}` to request the stock level and a shipping quote.
 
 <code-block lang="yaml" src="workflows/reference/parallel-order-checks.yaml"/>
 

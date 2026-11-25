@@ -59,4 +59,4 @@ do:
                   total:
                     type: number
                     minimum: 0
-      then: NextTask
+      then: end

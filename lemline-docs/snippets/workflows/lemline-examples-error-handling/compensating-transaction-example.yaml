@@ -21,9 +21,6 @@ do:
               endpoint: https://payments.example.com/api/charge
               body: ${ $workflow.input.paymentDetails }
       catch:
-        errors:
-          with:
-            type: https://example.com/errors/payment
         as: paymentError
         do:
           - cancelReservation:
