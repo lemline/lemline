@@ -61,7 +61,8 @@ bin/lemline definition get examples shop-receipt 0.1.0
 ```
 
 The second command prints the stored YAML. Without arguments, `bin/lemline definition get` lists the registered
-definitions and lets you pick one.
+definitions and lets you pick one; do not use that form in a script, where it loops forever on the current build
+([issue 109](https://github.com/lemline/lemline/issues/109)).
 
 ## Following Workflow Execution
 

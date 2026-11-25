@@ -65,6 +65,9 @@ bin/lemline definition get
 ```
 
 The CLI lists the namespace, name and version of each definition, here `tutorial acknowledge-order 0.1.3`, then prints the selected definition.
+With several definitions it asks which one to show. In a script, pass the namespace, name and version instead, as in
+`bin/lemline definition get tutorial acknowledge-order 0.1.3`: without a terminal, the prompt repeats forever on the
+current build ([issue 109](https://github.com/lemline/lemline/issues/109)).
 
 ## Running a Workflow Instance
 

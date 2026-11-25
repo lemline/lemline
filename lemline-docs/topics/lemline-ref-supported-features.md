@@ -15,7 +15,7 @@ Lemline implements a subset of the Open Workflow DSL 1.0 specification, with mor
 | Workflow Metadata | ✅ Supported | Full support for namespace, name, version |
 | Workflow Input/Output | ✅ Supported | Including schema validation and the workflow-level `input.from` and `output.as` |
 | States Definition | ✅ Supported | Via task constructs |
-| Expression Language | ✅ Supported | JQ expressions, evaluated by jackson-jq. Some jq built-ins are missing, for example `todate`: use `todateiso8601` |
+| Expression Language | ✅ Supported | JQ expressions, evaluated by jackson-jq. Some jq built-ins are missing, for example `todate` ([issue 110](https://github.com/lemline/lemline/issues/110)): use `todateiso8601` |
 | Workflow Variables | ✅ Supported | Context and scope variables |
 | Error Handling | ✅ Supported | Try/catch and retry mechanisms. A failed HTTP call raises a `runtime` error with status 500; the HTTP status is only in the title ([issue 97](https://github.com/lemline/lemline/issues/97)) |
 | Workflow Timeouts | ⚠️ Partial | Only `listen` task timeouts are enforced; workflow-level timeouts and timeouts on other tasks are ignored. HTTP calls use fixed limits (15 s connect, 30 s per request) |
@@ -107,6 +107,7 @@ Lemline implements a subset of the Open Workflow DSL 1.0 specification, with mor
 | Feature | Status | Notes |
 |---------|--------|-------|
 | `definition post` | ⚠️ Partial | Some invalid definitions, such as a task named after a task type, are stored and reported with exit code 0 ([issue 107](https://github.com/lemline/lemline/issues/107)) |
+| `definition get` | ⚠️ Partial | Without arguments and without a terminal, the selection prompt loops forever ([issue 109](https://github.com/lemline/lemline/issues/109)): pass the namespace, name and version in scripts |
 | Mock configuration | ⚠️ Partial | JSON files work; a YAML file cannot set an HTTP response body ([issue 108](https://github.com/lemline/lemline/issues/108)) |
 
 ## Specification Deviations
