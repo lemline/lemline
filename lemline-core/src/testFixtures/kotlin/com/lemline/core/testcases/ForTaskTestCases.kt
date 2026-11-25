@@ -37,6 +37,25 @@ object ForTaskTestCases {
         ),
 
         WorkflowTestCase(
+            name = "for while stops before the first non-positive item",
+            yaml = $$"""
+                do:
+                  - loop:
+                      for:
+                        in: ${ [1, 2, 0, 3] }
+                      while: ${ $item > 0 }
+                      do:
+                        - collect:
+                            set:
+                              seen: ${ .seen + [$item] }
+            """.trimIndent(),
+            input = buildJsonObject { put("seen", buildJsonArray {}) },
+            validate = expectOutput(buildJsonObject {
+                put("seen", ArrayNode(listOf(jsonValue(1), jsonValue(2))))
+            })
+        ),
+
+        WorkflowTestCase(
             name = "for in without delimiters is not evaluated in strict mode",
             yaml = $$"""
                 do:

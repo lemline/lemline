@@ -7,6 +7,7 @@ import com.lemline.common.json.*
 import com.lemline.common.json.LemlineJson.toJsonNode
 import com.lemline.core.nodes.Node
 import com.lemline.core.processors.scope.Scope
+import com.lemline.core.processors.scope.merge
 import com.lemline.core.states.ForState
 import com.lemline.core.workflows.forBlock
 import io.serverlessworkflow.api.types.ForTask
@@ -103,11 +104,11 @@ class ForProcessor(
     }
 
     private fun shouldContinue(state: ForState, transformedInput: JsonNode, scope: Scope) =
-        state.collection.isNotEmpty() && evalWhile(transformedInput, scope)
+        state.collection.isNotEmpty() && evalWhile(state, transformedInput, scope)
 
-    private fun evalWhile(dataset: JsonNode, scope: Scope): Boolean {
+    private fun evalWhile(state: ForState, dataset: JsonNode, scope: Scope): Boolean {
         val whileCondition = node.task.`while` ?: return true
-        return evalBoolean(dataset, whileCondition, "while", scope)
+        return evalBoolean(dataset, whileCondition, "while", scope.merge(state.scope))
     }
 
     private fun evalForIn(dataset: JsonNode, scope: Scope): List<JsonNode> {
