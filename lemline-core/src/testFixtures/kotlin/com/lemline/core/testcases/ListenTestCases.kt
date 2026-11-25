@@ -35,13 +35,52 @@ import com.lemline.core.testcases.impl.TestMocks.userRegisteredData
 import com.lemline.core.testcases.impl.WorkflowTestCase
 import com.lemline.core.testcases.impl.WorkflowTestValidators.expectErrorContaining
 import com.lemline.core.testcases.impl.WorkflowTestValidators.expectOutput
+import io.cloudevents.CloudEvent
 import io.serverlessworkflow.api.types.ListenTaskConfiguration.ListenAndReadAs
+import java.time.Instant
 
 /**
  * Test cases for listen task execution.
  * Tests CloudEvent listening using real CloudEvents emitted to InMemoryCloudEventHook.
  */
 object ListenTestCases {
+
+    private const val correlationStarted = "org.open-workflow-specification.workflow.correlation-started.v1"
+    private const val correlationCompleted = "org.open-workflow-specification.workflow.correlation-completed.v1"
+
+    private fun expectCorrelationLifecycle(vararg expected: String): (List<CloudEvent>) -> String? = { events ->
+        runCatching {
+            val transitions = events.filter { ".workflow.correlation-" in it.type }.sortedBy { it.time }
+            check(transitions.map { it.type } == expected.toList()) {
+                "Expected correlation lifecycle ${expected.toList()}, got ${transitions.map { it.type }}"
+            }
+            if (transitions.isNotEmpty()) {
+                val workflowStarted = events.first { it.type.endsWith(".workflow.started.v1") }
+                val name = parseJson(workflowStarted.data!!.toBytes().decodeToString())["name"]
+                val workflowId = workflowStarted.getExtension("lemlineworkflowid")
+                check(transitions.map { it.id }.distinct().size == transitions.size) {
+                    "Correlation transitions must have distinct event IDs"
+                }
+                for (event in transitions) {
+                    val data = parseJson(event.data!!.toBytes().decodeToString())
+                    val timestamp = if (event.type == correlationStarted) "startedAt" else "completedAt"
+                    check(data["name"] == name) { "Incorrect correlation workflow name for ${event.type}" }
+                    check(event.getExtension("lemlineworkflowid") == workflowId) {
+                        "Incorrect correlation workflow ID for ${event.type}"
+                    }
+                    check(Instant.parse(data[timestamp].asText()) == event.time!!.toInstant()) {
+                        "Correlation payload and CloudEvent timestamp differ for ${event.type}"
+                    }
+                }
+                if (expected.last() == correlationCompleted) {
+                    val completed = events.first { it.type.endsWith(".workflow.completed.v1") }
+                    check(transitions.last().time!! <= completed.time!!) {
+                        "Correlation completion occurred after workflow completion"
+                    }
+                }
+            }
+        }.exceptionOrNull()?.message
+    }
 
     private fun terminationCase(name: String, until: String, types: List<String>, expected: List<String>, foreach: Boolean = false) =
         WorkflowTestCase(
@@ -81,7 +120,8 @@ object ListenTestCases {
                               type: order.created
             """.trimIndent(),
             tags = setOf("listen", "cloudevents"),
-            validate = expectOutput(ArrayNode(listOf(orderCreatedData)))
+            validate = expectOutput(ArrayNode(listOf(orderCreatedData))),
+            validateLifecycleEvents = expectCorrelationLifecycle(),
         ),
 
         // ─────────────────────────────────────────────────────────────────────────
@@ -1426,7 +1466,8 @@ object ListenTestCases {
                                 expect: ORD-54321
             """.trimIndent(),
             tags = setOf("listen", "correlate"),
-            validate = expectOutput(ArrayNode(listOf(orderCreatedData2)))
+            validate = expectOutput(ArrayNode(listOf(orderCreatedData2))),
+            validateLifecycleEvents = expectCorrelationLifecycle(correlationStarted, correlationCompleted),
         ),
 
         WorkflowTestCase(
@@ -1448,6 +1489,30 @@ object ListenTestCases {
             """.trimIndent(),
             tags = setOf("listen", "correlate"),
             validate = expectOutput(ArrayNode(listOf(orderCreatedData2)))
+        ),
+
+        WorkflowTestCase(
+            name = "listen timeout leaves correlation incomplete",
+            yaml = $$"""
+                do:
+                  - waitForMyOrder:
+                      listen:
+                        to:
+                          one:
+                            with: { type: order.created }
+                            correlate:
+                              orderId:
+                                from: ${ .orderId }
+                                expect: ORD-54321
+                      timeout:
+                        after: PT0.3S
+            """.trimIndent(),
+            tags = setOf("listen", "correlate"),
+            validate = { result ->
+                expectErrorContaining("Listen timeout")(result)
+                    ?.let { expectErrorContaining("Listen task timed out")(result) }
+            },
+            validateLifecycleEvents = expectCorrelationLifecycle(correlationStarted),
         ),
 
         WorkflowTestCase(
@@ -1496,7 +1561,8 @@ object ListenTestCases {
                                 expect: ${ .input.orderId }
             """.trimIndent(),
             tags = setOf("listen", "correlate"),
-            validate = expectErrorContaining("'.correlate.orderId.expect' expression must not be null")
+            validate = expectErrorContaining("'.correlate.orderId.expect' expression must not be null"),
+            validateLifecycleEvents = expectCorrelationLifecycle(),
         ),
 
         WorkflowTestCase(
@@ -1587,6 +1653,7 @@ object ListenTestCases {
                                   from: '${ .orderId }'
             """.trimIndent(),
             tags = setOf("listen", "correlate", "auto-correlation"),
+            validateLifecycleEvents = expectCorrelationLifecycle(correlationStarted, correlationCompleted),
             validate = expectOutput(
                 ArrayNode(
                     listOf(

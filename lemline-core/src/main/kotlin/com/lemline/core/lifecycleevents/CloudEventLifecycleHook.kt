@@ -122,6 +122,44 @@ class CloudEventLifecycleHook(
         emitter.emit(event)
     }
 
+    override suspend fun onWorkflowCorrelationStarted(
+        workflowInfo: WorkflowInfo,
+        nodeStack: NodeStack,
+        nodePosition: NodePosition,
+        startedAt: Instant,
+    ) {
+        emitter.emit(
+            buildCloudEvent(
+                eventType = LifecycleEventType.WORKFLOW_CORRELATION_STARTED,
+                workflowInfo = workflowInfo,
+                workflowId = nodeStack.workflowId,
+                nodeStack = nodeStack,
+                data = LifecycleEventData.WorkflowCorrelationStartedData(workflowInfo.qualifiedName, startedAt),
+                timestamp = startedAt,
+                idSuffix = "workflow-correlation-started-$nodePosition",
+            )
+        )
+    }
+
+    override suspend fun onWorkflowCorrelationCompleted(
+        workflowInfo: WorkflowInfo,
+        nodeStack: NodeStack,
+        nodePosition: NodePosition,
+        completedAt: Instant,
+    ) {
+        emitter.emit(
+            buildCloudEvent(
+                eventType = LifecycleEventType.WORKFLOW_CORRELATION_COMPLETED,
+                workflowInfo = workflowInfo,
+                workflowId = nodeStack.workflowId,
+                nodeStack = nodeStack,
+                data = LifecycleEventData.WorkflowCorrelationCompletedData(workflowInfo.qualifiedName, completedAt),
+                timestamp = completedAt,
+                idSuffix = "workflow-correlation-completed-$nodePosition",
+            )
+        )
+    }
+
     override suspend fun onWorkflowFaulted(
         workflowInfo: WorkflowInfo,
         nodeStack: NodeStack,

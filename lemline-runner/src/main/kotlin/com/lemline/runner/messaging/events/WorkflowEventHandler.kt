@@ -5,6 +5,7 @@ import com.lemline.common.logger.logger
 import com.lemline.common.values.IDV7
 import com.lemline.common.values.WorkflowInfo
 import com.lemline.core.errors.InternalException
+import com.lemline.core.lifecycleevents.LifecycleEventHook
 import com.lemline.core.states.WorkflowEvent
 import com.lemline.runner.common.config.DatabaseConfig
 import com.lemline.runner.common.messaging.CompensationException
@@ -26,6 +27,7 @@ import com.lemline.runner.retries.RetryService
 import com.lemline.runner.schedules.ScheduleService
 import com.lemline.runner.waits.WaitService
 import jakarta.enterprise.context.ApplicationScoped
+import kotlin.time.Clock
 import org.eclipse.microprofile.reactive.messaging.Message
 import org.jetbrains.annotations.TestOnly
 
@@ -58,6 +60,7 @@ internal class WorkflowEventHandler(
     private val parentService: ParentService,
     private val listenerService: ListenerService,
     private val listenerEventService: ListenerEventService,
+    private val lifecycleHook: LifecycleEventHook,
     private val scheduleService: ScheduleService,
     override val namespaceScope: NamespaceScope,
 ) : WithHealthCheckMessageHandler<InstanceMessage<WorkflowEvent>> {
@@ -172,8 +175,14 @@ internal class WorkflowEventHandler(
             is WorkflowEvent.ForkStarted ->
                 forkService.handleForkStarted(current as InstanceMessage<WorkflowEvent.ForkStarted>)
 
-            is WorkflowEvent.ListenStarted ->
-                listenerService.handleListenStarted(current as InstanceMessage<WorkflowEvent.ListenStarted>)
+            is WorkflowEvent.ListenStarted -> {
+                val registered = listenerService.handleListenStarted(current as InstanceMessage<WorkflowEvent.ListenStarted>)
+                if (registered && state.config.correlatesEvents) {
+                    lifecycleHook.onWorkflowCorrelationStarted(
+                        current.workflowInfo, state.nodeStack, state.nodePosition, Clock.System.now(),
+                    )
+                }
+            }
 
             is WorkflowEvent.ForkBranchCompleted ->
                 forkService.handleBranchCompleted(current as InstanceMessage<WorkflowEvent.ForkBranchCompleted>)

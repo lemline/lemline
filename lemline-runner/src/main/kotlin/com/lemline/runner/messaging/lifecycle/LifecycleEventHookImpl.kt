@@ -51,6 +51,20 @@ class LifecycleEventHookImpl(
         startedAt: Instant,
     ) = delegate.onWorkflowStarted(workflowInfo, nodeStack, startedAt)
 
+    override suspend fun onWorkflowCorrelationStarted(
+        workflowInfo: WorkflowInfo,
+        nodeStack: NodeStack,
+        nodePosition: NodePosition,
+        startedAt: Instant,
+    ) = delegate.onWorkflowCorrelationStarted(workflowInfo, nodeStack, nodePosition, startedAt)
+
+    override suspend fun onWorkflowCorrelationCompleted(
+        workflowInfo: WorkflowInfo,
+        nodeStack: NodeStack,
+        nodePosition: NodePosition,
+        completedAt: Instant,
+    ) = delegate.onWorkflowCorrelationCompleted(workflowInfo, nodeStack, nodePosition, completedAt)
+
     override suspend fun onWorkflowCompleted(
         workflowInfo: WorkflowInfo,
         nodeStack: NodeStack,

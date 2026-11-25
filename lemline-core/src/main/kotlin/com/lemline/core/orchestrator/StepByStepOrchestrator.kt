@@ -15,6 +15,7 @@ import com.lemline.core.nodes.Node
 import com.lemline.core.orchestrator.StepByStepOrchestrator.completeTask
 import com.lemline.core.orchestrator.StepByStepOrchestrator.processTaskFaulted
 import com.lemline.core.orchestrator.StepByStepOrchestrator.tryCatch
+import com.lemline.core.processors.ListenProcessor
 import com.lemline.core.processors.RootProcessor
 import com.lemline.core.processors.TryProcessor
 import com.lemline.core.processors.scope.taskScope
@@ -404,6 +405,9 @@ object StepByStepOrchestrator {
         workflowInfo = workflowInfo,
         lifecycleHook = lifecycleHook
     ) {
+        if ((node.processor as? ListenProcessor)?.correlatesEvents == true) {
+            lifecycleHook.onWorkflowCorrelationCompleted(workflowInfo, nodeStack, node.position, Clock.System.now())
+        }
         completeTask(nodeStack, node, rawOutput, workflowInfo, lifecycleHook)
     }
 

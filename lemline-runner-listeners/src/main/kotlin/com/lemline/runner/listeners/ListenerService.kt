@@ -52,7 +52,7 @@ class ListenerService {
      * @param instanceMessage The instance message containing the listen started event
      * @return true if the listener was created, false if it already existed (idempotent)
      */
-    suspend fun handleListenStarted(instanceMessage: InstanceMessage<WorkflowEvent.ListenStarted>) {
+    suspend fun handleListenStarted(instanceMessage: InstanceMessage<WorkflowEvent.ListenStarted>): Boolean {
         val listenStarted = instanceMessage.workflowState
         val config = listenStarted.config
 
@@ -84,10 +84,11 @@ class ListenerService {
 
         if (rowsInserted == 0) {
             logger.warn { "Listener already exists (idempotent insert): $listener" }
-            return
+            return false
         }
 
         logger.debug { "Listen task started at position ${listenStarted.nodePosition}: $listener " }
+        return true
     }
 
     /**

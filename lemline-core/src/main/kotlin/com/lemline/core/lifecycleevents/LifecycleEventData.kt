@@ -65,6 +65,20 @@ sealed class LifecycleEventData {
         val definition: WorkflowDefinitionData,
     ) : LifecycleEventData()
 
+    @Serializable
+    @SerialName("workflowCorrelationStarted")
+    data class WorkflowCorrelationStartedData(
+        val name: String,
+        val startedAt: Instant,
+    ) : LifecycleEventData()
+
+    @Serializable
+    @SerialName("workflowCorrelationCompleted")
+    data class WorkflowCorrelationCompletedData(
+        val name: String,
+        val completedAt: Instant,
+    ) : LifecycleEventData()
+
     /**
      * Data payload for workflow.completed event.
      *
