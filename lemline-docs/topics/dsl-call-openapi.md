@@ -5,8 +5,9 @@ title: OpenAPI Call
 
 # OpenAPI Call Task (`call: openapi`)
 
-> **Lemline runtime:** `call: openapi` is not executed by Lemline yet; use `call: http`.
-
+> **Lemline**
+>
+> Lemline accepts these workflow definitions at registration. Starting an instance that reaches `call: openapi` faults with `Unknown task type: CallOpenAPI` ([issue #45](https://github.com/lemline/lemline/issues/45)). Use `call: http` to invoke the operation directly.
 
 ## Purpose
 
@@ -18,17 +19,29 @@ code or configurations.
 
 ## Usage Example
 
-<code-block lang="yaml" src="workflows/dsl-call-openapi/usage-example.yaml"/>
+Use the shop’s OpenAPI description to select the `listProducts` operation and supply its `size` query parameter.
+
+<code-block lang="yaml" src="workflows/dsl-call-openapi/openapi-list-products.yaml"/>
 
 ## Additional Examples
 
-### Example: Sending Different Parameter Types
+### Example: Sending a Path Parameter
 
-<code-block lang="yaml" src="workflows/dsl-call-openapi/example-sending-different-parameter-types.yaml" include-lines="6-21"/>
+Get one product by passing the path parameter named in the specification.
+
+<code-block lang="yaml" src="workflows/dsl-call-openapi/openapi-product-by-id.yaml"/>
 
 ### Example: Getting the Full HTTP Response
 
-<code-block lang="yaml" src="workflows/dsl-call-openapi/example-getting-the-full-http-response.yaml" include-lines="6-21"/>
+Request the response envelope instead of just the deserialized body.
+
+<code-block lang="yaml" src="workflows/dsl-call-openapi/openapi-product-response.yaml"/>
+
+### Invoke the Operation with HTTP
+
+This workflow calls the same products endpoint using the operation’s HTTP method and path.
+
+<code-block lang="yaml" src="workflows/dsl-call-openapi/openapi-http-list-products.yaml"/>
 
 ## Configuration Options
 
@@ -83,4 +96,42 @@ raised as `Communication` errors.
 ### Flow Control
 
 <include from="_common-task-flow_control.md" element-id="common-flow-control"/>
-**Note**: If the underlying API call fails (e.g., validation error based on OpenAPI spec, unhandled error status code), a `Communication` or potentially `Validation` error is raised, and the `then` directive is *not* followed (unless caught by `Try`). 
+**Note**: If the underlying API call fails (e.g., validation error based on OpenAPI spec, unhandled error status code), a `Communication` or potentially `Validation` error is raised, and the `then` directive is *not* followed (unless caught by `Try`).
+
+## Run the Examples
+
+Complete the [SQLite setup](lemline-tutorial-setup.md) and leave the worker running. Save each workflow in the setup directory under the file name used below.
+
+Use this command from the root of the source checkout to [start the tutorial shop](lemline-tutorial-setup.md#use-the-tutorial-shop).
+
+```bash
+docker compose -f examples/tutorial-services/compose.yaml up -d --wait
+```
+
+Run these registration and start commands from the setup directory.
+
+```bash
+bin/lemline definition post -f openapi-list-products.yaml
+bin/lemline instance start examples openapi-list-products
+bin/lemline definition post -f openapi-product-by-id.yaml
+bin/lemline instance start examples openapi-product-by-id --input '{"productId":"SKU-1"}'
+bin/lemline definition post -f openapi-product-response.yaml
+bin/lemline instance start examples openapi-product-response --input '{"productId":"SKU-1"}'
+bin/lemline definition post -f openapi-http-list-products.yaml
+bin/lemline instance start examples openapi-http-list-products
+```
+
+Check the individual results in the worker terminal.
+
+| Example | Expected result |
+|---|---|
+| `openapi-list-products` | Registration succeeds. The instance faults with `Unknown task type: CallOpenAPI`. |
+| `openapi-product-by-id` | Registration succeeds. The instance faults with `Unknown task type: CallOpenAPI`. |
+| `openapi-product-response` | Registration succeeds. The instance faults with `Unknown task type: CallOpenAPI`. |
+| `openapi-http-list-products` | The first page of garden products, with IDs `SKU-1`, `SKU-2`, and `SKU-3`. |
+
+When the instances finish, use the command below in the source checkout to stop the shop.
+
+```bash
+docker compose -f examples/tutorial-services/compose.yaml down
+```
