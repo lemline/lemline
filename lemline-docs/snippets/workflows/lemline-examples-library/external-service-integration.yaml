@@ -1,20 +1,22 @@
 document:
-  dsl: 1.0.3
+  dsl: '1.0.3'
   namespace: examples
-  name: star-wars-homeplanet
-  version: 1.0.0
+  name: product-lookup
+  version: '1.0.0'
 do:
-  - getStarWarsCharacter:
+  - findProduct:
       call: http
       with:
         method: get
-        endpoint: https://swapi.dev/api/people/{id}
+        endpoint: http://127.0.0.1:8787/products
+        query:
+          search: ${ .search }
         output: response
       export:
         as:
-          homeworld: ${ .content.homeworld }
-  - getStarWarsHomeworld:
+          productId: ${ .content.items[0].id }
+  - getProduct:
       call: http
       with:
         method: get
-        endpoint: ${ $context.homeworld }
+        endpoint: ${ "http://127.0.0.1:8787/products/" + $context.productId }

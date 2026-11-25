@@ -6,14 +6,14 @@ document:
 do:
   - check:
       do:
-        - readShop:
+        - readStock:
             call: http
             with:
               method: get
-              endpoint: http://127.0.0.1:8787/state
+              endpoint: http://127.0.0.1:8787/stock
         - showAvailability:
             set:
-              available: ${ .stock }
+              available: ${ .available }
   - summarize:
       set:
         message: '${ "SKU-1 available: " + (.available | tostring) }'

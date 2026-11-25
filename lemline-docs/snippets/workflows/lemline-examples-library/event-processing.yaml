@@ -1,17 +1,17 @@
 document:
-  dsl: 1.0.3
+  dsl: '1.0.3'
   namespace: examples
   name: listen-to-any-example
-  version: 0.1.0
+  version: '0.1.0'
 do:
   - waitForEvent:
       listen:
         to:
           any:
             - with:
-                type: order.created
+                type: com.example.order.created
             - with:
-                type: order.cancelled
+                type: com.example.order.cancelled
       timeout:
         after:
           seconds: 30
