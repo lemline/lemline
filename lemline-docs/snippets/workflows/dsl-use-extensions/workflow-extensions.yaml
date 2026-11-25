@@ -19,13 +19,13 @@ use:
               call: http
               with:
                 method: post
-                endpoint: https://audit.example.com/responses
+                endpoint: http://127.0.0.1:8787/audit
                 body:
-                  task: '${ $task.reference }'
-                  response: '${ $task.output }'
+                  reference: '${ $task.reference }'
+                  message: '${ "Response with \($task.output.available) units" }'
 do:
-  - getUser:
+  - getStock:
       call: http
       with:
         method: get
-        endpoint: https://api.example.com/user
+        endpoint: http://127.0.0.1:8787/stock

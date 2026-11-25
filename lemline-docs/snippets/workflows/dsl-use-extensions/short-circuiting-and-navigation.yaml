@@ -7,12 +7,14 @@ use:
   extensions:
     - simulate:
         extend: call
-        when: '${ $task.definition.call == "http" and $task.definition.with.endpoint == "https://api.example.com/user" }'
+        when: '${ $task.definition.call == "http" and $task.definition.with.endpoint == "http://127.0.0.1:8787/stock" and $workflow.input.simulate == true }'
         before:
-          - fakeUser:
-              set: { id: 123, name: Test }
+          - fakeStock:
+              set: { sku: SKU-1, available: 0, simulated: true }
               then: exit
 do:
-  - example:
-      set:
-        ready: true
+  - getStock:
+      call: http
+      with:
+        method: get
+        endpoint: http://127.0.0.1:8787/stock

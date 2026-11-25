@@ -2,7 +2,7 @@
 
 DSL 1.0.3 `use.extensions` adds tasks before and after selected tasks without moving the original task's execution position.
 
-<code-block lang="yaml" src="workflows/dsl-use-extensions/workflow-extensions.yaml" include-lines="6-31"/>
+<code-block lang="yaml" src="workflows/dsl-use-extensions/workflow-extensions.yaml"/>
 
 `extend` accepts `call`, `composite`, `emit`, `for`, `listen`, `raise`, `run`, `set`, `switch`, `try`, `wait`, and `all`. `composite` matches declared `do` and `fork` tasks. Reusable function calls match `call`; their declared body tasks can also have extensions. Internal execution blocks are excluded.
 
@@ -16,7 +16,7 @@ Within extension expressions, `$task` describes the owner, including its origina
 
 A top-level `before` step with `then: exit` returns a simulated raw result, skips the body and remaining extensions, and applies the owner's output transformation, validation, and export once. The owner's own `then` is still honored.
 
-<code-block lang="yaml" src="workflows/dsl-use-extensions/short-circuiting-and-navigation.yaml" include-lines="6-14"/>
+<code-block lang="yaml" src="workflows/dsl-use-extensions/short-circuiting-and-navigation.yaml"/>
 
 A nested `exit` remains local to its nested block. A top-level `after` exit skips remaining after blocks and keeps the owner's result. `end` terminates the workflow without executing additional after blocks.
 
@@ -33,3 +33,36 @@ The owner's lifecycle spans all its extensions. Declared extension steps have th
 ## Deployment
 
 Deploy workers supporting extension continuations before enabling workflows that use them. Older workers cannot process `_ext` positions or pending task state. Do not route these executions to older workers during a mixed deployment. New workers continue to read messages without extension fields; already active legacy frames are not retroactively extended.
+
+## Run the Examples
+
+Every example on this page is a complete workflow. Complete [the SQLite setup](lemline-tutorial-setup.md), save each example under the file name used below, and run the commands from the setup directory. With the JAR, substitute `java -jar lemline.jar` for `bin/lemline`.
+
+Start the [tutorial shop](lemline-tutorial-order-processing.md#start-the-tutorial-shop) from the root of the Lemline source checkout:
+
+```bash
+docker compose -f examples/tutorial-services/compose.yaml up -d
+```
+
+Keep the setup worker running and use a second terminal in the setup directory.
+
+```bash
+bin/lemline definition post -f workflow-extensions.yaml
+bin/lemline instance start examples workflow-extensions
+bin/lemline definition post -f short-circuiting-and-navigation.yaml
+bin/lemline instance start examples short-circuiting-and-navigation --input '{"simulate":false}'
+bin/lemline instance start examples short-circuiting-and-navigation --input '{"simulate":true}'
+```
+
+| Example | Expected result |
+|---|---|
+| `workflow-extensions` | The stock; the extension records `Response with 100 units` for the HTTP task in the shop's audit list |
+| `short-circuiting-and-navigation`, `simulate` false | The real stock |
+| `short-circuiting-and-navigation`, `simulate` true | `{"sku":"SKU-1","available":0,"simulated":true}`: the HTTP call is skipped and the shop receives no request |
+
+Stop the shop when you are done:
+
+```bash
+docker compose -f examples/tutorial-services/compose.yaml down
+```
+
