@@ -1,25 +1,25 @@
 document:
   dsl: '1.0.3'
-  namespace: samples
+  namespace: examples
   name: call-custom-function-inline
   version: '0.1.0'
 use:
   functions:
-    getPetById:
+    getProductById:
       input:
         schema:
           document:
             type: object
             properties:
-              petId:
+              productId:
                 type: string
-            required: [ petId ]
+            required: [ productId ]
       call: http
       with:
         method: get
-        endpoint: '${ "https://petstore.swagger.io/v2/pet/" + .petId }'
+        endpoint: '${ "http://127.0.0.1:8787/products/" + .productId }'
 do:
-  - getPet:
-      call: getPetById
+  - getProduct:
+      call: getProductById
       with:
-        petId: '69'
+        productId: SKU-2

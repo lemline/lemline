@@ -208,6 +208,11 @@ async function snapshot() {
 
 // ---- Expectation matching: objects are partial, arrays are exact in length.
 function matches(actual, wanted, path = '$') {
+  // {"$contains": [...]}: each listed item matches some item of the actual array, in any order.
+  if (wanted !== null && typeof wanted === 'object' && Array.isArray(wanted.$contains)) {
+    if (!Array.isArray(actual)) return [`${path}: expected an array, got ${JSON.stringify(actual)}`];
+    return wanted.$contains.flatMap((item, index) => actual.some(row => matches(row, item).length === 0) ? [] : [`${path}: no item matches ${JSON.stringify(item)}`]);
+  }
   if (wanted !== null && typeof wanted === 'object' && !Array.isArray(wanted)) {
     if (actual === null || typeof actual !== 'object' || Array.isArray(actual)) return [`${path}: expected an object, got ${JSON.stringify(actual)}`];
     return Object.entries(wanted).flatMap(([key, value]) => matches(actual[key], value, `${path}.${key}`));
@@ -265,6 +270,13 @@ async function execute(command) {
       await until('instance ' + record.id, settleSeconds, () => terminal(record.id));
     } catch {
       note(`# instance ${record.id} still running after ${settleSeconds}s; continuing`);
+    }
+  }
+  // A reader waits where the page says so, for example before the next event of a loop.
+  for (const rule of expected.pauseAfter ?? []) {
+    if (new RegExp(rule.match).test(command)) {
+      note(`# pause ${rule.seconds}s as the page asks`);
+      await pause(rule.seconds * 1000);
     }
   }
   await snapshot();

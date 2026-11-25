@@ -14,10 +14,10 @@ input:
         searchQuery:
           type: string
 do:
-  - searchStarWarsCharacters:
+  - searchProducts:
       call: http
       with:
         method: get
-        endpoint: https://swapi.dev/api/people/
+        endpoint: http://127.0.0.1:8787/products
         query:
-          search: ${.searchQuery}
+          search: ${ .searchQuery }

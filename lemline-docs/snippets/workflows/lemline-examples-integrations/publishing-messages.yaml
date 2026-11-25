@@ -8,7 +8,7 @@ do:
       call: asyncapi
       with:
         document:
-          endpoint: https://fake.com/docs/asyncapi.json
+          endpoint: https://events.example.com/docs/asyncapi.json
         operation: findPetsByStatus
         server:
           name: staging

@@ -77,7 +77,9 @@ The results are compared with `expected/<page>.json`:
 | instances | One entry per `instance start` of the page, in order: expected `type` (`workflowCompleted`, `workflowFaulted`) and a partial `output` or `error`. `null` skips one. A string starting with `~` is a regular expression. |
 | others | Instances started by events, in completion order, with their `workflow`, `type` and `output`. |
 | state | Partial match of the shop's `/state` before the shop stops or at the end. |
+| `{"$contains": [...]}` | In place of an array: each listed item must match one of the actual items, in any order. |
 | settleSeconds, timeoutSeconds | How long to wait for each instance before the next command (default 20) and for all of them at the end (default 240). |
 | skip, allowFailure | Regular expressions of commands to skip or whose failure is expected. |
+| pauseAfter | List of `{match, seconds}`: wait that long after a matching command, where the page tells the reader to wait. |
 
 Without an expectations file, every instance must complete. The output directory keeps `commands.log`, `results.json` and the compressed worker logs. Run it outside any sandbox that blocks Docker.
