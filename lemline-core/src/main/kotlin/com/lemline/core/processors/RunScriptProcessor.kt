@@ -11,10 +11,13 @@ import com.lemline.core.states.NodeStack
 import com.lemline.core.states.RunState
 import com.lemline.core.states.WorkflowEvent
 import com.lemline.core.states.WorkflowEvent.RunScriptStarted
+import io.serverlessworkflow.api.types.Endpoint
+import io.serverlessworkflow.api.types.EndpointConfiguration
 import io.serverlessworkflow.api.types.ExternalScript
 import io.serverlessworkflow.api.types.InlineScript
 import io.serverlessworkflow.api.types.RunTask
 import io.serverlessworkflow.api.types.RunTaskConfiguration.ProcessReturnType
+import io.serverlessworkflow.api.types.UriTemplate
 import java.net.URI
 import java.nio.file.Files
 import java.nio.file.Paths
@@ -112,8 +115,20 @@ class RunScriptProcessor(
 
                 logger.debug { "Loading external script from: $uri" }
 
-                // Try to read from the file system
-                val filePath = Paths.get(URI.create(uri))
+                // Scripts are read from the file system of the worker executing the task
+                val filePath = try {
+                    URI.create(uri).takeIf { it.scheme.equals("file", ignoreCase = true) }?.let { Paths.get(it) }
+                } catch (e: IllegalArgumentException) {
+                    raiseError(
+                        WorkflowErrorType.CONFIGURATION,
+                        "Invalid script source endpoint: $uri",
+                        e.message
+                    )
+                } ?: raiseError(
+                    WorkflowErrorType.CONFIGURATION,
+                    "Unsupported scheme for script source: $uri",
+                    "Only file:// URIs are supported"
+                )
                 if (!Files.exists(filePath)) {
                     raiseError(
                         WorkflowErrorType.CONFIGURATION,
@@ -198,23 +213,42 @@ class RunScriptProcessor(
 
     /**
      * Converts endpoint to URL string.
-     * Supports simple string URIs, URI templates, and endpoint configurations.
+     * Supports URI templates, endpoint configurations and runtime expressions.
      */
     private fun toUrl(
-        endpoint: io.serverlessworkflow.api.types.Endpoint,
+        endpointUnion: Endpoint,
         data: JsonNode,
         scope: Scope
-    ): String {
-        return when (endpoint.get()) {
-            is String -> {
-                val uri = endpoint.get() as String
-                evaluateString(data, uri, "endpoint", scope)
-            }
-
+    ): String = when (val endpoint = endpointUnion.get()) {
+        is EndpointConfiguration -> when (val uri = endpoint.uri.get()) {
+            is UriTemplate -> uriTemplateToUrl(uri, data, scope)
+            is String -> evaluateString(data, uri, "endpoint", scope)
             else -> raiseError(
                 WorkflowErrorType.RUNTIME,
-                "Unsupported endpoint type for script source: ${endpoint.get()?.javaClass?.simpleName}"
+                "Unsupported endpoint URI type for script source: ${uri?.javaClass?.simpleName}"
             )
         }
+
+        is UriTemplate -> uriTemplateToUrl(endpoint, data, scope)
+
+        is String -> evaluateString(data, endpoint, "endpoint", scope)
+
+        else -> raiseError(
+            WorkflowErrorType.RUNTIME,
+            "Unsupported endpoint type for script source: ${endpoint?.javaClass?.simpleName}"
+        )
+    }
+
+    private fun uriTemplateToUrl(
+        uriTemplate: UriTemplate,
+        data: JsonNode,
+        scope: Scope
+    ): String = when (val value = uriTemplate.get()) {
+        is URI -> value.toString()
+        is String -> evaluateString(data, value, "endpoint", scope)
+        else -> raiseError(
+            WorkflowErrorType.RUNTIME,
+            "Unsupported URI template type for script source: ${value?.javaClass?.simpleName}"
+        )
     }
 }
