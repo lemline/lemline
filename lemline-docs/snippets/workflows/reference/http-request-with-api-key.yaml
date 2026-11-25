@@ -7,10 +7,10 @@ use:
   secrets:
     - apiKey
 do:
-  - getProducts:
+  - getPartnerStock:
       call: http
       with:
         method: get
-        endpoint: https://api.example.com/products
+        endpoint: http://127.0.0.1:8787/partner/stock
         headers:
           X-API-Key: ${ $secrets.apiKey }
