@@ -78,10 +78,16 @@ function string(value) {
 function validEmail(value) {
   return typeof value === 'string' && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(value);
 }
+const DEVICES = [
+  { deviceId: 'sensor-1', deviceType: 'sensor', zone: 'cold-room', firmware: '1.0.0', status: 'active', temperature: 4, vibration: 1 },
+  { deviceId: 'sensor-2', deviceType: 'sensor', zone: 'dock', firmware: '1.0.0', status: 'active', temperature: 19, vibration: 6 },
+  { deviceId: 'sensor-3', deviceType: 'sensor', zone: 'dock', firmware: '1.1.0', status: 'active', temperature: 21, vibration: 3.2 },
+];
 function initialState() {
   return {
     stock: 100, reservations: [], charges: [], refunds: [], quotes: [], shipments: [], inbox: [],
-    customers: [], reviews: [], documents: [], audit: [], history: [], requests: [], failures: [],
+    customers: [], reviews: [], documents: [], audit: [], devices: DEVICES.map(row => ({ ...row, reference: row.deviceId })),
+    history: [], requests: [], failures: [],
   };
 }
 function integerParameter(query, name, fallback, min, max) {
@@ -228,7 +234,33 @@ export function createShop() {
         requireValue(document, 'Unknown document', 404);
         return document;
       }
+      if (path === '/devices') {
+        const zone = query.get('zone');
+        const firmwareBelow = query.get('firmwareBelow');
+        const items = state.devices.filter(row => (!zone || row.zone === zone) && (!firmwareBelow || row.firmware < firmwareBelow));
+        return { items, total: items.length };
+      }
+      if (segments[0] === 'devices' && segments.length === 2) {
+        const device = state.devices.find(row => row.deviceId === segments[1]);
+        requireValue(device, 'Unknown device ' + segments[1], 404);
+        return device;
+      }
       throw new ShopError(404, 'Unknown route');
+    }
+
+    if ((method === 'PATCH' || method === 'PUT') && segments[0] === 'devices' && segments.length === 2) {
+      const device = state.devices.find(row => row.deviceId === segments[1]);
+      requireValue(device, 'Unknown device ' + segments[1], 404);
+      requireValue(body && typeof body === 'object' && !Array.isArray(body), 'Expected a JSON object');
+      const changed = [];
+      for (const field of ['status', 'firmware', 'config', 'settings', 'lastPing', 'zone']) {
+        if (field in body && JSON.stringify(device[field]) !== JSON.stringify(body[field])) {
+          device[field] = body[field];
+          changed.push(field);
+        }
+      }
+      if (changed.length) record(device.deviceId, 'Device updated: ' + changed.join(', '));
+      return device;
     }
 
     if (method === 'DELETE') {
@@ -330,6 +362,33 @@ export function createShop() {
       if (!/^[A-Z]{2}$/.test(address.country ?? '')) problems.push('country must be a two-letter code');
       if (problems.length) throw new ShopError(422, 'Invalid address: ' + problems.join(', '));
       return { valid: true, address };
+    }
+    if (path === '/devices') {
+      requireValue([body.deviceId, body.deviceType].every(string), 'Expected deviceId and deviceType');
+      let device = state.devices.find(row => row.deviceId === body.deviceId);
+      if (!device) {
+        device = { deviceId: body.deviceId, reference: body.deviceId, deviceType: body.deviceType, zone: body.location?.zone ?? null, firmware: '1.0.0', status: body.status ?? 'registered' };
+        state.devices.push(device);
+        record(body.deviceId, 'Device registered');
+      }
+      return device;
+    }
+    if (segments[0] === 'devices' && segments.length === 3) {
+      const device = state.devices.find(row => row.deviceId === segments[1]);
+      requireValue(device, 'Unknown device ' + segments[1], 404);
+      if (segments[2] === 'credentials') return { deviceId: device.deviceId, token: 'device-token-' + device.deviceId };
+      if (segments[2] === 'predictions') {
+        const vibration = device.vibration ?? 0;
+        return { deviceId: device.deviceId, probabilityOfFailure: Math.min(0.95, Math.round(vibration * 13) / 100) };
+      }
+      throw new ShopError(404, 'Unknown route');
+    }
+    if (path === '/energy-plans') {
+      requireValue(string(body.zone), 'Expected a zone');
+      const sensors = state.devices.filter(row => row.zone === body.zone && typeof row.temperature === 'number');
+      requireValue(sensors.length, 'No sensors in zone ' + body.zone, 404);
+      const average = sensors.reduce((sum, row) => sum + row.temperature, 0) / sensors.length;
+      return { zone: body.zone, sensors: sensors.length, averageTemperature: average, hvacSetpoint: Math.round(average) - 1, lightingLevel: 70 };
     }
     requireValue(string(orderId), 'Expected an orderId');
     const reservation = state.reservations.find(row => row.orderId === orderId);

@@ -39,6 +39,12 @@ Send JSON objects. Inspect all state with GET /state. Each POST below uses an or
 | POST /graphql | query and variables | Answers the customer(id) query and the addReview mutation only, with GraphQL-style data and errors |
 | POST /documents, PATCH /documents/{id}, DELETE /documents/{id} | reference, title, optional content; PATCH: title, content, status or attachmentId | Draft document, updated document, document marked deleted |
 | POST /audit | reference, message | Stored audit entry |
+| GET /devices | optional zone, firmwareBelow | Warehouse devices: sensor-1 (cold-room), sensor-2 and sensor-3 (dock), with firmware, temperature and vibration |
+| GET /devices/{id}, PATCH or PUT /devices/{id} | PATCH: status, firmware, config, settings, lastPing or zone | Device, or HTTP 404 for an unknown ID; updated device |
+| POST /devices | deviceId, deviceType, optional location.zone and status | Registered device; the same ID returns the existing device |
+| POST /devices/{id}/credentials | — | deviceId and a token |
+| POST /devices/{id}/predictions | — | probabilityOfFailure from the device's vibration: 0.13, 0.78 and 0.42 for the three sensors |
+| POST /energy-plans | zone | Average temperature of the zone's sensors, hvacSetpoint and lightingLevel |
 | POST /reset | — | Fresh shop with 100 units and empty collections |
 
 ### Failures, delays and inspection on any route

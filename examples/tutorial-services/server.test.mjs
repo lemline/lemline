@@ -204,3 +204,19 @@ test('the catalog is described by an OpenAPI document', () => {
   assert.equal(document.paths['/products/{productId}'].get.operationId, 'getProduct');
   assert.equal(document.paths['/products'].get.operationId, 'listProducts');
 });
+
+test('warehouse devices: register, update, predict and plan energy', () => {
+  const shop = createShop();
+  assert.deepEqual(shop('GET', '/devices?zone=dock').items.map(row => row.deviceId), ['sensor-2', 'sensor-3']);
+  assert.deepEqual(shop('GET', '/devices?firmwareBelow=1.1.0').items.map(row => row.deviceId), ['sensor-1', 'sensor-2']);
+  assert.throws(() => shop('GET', '/devices/sensor-9'), status(404));
+  const created = shop('POST', '/devices', { deviceId: 'sensor-9', deviceType: 'sensor', location: { zone: 'dock' } });
+  assert.equal(shop('POST', '/devices', { deviceId: 'sensor-9', deviceType: 'sensor' }).status, created.status);
+  assert.equal(shop('POST', '/devices/sensor-9/credentials').token, 'device-token-sensor-9');
+  assert.equal(shop('PATCH', '/devices/sensor-9', { status: 'active', config: { interval: 60 } }).status, 'active');
+  assert.equal(shop('POST', '/devices/sensor-2/predictions').probabilityOfFailure, 0.78);
+  assert.equal(shop('POST', '/devices/sensor-1/predictions').probabilityOfFailure, 0.13);
+  assert.equal(shop('POST', '/devices/sensor-3/predictions').probabilityOfFailure, 0.42);
+  assert.deepEqual(shop('POST', '/energy-plans', { zone: 'dock' }), { zone: 'dock', sensors: 2, averageTemperature: 20, hvacSetpoint: 19, lightingLevel: 70 });
+  assert.throws(() => shop('POST', '/energy-plans', { zone: 'roof' }), status(404));
+});
