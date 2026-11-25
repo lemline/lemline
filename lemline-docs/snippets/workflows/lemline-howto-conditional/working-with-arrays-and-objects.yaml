@@ -1,19 +1,34 @@
 document:
-  dsl: 1.0.3
+  dsl: '1.0.3'
   namespace: examples
   name: working-with-arrays-and-objects
-  version: 1.0.0
+  version: '1.0.0'
 do:
-  - DetermineShippingMethod:
+  - determineShippingMethod:
       switch:
-        - case1:
+        - heavy:
             when: ${ .items | map(.weight) | add > 20 }
-            then: ArrangeFreightShipping
-        - case2:
+            then: arrangeFreightShipping
+        - express:
             when: ${ .shipping.express == true }
-            then: ArrangeExpressShipping
-        - case3:
+            then: arrangeExpressShipping
+        - premium:
             when: ${ .customer.tier == "premium" }
-            then: ArrangePriorityShipping
-        - case4:
-            then: ArrangeStandardShipping
+            then: arrangePriorityShipping
+        - standard:
+            then: arrangeStandardShipping
+  - arrangeFreightShipping:
+      set:
+        shipping: freight
+      then: exit
+  - arrangeExpressShipping:
+      set:
+        shipping: express
+      then: exit
+  - arrangePriorityShipping:
+      set:
+        shipping: priority
+      then: exit
+  - arrangeStandardShipping:
+      set:
+        shipping: standard

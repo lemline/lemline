@@ -1,0 +1,311 @@
+{
+ "settleSeconds": 20,
+ "timeoutSeconds": 300,
+ "instances": [
+  {
+   "type": "workflowCompleted",
+   "output": {
+    "action": "cooling"
+   }
+  },
+  {
+   "type": "workflowCompleted",
+   "output": {
+    "action": "heating"
+   }
+  },
+  {
+   "type": "workflowCompleted",
+   "output": {
+    "action": "unchanged"
+   }
+  },
+  {
+   "type": "workflowCompleted",
+   "output": {
+    "decision": "process"
+   }
+  },
+  {
+   "type": "workflowCompleted",
+   "output": {
+    "decision": "backorder"
+   }
+  },
+  {
+   "type": "workflowCompleted",
+   "output": {
+    "tier": "gold"
+   }
+  },
+  {
+   "type": "workflowCompleted",
+   "output": {
+    "tier": "silver"
+   }
+  },
+  {
+   "type": "workflowCompleted",
+   "output": {
+    "tier": "bronze"
+   }
+  },
+  {
+   "type": "workflowCompleted",
+   "output": {
+    "tier": "basic"
+   }
+  },
+  {
+   "type": "workflowCompleted",
+   "output": {
+    "route": "supervisor"
+   }
+  },
+  {
+   "type": "workflowCompleted",
+   "output": {
+    "route": "return-policy"
+   }
+  },
+  {
+   "type": "workflowCompleted",
+   "output": {
+    "route": "standard-refund"
+   }
+  },
+  {
+   "type": "workflowCompleted",
+   "output": {
+    "route": "defective-exchange"
+   }
+  },
+  {
+   "type": "workflowCompleted",
+   "output": {
+    "route": "standard-exchange"
+   }
+  },
+  {
+   "type": "workflowCompleted",
+   "output": {
+    "route": "generic"
+   }
+  },
+  {
+   "type": "workflowCompleted",
+   "output": {
+    "next": "ship"
+   }
+  },
+  {
+   "type": "workflowCompleted",
+   "output": {
+    "next": "wait"
+   }
+  },
+  {
+   "type": "workflowCompleted",
+   "output": {
+    "next": "cancel"
+   }
+  },
+  {
+   "type": "workflowCompleted",
+   "output": {
+    "next": "investigate"
+   }
+  },
+  {
+   "type": "workflowCompleted",
+   "output": {
+    "shipping": "freight"
+   }
+  },
+  {
+   "type": "workflowCompleted",
+   "output": {
+    "shipping": "express"
+   }
+  },
+  {
+   "type": "workflowCompleted",
+   "output": {
+    "shipping": "priority"
+   }
+  },
+  {
+   "type": "workflowCompleted",
+   "output": {
+    "shipping": "standard"
+   }
+  },
+  {
+   "type": "workflowCompleted",
+   "output": {
+    "discountPercent": 20
+   }
+  },
+  {
+   "type": "workflowCompleted",
+   "output": {
+    "discountPercent": 10
+   }
+  },
+  {
+   "type": "workflowCompleted",
+   "output": {
+    "discountPercent": 5
+   }
+  },
+  {
+   "type": "workflowCompleted",
+   "output": {
+    "discountPercent": 0
+   }
+  },
+  {
+   "type": "workflowCompleted",
+   "output": {
+    "decision": "manual-review"
+   }
+  },
+  {
+   "type": "workflowCompleted",
+   "output": {
+    "decision": "approved"
+   }
+  },
+  {
+   "type": "workflowCompleted",
+   "output": {
+    "decision": "verification"
+   }
+  },
+  {
+   "type": "workflowCompleted",
+   "output": {
+    "decision": "standard"
+   }
+  },
+  {
+   "type": "workflowCompleted",
+   "output": {
+    "route": "compliance"
+   }
+  },
+  {
+   "type": "workflowCompleted",
+   "output": {
+    "route": "verification"
+   }
+  },
+  {
+   "type": "workflowCompleted",
+   "output": {
+    "route": "priority"
+   }
+  },
+  {
+   "type": "workflowCompleted",
+   "output": {
+    "route": "standard"
+   }
+  },
+  {
+   "type": "workflowCompleted",
+   "output": {
+    "orderStatus": "completed"
+   }
+  },
+  {
+   "type": "workflowCompleted",
+   "output": {
+    "orderStatus": "waiting"
+   }
+  },
+  {
+   "type": "workflowCompleted",
+   "output": {
+    "orderStatus": "payment-failed"
+   }
+  },
+  {
+   "type": "workflowCompleted",
+   "output": {
+    "orderStatus": "completed"
+   }
+  },
+  {
+   "type": "workflowCompleted",
+   "output": {
+    "orderStatus": "in-review"
+   }
+  },
+  {
+   "type": "workflowCompleted",
+   "output": {
+    "orderStatus": "completed"
+   }
+  },
+  {
+   "type": "workflowCompleted",
+   "output": {
+    "orderStatus": "error"
+   }
+  },
+  {
+   "type": "workflowCompleted",
+   "output": {
+    "orderStatus": "CONFIRMED",
+    "message": "~ship via express\\.$"
+   }
+  },
+  {
+   "type": "workflowCompleted",
+   "output": {
+    "orderStatus": "CONFIRMED",
+    "message": "~ship via economy\\.$"
+   }
+  },
+  {
+   "type": "workflowCompleted",
+   "output": {
+    "orderStatus": "PENDING_REVIEW"
+   }
+  },
+  {
+   "type": "workflowCompleted",
+   "output": {
+    "orderStatus": "PAYMENT_DECLINED"
+   }
+  },
+  {
+   "type": "workflowCompleted",
+   "output": {
+    "orderStatus": "REJECTED",
+    "message": "~no items"
+   }
+  },
+  {
+   "type": "workflowCompleted",
+   "output": {
+    "orderStatus": "REJECTED",
+    "message": "~out of stock"
+   }
+  }
+ ],
+ "state": {
+  "stock": 92,
+  "shipments": [
+   {
+    "orderId": "ORD-601",
+    "carrier": "express"
+   },
+   {
+    "orderId": "ORD-602",
+    "carrier": "economy"
+   }
+  ]
+ }
+}

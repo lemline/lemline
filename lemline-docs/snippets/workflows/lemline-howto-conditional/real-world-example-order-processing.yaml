@@ -1,178 +1,155 @@
 document:
-  dsl: 1.0.3
+  dsl: '1.0.3'
   namespace: examples
-  name: order-processing
-  version: 1.0.0
+  name: shop-order-routing
+  version: '1.0.0'
   title: Order Processing Workflow
 do:
-  - ValidateOrder:
+  - validateOrder:
       set:
         isValid: ${ .items | length > 0 }
-        hasFulfillableItems: true
       output:
         as: '${ $input + . }'
       export:
         as: '${ $context + { order: . } }'
-      then: CheckOrderValidity
-  - CheckOrderValidity:
+  - checkOrderValidity:
       switch:
-        - case1:
+        - invalid:
             when: ${ .isValid == false }
-            then: RejectOrder
-        - case2:
-            then: CheckInventory
-  - CheckInventory:
-      call: http
-      with:
-        method: get
-        endpoint: https://inventory-api.example.com/check
-        body:
-          items: '${ .items | map({id: .productId, quantity: .quantity}) }'
+            then: rejectOrder
+        - valid:
+            then: reserveStock
+  - reserveStock:
+      try:
+        - requestReservation:
+            call: http
+            with:
+              method: post
+              endpoint: http://127.0.0.1:8787/reservations
+              body:
+                orderId: ${ .orderId }
+                items: ${ .items }
+            output:
+              as: '${ { reserved: true, reservationId: .id } }'
+      catch:
+        do:
+          - markUnavailable:
+              set:
+                reserved: false
       output:
         as: '${ $context.order + . }'
       export:
         as: '${ $context + { order: . } }'
-      then: EvaluateInventory
-  - EvaluateInventory:
+  - evaluateInventory:
       switch:
-        - case1:
-            when: ${ .allAvailable == true }
-            then: CalculateShipping
-        - case2:
-            when: ${ .partiallyAvailable == true and .allowPartial == true }
-            then: AdjustForPartialInventory
-        - case3:
-            then: HandleOutOfStock
-  - AdjustForPartialInventory:
+        - available:
+            when: ${ .reserved == true }
+            then: getQuotes
+        - unavailable:
+            then: handleOutOfStock
+  - getQuotes:
+      fork:
+        branches:
+          - express:
+              call: http
+              with:
+                method: post
+                endpoint: http://127.0.0.1:8787/quotes/express
+                body:
+                  orderId: ${ .orderId }
+          - economy:
+              call: http
+              with:
+                method: post
+                endpoint: http://127.0.0.1:8787/quotes/economy
+                body:
+                  orderId: ${ .orderId }
+      output:
+        as: '${ $context.order + { quotes: . } }'
+      export:
+        as: '${ $context + { order: . } }'
+  - determineShippingMethod:
+      switch:
+        - express:
+            when: ${ .express == true }
+            then: applyExpressShipping
+        - economy:
+            then: applyEconomyShipping
+  - applyExpressShipping:
       set:
-        items: ${ .availableItems as $available | .items | map(select(.productId as $id | $available | map(.id) | contains([$id]))) }
-        message: Some items were unavailable and have been removed from your order.
+        carrier: express
+        shippingCost: ${ .quotes | map(select(.carrier == "express")) | .[0].price }
       output:
         as: '${ $context.order + . }'
       export:
         as: '${ $context + { order: . } }'
-      then: CalculateShipping
-  - CalculateShipping:
+      then: processPayment
+  - applyEconomyShipping:
+      set:
+        carrier: economy
+        shippingCost: ${ .quotes | map(select(.carrier == "economy")) | .[0].price }
+      output:
+        as: '${ $context.order + . }'
+      export:
+        as: '${ $context + { order: . } }'
+  - processPayment:
+      try:
+        - charge:
+            call: http
+            with:
+              method: post
+              endpoint: http://127.0.0.1:8787/charges
+              body:
+                orderId: ${ .orderId }
+                paymentInfo: ${ .paymentInfo }
+      catch:
+        do:
+          - markDeclined:
+              set:
+                status: declined
+      output:
+        as: '${ $context.order + { payment: . } }'
+      export:
+        as: '${ $context + { order: . } }'
+  - evaluatePayment:
+      switch:
+        - approved:
+            when: ${ .payment.status == "approved" }
+            then: bookShipment
+        - review:
+            when: ${ .payment.status == "review" }
+            then: flagForReview
+        - declined:
+            then: handleDeclinedPayment
+  - bookShipment:
       call: http
       with:
         method: post
-        endpoint: https://shipping-api.example.com/calculate
+        endpoint: http://127.0.0.1:8787/shipments
         body:
-          destination: ${ .shippingAddress }
-          items: ${ .items }
-      output:
-        as: '${ $context.order + . }'
-      export:
-        as: '${ $context + { order: . } }'
-      then: DetermineShippingMethod
-  - DetermineShippingMethod:
-      switch:
-        - case1:
-            when: ${ .expressSelected == true and .expressAvailable == true }
-            then: ApplyExpressShipping
-        - case2:
-            when: ${ .total.weight > 20 }
-            then: ApplyFreightShipping
-        - case3:
-            then: ApplyStandardShipping
-  - ApplyExpressShipping:
-      set:
-        shippingMethod: EXPRESS
-        shippingCost: ${ .rates.express }
-        estimatedDelivery: ${ .deliveryEstimates.express }
-      output:
-        as: '${ $context.order + . }'
-      export:
-        as: '${ $context + { order: . } }'
-      then: CalculateTotals
-  - ApplyFreightShipping:
-      set:
-        shippingMethod: FREIGHT
-        shippingCost: ${ .rates.freight }
-        estimatedDelivery: ${ .deliveryEstimates.freight }
-      output:
-        as: '${ $context.order + . }'
-      export:
-        as: '${ $context + { order: . } }'
-      then: CalculateTotals
-  - ApplyStandardShipping:
-      set:
-        shippingMethod: STANDARD
-        shippingCost: ${ .rates.standard }
-        estimatedDelivery: ${ .deliveryEstimates.standard }
-      output:
-        as: '${ $context.order + . }'
-      export:
-        as: '${ $context + { order: . } }'
-      then: CalculateTotals
-  - CalculateTotals:
-      set:
-        subtotal: ${ .items | map(.price * .quantity) | add }
-        tax: ${ (.items | map(.price * .quantity) | add) * 0.08 }
-        total: ${ (.items | map(.price * .quantity) | add) * 1.08 + .shippingCost }
-      output:
-        as: '${ $context.order + . }'
-      export:
-        as: '${ $context + { order: . } }'
-      then: ProcessPayment
-  - ProcessPayment:
-      call: http
-      with:
-        method: post
-        endpoint: https://payment-api.example.com/process
-        body:
-          amount: ${ .total }
-          method: ${ .paymentMethod }
-          currency: USD
-      output:
-        as: '${ $context.order + . }'
-      export:
-        as: '${ $context + { order: . } }'
-      then: EvaluatePayment
-  - EvaluatePayment:
-      switch:
-        - case1:
-            when: ${ .status == "approved" }
-            then: CompleteOrder
-        - case2:
-            when: ${ .status == "review" }
-            then: FlagForReview
-        - case3:
-            when: ${ .status == "declined" }
-            then: HandleDeclinedPayment
-        - case4:
-            then: HandlePaymentError
-  - CompleteOrder:
+          orderId: ${ .orderId }
+          carrier: ${ .carrier }
+  - completeOrder:
       set:
         orderStatus: CONFIRMED
-        confirmationNumber: ${ .transactionId }
-        message: ${ "Your order has been confirmed and will ship via " + .shippingMethod + "." }
+        message: ${ "Your order has been confirmed and will ship via " + .carrier + "." }
       then: end
-  - RejectOrder:
+  - rejectOrder:
       set:
         orderStatus: REJECTED
-        reason: Invalid order
         message: Your order could not be processed because it contains no items.
       then: end
-  - HandleOutOfStock:
+  - handleOutOfStock:
       set:
         orderStatus: REJECTED
-        reason: Out of stock
         message: Your order could not be processed because some items are out of stock.
       then: end
-  - FlagForReview:
+  - flagForReview:
       set:
         orderStatus: PENDING_REVIEW
         message: Your order requires additional review. We will contact you shortly.
       then: end
-  - HandleDeclinedPayment:
+  - handleDeclinedPayment:
       set:
         orderStatus: PAYMENT_DECLINED
-        reason: ${ .declineReason }
         message: Your payment was declined. Please try a different payment method.
-      then: end
-  - HandlePaymentError:
-      set:
-        orderStatus: PAYMENT_ERROR
-        message: We encountered an error processing your payment. Please try again later.
-      then: end

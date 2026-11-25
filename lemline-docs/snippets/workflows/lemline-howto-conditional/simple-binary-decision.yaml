@@ -1,19 +1,27 @@
 document:
-  dsl: 1.0.3
+  dsl: '1.0.3'
   namespace: examples
   name: simple-binary-decision
-  version: 1.0.0
+  version: '1.0.0'
 do:
-  - CheckInventory:
-      call: inventoryService
+  - checkInventory:
+      call: http
       with:
-        productId: ${ .productId }
-        quantity: ${ .quantity }
-      then: EvaluateInventory
-  - EvaluateInventory:
+        method: get
+        endpoint: ${ "http://127.0.0.1:8787/products/" + .productId }
+      export:
+        as: '${ $context + { requested: $workflow.input.quantity } }'
+  - evaluateInventory:
       switch:
-        - case1:
-            when: ${ .available == true }
-            then: ProcessOrder
-        - case2:
-            then: HandleOutOfStock
+        - inStock:
+            when: ${ .available >= $context.requested }
+            then: processOrder
+        - outOfStock:
+            then: handleOutOfStock
+  - processOrder:
+      set:
+        decision: process
+      then: exit
+  - handleOutOfStock:
+      set:
+        decision: backorder

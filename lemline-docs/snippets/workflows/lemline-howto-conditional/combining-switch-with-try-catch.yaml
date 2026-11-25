@@ -4,20 +4,32 @@ document:
   name: combining-switch-with-try-catch
   version: '1.0.0'
 do:
+  - reserveStock:
+      call: http
+      with:
+        method: post
+        endpoint: http://127.0.0.1:8787/reservations
+        body:
+          orderId: ${ .orderId }
+          items: [{ id: SKU-1, quantity: 1 }]
   - processOrder:
       try:
         - attemptPayment:
             call: http
             with:
               method: post
-              endpoint: https://payments.example.com/charges
+              endpoint: http://127.0.0.1:8787/charges
+              query:
+                fail: '503'
+                failTimes: ${ $workflow.input.failures // 0 | tostring }
               body:
-                amount: ${ .total }
-                cardToken: ${ .paymentMethod.token }
+                orderId: ${ $workflow.input.orderId }
+                paymentInfo:
+                  token: ${ $workflow.input.token }
         - evaluatePayment:
             switch:
               - success:
-                  when: ${ .status == "success" }
+                  when: ${ .status == "approved" }
                   then: completeOrder
               - review:
                   when: ${ .status == "review" }

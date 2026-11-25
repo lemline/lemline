@@ -1,16 +1,27 @@
 document:
-  dsl: 1.0.3
+  dsl: '1.0.3'
   namespace: examples
   name: basic-switch-structure
-  version: 1.0.0
+  version: '1.0.0'
 do:
-  - DecideAction:
+  - checkTemperature:
       switch:
-        - case1:
+        - hot:
             when: ${ .temperature > 30 }
-            then: HandleHotWeather
-        - case2:
+            then: coolWarehouse
+        - cold:
             when: ${ .temperature < 10 }
-            then: HandleColdWeather
-        - case3:
-            then: HandleMildWeather
+            then: heatWarehouse
+        - mild:
+            then: keepSettings
+  - coolWarehouse:
+      set:
+        action: cooling
+      then: exit
+  - heatWarehouse:
+      set:
+        action: heating
+      then: exit
+  - keepSettings:
+      set:
+        action: unchanged
