@@ -5,9 +5,10 @@ document:
   version: '1.0.0'
 use:
   secrets:
-    - PAYMENT_API_KEY
-    - DB_CREDENTIALS
+    - PARTNER_TOKEN
+    - SHOP_CREDENTIALS
 do:
-  - example:
+  - checkSecrets:
       set:
-        ready: true
+        tokenSet: ${ $secrets.PARTNER_TOKEN != null }
+        user: ${ $secrets.SHOP_CREDENTIALS.username }
