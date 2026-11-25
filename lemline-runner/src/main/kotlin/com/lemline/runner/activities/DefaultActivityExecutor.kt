@@ -68,15 +68,20 @@ class DefaultActivityExecutor(
                 connectTimeoutMillis = 15000
                 socketTimeoutMillis = 30000
             }
-            install(HttpRedirect) {
-                checkHttpMethod = false
-                allowHttpsDowngrade = true
-            }
             followRedirects = false
         }
     }
 
-    private val a2a by lazy { A2AActivity(httpClient) }
+    private val redirectingHttpClient by lazy {
+        httpClient.config {
+            install(HttpRedirect) {
+                checkHttpMethod = false
+                allowHttpsDowngrade = true
+            }
+        }
+    }
+
+    private val a2a by lazy { A2AActivity(redirectingHttpClient) }
 
     override suspend fun execute(event: ActivityStarted): JsonNode = when (event) {
         is EmitStarted -> executeEmit(event.config, event.input)
@@ -118,9 +123,8 @@ class DefaultActivityExecutor(
         logger.debug { "Executing HTTP ${config.method} $url (query=${config.query}, redirect=${config.redirect})" }
 
         val response: HttpResponse = reaching(url) {
-            httpClient.config {
-                followRedirects = config.redirect
-            }.request(url) {
+            val client = if (config.redirect) redirectingHttpClient else httpClient
+            client.request(url) {
                 this.method = method
 
                 // Set headers

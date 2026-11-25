@@ -2,15 +2,23 @@
 package com.lemline.runner.activities
 
 import com.lemline.common.json.parseJson
+import com.lemline.core.activities.mock.MockFunctionResolver
+import com.lemline.core.cloudevents.InMemoryCloudEventHook
 import com.lemline.core.errors.CommunicationException
+import com.lemline.core.errors.InternalException
+import com.lemline.core.errors.WorkflowErrorType
+import com.lemline.core.lifecycleevents.LifecycleEventHook
+import com.lemline.core.orchestrator.FullOrchestrator
 import com.lemline.core.processors.CallHttpConfig
 import com.lemline.core.random.random
 import com.lemline.core.states.NodeStack
 import com.lemline.core.states.WorkflowEvent
+import com.lemline.core.workflows.WorkflowCache
 import com.lemline.runner.common.messaging.InstanceMessageCodec
 import com.sun.net.httpserver.HttpServer
 import java.net.InetSocketAddress
 import java.net.ServerSocket
+import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -52,6 +60,65 @@ class DefaultActivityExecutorHttpTest {
                     assertEquals(body, parseJson(receivedBody))
                 }
             }
+        } finally {
+            server.stop(0)
+        }
+    }
+
+    @Test
+    fun `a workflow follows HTTP redirects only when it opts in`() = runTest {
+        val server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
+        val targetCalls = AtomicInteger()
+        val targetBody = """{"stock":100}"""
+        server.createContext("/old-stock") { exchange ->
+            exchange.use {
+                it.responseHeaders.add("Location", "/stock")
+                it.sendResponseHeaders(301, -1)
+            }
+        }
+        server.createContext("/stock") { exchange ->
+            exchange.use {
+                targetCalls.incrementAndGet()
+                val bytes = targetBody.toByteArray()
+                it.responseHeaders.add("Content-Type", "application/json")
+                it.sendResponseHeaders(200, bytes.size.toLong())
+                it.responseBody.write(bytes)
+            }
+        }
+        server.start()
+        try {
+            val executor = DefaultActivityExecutor()
+            suspend fun call(redirect: Boolean?) = FullOrchestrator.start(
+                workflow = WorkflowCache.parseYamlAndPut(
+                    """
+                    document: {dsl: '1.0.3', namespace: test, name: http-redirect, version: '1.0.0'}
+                    do:
+                      - fetch:
+                          call: http
+                          with:
+                            method: get
+                            endpoint: http://127.0.0.1:${server.address.port}/old-stock
+                    """.trimIndent() + if (redirect == null) "" else "\n        redirect: $redirect",
+                ),
+                serde = true,
+                activityExecutor = executor,
+                functionResolver = MockFunctionResolver(),
+                cloudEventHook = InMemoryCloudEventHook(),
+                lifecycleHook = LifecycleEventHook.NOOP,
+            )
+
+            val defaultFailure = assertFailsWith<InternalException> { call(redirect = null) }
+            assertTrue(defaultFailure.error.type.endsWith(WorkflowErrorType.COMMUNICATION.type))
+            assertEquals(301, defaultFailure.error.status)
+            assertEquals(0, targetCalls.get())
+
+            assertEquals(parseJson(targetBody), call(redirect = true))
+            assertEquals(1, targetCalls.get())
+
+            val explicitFailure = assertFailsWith<InternalException> { call(redirect = false) }
+            assertEquals(defaultFailure.error.type, explicitFailure.error.type)
+            assertEquals(301, explicitFailure.error.status)
+            assertEquals(1, targetCalls.get())
         } finally {
             server.stop(0)
         }
