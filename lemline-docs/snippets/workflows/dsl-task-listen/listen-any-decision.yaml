@@ -1,0 +1,14 @@
+document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: listen-any-decision
+  version: '1.0.0'
+do:
+  - collect:
+      listen:
+        to:
+          any:
+            - with: { type: com.example.approved }
+            - with: { type: com.example.rejected }
+      timeout:
+        after: PT2M

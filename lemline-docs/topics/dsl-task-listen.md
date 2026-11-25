@@ -1,103 +1,129 @@
-<!-- Examples are validated -->
-
 # Listen
 
-## Purpose
+A `listen` task pauses the instance until it consumes matching CloudEvents or reaches its timeout.
+The conditions in `listen.to` define which events can resume the task.
 
-The `Listen` task pauses the workflow execution until one or more specific external events are received, based on
-defined conditions. It allows workflows to react to asynchronous occurrences from external systems or other parts of the
-application.
+## Filter on Event Data
 
-This is crucial for building event-driven workflows where progression depends on external signals.
+The first workflow waits for a stock alert. A stock update resumes it only when fewer than five units remain.
 
-## Usage Example
+<code-block lang="yaml" src="workflows/dsl-task-listen/listen-low-stock.yaml"/>
 
-<code-block lang="yaml" src="workflows/dsl-task-listen/usage-example.yaml"/>
+## Choose a Consumption Strategy
 
-In this example, the workflow pauses at `waitForVitalSignAlert` until an event matching either the high temperature
-condition or the abnormal BPM condition arrives, or until the 1-hour timeout is reached. The output will be an array
-containing the data of the event(s) that triggered completion.
+### Any
 
-## Configuration Options
+Use `any` when one of several signals is enough. Here either an approval or a rejection completes the task.
 
-### `listen` (Listen, Required)
+<code-block lang="yaml" src="workflows/dsl-task-listen/listen-any-decision.yaml"/>
 
-This object defines the core parameters for the listening behavior.
+### All
 
-* **`to`** (`eventConsumptionStrategy`, Required): Configures how event conditions are defined and correlated. Common
-  strategies include:
-    * `any`: Defines a list of conditions (using `with`). The task completes as soon as *any single event matching any*
-      listed condition is received.
-        * **Use Case**: Waiting for one of several possible outcomes or signals (e.g., 'approved' OR 'rejected', '
-          payment succeeded' OR 'payment failed').
-        * **Example**:
+Use `all` when each listed event filter must match. Here the inventory and shipping checks must both arrive.
 
-          <code-block lang="yaml" src="workflows/dsl-task-listen/listen-listen-required.yaml" include-lines="8-14"/>
-    * `all`: Defines a list of conditions (using `with`). The task completes only when *at least one event matching
-      each* listed condition has been received.
-        * **Use Case**: Waiting for multiple distinct signals or acknowledgments before proceeding (e.g., confirmation
-          from inventory AND confirmation from shipping).
-        * **Example**:
+<code-block lang="yaml" src="workflows/dsl-task-listen/listen-all-checks.yaml"/>
 
-          <code-block lang="yaml" src="workflows/dsl-task-listen/listen-listen-required-2.yaml" include-lines="8-12"/>
-    * `one`: Defines a *single* condition (using `with`). The task completes only when an event matching this specific
-      condition is received.
-        * **Use Case**: Waiting for a specific, singular event (e.g., 'order shipped' notification, 'user verified'
-          signal).
-        * **Example**:
+### One
 
-          <code-block lang="yaml" src="workflows/dsl-task-listen/listen-listen-required-3.yaml" include-lines="8-11"/>
-    * Each condition is typically defined using a `with` object specifying:
-        * CloudEvent attributes to match (e.g., `type`, `source`).
-        * An optional `data` property containing a [Runtime Expression](dsl-runtime-expressions.md) evaluated against
-          the *event data* for further filtering.
-    * The strategy may also include an optional `until` clause, defining a separate event condition.
-        * **Use Case**: Providing an alternative, event-based exit condition for the listening state, often used for
-          cancellation or timeouts triggered by specific events (e.g., 'order cancelled', 'timeout notification').
-          If an event matching the `until` condition is received, the `Listen` task terminates *immediately*, regardless
-          of whether the main `any`/`all`/`one` conditions were satisfied.
-        * Events matching the `until` condition are **not** included in the task's output array.
-        * **Example**:
+Use `one` for a single filter. Attributes in the filter can match a type and source together. For data-based
+identity matching, see [Event Correlation](dsl-event-correlation.md).
 
-          <code-block lang="yaml" src="workflows/reference/listen-until-complete.yaml"/>
-    * *(Note: The exact structure for defining `any`, `all`, `one`, and `until` depends on the specific definition of
-      the `eventConsumptionStrategy` type in the full DSL reference.)*
+<code-block lang="yaml" src="workflows/dsl-task-listen/listen-one-verification.yaml"/>
 
-* **`read`** (String - `data` | `envelope` | `raw`, Optional, Default: `data`): Specifies what part of the consumed
-  event(s) should be included in the task's output array:
-    * `data`: Include only the event's data payload.
-    * `envelope`: Include the full event envelope (context attributes + data).
-    * `raw`: Include the event's raw data as received.
+### Until
 
-* **`foreach`** (`subscriptionIterator`, Optional): If
-  specified, configures how to process each consumed event individually using a sub-flow (often defined in
-  `foreach.output.as` or a `do` block if the iterator type allows). Consumed events are processed sequentially (FIFO).
+With `any`, an `until` filter lets a separate event stop collection. This workflow collects updates until
+an order completion event arrives. The completion event ends the collection and does not appear in its output.
 
-* **`timeout`** (String - ISO 8601 Duration, Optional): Specifies the maximum time to wait for the required events based
-  on the `listen.to` strategy. If the timeout is reached before the conditions are met, the task **must** fault with a
-  `Timeout` error (`https://open-workflow-specification.org/spec/1.0.0/errors/timeout`).
+<code-block lang="yaml" src="workflows/reference/listen-until-complete.yaml"/>
 
-### Data Flow
+## Read and Process the Events
+
+`listen.read` selects the data payload (the default), the full `envelope`, or the `raw` received event.
+The task returns a list in consumption order. A `foreach` iterator can process and transform each item before it
+joins that list. The task’s `timeout` can limit how long the instance waits. See [Timeouts](dsl-timeouts.md).
 
 <include from="_common-task-data-flow.md" element-id="common-data-flow"/>
 
-**Note**:
-
-* The `transformed input` to the `Listen` task is available for use within the `data` expressions defined under
-  `listen.to` (e.g., referencing `$context`).
-* The `raw output` of the `Listen` task is **always** a sequentially ordered array containing the content specified by
-  `listen.read` (e.g., event data, envelope, or raw) for **all** the event(s) consumed to satisfy the `listen.to`
-  condition.
-* If `foreach` is used, the transformation configured within the iterator (e.g., `foreach.output.as`) is applied to each
-  item *before* it's added to the final output array.
-* Standard `output.as` and `export.as` process this resulting `rawOutput` array.
-
-> [!WARNING]
-> Events consumed solely to satisfy an `until` clause should **not** be included in the task's output array.
-
-### Flow Control
+## Flow Control
 
 <include from="_common-task-flow_control.md" element-id="common-flow-control"/>
-**Note**:
-*   The `if` condition is evaluated *before* the task starts listening. If false, the task is skipped, and its `then` directive is followed immediately.
-*   The `then` directive is followed only *after* the required event(s) are successfully received (and processed, if `foreach` is used) before the `timeout`. If the task times out, it faults, and `then` is *not* followed. 
+
+After the required events are consumed, control follows the task’s `then` directive.
+If the timeout arrives first, the task faults with a timeout error.
+
+## Publish Sample Events
+
+Use the publisher below to send events from a second instance.
+
+<code-block lang="yaml" src="workflows/reference/tutorial-publisher.yaml"/>
+
+## Run the Examples
+
+Complete the [SQLite setup](lemline-tutorial-setup.md) and leave the worker running. Save each workflow in the setup directory under the file name used below.
+
+Run the publisher registration once from the setup directory.
+
+```bash
+bin/lemline definition post -f tutorial-publisher.yaml
+```
+
+Start `listen-low-stock` and allow the listener to register before sending the first event.
+
+```bash
+bin/lemline definition post -f listen-low-stock.yaml
+bin/lemline instance start examples listen-low-stock
+sleep 12
+bin/lemline instance start examples tutorial-publisher --input '{"type":"com.example.stock.changed","data":{"sku":"SKU-1","available":20}}'
+sleep 6
+bin/lemline instance start examples tutorial-publisher --input '{"type":"com.example.stock.changed","data":{"sku":"SKU-1","available":3}}'
+```
+
+Start `listen-any-decision` and allow the listener to register before sending the first event.
+
+```bash
+bin/lemline definition post -f listen-any-decision.yaml
+bin/lemline instance start examples listen-any-decision
+sleep 12
+bin/lemline instance start examples tutorial-publisher --input '{"type":"com.example.rejected","data":{"decision":"rejected"}}'
+```
+
+Start `listen-all-checks` and allow the listener to register before sending the first event.
+
+```bash
+bin/lemline definition post -f listen-all-checks.yaml
+bin/lemline instance start examples listen-all-checks
+sleep 12
+bin/lemline instance start examples tutorial-publisher --input '{"type":"inventory.checked","data":{"check":"inventory"}}'
+sleep 6
+bin/lemline instance start examples tutorial-publisher --input '{"type":"shipping.ready","data":{"check":"shipping"}}'
+```
+
+Start `listen-one-verification` and allow the listener to register before sending the first event.
+
+```bash
+bin/lemline definition post -f listen-one-verification.yaml
+bin/lemline instance start examples listen-one-verification
+sleep 12
+bin/lemline instance start examples tutorial-publisher --input '{"type":"user.verified","data":{"customerId":"C-100"}}'
+```
+
+Start `listen-until-complete` and allow the listener to register before sending the first event.
+
+```bash
+bin/lemline definition post -f listen-until-complete.yaml
+bin/lemline instance start examples listen-until-complete
+sleep 12
+bin/lemline instance start examples tutorial-publisher --input '{"type":"com.example.order.updated","data":{"status":"paid"}}'
+sleep 6
+bin/lemline instance start examples tutorial-publisher --input '{"type":"com.example.order.completed","data":{"status":"complete"}}'
+```
+
+| Example | Expected result |
+|---|---|
+| `listen-low-stock` | Returns only the update with `available: 3`. |
+| `listen-any-decision` | Finishes on the rejection and returns `[{"decision":"rejected"}]`. |
+| `listen-all-checks` | Returns both checks in the order sent. |
+| `listen-one-verification` | Returns the matching verification data. |
+| `listen-until-complete` | Returns the paid update alone. The completion event stops the listener. |
+| `tutorial-publisher` | Each publisher instance completes after emitting its event. |

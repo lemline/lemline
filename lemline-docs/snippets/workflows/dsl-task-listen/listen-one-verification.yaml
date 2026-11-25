@@ -1,0 +1,15 @@
+document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: listen-one-verification
+  version: '1.0.0'
+do:
+  - collect:
+      listen:
+        to:
+          one:
+            with:
+              type: user.verified
+              source: https://events.example.com/tutorial
+      timeout:
+        after: PT2M
