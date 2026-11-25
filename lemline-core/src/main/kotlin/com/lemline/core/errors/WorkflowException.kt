@@ -63,6 +63,13 @@ data class InternalException(
             private const val URI_BASE = "https://open-workflow-specification.org/spec/1.0.0/errors"
             fun from(e: Exception, position: NodePosition) = when (e) {
                 is InternalException -> e.error
+                is CommunicationException -> Error(
+                    errorType = WorkflowErrorType.COMMUNICATION,
+                    status = e.status,
+                    position = position,
+                    title = e.message,
+                    details = e.stackTraceToString(),
+                )
                 else -> Error(
                     errorType = WorkflowErrorType.RUNTIME,
                     position = position,

@@ -74,4 +74,30 @@ class WorkflowErrorTest {
 
         assertEquals(expected, json)
     }
+
+    @Test
+    fun `a communication failure becomes a communication error carrying its status`() {
+        val error = InternalException.Error.from(CommunicationException("HTTP 503: busy", 503), NodePosition("/do/0"))
+
+        assertEquals("https://open-workflow-specification.org/spec/1.0.0/errors/communication", error.type)
+        assertEquals(503, error.status)
+        assertEquals("HTTP 503: busy", error.title)
+        assertEquals("/do/0", error.position)
+    }
+
+    @Test
+    fun `a communication failure without response uses the default communication status`() {
+        val error = InternalException.Error.from(CommunicationException("Unable to reach api.example.com"), NodePosition("/do/0"))
+
+        assertEquals("https://open-workflow-specification.org/spec/1.0.0/errors/communication", error.type)
+        assertEquals(500, error.status)
+    }
+
+    @Test
+    fun `any other failure stays a runtime error`() {
+        val error = InternalException.Error.from(IllegalStateException("boom"), NodePosition("/do/0"))
+
+        assertEquals("https://open-workflow-specification.org/spec/1.0.0/errors/runtime", error.type)
+        assertEquals(500, error.status)
+    }
 }

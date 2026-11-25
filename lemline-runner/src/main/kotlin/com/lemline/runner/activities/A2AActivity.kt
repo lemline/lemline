@@ -3,6 +3,7 @@ package com.lemline.runner.activities
 
 import com.fasterxml.jackson.databind.JsonNode
 import com.lemline.common.json.*
+import com.lemline.core.errors.CommunicationException
 import com.lemline.core.errors.InternalException
 import com.lemline.core.processors.CallA2AConfig
 import com.lemline.core.states.WorkflowEvent.CallA2AStarted
@@ -15,7 +16,9 @@ import io.ktor.http.*
 import io.ktor.utils.io.*
 import io.serverlessworkflow.api.types.A2AArguments.WithA2AMethod
 import io.serverlessworkflow.impl.resources.DefaultResourceLoaderFactory
+import java.io.IOException
 import java.net.URI
+import java.nio.channels.UnresolvedAddressException
 import java.util.UUID
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
@@ -52,14 +55,27 @@ internal class A2AActivity(
     } catch (cancelled: CancellationException) {
         throw cancelled
     } catch (e: Exception) {
+        // The agent answered a failing HTTP status, or gave no usable answer at all:
+        // the workflow can catch these apart, and by status, to retry them.
+        val failure = when (e) {
+            is CommunicationException -> e
+            is IOException, is UnresolvedAddressException -> CommunicationException(
+                "Unable to reach ${event.config.url.server()}: ${e.message ?: e.javaClass.simpleName}", cause = e,
+            )
+            else -> null
+        }
         throw InternalException(InternalException.Error(
-            type = "https://serverlessworkflow.io/spec/1.0.0/errors/runtime",
-            status = 500,
+            type = "https://serverlessworkflow.io/spec/1.0.0/errors/${if (failure == null) "runtime" else "communication"}",
+            status = failure?.status ?: 500,
             position = event.nodePosition.toString(),
             title = "A2A ${event.config.method.value()} failed",
-            details = e.message ?: e.javaClass.simpleName,
+            details = (failure ?: e).message ?: e.javaClass.simpleName,
         ))
     }
+
+    // The server only: the path and the query of the URL may carry credentials.
+    private fun String.server() = runCatching { URI.create(this) }.getOrNull()
+        ?.takeIf { it.host != null }?.let { "${it.scheme}://${it.host}${if (it.port >= 0) ":${it.port}" else ""}" } ?: "the agent"
 
     private suspend fun call(config: CallA2AConfig): JsonNode {
         val source = URI.create(config.url)
@@ -96,7 +112,9 @@ internal class A2AActivity(
                     accept(ContentType.Text.EventStream)
                     setBody(request)
                 }.execute { response ->
-                    check(response.status.isSuccess()) { "HTTP ${response.status.value}: ${response.bodyAsText()}" }
+                    if (!response.status.isSuccess()) {
+                        throw CommunicationException("HTTP ${response.status.value}: ${response.bodyAsText()}", response.status.value)
+                    }
                     if (response.contentType()?.withoutParameters() != ContentType.Text.EventStream) {
                         // Agents may report JSON-RPC errors as ordinary JSON before opening the stream.
                         result(response.bodyAsText(), id)
@@ -104,7 +122,7 @@ internal class A2AActivity(
                     }
                     readStream(response.bodyAsChannel(), id)
                 }
-            } ?: error("A2A stream exceeded ${limits.streamTimeout}")
+            } ?: throw CommunicationException("A2A stream exceeded ${limits.streamTimeout}")
         }
         val response = transportCall {
             transport.createPost().url(rpc.uri.toString()).addHeaders(headers).body(request).post().checkedBody()
@@ -149,10 +167,10 @@ internal class A2AActivity(
 
     private suspend fun <T : Any> transportCall(block: () -> T): T =
         withTimeoutOrNull(limits.requestTimeout) { runInterruptible(Dispatchers.IO) { block() } }
-            ?: error("A2A HTTP request timed out after ${limits.requestTimeout}")
+            ?: throw CommunicationException("A2A HTTP request timed out after ${limits.requestTimeout}")
 
     private fun A2AHttpResponse.checkedBody(): String {
-        check(success()) { "HTTP ${status()}: ${body()}" }
+        if (!success()) throw CommunicationException("HTTP ${status()}: ${body()}", status())
         return body()
     }
 
@@ -188,7 +206,7 @@ internal class A2AActivity(
             }
         }
         channel.closedCause?.let { throw it }
-        error("A2A stream ended before its final result")
+        throw CommunicationException("A2A stream ended before its final result")
     }
 
     private fun JsonNode.endsStream(): Boolean {

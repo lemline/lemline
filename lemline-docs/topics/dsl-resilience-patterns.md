@@ -18,7 +18,7 @@ Retries are declared in the `catch` clause of a `try` task:
 
 <code-block lang="yaml" src="workflows/dsl-resilience-patterns/implementation.yaml" include-lines="7-32"/>
 
-Failed HTTP calls raise a `runtime` error. A retry policy can also be declared once in `use.retries` and referenced by name (`retry: <name>`).
+Failed HTTP calls raise a `communication` error whose `status` is the HTTP status. A retry policy can also be declared once in `use.retries` and referenced by name (`retry: <name>`).
 
 ### Key Components
 
