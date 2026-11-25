@@ -1,46 +1,98 @@
 ---
 title: AsyncAPI Call
 ---
-<!-- Examples are validated -->
 
 # AsyncAPI Call Task (`call: asyncapi`)
 
-> **Lemline runtime:** `call: asyncapi` is not executed by Lemline yet; use `emit` and `listen` tasks.
+An AsyncAPI call selects an operation from an [AsyncAPI document](https://www.asyncapi.com/docs/reference/specification/v3.0.0).
+The operation describes whether the application sends or receives a message and identifies the channel.
+The tutorial shop serves a sample contract with one payment channel and two operations.
 
+> **Lemline**
+>
+> Lemline accepts these workflow definitions at registration. Starting an instance that reaches
+> `call: asyncapi` faults with `Unknown task type: CallAsyncAPI`. The shop serves the
+> sample contract over HTTP. Use `emit` and `listen` for the executable event exchange below.
 
-## Purpose
+## Publish a Message
 
-The AsyncAPI Call task enables workflows to interact with message brokers and event-driven services described by an [AsyncAPI](https://www.asyncapi.com/) specification document.
+Select the `publishPayment` operation and pass the order ID as message data.
 
-This allows workflows to publish messages to channels or subscribe to messages from channels defined in the AsyncAPI document.
+<code-block lang="yaml" src="workflows/dsl-call-asyncapi/asyncapi-publish-payment.yaml"/>
 
-## Usage Examples
+## Subscribe to Messages
 
-### Example: Publishing a Message
+Select the `receivePayment` operation. The subscription asks for one matching message and limits
+the time spent consuming messages.
 
-<code-block lang="yaml" src="workflows/dsl-call-asyncapi/example-publishing-a-message.yaml"/>
+<code-block lang="yaml" src="workflows/dsl-call-asyncapi/asyncapi-receive-payment.yaml"/>
 
-### Example: Subscribing to Messages
+## Exchange CloudEvents
 
-<code-block lang="yaml" src="workflows/dsl-call-asyncapi/example-subscribing-to-messages.yaml"/>
+This listener waits for a payment with the requested order ID. The publisher sends that payment
+as a CloudEvent through the runtime’s event channel.
+
+<code-block lang="yaml" src="workflows/reference/listen-for-payment.yaml"/>
+
+<code-block lang="yaml" src="workflows/reference/tutorial-publisher.yaml"/>
 
 ## Configuration Options
 
-The configuration for an AsyncAPI call is provided within the `with` property of the `call: asyncapi` task.
+| Property | Purpose |
+|---|---|
+| `with.document.endpoint` | URL of the AsyncAPI description. |
+| `with.operation` | Operation identifier in that description. |
+| `with.server` | Server name and optional template variable values. |
+| `with.protocol` | Transport protocol used for the operation. |
+| `with.message` | Payload and optional headers for a send operation. |
+| `with.subscription` | Consumer filter and limits for a receive operation. |
 
-### `with` (Object, Required)
+See [Listen](dsl-task-listen.md) and [Emit](dsl-task-emit.md) for the equivalent DSL event tasks.
 
-*   **`document`** (Object, Required): Defines the location of the AsyncAPI specification document (JSON or YAML). Contains:
-    *   `endpoint` (Object, Required): Specifies the location with `uri` (String | Object, Required) and optional `authentication` (String | Object).
-*   **`operation`** (String, Required): The operation (publish or subscribe) to invoke, as defined within the AsyncAPI `document`.
-*   **`server`** (Object, Optional): Configuration for connecting to a specific server defined in the AsyncAPI document. If omitted, the runtime selects a suitable server based on the operation and `protocol`. Contains:
-    *   `name` (String, Required): The name of the server (must match a server name defined in the AsyncAPI document under the specified operation/channel).
-    *   `variables` (Object, Optional): A key/value map to override [Server Variables](https://www.asyncapi.com/docs/reference/specification/v3.0.0#serverVariableObject) defined in the AsyncAPI document for the selected server.
-*   **`protocol`** (String, Optional): The protocol to use, helping select the target server if `server` is not specified or if multiple servers support the operation. Supported values include: `amqp`, `amqp1`, `anypointmq`, `googlepubsub`, `http`, `ibmmq`, `jms`, `kafka`, `mercure`, `mqtt`, `mqtt5`, `nats`, `pulsar`, `redis`, `sns`, `solace`, `sqs`, `stomp`, `ws`.
-*   **`message`** (Object, Conditionally Required): Defines the message to be published. Required if the `operation` represents a *publish* action. Contains details matching the [AsyncAPI Message Object](https://www.asyncapi.com/docs/reference/specification/v3.0.0#messageObject), such as:
-    *   `payload` (Any, Optional): The main content/body of the message.
-    *   `headers` (Object, Optional): Application-specific headers for the message.
-    *   `correlationId` (String, Optional): ID used for message correlation.
-    *   (Other properties like `contentType`, `name`, `title`, `summary`, `description`, `tags`, `externalDocs`, `bindings`, `examples`, `traits` may be supported depending on runtime capabilities).
-*   **`subscription`** (Object, Conditionally Required): Defines how to subscribe to and consume messages. Required if the `operation` represents a *subscribe* action. Contains:
-    *   `
+## Run the Examples
+
+Complete the [SQLite setup](lemline-tutorial-setup.md) and leave the worker running. Save each workflow in the setup directory under the file name used below.
+
+Use this command from the source checkout to [start the tutorial shop](lemline-tutorial-setup.md#use-the-tutorial-shop).
+
+```bash
+docker compose -f examples/tutorial-services/compose.yaml up -d --wait
+```
+
+Fetch the sample contract from the shop to inspect its channels.
+
+```bash
+curl --retry 10 --retry-connrefused --retry-delay 1 -fsS http://127.0.0.1:8787/asyncapi.json
+```
+
+Use the setup terminal to register the definitions and start both AsyncAPI workflows.
+
+```bash
+bin/lemline definition post -f asyncapi-publish-payment.yaml
+bin/lemline instance start examples asyncapi-publish-payment --input '{"orderId":"O-170"}'
+bin/lemline definition post -f asyncapi-receive-payment.yaml
+bin/lemline instance start examples asyncapi-receive-payment --input '{"orderId":"O-170"}'
+```
+
+Start the listener in the same terminal. Wait for it to register before publishing the payment event.
+
+```bash
+bin/lemline definition post -f listen-for-payment.yaml
+bin/lemline definition post -f tutorial-publisher.yaml
+bin/lemline instance start examples listen-for-payment --input '{"orderId":"O-170"}'
+sleep 12
+bin/lemline instance start examples tutorial-publisher --input '{"type":"com.example.payment.received","data":{"orderId":"O-170"}}'
+```
+
+| Example | Expected result |
+|---|---|
+| `asyncapi-publish-payment` | Registers, then faults with `Unknown task type: CallAsyncAPI`. |
+| `asyncapi-receive-payment` | Registers, then faults with `Unknown task type: CallAsyncAPI`. |
+| `listen-for-payment` | Returns `[{"orderId":"O-170"}]` after receiving the payment event. |
+| `tutorial-publisher` | Completes after emitting the payment event. |
+
+When the instances finish, use the command below in the source checkout to stop the shop.
+
+```bash
+docker compose -f examples/tutorial-services/compose.yaml down
+```

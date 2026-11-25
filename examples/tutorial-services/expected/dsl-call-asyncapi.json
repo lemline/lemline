@@ -1,0 +1,29 @@
+{
+  "settleSeconds": 4,
+  "timeoutSeconds": 45,
+  "instances": [
+    {
+      "type": "workflowFaulted",
+      "error": {
+        "title": "~Unknown task type: CallAsyncAPI"
+      }
+    },
+    {
+      "type": "workflowFaulted",
+      "error": {
+        "title": "~Unknown task type: CallAsyncAPI"
+      }
+    },
+    {
+      "type": "workflowCompleted",
+      "output": [
+        {
+          "orderId": "O-170"
+        }
+      ]
+    },
+    {
+      "type": "workflowCompleted"
+    }
+  ]
+}

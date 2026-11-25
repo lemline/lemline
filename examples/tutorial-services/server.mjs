@@ -67,6 +67,30 @@ const OPENAPI = {
   },
 };
 
+const ASYNCAPI = {
+  asyncapi: '3.0.0',
+  info: { title: 'Tutorial shop payment messages', version: '1.0.0' },
+  servers: { tutorial: { host: '127.0.0.1:8787', protocol: 'http' } },
+  channels: {
+    payment: {
+      address: 'payment.received',
+      messages: {
+        paymentReceived: {
+          payload: {
+            type: 'object',
+            required: ['orderId'],
+            properties: { orderId: { type: 'string' } },
+          },
+        },
+      },
+    },
+  },
+  operations: {
+    publishPayment: { action: 'send', channel: { $ref: '#/channels/payment' } },
+    receivePayment: { action: 'receive', channel: { $ref: '#/channels/payment' } },
+  },
+};
+
 const INVENTORY_PROTO = Buffer.from(`syntax = "proto3";
 
 package shop;
@@ -230,6 +254,7 @@ export function createShop() {
       }
       if (path === '/old-stock') return new Reply(301, { moved: '/stock' }, { Location: '/stock' });
       if (path === '/openapi.json') return OPENAPI;
+      if (path === '/asyncapi.json') return ASYNCAPI;
       if (path === '/inventory.proto') {
         return new Reply(200, INVENTORY_PROTO, { 'Content-Type': 'text/plain; charset=utf-8' });
       }
