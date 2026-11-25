@@ -1,15 +1,18 @@
 document:
-  dsl: 1.0.3
+  dsl: '1.0.3'
   namespace: examples
   name: complex-integration
-  version: 1.0.0
+  version: '1.0.0'
 use:
-  catalogs:
-    catalogs1:
-      endpoint: file://catalog.json
+  functions:
+    getCustomer:
+      call: http
+      with:
+        method: get
+        endpoint: '${ "http://127.0.0.1:8787/customers/" + .customerId }'
 do:
   - getCustomerData:
-      call: crm.getCustomerById
+      call: getCustomer
       with:
         customerId: ${ .customerId }
       export:
@@ -17,54 +20,57 @@ do:
   - processPurchaseOrder:
       try:
         - validateInventory:
-            call: openapi
+            call: http
             with:
-              document:
-                endpoint: https://inventory.example.com/api/openapi.json
-              operationId: checkItemsAvailability
-              parameters:
+              method: post
+              endpoint: http://127.0.0.1:8787/reservations
+              body:
+                orderId: ${ $workflow.input.orderId }
                 items: ${ $workflow.input.orderItems }
         - processPayment:
             call: http
             with:
               method: post
-              endpoint: https://payments.example.com/api/transactions
-              headers:
-                Content-Type: application/json
-                Authorization: Bearer ${ $workflow.input.paymentToken }
-              body: '${ $workflow.input | { customerId: .customerId, amount: .totalAmount, items: .orderItems } }'
+              endpoint: http://127.0.0.1:8787/charges
+              body:
+                orderId: ${ $workflow.input.orderId }
+                paymentInfo:
+                  token: ${ $workflow.input.paymentToken }
         - notifyShipping:
-            call: asyncapi
-            with:
-              document:
-                endpoint: https://messaging.example.com/asyncapi.json
-              operation: publishShippingRequest
-              server:
-                name: production
-              message:
-                payload:
-                  orderId: ${ $workflow.input.orderId }
-                  customer: ${ $context.customerData }
-                  items: ${ $workflow.input.orderItems }
+            emit:
+              event:
+                with:
+                  type: com.example.shipping.requested
+                  source: https://events.example.com/order-service
+                  data:
+                    orderId: ${ $workflow.input.orderId }
+                    customer: ${ $context.customerData.name }
+                    items: ${ $workflow.input.orderItems }
       catch:
         as: error
         do:
           - routeByErrorType:
               switch:
                 - paymentDeclined:
-                    when: ${ $error.type == "https://example.com/errors/payment-declined" }
+                    when: ${ $error.status == 402 }
                     then: notifyCustomer
                 - default:
                     then: logError
           - notifyCustomer:
-              call: crm.sendNotification
+              call: http
               with:
-                customerId: ${ $workflow.input.customerId }
-                message: Your payment was declined. Please update payment information.
+                method: post
+                endpoint: http://127.0.0.1:8787/notifications
+                body:
+                  reference: ${ $workflow.input.orderId }
+                  recipient: customer
+                  message: Your payment was declined. Please update payment information.
               then: exit
           - logError:
               call: http
               with:
                 method: post
-                endpoint: https://logging.example.com/api/errors
-                body: ${ $error }
+                endpoint: http://127.0.0.1:8787/audit
+                body:
+                  reference: ${ $workflow.input.orderId }
+                  message: ${ $error.title }

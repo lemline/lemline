@@ -1,0 +1,69 @@
+{
+ "settleSeconds": 5,
+ "instances": [
+  {
+   "type": "workflowCompleted",
+   "output": {
+    "message": "SKU-1 available: 100"
+   }
+  },
+  {
+   "type": "workflowCompleted",
+   "output": {
+    "id": "SKU-4",
+    "name": "Desk lamp",
+    "category": "home",
+    "price": 30,
+    "available": 10
+   }
+  },
+  {
+   "type": "workflowCompleted",
+   "output": {
+    "sku": "SKU-1",
+    "available": 100
+   }
+  },
+  {
+   "type": "workflowCompleted",
+   "output": {
+    "transformedUser": {
+     "name": "Ada Lovelace",
+     "role": "admin",
+     "lastAccess": "~^20\\d\\d-"
+    }
+   }
+  },
+  {
+   "type": "workflowCompleted",
+   "output": [
+    {
+     "orderId": "ORD-1003"
+    }
+   ]
+  },
+  {
+   "type": "workflowCompleted",
+   "output": [
+    {
+     "orderId": "ORD-1003"
+    }
+   ]
+  },
+  {
+   "type": "workflowCompleted"
+  },
+  {
+   "type": "workflowCompleted",
+   "output": {
+    "fulfillment": "digital-delivery"
+   }
+  },
+  {
+   "type": "workflowCompleted",
+   "output": {
+    "fulfillment": "physical-shipping"
+   }
+  }
+ ]
+}

@@ -1,25 +1,39 @@
 document:
-  dsl: 1.0.3
+  dsl: '1.0.3'
   namespace: examples
   name: using-data-transformations-before-switching
-  version: 1.0.0
+  version: '1.0.0'
 do:
-  - PrepareDecisionData:
+  - prepareDecisionData:
       set:
-        isNewCustomer: ${ (.customer.joinDate | fromdateiso8601) > (now - 30 * 24 * 3600) }
+        isNewCustomer: ${ (.orderDate | fromdateiso8601) - (.customer.joinDate | fromdateiso8601) < 30 * 24 * 3600 }
         isHighValue: ${ .order.total > 1000 }
         hasRiskyItems: ${ .order.items | map(select(.category == "restricted")) | length > 0 }
-      then: RouteOrder
-  - RouteOrder:
+  - routeOrder:
       switch:
-        - case1:
+        - restricted:
             when: ${ .hasRiskyItems == true }
-            then: ComplianceReview
-        - case2:
+            then: complianceReview
+        - newAndLarge:
             when: ${ .isNewCustomer == true and .isHighValue == true }
-            then: VerificationProcess
-        - case3:
+            then: verificationProcess
+        - large:
             when: ${ .isHighValue == true }
-            then: PriorityProcessing
-        - case4:
-            then: StandardProcessing
+            then: priorityProcessing
+        - other:
+            then: standardProcessing
+  - complianceReview:
+      set:
+        route: compliance
+      then: exit
+  - verificationProcess:
+      set:
+        route: verification
+      then: exit
+  - priorityProcessing:
+      set:
+        route: priority
+      then: exit
+  - standardProcessing:
+      set:
+        route: standard

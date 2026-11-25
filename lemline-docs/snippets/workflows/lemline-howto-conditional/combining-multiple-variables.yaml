@@ -1,19 +1,34 @@
 document:
-  dsl: 1.0.3
+  dsl: '1.0.3'
   namespace: examples
   name: combining-multiple-variables
-  version: 1.0.0
+  version: '1.0.0'
 do:
-  - ApplyDiscount:
+  - applyDiscount:
       switch:
-        - case1:
-            when: ${ .customer.loyalty_years >= 5 and .order.total > 100 }
-            then: ApplyPremiumDiscount
-        - case2:
-            when: ${ .customer.loyalty_years >= 2 or .order.total > 200 }
-            then: ApplyStandardDiscount
-        - case3:
+        - premium:
+            when: ${ .customer.loyaltyYears >= 5 and .order.total > 100 }
+            then: applyPremiumDiscount
+        - standard:
+            when: ${ .customer.loyaltyYears >= 2 or .order.total > 200 }
+            then: applyStandardDiscount
+        - sale:
             when: ${ .order.items | map(select(.category == "sale")) | length > 0 }
-            then: ApplySaleDiscount
-        - case4:
-            then: NoDiscount
+            then: applySaleDiscount
+        - none:
+            then: noDiscount
+  - applyPremiumDiscount:
+      set:
+        discountPercent: 20
+      then: exit
+  - applyStandardDiscount:
+      set:
+        discountPercent: 10
+      then: exit
+  - applySaleDiscount:
+      set:
+        discountPercent: 5
+      then: exit
+  - noDiscount:
+      set:
+        discountPercent: 0

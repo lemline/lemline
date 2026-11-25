@@ -4,11 +4,11 @@ document:
   name: output-formats
   version: '1.0.0'
 do:
-  - fetchUsers:
+  - fetchProducts:
       call: http
       with:
         method: get
-        endpoint: https://api.example.com/users
+        endpoint: http://127.0.0.1:8787/products
         output: response
       output:
-        as: ${ .content.items }
+        as: '${ { status: .statusCode, ids: [.content.items[].id] } }'

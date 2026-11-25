@@ -1,8 +1,8 @@
 document:
-  dsl: 1.0.3
+  dsl: '1.0.3'
   namespace: examples
   name: database-timeouts
-  version: 1.0.0
+  version: '1.0.0'
 do:
   - simpleQuery:
       try:
@@ -10,14 +10,14 @@ do:
             call: http
             with:
               method: get
-              endpoint: https://db.example/api/items
+              endpoint: http://127.0.0.1:8787/products
               query:
-                limit: "10"
+                size: '10'
             timeout:
               after:
                 seconds: 3
             export:
-              as: '${ $context + { queryResult: . } }'
+              as: '${ $context + { queryResult: .total } }'
       catch:
         errors:
           with:
@@ -33,31 +33,17 @@ do:
         - executeComplexQuery:
             call: http
             with:
-              method: post
-              endpoint: https://db.example/api/query
-              body:
-                joins: 3
-                filters:
-                  - field: category
-                    operator: in
-                    values:
-                      - A
-                      - B
-                      - C
-                  - field: status
-                    operator: '='
-                    value: active
-                  - field: date
-                    operator: '>='
-                    value: '2023-01-01'
-                sort:
-                  - field: date
-                    direction: desc
+              method: get
+              endpoint: http://127.0.0.1:8787/products
+              query:
+                category: garden
+                search: hose
+                delayMs: ${ $workflow.input.slowQueryMs // 0 | tostring }
             timeout:
               after:
-                seconds: 10
+                seconds: 1
             export:
-              as: '${ $context + { complexResult: . } }'
+              as: '${ $context + { complexResult: [.items[].id] } }'
       catch:
         errors:
           with:
@@ -66,92 +52,12 @@ do:
           - simplifyAndRetry:
               call: http
               with:
-                method: post
-                endpoint: https://db.example/api/query
-                body:
-                  joins: 1
-                  filters:
-                    - field: status
-                      operator: '='
-                      value: active
-                  sort:
-                    - field: date
-                      direction: desc
-              timeout:
-                after:
-                  seconds: 5
+                method: get
+                endpoint: http://127.0.0.1:8787/products
+                query:
+                  category: garden
               export:
-                as: '${ $context + { usedSimplifiedQuery: true, simplifiedResult: . } }'
-  - analyticalQuery:
-      try:
-        - executeAnalyticalQuery:
-            call: http
-            with:
-              method: post
-              endpoint: https://analytics.example/api/query
-              body:
-                type: aggregate
-                groupBy:
-                  - category
-                  - month
-                metrics:
-                  - count
-                  - sum
-                  - average
-                filters: '${ $workflow.input.additionalFilters // [] }'
-            timeout:
-              after:
-                minutes: 2
-            export:
-              as: '${ $context + { analyticalResult: . } }'
-      catch:
-        errors:
-          with:
-            type: https://open-workflow-specification.org/spec/1.0.0/errors/timeout
-        do:
-          - requestAsyncProcessing:
-              call: http
-              with:
-                method: post
-                endpoint: https://analytics.example/api/jobs
-                body:
-                  queryType: aggregate
-                  parameters:
-                    groupBy:
-                      - category
-                      - month
-                    metrics:
-                      - count
-                      - sum
-                      - average
-                    filters: '${ $workflow.input.additionalFilters // [] }'
-                  callbackEvent:
-                    type: com.example.analytics.complete
-                    correlationId: ${ $workflow.id }
-              export:
-                as: '${ $context + { analyticsJobId: .id, usedAsyncAnalytics: true } }'
-  - waitForAsyncResults:
-      listen:
-        to:
-          one:
-            with:
-              type: com.example.analytics.complete
-            correlate:
-              correlationId:
-                from: ${ .correlationId }
-                expect: ${ $workflow.id }
-      timeout:
-        after:
-          minutes: 15
-      export:
-        as: '${ $context + { analyticalResult: .[0] } }'
-      if: ${ $context.usedAsyncAnalytics == true }
-  - prepareResponse:
+                as: '${ $context + { usedSimplifiedQuery: true, simplifiedResult: [.items[].id] } }'
+  - summarize:
       set:
-        result:
-          simpleQuery: ${ $context.queryResult }
-          complexQuery: '${ if $context.usedSimplifiedQuery then $context.simplifiedResult else $context.complexResult end
-            }'
-          analyticalQuery: '${ $context.analyticalResult // "No analytical results available" }'
-          usedSimplifiedQuery: ${ $context.usedSimplifiedQuery == true }
-          usedAsyncAnalytics: ${ $context.usedAsyncAnalytics == true }
+        results: ${ $context }

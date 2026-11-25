@@ -12,12 +12,23 @@ Before diving into debugging techniques, it's important to understand how Lemlin
 4. States and variables are tracked throughout execution
 5. Errors can occur at any stage and are handled according to your error handling configuration
 
+## Follow Along
+
+The commands below run on [the SQLite setup](lemline-tutorial-setup.md). Run them from the setup directory. With the
+JAR, substitute `java -jar lemline.jar` for `bin/lemline`. Some sections use the
+[tutorial shop](lemline-tutorial-order-processing.md#start-the-tutorial-shop); start it from the root of the Lemline
+source checkout:
+
+```bash
+docker compose -f examples/tutorial-services/compose.yaml up -d
+```
+
 ## Enabling Debug Logging
 
 The quickest way to see what a runner does is to start it with a more verbose log level:
 
 ```bash
-lemline listen --debug
+bin/lemline listen --debug
 ```
 
 The `--debug`, `--info`, `--warn` and `--error` options work with every command; the default level is `ERROR`. At `DEBUG` level, the runner logs each task it enters with its input, and the workflow output.
@@ -40,13 +51,17 @@ Log levels include:
 
 ## Inspecting Workflow Definitions
 
-Print the definition Lemline has stored for a workflow:
+Print the definition Lemline has stored for a workflow. Save this definition as `hello.yaml` and register it:
+
+<code-block lang="yaml" src="workflows/lemline-getting-started/creating-your-first-workflow.yaml"/>
 
 ```bash
-lemline definition get <namespace> <name> <version>
+bin/lemline definition post -f hello.yaml
+bin/lemline definition get examples shop-receipt 0.1.0
 ```
 
-Without arguments, `lemline definition get` lists the registered definitions and lets you pick one.
+The second command prints the stored YAML. Without arguments, `bin/lemline definition get` lists the registered
+definitions and lets you pick one.
 
 ## Following Workflow Execution
 
@@ -60,6 +75,18 @@ JQ expressions are a common source of workflow issues. Lemline has no command to
 echo '{"user":{"address":{"city":"Berlin"}}}' | jq '.user.address.city'
 ```
 
+For example, this workflow sums order lines. Save it as `aggregate-order-data.yaml`:
+
+<code-block lang="yaml" src="workflows/reference/aggregate-order-data.yaml"/>
+
+```bash
+bin/lemline definition post -f aggregate-order-data.yaml
+bin/lemline instance start examples aggregate-order-data --input '{"orderId":"ORD-1"}'
+```
+
+The input has no `items`, so `.items[]` fails: the instance faults with an `expression` error (status 400) whose
+title shows the input and the expression, `Unable to evaluate content {"orderId":"ORD-1"} using expr [.items[] | …`. With `--debug`, the worker log shows the task input `{"orderId":"ORD-1"}` just before the error.
+
 ## Debugging Common Issues
 
 ### Schema Validation Errors
@@ -71,7 +98,7 @@ If your workflow fails with schema validation errors:
 3. Register the file again: `lemline definition post` parses each file and reports the files it cannot read:
 
 ```bash
-lemline definition post -f path/to/workflow.yaml
+bin/lemline definition post -f hello.yaml
 ```
 
 ### Expression Evaluation Errors
@@ -112,20 +139,55 @@ When debugging event-based tasks:
 
 ## Testing with Mocked Activities
 
-To run workflows without calling real services, start a runner in test mode with a file of mocked activity responses:
+To run workflows without calling real services, start a runner in test mode with a file of mocked activity
+responses. Each `http` rule matches a URL (a `*` wildcard is allowed) and a method, and returns the given body.
+The file can be YAML or JSON. Create `mocks.json` with a rule for the shop's stock:
 
 ```bash
-lemline listen --mock-config mocks.yaml
+cat > mocks.json <<'EOF'
+{
+  "http": [
+    {
+      "match": { "url": "http://127.0.0.1:8787/stock", "method": "GET" },
+      "response": { "status": 200, "body": { "sku": "SKU-1", "available": 0, "reserved": 0 } }
+    }
+  ]
+}
+EOF
 ```
+
+Stop the running worker with Ctrl+C, start it in test mode, then run a workflow that reads the stock. Save the
+workflow as `check-stock.yaml`:
+
+<code-block lang="yaml" src="workflows/lemline-getting-started/connect-to-http-services.yaml"/>
+
+```bash
+bin/lemline listen --debug --mock-config mocks.json
+```
+
+From a second terminal:
+
+```bash
+bin/lemline definition post -f check-stock.yaml
+bin/lemline instance start examples check-stock
+```
+
+The instance completes with the mocked body, `{"sku":"SKU-1","available":0,"reserved":0}`, while the real shop still
+has 100 units. A mocked call never reaches the shop. Mocked HTTP responses are returned whatever their `status`;
+use `response.error` to make a mocked call fail. Restart the worker without `--mock-config` when you are done.
 
 ## Messages That Could Not Be Processed
 
-Messages that a runner receives for a namespace it does not serve are parked in the failures table. Once the right runner is deployed, re-send them:
+With a shared broker, messages that a runner receives for a namespace it does not serve are parked in the failures
+table. Once the right runner is deployed, re-send them:
 
 ```bash
-lemline failures replay --dry-run
-lemline failures replay --yes
+bin/lemline failures replay --dry-run
+bin/lemline failures replay --yes
 ```
+
+On the SQLite setup nothing is parked: the message waits in the queue until a worker serving its namespace starts,
+and `failures replay --dry-run` answers `No failures found with reason 'foreign_namespace'`.
 
 ## Debugging Timeouts and Performance
 
@@ -134,6 +196,31 @@ To troubleshoot performance issues:
 1. Read the runner metrics at `http://<host>:8080/q/metrics` (message processing counts, failures and durations per channel)
 2. Look for instances that stay pending in the dashboard
 3. Remember that only `listen` task timeouts are enforced; HTTP calls use fixed limits (15 seconds to connect, 30 seconds per request)
+
+To see the request limit, this workflow asks the shop to wait before answering. If the worker still runs with
+`--mock-config`, stop it with Ctrl+C and start it again without that option:
+
+```bash
+bin/lemline listen --debug
+```
+
+Save the workflow as `slow-http-call.yaml`:
+
+<code-block lang="yaml" src="workflows/reference/slow-http-call.yaml"/>
+
+```bash
+bin/lemline definition post -f slow-http-call.yaml
+bin/lemline instance start examples slow-http-call --input '{"delayMs":1000}'
+bin/lemline instance start examples slow-http-call --input '{"delayMs":40000}'
+```
+
+The first instance returns the stock after one second. The second faults after 30 seconds, before the shop
+answers, with a `communication` error titled `Socket timeout has expired [url=http://127.0.0.1:8787/stock?delayMs=40000,
+socket_timeout=30000] ms`. Stop the shop when you are done:
+
+```bash
+docker compose -f examples/tutorial-services/compose.yaml down
+```
 
 ## Best Practices
 

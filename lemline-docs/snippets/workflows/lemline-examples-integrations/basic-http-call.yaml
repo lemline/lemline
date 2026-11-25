@@ -4,8 +4,8 @@ document:
   name: call-http-shorthand-endpoint
   version: '0.1.0'
 do:
-  - getPet:
+  - getProduct:
       call: http
       with:
         method: get
-        endpoint: https://petstore.swagger.io/v2/pet/{petId}
+        endpoint: '${ "http://127.0.0.1:8787/products/" + .productId }'

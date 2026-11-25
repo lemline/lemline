@@ -1,0 +1,81 @@
+{
+ "settleSeconds": 8,
+ "timeoutSeconds": 300,
+ "instances": [
+  {
+   "type": "workflowCompleted",
+   "output": {
+    "deviceId": "sensor-4",
+    "status": "active",
+    "lastPing": "2026-11-25T10:00:00Z"
+   }
+  },
+  {
+   "type": "workflowCompleted"
+  },
+  {
+   "type": "workflowCompleted"
+  },
+  {
+   "type": "workflowCompleted"
+  },
+  {
+   "type": "workflowCompleted",
+   "output": {
+    "deviceId": "sensor-2",
+    "firmware": "1.1.0"
+   }
+  },
+  {
+   "type": "workflowCompleted"
+  },
+  {
+   "type": "workflowCompleted",
+   "output": {
+    "deviceId": "sensor-1",
+    "firmware": "1.0.0"
+   }
+  },
+  {
+   "type": "workflowCompleted"
+  },
+  {
+   "type": "workflowCompleted",
+   "output": {
+    "reference": "dock",
+    "message": "Optimization applied: hvac 19, lighting 70, 2 confirmations"
+   }
+  },
+  {
+   "type": "workflowCompleted"
+  },
+  {
+   "type": "workflowCompleted"
+  }
+ ],
+ "others": [
+  {
+   "workflow": "examples/device-telemetry:1.0.0",
+   "type": "workflowCompleted"
+  },
+  {
+   "workflow": "examples/device-telemetry:1.0.0",
+   "type": "workflowCompleted"
+  }
+ ],
+ "state": {
+  "documents": [
+   {
+    "reference": "sensor-2",
+    "title": "Maintenance ticket"
+   }
+  ],
+  "inbox": [
+   {
+    "reference": "sensor-3",
+    "recipient": "maintenance",
+    "message": "Failure probability 0.42"
+   }
+  ]
+ }
+}

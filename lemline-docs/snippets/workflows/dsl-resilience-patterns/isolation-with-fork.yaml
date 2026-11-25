@@ -1,7 +1,7 @@
 document:
-  dsl: 1.0.3
+  dsl: '1.0.3'
   namespace: examples
-  name: isolation-with-fork
+  name: resilience-fork-isolation
   version: 1.0.0
 do:
   - processBatch:
@@ -13,16 +13,23 @@ do:
                     call: http
                     with:
                       method: post
-                      endpoint: http://inventory/api/reservations
-                      body: ${ .items }
+                      endpoint: http://127.0.0.1:8787/reservations
+                      body:
+                        orderId: ${ .orderId }
+                        items: ${ .items }
+                    output:
+                      as: '${ { inventoryUpdated: true } }'
               catch:
                 do:
                   - ignore:
                       set:
                         inventoryUpdated: false
           - notifyCustomer:
-              emit:
-                event:
-                  with:
-                    type: com.example.order.confirmed
-                    source: https://events.example.com/order-service
+              call: http
+              with:
+                method: post
+                endpoint: http://127.0.0.1:8787/notifications
+                body:
+                  reference: ${ .orderId }
+                  recipient: customer
+                  message: Order received

@@ -1,21 +1,24 @@
 document:
   dsl: '1.0.3'
-  namespace: test
-  name: for-example
+  namespace: examples
+  name: pack-order-items
   version: '0.1.0'
 do:
-  - checkup:
+  - packItems:
       for:
-        each: pet
-        in: ${ .pets }
-        at: childIndex
-      while: ${ .vet != null }
+        each: item
+        in: ${ $workflow.input.items }
+        at: index
+      while: ${ (.stop // false) | not }
       do:
-        - waitForCheckup:
+        - waitForPacking:
             listen:
               to:
                 one:
                   with:
-                    type: com.fake.petclinic.pets.checkup.completed.v2
-            output:
-              as: '${ .pets + [{ "id": $pet.id }] }'
+                    type: com.example.item.packed
+        - recordPacking:
+            set:
+              lastPacked: ${ $item.id }
+              position: ${ $index }
+              stop: ${ .[0].lastItem // false }

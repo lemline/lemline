@@ -30,9 +30,9 @@ Tutorials are hands-on lessons that lead the user through a series of steps to c
 - Reduce cognitive load
 
 **Examples in Lemline Documentation**:
-- [Hello World Tutorial](lemline-tutorial-hello.md)
-- [Order Processing Tutorial](lemline-tutorial-order-processing.md)
-- [IoT Device Monitoring Tutorial](lemline-tutorial-iot.md)
+- [Acknowledge the first order](lemline-tutorial-hello.md)
+- [Reserve, charge and ship an order](lemline-tutorial-order-processing.md)
+- [Monitor the warehouse temperature](lemline-tutorial-iot.md)
 
 #### Tutorial Template
 

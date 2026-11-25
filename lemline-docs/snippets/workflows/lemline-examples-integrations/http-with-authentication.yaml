@@ -1,22 +1,24 @@
 document:
   dsl: '1.0.3'
   namespace: examples
-  name: oauth2-authentication
+  name: http-with-oauth2
   version: '0.1.0'
+use:
+  secrets:
+    - clientSecret
 do:
-  - getPet:
+  - getPartnerStock:
       call: http
       with:
         method: get
         endpoint:
-          uri: https://petstore.swagger.io/v2/pet/{petId}
+          uri: http://127.0.0.1:8787/partner/stock
           authentication:
             oauth2:
-              authority: http://keycloak/realms/fake-authority
-              endpoints: #optional
-                token: /auth/token #defaults to /oauth2/token
-                introspection: /auth/introspect #defaults to /oauth2/introspect
+              authority: http://127.0.0.1:8787
+              endpoints:
+                token: /oauth2/token
               grant: client_credentials
               client:
-                id: workflow-runtime-id
-                secret: workflow-runtime-secret
+                id: shop-workflows
+                secret: ${ $secrets.clientSecret }

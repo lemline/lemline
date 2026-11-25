@@ -1,37 +1,39 @@
 document:
-  dsl: 1.0.3
+  dsl: '1.0.3'
   namespace: examples
-  name: export-schema-validation
-  version: 1.0.0
+  name: io-export-schema-validation
+  version: '1.0.0'
 do:
-  - ValidateExportedData:
-      call: dataService
+  - validateExportedData:
+      call: http
       with:
-        id: ${ .entityId }
+        method: get
+        endpoint: ${ "http://127.0.0.1:8787/products/" + .productId }
       export:
         as:
-          validatedEntity: ${ . }
+          validatedProduct: ${ . }
         schema:
           document:
             type: object
             required:
-              - validatedEntity
+              - validatedProduct
             properties:
-              validatedEntity:
+              validatedProduct:
                 type: object
                 required:
                   - id
                   - name
-                  - status
+                  - category
                 properties:
                   id:
                     type: string
                   name:
                     type: string
-                  status:
+                  category:
                     type: string
                     enum:
-                      - ACTIVE
-                      - INACTIVE
-                      - PENDING
-      then: NextTask
+                      - garden
+                      - home
+  - showContext:
+      set:
+        context: ${ $context }

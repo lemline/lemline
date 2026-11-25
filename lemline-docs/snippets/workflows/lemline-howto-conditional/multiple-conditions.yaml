@@ -1,19 +1,34 @@
 document:
-  dsl: 1.0.3
+  dsl: '1.0.3'
   namespace: examples
   name: multiple-conditions
-  version: 1.0.0
+  version: '1.0.0'
 do:
-  - CategorizeLead:
+  - assignLoyaltyTier:
       switch:
-        - case1:
-            when: ${ .score >= 80 }
-            then: ProcessHotLead
-        - case2:
-            when: ${ .score >= 50 and .score < 80 }
-            then: ProcessWarmLead
-        - case3:
-            when: ${ .score >= 20 and .score < 50 }
-            then: ProcessCoolLead
-        - case4:
-            then: ProcessColdLead
+        - gold:
+            when: ${ .points >= 80 }
+            then: setGold
+        - silver:
+            when: ${ .points >= 50 and .points < 80 }
+            then: setSilver
+        - bronze:
+            when: ${ .points >= 20 and .points < 50 }
+            then: setBronze
+        - basic:
+            then: setBasic
+  - setGold:
+      set:
+        tier: gold
+      then: exit
+  - setSilver:
+      set:
+        tier: silver
+      then: exit
+  - setBronze:
+      set:
+        tier: bronze
+      then: exit
+  - setBasic:
+      set:
+        tier: basic

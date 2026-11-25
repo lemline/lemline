@@ -1,13 +1,14 @@
 document:
-  dsl: 1.0.3
+  dsl: '1.0.3'
   namespace: examples
   name: accessing-workflow-input
-  version: 1.0.0
+  version: '1.0.0'
 do:
-  - ProcessOrder:
+  - summarize:
+      set:
+        itemCount: ${ .items | length }
+  - processOrder:
       set:
         orderId: ${ $workflow.input.orderId }
         customerId: ${ $workflow.input.customerId }
-        items: ${ $workflow.input.items }
-        timestamp: ${ (now | todateiso8601) }
-      then: NextTask
+        itemCount: ${ .itemCount }

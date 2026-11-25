@@ -1,0 +1,142 @@
+{
+ "settleSeconds": 20,
+ "instances": [
+  {
+   "type": "workflowCompleted",
+   "output": {
+    "id": "C-100",
+    "name": "Ada Lovelace"
+   }
+  },
+  {
+   "type": "workflowCompleted",
+   "output": {
+    "id": "C-100"
+   }
+  },
+  {
+   "type": "workflowCompleted",
+   "output": {
+    "id": "C-200",
+    "name": "Alan Turing"
+   }
+  },
+  {
+   "type": "workflowCompleted",
+   "output": {
+    "sku": "SKU-1"
+   }
+  },
+  {
+   "type": "workflowCompleted",
+   "output": {
+    "items": [
+     {
+      "id": "SKU-4"
+     },
+     {
+      "id": "SKU-5"
+     }
+    ]
+   }
+  },
+  {
+   "type": "workflowCompleted",
+   "output": {
+    "id": "C-901",
+    "name": "Hedy Lamarr"
+   }
+  },
+  {
+   "type": "workflowCompleted",
+   "output": {
+    "status": 200,
+    "ids": [
+     "SKU-1",
+     "SKU-2",
+     "SKU-3"
+    ]
+   }
+  },
+  {
+   "type": "workflowCompleted",
+   "output": {
+    "data": [],
+    "reason": "~^HTTP 404"
+   }
+  },
+  {
+   "type": "workflowCompleted",
+   "output": {
+    "authenticatedWith": "basic"
+   }
+  },
+  {
+   "type": "workflowCompleted",
+   "output": {
+    "authenticatedWith": "bearer"
+   }
+  },
+  {
+   "type": "workflowCompleted",
+   "output": {
+    "authenticatedWith": "bearer"
+   }
+  },
+  {
+   "type": "workflowCompleted",
+   "output": {
+    "sku": "SKU-1",
+    "available": 100
+   }
+  },
+  {
+   "type": "workflowFaulted",
+   "error": {
+    "type": "~errors/communication$",
+    "status": 301
+   }
+  },
+  {
+   "type": "workflowCompleted",
+   "output": {
+    "sku": "SKU-1"
+   }
+  },
+  {
+   "type": "workflowCompleted",
+   "output": {
+    "statusCode": 200,
+    "content": {
+     "orderId": "ORD-1601",
+     "status": "reserved"
+    }
+   }
+  },
+  {
+   "type": "workflowCompleted",
+   "output": {
+    "data": {
+     "customer": {
+      "name": "Ada Lovelace"
+     }
+    }
+   }
+  }
+ ],
+ "state": {
+  "requests": {
+   "$contains": [
+    {
+     "headers": {
+      "x-request-id": "REQ-42"
+     }
+    },
+    {
+     "path": "/old-stock",
+     "status": 301
+    }
+   ]
+  }
+ }
+}

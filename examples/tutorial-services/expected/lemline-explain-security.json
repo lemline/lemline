@@ -1,0 +1,25 @@
+{
+ "allowFailure": [
+  "order-input-schema --input '\\{\\}'$"
+ ],
+ "instances": [
+  {
+   "type": "workflowCompleted",
+   "output": {
+    "authenticatedWith": "bearer"
+   }
+  },
+  {
+   "type": "workflowCompleted",
+   "output": {
+    "authenticatedWith": "basic"
+   }
+  },
+  {
+   "type": "workflowCompleted",
+   "output": {
+    "ready": true
+   }
+  }
+ ]
+}

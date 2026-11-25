@@ -40,8 +40,10 @@ List and read the registered definitions from the CLI:
 lemline definition get
 
 # Print one definition
-lemline definition get example order-processing 1.0.0
+lemline definition get tutorial acknowledge-order 0.1.3
 ```
+
+Without arguments the command asks which definition to print. In a script, pass the namespace, name and version.
 
 The gRPC gateway also exposes per-definition counters (`ListDefinitionStats`, `WatchDefinitionStats`), shown in the dashboard.
 

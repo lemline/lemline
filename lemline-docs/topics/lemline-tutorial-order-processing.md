@@ -1,39 +1,45 @@
----
-title: "Tutorial: Database-Less Order Processing"
----
+# Reserve, charge and ship an order
 
-# Tutorial: Database-Less Order Processing
+## Start the tutorial shop
 
-This example shows how workflow context can carry an external reservation ID across
-tasks. Lemline persists orchestration state. The inventory and payment services own
-their business records.
+Complete [the SQLite setup](lemline-tutorial-setup.md) and keep the worker running on the host. In a separate terminal, open the root of the [Lemline source checkout](https://github.com/lemline/lemline) matching these docs (the directory containing `examples/tutorial-services`). With Docker Compose running, start the single shop container:
 
-## Read the definition
+```bash
+docker compose -f examples/tutorial-services/compose.yaml up -d
+```
 
-The workflow reserves inventory, saves the reservation ID in context, then calls
-a payment service. If payment fails, the catch task list releases the reservation
-and raises an error. The workflow data passed to the payment service comes from
-the original input.
+Open [the shop](http://127.0.0.1:8787). The stock starts at 100 units of SKU-1. To repeat this exercise, wait for outstanding workflows to finish, then reset the tutorial shop:
+
+```bash
+curl -X POST http://127.0.0.1:8787/reset
+```
+
+## Register checkout
+
+From the setup directory, save this definition as `compensate-reservation.yaml`. With the JAR, substitute `java -jar lemline.jar` for `bin/lemline`. The workflow sends real HTTP requests to the local shop.
 
 <code-block lang="yaml" src="workflows/reference/compensate-reservation.yaml"/>
 
-## Try it with your services
-
-Replace the inventory and payment URLs with services you can test against. The
-reservation endpoint should return an `id` in its response. Use an idempotent
-release operation so a retried request can safely release the same reservation.
-
-Save the file as `compensate-reservation.yaml`. Follow
-[Getting Started](lemline-getting-started.md) to prepare a runner for the
-`examples` namespace, then register the workflow and start it with an order payload.
-
 ```bash
-lemline definition post -f compensate-reservation.yaml
-lemline instance start examples compensate-reservation --input '{"orderId":"ORD-123","items":[{"id":"SKU-1","quantity":2}],"paymentInfo":{"token":"example-token"}}'
+bin/lemline definition post -f compensate-reservation.yaml
 ```
 
-Test a successful charge and a failed charge. Inspect the payment and inventory
-services to verify that the reservation is released on the failure path.
+The reservation response replaces the task input. The workflow exports its ID to context for compensation and reads the original payment details from `$workflow.input`.
 
-See [Event Correlation](https://github.com/open-workflow-specification/specification/blob/v1.0.3/dsl-reference.md#correlation) to extend the pattern with a
-payment confirmation event.
+## Ship a paid order
+
+```bash
+bin/lemline instance start examples compensate-reservation --input '{"orderId":"ORD-201","items":[{"id":"SKU-1","quantity":2}],"paymentInfo":{"token":"approved"},"failTwice":true}'
+```
+
+Refresh the shop and filter by `ORD-201`. Expect 98 units in stock and one reserved record. The fork requests both quotes. Express succeeds once at 9, while economy returns 503 twice before succeeding at 5. The workflow compares the prices, books economy and writes one customer confirmation to the inbox. The order of the first two carrier requests can vary.
+
+## Compensate a declined payment
+
+```bash
+bin/lemline instance start examples compensate-reservation --input '{"orderId":"ORD-202","items":[{"id":"SKU-1","quantity":2}],"paymentInfo":{"token":"declined"}}'
+```
+
+Filter by `ORD-202`. The reservation is released, the charge is declined, and shipments and inbox are empty for this order. Total available stock returns to 98. The workflow raises `Order completion failed` after the release. Repeat both paths from a reset shop with the same inputs.
+
+Continue with [Wait for payments and collect order checks](lemline-tutorial-waits.md).

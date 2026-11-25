@@ -1,16 +1,20 @@
 document:
-  dsl: 1.0.3
+  dsl: '1.0.3'
   namespace: examples
-  name: star-wars-planets-batch
-  version: 1.0.0-alpha2
+  name: stock-with-retry
+  version: '1.0.0'
 do:
-  - tryGetAllCharacters:
+  - tryGetStock:
       try:
-        - getAllCharacters:
+        - getStock:
             call: http
             with:
               method: get
-              endpoint: https://swapi.dev/api/people/
+              endpoint: http://127.0.0.1:8787/stock
+              query:
+                fail: '503'
+                failTimes: ${ .failures // 0 | tostring }
+                key: ${ $workflow.id }
       catch:
         errors:
           with:

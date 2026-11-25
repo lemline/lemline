@@ -1,0 +1,16 @@
+{
+ "instances": [
+  {
+   "type": "workflowCompleted",
+   "output": {
+    "authenticatedWith": "bearer"
+   }
+  },
+  {
+   "type": "workflowCompleted",
+   "output": {
+    "authenticatedWith": "basic"
+   }
+  }
+ ]
+}

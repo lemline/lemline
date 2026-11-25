@@ -4,14 +4,18 @@ document:
   name: event-correlation
   version: 1.0.0
 do:
-  - WaitForShipmentEvents:
+  - waitForShipmentEvents:
       listen:
         to:
           one:
             with:
-              type: ShipmentStatusUpdate
+              type: com.example.shipment.updated
             correlate:
               orderId:
                 from: ${ .orderId }
                 expect: ${ $workflow.input.orderId }
-      then: ProcessShipmentUpdates
+      then: processShipmentUpdates
+  - processShipmentUpdates:
+      set:
+        orderId: ${ .[0].orderId }
+        status: ${ .[0].status }

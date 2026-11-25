@@ -19,3 +19,4 @@ do:
   - finalize:
       set:
         completed: true
+        status: ${ .status // "skipped" }

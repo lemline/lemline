@@ -6,5 +6,5 @@ document:
 do:
   - example:
       set:
-        total: "${ .items[].price | add }"
-        # If .items isn't an array, ExpressionError is raised
+        total: ${ [.items[].price] | add }
+        # If .items isn't an array, the expression raises an expression error

@@ -1,25 +1,48 @@
 document:
-  dsl: 1.0.3
+  dsl: '1.0.3'
   namespace: examples
   name: using-complex-expressions
-  version: 1.0.0
+  version: '1.0.0'
 do:
-  - RouteCustomerRequest:
+  - routeCustomerRequest:
       switch:
-        - case1:
+        - largeRefund:
             when: ${ .type == "refund" and .amount > 1000 }
-            then: EscalateToSupervisor
-        - case2:
+            then: escalateToSupervisor
+        - lateRefund:
             when: ${ .type == "refund" and .daysSincePurchase > 30 }
-            then: ApplyReturnPolicy
-        - case3:
+            then: applyReturnPolicy
+        - refund:
             when: ${ .type == "refund" }
-            then: ProcessStandardRefund
-        - case4:
+            then: processStandardRefund
+        - defectiveExchange:
             when: ${ .type == "exchange" and .reason == "defective" }
-            then: ProcessDefectiveExchange
-        - case5:
+            then: processDefectiveExchange
+        - exchange:
             when: ${ .type == "exchange" }
-            then: ProcessStandardExchange
-        - case6:
-            then: HandleGenericRequest
+            then: processStandardExchange
+        - other:
+            then: handleGenericRequest
+  - escalateToSupervisor:
+      set:
+        route: supervisor
+      then: exit
+  - applyReturnPolicy:
+      set:
+        route: return-policy
+      then: exit
+  - processStandardRefund:
+      set:
+        route: standard-refund
+      then: exit
+  - processDefectiveExchange:
+      set:
+        route: defective-exchange
+      then: exit
+  - processStandardExchange:
+      set:
+        route: standard-exchange
+      then: exit
+  - handleGenericRequest:
+      set:
+        route: generic

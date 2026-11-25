@@ -1,17 +1,14 @@
 document:
   dsl: '1.0.3'
   namespace: examples
-  name: call-http-shorthand-endpoint
-  version: '0.1.0'
+  name: stock-availability
+  version: '1.0.0'
 do:
-  - getPet:
+  - readStock:
       call: http
       with:
         method: get
-        endpoint: https://petstore.swagger.io/v2/pet/{petId}
-  - buyPet:
-      call: http
-      with:
-        method: put
-        endpoint: https://petstore.swagger.io/v2/pet/{petId}
-        body: '${ . + { status: "sold" } }'
+        endpoint: http://127.0.0.1:8787/stock
+  - showAvailability:
+      set:
+        available: ${ .available }

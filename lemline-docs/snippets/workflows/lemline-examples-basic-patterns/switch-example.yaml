@@ -1,8 +1,8 @@
 document:
   dsl: '1.0.3'
-  namespace: test
-  name: sample-workflow
-  version: 0.1.0
+  namespace: examples
+  name: order-type-routing
+  version: '0.1.0'
 do:
   - processOrder:
       switch:
@@ -23,9 +23,9 @@ do:
       set:
         inventory: clear
         items: 1
-        address: Elmer St
+        address: 12 Main St
       then: exit
   - handleUnknownOrderType:
       set:
         log: warn
-        message: something's wrong
+        message: Unknown order type

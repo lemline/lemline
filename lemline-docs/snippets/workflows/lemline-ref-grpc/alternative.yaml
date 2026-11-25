@@ -1,13 +1,11 @@
 document:
   dsl: '1.0.3'
   namespace: examples
-  name: alternative
+  name: grpc-alternative
   version: '1.0.0'
 do:
-  - getUser:
+  - getStock:
       call: http
       with:
-        method: post
-        endpoint: https://users.example.com/v1/users:get
-        body:
-          id: ${ .userId }
+        method: get
+        endpoint: '${ "http://127.0.0.1:8787/products/\(.sku | @uri)" }'

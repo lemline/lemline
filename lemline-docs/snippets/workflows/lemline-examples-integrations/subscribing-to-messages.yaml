@@ -1,14 +1,14 @@
 document:
   dsl: '1.0.3'
   namespace: examples
-  name: bearer-auth
+  name: asyncapi-subscribe
   version: '0.1.0'
 do:
   - getNotifications:
       call: asyncapi
       with:
         document:
-          endpoint: https://fake.com/docs/asyncapi.json
+          endpoint: https://events.example.com/docs/asyncapi.json
         operation: getNotifications
         protocol: ws
         subscription:

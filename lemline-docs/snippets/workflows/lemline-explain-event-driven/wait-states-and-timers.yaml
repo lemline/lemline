@@ -4,6 +4,9 @@ document:
   name: wait-states-and-timers
   version: 1.0.0
 do:
-  - WaitForPaymentWindow:
-      wait: PT24H
-      then: CheckPaymentStatus
+  - waitForPaymentWindow:
+      wait: PT10S
+      then: checkPaymentStatus
+  - checkPaymentStatus:
+      set:
+        windowClosed: true

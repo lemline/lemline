@@ -10,7 +10,7 @@ do:
             call: http
             with:
               method: get
-              endpoint: https://api.example.com/data
+              endpoint: ${ "http://127.0.0.1:8787/products/" + .productId }
       catch:
         errors:
           with:
@@ -20,3 +20,4 @@ do:
           - fallback:
               set:
                 data: []
+                reason: ${ $apiError.title }

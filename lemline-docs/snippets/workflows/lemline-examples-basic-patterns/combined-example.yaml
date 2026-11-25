@@ -1,19 +1,19 @@
 document:
-  dsl: 1.0.3
+  dsl: '1.0.3'
   namespace: examples
   name: combined-patterns
-  version: 0.1.0
+  version: '0.1.0'
 do:
   - initialize:
       set:
         items:
-          - id: 1
+          - id: SKU-8
             type: digital
             name: E-book
-          - id: 2
+          - id: SKU-9
             type: physical
             name: Notebook
-          - id: 3
+          - id: SKU-10
             type: digital
             name: Software
   - processItems:
@@ -47,5 +47,7 @@ do:
             call: http
             with:
               method: post
-              endpoint: https://example.com/log
-              body: ${ .processed }
+              endpoint: http://127.0.0.1:8787/audit
+              body:
+                reference: ${ .processed.id }
+                message: '${ .processed.name + " processed" + (if .processed.shippingRequired then ", shipping required" else ", download ready" end) }'

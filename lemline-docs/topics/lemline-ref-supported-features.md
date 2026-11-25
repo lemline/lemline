@@ -15,9 +15,9 @@ Lemline implements a subset of the Open Workflow DSL 1.0 specification, with mor
 | Workflow Metadata | ✅ Supported | Full support for namespace, name, version |
 | Workflow Input/Output | ✅ Supported | Including schema validation and the workflow-level `input.from` and `output.as` |
 | States Definition | ✅ Supported | Via task constructs |
-| Expression Language | ✅ Supported | JQ expressions fully supported |
+| Expression Language | ✅ Supported | JQ expressions, evaluated by jackson-jq. |
 | Workflow Variables | ✅ Supported | Context and scope variables |
-| Error Handling | ✅ Supported | Try/catch and retry mechanisms |
+| Error Handling | ✅ Supported | Try/catch and retry mechanisms. A failed HTTP call raises a `communication` error whose `status` is the HTTP status |
 | Workflow Timeouts | ⚠️ Partial | Only `listen` task timeouts are enforced; workflow-level timeouts and timeouts on other tasks are ignored. HTTP calls use fixed limits (15 s connect, 30 s per request) |
 
 ## Control Flow Support
@@ -26,7 +26,7 @@ Lemline implements a subset of the Open Workflow DSL 1.0 specification, with mor
 |---------|--------|-------|
 | Sequential Execution | ✅ Supported | Via `do` construct |
 | Parallel Execution | ✅ Supported | Via `fork` construct |
-| Switch/Choice | ✅ Supported | Via `switch` construct |
+| Switch/Choice | ✅ Supported | Via `switch` construct. |
 | Loops | ✅ Supported | Via `for` and `while` constructs |
 | Error Handling Flow | ✅ Supported | Via `try`/`catch` constructs |
 | Event-Based Execution | ✅ Supported | Via `listen` construct |
@@ -37,17 +37,16 @@ Lemline implements a subset of the Open Workflow DSL 1.0 specification, with mor
 
 | Task Type | Status | Notes |
 |-----------|--------|-------|
-| HTTP Calls | ✅ Supported | Full REST API support |
+| HTTP Calls | ✅ Supported | Any method, headers, query, JSON body, `basic` and `bearer` authentication, redirects with `redirect: true`. URI templates such as `{id}` are not expanded: build the URI with an expression |
 | OpenAPI Calls | ❌ Not supported | Parsed, but no runtime executor; use `call: http` |
 | AsyncAPI Calls | ❌ Not supported | Parsed, but no runtime executor; use `emit` and `listen` |
 | gRPC Calls | ❌ Not supported | Parsed, but no runtime executor |
-| GraphQL | ⚠️ Planned | On roadmap for future release |
+| GraphQL | ✅ Supported | Send the query and variables as the body of a `call: http` POST |
 | Expression Evaluation | ✅ Supported | Via `set` construct |
-| Container Execution | ⚠️ Partial | Basic support via `run` construct |
-| Script Execution | ⚠️ Partial | JavaScript and Python, inline or loaded from a `file://` endpoint |
-| Event Emission | ✅ Supported | Via `emit` construct |
+| Container Execution | ❌ Not supported | Parsed, but no runtime executor: a `run.container` task fails when it runs |
+| Script Execution | ⚠️ Partial | Inline `code`, or a `source.endpoint` with an absolute `file://` URI, in JavaScript or Python; other URI schemes are refused || Event Emission | ✅ Supported | Via `emit` construct |
 | Wait/Delay | ✅ Supported | Via `wait` construct |
-| Custom Function Calls | ✅ Supported | Via function catalog |
+| Custom Function Calls | ⚠️ Partial | Functions declared under `use.functions` run; catalogs declared under `use.catalogs` are ignored ([issue 111](https://github.com/lemline/lemline/issues/111)) |
 
 ## Event Features Support
 
@@ -77,7 +76,7 @@ Lemline implements a subset of the Open Workflow DSL 1.0 specification, with mor
 |---------|--------|-------|
 | Basic Auth | ✅ Supported | For `call: http` |
 | Bearer Token | ✅ Supported | For `call: http` |
-| OAuth2 | ❌ Not yet supported | A call using it fails with a `configuration` error |
+| OAuth2 | ❌ Not yet supported | A call using it fails with a `runtime` error titled `Unsupported OAuth2 authentication` |
 | API Keys | ⚠️ No dedicated policy | Pass the key in `headers` or `query`, read from `$secrets` |
 | mTLS | ❌ Not supported | |
 | OIDC | ❌ Not supported | |
@@ -88,11 +87,25 @@ Lemline implements a subset of the Open Workflow DSL 1.0 specification, with mor
 | Feature | Status | Notes |
 |---------|--------|-------|
 | Custom Extensions | ⚠️ Partial | Basic extension framework available |
-| Function Catalog | ✅ Supported | For reusable functions |
+| Function Catalog | ❌ Not supported | `use.catalogs` is accepted, but a call to one of its functions fails with `Unknown catalog` ([issue 111](https://github.com/lemline/lemline/issues/111)) |
 | Service Discovery | ⚠️ Partial | Basic support via configuration |
 | Metrics Integration | ✅ Supported | Prometheus, JMX, etc. |
 | Tracing Integration | ✅ Supported | OpenTelemetry support |
 | Kubernetes Integration | ✅ Supported | Native Kubernetes support |
+
+## Schema Validation
+
+| Feature | Status | Notes |
+|---------|--------|-------|
+| JSON Schema | ✅ Supported | Draft 2020-12 for workflow input, task input and output, and exports |
+| String formats | ✅ Supported | `email`, `uri`, `date`, `time`, `date-time`, `ipv4` and `uuid` are checked |
+| `contentMediaType` | ⚠️ Annotation only | The content of the string is not checked |
+
+## Tooling
+
+| Feature | Status | Notes |
+|---------|--------|-------|
+| Mock configuration | ✅ Supported | YAML or JSON files |
 
 ## Specification Deviations
 

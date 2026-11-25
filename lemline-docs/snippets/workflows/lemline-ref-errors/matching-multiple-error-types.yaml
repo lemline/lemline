@@ -10,7 +10,9 @@ do:
             call: http
             with:
               method: get
-              endpoint: https://api.example.com/items
+              endpoint: http://127.0.0.1:8787/products
+              query:
+                fail: ${ .failStatus | tostring }
       catch:
         as: error
         do:

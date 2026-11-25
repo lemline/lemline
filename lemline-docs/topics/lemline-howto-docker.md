@@ -6,7 +6,7 @@ title: "How to Set Up with Docker"
 
 This guide shows how to set up a local development environment with Docker Compose using PostgreSQL and a message broker.
 
-> **Note**: For quick experimentation and tutorials, use the [in-memory configuration](lemline-tutorial-hello.md) instead. For production deployments, use managed services (e.g., AWS RDS, Amazon MSK, CloudAMQP) or your organization's infrastructure.
+> **Note**: For quick experimentation and tutorials, use the [Acknowledge the first order](lemline-tutorial-hello.md) instead. For production deployments, use managed services (e.g., AWS RDS, Amazon MSK, CloudAMQP) or your organization's infrastructure.
 
 ## Prerequisites
 

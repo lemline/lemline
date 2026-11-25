@@ -41,7 +41,7 @@ CloudEvents emitted by `emit` tasks and consumed by `listen` tasks use the JSON 
 
 ## Schema Validation
 
-<code-block lang="yaml" src="workflows/reference/customer-input-schema.yaml" include-lines="6-14"/>
+<code-block lang="yaml" src="workflows/reference/customer-input-schema.yaml"/>
 
 Data that does not match its schema raises a `validation` error. External schemas referenced by URL are fetched at validation time.
 
@@ -53,6 +53,23 @@ Data that does not match its schema raises a `validation` error. External schema
 | Data does not match a schema | `validation` error |
 | An expression fails | `expression` error |
 | A message cannot be decoded by a runner | The message goes to the dead-letter destination of its source |
+
+## Run the Examples
+
+Every example on this page is a complete workflow. Complete [the SQLite setup](lemline-tutorial-setup.md), save each example under the file name used below, and run the commands from the setup directory. With the JAR, substitute `java -jar lemline.jar` for `bin/lemline`.
+
+Keep the setup worker running and use a second terminal in the setup directory.
+
+```bash
+bin/lemline definition post -f customer-input-schema.yaml
+bin/lemline instance start examples customer-input-schema --input '{"customerId":"C-100"}'
+bin/lemline instance start examples customer-input-schema --input '{"customerId":100}'
+```
+
+| Example | Expected result |
+|---|---|
+| `{"customerId":"C-100"}` | Completes with `{"ready":true}` |
+| `{"customerId":100}` | Refused by `instance start`: `integer found, string expected` |
 
 ## Related Resources
 

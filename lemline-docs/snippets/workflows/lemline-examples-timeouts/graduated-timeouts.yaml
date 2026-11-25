@@ -1,114 +1,42 @@
 document:
-  dsl: 1.0.3
+  dsl: '1.0.3'
   namespace: examples
   name: graduated-timeouts
-  version: 1.0.0
+  version: '1.0.0'
 do:
-  - fastQuickLookup:
+  - tryCache:
       try:
-        - callCacheService:
+        - lookupCache:
             call: http
             with:
               method: get
-              endpoint: ${ "https://cache.example/lookup/\(.itemId)" }
+              endpoint: '${ "http://127.0.0.1:8787/products/\(.itemId)" + (if .cacheMiss then "?fail=404" else "" end) }'
             timeout:
               after:
                 milliseconds: 500
-            export:
-              as: '${ $context + { cacheResult: ., cacheHit: true } }'
+            output:
+              as: '${ . + { source: "cache" } }'
       catch:
         errors:
           with:
-            type: https://open-workflow-specification.org/spec/1.0.0/errors/timeout
-        as: timeoutError
+            type: https://open-workflow-specification.org/spec/1.0.0/errors/communication
+            status: 404
         do:
-          - setDefaultCache:
-              set:
-                cacheResult:
-                cacheHit: false
-              export:
-                as: '${ $context + { cacheHit: false } }'
-  - conditionalDatabaseCall:
-      try:
-        - callDatabaseService:
-            call: http
-            with:
-              method: get
-              endpoint: ${ "https://db.example/items/\($workflow.input.itemId)" }
-            timeout:
-              after:
-                seconds: 3
-            export:
-              as: '${ $context + { dbResult: ., dbLookupSuccess: true } }'
-      catch:
-        errors:
-          with:
-            type: https://open-workflow-specification.org/spec/1.0.0/errors/timeout
-        as: dbTimeoutError
-      if: ${ $context.cacheHit != true }
-  - conditionalSlowProcessing:
-      try:
-        - callFallbackService:
-            call: http
-            with:
-              method: get
-              endpoint: ${ "https://fallback.example/compute/\($workflow.input.itemId)" }
-            timeout:
-              after:
-                seconds: 10
-            export:
-              as: '${ $context + { fallbackResult: ., fallbackSuccess: true } }'
-      catch:
-        errors:
-          with:
-            type: https://open-workflow-specification.org/spec/1.0.0/errors/timeout
-        as: fallbackTimeoutError
-      if: ${ $context.dbLookupSuccess != true }
-  - prepareResponse:
-      do:
-        - route:
-            switch:
-              - cachedResult:
-                  when: ${ $context.cacheHit == true }
-                  then: cachedResultAction
-              - dbResult:
-                  when: ${ $context.dbLookupSuccess == true }
-                  then: dbResultAction
-              - fallbackResult:
-                  when: ${ $context.fallbackSuccess == true }
-                  then: fallbackResultAction
-              - default:
-                  then: defaultAction
-        - cachedResultAction:
-            do:
-              - action:
-                  set:
-                    result:
-                      source: cache
-                      data: ${ $context.cacheResult }
-            then: exit
-        - dbResultAction:
-            do:
-              - action:
-                  set:
-                    result:
-                      source: database
-                      data: ${ $context.dbResult }
-            then: exit
-        - fallbackResultAction:
-            do:
-              - action:
-                  set:
-                    result:
-                      source: fallback
-                      data: ${ $context.fallbackResult }
-            then: exit
-        - defaultAction:
-            do:
-              - action:
-                  set:
-                    result:
-                      source: default
-                      data:
-                      error: All data sources timed out
-            then: exit
+          - lookupDatabase:
+              try:
+                - queryDatabase:
+                    call: http
+                    with:
+                      method: get
+                      endpoint: '${ "http://127.0.0.1:8787/products/\($workflow.input.itemId)?delayMs=\($workflow.input.databaseDelayMs // 0)" }'
+                    timeout:
+                      after:
+                        seconds: 3
+                    output:
+                      as: '${ . + { source: "database" } }'
+              catch:
+                do:
+                  - computeFallback:
+                      set:
+                        id: ${ $workflow.input.itemId }
+                        source: fallback

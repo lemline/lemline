@@ -1,8 +1,8 @@
 document:
-  dsl: 1.0.3
+  dsl: '1.0.3'
   namespace: examples
   name: customer-onboarding
-  version: 1.0.0
+  version: '1.0.0'
   title: Customer Onboarding Workflow
 input:
   schema:
@@ -39,6 +39,6 @@ input:
           type: string
           pattern: ^\+?[1-9]\d{1,14}$
 do:
-  - example:
+  - acceptCustomer:
       set:
-        ready: true
+        accepted: ${ .email }

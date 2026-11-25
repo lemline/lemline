@@ -19,10 +19,15 @@ do:
             call: http
             with:
               method: get
-              endpoint: https://api.example.com/inventory
+              endpoint: http://127.0.0.1:8787/stock
+              query:
+                fail: '503'
+                failTimes: ${ .failures // 0 | tostring }
+                key: ${ $workflow.id }
       catch:
         errors:
           with:
+            type: https://open-workflow-specification.org/spec/1.0.0/errors/communication
             status: 503
         retry: transient
         do:

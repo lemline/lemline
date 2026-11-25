@@ -1,0 +1,11 @@
+{
+ "instances": [
+  {
+   "type": "workflowCompleted",
+   "output": {
+    "id": "SKU-1",
+    "name": "Garden hose"
+   }
+  }
+ ]
+}

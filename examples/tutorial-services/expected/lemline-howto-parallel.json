@@ -1,0 +1,11 @@
+{
+  "instances": [
+    { "type": "workflowCompleted", "output": { "checks": [{ "available": 100 }, { "orderId": "QUOTE-1", "carrier": "express", "attempts": 1, "price": 9 }] } },
+    { "type": "workflowCompleted", "output": [{ "available": 100 }, { "orderId": "QUOTE-2", "carrier": "express", "price": 9 }] },
+    { "type": "workflowCompleted", "output": { "status": "needs-review" } },
+    { "type": "workflowCompleted", "output": { "checks": [{ "stock": 2 }, { "price": 15 }] } },
+    { "type": "workflowCompleted" },
+    { "type": "workflowCompleted" }
+  ],
+  "state": { "quotes": [{ "orderId": "QUOTE-1" }, { "orderId": "QUOTE-2" }, { "orderId": "QUOTE-3", "carrier": "express", "price": 9 }] }
+}

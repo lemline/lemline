@@ -1,352 +1,51 @@
----
-title: "Tutorial: Hello, Workflow!"
----
+# Acknowledge the first order
 
-# Tutorial: Hello, Workflow!
+Complete [the SQLite setup](lemline-tutorial-setup.md). Keep the worker running and use a second terminal in the setup directory. Substitute `java -jar lemline.jar` for `bin/lemline` if using the JAR. Each definition below is a new version of the same workflow. Save each in turn as `acknowledge-order.yaml`.
 
-In this tutorial, you'll build and run your first workflow with Lemline using `set` and `log` operations. By the end, you'll have a working understanding of basic workflow creation and execution.
-
-## Learning Objectives
-
-By completing this tutorial, you will learn:
-
-- How to create a basic workflow definition
-- How to register a workflow definition with Lemline
-- How to start a workflow instance
-- How to use the `set` task to manipulate data
-- How to use a function to log information
-
-## Prerequisites
-
-- Basic familiarity with YAML syntax
-- A working Lemline environment (complete the [Setting Up A Local Environment](lemline-tutorial-setup.md) tutorial first)
-
-## 1. Creating Your First Workflow
-
-Create a file named `hello.yaml` with the following content:
+## Return an acknowledgement
 
 <code-block lang="yaml" src="workflows/lemline-tutorial-hello/1-creating-your-first-workflow.yaml"/>
 
-Let's break down what this workflow does:
-
-- **document**: Defines metadata (DSL version, namespace, name, version)
-- **do**: Contains the list of tasks to execute sequentially
-- **setGreeting**: Uses `set` to create a `message` variable
-- **logMessage**: Calls the standard log function to output the message
-
-## 2. Registering the Workflow Definition
-
-Before running a workflow, you need to register it with Lemline. This stores the workflow definition in the database:
-
-<tabs group="platform">
-<tab id="macos-post" title="macOS (ARM64)" group-key="macos">
-
 ```bash
-bin/lemline definition post -f hello.yaml
+bin/lemline definition post -f acknowledge-order.yaml
+bin/lemline instance start tutorial acknowledge-order 0.1.0
 ```
 
-</tab>
-<tab id="linux-post" title="Linux (x86_64)" group-key="linux">
+The CLI prints the instance ID. In the worker terminal, find that ID and the line `Workflow completed with output`. The worker completes the workflow with `{"message":"Order received"}`.
 
-```bash
-bin/lemline definition post -f hello.yaml
-```
-
-</tab>
-<tab id="windows-post" title="Windows (x86_64)" group-key="windows">
-
-```powershell
-bin\lemline.exe definition post -f hello.yaml
-```
-
-</tab>
-<tab id="java-post" title="Java (Any OS)" group-key="java">
-
-```bash
-java -jar lemline.jar definition post -f hello.yaml
-```
-
-</tab>
-</tabs>
-
-You should see output confirming the workflow was created:
-```
-  -> Workflow successfully created: 'hello-workflow' (version '0.1.0')
-```
-
-You can verify the definition was registered by listing all workflows:
-
-<tabs group="platform">
-<tab id="macos-get" title="macOS (ARM64)" group-key="macos">
-
-```bash
-bin/lemline definition get
-```
-
-</tab>
-<tab id="linux-get" title="Linux (x86_64)" group-key="linux">
-
-```bash
-bin/lemline definition get
-```
-
-</tab>
-<tab id="windows-get" title="Windows (x86_64)" group-key="windows">
-
-```powershell
-bin\lemline.exe definition get
-```
-
-</tab>
-<tab id="java-get" title="Java (Any OS)" group-key="java">
-
-```bash
-java -jar lemline.jar definition get
-```
-
-</tab>
-</tabs>
-
-This displays all registered workflows with their namespace, name, and version.
-
-## 3. Running Your Workflow
-
-Workflows are executed by a runner. In a separate terminal, from the same directory, start one and leave it running:
-
-<tabs group="platform">
-<tab id="macos-listen" title="macOS (ARM64)" group-key="macos">
-
-```bash
-bin/lemline listen --info
-```
-
-</tab>
-<tab id="linux-listen" title="Linux (x86_64)" group-key="linux">
-
-```bash
-bin/lemline listen --info
-```
-
-</tab>
-<tab id="windows-listen" title="Windows (x86_64)" group-key="windows">
-
-```powershell
-bin\lemline.exe listen --info
-```
-
-</tab>
-<tab id="java-listen" title="Java (Any OS)" group-key="java">
-
-```bash
-java -jar lemline.jar listen --info
-```
-
-</tab>
-</tabs>
-
-Now, let's start an instance of the workflow. You need to specify the namespace and name from your workflow definition:
-
-<tabs group="platform">
-<tab id="macos-run" title="macOS (ARM64)" group-key="macos">
-
-```bash
-bin/lemline instance start tutorial hello-workflow
-```
-
-</tab>
-<tab id="linux-run" title="Linux (x86_64)" group-key="linux">
-
-```bash
-bin/lemline instance start tutorial hello-workflow
-```
-
-</tab>
-<tab id="windows-run" title="Windows (x86_64)" group-key="windows">
-
-```powershell
-bin\lemline.exe instance start tutorial hello-workflow
-```
-
-</tab>
-<tab id="java-run" title="Java (Any OS)" group-key="java">
-
-```bash
-java -jar lemline.jar instance start tutorial hello-workflow
-```
-
-</tab>
-</tabs>
-
-You should see output confirming the instance was started, including the workflow ID.
-
-## 4. Enhancing Your Workflow
-
-Let's make this workflow more interesting by adding more variables and string manipulation.
-
-Update `hello.yaml` to the following:
+## Pass data between tasks
 
 <code-block lang="yaml" src="workflows/lemline-tutorial-hello/4-enhancing-your-workflow.yaml"/>
 
-This enhanced workflow:
-1. Sets `user` and `role` variables
-2. Constructs a personalized greeting using string concatenation
-3. Logs the final message
-
-Update the definition (use `--force` to overwrite the existing version) and run it:
-
-<tabs group="platform">
-<tab id="macos-run2" title="macOS (ARM64)" group-key="macos">
-
 ```bash
-bin/lemline definition post -f hello.yaml --force
-bin/lemline instance start tutorial hello-workflow
+bin/lemline definition post -f acknowledge-order.yaml
+bin/lemline instance start tutorial acknowledge-order 0.1.1
 ```
 
-</tab>
-<tab id="linux-run2" title="Linux (x86_64)" group-key="linux">
+The second task reads the first task's output and returns `Order received for ORD-100` in the message.
 
-```bash
-bin/lemline definition post -f hello.yaml --force
-bin/lemline instance start tutorial hello-workflow
-```
-
-</tab>
-<tab id="windows-run2" title="Windows (x86_64)" group-key="windows">
-
-```powershell
-bin\lemline.exe definition post -f hello.yaml --force
-bin\lemline.exe instance start tutorial hello-workflow
-```
-
-</tab>
-<tab id="java-run2" title="Java (Any OS)" group-key="java">
-
-```bash
-java -jar lemline.jar definition post -f hello.yaml --force
-java -jar lemline.jar instance start tutorial hello-workflow
-```
-
-</tab>
-</tabs>
-
-## 5. Adding User Input
-
-Let's modify the workflow to accept user input. Create a file named `input.json`:
-
-<!-- workflow-example: data -->
-```json
-{
-  "name": "Your Name"
-}
-```
-
-Update your workflow to use this input:
+## Accept the customer's order ID
 
 <code-block lang="yaml" src="workflows/lemline-tutorial-hello/5-adding-user-input.yaml"/>
 
-Update the definition and run the workflow with your input:
-
-<tabs group="platform">
-<tab id="macos-run3" title="macOS (ARM64)" group-key="macos">
-
 ```bash
-bin/lemline definition post -f hello.yaml --force
-bin/lemline instance start tutorial hello-workflow --input '{"name": "Your Name"}'
+bin/lemline definition post -f acknowledge-order.yaml
+bin/lemline instance start tutorial acknowledge-order 0.1.2 --input '{"orderId":"ORD-101"}'
 ```
 
-</tab>
-<tab id="linux-run3" title="Linux (x86_64)" group-key="linux">
+The message now contains the ID supplied at startup.
 
-```bash
-bin/lemline definition post -f hello.yaml --force
-bin/lemline instance start tutorial hello-workflow --input '{"name": "Your Name"}'
-```
-
-</tab>
-<tab id="windows-run3" title="Windows (x86_64)" group-key="windows">
-
-```powershell
-bin\lemline.exe definition post -f hello.yaml --force
-bin\lemline.exe instance start tutorial hello-workflow --input '{\"name\": \"Your Name\"}'
-```
-
-</tab>
-<tab id="java-run3" title="Java (Any OS)" group-key="java">
-
-```bash
-java -jar lemline.jar definition post -f hello.yaml --force
-java -jar lemline.jar instance start tutorial hello-workflow --input '{"name": "Your Name"}'
-```
-
-</tab>
-</tabs>
-
-## 6. Adding Conditional Logic
-
-Let's add a conditional greeting based on the time of day using a `switch` task:
+## Add conditional logic
 
 <code-block lang="yaml" src="workflows/lemline-tutorial-hello/6-adding-conditional-logic.yaml"/>
 
-Update the definition and run the workflow with a morning hour:
-
-<tabs group="platform">
-<tab id="macos-run4" title="macOS (ARM64)" group-key="macos">
-
 ```bash
-bin/lemline definition post -f hello.yaml --force
-bin/lemline instance start tutorial hello-workflow --input '{"name": "Your Name", "hour": 10}'
+bin/lemline definition post -f acknowledge-order.yaml
+bin/lemline instance start tutorial acknowledge-order 0.1.3 --input '{"orderId":"ORD-101","hour":10}'
+bin/lemline instance start tutorial acknowledge-order 0.1.3 --input '{"orderId":"ORD-102","hour":15}'
+bin/lemline instance start tutorial acknowledge-order 0.1.3 --input '{"orderId":"ORD-103","hour":20}'
 ```
 
-</tab>
-<tab id="linux-run4" title="Linux (x86_64)" group-key="linux">
+Expect messages starting with `Good morning`, `Good afternoon` and `Good evening`, respectively. The switch enters one branch. The morning and afternoon tasks jump to `createMessage` to skip subsequent greetings. The evening task reaches it as the next task in sequence.
 
-```bash
-bin/lemline definition post -f hello.yaml --force
-bin/lemline instance start tutorial hello-workflow --input '{"name": "Your Name", "hour": 10}'
-```
-
-</tab>
-<tab id="windows-run4" title="Windows (x86_64)" group-key="windows">
-
-```powershell
-bin\lemline.exe definition post -f hello.yaml --force
-bin\lemline.exe instance start tutorial hello-workflow --input '{\"name\": \"Your Name\", \"hour\": 10}'
-```
-
-</tab>
-<tab id="java-run4" title="Java (Any OS)" group-key="java">
-
-```bash
-java -jar lemline.jar definition post -f hello.yaml --force
-java -jar lemline.jar instance start tutorial hello-workflow --input '{"name": "Your Name", "hour": 10}'
-```
-
-</tab>
-</tabs>
-
-## What You've Learned
-
-In this tutorial, you've learned how to:
-
-- Create workflow definitions using the Open Workflow DSL v1.0
-- Register workflow definitions with `definition post`
-- Start workflow instances with `instance start`
-- Use the `set` task to create and manipulate variables
-- Use expressions with `${ }` for dynamic values
-- Call external functions (like the log function)
-- Pass input to a workflow instance
-- Use `switch` for conditional branching
-
-## Next Steps
-
-Now that you've completed your first workflow, you might want to:
-
-- Learn about [HTTP calls](lemline-howto-http.md) to connect to external services
-- Explore [data passing between tasks](lemline-howto-data-passing.md) in more depth
-- Try the [Database-Less Order Processing](lemline-tutorial-order-processing.md) tutorial
-- Learn about [event handling](lemline-howto-events.md) for more complex workflows
-
-For more comprehensive information about the concepts introduced in this tutorial, see:
-- [Task Set Reference](lemline-ref-task-types.md)
-- [Data Flow in Workflows](lemline-explain-execution.md)
-- [Runtime Expressions and jq](lemline-explain-jq.md)
+Continue with [Reserve, charge and ship an order](lemline-tutorial-order-processing.md).

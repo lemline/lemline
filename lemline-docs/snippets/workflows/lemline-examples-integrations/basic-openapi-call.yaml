@@ -1,14 +1,14 @@
 document:
   dsl: '1.0.3'
-  namespace: test
-  name: openapi-example
+  namespace: examples
+  name: openapi-list-products
   version: '0.1.0'
 do:
-  - findPet:
+  - findGardenProducts:
       call: openapi
       with:
         document:
-          endpoint: https://petstore.swagger.io/v2/swagger.json
-        operationId: findPetsByStatus
+          endpoint: http://127.0.0.1:8787/openapi.json
+        operationId: listProducts
         parameters:
-          status: available
+          category: garden

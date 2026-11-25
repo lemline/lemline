@@ -18,10 +18,10 @@ Welcome to the official documentation for Lemline, the modern runtime for Open W
 
 *Learning-oriented experiences for skill acquisition*
 
-* [Tutorial: Hello, Workflow!](lemline-tutorial-hello.md)
-* [Tutorial: Database-Less Order Processing](lemline-tutorial-order-processing.md)
-* [Tutorial: Waits, Fan-In, and Timers](lemline-tutorial-waits.md)
-* [Tutorial: Streaming Sensor Events (IoT)](lemline-tutorial-iot.md)
+* [Acknowledge the first order](lemline-tutorial-hello.md)
+* [Reserve, charge and ship an order](lemline-tutorial-order-processing.md)
+* [Wait for payments and collect order checks](lemline-tutorial-waits.md)
+* [Monitor the warehouse temperature](lemline-tutorial-iot.md)
 
 ## 🛠️ How-to Guides
 

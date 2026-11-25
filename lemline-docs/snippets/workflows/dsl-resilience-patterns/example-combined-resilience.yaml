@@ -1,7 +1,7 @@
 document:
-  dsl: 1.0.3
+  dsl: '1.0.3'
   namespace: examples
-  name: example-combined-resilience
+  name: resilience-combined
   version: 1.0.0
 do:
   - processOrder:
@@ -10,7 +10,10 @@ do:
             call: http
             with:
               method: post
-              endpoint: http://order-service/api/orders
+              endpoint: http://127.0.0.1:8787/reservations
+              query:
+                fail: '503'
+                failTimes: ${ .failures // 0 | tostring }
               body: ${ .order }
       catch:
         errors:
@@ -26,9 +29,11 @@ do:
               count: 3
         do:
           - queueForLater:
-              emit:
-                event:
-                  with:
-                    type: com.example.order.pending
-                    source: https://events.example.com/order-workflow
-                    data: ${ .order }
+              call: http
+              with:
+                method: post
+                endpoint: http://127.0.0.1:8787/notifications
+                body:
+                  reference: ${ .order.orderId }
+                  recipient: order-desk
+                  message: Order queued for later processing

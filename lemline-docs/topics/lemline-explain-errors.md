@@ -78,7 +78,7 @@ The Lemline runtime automatically generates errors for common failure scenarios:
 
 - **Expression Evaluation**: When JQ expressions fail
 
-  <code-block lang="yaml" src="workflows/lemline-explain-errors/1-system-generated-errors.yaml" include-lines="8-10"/>
+  <code-block lang="yaml" src="workflows/lemline-explain-errors/1-system-generated-errors.yaml"/>
 
 - **HTTP Communication**: When API calls fail
 
@@ -86,7 +86,7 @@ The Lemline runtime automatically generates errors for common failure scenarios:
 
 - **Timeout Violations**: When operations exceed their timeouts
 
-  <code-block lang="yaml" src="workflows/lemline-explain-errors/1-system-generated-errors-2.yaml" include-lines="8-10"/>
+  <code-block lang="yaml" src="workflows/lemline-explain-errors/1-system-generated-errors-2.yaml"/>
 
   > **Lemline runtime:** only `listen` task timeouts are enforced. Workflow-level timeouts and timeouts on other tasks are accepted but ignored for now. HTTP calls use fixed client limits instead: 15 seconds to connect, 30 seconds per request.
 
@@ -136,7 +136,7 @@ Lemline provides several mechanisms for handling errors:
 
 The primary error handling mechanism:
 
-<code-block lang="yaml" src="workflows/lemline-explain-errors/1-try-catch-blocks.yaml" include-lines="7-23"/>
+<code-block lang="yaml" src="workflows/lemline-explain-errors/1-try-catch-blocks.yaml"/>
 
 Key components:
 - **try**: Contains tasks that might fail
@@ -149,7 +149,7 @@ Key components:
 
 Automated retry for transient failures:
 
-<code-block lang="yaml" src="workflows/lemline-explain-errors/2-retry-policies.yaml" include-lines="7-22"/>
+<code-block lang="yaml" src="workflows/lemline-explain-errors/2-retry-policies.yaml"/>
 
 When an error occurs:
 1. The error is caught
@@ -161,7 +161,7 @@ When an error occurs:
 
 Define explicit fallback behavior:
 
-<code-block lang="yaml" src="workflows/lemline-explain-errors/3-fallback-patterns.yaml" include-lines="7-24"/>
+<code-block lang="yaml" src="workflows/lemline-explain-errors/3-fallback-patterns.yaml"/>
 
 This pattern allows graceful degradation when preferred data sources fail.
 
@@ -177,13 +177,13 @@ Best practices for error-resilient workflows:
 
 Explicitly define expected error conditions:
 
-<code-block lang="yaml" src="workflows/lemline-explain-errors/1-define-expected-errors.yaml" include-lines="6-15"/>
+<code-block lang="yaml" src="workflows/lemline-explain-errors/1-define-expected-errors.yaml"/>
 
 ### 2. Implement Structured Error Handling
 
 Structure your workflow with proper error handling:
 
-<code-block lang="yaml" src="workflows/lemline-explain-errors/2-implement-structured-error-handling.yaml" include-lines="7-31"/>
+<code-block lang="yaml" src="workflows/lemline-explain-errors/2-implement-structured-error-handling.yaml"/>
 
 ### 3. Use Appropriate Retry Strategies
 
@@ -198,13 +198,13 @@ Choose retry strategies based on error types:
 
 Design workflows to handle partial failures:
 
-<code-block lang="yaml" src="workflows/lemline-explain-errors/4-implement-graceful-degradation.yaml" include-lines="7-29"/>
+<code-block lang="yaml" src="workflows/lemline-explain-errors/4-implement-graceful-degradation.yaml"/>
 
 ### 5. Provide Comprehensive Error Context
 
 Ensure errors contain useful diagnostic information:
 
-<code-block lang="yaml" src="workflows/lemline-explain-errors/5-provide-comprehensive-error-context.yaml" include-lines="7-14"/>
+<code-block lang="yaml" src="workflows/lemline-explain-errors/5-provide-comprehensive-error-context.yaml"/>
 
 ## Debugging and Monitoring Errors
 
@@ -227,6 +227,67 @@ Runners expose processing metrics at `/q/metrics`, including failure counters pe
 ### Error Tracing
 
 The `workflow.faulted` and `task.faulted` lifecycle events of an instance carry the full error (`type`, `status`, `title`, `instance`, `detail`), where `instance` is the position of the failing task in the workflow. They are visible in the dashboard and, with lifecycle analytics enabled, stored in the analytics database.
+
+## Run the Examples
+
+Every example on this page is a complete workflow. Complete [the SQLite setup](lemline-tutorial-setup.md), save each example under the file name used below, and run the commands from the setup directory. With the JAR, substitute `java -jar lemline.jar` for `bin/lemline`.
+
+Start the [tutorial shop](lemline-tutorial-order-processing.md#start-the-tutorial-shop) from the root of the Lemline source checkout:
+
+```bash
+docker compose -f examples/tutorial-services/compose.yaml up -d
+```
+
+Keep the setup worker running and use a second terminal in the setup directory.
+
+```bash
+bin/lemline definition post -f validate-and-route-order.yaml
+bin/lemline instance start examples validate-and-route-order --input '{"orderId":"ORD-303","total":-1}'
+bin/lemline definition post -f 1-system-generated-errors.yaml
+bin/lemline instance start examples 1-system-generated-errors --input '{"items":"none"}'
+bin/lemline definition post -f connect-to-http-services.yaml
+bin/lemline instance start examples check-stock
+bin/lemline definition post -f 1-system-generated-errors-2.yaml
+bin/lemline instance start examples 1-system-generated-errors-2
+bin/lemline definition post -f typed-error.yaml
+bin/lemline instance start examples typed-error
+bin/lemline definition post -f 1-try-catch-blocks.yaml
+bin/lemline instance start examples 1-try-catch-blocks --input '{"orderId":"ORD-1802"}'
+bin/lemline definition post -f 2-retry-policies.yaml
+bin/lemline instance start examples 2-retry-policies
+bin/lemline definition post -f 3-fallback-patterns.yaml
+bin/lemline instance start examples 3-fallback-patterns --input '{"customerId":"C-100","apiDown":true}'
+bin/lemline definition post -f 1-define-expected-errors.yaml
+bin/lemline instance start examples 1-define-expected-errors --input '{"quantity":500}'
+bin/lemline definition post -f 2-implement-structured-error-handling.yaml
+bin/lemline instance start examples 2-implement-structured-error-handling --input '{"orderId":"ORD-1803","token":"approved"}'
+bin/lemline instance start examples 2-implement-structured-error-handling --input '{"orderId":"ORD-1804","token":"declined"}'
+bin/lemline definition post -f 4-implement-graceful-degradation.yaml
+bin/lemline instance start examples 4-implement-graceful-degradation --input '{"customerId":"C-100","recommendationsDown":true}'
+bin/lemline definition post -f 5-provide-comprehensive-error-context.yaml
+bin/lemline instance start examples 5-provide-comprehensive-error-context --input '{"recordId":"R-9","recordType":"invalid"}'
+```
+
+| Example | Expected result |
+|---|---|
+| `validate-and-route-order` with a negative total | Refused by `instance start`: the total must be at least 0 |
+| `1-system-generated-errors` | Faults with an `expression` error: `items` is not an array |
+| `check-stock` | The stock |
+| `1-system-generated-errors-2` | Completes after 30 to 40 seconds |
+| `typed-error` | Faults with `invalid-order`, status 422 |
+| `1-try-catch-blocks` | `{"errorMessage":"Payment service unavailable: HTTP 503: …"}` |
+| `2-retry-policies` | The stock after two retries |
+| `3-fallback-patterns` | `{"name":"Ada Lovelace","dataSource":"cache","isFresh":false}` |
+| `1-define-expected-errors` | Faults with `insufficient-inventory`, status 409, title `Insufficient Inventory` |
+| `2-implement-structured-error-handling` | `{"fulfilled":true}` for ORD-1803, `{"fulfilled":false}` for ORD-1804 |
+| `4-implement-graceful-degradation` | `[{"profile":"Ada Lovelace"},{"recommendations":[]}]` |
+| `5-provide-comprehensive-error-context` | Faults with `Invalid Record Type` and detail `Record ID R-9 has invalid type 'invalid'` |
+
+Stop the shop when you are done:
+
+```bash
+docker compose -f examples/tutorial-services/compose.yaml down
+```
 
 ## Related Resources
 

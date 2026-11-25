@@ -4,11 +4,17 @@ document:
   name: using-retry-policies
   version: 1.0.0
 do:
-  - example:
+  - readStock:
       try:
         - operation:
-            set:
-              processed: true
+            call: http
+            with:
+              method: get
+              endpoint: http://127.0.0.1:8787/stock
+              query:
+                fail: '503'
+                failTimes: '1'
+                key: ${ $workflow.id }
       catch:
         retry:
           delay:

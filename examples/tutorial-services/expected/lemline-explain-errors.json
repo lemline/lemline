@@ -1,0 +1,88 @@
+{
+ "settleSeconds": 50,
+ "allowFailure": [
+  "\"total\":-1\\}'$"
+ ],
+ "instances": [
+  {
+   "type": "workflowFaulted",
+   "error": {
+    "type": "~errors/expression$"
+   }
+  },
+  {
+   "type": "workflowCompleted",
+   "output": {
+    "sku": "SKU-1"
+   }
+  },
+  {
+   "type": "workflowCompleted"
+  },
+  {
+   "type": "workflowFaulted",
+   "error": {
+    "type": "https://errors.example.com/invalid-order",
+    "status": 422
+   }
+  },
+  {
+   "type": "workflowCompleted",
+   "output": {
+    "errorMessage": "~^Payment service unavailable: HTTP 503"
+   }
+  },
+  {
+   "type": "workflowCompleted",
+   "output": {
+    "sku": "SKU-1"
+   }
+  },
+  {
+   "type": "workflowCompleted",
+   "output": {
+    "name": "Ada Lovelace",
+    "dataSource": "cache",
+    "isFresh": false
+   }
+  },
+  {
+   "type": "workflowFaulted",
+   "error": {
+    "type": "https://example.com/errors/insufficient-inventory",
+    "status": 409,
+    "title": "Insufficient Inventory"
+   }
+  },
+  {
+   "type": "workflowCompleted",
+   "output": {
+    "fulfilled": true
+   }
+  },
+  {
+   "type": "workflowCompleted",
+   "output": {
+    "fulfilled": false
+   }
+  },
+  {
+   "type": "workflowCompleted",
+   "output": [
+    {
+     "profile": "Ada Lovelace"
+    },
+    {
+     "recommendations": []
+    }
+   ]
+  },
+  {
+   "type": "workflowFaulted",
+   "error": {
+    "title": "Invalid Record Type",
+    "detail": "Record ID R-9 has invalid type 'invalid'"
+   }
+  }
+ ]
+}

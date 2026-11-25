@@ -12,9 +12,9 @@ do:
       with:
         method: get
         endpoint:
-          uri: https://onetime-service.example.com/resource
+          uri: http://127.0.0.1:8787/partner/stock
           # Define authentication directly here
           authentication:
             basic:
-              username: temp_user
+              username: demo
               password: ${ $secrets.tempPassword }

@@ -7,8 +7,14 @@ do:
   - secureOperation:
       try:
         - riskyTask:
-            set:
-              processed: true
+            listen:
+              to:
+                one:
+                  with:
+                    type: com.example.payment.received
+            timeout:
+              after:
+                seconds: 5
       catch:
         errors:
           with:
@@ -17,4 +23,5 @@ do:
         do:
           - handleTimeout:
               set:
-                processed: true
+                processed: false
+                reason: ${ $timeoutError.title }

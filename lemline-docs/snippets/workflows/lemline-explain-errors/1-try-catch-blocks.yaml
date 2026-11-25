@@ -1,8 +1,8 @@
 document:
-  dsl: 1.0.3
+  dsl: '1.0.3'
   namespace: examples
   name: 1-try-catch-blocks
-  version: 1.0.0
+  version: '1.0.0'
 do:
   - processPayment:
       try:
@@ -10,7 +10,9 @@ do:
             call: http
             with:
               method: post
-              endpoint: https://payment.example.com/charge
+              endpoint: http://127.0.0.1:8787/charges?fail=503
+              body:
+                orderId: ${ .orderId }
       catch:
         errors:
           with:
@@ -20,4 +22,4 @@ do:
         do:
           - logError:
               set:
-                errorMessage: '${ "Payment service unavailable: \($paymentError.details)" }'
+                errorMessage: '${ "Payment service unavailable: \($paymentError.title)" }'

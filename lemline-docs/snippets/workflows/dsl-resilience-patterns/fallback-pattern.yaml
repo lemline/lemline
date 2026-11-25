@@ -1,7 +1,7 @@
 document:
   dsl: '1.0.3'
   namespace: examples
-  name: fallback-pattern
+  name: resilience-fallback
   version: '1.0.0'
 do:
   - getRecommendations:
@@ -10,7 +10,14 @@ do:
             call: http
             with:
               method: get
-              endpoint: http://recommendations/api
+              endpoint: http://127.0.0.1:8787/products
+              query:
+                category: garden
+                fail: '503'
+                failTimes: ${ if .recommendationsDown then "1" else "0" end }
+                key: ${ $workflow.id }
+            output:
+              as: '${ { recommendations: [.items[].id] } }'
       catch:
         as: error
         do:

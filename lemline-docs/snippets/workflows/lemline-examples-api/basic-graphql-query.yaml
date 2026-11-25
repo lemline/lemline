@@ -1,53 +1,53 @@
 document:
-  dsl: 1.0.3
+  dsl: '1.0.3'
   namespace: examples
-  name: graphql-query
-  version: 1.0.0
+  name: customer-graphql-query
+  version: '1.0.0'
 input:
   schema:
     format: json
     document:
       type: object
       required:
-        - userId
+        - customerId
       properties:
-        userId:
+        customerId:
           type: string
 use:
   secrets:
     - API_TOKEN
 do:
-  - fetchUserData:
+  - fetchCustomerData:
       call: http
       with:
         method: post
-        endpoint: https://api.example/graphql
+        endpoint: http://127.0.0.1:8787/graphql
         headers:
           Content-Type: application/json
           Authorization: Bearer ${ $secrets.API_TOKEN }
         body:
           query: |
-            query GetUser($id: ID!) {
-              user(id: $id) {
+            query GetCustomer($id: ID!) {
+              customer(id: $id) {
                 id
                 name
                 email
-                posts {
+                reviews {
                   id
+                  rating
                   title
-                  createdAt
                 }
-                followers {
+                orders {
                   totalCount
                 }
               }
             }
           variables:
-            id: ${ .userId }
+            id: ${ .customerId }
       export:
         as: '${ $context + { graphqlResponse: . } }'
-  - processUserData:
+  - processCustomerData:
       set:
-        userData: ${ $context.graphqlResponse.data.user }
-        totalPosts: ${ $context.graphqlResponse.data.user.posts | length }
-        followerCount: ${ $context.graphqlResponse.data.user.followers.totalCount }
+        customerName: ${ $context.graphqlResponse.data.customer.name }
+        totalReviews: ${ $context.graphqlResponse.data.customer.reviews | length }
+        orderCount: ${ $context.graphqlResponse.data.customer.orders.totalCount }

@@ -17,7 +17,7 @@ and use documentation. This guide will help you navigate to the right type of do
 - You want a guided, step-by-step journey to build confidence
 - You prefer practical experience over conceptual understanding
 
-[Browse Tutorials →](lemline-tutorial-hello.md)
+[Acknowledge the first order](lemline-tutorial-hello.md)
 
 ## 🛠️ How-to Guides
 

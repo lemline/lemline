@@ -11,38 +11,21 @@ Lemline reads its configuration from, in order of decreasing priority:
 3. **A YAML configuration file**
 4. **Built-in defaults**
 
-Every command except `lemline config create` needs a configuration file, and stops with an error when none is found. To try Lemline on one machine, use PostgreSQL for everything (database, PGMQ messaging and lifecycle analytics), as described in [Setting Up A Local Environment](lemline-tutorial-setup.md).
+Every command except `lemline config create` needs a configuration file, and stops with an error when none is found. To try Lemline on one machine, use SQLite for orchestration, messaging and lifecycle analytics, as described in [Setting Up A Local Environment](lemline-tutorial-setup.md).
 
 The in-memory database and the in-memory H2 analytics store are only available in Lemline's own test suite: the released binaries and jar do not include them, so `database.type: in-memory` and the default `analytics.type: h2` cannot start a runner.
 
 ## Create a Configuration File
 
-Generate a starting file for your broker and database:
+Choose the broker, orchestration database and workflow history database independently:
 
 ```bash
-lemline config create --messaging kafka --database postgresql
+lemline config create --messaging kafka --database postgresql --analytics postgresql
 ```
 
-This writes `lemline.yaml` in the current directory. Lemline does not look for that name on its own: either pass it with `--config lemline.yaml`, or create the file as `.lemline.yaml` with `-o .lemline.yaml` so that it is found automatically. Use `--output <path>` to choose another path, `--force` to overwrite an existing file, and `--dry-run` to print the file instead of writing it. Supported values: `kafka`, `rabbitmq`, `pgmq` or `sqlite` for messaging, `postgresql` or `mysql` for the database. With `sqlite`, the generated file also declares a PostgreSQL database for lifecycle analytics.
+This writes `lemline.yaml` in the current directory. Lemline does not look for that name on its own: either pass it with `--config lemline.yaml`, or create the file as `.lemline.yaml` with `-o .lemline.yaml` so that it is found automatically. Use `--output <path>` to choose another path, `--force` to overwrite an existing file, and `--dry-run` to print the file instead of writing it. See the [CLI reference](lemline-ref-cli.md#config-create) for supported types and defaults.
 
-A minimal file looks like this:
-
-<!-- workflow-example: data -->
-```yaml
-lemline:
-  database:
-    type: postgresql
-    migrate-at-start: true
-    postgresql:
-      host: localhost
-      port: 5432
-      database: lemline
-      username: postgres
-  messaging:
-    type: kafka
-    kafka:
-      brokers: localhost:9092
-```
+In the example above, workflow definitions use the PostgreSQL database `lemline` and workflow history uses `lemline_analytics`. Follow the commands in the generated file to start the services and create the analytics database. To store history in a local file while keeping Kafka and PostgreSQL for the other roles, change the option to `--analytics sqlite`.
 
 ## Tell Lemline Where the File Is
 
@@ -100,7 +83,7 @@ Use `--format yaml` or `--format properties` to choose the output format, and `-
 ```yaml
 lemline:
   database:
-    type: postgresql          # postgresql, mysql or in-memory
+    type: postgresql          # postgresql, mysql or sqlite
     migrate-at-start: true    # apply schema migrations at startup
     postgresql:
       host: localhost

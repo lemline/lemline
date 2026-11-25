@@ -164,7 +164,7 @@ When resolving variables, Lemline searches:
 
 JQ expressions are evaluated against the current context:
 
-<code-block lang="yaml" src="workflows/lemline-explain-execution/expression-evaluation.yaml" include-lines="7-9"/>
+<code-block lang="yaml" src="workflows/lemline-explain-execution/expression-evaluation.yaml"/>
 
 The expression `.orderTotal * .taxRate` is evaluated with:
 1. Current node's variables
@@ -341,6 +341,21 @@ Structured logging captures:
 - Data transformations
 - Error details
 - External interactions
+
+## Run the Examples
+
+Every example on this page is a complete workflow. Complete [the SQLite setup](lemline-tutorial-setup.md), save each example under the file name used below, and run the commands from the setup directory. With the JAR, substitute `java -jar lemline.jar` for `bin/lemline`.
+
+Keep the setup worker running and use a second terminal in the setup directory.
+
+```bash
+bin/lemline definition post -f expression-evaluation.yaml
+bin/lemline instance start examples expression-evaluation --input '{"orderTotal":200,"taxRate":0.2}'
+```
+
+| Example | Expected result |
+|---|---|
+| `expression-evaluation` | `{"taxAmount":40}` |
 
 ## Related Resources
 

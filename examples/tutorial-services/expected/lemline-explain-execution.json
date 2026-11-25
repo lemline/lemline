@@ -1,0 +1,10 @@
+{
+ "instances": [
+  {
+   "type": "workflowCompleted",
+   "output": {
+    "taxAmount": 40
+   }
+  }
+ ]
+}

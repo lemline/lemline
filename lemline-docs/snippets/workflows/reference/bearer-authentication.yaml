@@ -7,15 +7,15 @@ use:
   secrets:
     - apiToken
   authentications:
-    catalogAuth:
+    partnerAuth:
       bearer:
         token: ${ $secrets.apiToken }
 do:
-  - getProducts:
+  - getPartnerStock:
       call: http
       with:
         method: get
         endpoint:
-          uri: https://api.example.com/products
+          uri: http://127.0.0.1:8787/partner/stock
           authentication:
-            use: catalogAuth
+            use: partnerAuth

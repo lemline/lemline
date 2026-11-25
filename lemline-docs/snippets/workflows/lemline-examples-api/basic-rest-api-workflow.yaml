@@ -1,8 +1,8 @@
 document:
-  dsl: 1.0.3
+  dsl: '1.0.3'
   namespace: examples
-  name: user-registration
-  version: 1.0.0
+  name: register-customer
+  version: '1.0.0'
 input:
   schema:
     format: json
@@ -26,7 +26,7 @@ do:
       call: http
       with:
         method: post
-        endpoint: https://validation.example/api/verify-email
+        endpoint: http://127.0.0.1:8787/email-checks
         body:
           email: ${ .email }
       export:
@@ -46,30 +46,27 @@ do:
                   call: http
                   with:
                     method: post
-                    endpoint: https://accounts.example/api/users
+                    endpoint: http://127.0.0.1:8787/customers
                     headers:
                       Content-Type: application/json
                       X-API-Key: ${ $secrets.API_KEY }
                     body:
                       email: ${ $workflow.input.email }
                       name: ${ $workflow.input.name }
-                      verificationStatus: verified
                   export:
                     as: '${ $context + { userAccount: . } }'
               - sendWelcomeEmail:
                   call: http
                   with:
                     method: post
-                    endpoint: https://notifications.example/api/emails
+                    endpoint: http://127.0.0.1:8787/notifications
                     headers:
                       Content-Type: application/json
                       Authorization: Bearer ${ $secrets.EMAIL_SERVICE_TOKEN }
                     body:
-                      template: welcome
+                      reference: ${ $context.userAccount.id }
                       recipient: ${ $workflow.input.email }
-                      data:
-                        name: ${ $workflow.input.name }
-                        accountId: ${ $context.userAccount.id }
+                      message: '${ "Welcome, " + $workflow.input.name }'
             then: exit
         - defaultAction:
             do:
@@ -78,5 +75,5 @@ do:
                     result:
                       success: false
                       reason: Invalid email address
-                      details: ${ $context.emailValidation.reason }
+                      email: ${ $context.emailValidation.email }
             then: exit

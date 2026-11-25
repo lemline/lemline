@@ -1,15 +1,15 @@
 document:
   dsl: '1.0.3'
   namespace: examples
-  name: graphql-query
+  name: customer-graphql-lookup
   version: '1.0.0'
 do:
   - queryGraphQL:
       call: http
       with:
         method: post
-        endpoint: https://api.example.com/graphql
+        endpoint: http://127.0.0.1:8787/graphql
         body:
-          query: "query($id: ID!) { user(id: $id) { name email } }"
+          query: "query($id: ID!) { customer(id: $id) { name email } }"
           variables:
-            id: ${ .userId }
+            id: ${ .customerId }

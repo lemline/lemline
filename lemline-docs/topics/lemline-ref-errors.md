@@ -97,17 +97,17 @@ Custom error types can be defined in workflow definitions:
 
 ### Basic Try-Catch
 
-<code-block lang="yaml" src="workflows/lemline-ref-errors/basic-try-catch.yaml" include-lines="7-20"/>
+<code-block lang="yaml" src="workflows/lemline-ref-errors/basic-try-catch.yaml"/>
 
 ### Matching Multiple Error Types
 
 A `try` task has a single `catch`. To handle several errors differently, catch them and route on the fields of the caught error in `catch.do`:
 
-<code-block lang="yaml" src="workflows/lemline-ref-errors/matching-multiple-error-types.yaml" include-lines="6-38"/>
+<code-block lang="yaml" src="workflows/lemline-ref-errors/matching-multiple-error-types.yaml"/>
 
 ### Using Retry Policies
 
-<code-block lang="yaml" src="workflows/lemline-ref-errors/using-retry-policies.yaml" include-lines="8-21"/>
+<code-block lang="yaml" src="workflows/lemline-ref-errors/using-retry-policies.yaml"/>
 
 ## Error Debugging 
 
@@ -126,6 +126,45 @@ When debugging errors:
 6. **Use appropriate error status codes**: Match HTTP status codes to semantics
 7. **Define custom error types**: Create domain-specific error types for your application
 8. **Organize errors hierarchically**: Use consistent type URIs that reflect hierarchy
+
+## Run the Examples
+
+Every example on this page is a complete workflow. Complete [the SQLite setup](lemline-tutorial-setup.md), save each example under the file name used below, and run the commands from the setup directory. With the JAR, substitute `java -jar lemline.jar` for `bin/lemline`.
+
+Start the [tutorial shop](lemline-tutorial-order-processing.md#start-the-tutorial-shop) from the root of the Lemline source checkout:
+
+```bash
+docker compose -f examples/tutorial-services/compose.yaml up -d
+```
+
+Keep the setup worker running and use a second terminal in the setup directory.
+
+```bash
+bin/lemline definition post -f typed-error.yaml
+bin/lemline instance start examples typed-error
+bin/lemline definition post -f basic-try-catch.yaml
+bin/lemline instance start examples basic-try-catch
+bin/lemline definition post -f matching-multiple-error-types.yaml
+bin/lemline instance start examples matching-multiple-error-types --input '{"failStatus":429}'
+bin/lemline instance start examples matching-multiple-error-types --input '{"failStatus":503}'
+bin/lemline instance start examples matching-multiple-error-types --input '{"failStatus":404}'
+bin/lemline definition post -f using-retry-policies.yaml
+bin/lemline instance start examples using-retry-policies
+```
+
+| Example | Expected result |
+|---|---|
+| `typed-error` | Faults with `invalid-order`, status 422 |
+| `basic-try-catch` | After 5 to 15 seconds, `{"processed":false,"reason":"Listen task timed out"}` |
+| `matching-multiple-error-types` | `{"outcome":"rate-limited"}`, `{"outcome":"unavailable"}`, then `{"outcome":"failed"}` with the `communication` error type |
+| `using-retry-policies` | The stock after one retry: the HTTP 503 has status 503, so `when` holds |
+
+
+Stop the shop when you are done:
+
+```bash
+docker compose -f examples/tutorial-services/compose.yaml down
+```
 
 ## Related Resources
 

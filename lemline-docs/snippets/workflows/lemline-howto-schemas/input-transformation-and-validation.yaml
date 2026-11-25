@@ -1,8 +1,8 @@
 document:
-  dsl: 1.0.3
+  dsl: '1.0.3'
   namespace: examples
   name: input-transformation-and-validation
-  version: 1.0.0
+  version: '1.0.0'
 do:
   - FormatUserData:
       set:
@@ -38,4 +38,3 @@ do:
             fullName: ${ .firstName + " " + .lastName }
             email: ${ .email | ascii_downcase }
             age: ${ .age }
-      then: NextTask

@@ -1,0 +1,56 @@
+{
+ "instances": [
+  {
+   "type": "workflowCompleted",
+   "output": {
+    "status": "accepted"
+   }
+  },
+  {
+   "type": "workflowFaulted",
+   "error": {
+    "type": "https://errors.example.com/invalid-order",
+    "status": 422,
+    "title": "Invalid order"
+   }
+  },
+  {
+   "type": "workflowFaulted",
+   "error": {
+    "status": 409,
+    "title": "Insufficient stock",
+    "detail": "Requested 3; available 1"
+   }
+  },
+  {
+   "type": "workflowCompleted",
+   "output": {
+    "stock": 5,
+    "quantity": 3
+   }
+  },
+  {
+   "type": "workflowCompleted",
+   "output": {
+    "orderId": "ORD-901",
+    "status": "reserved"
+   }
+  },
+  {
+   "type": "workflowCompleted",
+   "output": {
+    "success": false,
+    "status": 400,
+    "reason": "~^HTTP 400"
+   }
+  },
+  {
+   "type": "workflowCompleted",
+   "output": {
+    "success": false,
+    "status": 409,
+    "reason": "~^HTTP 409"
+   }
+  }
+ ]
+}

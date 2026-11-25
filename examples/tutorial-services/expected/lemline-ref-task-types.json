@@ -1,0 +1,18 @@
+{
+ "instances": [
+  {
+   "type": "workflowCompleted",
+   "output": {
+    "orderId": "ORD-301",
+    "status": "accepted"
+   }
+  },
+  {
+   "type": "workflowCompleted",
+   "output": {
+    "orderId": "ORD-302",
+    "status": "needs-review"
+   }
+  }
+ ]
+}

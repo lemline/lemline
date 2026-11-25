@@ -5,11 +5,21 @@ document:
   version: '1.0.0'
 do:
   - waitForPayment:
-      listen:
-        to:
-          one:
-            with:
-              type: com.example.payment.received
-      timeout:
-        after:
-          hours: 24
+      try:
+        - listenForPayment:
+            listen:
+              to:
+                one:
+                  with:
+                    type: com.example.payment.received
+            timeout:
+              after:
+                seconds: 30
+      catch:
+        errors:
+          with:
+            type: https://open-workflow-specification.org/spec/1.0.0/errors/timeout
+        do:
+          - markExpired:
+              set:
+                status: expired

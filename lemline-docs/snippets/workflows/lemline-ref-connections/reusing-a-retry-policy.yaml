@@ -20,6 +20,10 @@ do:
             call: http
             with:
               method: get
-              endpoint: https://api.example.com/data
+              endpoint: http://127.0.0.1:8787/stock
+              query:
+                fail: '503'
+                failTimes: ${ .failures // 0 | tostring }
+                key: ${ $workflow.id }
       catch:
         retry: standard

@@ -25,7 +25,8 @@ do:
                       from: ${ .processId }
                       expect: ${ $workflow.input.processId }
             timeout:
-              after: PT5M
+              after:
+                seconds: 30
         - processResult:
             set:
               success: true
@@ -40,10 +41,9 @@ do:
               call: http
               with:
                 method: get
-                endpoint: '${ "https://process.example/status/\($workflow.input.processId | @uri)" }'
+                endpoint: '${ "http://127.0.0.1:8787/reservations/\($workflow.input.processId | @uri)" }'
           - summarizeStatus:
               set:
-                success: ${ .status == "completed" }
+                success: ${ .status == "reserved" }
                 status: ${ .status }
                 processId: ${ $workflow.input.processId }
-                data: ${ .result }

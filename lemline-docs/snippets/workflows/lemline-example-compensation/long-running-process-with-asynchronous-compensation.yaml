@@ -8,7 +8,7 @@ do:
       call: http
       with:
         method: post
-        endpoint: https://inventory.example.com/reservations
+        endpoint: http://127.0.0.1:8787/reservations
         body:
           orderId: ${ $workflow.input.orderId }
           items: ${ $workflow.input.items }
@@ -27,7 +27,7 @@ do:
                       from: ${ .orderId }
                       expect: ${ $workflow.input.orderId }
             timeout:
-              after: PT30M
+              after: PT30S
         - confirmOrder:
             set:
               status: confirmed
@@ -40,7 +40,7 @@ do:
               call: http
               with:
                 method: delete
-                endpoint: '${ "https://inventory.example.com/reservations/\($context.reservationId | @uri)" }'
+                endpoint: '${ "http://127.0.0.1:8787/reservations/\($context.reservationId | @uri)" }'
           - reportExpiry:
               set:
                 status: expired

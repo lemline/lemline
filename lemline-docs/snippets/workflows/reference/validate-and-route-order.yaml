@@ -26,7 +26,7 @@ do:
   - requestReview:
       set:
         status: needs-review
-      then: end
+      then: exit
   - acceptOrder:
       set:
         status: accepted

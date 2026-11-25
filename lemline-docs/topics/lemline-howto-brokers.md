@@ -135,6 +135,26 @@ The broker-independent `lemline.messaging.<channel>.consumer.concurrency` only a
 
 ## Implementing Event-Driven Workflows
 
+Both examples run on [the SQLite setup](lemline-tutorial-setup.md), whose messaging channel carries the events. With
+the JAR, substitute `java -jar lemline.jar` for `bin/lemline`. Save them as `emitting-events.yaml` and
+`listening-for-events.yaml`. The listener is started by an event, so register both before the worker starts: stop
+the setup worker with Ctrl+C, then run from the setup directory:
+
+```bash
+bin/lemline definition post -f emitting-events.yaml
+bin/lemline definition post -f listening-for-events.yaml
+bin/lemline listen --debug
+```
+
+From a second terminal in the setup directory, emit one event:
+
+```bash
+bin/lemline instance start examples order-workflow --input '{"orderId":"ORD-1001"}'
+```
+
+About 10 seconds later, the event starts a `shipping-workflow` instance that completes with
+`{"received":[{"orderId":"ORD-1001"}]}`: the worker picks up events for event-started workflows every 10 seconds.
+
 ### Emitting Events
 
 `emit` tasks publish a CloudEvent on the `cloudevents` destination of the workflow's namespace:

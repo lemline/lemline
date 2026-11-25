@@ -1,16 +1,27 @@
 document:
-  dsl: 1.0.3
+  dsl: '1.0.3'
   namespace: examples
   name: error-handling-in-switch-tasks
-  version: 1.0.0
+  version: '1.0.0'
 do:
-  - ProcessPayment:
+  - processPayment:
       switch:
-        - case1:
+        - paid:
             when: '${ try (.paymentResult.status == "success") catch false }'
-            then: CompleteOrder
-        - case2:
+            then: completeOrder
+        - pending:
             when: '${ try (.paymentResult.status == "pending") catch false }'
-            then: WaitForPayment
-        - case3:
-            then: HandlePaymentFailure
+            then: waitForPayment
+        - failed:
+            then: handlePaymentFailure
+  - completeOrder:
+      set:
+        orderStatus: completed
+      then: exit
+  - waitForPayment:
+      set:
+        orderStatus: waiting
+      then: exit
+  - handlePaymentFailure:
+      set:
+        orderStatus: payment-failed

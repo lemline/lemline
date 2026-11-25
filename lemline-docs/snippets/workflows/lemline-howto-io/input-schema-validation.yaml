@@ -1,8 +1,8 @@
 document:
-  dsl: 1.0.3
+  dsl: '1.0.3'
   namespace: examples
   name: input-schema-validation
-  version: 1.0.0
+  version: '1.0.0'
 do:
   - ValidatePaymentInfo:
       set:
@@ -37,4 +37,3 @@ do:
                       - CREDIT
                       - DEBIT
                       - PAYPAL
-      then: ProcessPayment

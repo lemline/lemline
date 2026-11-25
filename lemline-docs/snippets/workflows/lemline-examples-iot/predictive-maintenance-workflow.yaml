@@ -1,27 +1,27 @@
 document:
   dsl: '1.0.3'
-  namespace: iot
+  namespace: examples
   name: predictive-maintenance
   version: '1.0.0'
 schedule:
-  cron: '0 0 * * *'
+  every:
+    hours: 24
 do:
   - retrieveDevices:
       call: http
       with:
         method: get
-        endpoint: https://iot-analytics.example/api/devices
+        endpoint: http://127.0.0.1:8787/devices
   - reviewDevices:
       for:
-        in: ${ .devices }
+        in: ${ .items }
         each: device
       do:
         - predictMaintenance:
             call: http
             with:
               method: post
-              endpoint: https://iot-ml.example/api/predict-maintenance
-              body: ${ $device }
+              endpoint: ${ "http://127.0.0.1:8787/devices/\($device.deviceId)/predictions" }
         - routePrediction:
             switch:
               - maintenanceNeeded:
@@ -36,16 +36,18 @@ do:
             call: http
             with:
               method: post
-              endpoint: https://maintenance.example/api/tickets
+              endpoint: http://127.0.0.1:8787/documents
               body:
-                deviceId: ${ $device.id }
-                probabilityOfFailure: ${ .probabilityOfFailure }
+                reference: ${ $device.deviceId }
+                title: Maintenance ticket
+                content: '${ "Failure probability \(.probabilityOfFailure)" }'
             then: exit
         - notifyMaintenance:
             call: http
             with:
               method: post
-              endpoint: https://notifications.example/api/notify
+              endpoint: http://127.0.0.1:8787/notifications
               body:
-                deviceId: ${ $device.id }
-                probabilityOfFailure: ${ .probabilityOfFailure }
+                reference: ${ $device.deviceId }
+                recipient: maintenance
+                message: '${ "Failure probability \(.probabilityOfFailure)" }'

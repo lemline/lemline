@@ -42,7 +42,7 @@ limitations include:
    `$input`, `$output`, or `$secrets` inside `{}` placeholders. Use standard Runtime Expressions (`${...}`) when you
    need access to these.
 
-This expression builds an endpoint from the current input and escapes the order ID
+This expression builds an endpoint from the current input and escapes the product ID
 before inserting it into the path.
 
 <code-block lang="yaml" src="workflows/reference/dynamic-http-endpoint.yaml"/>

@@ -13,7 +13,7 @@ do:
                   with:
                     type: com.example.request.approved
             timeout:
-              after: PT5M
+              after: PT30S
       catch:
         errors:
           with:

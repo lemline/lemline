@@ -1,19 +1,18 @@
 document:
   dsl: '1.0.3'
   namespace: examples
-  name: loan-application-review
+  name: order-review-routing
   version: '1.0.0'
 do:
-  - obtainEligibility:
+  - obtainCustomerRecord:
       call: http
       with:
-        method: post
-        endpoint: https://eligibility.example.com/evaluate
-        body: '${ { applicationId: .applicationId } }'
-  - routeApplication:
+        method: get
+        endpoint: '${ "http://127.0.0.1:8787/customers/" + .customerId }'
+  - routeOrder:
       switch:
         - needsReview:
-            when: ${ .requiresReview }
+            when: ${ .emailValid == false or .tier != "gold" }
             then: manualReview
         - otherwise:
             then: automaticReview

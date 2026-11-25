@@ -28,3 +28,37 @@ path.
 
 See [Runtime Expressions](https://github.com/open-workflow-specification/specification/blob/v1.0.3/dsl.md#runtime-expressions) for other variables and
 [Time in Workflows](lemline-explain-time.md) for timestamp comparisons.
+
+## Run the Examples
+
+Every example on this page is a complete workflow. Complete [the SQLite setup](lemline-tutorial-setup.md), save each example under the file name used below, and run the commands from the setup directory. With the JAR, substitute `java -jar lemline.jar` for `bin/lemline`.
+
+Start the [tutorial shop](lemline-tutorial-order-processing.md#start-the-tutorial-shop) from the root of the Lemline source checkout:
+
+```bash
+docker compose -f examples/tutorial-services/compose.yaml up -d
+```
+
+Keep the setup worker running and use a second terminal in the setup directory.
+
+```bash
+bin/lemline definition post -f aggregate-order-data.yaml
+bin/lemline instance start examples aggregate-order-data --input '{"orderId":"ORD-801","items":[{"quantity":2,"price":12.5},{"quantity":1,"price":5}]}'
+bin/lemline definition post -f validate-and-route-order.yaml
+bin/lemline instance start examples validate-and-route-order --input '{"orderId":"ORD-302","total":1500}'
+bin/lemline definition post -f dynamic-http-endpoint.yaml
+bin/lemline instance start examples dynamic-http-endpoint --input '{"productId":"SKU-2"}'
+```
+
+| Example | Expected result |
+|---|---|
+| `aggregate-order-data` | `{"orderId":"ORD-801","total":30,"itemCount":2}` |
+| `validate-and-route-order` | `{"orderId":"ORD-302","status":"needs-review"}` |
+| `dynamic-http-endpoint` | The watering can |
+
+Stop the shop when you are done:
+
+```bash
+docker compose -f examples/tutorial-services/compose.yaml down
+```
+
