@@ -345,8 +345,9 @@ if (shopUp) run(`docker compose -p ${composeProject} -f examples/tutorial-servic
   for (const problem of matches(results.others[index], wanted, `event-started instance ${index}`)) failures.push(problem);
 });
 if (expected.state) for (const problem of matches(results.state, expected.state, 'shop state')) failures.push(problem);
-if (!expected.instances) {
-  for (const record of results.instances) if (record.type !== 'workflowCompleted') failures.push(`instance ${record.index} ended with ${record.type}: ${record.command}`);
+// Instances the expectations do not list (all of them without a list) must complete.
+for (const record of results.instances.slice(expected.instances?.length ?? 0)) {
+  if (record.type !== 'workflowCompleted') failures.push(`instance ${record.index} ended with ${record.type}: ${record.command}`);
 }
 results.failures = failures;
 writeFileSync(join(out, 'results.json'), JSON.stringify(results, null, 2));

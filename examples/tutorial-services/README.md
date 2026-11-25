@@ -82,4 +82,4 @@ The results are compared with `expected/<page>.json`:
 | skip, allowFailure | Regular expressions of commands to skip or whose failure is expected. |
 | pauseAfter | List of `{match, seconds}`: wait that long after a matching command, where the page tells the reader to wait. |
 
-Without an expectations file, every instance must complete. The output directory keeps `commands.log`, `results.json` and the compressed worker logs. Run it outside any sandbox that blocks Docker.
+Instances beyond those listed in `instances`, or all of them without that list, must complete. The output directory keeps `commands.log`, `results.json` and the compressed worker logs. Run it outside any sandbox that blocks Docker.
