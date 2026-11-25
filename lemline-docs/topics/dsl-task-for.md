@@ -47,14 +47,11 @@ An optional [Runtime Expression](dsl-runtime-expressions.md) evaluated *before* 
 including the first item).
 
 If the expression evaluates to `false`, the `do` block for the current item is skipped, and the loop terminates.
-This example tests a counter in the current input, then decrements it in the body. The next condition sees the
-previous iteration’s output.
+The condition can read the current loop item and index through `for.each` and `for.at`, which default to
+`$item` and `$index`. This example stops at the first nonpositive number and returns the value and
+zero-based index from the last completed iteration.
 
 <code-block lang="yaml" src="workflows/dsl-task-for/while-string-optional.yaml"/>
-
-> **Lemline**
->
-> The condition can read the current input and context. Referencing `$item` directly in `while` faults with an expression error. Use the loop variable inside a task in the body. [Issue #121](https://github.com/lemline/lemline/issues/121) tracks this limitation.
 
 ## Data Flow
 
@@ -95,7 +92,7 @@ bin/lemline instance start examples for-object-required --input '{"users":["Ada"
 bin/lemline definition post -f read-products-in-order.yaml
 bin/lemline instance start examples read-products-in-order --input '{"products":[{"id":"SKU-1"},{"id":"SKU-2"}]}'
 bin/lemline definition post -f while-string-optional.yaml
-bin/lemline instance start examples while-string-optional --input '{"numbers":[12,8,15],"remaining":2}'
+bin/lemline instance start examples while-string-optional --input '{"numbers":[1,2,0,3]}'
 ```
 
 | Example | Expected output |
@@ -103,7 +100,7 @@ bin/lemline instance start examples while-string-optional --input '{"numbers":[1
 | `for-loop-basic` | `{"position":2,"doubled":6}` |
 | `for-object-required` | `{"item":"Alan","index":1}` |
 | `read-products-in-order` | `{"productId":"SKU-2"}` |
-| `while-string-optional` | `{"value":8,"remaining":0}` |
+| `while-string-optional` | `{"value":2,"index":1}`. The loop stops at `0`. |
 
 Check the worker terminal for the results. Then run this command from the source checkout to stop the shop.
 

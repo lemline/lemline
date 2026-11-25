@@ -7,9 +7,9 @@ do:
   - takeNumbers:
       for:
         in: ${ .numbers }
-      while: ${ .remaining > 0 }
+      while: ${ $item > 0 }
       do:
         - take:
             set:
               value: ${ $item }
-              remaining: ${ .remaining - 1 }
+              index: ${ $index }

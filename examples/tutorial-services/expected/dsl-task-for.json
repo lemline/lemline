@@ -23,8 +23,8 @@
     {
       "type": "workflowCompleted",
       "output": {
-        "value": 8,
-        "remaining": 0
+        "value": 2,
+        "index": 1
       }
     }
   ]
