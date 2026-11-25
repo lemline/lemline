@@ -124,6 +124,24 @@
         "status": 404,
         "retry": false
       }
+    },
+    {
+      "type": "workflowFaulted",
+      "error": {
+        "type": "https://open-workflow-specification.org/spec/1.0.0/errors/validation",
+        "status": 400,
+        "title": "Invalid order",
+        "detail": "Missing order reference"
+      }
+    },
+    {
+      "type": "workflowFaulted",
+      "error": {
+        "type": "https://open-workflow-specification.org/spec/1.0.0/errors/validation",
+        "status": 400,
+        "title": "Invalid order",
+        "detail": "Missing order reference"
+      }
     }
   ]
 }

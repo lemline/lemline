@@ -17,7 +17,7 @@ do:
         errors:
           with:
             type: https://errors.example.com/invalid-order
-        exceptWhen: ${ ($error.detail // $error.details) == "customerId" }
+        exceptWhen: ${ $error.detail == "customerId" }
         do:
           - fallback:
               set:

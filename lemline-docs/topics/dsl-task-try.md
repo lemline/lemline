@@ -52,7 +52,7 @@ This workflow uses `when` to catch communication errors with a status of 500 or 
 
 <code-block lang="yaml" src="workflows/dsl-task-try/try-use-named-error.yaml"/>
 
-This workflow uses `exceptWhen` to let errors about `customerId` propagate.
+This workflow uses `exceptWhen` to let errors about `customerId` propagate by checking `$error.detail`.
 
 <code-block lang="yaml" src="workflows/dsl-task-try/try-exclude-validation-field.yaml"/>
 
@@ -89,6 +89,15 @@ Retry only HTTP 503 responses. The fallback reports the status when the policy d
 `catch.do` runs a list of recovery tasks for an error that matches the catch filters. When a retry policy applies,
 the recovery tasks run if the policy stops or declines to schedule another attempt. A successful retry completes
 the `Try` task with the retry's output.
+
+In Lemline, if the retry policy declines another attempt and the catch has no recovery tasks or
+`then` directive, the original error propagates. An enclosing catch can handle it. Otherwise the
+workflow faults with that error.
+
+This example raises the same validation error when the policy declines a retry and after its one retry
+also fails.
+
+<code-block lang="yaml" src="workflows/dsl-task-try/try-retry-without-recovery.yaml"/>
 
 ## Data Flow
 
@@ -138,6 +147,9 @@ bin/lemline instance start examples try-exponential-retry --input '{"status":503
 bin/lemline definition post -f try-conditional-retry.yaml
 bin/lemline instance start examples try-conditional-retry --input '{"status":503,"failures":2,"key":"try-conditional-retry"}'
 bin/lemline instance start examples try-conditional-retry --input '{"status":404,"failures":1,"key":"skip-retry"}'
+bin/lemline definition post -f try-retry-without-recovery.yaml
+bin/lemline instance start examples try-retry-without-recovery --input '{"shouldRetry":false}'
+bin/lemline instance start examples try-retry-without-recovery --input '{"shouldRetry":true}'
 ```
 
 Check the individual results in the worker terminal.
@@ -156,6 +168,8 @@ Check the individual results in the worker terminal.
 | `try-exponential-retry` | The stock for `SKU-1` after two HTTP 503 responses. |
 | `try-conditional-retry` with `{"status":503,"failures":2,"key":"try-conditional-retry"}` | The stock for `SKU-1` after two HTTP 503 responses. |
 | `try-conditional-retry` with `{"status":404,"failures":1,"key":"skip-retry"}` | Returns `{"status":404,"retry":false}` after one request. |
+| `try-retry-without-recovery` with `{"shouldRetry":false}` | Faults with `400 Invalid order` and detail `Missing order reference` after the first attempt. |
+| `try-retry-without-recovery` with `{"shouldRetry":true}` | Retries once, then faults with the same validation error. |
 
 Once the workflows finish, query the shop for its counts of failed and successful requests.
 
@@ -167,10 +181,6 @@ curl -fsS http://127.0.0.1:8787/state
 > **Lemline**
 >
 > The attempt count limits retries after the first execution and defaults to one retry when omitted. SQLite checks for due retries periodically, so the interval between requests can exceed the configured delay.
->
-> Catch expressions currently receive the error's `detail` field under the key `details`. The example accepts both spellings. This behavior is tracked in [issue #126](https://github.com/lemline/lemline/issues/126).
->
-> If the retry policy declines or exhausts retries and `catch.do` is absent, the workflow can complete with the input to `try` as its output. The conditional retry example defines a fallback. This behavior is tracked in [issue #127](https://github.com/lemline/lemline/issues/127).
 
 When the instances finish, use the command below in the source checkout to stop the shop.
 
