@@ -4,205 +4,95 @@ title: Setting Up A Local Environment
 
 # Setting Up A Local Environment
 
-This tutorial walks you through setting up Lemline for local development. By the end, you'll have a fully working
-environment ready to run workflows.
+Run Lemline on one machine with SQLite. Lemline stores workflow definitions, queued messages, and workflow history in local files. Use a writable directory on a local filesystem.
 
-## Prerequisites
+## 1. Install Lemline
 
-- Docker and Docker Compose installed
-- Basic familiarity with command-line terminals
-- JDK 17 or higher (only required if using the Java JAR version)
-
-## 1. Start the Infrastructure
-
-This tutorial uses **PostgreSQL** with **PGMQ** (PostgreSQL Message Queue) for local development.
-PGMQ runs in SQL-only mode, requiring no extensions—just a standard PostgreSQL instance handles both data persistence
-and message brokering. You can substitute with other supported databases (MySQL) or message brokers (Kafka, RabbitMQ)
-that mirror your production infrastructure. See [Configure Message Brokers](lemline-howto-brokers.md) for alternatives.
-
-Create a project directory and add a `docker-compose.yaml` file:
+Create a project directory and open it in your terminal:
 
 ```bash
 mkdir lemline-project
 cd lemline-project
 ```
 
-Create `docker-compose.yaml` with PostgreSQL:
-
-<!-- workflow-example: data -->
-```yaml
-services:
-    postgres:
-        image: postgres:16
-        environment:
-            POSTGRES_DB: lemline
-            POSTGRES_USER: postgres
-            POSTGRES_PASSWORD: postgres
-        ports:
-            - "5432:5432"
-```
-
-Start the service:
-
-```bash
-docker-compose up -d
-```
-
-Verify the service is running:
-
-```bash
-docker-compose ps
-```
-
-You should see the `postgres` container running.
-
-Create a second database for the workflow history (the lifecycle analytics that the runner records and the dashboard displays):
-
-```bash
-docker-compose exec postgres createdb -U postgres lemline_analytics
-```
-
-## 2. Create the Configuration File
-
-Create a `.lemline.yaml` configuration file in your project directory. Lemline reads `./.lemline.yaml` automatically, so every command you run from this directory uses it (you can also point to another file with `--config <path>` or the `LEMLINE_CONFIG` environment variable):
-
-<!-- workflow-example: data -->
-```yaml
-lemline:
-    database:
-        postgresql:
-            host: localhost
-            port: 5432
-            database: lemline
-            username: postgres
-            password: postgres
-
-    messaging:
-        pgmq:
-            host: localhost
-            port: 5432
-            database: lemline
-            username: postgres
-            password: postgres
-
-    analytics:
-        postgresql:
-            host: localhost
-            port: 5432
-            database: lemline_analytics
-            username: postgres
-            password: postgres
-
-    namespaces: default, examples, tutorial
-```
-
-- `analytics` is required by `lemline listen`: the runner records each instance's history there and creates its table on startup. It must be a separate database from `database`.
-- A runner only executes workflows of the namespaces listed in `namespaces` (only `default` when unset). This list covers the namespaces used by the getting-started guide and the tutorials; add your own namespaces to it.
-
-## 3. Download Lemline
-
-Choose your platform and download the appropriate binary:
+SQLite support was added after version 0.7.0. Use a build that lists `sqlite` for messaging, orchestration and the `--analytics` option in `config create --help`.
 
 <tabs group="platform">
-<tab id="macos" title="macOS (ARM64)" group-key="macos">
-
-```bash
-# Download and extract the native binary
-curl -L https://github.com/lemline/lemline/releases/download/v%version%/lemline-v%version%-macos-arm64.tar.gz | tar -xz
-
-# Verify the installation
-bin/lemline --version
-```
-
-</tab>
 <tab id="linux" title="Linux (x86_64)" group-key="linux">
 
 ```bash
-# Download and extract the native binary
-curl -L https://github.com/lemline/lemline/releases/download/v%version%/lemline-v%version%-linux-x86_64.tar.gz | tar -xz
-
-# Verify the installation
-bin/lemline --version 
+curl -fL https://github.com/lemline/lemline/releases/download/nightly/lemline-nightly-linux-x86_64.tar.gz -o lemline.tar.gz
+tar -xzf lemline.tar.gz
+bin/lemline config create --help
 ```
 
 </tab>
 <tab id="windows" title="Windows (x86_64)" group-key="windows">
 
 ```powershell
-# Download and extract the native binary
-Invoke-WebRequest -Uri "https://github.com/lemline/lemline/releases/download/v%version%/lemline-v%version%-windows-x86_64.zip" -OutFile "lemline.zip"
+Invoke-WebRequest -Uri "https://github.com/lemline/lemline/releases/download/nightly/lemline-nightly-windows-x86_64.zip" -OutFile "lemline.zip"
 Expand-Archive -Path "lemline.zip" -DestinationPath "."
-Remove-Item "lemline.zip"
-
-# Verify the installation
-bin\lemline.exe --version
+.\bin\lemline.exe config create --help
 ```
 
 </tab>
-<tab id="java" title="Java (Any OS)" group-key="java">
+<tab id="java" title="macOS and other platforms (JAR)" group-key="java">
 
-Requires JDK 17 or higher.
+Install JDK 17 or later and download the nightly JAR:
 
 ```bash
-# Download the JAR
-curl -L https://github.com/lemline/lemline/releases/download/v%version%/lemline-v%version%.jar -o lemline.jar
-
-# Verify the installation
-java -jar lemline.jar --version
+curl -fL https://github.com/lemline/lemline/releases/download/nightly/lemline-nightly.jar -o lemline.jar
+java -jar lemline.jar config create --help
 ```
 
 </tab>
 </tabs>
 
-You should see output showing the Lemline version (e.g., `%version%`).
+## 2. Configure the SQLite files
 
-## 4. Run Database Migrations
-
-Lemline requires database tables for workflow state persistence. Run the migration command to create them, and answer `y` when it asks for confirmation (add `--force` to skip the question):
-
-<tabs group="platform">
-<tab id="macos-migrate" title="macOS (ARM64)" group-key="macos">
+From `lemline-project`, run the configuration wizard. In PowerShell, use `.\bin\lemline.exe` for the remaining commands. With the JAR, substitute `java -jar lemline.jar` for `bin/lemline`.
 
 ```bash
-bin/lemline migrate
+bin/lemline config create --output .lemline.yaml
 ```
 
-</tab>
-<tab id="linux-migrate" title="Linux (x86_64)" group-key="linux">
+1. At **Select messaging broker**, enter `sqlite`.
+2. At **Select database**, enter `sqlite` for orchestration.
+3. At **Select analytics database**, press Enter to accept `sqlite` for workflow history.
+
+For a script, the equivalent command is:
 
 ```bash
-bin/lemline migrate
+bin/lemline config create --messaging sqlite --database sqlite --analytics sqlite --output .lemline.yaml
 ```
 
-</tab>
-<tab id="windows-migrate" title="Windows (x86_64)" group-key="windows">
+Lemline automatically reads `.lemline.yaml` from the current directory. The generated configuration uses three separate files: `orchestration.db` for definitions and durable operations, `messaging.db` for queues, and `analytics.db` for workflow history.
 
-```powershell
-bin\lemline.exe migrate
+To let the worker run workflows from the tutorials, add this line directly below the existing `lemline:` key, indented to the same level as `database:`:
+
+<!-- workflow-example: data -->
+```yaml
+  namespaces: [default, examples, tutorial]
 ```
 
-</tab>
-<tab id="java-migrate" title="Java (Any OS)" group-key="java">
+Initialize the database tables:
 
 ```bash
-java -jar lemline.jar migrate
+bin/lemline migrate --force
 ```
 
-</tab>
-</tabs>
+## 3. Verify the setup
 
-You should see output indicating successful migration. This creates the necessary tables for workflow definitions,
-instances, retries, waits, and other operational data—as well as the PGMQ schema and functions for message brokering.
-The actual message queue tables are created automatically when Lemline first starts.
+Start the worker from `lemline-project`:
 
-## Your Environment is Ready!
+```bash
+bin/lemline listen --info
+```
 
-You now have:
+Leave the worker running and list the registered definitions from a second terminal in the same directory:
 
-- PostgreSQL database for workflow state persistence
-- PGMQ message broker for workflow execution (built into PostgreSQL)
-- Lemline binary configured and ready to run workflows
+```bash
+bin/lemline definition get
+```
 
-## Next Steps
-
-Continue with the [Hello, Workflow!](lemline-tutorial-hello.md) tutorial to create and run your first workflow.
+On a fresh project, expect `No workflows found.` Stop the worker with Ctrl+C, then continue with [Hello, Workflow!](lemline-tutorial-hello.md).
