@@ -4,14 +4,15 @@ document:
   name: set-object-required
   version: '1.0.0'
 do:
+  - shareOffset:
+      set:
+        inputField: ${ .inputField }
+      export:
+        as: '${ {offset: 3} }'
   - example:
       set:
-        # Static values
         configValue: 100
-        # Values from transformed input
-        inputValue: "${ .inputField }"
-        processedValue: "${ (.inputField * 2) + $context.offset }" # Combine input and context
-        # Nested structures
+        inputValue: ${ .inputField }
+        processedValue: ${ (.inputField * 2) + $context.offset }
         details:
-          timestamp: "${ $runtime.now.iso8601 }" # Using runtime variable
-          source: "workflowX"
+          source: workflowX
