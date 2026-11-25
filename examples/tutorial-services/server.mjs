@@ -32,6 +32,28 @@ const REVIEWS = [
   { id: 'R-2', customerId: 'C-100', productId: 'SKU-4', rating: 4, title: 'Bright enough' },
 ];
 
+const OPENAPI = {
+  openapi: '3.0.3',
+  info: { title: 'Tutorial shop catalog', version: '1.0.0' },
+  servers: [{ url: 'http://127.0.0.1:8787' }],
+  paths: {
+    '/products': {
+      get: {
+        operationId: 'listProducts',
+        parameters: ['page', 'size', 'category', 'search'].map(name => ({ name, in: 'query', required: false, schema: { type: name === 'page' || name === 'size' ? 'integer' : 'string' } })),
+        responses: { 200: { description: 'One page of products' } },
+      },
+    },
+    '/products/{productId}': {
+      get: {
+        operationId: 'getProduct',
+        parameters: [{ name: 'productId', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: { 200: { description: 'The product' }, 404: { description: 'Unknown product' } },
+      },
+    },
+  },
+};
+
 class ShopError extends Error {
   constructor(status, message, headers = {}) {
     super(message);
@@ -170,6 +192,7 @@ export function createShop() {
         return { sku: 'SKU-1', available: state.stock, reserved: state.reservations.filter(row => row.status === 'reserved').length };
       }
       if (path === '/old-stock') return new Reply(301, { moved: '/stock' }, { Location: '/stock' });
+      if (path === '/openapi.json') return OPENAPI;
       if (path === '/products') {
         const page = integerParameter(query, 'page', 1, 1, 1000);
         const size = integerParameter(query, 'size', 3, 1, 50);
@@ -329,15 +352,15 @@ export function createShop() {
       }
       case '/charges': {
         const token = body.paymentInfo?.token;
-        requireValue(['approved', 'declined'].includes(token), 'Unknown payment token');
+        requireValue(['approved', 'declined', 'review'].includes(token), 'Unknown payment token');
         requireValue(reservation?.status === 'reserved', 'Missing active reservation', 409);
         let charge = state.charges.find(row => row.orderId === orderId);
         if (!charge) {
-          charge = { id: 'CH-' + (state.charges.length + 1), orderId, paid: token === 'approved', amount: reservation.quantity * PRODUCTS[0].price };
+          charge = { id: 'CH-' + (state.charges.length + 1), orderId, paid: token === 'approved', status: token, amount: reservation.quantity * PRODUCTS[0].price };
           state.charges.push(charge);
-          record(orderId, charge.paid ? 'Payment approved' : 'Payment declined');
+          record(orderId, { approved: 'Payment approved', declined: 'Payment declined', review: 'Payment held for review' }[token]);
         }
-        requireValue(charge.paid, 'Payment declined', 402);
+        requireValue(charge.status !== 'declined', 'Payment declined', 402);
         return charge;
       }
       case '/refunds': {

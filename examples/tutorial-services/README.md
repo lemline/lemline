@@ -20,7 +20,7 @@ Send JSON objects. Inspect all state with GET /state. Each POST below uses an or
 |---|---|---|
 | POST /reservations | orderId, items (SKU-1 and positive integer quantity) | id, orderId, quantity, status |
 | DELETE /reservations/{id} | — | Released reservation; repeated release restores stock only once |
-| POST /charges | orderId, paymentInfo.token (approved or declined) | paid, or HTTP 402 |
+| POST /charges | orderId, paymentInfo.token (approved, review or declined) | id, paid, status (approved or review) and amount (25 per unit), or HTTP 402 for declined. A repeated charge returns the first result |
 | POST /quotes/economy or /quotes/express | orderId, optional failTwice boolean | carrier and integer price (5 or 9); economy returns 503 on its first two attempts when requested |
 | POST /shipments | orderId, carrier | orderId and carrier |
 | POST /notifications | reference, recipient, message | Stored inbox entry |
@@ -28,6 +28,7 @@ Send JSON objects. Inspect all state with GET /state. Each POST below uses an or
 | DELETE /shipments/{orderId} | — | Shipment marked cancelled, so the reservation can be released |
 | GET /stock (also /inventory/SKU-1) | — | sku, available units and number of active reservations |
 | GET /old-stock | — | HTTP 301 to /stock |
+| GET /openapi.json | — | OpenAPI 3.0 description of GET /products (listProducts) and GET /products/{productId} (getProduct) |
 | GET /products | optional page, size (default 3), category, search | items, page, size, total, hasMore, nextPage |
 | GET /products/{id} | — | Product with its price, or HTTP 404 for an unknown ID |
 | GET /customers/{id} | — | C-100 and C-200 are valid customers; C-300 has an invalid email (emailValid false); others are HTTP 404 |

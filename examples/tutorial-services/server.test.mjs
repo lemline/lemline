@@ -187,3 +187,20 @@ test('HTTP layer: request log, delay, redirect and Retry-After', async t => {
   assert.equal(requests[1].body, '{"reference":"R","message":"m"}');
   assert.equal(requests[1].reference, 'R');
 });
+
+test('a review token holds the payment without charging or shipping', () => {
+  const shop = createShop();
+  const order = { orderId: 'held', items };
+  shop('POST', '/reservations', order);
+  const charge = shop('POST', '/charges', { ...order, paymentInfo: { token: 'review' } });
+  assert.deepEqual([charge.paid, charge.status], [false, 'review']);
+  shop('POST', '/quotes/express', order);
+  assert.throws(() => shop('POST', '/shipments', { ...order, carrier: 'express' }), status(409));
+  assert.equal(shop('POST', '/charges', { ...order, paymentInfo: { token: 'approved' } }).status, 'review');
+});
+
+test('the catalog is described by an OpenAPI document', () => {
+  const document = createShop()('GET', '/openapi.json');
+  assert.equal(document.paths['/products/{productId}'].get.operationId, 'getProduct');
+  assert.equal(document.paths['/products'].get.operationId, 'listProducts');
+});
