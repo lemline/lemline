@@ -47,6 +47,109 @@ object CallHttpTestCases {
         ),
 
         WorkflowTestCase(
+            name = "http call expands a URI template from transformed task input",
+            mockConfig = MockConfiguration(httpMocks = listOf(
+                HttpMockRule(
+                    match = HttpMockMatcher(url = "https://api.example.com/products/SKU-1", method = "GET"),
+                    response = HttpMockResponse(body = buildJsonObject { put("id", "SKU-1") })
+                )
+            )),
+            yaml = $$"""
+                do:
+                  - getProduct:
+                      input:
+                        from: ${ .request }
+                      call: http
+                      with:
+                        method: get
+                        endpoint: https://api.example.com/products/{productId}
+            """.trimIndent(),
+            input = buildJsonObject {
+                put("productId", "SKU-2")
+                put("request", buildJsonObject { put("productId", "SKU-1") })
+            },
+            tags = setOf("http"),
+            validate = expectOutput(buildJsonObject { put("id", "SKU-1") })
+        ),
+
+        WorkflowTestCase(
+            name = "http call percent encodes scalar URI template values in an endpoint object",
+            mockConfig = MockConfiguration(httpMocks = listOf(
+                HttpMockRule(
+                    match = HttpMockMatcher(
+                        url = "https://api.example.com/a%20b%2B%2F%C3%A9%252F%2A~%7B%7D%3F/42/true/%7Bliteral%7D/%2F/end?missing=&empty="
+                    ),
+                    response = HttpMockResponse(body = buildJsonObject { put("matched", true) })
+                )
+            )),
+            yaml = """
+                do:
+                  - getPet:
+                      call: http
+                      with:
+                        method: get
+                        endpoint:
+                          uri: https://api.example.com/{pet.id}/{count}/{enabled}/%7Bliteral%7D/%2F/end?missing={missing}&empty={empty}
+            """.trimIndent(),
+            input = parseJson("""
+                {"pet.id":"a b+/é%2F*~{}?","pet":{"id":"nested id"},"count":42,"enabled":true,"literal":"ignored","empty":null}
+            """),
+            tags = setOf("http"),
+            validate = expectOutput(buildJsonObject { put("matched", true) })
+        ),
+
+        WorkflowTestCase(
+            name = "http call leaves URI placeholders from a jq endpoint expression unchanged",
+            mockConfig = MockConfiguration(httpMocks = listOf(
+                HttpMockRule(
+                    match = HttpMockMatcher(url = """https://api.example.com/\{productId\}"""),
+                    response = HttpMockResponse(body = buildJsonObject { put("matched", true) })
+                )
+            )),
+            yaml = $$"""
+                do:
+                  - callComputedUrl:
+                      call: http
+                      with:
+                        method: get
+                        endpoint: '${ "https://api.example.com/" + .path }'
+            """.trimIndent(),
+            input = buildJsonObject {
+                put("path", "{productId}")
+                put("productId", "SKU-1")
+            },
+            tags = setOf("http"),
+            validate = expectOutput(buildJsonObject { put("matched", true) })
+        ),
+
+        WorkflowTestCase(
+            name = "http call raises an expression error for a non-scalar URI template value",
+            mockConfig = MockConfiguration(),
+            yaml = """
+                do:
+                  - request:
+                      try:
+                        - getPet:
+                            call: http
+                            with:
+                              method: get
+                              endpoint: https://api.example.com/{pet}
+                      catch:
+                        errors:
+                          with:
+                            type: https://open-workflow-specification.org/spec/1.0.0/errors/expression
+                            status: 400
+                        do:
+                          - report:
+                              set:
+                                caught: true
+            """.trimIndent(),
+            input = buildJsonObject { put("pet", buildJsonObject { put("id", "nested id") }) },
+            tags = setOf("http"),
+            validate = expectOutput(buildJsonObject { put("caught", true) })
+        ),
+
+        WorkflowTestCase(
             name = "http call can perform GET request with query parameters",
             mockConfig = TestMocks.httpConfig,
             yaml = """

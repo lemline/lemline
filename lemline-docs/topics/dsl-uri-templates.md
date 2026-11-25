@@ -4,7 +4,7 @@ title: URI Templates
 
 # URI Templates
 
-> **Lemline runtime:** placeholders such as `{userId}` are not expanded by Lemline yet; the URI is used as written. Build dynamic URIs with a runtime expression, e.g. `${ "https://api.example.com/users/" + .userId }`.
+> **Lemline runtime.** HTTP calls expand simple placeholders such as `{userId}` in `endpoint` and `endpoint.uri` using the task’s transformed input. Use a runtime expression to build URLs from nested data or workflow arguments.
 
 
 ## Purpose
