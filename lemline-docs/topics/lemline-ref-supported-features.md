@@ -44,9 +44,10 @@ Lemline implements a subset of the Open Workflow DSL 1.0 specification, with mor
 | GraphQL | ✅ Supported | Send the query and variables as the body of a `call: http` POST |
 | Expression Evaluation | ✅ Supported | Via `set` construct |
 | Container Execution | ❌ Not supported | Parsed, but no runtime executor: a `run.container` task fails when it runs |
-| Script Execution | ⚠️ Partial | Inline `code`, or a `source.endpoint` with an absolute `file://` URI, in JavaScript or Python; other URI schemes are refused || Event Emission | ✅ Supported | Via `emit` construct |
+| Script Execution | ⚠️ Partial | Inline `code`, or a `source.endpoint` with an absolute `file://` URI, in JavaScript or Python; other URI schemes are refused |
+| Event Emission | ✅ Supported | Via `emit` construct |
 | Wait/Delay | ✅ Supported | Via `wait` construct |
-| Custom Function Calls | ⚠️ Partial | Functions declared under `use.functions` run; catalogs declared under `use.catalogs` are ignored ([issue 111](https://github.com/lemline/lemline/issues/111)) |
+| Custom Function Calls | ✅ Supported | Functions declared under `use.functions`, or read from a catalog declared under `use.catalogs` |
 
 ## Event Features Support
 
@@ -87,7 +88,7 @@ Lemline implements a subset of the Open Workflow DSL 1.0 specification, with mor
 | Feature | Status | Notes |
 |---------|--------|-------|
 | Custom Extensions | ⚠️ Partial | Basic extension framework available |
-| Function Catalog | ❌ Not supported | `use.catalogs` is accepted, but a call to one of its functions fails with `Unknown catalog` ([issue 111](https://github.com/lemline/lemline/issues/111)) |
+| Function Catalog | ⚠️ Partial | `name:version@catalog` reads `<endpoint>/functions/<name>/<version>/function.yaml` from an `http`, `https` or `file` endpoint, or from the built-in `global` catalog; endpoints with authentication are not supported ([example](lemline-examples-integrations.md#cataloged-function)) |
 | Service Discovery | ⚠️ Partial | Basic support via configuration |
 | Metrics Integration | ✅ Supported | Prometheus, JMX, etc. |
 | Tracing Integration | ✅ Supported | OpenTelemetry support |
