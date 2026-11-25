@@ -16,6 +16,7 @@ import com.lemline.core.activities.mock.ScriptMockRule
 import com.lemline.core.activities.mock.ShellMockMatcher
 import com.lemline.core.activities.mock.ShellMockResponse
 import com.lemline.core.activities.mock.ShellMockRule
+import com.lemline.core.errors.CommunicationException
 import com.lemline.core.processors.CallHttpConfig
 import com.lemline.core.processors.RunScriptConfig
 import com.lemline.core.processors.RunShellConfig
@@ -96,12 +97,12 @@ class MockActivityExecutorTest : FunSpec({
             exception.message shouldContain "api.example.com"
         }
 
-        test("throws MockedActivityException when mock has error") {
+        test("fails like a real HTTP call when the mock has a non-2xx status") {
             val config = MockConfiguration(
                 httpMocks = listOf(
                     HttpMockRule(
                         HttpMockMatcher(url = "*failing.api*"),
-                        HttpMockResponse(status = 500, error = "Service unavailable")
+                        HttpMockResponse(status = 503, body = buildJsonObject { put("error", "busy") })
                     )
                 )
             )
@@ -116,10 +117,42 @@ class MockActivityExecutorTest : FunSpec({
                 )
             )
 
-            val exception = shouldThrow<MockedActivityException> {
+            val exception = shouldThrow<CommunicationException> {
                 executor.execute(event)
             }
-            exception.message shouldBe "Service unavailable"
+            exception.status shouldBe 503
+            exception.message shouldBe """HTTP 503: {"error":"busy"}"""
+        }
+
+        test("fails with a communication error when the mock has an error") {
+            val config = MockConfiguration(
+                httpMocks = listOf(
+                    HttpMockRule(
+                        HttpMockMatcher(url = "*failing.api*"),
+                        HttpMockResponse(status = 500, error = "Service unavailable")
+                    ),
+                    HttpMockRule(
+                        HttpMockMatcher(url = "*unreachable.api*"),
+                        HttpMockResponse(error = "Connection refused")
+                    )
+                )
+            )
+            val executor = MockActivityExecutor(config)
+
+            fun call(url: String) = CallHttpStarted(
+                nodeStack = testNodeStack,
+                input = emptyInput,
+                config = CallHttpConfig(method = "GET", url = url)
+            )
+
+            val failed = shouldThrow<CommunicationException> { executor.execute(call("https://failing.api/endpoint")) }
+            failed.status shouldBe 500
+            failed.message shouldBe "Service unavailable"
+
+            // An error without a failing status models a call that got no response at all.
+            val unreachable = shouldThrow<CommunicationException> { executor.execute(call("https://unreachable.api/endpoint")) }
+            unreachable.status shouldBe 500
+            unreachable.message shouldBe "Connection refused"
         }
 
         test("returns empty object when body is null") {

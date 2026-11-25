@@ -14,6 +14,7 @@ import com.lemline.core.testcases.impl.TestMocks.post1Response
 import com.lemline.core.testcases.impl.TestMocks.updatedPostResponse
 import com.lemline.core.testcases.impl.TestMocks.user1Response
 import com.lemline.core.testcases.impl.WorkflowTestCase
+import com.lemline.core.testcases.impl.WorkflowTestValidators.expectErrorContaining
 import com.lemline.core.testcases.impl.WorkflowTestValidators.expectOutput
 
 /**
@@ -21,6 +22,13 @@ import com.lemline.core.testcases.impl.WorkflowTestValidators.expectOutput
  * Tests HTTP calls using mock responses from TestMocks.
  */
 object CallHttpTestCases {
+
+    private val unavailable = MockConfiguration(httpMocks = listOf(
+        HttpMockRule(
+            match = HttpMockMatcher(url = "https://api.example.com/inventory"),
+            response = HttpMockResponse(status = 503, body = buildJsonObject { put("error", "busy") })
+        )
+    ))
 
     val cases = listOf(
         WorkflowTestCase(
@@ -258,6 +266,67 @@ object CallHttpTestCases {
                     put("result", "sunt aut facere repellat provident occaecati excepturi optio reprehenderit")
                 }
             )
+        ),
+
+        WorkflowTestCase(
+            name = "http call failing with a non-2xx status raises a communication error carrying that status",
+            mockConfig = unavailable,
+            yaml = $$"""
+                do:
+                  - fetchInventory:
+                      try:
+                        - requestInventory:
+                            call: http
+                            with:
+                              method: get
+                              endpoint: https://api.example.com/inventory
+                      catch:
+                        errors:
+                          with:
+                            type: https://open-workflow-specification.org/spec/1.0.0/errors/communication
+                            status: 503
+                        as: failure
+                        do:
+                          - report:
+                              set:
+                                type: ${ $failure.type }
+                                status: ${ $failure.status }
+                                title: ${ $failure.title }
+            """.trimIndent(),
+            tags = setOf("http"),
+            validate = expectOutput(
+                buildJsonObject {
+                    put("type", "https://open-workflow-specification.org/spec/1.0.0/errors/communication")
+                    put("status", 503)
+                    put("title", """HTTP 503: {"error":"busy"}""")
+                }
+            )
+        ),
+
+        WorkflowTestCase(
+            name = "http call failing with another status is not caught by a status filter",
+            mockConfig = unavailable,
+            yaml = """
+                do:
+                  - fetchInventory:
+                      try:
+                        - requestInventory:
+                            call: http
+                            with:
+                              method: get
+                              endpoint: https://api.example.com/inventory
+                      catch:
+                        errors:
+                          with:
+                            type: https://open-workflow-specification.org/spec/1.0.0/errors/communication
+                            status: 404
+                        do:
+                          - report:
+                              set:
+                                caught: true
+            """.trimIndent(),
+            tags = setOf("http"),
+            validate = expectErrorContaining("errors/communication")
         )
     )
 }
