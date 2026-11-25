@@ -1,0 +1,44 @@
+{
+ "settleSeconds": 40,
+ "instances": [
+  {
+   "type": "workflowFaulted",
+   "error": {
+    "type": "https://errors.example.com/invalid-order",
+    "status": 422
+   }
+  },
+  {
+   "type": "workflowCompleted",
+   "output": {
+    "processed": false,
+    "reason": "~timed out"
+   }
+  },
+  {
+   "type": "workflowCompleted",
+   "output": {
+    "outcome": "rate-limited"
+   }
+  },
+  {
+   "type": "workflowCompleted",
+   "output": {
+    "outcome": "unavailable"
+   }
+  },
+  {
+   "type": "workflowCompleted",
+   "output": {
+    "outcome": "failed",
+    "errorType": "~errors/runtime$"
+   }
+  },
+  {
+   "type": "workflowCompleted",
+   "output": {
+    "sku": "SKU-1"
+   }
+  }
+ ]
+}

@@ -10,17 +10,19 @@ do:
             call: http
             with:
               method: get
-              endpoint: https://api.example.com/items
+              endpoint: http://127.0.0.1:8787/products
+              query:
+                fail: ${ .failStatus | tostring }
       catch:
         as: error
         do:
           - routeByStatus:
               switch:
                 - rateLimited:
-                    when: ${ $error.status == 429 }
+                    when: ${ $error.title | startswith("HTTP 429") }
                     then: handleRateLimit
                 - unavailable:
-                    when: ${ $error.status == 503 }
+                    when: ${ $error.title | startswith("HTTP 503") }
                     then: handleUnavailable
                 - default:
                     then: handleOtherError
