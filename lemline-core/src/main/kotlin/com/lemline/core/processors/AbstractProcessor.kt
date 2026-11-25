@@ -218,7 +218,13 @@ abstract class AbstractProcessor<T : TaskBase, S : NodeState>(
         if (extensionReturn != null) {
             ExtensionController.validateReturn(node, nodeStack.last(), extensionReturn)
             val continuation = nodeStack.currentExtension!!
-            if (extensionReturn.kind == ExtensionReturnKind.END) return continueToEnd(nodeStack, workflowInfo, output, lifecycleHook)
+            if (extensionReturn.kind == ExtensionReturnKind.END) {
+                // An extension can terminate before the owner body or after its result was prepared.
+                return finalizeTask(
+                    output, FlowDirective().apply { flowDirectiveEnum = FlowDirectiveEnum.END },
+                    nodeStack, workflowInfo, lifecycleHook,
+                )
+            }
             return when (continuation.phase) {
                 ExtensionPhase.BEFORE -> if (extensionReturn.kind == ExtensionReturnKind.EXIT) {
                     completeTask(output, getFlowDirective(), nodeStack.taskScope(node), nodeStack, workflowInfo, lifecycleHook, shortCircuit = true)
@@ -252,12 +258,15 @@ abstract class AbstractProcessor<T : TaskBase, S : NodeState>(
 
         return withExecutionStack(updatedStack) { when (val directive = flowDirective?.get()) {
             is FlowDirectiveEnum -> when (directive) {
-                // END: Workflow complete - recursive unwinding
-                FlowDirectiveEnum.END -> continueToEnd(
+                // Complete each ancestor while unwinding, skipping siblings and remaining after blocks.
+                FlowDirectiveEnum.END -> completeTask(
+                    rawOutput = output,
+                    currentFlowDirective = flowDirective,
+                    currentScope = scope,
                     nodeStack = updatedStack,
                     workflowInfo = workflowInfo,
-                    output = output,
-                    lifecycleHook = lifecycleHook
+                    lifecycleHook = lifecycleHook,
+                    shortCircuit = true,
                 )
                 // EXIT: exit current node
                 FlowDirectiveEnum.EXIT -> continueToParent(
@@ -452,8 +461,9 @@ abstract class AbstractProcessor<T : TaskBase, S : NodeState>(
         lifecycleHook: LifecycleEventHook,
     ): WorkflowEvent {
         if (node.origin == NodeOrigin.EXTENSION_BLOCK) return returnExtensionBlock(nodeStack, transformedOutput, ExtensionReturnKind.COMPLETE, workflowInfo, lifecycleHook)
+        val isRoot = node.position == NodePosition.root
         // Emit task completed events
-        if (node.position != NodePosition.root) {
+        if (!isRoot) {
             lifecycleHook.onTaskCompleted(
                 workflowInfo = workflowInfo,
                 nodeStack = nodeStack,
@@ -463,46 +473,18 @@ abstract class AbstractProcessor<T : TaskBase, S : NodeState>(
             )
         }
 
-        // Build the updated state stack: pop the current node's state (but never root)
-        // State was pushed in enterFromParent, so it's always on the stack
-        val updatedStack = nodeStack.pop().incrementTopCounter()
+        // Keep the terminal counter for END so replay preserves the workflow completion event ID.
+        val updatedStack = if (isRoot && currentFlowDirective?.get() == FlowDirectiveEnum.END) {
+            nodeStack
+        } else {
+            nodeStack.pop().incrementTopCounter()
+        }
 
         return getNextEvent(
             nodeStack = updatedStack,
             nextNode = node.parent,
             nextInput = transformedOutput,
             nextDirective = currentFlowDirective,
-        )
-    }
-
-    // ========================================
-    // END
-    // ========================================
-
-    private suspend fun continueToEnd(
-        nodeStack: NodeStack,
-        workflowInfo: WorkflowInfo,
-        output: JsonNode,
-        lifecycleHook: LifecycleEventHook
-    ): WorkflowEvent {
-
-        // Emit task completed events
-        if (node.position != NodePosition.root) {
-            lifecycleHook.onTaskCompleted(
-                workflowInfo = workflowInfo,
-                nodeStack = nodeStack,
-                nodePosition = node.position,
-                output = output,
-                completedAt = Clock.System.now(),
-            )
-        }
-
-        return getNextEvent(
-            // Pop the current node's state (but never root) - state was pushed in enterFromParent
-            nodeStack = if (node.position == NodePosition.root) nodeStack else nodeStack.pop().incrementTopCounter(),
-            nextNode = node.parent,
-            nextInput = output,
-            nextDirective = FlowDirective().apply { flowDirectiveEnum = FlowDirectiveEnum.END } // Pass END up the chain
         )
     }
 
