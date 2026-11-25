@@ -28,6 +28,49 @@ import org.junit.jupiter.api.Test
 
 class DefaultActivityExecutorHttpTest {
     @Test
+    fun `a workflow sends expanded HTTP URI values encoded exactly once`() = runTest {
+        val requestTarget = AtomicReference<String>()
+        val server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
+        val response = """{"matched":true}"""
+        server.createContext("/") { exchange ->
+            exchange.use {
+                requestTarget.set(it.requestURI.toASCIIString())
+                val bytes = response.toByteArray()
+                it.responseHeaders.add("Content-Type", "application/json")
+                it.sendResponseHeaders(200, bytes.size.toLong())
+                it.responseBody.write(bytes)
+            }
+        }
+        server.start()
+        try {
+            val result = FullOrchestrator.start(
+                workflow = WorkflowCache.parseYamlAndPut(
+                    """
+                    document: {dsl: '1.0.3', namespace: test, name: http-uri-template, version: '1.0.0'}
+                    do:
+                      - getProduct:
+                          call: http
+                          with:
+                            method: get
+                            endpoint:
+                              uri: http://127.0.0.1:${server.address.port}/products/{productId}/%7Bliteral%7D?source={source}
+                    """.trimIndent(),
+                ),
+                workflowInput = parseJson("""{"productId":"SKU/1 café%20","source":"a+b"}"""),
+                serde = true,
+                activityExecutor = DefaultActivityExecutor(),
+                functionResolver = MockFunctionResolver(),
+                cloudEventHook = InMemoryCloudEventHook(),
+                lifecycleHook = LifecycleEventHook.NOOP,
+            )
+            assertEquals(parseJson(response), result)
+            assertEquals("/products/SKU%2F1%20caf%C3%A9%2520/%7Bliteral%7D?source=a%2Bb", requestTarget.get())
+        } finally {
+            server.stop(0)
+        }
+    }
+
+    @Test
     fun `runner sends native JSON bodies for POST PUT and PATCH after durable resume`() = runTest {
         val request = AtomicReference<List<String>>()
         val server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)

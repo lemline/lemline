@@ -103,17 +103,18 @@ abstract class EndpointCallProcessor<T : TaskBase>(node: Node<T>) : AbstractProc
     protected fun toUrl(
         endpointUnion: Endpoint,
         data: JsonNode,
-        scope: Scope
+        scope: Scope,
+        expandLiteralTemplate: (String) -> String = { it },
     ): String {
         return when (val endpoint = endpointUnion.get()) {
             // EndpointConfiguration object
             is EndpointConfiguration -> when (val uriValue = endpoint.uri.get()) {
-                is UriTemplate -> uriTemplateToUrl(uriValue, data, scope)
+                is UriTemplate -> uriTemplateToUrl(uriValue, expandLiteralTemplate)
                 is String -> evaluateUrlExpression(uriValue, data, scope)
                 else -> raiseError(RUNTIME, "Unsupported EndpointUri type: ${uriValue?.javaClass?.name}")
             }
             // UriTemplate
-            is UriTemplate -> uriTemplateToUrl(endpoint, data, scope)
+            is UriTemplate -> uriTemplateToUrl(endpoint, expandLiteralTemplate)
             // Expression string
             is String -> evaluateUrlExpression(endpoint, data, scope)
             // Unsupported type
@@ -126,11 +127,10 @@ abstract class EndpointCallProcessor<T : TaskBase>(node: Node<T>) : AbstractProc
      */
     private fun uriTemplateToUrl(
         uriTemplate: UriTemplate,
-        data: JsonNode,
-        scope: Scope
+        expandLiteralTemplate: (String) -> String,
     ): String = when (val templateValue = uriTemplate.get()) {
         is URI -> templateValue.toString()
-        is String -> evaluateUrlExpression(templateValue, data, scope)
+        is String -> expandLiteralTemplate(templateValue)
         else -> raiseError(RUNTIME, "Unsupported UriTemplate type: ${templateValue?.javaClass?.name}")
     }
 
