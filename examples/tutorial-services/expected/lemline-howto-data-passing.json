@@ -1,0 +1,1 @@
+{"instances":[{"type":"workflowCompleted","output":{"customerId":"C-100","itemCount":2}},{"type":"workflowCompleted","output":{"orderId":"ORD-803","customerId":"C-100"}}]}
