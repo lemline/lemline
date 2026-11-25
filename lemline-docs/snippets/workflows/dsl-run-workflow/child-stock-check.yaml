@@ -1,0 +1,22 @@
+document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: child-stock-check
+  version: '1.0.0'
+do:
+  - validate:
+      if: ${ .quantity < 1 }
+      raise:
+        error:
+          type: https://errors.example.com/invalid-stock-quantity
+          status: 422
+          title: Quantity must be positive
+  - readStock:
+      call: http
+      with:
+        method: get
+        endpoint: http://127.0.0.1:8787/stock
+  - decide:
+      set:
+        quantity: ${ $workflow.input.quantity }
+        canReserve: ${ .available >= $workflow.input.quantity }

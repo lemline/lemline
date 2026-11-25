@@ -1,0 +1,74 @@
+{
+  "settleSeconds": 8,
+  "timeoutSeconds": 30,
+  "others": [
+    {
+      "workflow": "examples/child-stock-check:1.0.0",
+      "type": "workflowCompleted",
+      "output": {
+        "quantity": 2,
+        "canReserve": true
+      }
+    },
+    {
+      "workflow": "examples/child-stock-check:1.0.0",
+      "type": "workflowCompleted",
+      "output": {
+        "quantity": 3,
+        "canReserve": true
+      }
+    },
+    {
+      "workflow": "examples/child-stock-check:1.0.0",
+      "type": "workflowFaulted",
+      "error": {
+        "status": 422,
+        "title": "Quantity must be positive"
+      }
+    },
+    {
+      "workflow": "examples/child-stock-check:1.0.0",
+      "type": "workflowCompleted",
+      "output": {
+        "quantity": 4,
+        "canReserve": true
+      }
+    }
+  ],
+  "instances": [
+    {
+      "type": "workflowCompleted",
+      "output": {
+        "quantity": 1,
+        "canReserve": true
+      }
+    },
+    {
+      "type": "workflowCompleted",
+      "output": {
+        "canReserve": true
+      }
+    },
+    {
+      "type": "workflowCompleted",
+      "output": {
+        "submittedQuantity": 3
+      }
+    },
+    {
+      "type": "workflowCompleted",
+      "output": {
+        "status": 422,
+        "reason": "Quantity must be positive"
+      }
+    },
+    {
+      "type": "workflowCompleted",
+      "output": {
+        "quantity": 4,
+        "canReserve": true
+      }
+    },
+    null
+  ]
+}
