@@ -213,7 +213,10 @@ class EmitProcessor(
 
     /**
      * Resolve the data property (optional).
-     * Can be an object or a runtime expression.
+     *
+     * Can be a single runtime expression or a structured value (object, array, scalar).
+     * Runtime expressions nested at any depth of a structured value are evaluated,
+     * the same way `set` evaluates its configuration.
      */
     private fun resolveData(
         eventData: EventData?,
@@ -222,14 +225,12 @@ class EmitProcessor(
     ): JsonNode? {
         if (eventData == null) return null
 
-        return when (val value = eventData.get()) {
-            is String -> eval(data, jsonValue(value), scope, false)
-
-            else -> {
-                // Object - convert to JsonNode
-                with(LemlineJson) { value.toJsonNode() }
-            }
+        val template = when (val value = eventData.get()) {
+            is String -> jsonValue(value)
+            else -> with(LemlineJson) { value.toJsonNode() }
         }
+
+        return eval(data, template, scope, false)
     }
 
     /**
