@@ -6,21 +6,27 @@ title: Run Shell Command
 
 ## Purpose
 
-The `run: shell` task allows a workflow to execute a command line instruction using the host system's default shell (e.g., bash, sh, cmd, powershell). This is useful for simple system interactions, invoking command-line tools, or file system operations.
+The `run: shell` task invokes a command on the host that runs the workflow. Use it for command-line tools and simple file or system operations.
 
 ## Usage Example
 
-<code-block lang="yaml" src="workflows/dsl-run-shell/usage-example.yaml"/>
+Pass an order ID through an environment variable and capture standard output.
+
+<code-block lang="yaml" src="workflows/dsl-run-shell/run-simple-shell.yaml"/>
 
 ## Additional Examples
 
 ### Example: Capturing Standard Error
 
-<code-block lang="yaml" src="workflows/dsl-run-shell/example-capturing-standard-error.yaml" include-lines="6-18"/>
+The command writes a diagnostic to standard error and exits successfully.
+
+<code-block lang="yaml" src="workflows/dsl-run-shell/shell-capture-stderr.yaml"/>
 
 ### Example: Capturing All Outputs
 
-<code-block lang="yaml" src="workflows/dsl-run-shell/example-capturing-all-outputs.yaml" include-lines="6-20"/>
+Pass the receipt message as a single argument and capture both streams with the exit code.
+
+<code-block lang="yaml" src="workflows/dsl-run-shell/shell-capture-all.yaml"/>
 
 ## Configuration Options
 
@@ -29,8 +35,8 @@ The configuration is provided under the `run` property, specifically within the 
 ### `run` (Object, Required)
 
 *   **`shell`** (Object, Required): Defines the shell command process configuration.
-    *   **`command`** (String, Required): The shell command line to execute. This string is typically passed directly to the system's shell interpreter.
-    *   **`arguments`** (List<String>, Optional): An ordered list appended to the command, for example `["-n", "Hello world"]`. Entries can use [Runtime Expressions](dsl-runtime-expressions.md). Duplicate arguments, empty strings, and spaces within an entry are preserved. Older definitions using argument maps must be converted to lists.
+    *   **`command`** (String, Required): The command to execute.
+    *   **`arguments`** (List of strings, Optional): An ordered list appended to the command, for example `["-n", "Hello world"]`. Entries can use [Runtime Expressions](dsl-runtime-expressions.md).
     *   **`stdin`** (String, Optional): Standard input passed to the process, either a literal string or a runtime expression. Input is closed after the supplied content, including when no content is supplied.
     *   **`environment`** (Map<String, String>, Optional): A key/value map of environment variables to set specifically for the execution of this shell command. Values can be static strings or evaluated from [Runtime Expressions](dsl-runtime-expressions.md). This is a common way to pass dynamic data to the command.
 *   **`await`** (Boolean, Optional, Default: `true`):
@@ -46,6 +52,10 @@ The configuration is provided under the `run` property, specifically within the 
         *   `stderr` (String | Null): The content captured from the standard error stream.
     *   `none`: The task produces no output (evaluates to `null`).
 
+> **Lemline**
+>
+> The worker starts the executable directly. Use `command: sh` with `-c` and the command string as separate arguments when you need shell expansion or redirection.
+
 ### Data Flow
 <include from="_common-task-data-flow.md" element-id="common-data-flow"/>
 **Note**:
@@ -56,4 +66,31 @@ The configuration is provided under the `run` property, specifically within the 
 
 ### Flow Control
 <include from="_common-task-flow_control.md" element-id="common-flow-control"/>
-**Note**: If `await` is `true` and the shell command exits with a non-zero status code, a `Runtime` error is typically raised, and the `then` directive is *not* followed (unless caught by `Try`).
+> **Lemline**
+>
+> With `return: code` or `return: all`, the task returns the command’s exit status. A following task can use that status to choose how to proceed.
+
+## Run the Examples
+
+Complete the [SQLite setup](lemline-tutorial-setup.md) and leave the worker running. Save each workflow in the setup directory under the file name used below.
+
+Run these examples with the worker on Linux or macOS, where a POSIX shell is available.
+
+Run these registration and start commands from the setup directory.
+
+```bash
+bin/lemline definition post -f run-simple-shell.yaml
+bin/lemline instance start examples run-simple-shell --input '{"orderId":"O-100"}'
+bin/lemline definition post -f shell-capture-stderr.yaml
+bin/lemline instance start examples shell-capture-stderr
+bin/lemline definition post -f shell-capture-all.yaml
+bin/lemline instance start examples shell-capture-all --input '{"message":"receipt ready"}'
+```
+
+Check the individual results in the worker terminal.
+
+| Example | Expected result |
+|---|---|
+| `run-simple-shell` | `{"orderId":"O-100"}` |
+| `shell-capture-stderr` | `{"diagnostic":"stock check skipped"}` |
+| `shell-capture-all` | `{"code":0,"stdout":"receipt ready","stderr":"sample run"}` |
