@@ -18,6 +18,6 @@ do:
       with:
         method: get
         endpoint:
-          uri: https://api.example.com/data
+          uri: http://127.0.0.1:8787/partner/stock
           authentication:
             use: serviceAuth

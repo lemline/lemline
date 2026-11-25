@@ -27,11 +27,11 @@ Runners themselves expose no API: they only consume from the message broker and 
 
 Declare an authentication inline on the endpoint:
 
-<code-block lang="yaml" src="workflows/lemline-explain-security/authentication-configuration.yaml" include-lines="6-18"/>
+<code-block lang="yaml" src="workflows/lemline-explain-security/authentication-configuration.yaml"/>
 
 Or declare it once in `use.authentications` and reference it by name:
 
-<code-block lang="yaml" src="workflows/lemline-explain-security/authentication-configuration-2.yaml" include-lines="6-23"/>
+<code-block lang="yaml" src="workflows/lemline-explain-security/authentication-configuration-2.yaml"/>
 
 A reference to an unknown name fails with a `configuration` error.
 
@@ -53,7 +53,7 @@ Lemline has no built-in secret store: expose Vault, cloud secret managers or Kub
 
 Validate data with JSON Schema at the workflow or task level:
 
-<code-block lang="yaml" src="workflows/reference/order-input-schema.yaml" include-lines="6-14"/>
+<code-block lang="yaml" src="workflows/reference/order-input-schema.yaml"/>
 
 Lemline checks `input.schema` before a task runs, `output.schema` after it runs and `export.schema` on exported data. Data that does not match raises a `validation` error, which can be caught with `try`.
 
@@ -112,6 +112,49 @@ A runner only consumes and executes the namespaces listed in `lemline.namespaces
 | Gateway returns `PERMISSION_DENIED` | Token lacks the required scope or namespace |
 
 Run the runner with `--debug` to see the details of a failing call. Do not leave debug logging on in production: it can log request and response data.
+
+## Run the Examples
+
+Every example on this page is a complete workflow. Complete [the SQLite setup](lemline-tutorial-setup.md), save each example under the file name used below, and run the commands from the setup directory. With the JAR, substitute `java -jar lemline.jar` for `bin/lemline`.
+
+Start the [tutorial shop](lemline-tutorial-order-processing.md#start-the-tutorial-shop) from the root of the Lemline source checkout:
+
+```bash
+docker compose -f examples/tutorial-services/compose.yaml up -d
+```
+
+The examples read secrets from the worker's environment. Stop the setup worker with Ctrl+C, export the values, and start it again:
+
+```bash
+export API_TOKEN='demo-token'
+export API_USER='demo'
+export API_PASSWORD='demo-password'
+bin/lemline listen --debug
+```
+
+Run the next commands from a second terminal in the setup directory.
+
+```bash
+bin/lemline definition post -f authentication-configuration.yaml
+bin/lemline instance start examples authentication-configuration
+bin/lemline definition post -f authentication-configuration-2.yaml
+bin/lemline instance start examples authentication-configuration-2
+bin/lemline definition post -f order-input-schema.yaml
+bin/lemline instance start examples order-input-schema --input '{"orderId":"ORD-1805"}'
+bin/lemline instance start examples order-input-schema --input '{}'
+```
+
+| Example | Expected result |
+|---|---|
+| `authentication-configuration` | The partner stock with `"authenticatedWith":"bearer"` |
+| `authentication-configuration-2` | The partner stock with `"authenticatedWith":"basic"` |
+| `order-input-schema` | `{"ready":true}`; the empty input is refused by `instance start` |
+
+Stop the shop when you are done:
+
+```bash
+docker compose -f examples/tutorial-services/compose.yaml down
+```
 
 ## Related Resources
 
