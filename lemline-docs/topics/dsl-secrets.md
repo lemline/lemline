@@ -1,73 +1,130 @@
 ---
-title: Secrets Management
+title: Secrets
 ---
 
-# Secrets Management
+# Secrets
 
-## Introduction
-
-Secure handling of sensitive information is critical in modern workflow systems. The Open Workflow DSL provides a structured approach to secrets management that allows workflows to securely access protected resources without exposing sensitive information in workflow definitions.
-
-Secrets can include credentials, API keys, tokens, certificates, and other sensitive information required to access external services or systems.
+Declare names in `use.secrets` when a workflow needs credentials or other values supplied by its environment.
+The definition records the names and expressions that read them. The runtime resolves their values when it
+executes the workflow.
 
 ## Declaring Secrets
 
-Secrets are declared in the `use.secrets` section of a workflow definition. This establishes which secrets a workflow requires access to, without containing the actual secret values.
+Declare `API_TOKEN` without prescribing its value or putting it in the output.
 
-<code-block lang="yaml" src="workflows/dsl-secrets/declaring-secrets.yaml"/>
+<code-block lang="yaml" src="workflows/dsl-secrets/secrets-example.yaml"/>
 
 ## Secret Resolution
 
-The actual secret values are never stored within workflow definitions. The workflow runtime retrieves them at execution time.
+The runtime determines where to load a named value. Deployments can provide values through process
+configuration or a secret manager.
 
-**In Lemline**, each declared name is read from the runner environment variable with exactly the same name (for example `use.secrets: [PAYMENT_API_KEY]` reads `PAYMENT_API_KEY`). Inject these variables with your platform: Kubernetes Secrets, Docker secrets, or your deployment tool. See [Managing Secrets in Lemline](lemline-howto-secrets.md).
+> **Lemline**
+>
+> Declare the exact environment variable name, including case. Set it on every worker that
+> could execute the workflow. The worker parses a JSON object as a structured secret and keeps other
+> values as strings. A declared secret missing from the worker environment faults with status 403 before
+> the task runs.
 
 ## Accessing Secrets in Workflows
 
-Secrets are available in runtime expressions through the `$secrets` argument. A workflow only sees the secrets it declares.
+A secret is available as `$secrets.NAME`. Limit its use to fields that need the value, and keep it out
+of workflow outputs and shared context. An exported value becomes ordinary workflow data.
 
 ### Example: Using a Secret in an HTTP Call
 
-<code-block lang="yaml" src="workflows/dsl-secrets/example-using-a-secret-in-an-http-call.yaml" include-lines="6-16"/>
+> **Lemline**
+>
+> The HTTP task can read the secret into a request header, as shown here.
+
+<code-block lang="yaml" src="workflows/dsl-secrets/example-using-a-secret-in-an-http-call.yaml"/>
 
 ### Example: Structured Secret
 
-When a secret value is a JSON object, its fields can be read directly:
+The Basic policy reads the two fields from a credentials object.
 
-<code-block lang="yaml" src="workflows/dsl-secrets/example-structured-secret.yaml" include-lines="6-17"/>
+<code-block lang="yaml" src="workflows/dsl-secrets/example-structured-secret.yaml"/>
 
 ### Example: Secret in an Authentication Policy
 
-<code-block lang="yaml" src="workflows/dsl-secrets/example-secret-in-an-authentication-policy.yaml" include-lines="6-18"/>
+Use a named [authentication policy](dsl-authentication.md) when endpoints share credentials.
 
-## Security Considerations and Best Practices
+<code-block lang="yaml" src="workflows/dsl-secrets/example-secret-in-an-authentication-policy.yaml"/>
 
-1. **Principle of Least Privilege**: Only request access to secrets that are absolutely necessary for the workflow's operation.
+## Security Considerations
 
-2. **Secret Rotation**: Implement regular rotation of secrets and ensure your workflow can handle updated secret values without disruption.
+Use separate values for separate environments. Never put production credentials in a workflow definition,
+input argument, log, or output. The credentials below are the tutorial shop’s local demo values.
 
-3. **Auditing**: Ensure your secrets management system maintains logs of which workflows accessed which secrets, for compliance and security monitoring.
+## Run the Examples
 
-4. **No Secret Values in Logs**: Configure your workflow runtime to prevent secret values from appearing in logs or error messages.
+Complete the [SQLite setup](lemline-tutorial-setup.md) and leave the worker running. Save each workflow in the setup directory under the file name used below.
 
-5. **Access Control**: Implement proper access controls to restrict which users or systems can deploy workflows that access sensitive secrets.
+Use this command from the root of the source checkout to [start the tutorial shop](lemline-tutorial-setup.md#use-the-tutorial-shop).
 
-6. **Different Secrets Per Environment**: Use different secret values across development, testing, and production environments.
-
-## Error Handling
-
-If a declared secret is not available, the workflow faults with an authorization error:
-
-```
-https://open-workflow-specification.org/spec/1.0.0/errors/authorization
+```bash
+docker compose -f examples/tutorial-services/compose.yaml up -d --wait
 ```
 
-In Lemline, this check runs before each step, outside of any task: the workflow faults directly with the title `Required secret '<name>' is unavailable` (status 403), and a `try` task cannot catch it. Make the secret available on the runners, then start a new instance.
+Stop the setup worker with Ctrl+C. In the same terminal, export the demo values before restarting it.
 
-## Integration with External Secret Management Systems
+```bash
+export API_TOKEN='demo-token'
+export API_KEY='demo-api-key'
+export SHOP_CREDENTIALS='{"username":"demo","password":"demo-password"}'
+bin/lemline listen --debug
+```
 
-The workflow simply references secrets by name; the runtime resolves them at execution time. Lemline reads them from environment variables and has no built-in connector to a secret manager: use your platform to expose secrets from Vault, a cloud secret manager or Kubernetes as environment variables of the runners.
+Use a second terminal in the setup directory for the instance commands.
 
-## Conclusion
+Run these registration and start commands from the setup directory.
 
-Effective secrets management is a critical aspect of secure workflow design. The Open Workflow DSL provides a clean separation between workflow logic and sensitive information through its secrets mechanism. By following best practices for secrets management, you can build workflows that securely access protected resources while maintaining the confidentiality of sensitive information.
+```bash
+bin/lemline definition post -f secrets-example.yaml
+bin/lemline instance start examples secrets-example
+bin/lemline definition post -f example-using-a-secret-in-an-http-call.yaml
+bin/lemline instance start examples example-using-a-secret-in-an-http-call
+bin/lemline definition post -f example-structured-secret.yaml
+bin/lemline instance start examples example-structured-secret
+bin/lemline definition post -f example-secret-in-an-authentication-policy.yaml
+bin/lemline instance start examples example-secret-in-an-authentication-policy
+```
+
+Check the individual results in the worker terminal.
+
+| Example | Expected result |
+|---|---|
+| `secrets-example` | `{"ready":true}` |
+| `example-using-a-secret-in-an-http-call` | The shop accepts the API-key header and returns `SKU-1` with `100` available units and `authenticatedWith: "api-key-header"`. |
+| `example-structured-secret` | The shop accepts the Basic policy and returns `SKU-1` with `100` available units and `authenticatedWith: "basic"`. |
+| `example-secret-in-an-authentication-policy` | The shop accepts the Bearer policy and returns `SKU-1` with `100` available units and `authenticatedWith: "bearer"`. |
+
+### Run with a Missing Secret
+
+Before stopping the worker, wait for all four results in its terminal. Starting an instance queues work asynchronously.
+The commands below change the worker environment after those runs finish.
+
+```bash
+sleep 10
+```
+
+When the results are visible, stop the worker with Ctrl+C. Remove `API_TOKEN` in the worker terminal and start it again.
+
+```bash
+unset API_TOKEN
+bin/lemline listen --debug
+```
+
+Use the second terminal to start the declaration-only workflow with the new worker environment.
+
+```bash
+bin/lemline instance start examples secrets-example
+```
+
+The instance faults with status `403` and the title `Required secret 'API_TOKEN' is unavailable`.
+
+When the instances finish, use the command below in the source checkout to stop the shop.
+
+```bash
+docker compose -f examples/tutorial-services/compose.yaml down
+```
