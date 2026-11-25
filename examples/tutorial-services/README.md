@@ -50,7 +50,7 @@ Every route except GET /state and POST /reset accepts these query parameters:
 | fail | Answer with this status instead: 400, 401, 403, 404, 409, 422, 429, 500, 502, 503 or 504. 429 adds Retry-After: 1. |
 | failTimes | Fail only the first N calls, then process the request normally. Without it, every call fails. |
 | key | Count failures separately per key. Without it, the count uses the body's orderId or reference. |
-| delayMs | Wait this many milliseconds, up to 30000, before answering. |
+| delayMs | Wait this many milliseconds, up to 60000, before answering. |
 
 `/state` lists each simulated failure counter in `failures` and the last 500 requests in `requests`, with their method, path, query, headers, raw body and response status. Use them to check that a retry happened or that a credential was sent.
 

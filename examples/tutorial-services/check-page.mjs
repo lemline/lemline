@@ -17,6 +17,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { setTimeout as pause } from 'node:timers/promises';
 import { pipeline } from 'node:stream/promises';
 import { createGzip } from 'node:zlib';
+import { createServer } from 'node:net';
 import { fileURLToPath } from 'node:url';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -44,7 +45,19 @@ const log = join(out, 'commands.log');
 writeFileSync(log, `page ${page}\nproject ${project}\njar ${jar}\n`);
 const env = { ...process.env };
 const composeProject = 'lemline-docs-check-' + process.pid;
-const metricsPort = String(expected.metricsPort ?? 8090 + (process.pid % 50));
+/** The first port from 8100 that nothing listens on: the reader's worker uses 8080, often taken. */
+async function freePort(from) {
+  for (let port = from; port < from + 200; port++) {
+    const server = createServer();
+    const ok = await new Promise(resolve => server.once('error', () => resolve(false)).listen(port, '127.0.0.1', () => resolve(true)));
+    if (ok) {
+      await new Promise(resolve => server.close(resolve));
+      return port;
+    }
+  }
+  throw Error('No free port for the worker metrics');
+}
+const metricsPort = String(expected.metricsPort ?? await freePort(8100 + (process.pid % 50) * 2));
 const settleSeconds = expected.settleSeconds ?? 20;
 const timeoutSeconds = expected.timeoutSeconds ?? 240;
 const skip = (expected.skip ?? []).map(pattern => new RegExp(pattern));
@@ -68,8 +81,24 @@ for (const match of markdown.matchAll(/<code-block\b[^>]*\bsrc="([^"]+\.ya?ml)"[
     continue;
   }
   let pending = '';
+  let heredoc;
   for (const raw of match[2].split('\n')) {
     const line = raw.trimEnd();
+    // A here-document, such as cat > mocks.yaml <<'EOF', runs as one command.
+    if (heredoc) {
+      heredoc.lines.push(raw);
+      if (line === heredoc.end) {
+        stream.push({ command: heredoc.lines.join('\n') });
+        heredoc = undefined;
+      }
+      continue;
+    }
+    const marker = line.match(/<<-?\s*'?([A-Za-z_]+)'?\s*$/);
+    if (marker) {
+      heredoc = { end: marker[1], lines: [pending + line] };
+      pending = '';
+      continue;
+    }
     if (line.endsWith('\\')) {
       pending += line.slice(0, -1) + ' ';
       continue;
@@ -200,6 +229,11 @@ async function execute(command) {
   }
   if (/^(mkdir|cd) /.test(command) && /lemline-project/.test(command)) return note('\n# setup directory: ' + command);
   const exported = command.match(/^export ([A-Za-z_][A-Za-z0-9_]*)=(.*)$/);
+  const unset = command.match(/^unset ([A-Za-z_][A-Za-z0-9_]*)$/);
+  if (unset) {
+    delete env[unset[1]];
+    return note(`\n$ ${command}`);
+  }
   if (exported) {
     env[exported[1]] = execFileSync('/bin/sh', ['-c', `printf %s ${exported[2]}`], { encoding: 'utf8' });
     return note(`\n$ ${command}`);
