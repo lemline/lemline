@@ -1,0 +1,41 @@
+{
+  "settleSeconds": 35,
+  "timeoutSeconds": 20,
+  "others": [
+    {
+      "workflow": "examples/order-event-schedule:1.0.0",
+      "type": "workflowCompleted",
+      "output": {
+        "orderId": "O-181",
+        "status": "received"
+      }
+    },
+    {
+      "workflow": "examples/cron-stock-report:1.0.0",
+      "type": "workflowCompleted",
+      "output": {
+        "report": "stock"
+      }
+    }
+  ],
+  "instances": [
+    {
+      "type": "workflowCompleted",
+      "output": {
+        "orderId": "O-180",
+        "status": "needs-review"
+      }
+    },
+    {
+      "type": "workflowCompleted",
+      "output": {
+        "sku": "SKU-1",
+        "available": 100
+      }
+    },
+    {
+      "type": "workflowCompleted"
+    },
+    null
+  ]
+}
