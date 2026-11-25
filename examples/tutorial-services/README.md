@@ -24,7 +24,34 @@ Send JSON objects. Inspect all state with GET /state. Each POST below uses an or
 | POST /quotes/economy or /quotes/express | orderId, optional failTwice boolean | carrier and integer price (5 or 9); economy returns 503 on its first two attempts when requested |
 | POST /shipments | orderId, carrier | orderId and carrier |
 | POST /notifications | reference, recipient, message | Stored inbox entry |
-| POST /reset | — | Fresh shop with 100 units and empty inbox |
+| POST /refunds | orderId of an approved charge | Refund for the charge amount; repeated calls return the same refund |
+| DELETE /shipments/{orderId} | — | Shipment marked cancelled, so the reservation can be released |
+| GET /stock (also /inventory/SKU-1) | — | sku, available units and number of active reservations |
+| GET /old-stock | — | HTTP 301 to /stock |
+| GET /products | optional page, size (default 3), category, search | items, page, size, total, hasMore, nextPage |
+| GET /products/{id} | — | Product with its price, or HTTP 404 for an unknown ID |
+| GET /customers/{id} | — | C-100 and C-200 are valid customers; C-300 has an invalid email (emailValid false); others are HTTP 404 |
+| POST /customers | name, email | Created customer (C-901…); HTTP 422 for an invalid email; same email returns the same customer |
+| POST /email-checks | email | email and valid |
+| POST /addresses/validate | address with street, city and two-letter country | valid true, or HTTP 422 naming the missing fields |
+| GET /partner/stock | one credential: header X-API-Key, query api_key, Bearer token or Basic | Stock and authenticatedWith; HTTP 401 without credentials, 403 with a wrong value. Accepted values: key demo-api-key, token demo-token, user demo with password demo-password |
+| POST /graphql | query and variables | Answers the customer(id) query and the addReview mutation only, with GraphQL-style data and errors |
+| POST /documents, PATCH /documents/{id}, DELETE /documents/{id} | reference, title, optional content; PATCH: title, content, status or attachmentId | Draft document, updated document, document marked deleted |
+| POST /audit | reference, message | Stored audit entry |
+| POST /reset | — | Fresh shop with 100 units and empty collections |
+
+### Failures, delays and inspection on any route
+
+Every route except GET /state and POST /reset accepts these query parameters:
+
+| Parameter | Effect |
+|---|---|
+| fail | Answer with this status instead: 400, 401, 403, 404, 409, 422, 429, 500, 502, 503 or 504. 429 adds Retry-After: 1. |
+| failTimes | Fail only the first N calls, then process the request normally. Without it, every call fails. |
+| key | Count failures separately per key. Without it, the count uses the body's orderId or reference. |
+| delayMs | Wait this many milliseconds, up to 30000, before answering. |
+
+`/state` lists each simulated failure counter in `failures` and the last 500 requests in `requests`, with their method, path, query, headers, raw body and response status. Use them to check that a retry happened or that a credential was sent.
 
 A reservation belongs to one order. Use a fresh order ID for a new purchase. Duplicate successful writes return the existing business record. Reset only between exercises when no instances are running. The shop serves one process on one port; Lemline owns branching, retry timing, event routing and compensation.
 
