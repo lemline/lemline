@@ -8,65 +8,81 @@ This guide covers publishing a workflow definition to Lemline and starting insta
 
 ## Prerequisites
 
-Before you begin, ensure that:
-- You have [installed Lemline](lemline-getting-started.md)
-- You have [defined a workflow](lemline-howto-define-workflow.md)
-- You have a configured database and broker, and at least one runner running (`lemline listen`)
+Complete [the SQLite setup](lemline-tutorial-setup.md) and keep its worker running. Run the commands below from a
+second terminal in the setup directory. With the JAR, substitute `java -jar lemline.jar` for `bin/lemline`.
+The [production section](#running-workflows-in-production) lists what changes with a shared database and broker.
 
 ## Understanding the Workflow Lifecycle
 
 1. **Define**: write a workflow definition in YAML
 2. **Publish**: store the definition in Lemline's database
 3. **Start**: create instances of the workflow
-4. **Observe**: follow instances in the dashboard or through the gateway
+4. **Observe**: follow instances in the dashboard, through the gateway or in the worker log
 
 ## Publishing a Workflow Definition
 
-For a local example, save the conditional definition from [Acknowledge the first order](lemline-tutorial-hello.md#add-conditional-logic) as `acknowledge-order.yaml` in the SQLite setup directory. Use your installed Lemline CLI (or `java -jar lemline.jar`).
+Save this definition, the conditional greeting from [Acknowledge the first order](lemline-tutorial-hello.md#add-conditional-logic), as `acknowledge-order.yaml`:
+
+<code-block lang="yaml" src="workflows/lemline-tutorial-hello/6-adding-conditional-logic.yaml"/>
 
 ```bash
-lemline definition post --file acknowledge-order.yaml
+bin/lemline definition post --file acknowledge-order.yaml
 ```
 
-The namespace, name and version come from the `document` section of the file. Lemline parses the definition before storing it and rejects invalid files.
+The CLI answers `Workflow successfully created: 'acknowledge-order' (version '0.1.3')`. The namespace, name and
+version come from the `document` section of the file. Lemline parses the definition before storing it and rejects
+invalid files.
 
 ### Publishing Multiple Workflows
 
+Pass a directory to publish every definition file it contains. Add `--recursive` to include subdirectories.
+
 ```bash
-lemline definition post --directory /path/to/workflows
+mkdir -p workflows
+cp acknowledge-order.yaml workflows/
+bin/lemline definition post --directory workflows
 ```
 
-Add `--recursive` to include subdirectories.
+Each file is reported on its own line. Here the only definition is already registered, so the CLI prints
+`Workflow already exists (use --force to overwrite)` and still exits successfully.
 
 ### Republishing a Workflow
 
 A definition with the same namespace, name and version is not replaced unless you add `--force`:
 
 ```bash
-lemline definition post --file acknowledge-order.yaml --force
+bin/lemline definition post --file acknowledge-order.yaml --force
 ```
+
+The CLI answers `Workflow successfully updated`.
 
 ### Checking Published Definitions
 
 ```bash
-lemline definition get
+bin/lemline definition get
 ```
+
+The CLI lists the namespace, name and version of each definition, here `tutorial acknowledge-order 0.1.3`, then prints the selected definition.
 
 ## Running a Workflow Instance
 
 ### Using the CLI
 
-```bash
-lemline instance start <namespace> <name> [<version>]
+The command takes a namespace, a name and an optional version:
+
+```text
+bin/lemline instance start <namespace> <name> [<version>]
 ```
 
 Without a version, the latest published version is started. Provide input as JSON:
 
 ```bash
-lemline instance start tutorial acknowledge-order 0.1.3 --input '{"orderId":"ORD-101","hour":10}'
+bin/lemline instance start tutorial acknowledge-order --input '{"orderId":"ORD-101","hour":10}'
 ```
 
-The command prints the new instance id and returns; it does not wait for the workflow to finish. The instance is executed by the running runners.
+The command prints `Instance <id> started successfully` with the version it chose, here `0.1.3`, and returns;
+it does not wait for the workflow to finish. The running worker executes the instance and logs
+`Workflow completed with output` with `{"message":"Good morning: order received for ORD-101!"}`.
 
 ### Using the gRPC Gateway
 
@@ -78,7 +94,8 @@ The CLI has no command to read instances. Use:
 
 - the dashboard, connected to the gateway
 - the gateway RPCs `GetInstance`, `ListInstances` and `ListInstanceEvents`
-- the runner logs (`lemline listen --info`)
+- the worker log (`bin/lemline listen --debug` logs each workflow output)
+- on the SQLite setup, the `lemline_lifecycle_events` table of `analytics.db`
 
 ## Running Workflows in Production
 
@@ -115,9 +132,13 @@ Start several `lemline listen` processes with the same database and broker. They
 
 ### 4. Check Health
 
+The worker serves health and metrics on port 8080, or on the port given with `--metrics-port`:
+
 ```bash
 curl http://localhost:8080/q/health
 ```
+
+A healthy worker answers `"status": "UP"`.
 
 ### 5. Monitor Activity
 
@@ -128,7 +149,7 @@ curl http://localhost:8080/q/metrics
 ### 6. Keep One Configuration per Environment
 
 ```bash
-lemline listen --config /etc/lemline/prod.yaml
+bin/lemline listen --config /etc/lemline/prod.yaml
 ```
 
 ## Troubleshooting
@@ -141,7 +162,7 @@ lemline listen --config /etc/lemline/prod.yaml
 
 ### Workflow Instance Won't Start
 
-1. **Unknown workflow**: check namespace, name and version with `lemline definition get`.
+1. **Unknown workflow**: check namespace, name and version with `bin/lemline definition get`.
 2. **Invalid input**: input must be valid JSON and match the workflow's input schema.
 
 ### Instance Does Not Progress

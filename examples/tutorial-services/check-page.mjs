@@ -42,7 +42,7 @@ mkdirSync(out, { recursive: true });
 const project = mkdtempSync(join(tmpdir(), 'lemline-page-project-'));
 const log = join(out, 'commands.log');
 writeFileSync(log, `page ${page}\nproject ${project}\njar ${jar}\n`);
-const env = { ...process.env, QUARKUS_HTTP_HOST_ENABLED: 'false' };
+const env = { ...process.env };
 const composeProject = 'lemline-docs-check-' + process.pid;
 const metricsPort = String(expected.metricsPort ?? 8090 + (process.pid % 50));
 const settleSeconds = expected.settleSeconds ?? 20;
@@ -201,6 +201,8 @@ async function execute(command) {
     return note(`\n$ ${command}`);
   }
   let line = command.replace(/^(?:bin\/lemline|\.\/bin\/lemline|lemline|java -jar lemline\.jar)(?=\s)/, cli);
+  // The page's worker listens on 8080 for health and metrics; this one uses its own port.
+  line = line.replaceAll('localhost:8080', 'localhost:' + metricsPort);
   if (line.startsWith(cli + ' listen')) return startWorker(line.slice((cli + ' listen').length));
   if (/^docker compose\b/.test(line) && /examples\/tutorial-services\/compose\.yaml/.test(line)) {
     line = line.replace(/^docker compose/, `docker compose -p ${composeProject}`);
@@ -242,7 +244,7 @@ try {
   if (!expected.noInitialWorker) await startWorker();
   for (const [position, item] of stream.entries()) {
     if (!item.command) continue;
-    const posted = item.command.match(/definition post -f (\S+)/);
+    const posted = item.command.match(/definition post (?:-f|--file) (\S+)/);
     if (posted) {
       const source = sourceFor(posted[1], position);
       if (source) {

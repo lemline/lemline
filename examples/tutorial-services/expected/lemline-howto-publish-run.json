@@ -1,0 +1,6 @@
+{
+  "skip": ["--config /etc/lemline/prod.yaml"],
+  "instances": [
+    { "type": "workflowCompleted", "output": { "message": "Good morning: order received for ORD-101!" } }
+  ]
+}
