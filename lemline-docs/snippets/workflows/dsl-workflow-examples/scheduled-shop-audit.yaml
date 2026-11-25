@@ -1,0 +1,24 @@
+document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: scheduled-shop-audit
+  version: '1.0.0'
+schedule:
+  cron: '* * * * *'
+do:
+  - readStock:
+      call: http
+      with:
+        method: get
+        endpoint: http://127.0.0.1:8787/stock
+  - recordReport:
+      call: http
+      with:
+        method: post
+        endpoint: http://127.0.0.1:8787/audit
+        body:
+          reference: scheduled-stock
+          message: '${ "Available units: " + (.available | tostring) }'
+  - finish:
+      set:
+        report: stock-recorded
