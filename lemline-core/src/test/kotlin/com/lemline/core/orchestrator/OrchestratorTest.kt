@@ -233,6 +233,21 @@ class OrchestratorTest : FunSpec() {
             assertEquals(15, output["sum"]?.jsonPrimitive?.int)
         }
 
+        test("converts epoch seconds with the jq todate alias") {
+            val yaml = $$"""
+                do:
+                  - stamp:
+                      set:
+                        iso: ${ 0 | todateiso8601 }
+                        alias: ${ 0 | todate }
+            """
+
+            val output = executeWorkflow(yaml)
+
+            assertEquals(jsonValue("1970-01-01T00:00:00Z"), output["iso"])
+            assertEquals(output["iso"], output["alias"])
+        }
+
         // ========================================
         // Activity Execution Tests
         // ========================================
