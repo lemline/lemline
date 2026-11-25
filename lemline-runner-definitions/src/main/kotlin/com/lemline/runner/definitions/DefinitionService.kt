@@ -25,7 +25,7 @@ import java.sql.Connection
  *
  * When creating or updating a definition:
  * ```kotlin
- * definitionService.save(model, workflow)
+ * definitionService.save(model)
  * ```
  *
  * When deleting a definition:
@@ -61,6 +61,7 @@ class DefinitionService {
      * @return SaveResult indicating success and whether it was created or updated
      */
     suspend fun save(model: DefinitionModel, force: Boolean = false): SaveResult {
+        val definition = WorkflowCache.prepareYaml(model.definition)
 
         val result = when (definitionRepository.insert(model)) {
             1 -> {
@@ -84,11 +85,8 @@ class DefinitionService {
             else -> SaveResult.FAILED
         }
 
-        // Parse and cache the workflow definition
-        // Note: Listen task definitions are retrieved on-demand from the cached workflow,
-        // so no database sync is needed here.
         if (result == SaveResult.CREATED || result == SaveResult.UPDATED) {
-            WorkflowCache.parseYamlAndPut(model.definition)
+            WorkflowCache.putDefinition(definition)
         }
 
         return result
