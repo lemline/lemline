@@ -28,6 +28,8 @@ dependencies {
     // UUID Creator
     implementation(libs.uuidCreator)
 
+    implementation(libs.javaSemver)
+
     // Testing
     testImplementation(kotlin("test"))
 

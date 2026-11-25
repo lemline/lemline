@@ -628,6 +628,53 @@ object RunWorkflowTestCases {
         ),
 
         WorkflowTestCase(
+            name = "workflow resolves the latest child version in its namespace",
+            yaml = """
+                do:
+                  - callChild:
+                      run:
+                        workflow:
+                          namespace: test
+                          name: versioned-child
+                          version: latest
+            """.trimIndent(),
+            dependencies = listOf(
+                WorkflowDependency(
+                    name = "versioned-child",
+                    version = "1.10.0",
+                    yaml = """
+                        do:
+                          - report:
+                              set:
+                                selected: latest
+                    """.trimIndent()
+                ),
+                WorkflowDependency(
+                    name = "versioned-child",
+                    version = "1.9.0",
+                    yaml = """
+                        do:
+                          - report:
+                              set:
+                                selected: older
+                    """.trimIndent()
+                ),
+                WorkflowDependency(
+                    namespace = "other",
+                    name = "versioned-child",
+                    version = "2.0.0",
+                    yaml = """
+                        do:
+                          - report:
+                              set:
+                                selected: other-namespace
+                    """.trimIndent()
+                )
+            ),
+            validate = expectOutput(buildJsonObject { put("selected", "latest") })
+        ),
+
+        WorkflowTestCase(
             name = "run workflow inside for loop executes multiple times with distinct results",
             yaml = $$"""
                 do:

@@ -347,11 +347,12 @@ object FullOrchestrator {
         lifecycleHook: LifecycleEventHook,
         secretsForWorkflow: (Workflow) -> ObjectNode,
     ): WorkflowCommand {
-        val childWorkflow = WorkflowCache.getWorkflow(
-            namespace = event.config.namespace,
-            name = event.config.name,
-            version = event.config.version
-        ) ?: throw IllegalStateException("Workflow definition not found")
+        val config = event.config
+        val childWorkflow = if (config.version.isLatest) {
+            WorkflowCache.getLatestWorkflow(config.namespace, config.name)
+        } else {
+            WorkflowCache.getWorkflow(config.namespace, config.name, config.version)
+        } ?: throw IllegalStateException("Workflow definition not found")
 
         return when (event.config.sync) {
             true -> {
