@@ -1,33 +1,30 @@
 document:
-  dsl: 1.0.3
-  namespace: test
+  dsl: '1.0.3'
+  namespace: examples
   name: grpc-auth-example
-  version: 0.1.0
+  version: '0.1.0'
 use:
+  secrets:
+    - apiToken
   authentications:
-    myGrpcAuth:
-      oauth2:
-        authority: https://auth.example.com
-        client:
-          id: client-id
-          secret: client-secret
-        grant: client_credentials
+    inventoryAuth:
+      bearer:
+        token: ${ $secrets.apiToken }
 do:
-  - getAccountDetails:
+  - getStock:
       call: grpc
       with:
         proto:
-          endpoint: file://protos/account.proto
+          endpoint: file:///opt/shop/inventory.proto
         service:
-          name: AccountService
-          host: secure-grpc
+          name: shop.InventoryService
+          host: localhost
           port: 50051
           authentication:
-            use: myGrpcAuth
-        method: GetAccount
+            use: inventoryAuth
+        method: GetStock
         arguments:
-          accountId: ${ .user.id }
-      then: processAccount
-  - processAccount:
+          sku: ${ .sku }
+  - recordStock:
       set:
-        processed: true
+        checked: true

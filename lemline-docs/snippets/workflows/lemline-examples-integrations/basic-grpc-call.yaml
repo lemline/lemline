@@ -1,18 +1,18 @@
 document:
   dsl: '1.0.3'
-  namespace: test
-  name: grpc-example
+  namespace: examples
+  name: grpc-get-stock
   version: '0.1.0'
 do:
-  - greet:
+  - getStock:
       call: grpc
       with:
         proto:
-          endpoint: file://app/greet.proto
+          endpoint: file:///opt/shop/inventory.proto
         service:
-          name: GreeterApi.Greeter
+          name: shop.InventoryService
           host: localhost
-          port: 5011
-        method: SayHello
+          port: 50051
+        method: GetStock
         arguments:
-          name: ${ .user.preferredDisplayName }
+          sku: ${ .sku }
