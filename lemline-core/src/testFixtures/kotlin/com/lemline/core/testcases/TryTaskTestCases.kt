@@ -177,14 +177,14 @@ object TryTaskTestCases {
                                 errorType: ${ $error.type }
                                 errorStatus: ${ $error.status }
                                 errorDetail: ${ $error.detail }
-                                legacyDetails: ${ $error.details }
+                                hasLegacyDetails: ${ $error | has("details") }
             """.trimIndent(),
             validate = expectOutput(
                 buildJsonObject {
                     put("errorType", "https://open-workflow-specification.org/spec/1.0.0/errors/runtime")
                     put("errorStatus", 500)
                     put("errorDetail", "Could not process the order")
-                    put("legacyDetails", "Could not process the order")
+                    put("hasLegacyDetails", false)
                 }
             )
         ),

@@ -26,7 +26,7 @@ use:
       # HTTP status failures carry the status in the title; transport errors retain their exception class.
       when: >-
         ${ (($error.title // "") | test("^HTTP (408|429|502|503|504):")) or
-           (($error.details // "") | test("^(java[.]net[.](ConnectException|SocketException|SocketTimeoutException)|io[.]ktor[.]client[.](plugins[.]HttpRequestTimeoutException|network[.]sockets[.](ConnectTimeoutException|SocketTimeoutException)))(:|$)")) }
+           (($error.detail // "") | test("^(java[.]net[.](ConnectException|SocketException|SocketTimeoutException)|io[.]ktor[.]client[.](plugins[.]HttpRequestTimeoutException|network[.]sockets[.](ConnectTimeoutException|SocketTimeoutException)))(:|$)")) }
       delay: PT2S
       backoff:
         exponential: {}
