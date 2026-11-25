@@ -19,7 +19,9 @@ import io.mockk.mockk
 import io.mockk.mockkStatic
 import io.mockk.verify
 import io.serverlessworkflow.api.types.Workflow
+import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
+import java.io.InputStream
 import java.io.PrintStream
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
@@ -42,6 +44,7 @@ class DefinitionGetCommandTest {
     private lateinit var cmd: CommandLine
     private lateinit var outStream: ByteArrayOutputStream
     private lateinit var errStream: ByteArrayOutputStream
+    private lateinit var originalIn: InputStream
     private lateinit var originalOut: PrintStream
     private lateinit var originalErr: PrintStream
 
@@ -88,6 +91,7 @@ class DefinitionGetCommandTest {
         } returns workflowDefinition
 
         // Save original streams
+        originalIn = System.`in`
         originalOut = System.out
         originalErr = System.err
 
@@ -103,6 +107,7 @@ class DefinitionGetCommandTest {
     @AfterEach
     fun cleanup() {
         // Restore original streams
+        System.setIn(originalIn)
         System.setOut(originalOut)
         System.setErr(originalErr)
     }
@@ -185,6 +190,9 @@ class DefinitionGetCommandTest {
 
     @Nested
     inner class InteractiveSelectionTests {
+        private val multipleDefinitions
+            get() = listOf(1 to workflowDefinition, 2 to workflowDefinition.copy(version = WorkflowVersion("2.0.0")))
+
         @Test
         fun `should use selector when only namespace and name are provided`() {
             // Given
@@ -233,6 +241,30 @@ class DefinitionGetCommandTest {
             exitCode shouldBe 0
             outStream.toString() shouldContain workflowDefinition.definition
             coVerify { mockedSelector.prepareSelection(null, filterName = null) }
+        }
+
+        @Test
+        fun `should exit at end of input without redisplaying definitions`() {
+            System.setIn(InputStream.nullInputStream())
+            // Stop a regression at the second selection so the test cannot hang on EOF.
+            coEvery { mockedSelector.prepareSelection(null, filterName = null) } returnsMany listOf(multipleDefinitions, null)
+
+            cmd.execute() shouldBe 0
+
+            coVerify(exactly = 1) { mockedSelector.prepareSelection(null, filterName = null) }
+        }
+
+        @Test
+        fun `should redisplay definitions for blank input and stop on quit`() {
+            System.setIn(ByteArrayInputStream(" \nQ\n1\n".toByteArray()))
+            coEvery { mockedSelector.prepareSelection(null, filterName = null) } returnsMany listOf(
+                multipleDefinitions, multipleDefinitions, null
+            )
+
+            cmd.execute() shouldBe 0
+
+            coVerify(exactly = 2) { mockedSelector.prepareSelection(null, filterName = null) }
+            outStream.toString().contains(workflowDefinition.definition) shouldBe false
         }
 
         @Test

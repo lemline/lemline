@@ -104,10 +104,10 @@ class DefinitionGetCommand : Runnable {
                 // --- Prompt loop if multiple results ---
                 while (true) {
                     print("Enter # to view, or q to quit: ")
-                    val input = readlnOrNull()?.trim()
+                    val input = readlnOrNull()?.trim() ?: break
 
                     when {
-                        input.isNullOrEmpty() -> {
+                        input.isEmpty() -> {
                             // Blank input: Redisplay the list and re-prompt
                             selector.prepareSelection(workflowNamespace, filterName = workflowName) ?: break
                             continue
