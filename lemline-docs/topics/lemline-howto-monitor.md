@@ -32,6 +32,29 @@ See [gRPC Gateway Reference](lemline-ref-gateway.md).
 
 The CLI has no command to list or inspect instances. `lemline instance start` prints the id of the instance it starts, which you can then look up in the dashboard.
 
+### Following an instance on the SQLite setup
+
+On [the SQLite setup](lemline-tutorial-setup.md), the worker stores every lifecycle event in `analytics.db`. Keep the
+setup worker running and use a second terminal in the setup directory. With the JAR, substitute `java -jar lemline.jar`
+for `bin/lemline`. Save this definition as `hello.yaml`:
+
+<code-block lang="yaml" src="workflows/lemline-getting-started/creating-your-first-workflow.yaml"/>
+
+```bash
+bin/lemline definition post -f hello.yaml
+bin/lemline instance start examples shop-receipt
+```
+
+With the `sqlite3` command-line tool, list the events of that run in order:
+
+```bash
+sqlite3 analytics.db "SELECT type FROM lemline_lifecycle_events WHERE lemline_workflow_name = 'shop-receipt' ORDER BY id"
+```
+
+The list starts with `org.open-workflow-specification.workflow.created.v1` and `workflow.started.v1`, shows the
+`task.created`, `task.started` and `task.completed` events, and ends with `workflow.completed.v1`. Each row's
+`payload` column holds the full CloudEvent, including the workflow output.
+
 ## Advanced Monitoring
 
 ### Listening to Lifecycle Events
@@ -45,6 +68,8 @@ Lemline exposes metrics via Micrometer that can be scraped by Prometheus or simi
 ```bash
 curl http://localhost:8080/q/metrics
 ```
+
+Use the port given with `--metrics-port` if the worker was started with one.
 
 Lemline metrics describe message processing per channel, with the prefixes `lemline_messaging_commands`, `lemline_messaging_events`, `lemline_messaging_cloudevents` and `lemline_analytics`. For example:
 
@@ -81,7 +106,7 @@ export QUARKUS_LOG_CONSOLE_LEVEL=DEBUG   # the console only shows ERROR by defau
 export QUARKUS_LOG_CATEGORY__COM_LEMLINE__LEVEL=DEBUG
 ```
 
-At `DEBUG` level, the runner logs each task it enters with its input, and errors with their details. Every log line carries the workflow namespace, name, version and instance id.
+Start the worker in the same terminal after these exports. At `DEBUG` level, the runner logs each task it enters with its input, the workflow output (`Workflow completed with output`), and errors with their details. Every log line carries the workflow namespace, name, version and instance id, for example `[examples/shop-receipt:0.1.0] [01a2128e-…]`. Without `--debug` or these variables, a completed workflow leaves no line in the console.
 
 ## Monitoring Best Practices
 
