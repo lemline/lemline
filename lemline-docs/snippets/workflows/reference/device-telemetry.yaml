@@ -8,11 +8,9 @@ schedule:
     one:
       with:
         type: com.example.device.telemetry.received
+input:
+  from: ${ .[0] }
 do:
-  - readDevice:
-      set:
-        deviceId: ${ .[0].deviceId }
-        temperature: ${ .[0].temperature }
   - inspectReading:
       switch:
         - highTemperature:

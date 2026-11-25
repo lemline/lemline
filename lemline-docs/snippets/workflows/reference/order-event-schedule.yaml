@@ -8,8 +8,10 @@ schedule:
     one:
       with:
         type: com.example.order.created
+input:
+  from: ${ .[0] }
 do:
   - recordOrder:
       set:
-        orderId: ${ .[0].orderId }
+        orderId: ${ .orderId }
         status: received

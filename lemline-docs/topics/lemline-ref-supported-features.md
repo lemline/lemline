@@ -13,7 +13,7 @@ Lemline implements a subset of the Open Workflow DSL 1.0 specification, with mor
 | YAML Definition Format | ✅ Supported | Primary format for workflow definitions |
 | JSON Definition Format | ⚠️ Partial | Basic JSON support available |
 | Workflow Metadata | ✅ Supported | Full support for namespace, name, version |
-| Workflow Input/Output | ⚠️ Partial | Schema validation and task-level `input`/`output` transformations are applied; a workflow-level `input.from` is not applied yet (put it on the first task) |
+| Workflow Input/Output | ✅ Supported | Including schema validation and the workflow-level `input.from` and `output.as` |
 | States Definition | ✅ Supported | Via task constructs |
 | Expression Language | ✅ Supported | JQ expressions fully supported |
 | Workflow Variables | ✅ Supported | Context and scope variables |

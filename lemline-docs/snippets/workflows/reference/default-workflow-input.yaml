@@ -3,10 +3,10 @@ document:
   namespace: examples
   name: default-workflow-input
   version: '1.0.0'
+input:
+  from: '${ { priority: "NORMAL", currency: "USD" } + . }'
 do:
   - recordOrder:
-      input:
-        from: '${ { priority: "NORMAL", currency: "USD" } + . }'
       set:
         orderId: ${ .orderId }
         priority: ${ .priority }
