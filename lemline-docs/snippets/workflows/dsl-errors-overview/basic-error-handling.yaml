@@ -1,47 +1,24 @@
 document:
-  dsl: 1.0.3
+  dsl: '1.0.3'
   namespace: examples
   name: basic-error-handling
-  version: 1.0.0
+  version: '1.0.0'
 do:
-  - processOrder:
+  - requestProduct:
       try:
-        - validateOrder:
+        - read:
             call: http
             with:
-              endpoint: https://api.example.com/validate-order
-              method: post
-              body: ${ $workflow.input.order }
-              headers:
-                Content-Type: application/json
-        - processPayment:
-            call: processPayment
-            with:
-              order: ${ $workflow.input.order }
-              paymentMethod: ${ $workflow.input.paymentMethod }
-            export:
-              as: '${ $context + { paymentResult: . } }'
+              method: get
+              endpoint: '${ "http://127.0.0.1:8787/products/" + (.productId | @uri) }'
+            output:
+              as: '${ {listed: true, productId: .id} }'
       catch:
-        as: error
+        errors:
+          with:
+            type: https://open-workflow-specification.org/spec/1.0.0/errors/communication
+            status: 404
         do:
-          - logError:
-              call: http
-              with:
-                endpoint: https://api.example.com/log-error
-                method: post
-                body:
-                  error: ${ $error }
-                  context: Order processing
-                headers:
-                  Content-Type: application/json
-          - notifyCustomer:
-              call: http
-              with:
-                endpoint: https://api.example.com/send-email
-                method: post
-                body:
-                  to: ${ $workflow.input.order.customerEmail }
-                  subject: Order Processing Failed
-                  body: '${ "We apologize, but we could not process your order. Error: " + $error.detail }'
-                headers:
-                  Content-Type: application/json
+          - unavailable:
+              set:
+                listed: false

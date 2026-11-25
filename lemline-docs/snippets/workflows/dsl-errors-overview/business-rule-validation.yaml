@@ -4,38 +4,18 @@ document:
   name: business-rule-validation
   version: '1.0.0'
 do:
-  - checkInventory:
+  - readStock:
       call: http
       with:
-        method: "GET"
-        endpoint: "https://api.example.com/inventory"
-        query:
-          productId: ${ $workflow.input.productId }
-        headers:
-          Content-Type: "application/json"
-      output:
-        as: '${ { inventoryData: . } }'
-
-  - validateOrder:
-      do:
-        - checkProductAvailability:
-            if: ${ .inventoryData.quantityAvailable < $workflow.input.quantity }
-            raise:
-              error:
-                type: "https://open-workflow-specification.org/errors/validation/failed-precondition"
-                status: 412
-                title: "Insufficient inventory"
-                detail: "${ \"Product '\" + $workflow.input.productId + \"' has insufficient inventory. Requested: \"\
-                  \ + ($workflow.input.quantity | tostring) + \", Available: \" + (.inventoryData.quantityAvailable | tostring)\
-                  \ + \". Next restock date: \" + .inventoryData.nextDeliveryDate }"
-
-        - checkOrderLimit:
-            if: '${ $workflow.input.quantity > 10 and $workflow.input.customerType != "wholesale" }'
-            raise:
-              error:
-                type: "https://open-workflow-specification.org/errors/authorization/permission-denied"
-                status: 403
-                title: "Retail customers are limited to 10 units per order"
-                detail: "${ \"Customer type '\" + $workflow.input.customerType + \"' is limited to 10 units
-                  per order. Requested quantity: \" + ($workflow.input.quantity | tostring) + \". Resolution: Apply for a wholesale
-                  account or reduce order quantity.\" }"
+        method: get
+        endpoint: http://127.0.0.1:8787/stock
+  - checkAvailableQuantity:
+      if: ${ .available < $workflow.input.quantity }
+      raise:
+        error:
+          type: https://errors.example.com/insufficient-stock
+          title: Insufficient stock
+          status: 409
+  - accept:
+      set:
+        accepted: true

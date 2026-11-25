@@ -6,24 +6,36 @@ document:
 do:
   - processOrder:
       try:
-        - checkOrderData:
-            if: ${ (.items // []) | length == 0 }
+        - rejectEmptyOrder:
+            if: ${ .items | length == 0 }
             raise:
               error:
-                type: https://example.com/errors/invalid-order
+                type: https://errors.example.com/invalid-order
+                title: Order has no items
                 status: 400
-                title: Order must contain at least one item
-        - processPayment:
+        - reserveStock:
             call: http
             with:
               method: post
-              endpoint: https://api.example.com/payments/process
-              body: ${ . }
+              endpoint: http://127.0.0.1:8787/reservations
+              body:
+                orderId: ${ .orderId }
+                items: ${ .items }
+        - charge:
+            call: http
+            with:
+              method: post
+              endpoint: http://127.0.0.1:8787/charges
+              body:
+                orderId: ${ .orderId }
+                paymentInfo:
+                  token: ${ $workflow.input.paymentToken }
+            output:
+              as: '${ {paid: .paid} }'
       catch:
         as: orderError
         do:
-          - formatFailure:
+          - reportError:
               set:
-                success: false
+                paid: false
                 status: ${ $orderError.status }
-                errorType: ${ $orderError.type }
