@@ -12,7 +12,34 @@ There are no `lemline.openapi.*` runner settings.
 
 Call the operation's URL directly with `call: http`, using the method, path, query parameters and body described in the OpenAPI document:
 
-<code-block lang="yaml" src="workflows/lemline-ref-openapi/alternative.yaml" include-lines="6-12"/>
+<code-block lang="yaml" src="workflows/lemline-ref-openapi/alternative.yaml"/>
+
+## Run the Examples
+
+Every example on this page is a complete workflow. Complete [the SQLite setup](lemline-tutorial-setup.md), save each example under the file name used below, and run the commands from the setup directory. With the JAR, substitute `java -jar lemline.jar` for `bin/lemline`.
+
+Start the [tutorial shop](lemline-tutorial-order-processing.md#start-the-tutorial-shop) from the root of the Lemline source checkout:
+
+```bash
+docker compose -f examples/tutorial-services/compose.yaml up -d
+```
+
+Keep the setup worker running and use a second terminal in the setup directory.
+
+```bash
+bin/lemline definition post -f alternative.yaml
+bin/lemline instance start examples openapi-alternative
+```
+
+| Example | Expected result |
+|---|---|
+| `openapi-alternative` | The first page of garden products, SKU-1 to SKU-3 |
+
+Stop the shop when you are done:
+
+```bash
+docker compose -f examples/tutorial-services/compose.yaml down
+```
 
 ## Related Resources
 
