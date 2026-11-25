@@ -1,0 +1,26 @@
+document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: try-linear-retry
+  version: '1.0.0'
+do:
+  - request:
+      try:
+        - readStock:
+            call: http
+            with:
+              method: get
+              endpoint: http://127.0.0.1:8787/stock
+              query:
+                fail: ${ .status | tostring }
+                failTimes: ${ .failures | tostring }
+                key: ${ .key }
+      catch:
+        retry:
+          delay: PT2S
+          backoff:
+            linear: {}
+          limit:
+            attempt:
+              count: 4
+            duration: PT1M

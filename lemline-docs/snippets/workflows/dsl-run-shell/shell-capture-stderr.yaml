@@ -1,0 +1,17 @@
+document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: shell-capture-stderr
+  version: '1.0.0'
+do:
+  - writeDiagnostic:
+      run:
+        shell:
+          command: sh
+          arguments:
+            - '-c'
+            - 'printf "stock check skipped" >&2'
+        return: stderr
+  - result:
+      set:
+        diagnostic: ${ . }

@@ -33,7 +33,7 @@ Data flows through a sequence of validation and transformation steps:
    The result of this action is the task's `raw output`
 4. **Task Output Processing** (for each task):
     * `task.output.as`: Transforms the `raw output` of the task.
-      The result (task's `transformed output`) is available as `$output` in subsequent steps and
+      The result (task's `transformed output`) is available as `$output` in the task’s export expression and
       becomes the `raw input` for the *next* task (or the workflow's `raw output` if it's the last task)
     * `task.output.schema`: Validates the task's `transformed output`
 5. **Task Context Export** (for each task):
@@ -55,10 +55,11 @@ These properties are defined at the top level of the workflow document.
 Controls processing of the initial data the workflow receives.
 
 * **`from`** (String | Object | Array | ..., Optional): A [Runtime Expression](dsl-runtime-expressions.md) or literal
-  value defining how to transform the raw workflow input. The result initializes `$context` and is passed as raw input
-  to the first task. Defaults to identity (`${. }`)
+  value defining how to transform the raw workflow input. The result is passed as raw input to the first task. Defaults to identity (`${. }`)
 * **`schema`** (Schema Definition, Optional): A [JSON Schema](https://json-schema.org/) used to validate the *raw*
   workflow input *before* `input.from` is applied. If validation fails, the workflow faults immediately
+
+The workflow validates a nested customer object and flattens the fields used by its first task.
 
 <code-block lang="yaml" src="workflows/dsl-data-flow/input-object-optional-workflow-input.yaml"/>
 
@@ -70,6 +71,8 @@ Controls processing of the final data returned by the workflow.
   value defining how to transform the *transformed output* of the *last* task. Defaults to identity (`${. }`)
 * **`schema`** (Schema Definition, Optional): A [JSON Schema](https://json-schema.org/) used to validate the *final
   transformed workflow output* (after `output.as` is applied). If validation fails, the workflow faults
+
+The workflow returns a confirmation ID and leaves the internal status out of the result.
 
 <code-block lang="yaml" src="workflows/dsl-data-flow/output-object-optional-workflow-output.yaml"/>
 
@@ -85,7 +88,9 @@ Controls processing of data entering a specific task.
   `$input` within the task's scope. Defaults to identity (`${ . }`)
 * **`schema`** (Schema Definition, Optional): Validates the task's *raw input* *before* `input.from` is applied
 
-<code-block lang="yaml" src="workflows/dsl-data-flow/input-object-optional-task-input.yaml" include-lines="7-19"/>
+The schema checks the wrapper object. The transformation then passes only `data` to the task.
+
+<code-block lang="yaml" src="workflows/dsl-data-flow/input-object-optional-task-input.yaml"/>
 
 ### `output` (Object, Optional) {#task-output}
 
@@ -96,7 +101,9 @@ Controls processing of data produced by a specific task.
   available as `$output` for `export.as`. Defaults to identity (`${. }`)
 * **`schema`** (Schema Definition, Optional): Validates the *transformed output* (after `output.as` is applied)
 
-<code-block lang="yaml" src="workflows/dsl-data-flow/output-object-optional-task-output.yaml" include-lines="7-19"/>
+The HTTP task selects the customer ID and validates the resulting object before passing it to the next step.
+
+<code-block lang="yaml" src="workflows/dsl-data-flow/output-object-optional-task-output.yaml"/>
 
 ### `export` (Object, Optional)
 
@@ -108,7 +115,9 @@ Controls how the task's results update the shared workflow context (`$context`).
 * **`schema`** (Schema Definition, Optional): Validates the data structure produced by `export.as` *before* it updates
   `$context`
 
-<code-block lang="yaml" src="workflows/dsl-data-flow/export-object-optional.yaml" include-lines="7-24"/>
+The final step can read the exported customer ID after an intervening task replaces the immediate input.
+
+<code-block lang="yaml" src="workflows/dsl-data-flow/export-object-optional.yaml"/>
 
 ## Visualization
 
@@ -148,7 +157,7 @@ flowchart TD
   task_export_schema[\Task: export.schema/]
 
   new_context{{New $context value}}
-  
+
   workflow_raw_output["Raw Workflow Output (from last task)"]
   workflow_output_as[Workflow: output.as]
   workflow_transformed_output{{Transformed Workflow Output}}
@@ -215,3 +224,44 @@ Several types of errors can occur during data flow processing:
 
 These errors are critical and will cause the workflow execution to halt in a `faulted` state unless properly handled
 using error handling mechanisms like `Try` tasks.
+
+## Run the Examples
+
+Complete the [SQLite setup](lemline-tutorial-setup.md) and leave the worker running. Save each workflow in the setup directory under the file name used below.
+
+Use this command from the root of the source checkout to [start the tutorial shop](lemline-tutorial-setup.md#use-the-tutorial-shop).
+
+```bash
+docker compose -f examples/tutorial-services/compose.yaml up -d --wait
+```
+
+Run these registration and start commands from the setup directory.
+
+```bash
+bin/lemline definition post -f input-object-optional-workflow-input.yaml
+bin/lemline instance start examples input-object-optional-workflow-input --input '{"customer":{"id":"C-100"},"quantity":2}'
+bin/lemline definition post -f output-object-optional-workflow-output.yaml
+bin/lemline instance start examples output-object-optional-workflow-output
+bin/lemline definition post -f input-object-optional-task-input.yaml
+bin/lemline instance start examples input-object-optional-task-input --input '{"data":{"value":7}}'
+bin/lemline definition post -f output-object-optional-task-output.yaml
+bin/lemline instance start examples output-object-optional-task-output --input '{"customerId":"C-100"}'
+bin/lemline definition post -f export-object-optional.yaml
+bin/lemline instance start examples export-object-optional --input '{"customerId":"C-200"}'
+```
+
+Check the individual results in the worker terminal.
+
+| Example | Expected result |
+|---|---|
+| `input-object-optional-workflow-input` | `{"customerId":"C-100","units":2}` |
+| `output-object-optional-workflow-output` | `{"confirmationId":"ABC-123"}` |
+| `input-object-optional-task-input` | `{"doubled":14}` |
+| `output-object-optional-task-output` | `{"identifiedCustomer":"C-100"}` |
+| `export-object-optional` | `{"action":"processed","customerId":"C-200"}` |
+
+When the instances finish, use the command below in the source checkout to stop the shop.
+
+```bash
+docker compose -f examples/tutorial-services/compose.yaml down
+```

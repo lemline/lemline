@@ -1,0 +1,39 @@
+document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: customer-communication
+  version: '1.0.0'
+schedule:
+  on:
+    one:
+      with:
+        type: com.example.customer.signup.v1
+input:
+  from: ${ .[0] }
+do:
+  - determineChannel:
+      switch:
+        - sms:
+            when: ${ .contactMethod == "sms" }
+            then: sendSms
+        - email:
+            then: sendEmail
+  - sendEmail:
+      call: http
+      with:
+        method: post
+        endpoint: http://127.0.0.1:8787/notifications
+        body:
+          reference: ${ .reference }
+          recipient: ${ .email }
+          message: Welcome by email
+      then: end
+  - sendSms:
+      call: http
+      with:
+        method: post
+        endpoint: http://127.0.0.1:8787/notifications
+        body:
+          reference: ${ .reference }
+          recipient: ${ .phone }
+          message: Welcome by SMS

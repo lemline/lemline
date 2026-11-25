@@ -4,67 +4,115 @@ title: Workflow Definition Examples
 
 # Workflow Definition Examples
 
-## Introduction
+These complete examples combine the constructs described in [Workflow Definition Structure](dsl-workflow-definition.md).
 
-This page provides a collection of practical examples showing different approaches to defining Open Workflows. Each example demonstrates specific use cases, patterns, and combinations of features that can be employed when creating workflow definitions.
+## Sequential Task Execution
 
-These examples range from simple sequential task execution to complex event-driven workflows with parallel processing and error handling. They showcase how the various properties and constructs of the DSL can be combined to solve real-world orchestration challenges.
+The workflow checks that the customer exists, reserves the order’s items, and then charges the order.
+Its `use.functions` entries define named operations that receive the arguments passed by each call.
 
-For a complete reference of all top-level workflow properties, please see [Workflow Definition Structure](dsl-workflow-definition.md).
+<code-block lang="yaml" src="workflows/dsl-workflow-examples/process-new-order.yaml"/>
 
-Feel free to use these examples as starting points or templates for your own workflow definitions. You can modify and extend them to suit your specific requirements.
+## Event-Driven Customer Communication
 
-## Example 1: Basic Sequential Task Execution
+A customer signup event starts the workflow. The contact preference selects one notification path.
+The shop records each notification in its inbox.
 
-This example demonstrates a straightforward workflow with minimal properties and sequential task execution. It represents a simple order processing flow with three consecutive function calls.
+<code-block lang="yaml" src="workflows/dsl-workflow-examples/customer-communication.yaml"/>
 
-**Key features:**
-- Proper `document` structure with required workflow properties
-- Function definitions in the resource catalog (`use.functions`)
-- Sequential task execution with explicit `then` directives
-- Function calls with runtime expression arguments
+Start the publisher to send the signup events.
 
-<code-block lang="yaml" src="workflows/dsl-workflow-examples/example-1-basic-sequential-task-execution.yaml"/>
+<code-block lang="yaml" src="workflows/reference/tutorial-publisher.yaml"/>
 
-## Example 2: Event-Driven Customer Communication
+## Parallel Execution and Error Handling
 
-A customer signup starts a workflow and supplies the signup payload. The workflow
-chooses one notification channel based on the customer preference.
-
-<code-block lang="yaml" src="workflows/dsl-workflow-examples/example-2-event-driven-workflow-with-resource-catalog.yaml"/>
-
-## Example 3: Workflow with Parallel Execution and Error Handling
-
-This example runs two checks on an order in parallel and falls back to a manual review if either of them fails.
-
-**Key features:**
-- Proper `document` structure with required workflow properties
-- Parallel execution using the `fork` task
-- Error handling with `try`/`catch` around the parallel branches
-- A fallback result set in the `catch` block
+This example runs the stock and shipping checks in parallel. The surrounding catch returns a manual review
+result if either check fails.
 
 <code-block lang="yaml" src="workflows/reference/parallel-checks-with-fallback.yaml"/>
 
-## Example 4: Time-based Scheduled Workflow
+## Time-Based Scheduled Workflow
 
-This example shows a simple maintenance workflow that runs on a time-based schedule using cron syntax. It executes a cleanup container and then sends a report of the operation.
+The scheduled workflow records a stock audit at the start of each minute. It creates a new instance on each occurrence.
 
-**Key features:**
-- Proper `document` structure with required workflow properties
-- Time-based scheduling with cron syntax
-- Container execution with the `run` task
-- Command line with its parameters
-- Result handling from previous task executions
+<code-block lang="yaml" src="workflows/dsl-workflow-examples/scheduled-shop-audit.yaml"/>
 
-<code-block lang="yaml" src="workflows/dsl-workflow-examples/example-4-time-based-scheduled-workflow.yaml"/>
+## Input and Output Transformation
 
-## Example 5: Input/Output Transformation Workflow
-
-This example demonstrates a workflow with input transformation and output formatting. It reshapes the data it receives before the first task runs and returns only the fields it computed.
-
-**Key features:**
-- Proper `document` structure with required workflow properties
-- Workflow-level input transformation with a runtime expression
-- Workflow-level output transformation
+The workflow reshapes incoming customer and item fields and returns the customer ID with the number of items.
 
 <code-block lang="yaml" src="workflows/reference/transform-workflow-data.yaml"/>
+
+## Run the Examples
+
+Complete the [SQLite setup](lemline-tutorial-setup.md) and leave the worker running. Save each workflow in the setup directory under the file name used below.
+
+Use this command from the source checkout to [start the tutorial shop](lemline-tutorial-setup.md#use-the-tutorial-shop).
+
+```bash
+docker compose -f examples/tutorial-services/compose.yaml up -d --wait
+```
+
+Run all registration commands in a fresh setup directory.
+
+```bash
+bin/lemline definition post -f process-new-order.yaml
+bin/lemline definition post -f customer-communication.yaml
+bin/lemline definition post -f tutorial-publisher.yaml
+bin/lemline definition post -f parallel-checks-with-fallback.yaml
+bin/lemline definition post -f transform-workflow-data.yaml
+bin/lemline definition post -f scheduled-shop-audit.yaml
+```
+
+> **Lemline**
+>
+> Once registration finishes, stop the setup worker and restart it in its terminal so it subscribes to the signup filter.
+
+```bash
+bin/lemline listen --debug
+```
+
+In the second terminal, start the order and transformation workflows and run the parallel checks both with and without a shop failure.
+
+```bash
+bin/lemline instance start examples process-new-order --input '{"orderId":"O-190","customerId":"C-100","items":[{"id":"SKU-1","quantity":2}],"paymentToken":"approved"}'
+bin/lemline instance start examples parallel-checks-with-fallback --input '{"orderId":"O-191"}'
+bin/lemline instance start examples parallel-checks-with-fallback --input '{"orderId":"O-192","inventoryFailures":1}'
+bin/lemline instance start examples transform-workflow-data --input '{"user":{"id":"C-100"},"payload":{"items":["SKU-1","SKU-2"]}}'
+```
+
+Publish a signup event for each contact preference.
+
+```bash
+bin/lemline instance start examples tutorial-publisher --input '{"type":"com.example.customer.signup.v1","data":{"reference":"REG-190","contactMethod":"email","email":"ada@example.com"}}'
+bin/lemline instance start examples tutorial-publisher --input '{"type":"com.example.customer.signup.v1","data":{"reference":"REG-191","contactMethod":"sms","phone":"+15550100191"}}'
+```
+
+> **Lemline**
+>
+> Query the shop's inbox and audit entries after the first cron occurrence runs.
+
+```bash
+bin/lemline instance start examples scheduled-shop-audit --zone UTC
+sleep 75
+curl -fsS http://127.0.0.1:8787/state
+```
+
+| Example | Expected result |
+|---|---|
+| `process-new-order` | Returns `{"orderId":"O-190","paid":true,"amount":50}`. |
+| `parallel-checks-with-fallback` for `O-191` | Returns the stock and an express quote priced at `9`. |
+| `parallel-checks-with-fallback` for `O-192` | Returns `{"status":"needs-review"}` after the inventory failure. |
+| `transform-workflow-data` | Returns `{"customerId":"C-100","itemCount":2}`. |
+| `tutorial-publisher` | Each publisher instance completes after emitting its signup event. |
+| `customer-communication` | The shop inbox records `Welcome by email` for `REG-190` and `Welcome by SMS` for `REG-191`. |
+| `scheduled-shop-audit` | The first scheduled instance returns `{"report":"stock-recorded"}` and records `Available units: 98` in the shop audit. |
+
+After checking the results, stop the worker with Ctrl+C before stopping the shop. This pauses the cron schedule,
+which remains in this example’s SQLite project. Start the shop again before restarting this worker.
+
+Run the shutdown command from the source checkout to stop the shop.
+
+```bash
+docker compose -f examples/tutorial-services/compose.yaml down
+```

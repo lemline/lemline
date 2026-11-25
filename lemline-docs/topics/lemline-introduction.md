@@ -66,8 +66,6 @@ This documentation is intended for:
 * **Operations Engineers:** Automating infrastructure tasks and operational procedures.
 * Anyone interested in learning and applying the Open Workflow Specification.
 
-For a more detailed breakdown by role, see [Who is Lemline For?](lemline-who-for.md)
-
 ## Getting Started
 
 To get started with the Open Workflow DSL:
@@ -76,8 +74,7 @@ To get started with the Open Workflow DSL:
 2. Explore the **Core Concepts** section, paying particular attention to [Data Flow](dsl-data-flow.md)
    and [Runtime Expressions](dsl-runtime-expressions.md), as they are used extensively.
 3. Review the **Tasks** and **Events** sections to understand the available building blocks.
-4. Dive into the specific **Task** or **Concept** pages relevant to your immediate needs. The examples within each page
-   are designed to illustrate practical usage.
+4. To run the definitions locally with Lemline, follow the [SQLite setup](lemline-tutorial-setup.md), then choose an example from [Workflow Examples](dsl-workflow-examples.md).
 
 ## Additional Resources
 

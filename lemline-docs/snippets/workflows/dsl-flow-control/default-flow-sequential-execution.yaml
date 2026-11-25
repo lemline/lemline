@@ -1,15 +1,18 @@
 document:
-  dsl: 1.0.3
+  dsl: '1.0.3'
   namespace: examples
   name: default-flow-sequential-execution
-  version: 1.0.0
+  version: '1.0.0'
 do:
   - validateOrder:
       set:
-        processed: true
+        orderId: ${ .orderId }
+        valid: true
   - checkInventory:
       set:
-        processed: true
+        orderId: ${ .orderId }
+        ready: ${ .valid }
   - processPayment:
       set:
-        processed: true
+        orderId: ${ .orderId }
+        paid: ${ .ready }

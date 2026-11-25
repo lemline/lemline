@@ -4,66 +4,109 @@ title: Run Workflow
 
 # Run Workflow Task (`run: workflow`)
 
-## Purpose
+Use `run.workflow` to start another workflow. This lets a parent reuse a child workflow that has its own
+inputs, outputs, and execution history. Register both definitions before starting the parent.
 
-The `run: workflow` task allows a workflow to invoke and execute another Open Workflow definition as a sub-workflow. This facilitates modular design, reusability, and the composition of complex processes from smaller, focused workflows.
+## Define the Child
 
-## Usage Example
+This child checks that a requested quantity is positive, reads the shop’s stock, and returns its decision.
 
-<code-block lang="yaml" src="workflows/dsl-run-workflow/usage-example.yaml"/>
+<code-block lang="yaml" src="workflows/dsl-run-workflow/child-stock-check.yaml"/>
 
-## Additional Examples
+## Await the Child Output
 
-### Example: Running Latest Version
+The parent selects a child by namespace, name, and version. It passes a quantity as input and awaits the child’s result.
 
-<code-block lang="yaml" src="workflows/dsl-run-workflow/example-running-latest-version.yaml" include-lines="7-16"/>
+<code-block lang="yaml" src="workflows/dsl-run-workflow/parent-stock-check.yaml"/>
 
-### Example: Starting Sub-Workflow Without Awaiting
+## Start Without Awaiting
 
-<code-block lang="yaml" src="workflows/dsl-run-workflow/example-starting-sub-workflow-without-awaiting.yaml" include-lines="6-17"/>
+With `await: false`, the parent can complete while the child still runs. The run task passes its input onward.
 
-### Example: Handling Faulted Sub-Workflow
+<code-block lang="yaml" src="workflows/dsl-run-workflow/parent-submit-stock-check.yaml"/>
 
-<code-block lang="yaml" src="workflows/dsl-run-workflow/example-handling-faulted-sub-workflow.yaml" include-lines="7-27"/>
+## Handle a Child Fault
 
-### Example: Using `return: all` to Get Status and Output/Error
+This parent catches the error raised by the child when the quantity is zero.
 
-<code-block lang="yaml" src="workflows/dsl-run-workflow/example-using-return-all-to-get-status-and-output-error.yaml" include-lines="7-26"/>
+<code-block lang="yaml" src="workflows/dsl-run-workflow/parent-handle-stock-error.yaml"/>
+
+## Select the Latest Version
+
+Use `version: latest` to select the latest registered version of the child in the named namespace
+when starting it.
+
+<code-block lang="yaml" src="workflows/dsl-run-workflow/parent-latest-stock-check.yaml"/>
+
+## Request All Process Results
+
+For an awaited process, `return: all` asks for the exit code and the standard result and error streams in one object.
+
+<code-block lang="yaml" src="workflows/dsl-run-workflow/parent-stock-result.yaml"/>
+
+> **Lemline**
+>
+> A successful child returns `code: 0`, its output as text in `stdout`, and an empty `stderr`.
+> Structured output is serialized as JSON. A child fault propagates to the parent’s error handlers.
 
 ## Configuration Options
 
-The configuration is provided under the `run` property, specifically within the nested `workflow` object.
+| Property | Purpose |
+|---|---|
+| `run.workflow.namespace` | Namespace of the child definition. |
+| `run.workflow.name` | Name of the child definition. |
+| `run.workflow.version` | Version of the child definition, written as a string. |
+| `run.workflow.input` | Child input. The child applies its own schema and transformations. |
+| `run.await` | Whether to wait for the child. Defaults to `true`. |
+| `run.return` | Which process result to return when awaiting completion. |
 
-### `run` (Object, Required)
+## Data Flow
 
-*   **`workflow`** (Object, Required): Defines the sub-workflow execution configuration.
-    *   **`namespace`** (String, Required): The namespace where the target workflow definition resides.
-    *   **`name`** (String, Required): The name of the target workflow definition to execute.
-    *   **`version`** (String, Optional, Default: `latest`): The specific version of the target workflow definition to execute. If omitted, the runtime typically uses the version marked as `latest`.
-    *   **`input`** (Any, Optional): The input data to pass to the sub-workflow when it starts. This data is processed by the sub-workflow's own `input.from` and validated against its `input.schema`, if defined.
-*   **`await`** (Boolean, Optional, Default: `true`):
-    *   `true`: The parent workflow task waits for the sub-workflow process to reach a terminal state (e.g., `completed`, `faulted`, `cancelled`) before proceeding. The task's output is determined by the `return` property based on the sub-workflow's outcome.
-    *   `false`: The task initiates the sub-workflow and proceeds immediately without waiting for its completion. The task's `rawOutput` is its `transformedInput`.
-*   **`return`** (String - `stdout` | `stderr` | `code` | `all` | `none`, Optional, Default: `stdout`): Specifies what the task's `rawOutput` should be when `await` is `true`.
-    *   `stdout`: The final output data of the sub-workflow (i.e., the result after its top-level `output.as` transformation), but only if it completed successfully.
-    *   `stderr`: The WorkflowError object if the sub-workflow faulted. This object typically includes:
-        *   `type` (String): A URI identifying the error type (e.g., `https://open-workflow-specification.org/spec/1.0.0/errors/runtime`).
-        *   `status` (Integer): An appropriate status code (often mirroring HTTP status codes).
-        *   `instance` (String): A JSON Pointer indicating the component within the sub-workflow where the error originated.
-        *   `title` (String, Optional): A short, human-readable summary.
-        *   `detail` (String, Optional): A more detailed explanation.
-    *   `code`: A representation of the sub-workflow's terminal status (e.g., 0 for `completed`, non-zero for `faulted`/`cancelled` - specific codes may vary by runtime).
-    *   `all`: An object containing the sub-workflow's status (`code`), final output (`stdout`), and error information (`stderr` if faulted).
-    *   `none`: The task produces no output (evaluates to `null`).
-
-### Data Flow
 <include from="_common-task-data-flow.md" element-id="common-data-flow"/>
-**Note**:
-*   The `transformedInput` to the `run: workflow` task is available for use within runtime expressions when defining the `run.workflow.input`.
-*   The `run.workflow.input` becomes the initial raw input for the sub-workflow.
-*   The `rawOutput` of the `run: workflow` task depends on the `run.await` and `run.return` settings, reflecting the outcome and final data of the sub-workflow.
-*   Standard `output.as` and `export.as` process this resulting `rawOutput`.
 
-### Flow Control
+## Flow Control
+
 <include from="_common-task-flow_control.md" element-id="common-flow-control"/>
-**Note**: If `await` is `true` and the sub-workflow terminates in a `faulted` or `cancelled` state, a `Runtime` error (potentially containing the sub-workflow's error details in its `stderr` component if `return: all` or `return: stderr` is used) is typically raised by the `run: workflow` task, and the `then` directive is *not* followed (unless caught by `Try`). 
+
+## Run the Examples
+
+Complete the [SQLite setup](lemline-tutorial-setup.md) and leave the worker running. Save each workflow in the setup directory under the file name used below.
+
+Use this command from the source checkout to [start the tutorial shop](lemline-tutorial-setup.md#use-the-tutorial-shop).
+
+```bash
+docker compose -f examples/tutorial-services/compose.yaml up -d --wait
+```
+
+Run these commands from the setup directory. Compare the parent and child results in the worker terminal.
+
+```bash
+bin/lemline definition post -f child-stock-check.yaml
+bin/lemline instance start examples child-stock-check --input '{"quantity":1}'
+bin/lemline definition post -f parent-stock-check.yaml
+bin/lemline instance start examples parent-stock-check --input '{"quantity":2}'
+bin/lemline definition post -f parent-submit-stock-check.yaml
+bin/lemline instance start examples parent-submit-stock-check --input '{"quantity":3}'
+bin/lemline definition post -f parent-handle-stock-error.yaml
+bin/lemline instance start examples parent-handle-stock-error --input '{"quantity":0}'
+bin/lemline definition post -f parent-stock-result.yaml
+bin/lemline instance start examples parent-stock-result --input '{"quantity":4}'
+bin/lemline definition post -f parent-latest-stock-check.yaml
+bin/lemline instance start examples parent-latest-stock-check --input '{"quantity":5}'
+sleep 20
+```
+
+| Example | Expected result |
+|---|---|
+| `child-stock-check` | `{"quantity":1,"canReserve":true}` |
+| `parent-stock-check` | Awaits its child and returns `{"canReserve":true}`. |
+| `parent-submit-stock-check` | Returns `{"submittedQuantity":3}`. The child independently returns `{"quantity":3,"canReserve":true}`. |
+| `parent-handle-stock-error` | The child faults. The parent returns `{"status":422,"reason":"Quantity must be positive"}`. |
+| `parent-stock-result` | Returns `{"code":0,"stdout":"{\"quantity\":4,\"canReserve\":true}","stderr":""}`. |
+| `parent-latest-stock-check` | Runs the registered version of `child-stock-check` and returns `{"quantity":5,"canReserve":true}`. |
+
+When the parent and child results are visible in the worker terminal, stop the shop from the source checkout.
+
+```bash
+docker compose -f examples/tutorial-services/compose.yaml down
+```

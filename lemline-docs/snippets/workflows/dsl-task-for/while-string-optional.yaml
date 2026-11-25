@@ -1,14 +1,15 @@
 document:
-  dsl: 1.0.3
+  dsl: '1.0.3'
   namespace: examples
   name: while-string-optional
-  version: 1.0.0
+  version: '1.0.0'
 do:
-  - example:
+  - takeNumbers:
       for:
-        in: ${ .dataPoints }
-      while: ${ $item.value > 10 }
+        in: ${ .numbers }
+      while: ${ $item > 0 }
       do:
-        - processHighValueItem:
+        - take:
             set:
-              processed: true
+              value: ${ $item }
+              index: ${ $index }

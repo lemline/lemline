@@ -30,6 +30,8 @@ Send JSON objects. Inspect all state with GET /state. Each POST below uses an or
 | GET /old-stock | — | HTTP 301 to /stock |
 | GET /catalog/functions/get-product/1.0.0/function.yaml | — | Function catalog entry (as JSON, valid YAML): validates `productId`, then GET /products/{productId} |
 | GET /openapi.json | — | OpenAPI 3.0 description of GET /products (listProducts) and GET /products/{productId} (getProduct) |
+| GET /inventory.proto | — | Plain-text Protobuf contract for `shop.Inventory/GetStock`; the shop exposes stock over HTTP |
+| GET /asyncapi.json | — | AsyncAPI 3.0 description of sample payment messages, with publish and receive operations |
 | GET /products | optional page, size (default 3), category, search | items, page, size, total, hasMore, nextPage |
 | GET /products/{id} | — | Product with its price, or HTTP 404 for an unknown ID |
 | GET /customers/{id} | — | C-100 and C-200 are valid customers; C-300 has an invalid email (emailValid false); others are HTTP 404 |

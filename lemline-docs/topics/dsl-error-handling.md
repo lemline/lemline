@@ -1,6 +1,6 @@
 <!-- Examples are validated -->
 
-# Error Handling
+# Workflow Errors
 
 ## Purpose
 
@@ -32,8 +32,6 @@ The core fields of a workflow error object are:
   Open Workflow, this is typically a [JSON Pointer](https://datatracker.ietf.org/doc/html/rfc6901) indicating the
   specific task or component within the workflow definition where the error originated (e.g., `/do/1/callApi`)
 
-See `InternalException.Error` in `com.lemline.core.errors.WorkflowException.kt` for the corresponding data class.
-
 ## Standard Error Types
 
 The specification defines standard error `type` URIs for common issues. Runtimes **must** use these types when
@@ -41,16 +39,16 @@ applicable to ensure consistent behavior. Authors should use these when defining
 
 Base URI: `https://open-workflow-specification.org/spec/1.0.0/errors/`
 
-| Type Suffix      | Default Status | Description                                                                  | Implementation (`WorkflowErrorType`) |
-|:-----------------|:---------------|:-----------------------------------------------------------------------------|:-------------------------------------|
-| `configuration`  | 400            | Problem with the workflow definition itself (e.g., invalid `then` target)    | `CONFIGURATION`                      |
-| `validation`     | 400            | Input/output data failed schema validation (`input.schema`, `output.schema`) | `VALIDATION`                         |
-| `expression`     | 400            | Evaluation of a runtime expression failed (e.g., syntax error, bad access)   | `EXPRESSION`                         |
-| `authentication` | 401            | Authentication failed when accessing a protected resource                    | `AUTHENTICATION`                     |
-| `authorization`  | 403            | Insufficient permissions to access a resource (e.g., secrets)                | `AUTHORIZATION`                      |
-| `timeout`        | 408            | A configured workflow or task timeout was exceeded                           | `TIMEOUT`                            |
-| `communication`  | 500            | Error during communication with an external service (e.g., HTTP call fail)   | `COMMUNICATION`                      |
-| `runtime`        | 500            | General runtime error not covered by other types                             | `RUNTIME`                            |
+| Type Suffix      | Default Status | Description |
+|:-----------------|:---------------|:-----------------------------------------------------------------------------|
+| `configuration`  | 400            | Problem with the workflow definition itself (e.g., invalid `then` target)    |
+| `validation`     | 400            | Input/output data failed schema validation (`input.schema`, `output.schema`) |
+| `expression`     | 400            | Evaluation of a runtime expression failed (e.g., syntax error, bad access)   |
+| `authentication` | 401            | Authentication failed when accessing a protected resource                    |
+| `authorization`  | 403            | Insufficient permissions to access a resource (e.g., secrets)                |
+| `timeout`        | 408            | A configured workflow or task timeout was exceeded                           |
+| `communication`  | 500            | Error during communication with an external service (e.g., HTTP call fail)   |
+| `runtime`        | 500            | General runtime error not covered by other types                             |
 
 ## Raising Errors
 
@@ -68,7 +66,7 @@ Errors can enter the system in two main ways:
 2. **Explicitly using the `Raise` Task**: Authors can use the [`Raise` task](dsl-task-raise.md) to explicitly throw a
    specific error (either predefined in `use.errors` or defined inline) based on workflow logic:
 
-   <code-block lang="yaml" src="workflows/reference/raise-order-error.yaml"/>
+<code-block lang="yaml" src="workflows/reference/raise-order-error.yaml"/>
 
 ## Catching and Handling Errors (`Try...Catch`)
 
@@ -121,4 +119,28 @@ Error propagation follows these rules:
 3. If the error propagates to the top level without being caught:
     * The entire workflow execution **faults**
     * The workflow terminates unsuccessfully
-    * The uncaught error is reported in the workflow result 
+    * The uncaught error is reported in the workflow result
+
+## Run the Examples
+
+> **Lemline**
+>
+> Delayed retries run on a periodic SQLite scan. Allow up to a minute for the second example.
+
+Complete the [SQLite setup](lemline-tutorial-setup.md) and leave the worker running. Save each workflow in the setup directory under the file name used below.
+
+Run these registration and start commands from the setup directory.
+
+```bash
+bin/lemline definition post -f raise-order-error.yaml
+bin/lemline instance start examples raise-order-error --input '{"stock":1,"quantity":3}'
+bin/lemline definition post -f catching-and-handling-errors-try-catch.yaml
+bin/lemline instance start examples catching-and-handling-errors-try-catch
+```
+
+Check the individual results in the worker terminal.
+
+| Example | Expected result |
+|---|---|
+| `raise-order-error` | Faults with status `409` and detail `Requested 3; available 1`. |
+| `catching-and-handling-errors-try-catch` | After retries, returns `{"status":"pending-review","message":"Operation failed with status 503"}`. |

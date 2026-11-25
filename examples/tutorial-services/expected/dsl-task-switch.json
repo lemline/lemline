@@ -1,0 +1,36 @@
+{
+  "instances": [
+    {
+      "type": "workflowCompleted",
+      "output": {
+        "route": "approved"
+      }
+    },
+    {
+      "type": "workflowCompleted",
+      "output": {
+        "route": "rejected"
+      }
+    },
+    {
+      "type": "workflowCompleted",
+      "output": {
+        "route": "manual-review"
+      }
+    },
+    {
+      "type": "workflowCompleted",
+      "output": {
+        "orderId": "O-100",
+        "status": "needs-review"
+      }
+    },
+    {
+      "type": "workflowCompleted",
+      "output": {
+        "orderId": "O-101",
+        "status": "accepted"
+      }
+    }
+  ]
+}

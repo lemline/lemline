@@ -1,0 +1,24 @@
+document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: flow-product-details
+  version: '1.0.0'
+do:
+  - lookUp:
+      fork:
+        branches:
+          - product:
+              call: http
+              with:
+                method: get
+                endpoint: http://127.0.0.1:8787/products/SKU-1
+          - stock:
+              call: http
+              with:
+                method: get
+                endpoint: http://127.0.0.1:8787/stock
+        compete: false
+  - summarize:
+      set:
+        productId: '${ [.[] | .id // empty][0] }'
+        available: '${ [.[] | .available // empty][0] }'

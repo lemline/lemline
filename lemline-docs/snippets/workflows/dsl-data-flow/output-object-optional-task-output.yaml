@@ -1,19 +1,23 @@
 document:
-  dsl: 1.0.3
+  dsl: '1.0.3'
   namespace: examples
   name: output-object-optional-task-output
-  version: 1.0.0
+  version: '1.0.0'
 do:
-  - callApi:
+  - readCustomer:
       call: http
       with:
-        endpoint: https://api.example.com/resource
         method: get
+        endpoint: '${ "http://127.0.0.1:8787/customers/" + (.customerId | @uri) }'
       output:
-        as: ${ .result.payload }
+        as: '${ {customerId: .id} }'
         schema:
+          format: json
           document:
             type: object
-  - nextTask:
+            required: [customerId]
+            properties:
+              customerId: { type: string }
+  - acknowledge:
       set:
-        processed: true
+        identifiedCustomer: ${ .customerId }

@@ -1,0 +1,17 @@
+document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: parent-stock-check
+  version: '1.0.0'
+do:
+  - checkStock:
+      run:
+        workflow:
+          namespace: examples
+          name: child-stock-check
+          version: '1.0.0'
+          input:
+            quantity: ${ .quantity }
+  - confirm:
+      set:
+        canReserve: ${ .canReserve }

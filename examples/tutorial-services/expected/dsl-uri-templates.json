@@ -1,0 +1,28 @@
+{
+  "state": {
+    "requests": {
+      "$contains": [
+        {
+          "path": "/products/SKU-1",
+          "status": 200
+        }
+      ]
+    }
+  },
+  "instances": [
+    {
+      "type": "workflowCompleted",
+      "output": {
+        "id": "SKU-1",
+        "name": "Garden hose"
+      }
+    },
+    {
+      "type": "workflowCompleted",
+      "output": {
+        "id": "SKU-1",
+        "name": "Garden hose"
+      }
+    }
+  ]
+}

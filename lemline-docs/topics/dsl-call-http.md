@@ -11,21 +11,37 @@ The HTTP Call task enables workflows to interact with external services and APIs
 
 ## Usage Example
 
-<code-block lang="yaml" src="workflows/dsl-call-http/usage-example.yaml"/>
+Read a customer record and select its ID and name from the deserialized response body.
+
+<code-block lang="yaml" src="workflows/dsl-call-http/http-read-customer.yaml"/>
 
 ## Additional Examples
 
 ### Example: POST Request with Body and Query Parameters
 
-<code-block lang="yaml" src="workflows/dsl-call-http/example-post-request-with-body-and-query-parameters.yaml" include-lines="6-21"/>
+Send a new customer as JSON, with `source=workflow` in the query string.
+
+<code-block lang="yaml" src="workflows/dsl-call-http/http-create-customer.yaml"/>
 
 ### Example: Getting the Full Response Object
 
-<code-block lang="yaml" src="workflows/dsl-call-http/example-getting-the-full-response-object.yaml" include-lines="6-22"/>
+Follow the redirect from `/old-stock` to `/stock` and read the final status and payload.
 
-### Example: Getting Raw Response (e.g., for Binary Data)
+> **Lemline**
+>
+> The task returns the status as `statusCode` and the payload as `content`.
 
-<code-block lang="yaml" src="workflows/dsl-call-http/example-getting-raw-response-e-g-for-binary-data.yaml" include-lines="6-17"/>
+<code-block lang="yaml" src="workflows/dsl-call-http/http-full-response.yaml"/>
+
+### Example: Getting the Raw Response
+
+This example asks for the raw stock response and parses the JSON after decoding it.
+
+> **Lemline**
+>
+> The worker returns raw response bytes encoded in Base64.
+
+<code-block lang="yaml" src="workflows/dsl-call-http/http-decode-body.yaml"/>
 
 ## Configuration Options
 
@@ -36,7 +52,7 @@ The configuration for an HTTP call is provided within the `with` property of the
 *   **`method`** (String, Required): The HTTP request method (e.g., `get`, `post`, `put`, `delete`, `patch`).
 *   **`endpoint`** (String | Object, Required): The target URL. Can be:
     *   A simple string URL.
-    *   A [URI Template](dsl-uri-templates.md) string for simple variable substitution (e.g., `https://.../items/{itemId}`).
+    *   A [URI Template](dsl-uri-templates.md) string for simple variable substitution (for example, a path ending in `/products/{productId}`).
     *   An `Endpoint` object (inline definition or reference by name from `use.resources`) allowing specification of `uri` (String | Object, Required) and optional `authentication` (String | Object).
 *   **`headers`** (Object, Optional): A key/value map of HTTP headers to include in the request.
 *   **`body`** (Any, Optional): The HTTP request body. Can be any valid JSON/YAML structure or a string. The runtime typically serializes this based on the `Content-Type` header.
@@ -44,13 +60,13 @@ The configuration for an HTTP call is provided within the `with` property of the
 *   **`output`** (String - `content` | `response` | `raw`, Optional, Default: `content`): Specifies the desired format of the task's `rawOutput`:
     *   `content` (Default): The deserialized body of the HTTP response.
     *   `response`: An object containing the full HTTP response details. It typically includes:
-        *   `status` (Integer): The HTTP status code.
-        *   `headers` (Object): A map of response headers.
-        *   `body` (Any): The deserialized response body.
-    *   `raw`: The raw response body, usually Base64 encoded if not plain text.
+        *   The response status code.
+        *   The response headers.
+        *   The deserialized response body.
+    *   `raw`: The response body before deserialization.
 *   **`redirect`** (Boolean, Optional, Default: `false`): Controls handling of HTTP redirect status codes (3xx):
-    *   `false` (Default): Only 2xx status codes are considered successful. 3xx codes will cause an error.
-    *   `true`: Both 2xx and 3xx status codes are considered successful (implying redirects are followed, although the runtime behavior might vary). Errors are raised for other statuses (4xx, 5xx).
+    *   `false` (Default): The client leaves redirects unfollowed.
+    *   `true`: The client follows redirects.
 
 ### Authentication
 
@@ -69,4 +85,42 @@ See the main [Authentication](dsl-authentication.md) page for details on definin
 
 ### Flow Control
 <include from="_common-task-flow_control.md" element-id="common-flow-control"/>
-**Note**: If the HTTP call results in an unhandled error status code (e.g., 4xx, 5xx, or 3xx if `redirect: false`), a `Communication` error is typically raised, and the `then` directive is *not* followed (unless caught by `Try`). 
+**Note**: If the HTTP call results in an unhandled error status code (e.g., 4xx, 5xx, or 3xx if `redirect: false`), a `Communication` error is typically raised, and the `then` directive is *not* followed (unless caught by `Try`).
+
+## Run the Examples
+
+Complete the [SQLite setup](lemline-tutorial-setup.md) and leave the worker running. Save each workflow in the setup directory under the file name used below.
+
+Use this command from the root of the source checkout to [start the tutorial shop](lemline-tutorial-setup.md#use-the-tutorial-shop).
+
+```bash
+docker compose -f examples/tutorial-services/compose.yaml up -d --wait
+```
+
+Run these registration and start commands from the setup directory.
+
+```bash
+bin/lemline definition post -f http-read-customer.yaml
+bin/lemline instance start examples http-read-customer --input '{"customerId":"C-100"}'
+bin/lemline definition post -f http-create-customer.yaml
+bin/lemline instance start examples http-create-customer --input '{"name":"Hedy Lamarr","email":"hedy@example.com"}'
+bin/lemline definition post -f http-full-response.yaml
+bin/lemline instance start examples http-full-response
+bin/lemline definition post -f http-decode-body.yaml
+bin/lemline instance start examples http-decode-body
+```
+
+Check the individual results in the worker terminal.
+
+| Example | Expected result |
+|---|---|
+| `http-read-customer` | `{"customerId":"C-100","name":"Ada Lovelace"}` |
+| `http-create-customer` | `{"customerId":"C-901","name":"Hedy Lamarr"}` |
+| `http-full-response` | `{"status":200,"sku":"SKU-1","available":100}` |
+| `http-decode-body` | `{"sku":"SKU-1"}` |
+
+When the instances finish, use the command below in the source checkout to stop the shop.
+
+```bash
+docker compose -f examples/tutorial-services/compose.yaml down
+```

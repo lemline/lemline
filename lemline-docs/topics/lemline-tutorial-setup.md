@@ -48,6 +48,17 @@ java -jar lemline.jar config create --help
 </tab>
 </tabs>
 
+<note instance="docs" title="Build the runner from the same source checkout as the DSL examples">
+
+Build the runner from the root of the Lemline checkout containing the examples you want to run. Use the resulting
+`*-runner.jar` from `lemline-runner/build/` as `lemline.jar` in your setup directory.
+
+```bash
+./gradlew :lemline-runner:quarkusBuild -Dquarkus.package.jar.type=uber-jar -x test
+```
+
+</note>
+
 ## 2. Configure the SQLite files
 
 From `lemline-project`, run the configuration wizard. In PowerShell, use `.\bin\lemline.exe` for the remaining commands. With the JAR, substitute `java -jar lemline.jar` for `bin/lemline`.
@@ -68,7 +79,7 @@ bin/lemline config create --messaging sqlite --database sqlite --analytics sqlit
 
 Lemline automatically reads `.lemline.yaml` from the current directory. The generated configuration uses three separate files: `orchestration.db` for definitions and durable operations, `messaging.db` for queues, and `analytics.db` for workflow history.
 
-To let the worker run workflows from the tutorials, add this line directly below the existing `lemline:` key, indented to the same level as `database:`:
+To let the worker run workflows from the tutorials and DSL examples, add the `namespaces` line under the existing `lemline:` key at the same indentation as `database`.
 
 <!-- workflow-example: data -->
 ```yaml
@@ -97,4 +108,14 @@ Leave the worker running and list the registered definitions from a second termi
 bin/lemline definition get
 ```
 
-On a fresh project, expect `No workflows found.` Leave the worker running and continue with [Acknowledge the first order](lemline-tutorial-hello.md).
+On a fresh project, expect `No workflows found.` Leave the worker running.
+
+<p instance="lemline">For the order-processing tutorial, continue with <a href="lemline-tutorial-hello.md">Acknowledge the first order</a>.</p>
+
+<p instance="docs">For the DSL reference, continue with <a href="dsl-workflow-examples.md">Workflow Examples</a>.</p>
+
+## Use the tutorial shop
+
+Examples that make HTTP calls use a local demonstration shop. Have Docker with Compose and a checkout of the [Lemline source repository](https://github.com/lemline/lemline) ready. Run the shop commands in each exercise from the root of that checkout. The shop listens on `http://127.0.0.1:8787`. Each exercise starts with fresh shop data. Stop the shop at the end of the exercise to discard its in-memory state.
+
+Keep the worker and CLI in `lemline-project`. Unless an exercise says otherwise, use the worker's debug output to check the result. A successful instance logs `Workflow completed with output` followed by its output.

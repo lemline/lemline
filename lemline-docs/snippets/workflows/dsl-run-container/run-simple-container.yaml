@@ -1,0 +1,12 @@
+document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: run-simple-container
+  version: '1.0.0'
+do:
+  - greet:
+      run:
+        container:
+          image: node:22-alpine
+          command: node -p "42"
+        return: stdout

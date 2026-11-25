@@ -18,7 +18,7 @@ It's primarily used for:
 
 Here's an example of raising a custom error based on input data:
 
-<code-block lang="yaml" src="workflows/dsl-task-raise/basic-usage.yaml"/>
+<code-block lang="yaml" src="workflows/dsl-task-raise/raise-basic.yaml"/>
 
 In this example, if the `validateInput` task receives an input object where `.value` is less than 0, it raises the
 predefined `invalidInputError`. This raised error
@@ -26,7 +26,7 @@ would then typically be caught by a surrounding `Try` task.
 
 You can also define the error inline:
 
-<code-block lang="yaml" src="workflows/dsl-task-raise/basic-usage-2.yaml" include-lines="6-16"/>
+<code-block lang="yaml" src="workflows/dsl-task-raise/raise-inline-stock-error.yaml"/>
 
 ## Additional Examples
 
@@ -38,9 +38,9 @@ This example shows how to define an error completely inline, using a runtime exp
 
 ### Example: Raising Error to be Caught by Try
 
-<code-block lang="yaml" src="workflows/dsl-task-raise/example-raising-error-to-be-caught-by-try.yaml" include-lines="11-32"/>
+<code-block lang="yaml" src="workflows/dsl-task-raise/raise-and-catch.yaml"/>
 
-Here, the `riskyOperation` might raise a specific error. The surrounding `Try` task is configured to `catch` errors of that specific type (`specialHandlingRequiredError` presumably has the type `https://myapp.com/errors/special-handling`). Instead of faulting the workflow, control transfers to the `catch.do` block (`handleSpecialCase`).
+With `needsSpecialHandling: true`, the error type matches the catch filter and control passes to `handleSpecialCase`. Otherwise, `normalProcessing` runs.
 
 ## Configuration Options
 
@@ -69,4 +69,34 @@ This mandatory object defines the error to be raised.
 *   Upon execution, it **immediately raises the specified error** and transfers control to the [Error Handling](dsl-error-handling.md) mechanism (searching for a suitable `Try` block).
 *   Consequently, the `Raise` task's `then` directive is **completely ignored** when the task executes and raises its error.
 
+## Run the Examples
 
+Complete the [SQLite setup](lemline-tutorial-setup.md) and leave the worker running. Save each workflow in the setup directory under the file name used below.
+
+Run these registration and start commands from the setup directory.
+
+```bash
+bin/lemline definition post -f raise-basic.yaml
+bin/lemline instance start examples raise-basic --input '{"value":1}'
+bin/lemline instance start examples raise-basic --input '{"value":-1}'
+bin/lemline definition post -f raise-inline-stock-error.yaml
+bin/lemline instance start examples raise-inline-stock-error --input '{"stockCount":5,"requestedAmount":3}'
+bin/lemline instance start examples raise-inline-stock-error --input '{"stockCount":1,"requestedAmount":3}'
+bin/lemline definition post -f raise-order-error.yaml
+bin/lemline instance start examples raise-order-error --input '{"stock":1,"quantity":3}'
+bin/lemline definition post -f raise-and-catch.yaml
+bin/lemline instance start examples raise-and-catch --input '{"needsSpecialHandling":true}'
+bin/lemline instance start examples raise-and-catch --input '{"needsSpecialHandling":false}'
+```
+
+Check the individual results in the worker terminal.
+
+| Example | Expected result |
+|---|---|
+| `raise-basic` with `{"value":1}` | `{"processed":true}` |
+| `raise-basic` with `{"value":-1}` | The instance faults with status `400` and title `Invalid Input Received`. |
+| `raise-inline-stock-error` with `{"stockCount":5,"requestedAmount":3}` | `{"accepted":true}` |
+| `raise-inline-stock-error` with `{"stockCount":1,"requestedAmount":3}` | The instance faults with status `409` and title `Insufficient stock`. |
+| `raise-order-error` | The instance faults with status `409` and detail `Requested 3; available 1`. |
+| `raise-and-catch` with `{"needsSpecialHandling":true}` | `{"route":"manual"}` |
+| `raise-and-catch` with `{"needsSpecialHandling":false}` | `{"route":"automatic"}` |

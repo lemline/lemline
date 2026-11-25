@@ -7,6 +7,7 @@
                   start-page="lemline-introduction.md">
 
     <toc-element topic="lemline-introduction.md"/>
+    <toc-element topic="lemline-tutorial-setup.md"/>
     <toc-element topic="dsl-workflow-examples.md"/>
 
     <!-- Core Concepts Group -->

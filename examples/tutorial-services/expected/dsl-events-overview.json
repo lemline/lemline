@@ -1,0 +1,62 @@
+{
+  "settleSeconds": 4,
+  "timeoutSeconds": 75,
+  "others": [
+    {
+      "workflow": "examples/event-driven-order-processing:1.0.0",
+      "type": "workflowCompleted",
+      "output": {
+        "orderId": "O-162",
+        "status": "approved"
+      }
+    },
+    {
+      "workflow": "examples/event-driven-order-processing:1.0.0",
+      "type": "workflowCompleted",
+      "output": {
+        "orderId": "O-163",
+        "status": "manual-review"
+      }
+    },
+    {
+      "workflow": "examples/coordinate-onboarding:1.0.0",
+      "type": "workflowCompleted",
+      "output": {
+        "customerId": "C-901",
+        "registrationId": "REG-160"
+      }
+    }
+  ],
+  "state": {
+    "customers": {
+      "$contains": [
+        {
+          "id": "C-901",
+          "email": "hedy@example.com"
+        }
+      ]
+    },
+    "inbox": {
+      "$contains": [
+        {
+          "reference": "REG-160",
+          "message": "Welcome to the tutorial shop"
+        }
+      ]
+    }
+  },
+  "instances": [
+    {
+      "type": "workflowCompleted"
+    },
+    {
+      "type": "workflowCompleted"
+    },
+    {
+      "type": "workflowCompleted"
+    },
+    {
+      "type": "workflowCompleted"
+    }
+  ]
+}

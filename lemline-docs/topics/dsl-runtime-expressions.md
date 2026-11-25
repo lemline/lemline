@@ -12,31 +12,27 @@ behaviors. They provide a powerful way to:
 
 ## Syntax and Evaluation
 
-By default, expressions are written using the syntax of the configured expression language. The standard DSL uses JQ.
+In the default `strict` mode, write a jq expression between `${` and `}`. If the expression contains
+YAML punctuation, enclose the entire value in single quotes. Use jq to construct a string with computed
+parts within one expression.
 
-* **JQ Syntax**: Expressions typically access data using dot notation (e.g., `.fieldName`, `.user.id`).
-* **DSL Embedding**: Within the YAML workflow definition, expressions are usually embedded within strings prefixed with
-  `@`. The runtime automatically identifies and evaluates these.
-    * Example: `message: "${ .user.name } processed item ${ .item.id }"`
-* **Strict vs. Loose Mode (Conceptual)**: While the DSL documentation mentions modes like `strict` (`${...}`) and
-  `loose`, the common practice and examples strongly favor the `@` prefix for automatic evaluation by the runtime. Using
-  `${...}` might be supported by specific runtimes or language extensions but isn't the primary method shown.
+The following workflow reads a customer name and item ID from the input. It also supplies a default
+when the input omits `quantity`.
+
+<code-block lang="yaml" src="workflows/dsl-runtime-expressions/format-line.yaml"/>
 
 ## Expression Language
 
-* **Default**: The default and mandatory expression language is **JQ** ([
-  `jq` documentation](https://jqlang.github.io/jq/)). The implementation uses the `net.thisptr.jackson.jq` library (see
-  `com.lemline.core.expressions.JQExpression.kt`).
-* **Configuration**: Runtimes *may* support other languages. If so, the language for a workflow can typically be
-  specified using the top-level `evaluate.language` property in the workflow definition (refer to the
-  [Resources Configuration Overview](dsl-resources-configuration-overview.md)).
+The default is [jq](https://jqlang.github.io/jq/). The workflow's top-level `evaluate` object can select
+a language and evaluation mode. The DSL's `loose` mode attempts to evaluate unwrapped values and keeps
+the original value when evaluation fails.
 
 ## Available Arguments
 
 During evaluation, the runtime makes several predefined variables (arguments) available within the expression scope.
 These provide access to the current state of the workflow and task execution.
 
-* **`.` (Dot)**: In JQ, the single dot (`.`) usually represents the **primary input data** being evaluated by the
+* **`.` (Dot)**: In jq, the single dot (`.`) usually represents the **primary input data** being evaluated by the
   expression. For example:
     * In `task.input.from`, `.` is the task's *raw input*.
     * In `task.output.as`, `.` is the task's *raw output*.
@@ -49,8 +45,7 @@ These provide access to the current state of the workflow and task execution.
 * **`$context`**: (Object) The workflow's current shared context data. This is modified by `task.export.as`.
 * **`$input`**: (Any) The task's **transformed input** (i.e., after `task.input.from` has been applied).
 * **`$output`**: (Any) The task's **transformed output** (i.e., after `task.output.as` has been applied).
-* **`$secrets`**: (Object) A key/value map of secrets available to the workflow. **Caution**: Use with care, as
-  embedding secrets directly in expressions or passing them as inputs might expose sensitive data in logs or outputs.
+* **`$secrets`**: (Object) A key/value map for resolving secrets in `input.from`. For safe handling, see [Secrets](dsl-secrets.md).
 * **`$authorization`**: (AuthorizationDescriptor) Describes the resolved authorization details if the task uses
   authentication.
 * **`$task`**: (TaskDescriptor) Describes the current task being executed.
@@ -59,13 +54,12 @@ These provide access to the current state of the workflow and task execution.
 
 ### Argument Structures
 
-These structures define the data available within the descriptor arguments. See `com.lemline.core.expressions.scopes.*`
-classes for implementation details.
+A descriptor groups information about the current runtime, workflow, task, or authorization.
 
 #### Runtime Descriptor (`$runtime`)
 
-* `name`: (String) Runtime name (e.g., "lemline").
-* `version`: (String) Runtime version (e.g., "1.0.0-SNAPSHOT").
+* `name`: (String) Runtime name.
+* `version`: (String) Runtime version.
 * `metadata`: (Object) Implementation-specific key-value pairs.
 
 #### Workflow Descriptor (`$workflow`)
@@ -74,6 +68,11 @@ classes for implementation details.
 * `definition`: (Object) The parsed workflow definition.
 * `input`: (Any) The *raw* workflow input (before `workflow.input.from`).
 * `startedAt`: (DateTimeDescriptor) Workflow start time.
+
+Here, a task exports the original order ID to `$context` and passes an updated item count to the next step.
+The final task combines the immediate input, the exported data, and the original workflow input.
+
+<code-block lang="yaml" src="workflows/dsl-runtime-expressions/read-expression-scope.yaml"/>
 
 #### Task Descriptor (`$task`)
 
@@ -104,24 +103,43 @@ The following table shows which arguments are available when evaluating differen
 |:----------------------|:-------------------------------------------|:---------------------------|:-----------|:---------|:----------|:-----------|:--------|:------------|:-----------|:-----------------|
 | Workflow `input.from` | Raw workflow input                         | Transformed workflow input |            |          |           | ✔          |         | ✔           | ✔          |                  |
 | Task `input.from`     | Raw task input (output from previous task) | Transformed task input     | ✔          |          |           | ✔          | ✔       | ✔           | ✔          |                  |
-| Task `if`             | Transformed task input                     | Boolean                    | ✔          | ✔        |           | ✔          | ✔       | ✔           | ✔          |                  |
-| Task definition\*     | Transformed task input                     | Task execution parameters  | ✔          | ✔        |           | ✔          | ✔       | ✔           | ✔          | ✔                |
-| Task `output.as`      | Raw task output                            | Transformed task output    | ✔          | ✔        |           | ✔          | ✔       | ✔           | ✔          | ✔                |
-| Task `export.as`      | Transformed task output                    | New `$context` value       | ✔          | ✔        | ✔         | ✔          | ✔       | ✔           | ✔          | ✔                |
-| Workflow `output.as`  | Transformed output of the *last* task      | Final workflow output      | ✔          |          |           | ✔          |         | ✔           | ✔          |                  |
+| Task `if`             | Transformed task input                     | Boolean                    | ✔          | ✔        |           |            | ✔       | ✔           | ✔          |                  |
+| Task definition\*     | Transformed task input                     | Task execution parameters  | ✔          | ✔        |           |            | ✔       | ✔           | ✔          | ✔                |
+| Task `output.as`      | Raw task output                            | Transformed task output    | ✔          | ✔        |           |            | ✔       | ✔           | ✔          | ✔                |
+| Task `export.as`      | Transformed task output                    | New `$context` value       | ✔          | ✔        | ✔         |            | ✔       | ✔           | ✔          | ✔                |
+| Workflow `output.as`  | Transformed output of the *last* task      | Final workflow output      | ✔          |          |           |            |         | ✔           | ✔          |                  |
 
 *\*Refers to expressions used *within* a task's configuration, like constructing an HTTP body or URI.*
 
-**Note on `$secrets`**: While available in many places, it's generally safest to restrict usage primarily to
-`task.input.from` or specific configurations (like authentication blocks) where the runtime can handle them securely,
-rather than embedding them directly into general-purpose fields like log messages or HTTP bodies.
-
 ## Error Handling
 
-If the evaluation of a runtime expression fails (e.g., due to invalid syntax, accessing a non-existent field in JQ), the
-runtime raises a standard error:
+A failed evaluation is an expression error with status 400. In jq, an absent object field yields
+`null`. An operation with an incompatible value, such as converting `"many"` to a number, can fail.
+Use [Try](dsl-task-try.md) to handle that failure.
 
-* **Type**: `https://open-workflow-specification.org/spec/1.0.0/errors/expression`
-* **Status**: `400` (Bad Request)
+<code-block lang="yaml" src="workflows/dsl-runtime-expressions/check-quantity-expression.yaml"/>
 
-This error can be caught and handled using a [`Try`](dsl-task-try.md) task. 
+## Run the Examples
+
+Complete the [SQLite setup](lemline-tutorial-setup.md) and leave the worker running. Save each workflow in the setup directory under the file name used below.
+
+Run these registration and start commands from the setup directory.
+
+```bash
+bin/lemline definition post -f format-line.yaml
+bin/lemline instance start examples format-line --input '{"customer":{"name":"Ada"},"item":{"id":"SKU-1"}}'
+bin/lemline definition post -f read-expression-scope.yaml
+bin/lemline instance start examples read-expression-scope --input '{"orderId":"O-100","count":2}'
+bin/lemline definition post -f check-quantity-expression.yaml
+bin/lemline instance start examples check-quantity-expression --input '{"quantity":"3"}'
+bin/lemline instance start examples check-quantity-expression --input '{"quantity":"many"}'
+```
+
+Check the individual results in the worker terminal.
+
+| Example | Expected result |
+|---|---|
+| `format-line` | `{"message":"Ada selected SKU-1","quantity":1}` |
+| `read-expression-scope` | `{"orderId":"O-100","adjustedCount":3,"originalCount":2}` |
+| `check-quantity-expression` with `{"quantity":"3"}` | `{"quantity":3}` |
+| `check-quantity-expression` with `{"quantity":"many"}` | The catch returns status `400` and an expression error type. |

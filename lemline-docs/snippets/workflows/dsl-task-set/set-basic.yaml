@@ -1,0 +1,16 @@
+document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: set-basic
+  version: '1.0.0'
+do:
+  - initialData:
+      set:
+        user:
+          name: Alice
+          id: 123
+        status: active
+  - processData:
+      set:
+        userId: ${ .user.id }
+        active: ${ .status == "active" }

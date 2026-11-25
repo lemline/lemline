@@ -1,0 +1,23 @@
+{
+  "instances": [
+    {
+      "type": "workflowCompleted",
+      "output": {
+        "valid": true
+      }
+    },
+    {
+      "type": "workflowCompleted",
+      "output": {
+        "sku": "SKU-1",
+        "available": 100
+      }
+    },
+    {
+      "type": "workflowCompleted",
+      "output": {
+        "id": "SKU-2"
+      }
+    }
+  ]
+}

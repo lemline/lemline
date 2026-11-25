@@ -13,7 +13,7 @@ The generic `Call` task enables the execution of a specified, named function wit
 
 ## Usage Example
 
-<code-block lang="yaml" src="workflows/dsl-call-function/usage-example.yaml"/>
+<code-block lang="yaml" src="workflows/dsl-call-function/call-address-function.yaml"/>
 
 In this example, the `checkAddress` task calls a function named `validateAddress`, passing arguments derived from the current context or input using the `with` property.
 
@@ -21,11 +21,15 @@ In this example, the `checkAddress` task calls a function named `validateAddress
 
 ### Example: Calling a Function with No Arguments
 
-<code-block lang="yaml" src="workflows/dsl-call-function/example-calling-a-function-with-no-arguments.yaml" include-lines="6-11"/>
+The named function has a fixed endpoint, so the caller can omit `with`.
+
+<code-block lang="yaml" src="workflows/dsl-call-function/call-stock-function.yaml"/>
 
 ### Example: Calling a Catalog Function
 
-<code-block lang="yaml" src="workflows/dsl-call-function/example-calling-a-catalog-function.yaml" include-lines="6-13"/>
+Name the catalog in `use.catalogs` and call the product function by name and version.
+
+<code-block lang="yaml" src="workflows/dsl-call-function/call-catalog-product-function.yaml"/>
 
 ## Configuration Options
 
@@ -57,4 +61,39 @@ If the function *definition* itself is hosted in a protected location (like a se
 *   Standard `output.as` and `export.as` process this function result.
 
 ### Flow Control
-<include from="_common-task-flow_control.md" element-id="common-flow-control"/> 
+<include from="_common-task-flow_control.md" element-id="common-flow-control"/>
+
+## Run the Examples
+
+Complete the [SQLite setup](lemline-tutorial-setup.md) and leave the worker running. Save each workflow in the setup directory under the file name used below.
+
+Use this command from the root of the source checkout to [start the tutorial shop](lemline-tutorial-setup.md#use-the-tutorial-shop).
+
+```bash
+docker compose -f examples/tutorial-services/compose.yaml up -d --wait
+```
+
+Run these registration and start commands from the setup directory.
+
+```bash
+bin/lemline definition post -f call-address-function.yaml
+bin/lemline instance start examples call-address-function --input '{"address":{"street":"10 High Street","city":"London","country":"GB"}}'
+bin/lemline definition post -f call-stock-function.yaml
+bin/lemline instance start examples call-stock-function
+bin/lemline definition post -f call-catalog-product-function.yaml
+bin/lemline instance start examples call-catalog-product-function --input '{"productId":"SKU-2"}'
+```
+
+Check the individual results in the worker terminal.
+
+| Example | Expected result |
+|---|---|
+| `call-address-function` | `{"valid":true}` |
+| `call-stock-function` | The stock for `SKU-1` with `100` available units. |
+| `call-catalog-product-function` | The product with ID `SKU-2`. |
+
+When the instances finish, use the command below in the source checkout to stop the shop.
+
+```bash
+docker compose -f examples/tutorial-services/compose.yaml down
+```

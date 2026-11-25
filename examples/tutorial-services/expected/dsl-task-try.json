@@ -1,0 +1,147 @@
+{
+  "settleSeconds": 55,
+  "state": {
+    "failures": {
+      "$contains": [
+        {
+          "reference": "GET /stock try-recover-stock",
+          "status": 503,
+          "failed": 2,
+          "passed": 1
+        },
+        {
+          "reference": "GET /stock try-fixed-retry",
+          "status": 503,
+          "failed": 2,
+          "passed": 1
+        },
+        {
+          "reference": "GET /stock try-linear-retry",
+          "status": 503,
+          "failed": 2,
+          "passed": 1
+        },
+        {
+          "reference": "GET /stock try-exponential-retry",
+          "status": 503,
+          "failed": 2,
+          "passed": 1
+        },
+        {
+          "reference": "GET /stock try-conditional-retry",
+          "status": 503,
+          "failed": 2,
+          "passed": 1
+        },
+        {
+          "reference": "GET /stock skip-retry",
+          "status": 404,
+          "failed": 1,
+          "passed": 0
+        }
+      ]
+    }
+  },
+  "instances": [
+    {
+      "type": "workflowCompleted",
+      "output": {
+        "status": 503,
+        "source": "fallback"
+      }
+    },
+    {
+      "type": "workflowCompleted",
+      "output": {
+        "sku": "SKU-1",
+        "available": 100
+      }
+    },
+    {
+      "type": "workflowCompleted",
+      "output": {
+        "result": "unavailable"
+      }
+    },
+    {
+      "type": "workflowFaulted",
+      "error": {
+        "status": 404,
+        "type": "https://open-workflow-specification.org/spec/1.0.0/errors/communication"
+      }
+    },
+    {
+      "type": "workflowCompleted",
+      "output": {
+        "reportedStatus": 503
+      }
+    },
+    {
+      "type": "workflowCompleted",
+      "output": {
+        "result": "rejected"
+      }
+    },
+    {
+      "type": "workflowFaulted",
+      "error": {
+        "status": 400,
+        "type": "https://errors.example.com/invalid-order",
+        "detail": "customerId"
+      }
+    },
+    {
+      "type": "workflowCompleted",
+      "output": {
+        "sku": "SKU-1",
+        "available": 100
+      }
+    },
+    {
+      "type": "workflowCompleted",
+      "output": {
+        "sku": "SKU-1",
+        "available": 100
+      }
+    },
+    {
+      "type": "workflowCompleted",
+      "output": {
+        "sku": "SKU-1",
+        "available": 100
+      }
+    },
+    {
+      "type": "workflowCompleted",
+      "output": {
+        "sku": "SKU-1",
+        "available": 100
+      }
+    },
+    {
+      "type": "workflowCompleted",
+      "output": {
+        "status": 404,
+        "retry": false
+      }
+    },
+    {
+      "type": "workflowFaulted",
+      "error": {
+        "type": "https://open-workflow-specification.org/spec/1.0.0/errors/validation",
+        "status": 400,
+        "title": "Invalid order",
+        "detail": "Missing order reference"
+      }
+    },
+    {
+      "type": "workflowFaulted",
+      "error": {
+        "type": "https://open-workflow-specification.org/spec/1.0.0/errors/validation",
+        "status": 400,
+        "title": "Invalid order",
+        "detail": "Missing order reference"
+      }
+    }
+  ]
+}

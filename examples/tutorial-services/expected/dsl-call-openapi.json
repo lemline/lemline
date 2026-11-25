@@ -1,0 +1,38 @@
+{
+  "instances": [
+    {
+      "type": "workflowFaulted",
+      "error": {
+        "title": "~Unknown task type: CallOpenAPI"
+      }
+    },
+    {
+      "type": "workflowFaulted",
+      "error": {
+        "title": "~Unknown task type: CallOpenAPI"
+      }
+    },
+    {
+      "type": "workflowFaulted",
+      "error": {
+        "title": "~Unknown task type: CallOpenAPI"
+      }
+    },
+    {
+      "type": "workflowCompleted",
+      "output": {
+        "items": [
+          {
+            "id": "SKU-1"
+          },
+          {
+            "id": "SKU-2"
+          },
+          {
+            "id": "SKU-3"
+          }
+        ]
+      }
+    }
+  ]
+}

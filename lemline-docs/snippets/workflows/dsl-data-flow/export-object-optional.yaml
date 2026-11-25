@@ -1,24 +1,27 @@
 document:
-  dsl: 1.0.3
+  dsl: '1.0.3'
   namespace: examples
   name: export-object-optional
-  version: 1.0.0
+  version: '1.0.0'
 do:
-  - updateUser:
+  - readCustomer:
       call: http
       with:
-        endpoint: https://api.example.com/resource
         method: get
+        endpoint: '${ "http://127.0.0.1:8787/customers/" + (.customerId | @uri) }'
       export:
-        as: '${ $context + { lastUserId: $output.userId } }'
+        as: '${ $context + {lastCustomerId: .id} }'
         schema:
+          format: json
           document:
             type: object
-            required:
-              - lastUserId
+            required: [lastCustomerId]
             properties:
-              lastUserId:
-                type: string
-  - subsequentTask:
+              lastCustomerId: { type: string }
+  - discardCustomerDetails:
       set:
-        message: '${ "Processed user: " + $context.lastUserId }'
+        action: processed
+  - summarize:
+      set:
+        action: ${ .action }
+        customerId: ${ $context.lastCustomerId }

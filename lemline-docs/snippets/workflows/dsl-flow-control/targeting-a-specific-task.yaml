@@ -6,13 +6,9 @@ document:
 do:
   - start:
       set: { value: 1 }
-      then: processValue # Jump to processValue after start
+      then: processValue
   - skippedTask:
-      # This task is skipped because 'start' jumps over it
       set: { value: 2 }
   - processValue:
-      set: { processed: "${ .value * 10 }" }
-      # Default: continues sequentially to 'finish'
-  - finish:
-      call: log
-      with: { result: "${ .processed }" }
+      set:
+        result: ${ .value * 10 }

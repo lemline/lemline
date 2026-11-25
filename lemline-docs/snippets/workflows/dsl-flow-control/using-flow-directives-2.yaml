@@ -1,16 +1,16 @@
 document:
-  dsl: 1.0.3
+  dsl: '1.0.3'
   namespace: examples
   name: using-flow-directives-2
-  version: 1.0.0
+  version: '1.0.0'
 do:
-  - criticalCheck:
-      call: getSystemStatus
   - decideTermination:
+      if: ${ .status == "FATAL" }
       set:
-        processed: true
-      if: '${ .status == "FATAL" }'
+        status: halted
       then: end
   - continueNormalProcessing:
       set:
-        processed: true
+        status: continued
+output:
+  as: '${ {result: .status} }'

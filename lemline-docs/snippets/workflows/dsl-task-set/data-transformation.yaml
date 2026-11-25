@@ -1,21 +1,19 @@
 document:
-  dsl: 1.0.3
+  dsl: '1.0.3'
   namespace: examples
   name: data-transformation
-  version: 1.0.0
+  version: '1.0.0'
 do:
-  - retrieveUserData:
-      call: userService
+  - getCustomer:
+      call: http
       with:
-        userId: ${ $workflow.input.userId }
+        method: get
+        endpoint: '${ "http://127.0.0.1:8787/customers/" + .customerId }'
       export:
-        as: '${ $context + { userData: . } }'
-  - transformUserProfile:
+        as: '${ $context + {customer: .} }'
+  - transformProfile:
       set:
         profile:
-          displayName: ${ $context.userData.firstName + " " + $context.userData.lastName }
-          email: ${ $context.userData.email }
-          joined: '${ ($context.userData.createdTimestamp | split("T")[0]) }'
-          membershipLevel: '${ if $context.userData.totalPurchases > 10000 then "platinum" elif $context.userData.totalPurchases
-            > 5000 then "gold" elif $context.userData.totalPurchases > 1000 then "silver" else "bronze" end }'
-          tags: '${ $context.userData.interests // [] }'
+          displayName: ${ $context.customer.name }
+          email: ${ $context.customer.email }
+          canContact: ${ $context.customer.emailValid }

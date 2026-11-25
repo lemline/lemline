@@ -4,56 +4,68 @@ title: URI Templates
 
 # URI Templates
 
-> **Lemline runtime.** HTTP calls expand simple placeholders such as `{userId}` in `endpoint` and `endpoint.uri` using the task’s transformed input. Use a runtime expression to build URLs from nested data or workflow arguments.
+URI templates construct a URI from input data. Open Workflow supports simple string expansion
+of `{variableName}` where a field accepts a URI template.
 
+## Simple String Expansion
 
-## Purpose
+The template reads a top-level value with the same name as the text inside the braces.
+For the example below, input `productId` selects the variable in the product path.
+A missing or null value expands to an empty string. Strings, numbers, and booleans are
+percent-encoded. An object or array faults with an expression error and status `400`.
 
-URI Templates provide a limited mechanism for creating dynamic URIs within the Open Workflow DSL, based on
-variable substitution. They are primarily used in places where a URI needs to be constructed based on available data,
-such as defining the endpoint for an HTTP `call`.
+<code-block lang="yaml" src="workflows/dsl-uri-templates/uri-template-product.yaml"/>
 
-This feature is based on [RFC 6570](https://datatracker.ietf.org/doc/html/rfc6570) but supports only a small subset of
-its capabilities.
+> **Lemline**
+>
+> HTTP calls expand templates in both `endpoint` and `endpoint.uri` using the task’s transformed input.
 
-## Supported Syntax: Simple String Expansion
+## Build a URI with an Expression
 
-The only syntax supported is **Simple String Expansion**: `{variableName}`.
-
-* The workflow runtime identifies placeholders enclosed in curly braces `{}`.
-* It looks for a variable with the exact name specified inside the braces (e.g., `variableName`) within the current data
-  context.
-* It replaces the entire `{variableName}` placeholder with the **value** of that variable.
-* If no variable with that exact name is found, the placeholder is replaced with an **empty string**.
-
-<code-block lang="yaml" src="workflows/dsl-uri-templates/supported-syntax-simple-string-expansion.yaml" include-lines="8-11"/>
-
-## Limitations Compared to Runtime Expressions (`${...}`)
-
-URI Templates are **much less powerful** than standard [Runtime Expressions](dsl-runtime-expressions.md). Key
-limitations include:
-
-1. **No Dot Notation:** You cannot access nested properties within variables (e.g., `{user.id}` is invalid for accessing
-   `id` within a `user` object). The template processor looks for a variable literally named `user.id`. You must ensure
-   the required value exists as a top-level variable (e.g., use `{userId}` instead).
-2. **Restricted Variable Types:** The variable referenced inside `{}` **must** resolve to a `string`, `number`,
-   `boolean`, or `null`. Using variables that resolve to objects or arrays will result in an error.
-3. **No Access to Workflow Arguments:** You **cannot** use special workflow arguments like `$context`, `$task`,
-   `$input`, `$output`, or `$secrets` inside `{}` placeholders. Use standard Runtime Expressions (`${...}`) when you
-   need access to these.
-
-This expression builds an endpoint from the current input and escapes the product ID
-before inserting it into the path.
+Use a [runtime expression](dsl-runtime-expressions.md) for nested data, workflow context, or
+custom URL construction. Here jq’s `@uri` encodes the product ID before it is inserted
+into the URL.
 
 <code-block lang="yaml" src="workflows/reference/dynamic-http-endpoint.yaml"/>
 
-Choose URI Templates only for very simple substitutions where the limitations are acceptable. For more complex URI
-construction or access to workflow context, use standard Runtime Expressions.
+See the [HTTP call reference](https://github.com/open-workflow-specification/specification/blob/v1.0.3/dsl-reference.md#http-call)
+for the `endpoint` property.
 
-## Error Handling
+## Run the Examples
 
-If a variable referenced within a URI Template resolves to an unsupported type (like an object or array), the workflow *
-*must** fault with an error:
+Complete the [SQLite setup](lemline-tutorial-setup.md) and leave the worker running. Save each workflow in the setup directory under the file name used below.
 
-* **`type`**: `https://open-workflow-specification.org/spec/1.0.0/errors/expression`
-* **`status`**: `400` (Bad Request) 
+Use this command from the root of the source checkout to [start the tutorial shop](lemline-tutorial-setup.md#use-the-tutorial-shop).
+
+```bash
+docker compose -f examples/tutorial-services/compose.yaml up -d --wait
+```
+
+Run these registration and start commands from the setup directory.
+
+```bash
+bin/lemline definition post -f uri-template-product.yaml
+bin/lemline instance start examples uri-template-product --input '{"productId":"SKU-1"}'
+bin/lemline definition post -f dynamic-http-endpoint.yaml
+bin/lemline instance start examples dynamic-http-endpoint --input '{"productId":"SKU-1"}'
+```
+
+Check the individual results in the worker terminal.
+
+| Example | Expected result |
+|---|---|
+| `uri-template-product` | The garden hose, product `SKU-1`. |
+| `dynamic-http-endpoint` | The garden hose, product `SKU-1`. |
+
+After both workflows finish, check that both sent a request to `/products/SKU-1`.
+
+```bash
+sleep 6
+curl -fsS http://127.0.0.1:8787/state
+```
+
+When the instances finish, use the command below in the source checkout to stop the shop.
+
+```bash
+docker compose -f examples/tutorial-services/compose.yaml down
+```

@@ -1,0 +1,29 @@
+document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: raise-and-catch
+  version: '1.0.0'
+use:
+  errors:
+    specialHandlingRequiredError:
+      type: https://errors.example.com/special-handling
+      title: Special handling required
+      status: 400
+do:
+  - outerTask:
+      try:
+        - riskyOperation:
+            if: ${ .needsSpecialHandling }
+            raise:
+              error: specialHandlingRequiredError
+        - normalProcessing:
+            set:
+              route: automatic
+      catch:
+        errors:
+          with:
+            type: https://errors.example.com/special-handling
+        do:
+          - handleSpecialCase:
+              set:
+                route: manual

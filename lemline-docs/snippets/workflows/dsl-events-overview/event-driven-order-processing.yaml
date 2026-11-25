@@ -1,0 +1,51 @@
+document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: event-driven-order-processing
+  version: '1.0.0'
+schedule:
+  on:
+    one:
+      with:
+        type: com.example.order.created
+input:
+  from: ${ .[0] }
+do:
+  - getPayment:
+      try:
+        - waitForPayment:
+            listen:
+              to:
+                one:
+                  with:
+                    type: com.example.payment.processed
+                  correlate:
+                    orderId:
+                      from: ${ .orderId }
+                      expect: ${ $workflow.input[0].orderId }
+            timeout:
+              after: PT30S
+            output:
+              as: ${ .[0] }
+      catch:
+        errors:
+          with:
+            type: https://open-workflow-specification.org/spec/1.0.0/errors/timeout
+        do:
+          - inspectShop:
+              call: http
+              with:
+                method: get
+                endpoint: http://127.0.0.1:8787/state
+          - findPayment:
+              set:
+                orderId: ${ $workflow.input[0].orderId }
+                status: '${ ([.charges[] | select(.orderId == $workflow.input[0].orderId)][0].status // "manual-review") }'
+  - publishStatus:
+      emit:
+        event:
+          with:
+            source: http://127.0.0.1:8787/orders
+            type: com.example.order.payment-status
+            subject: ${ .orderId }
+            data: ${ . }

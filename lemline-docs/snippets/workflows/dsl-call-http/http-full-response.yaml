@@ -1,0 +1,19 @@
+document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: http-full-response
+  version: '1.0.0'
+do:
+  - requestStock:
+      call: http
+      with:
+        method: get
+        endpoint:
+          uri: http://127.0.0.1:8787/old-stock
+        output: response
+        redirect: true
+  - summarize:
+      set:
+        status: ${ .statusCode }
+        sku: ${ .content.sku }
+        available: ${ .content.available }

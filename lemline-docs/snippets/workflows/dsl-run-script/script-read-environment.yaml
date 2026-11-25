@@ -1,0 +1,21 @@
+document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: script-read-environment
+  version: '1.0.0'
+do:
+  - processWithPython:
+      run:
+        script:
+          language: python
+          code: |
+            import json
+            import os
+            items = json.loads(os.environ["ORDER_ITEMS"])
+            print(len(items))
+          environment:
+            ORDER_ITEMS: ${ .items | tojson }
+        return: stdout
+  - countItems:
+      set:
+        count: ${ . | tonumber }

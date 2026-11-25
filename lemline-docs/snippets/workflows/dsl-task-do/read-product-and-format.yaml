@@ -1,0 +1,16 @@
+document:
+  dsl: 1.0.3
+  namespace: examples
+  name: read-product-and-format
+  version: 1.0.0
+do:
+  - myDoTask:
+      do:
+        - firstSubTask:
+            call: http
+            with:
+              method: get
+              endpoint: http://127.0.0.1:8787/products/SKU-1
+        - secondSubTask:
+            set:
+              productId: ${ .id }

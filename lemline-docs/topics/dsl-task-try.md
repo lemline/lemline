@@ -17,183 +17,173 @@ It's primarily used for:
 
 Here's a simple example of trying to call an external service and catching a potential communication error:
 
-<code-block lang="yaml" src="workflows/dsl-task-try/basic-usage.yaml"/>
+<code-block lang="yaml" src="workflows/dsl-task-try/try-handle-communication.yaml"/>
 
-In this example, if `callMyApi` fails with a standard `communication` error, the `catch` block is activated. The error
-details are stored in the `$apiError` variable (accessible within the `catch.do` block), the failure is logged, and a
-default output is set. Execution then proceeds normally to `continueProcessing`. If `callMyApi` succeeds, the `catch`
-block is skipped entirely.
+If `readStock` fails with a communication error, the catch stores it in `$apiError` and returns a fallback.
 
-Here's an example demonstrating automatic retries:
+The next workflow retries an HTTP 503 using an exponential backoff. The shop can fail its first two calls
+so the reader can see the retry recover.
 
-<code-block lang="yaml" src="workflows/dsl-task-try/basic-usage-2.yaml" include-lines="6-27"/>
-
-This example attempts `fetchCrucialData`. If it fails with a 503 status, it waits 2 seconds and retries. If it fails
-again, it waits 4 seconds, then 8 seconds. If it still fails after the 4th total attempt, the 503 error is *not*
-caught (because there's no `catch.do`), and the workflow likely faults unless a parent `Try` catches it.
+<code-block lang="yaml" src="workflows/dsl-task-try/try-recover-stock.yaml"/>
 
 ## Configuration Options
 
-### `try` (List<String, Object>, Required)
+### `try`
 
-This mandatory property contains a list defining the sequence of tasks to be attempted.
+The required `try` list contains the tasks to attempt in order. If a task raises an error, the required `catch` block
+determines how to handle it.
 
-If any task within this block raises an error, the runtime checks the corresponding `catch` block to see if the error
-should be handled.
+### Catch Filters
 
-### `catch` (Object, Required)
+`catch.errors.with` can match any combination of [error properties](dsl-error-handling.md#error-definition-problem-details),
+including `type`, `status`, `instance`, `title`, and `detail`. All listed properties must match. When the filter is
+omitted, any error can proceed to the `when` and `exceptWhen` checks.
 
-This mandatory object defines how errors originating from the `try` block are handled.
+This workflow catches communication errors with status 503. Errors with other statuses propagate to the enclosing scope.
 
-<note title="Summary: Conditions for an Error to be Caught">
-For an error raised in the `try` block to be considered "caught" by this `catch` block, it must sequentially pass **all** applicable filters in this order:
+<code-block lang="yaml" src="workflows/dsl-task-try/try-catch-type-and-status.yaml"/>
 
-1. **Match `errors.with`**: If `errors.with` is defined, the error's properties must exactly match all specified
-   criteria.
-2. **Pass `when`**: If `when` is defined, its runtime expression (evaluated against the error, accessible via the
-   variable named in `as`) must return `true`.
-3. **Pass `exceptWhen`**: If `exceptWhen` is defined, its runtime expression (evaluated against the error) must return
-   `false`.
-4. `retry` is configured and attempts are not exhausted (the `try` task is then retried) OR `catch.do` is defined (the
-   `catch.do` is then processed).
+`catch.as` names the variable that holds the error. It defaults to `error`, available as `$error` in
+[runtime expressions](dsl-runtime-expressions.md). The catch proceeds when `when` evaluates to `true` and
+`exceptWhen` evaluates to `false`, for whichever expressions are defined.
 
-</note>
+This workflow uses `when` to catch communication errors with a status of 500 or higher. It binds the error to
+`$serviceError`.
 
-The `catch` block can contain the following properties:
+<code-block lang="yaml" src="workflows/dsl-task-try/try-use-named-error.yaml"/>
 
-* **`errors`** (Object, Optional): Filters which errors are potentially caught.
-    * **`with`**: (Object, Optional) Defines specific properties that an error raised within the `try` block must have
-      to be considered for catching by this `catch` block. This allows for fine-grained filtering based on the error's
-      characteristics.
-        * You can specify one or more standard [Error object](dsl-error-handling.md#error-definition-problem-details)
-          fields: `type`, `status`, `instance`, `title`, `details`.
-        * **Matching Logic**: An incoming error matches the `with` filter **only if *all* fields specified within
-          the `with` object exactly match the corresponding fields in the raised error object.** It acts as a logical
-          AND condition.
-        * If the `with` object is omitted, this specific property-based filtering step is skipped, and all errors are
-          considered potentially catchable (subject to further filtering by `when`/`exceptWhen`).
-        * **Example**:
+This workflow uses `exceptWhen` to let errors about `customerId` propagate by checking `$error.detail`.
 
-            <code-block lang="yaml" src="workflows/reference/catch-type-and-status.yaml" include-lines="14-21"/>
-* **`as`** (String, Optional): Specifies the variable name used to store the caught error object within the scope of the
-  `catch` block (`when`, `exceptWhen`, `retry`, `do`). Defaults to `error` (accessible as `$error` in expressions).
-* **`when`** (String, Optional): A [Runtime Expression](dsl-runtime-expressions.md) evaluated *if* an error matches the
-  `errors.with` filter. The expression has access to the caught error via the variable named by `as`. The error is only
-  caught if this expression evaluates to `true`.
-    * **Example**: Catch communication errors only if they occurred for a specific instance:
+<code-block lang="yaml" src="workflows/dsl-task-try/try-exclude-validation-field.yaml"/>
 
-      <code-block lang="yaml" src="workflows/reference/use-named-caught-error.yaml" include-lines="14-19"/>
-* **`exceptWhen`** (String, Optional): A [Runtime Expression](dsl-runtime-expressions.md) evaluated *if* an error
-  matches the `errors.with` filter *and* the `when` condition (if present) was true. The expression has access to the
-  caught error. The error is *not* caught if this expression evaluates to `true`.
-    * **Example**: Catch all validation errors *except* those related to a specific field:
+### Retry Policies
 
-      <code-block lang="yaml" src="workflows/reference/filter-caught-error.yaml" include-lines="14-22"/>
-    * **`retry`** (String | Object, Optional): Defines the retry strategy if an error is caught (passes filters). Can be
-      a
-      string referencing a named `RetryPolicy` defined in `workflow.use.retries`, or an inline `RetryPolicy` object.
-        * **`when`** / **`exceptWhen`** (String, Optional): Runtime expressions evaluated *before* calculating the retry
-          delay to conditionally decide *if* a retry should occur for the caught error.
-        * **`delay`** (String | Object, Required in Policy): Base delay before the first retry (ISO 8601 Duration or
-          object
-          like `{ seconds: 5 }`).
-        * **`backoff`** (Object, Optional): Strategy for increasing delay between retries.
-            * `constant: {}`: No increase (default if `backoff` omitted).
-            * `linear: {}`: Delay increases linearly (delay * (1 + attemptIndex)).
-            * `exponential: {}`: Delay increases exponentially (delay ^ (1 + attemptIndex)).
-        * **`limit`** (Object, Optional): Defines limits for retrying.
-            * `attempt`: (Object, Optional) Limits related to individual attempts.
-                * `count` (Integer, Optional): The maximum number of *total* attempts allowed (the initial attempt plus
-                  all
-                  retries). If this limit is reached, retrying stops.
-                * `duration` (String | Object - Duration, Optional): The maximum allowed duration for any *single*
-                  attempt (
-                  initial or retry), measured from the start of that specific attempt's execution until its completion (
-                  success or error). If any individual attempt exceeds this duration, it's considered a failure (
-                  potentially
-                  triggering a `Timeout` error or the next retry if attempts remain), even if the overall retry duration
-                  limit (`limit.duration`) hasn't been reached. This duration does *not* include the `delay` time
-                  preceding
-                  the attempt.
-            * `duration` (String | Object - Duration, Optional): The maximum *total* duration allowed for the entire
-              retry
-              process, measured from the start of the *initial* attempt and encompassing all subsequent attempt
-              execution
-              times *and* the delay periods between them. If this overall duration is exceeded, retrying stops
-              immediately,
-              even if the attempt count (`limit.attempt.count`) hasn't been reached.
-        * **`jitter`** (Object, Optional): Introduces randomness to the retry delay to help prevent simultaneous retries
-          from multiple workflow instances causing a "thundering herd" problem on downstream services. Contains the
-          following properties:
-            * **`from`** (`duration`, Required): The minimum duration value for the random jitter range.
-            * **`to`** (`duration`, Required): The maximum duration value for the random jitter range.
-            * **How it works**: After the base delay (and any backoff multiplication) is calculated, a random duration
-              chosen uniformly from the range [`from`, `to`] (inclusive) is added to it. The actual delay before the
-              next
-              retry will be `calculated_delay + random(jitter.from, jitter.to)`.
-            * **Example**: If the calculated delay (after backoff) is 10 seconds and `jitter` is
-              `{ from: { seconds: 1 }, to: { seconds: 3 } }`, the actual delay before the next retry will be a random
-              value
-              between 11.0 and 13.0 seconds.
+Define `catch.retry` as an inline policy or reference a named policy from `use.retries`. A retry policy applies after
+the catch filters match.
 
-      #### Examples
+- The policy's optional `when` and `exceptWhen` expressions decide whether to retry the caught error.
+- `delay` sets the base delay. Use an ISO 8601 duration or an object such as `{ seconds: 5 }`.
+- `backoff` can be `constant`, `linear`, or `exponential`. Omitting `backoff` uses a constant delay.
+- `limit.attempt.count` sets the attempt limit. `limit.attempt.duration` can set a duration limit for retry attempts.
+  `limit.duration` limits how long the policy can continue scheduling retries.
+- `jitter.from` and `jitter.to` set the range of random time added after calculating the backoff.
 
-      **1. Simple Retry Count:** Retry up to 3 times with a fixed 5-second delay.
+Use a two-second delay and an explicit retry count.
 
-        <code-block lang="yaml" src="workflows/reference/fixed-retry-delay.yaml" include-lines="15-19"/>
+<code-block lang="yaml" src="workflows/dsl-task-try/try-fixed-retry.yaml"/>
 
-      **2. Linear Backoff with Total Duration Limit:** Retry with delay increasing linearly (2s, 4s, 6s...), stopping
-      after a
-      total of 1 minute.
+Combine linear backoff with a two-second base delay, a retry count limit, and a one-minute duration limit.
 
-        <code-block lang="yaml" src="workflows/reference/linear-retry-delay.yaml" include-lines="15-21"/>
+<code-block lang="yaml" src="workflows/dsl-task-try/try-linear-retry.yaml"/>
 
-      **3. Exponential Backoff with Jitter:** Retry with exponentially increasing delay (1s, 2s, 4s...) plus random
-      jitter
-      between 0.5 and 1.5 seconds.
+Combine exponential backoff with a two-second base delay and jitter between 0.5 and 1 second.
 
-        <code-block lang="yaml" src="workflows/reference/exponential-backoff-with-jitter.yaml" include-lines="15-24"/>
+<code-block lang="yaml" src="workflows/dsl-task-try/try-exponential-retry.yaml"/>
 
-      **4. Conditional Retry:** Only retry if the error details mention a timeout, using the default error variable
-      `$error`.
+Retry only HTTP 503 responses. The fallback reports the status when the policy declines or stops retrying.
 
-        <code-block lang="yaml" src="workflows/reference/conditional-retry.yaml" include-lines="15-20"/>
-* **`do`** (List<String, Object>, Optional): A block of tasks to execute sequentially *only if* an error is successfully
-  caught (passes `errors.with`, `when`, and `exceptWhen` filters).
-    * **Output**: If the `catch.do` block executes, its final transformed output becomes the `rawOutput` of the entire
-      `Try` task.
-    * **Omission**: If `catch.do` is omitted and retries are exhausted, the error propagates upwards.
-    <note title="Interaction with Retry">
+<code-block lang="yaml" src="workflows/dsl-task-try/try-conditional-retry.yaml"/>
 
-  If a `retry` policy is also defined for the caught error, the `catch.do` block will **only** execute if **all retry
-  attempts are exhausted without success**.
+### Recovery Tasks
 
-    * If any retry attempt *succeeds*, the `catch.do` block is skipped entirely, the `Try` task completes successfully
-      using the output of the successful retry attempt, and execution proceeds via the `Try` task's `then` directive.
-    * If all retries *fail* (due to limits or persistent errors), *then* the `catch.do` block (if present) is executed.
+`catch.do` runs a list of recovery tasks for an error that matches the catch filters. When a retry policy applies,
+the recovery tasks run if the policy stops or declines to schedule another attempt. A successful retry completes
+the `Try` task with the retry's output.
 
-    </note>
+In Lemline, if the retry policy declines another attempt and the catch has no recovery tasks or
+`then` directive, the original error propagates. An enclosing catch can handle it. Otherwise the
+workflow faults with that error.
+
+This example raises the same validation error when the policy declines a retry and after its one retry
+also fails.
+
+<code-block lang="yaml" src="workflows/dsl-task-try/try-retry-without-recovery.yaml"/>
 
 ## Data Flow
 
 <include from="_common-task-data-flow.md" element-id="common-data-flow"/>
-**Note on `Try` Data Flow**:
-*   The `rawOutput` used by `output.as` and `export.as` is determined as follows:
-    *   If the `try` block completes successfully, `rawOutput` is the `transformedOutput` of the last task within `try`.
-    *   If an error is caught and handled by executing the `catch.do` block, `rawOutput` is the `transformedOutput` of the last task within `catch.do`.
-    *   If an error is caught, retries are exhausted (or not configured), and there is **no** `catch.do` block, the error propagates upwards. The `Try` task does not produce an output in this case, as it doesn't complete successfully.
+
+The final task's transformed output from a successful `try` or `catch.do` block supplies `rawOutput` for `output.as` and
+`export.as`.
 
 ## Flow Control
 
 <include from="_common-task-flow_control.md" element-id="common-flow-control"/>
-**Note on `Try` Flow Control**:
-*   The `Try` task's `then` directive is followed **if and only if** the task completes successfully. Successful completion occurs under these conditions:
-    1.  The `try` block finishes without raising any error that is caught by the `catch` filters.
-    2.  An error *is* caught, a `retry` policy is triggered, and **any retry attempt succeeds**.
-    3.  An error *is* caught, all `retry` attempts (if configured) are exhausted without success, **and** the `catch.do` block (if present) executes successfully.
-*   In all other scenarios, the `Try` task does not complete successfully, and its `then` directive is **not** followed. This includes:
-    *   An error raised in `try` that is not caught by the `catch` filters.
-    *   An error that is caught, exhausts all retries (or has no retry policy), and has **no** `catch.do` block to handle it (the error propagates).
-    *   The `catch.do` block itself raises an error.
 
+Successful execution of `try` or `catch.do` follows the task's `then` directive. Errors outside the catch filters
+and errors raised by recovery tasks propagate to the enclosing scope.
 
+## Run the Examples
+
+Complete the [SQLite setup](lemline-tutorial-setup.md) and leave the worker running. Save each workflow in the setup directory under the file name used below.
+
+Use this command from the root of the source checkout to [start the tutorial shop](lemline-tutorial-setup.md#use-the-tutorial-shop).
+
+```bash
+docker compose -f examples/tutorial-services/compose.yaml up -d --wait
+```
+
+Run these registration and start commands from the setup directory.
+
+```bash
+bin/lemline definition post -f try-handle-communication.yaml
+bin/lemline instance start examples try-handle-communication --input '{"status":503,"failures":1,"key":"fallback"}'
+bin/lemline definition post -f try-recover-stock.yaml
+bin/lemline instance start examples try-recover-stock --input '{"status":503,"failures":2,"key":"try-recover-stock"}'
+bin/lemline definition post -f try-catch-type-and-status.yaml
+bin/lemline instance start examples try-catch-type-and-status --input '{"status":503,"failures":1,"key":"matching-status"}'
+bin/lemline instance start examples try-catch-type-and-status --input '{"status":404,"failures":1,"key":"other-status"}'
+bin/lemline definition post -f try-use-named-error.yaml
+bin/lemline instance start examples try-use-named-error --input '{"status":503,"failures":1,"key":"named-error"}'
+bin/lemline definition post -f try-exclude-validation-field.yaml
+bin/lemline instance start examples try-exclude-validation-field --input '{"field":"quantity"}'
+bin/lemline instance start examples try-exclude-validation-field --input '{"field":"customerId"}'
+bin/lemline definition post -f try-fixed-retry.yaml
+bin/lemline instance start examples try-fixed-retry --input '{"status":503,"failures":2,"key":"try-fixed-retry"}'
+bin/lemline definition post -f try-linear-retry.yaml
+bin/lemline instance start examples try-linear-retry --input '{"status":503,"failures":2,"key":"try-linear-retry"}'
+bin/lemline definition post -f try-exponential-retry.yaml
+bin/lemline instance start examples try-exponential-retry --input '{"status":503,"failures":2,"key":"try-exponential-retry"}'
+bin/lemline definition post -f try-conditional-retry.yaml
+bin/lemline instance start examples try-conditional-retry --input '{"status":503,"failures":2,"key":"try-conditional-retry"}'
+bin/lemline instance start examples try-conditional-retry --input '{"status":404,"failures":1,"key":"skip-retry"}'
+bin/lemline definition post -f try-retry-without-recovery.yaml
+bin/lemline instance start examples try-retry-without-recovery --input '{"shouldRetry":false}'
+bin/lemline instance start examples try-retry-without-recovery --input '{"shouldRetry":true}'
+```
+
+Check the individual results in the worker terminal.
+
+| Example | Expected result |
+|---|---|
+| `try-handle-communication` | `{"status":503,"source":"fallback"}` |
+| `try-recover-stock` | The stock for `SKU-1` after two HTTP 503 responses. |
+| `try-catch-type-and-status` with `{"status":503,"failures":1,"key":"matching-status"}` | `{"result":"unavailable"}` |
+| `try-catch-type-and-status` with `{"status":404,"failures":1,"key":"other-status"}` | Faults with the original HTTP `404` communication error. |
+| `try-use-named-error` | `{"reportedStatus":503}` |
+| `try-exclude-validation-field` with `{"field":"quantity"}` | `{"result":"rejected"}` |
+| `try-exclude-validation-field` with `{"field":"customerId"}` | Faults with the original error for `customerId`. |
+| `try-fixed-retry` | The stock for `SKU-1` after two HTTP 503 responses. |
+| `try-linear-retry` | The stock for `SKU-1` after two HTTP 503 responses. |
+| `try-exponential-retry` | The stock for `SKU-1` after two HTTP 503 responses. |
+| `try-conditional-retry` with `{"status":503,"failures":2,"key":"try-conditional-retry"}` | The stock for `SKU-1` after two HTTP 503 responses. |
+| `try-conditional-retry` with `{"status":404,"failures":1,"key":"skip-retry"}` | Returns `{"status":404,"retry":false}` after one request. |
+| `try-retry-without-recovery` with `{"shouldRetry":false}` | Faults with `400 Invalid order` and detail `Missing order reference` after the first attempt. |
+| `try-retry-without-recovery` with `{"shouldRetry":true}` | Retries once, then faults with the same validation error. |
+
+Once the workflows finish, query the shop for its counts of failed and successful requests.
+
+```bash
+sleep 35
+curl -fsS http://127.0.0.1:8787/state
+```
+
+> **Lemline**
+>
+> The attempt count limits retries after the first execution and defaults to one retry when omitted. SQLite checks for due retries periodically, so the interval between requests can exceed the configured delay.
+
+When the instances finish, use the command below in the source checkout to stop the shop.
+
+```bash
+docker compose -f examples/tutorial-services/compose.yaml down
+```

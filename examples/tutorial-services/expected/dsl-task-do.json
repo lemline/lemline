@@ -1,0 +1,16 @@
+{
+  "instances": [
+    {
+      "type": "workflowCompleted",
+      "output": {
+        "resultB": "Value from Task A and Task B"
+      }
+    },
+    {
+      "type": "workflowCompleted",
+      "output": {
+        "productId": "SKU-1"
+      }
+    }
+  ]
+}

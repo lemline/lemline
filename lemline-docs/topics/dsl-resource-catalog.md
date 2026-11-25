@@ -4,148 +4,108 @@ title: Resource Catalogs
 
 # Resource Catalogs
 
-## Purpose
+A catalog groups reusable workflow resources. A workflow declares a catalog’s endpoint in `use.catalogs`
+and can refer to a function by name, version, and catalog alias.
 
-A **Resource Catalog** is an external collection of reusable components, primarily [Functions](dsl-call-function.md) in
-current usage, that can be referenced and imported into Open Workflows.
+## Define a Catalog and Call Its Function
 
-The main goals of using catalogs are:
+The shop serves a function that validates its `productId` argument and requests the matching product.
+The call uses the form `name:version@catalog`.
 
-* **Reusability**: Define common components (like functions) once and use them across multiple workflows.
-* **Modularity**: Keep complex or domain-specific logic separate from the main workflow definition.
-* **Versioning**: Manage different versions of reusable components independently.
-* **Consistency**: Ensure that multiple workflows use the same implementation of shared logic.
-* **Discovery**: Provide a central place to find available reusable components.
+<code-block lang="yaml" src="workflows/dsl-resource-catalog/catalog-read-product.yaml"/>
 
-## Defining and Using Catalogs
+## Call a Function by URL
 
-Catalogs are defined in the workflow's `use.catalogs` section. Each catalog requires a unique name within the workflow
-and an `endpoint` specifying its location.
+A function can also be referenced directly by its definition URL. Here the workflow points to the
+same catalog entry without using an alias.
 
-### Workflow Structure
+<code-block lang="yaml" src="workflows/dsl-resource-catalog/catalog-direct-url.yaml"/>
 
-<code-block lang="yaml" src="workflows/reference/use-function-catalog.yaml"/>
+## Catalog Layout
 
-**Key Properties (from [Resources Configuration Overview](dsl-resources-configuration-overview.md)):**
+Publish each function as a task definition at `functions/<name>/<version>/function.yaml` under the catalog
+root. The version in the call selects the directory. The function body receives the caller’s `with` object.
 
-* **`use.catalogs`** (Map<String, Catalog>): A map where each key is a user-defined name for the catalog (e.g.,
-  `sharedUtils`, `publicApis`) and the value is a `Catalog` object definition.
-* **`Catalog` Object**: Defines a catalog resource.
-    * **`endpoint`** (Object, Required): Defines the location and access method for the catalog. Contains:
-        * `uri` (String | Object, Required): The URI (as a string or URI template object) pointing to the root of the
-          catalog.
-        * `authentication` (String | Object, Optional): Authentication details (inline definition or reference by name)
-          needed to access the catalog's `endpoint` itself.
+> **Lemline**
+>
+> The worker resolves function references from HTTP, HTTPS, and local file catalog roots.
+> References using the built-in `global` alias resolve against the public Open Workflow catalog.
+> The following workflow declares a local `global` alias for repeatable runs without a remote catalog.
 
-### Calling Cataloged Functions
+<code-block lang="yaml" src="workflows/dsl-resource-catalog/catalog-override-global.yaml"/>
 
-While catalogs can potentially hold various resources, the primary use case currently detailed is calling functions. To
-call a function defined within a catalog, you use a specific format in the `call` property of a task:
+## Separate Public and Private Catalogs
 
-`{functionName}:{functionVersion}${catalogName}`
+A workflow can declare more than one catalog. The second endpoint here uses an inline Basic policy.
 
-* `functionName`: The name of the function within the catalog.
-* `functionVersion`: The specific semantic version of the function to use.
-* `catalogName`: The name given to the catalog in the `use.catalogs` section.
+<code-block lang="yaml" src="workflows/dsl-resource-catalog/catalog-authenticated-endpoint.yaml"/>
 
-**Example:**
+> **Lemline**
+>
+> Lemline accepts this workflow definition at registration. When it resolves the private function, it faults
+> because catalog endpoint authentication is unsupported. That is separate from authentication on a
+> service endpoint called by a function.
 
-<code-block lang="yaml" src="workflows/dsl-resource-catalog/calling-cataloged-functions.yaml" include-lines="6-13"/>
+## Create a Local Catalog
 
-## Catalog Structure
+The next workflow reads a file catalog on the worker. In the run section, create the complete
+`function.yaml` that it calls. A function file contains a task definition, and the workflow below
+provides the document metadata, input, and enclosing task list.
 
-To ensure portability and allow runtimes to consistently locate resources, catalogs hosted externally (especially in Git
-repositories) are expected to follow a specific file structure. The Open Workflow Specification recommends a
-structure like this (refer to
-the [official catalog structure documentation](https://github.com/open-workflow-specification/catalog?tab=readme-ov-file#structure)
-for precise details):
+<code-block lang="yaml" src="workflows/dsl-resource-catalog/catalog-local-formatter.yaml"/>
 
-```
-my-catalog-repo/
-├── functions/
-│   ├── functionA/
-│   │   ├── 1.0.0/
-│   │   │   └── function.yaml  # Definition for v1.0.0
-│   │   └── 1.1.0/
-│   │       └── function.yaml  # Definition for v1.1.0
-│   └── functionB/
-│       └── 0.5.2/
-│           └── function.yaml
-├── authentications/ # Example for other potential resource types
-│   └── mySharedAuth/
-│       └── authentication.yaml 
-└── README.md
+## Run the Examples
+
+Complete the [SQLite setup](lemline-tutorial-setup.md) and leave the worker running. Save each workflow in the setup directory under the file name used below.
+
+Use this command from the root of the source checkout to [start the tutorial shop](lemline-tutorial-setup.md#use-the-tutorial-shop).
+
+```bash
+docker compose -f examples/tutorial-services/compose.yaml up -d --wait
 ```
 
-### Runtime Resolution (Git Repositories)
+Create the function file for the local catalog on the worker's machine.
 
-When a catalog endpoint points to a Git repository (like GitHub or GitLab), runtimes are expected to resolve the *raw*
-content URLs for the definition files (e.g., `function.yaml`, `authentication.yaml`).
+```bash
+mkdir -p /tmp/lemline-dsl-catalog/functions/format-product/1.0.0
+cat > /tmp/lemline-dsl-catalog/functions/format-product/1.0.0/function.yaml <<'EOF'
+set:
+  label: '${ "Product " + .productId }'
+EOF
+```
 
-For example, if the catalog endpoint is `https://github.com/my-org/catalog/tree/main` and you call
-`log:1.0.0@myCatalog`, the runtime should look for the definition at a path like `functions/log/1.0.0/function.yaml`
-within that repository and fetch its raw content (e.g., from
-`https://raw.githubusercontent.com/my-org/catalog/main/functions/log/1.0.0/function.yaml`).
+Run these registration and start commands from the setup directory.
 
-## Default Catalog
+```bash
+bin/lemline definition post -f catalog-read-product.yaml
+bin/lemline instance start examples catalog-read-product --input '{"productId":"SKU-1"}'
+bin/lemline definition post -f catalog-direct-url.yaml
+bin/lemline instance start examples catalog-direct-url --input '{"productId":"SKU-2"}'
+bin/lemline definition post -f catalog-override-global.yaml
+bin/lemline instance start examples catalog-override-global --input '{"productId":"SKU-3"}'
+bin/lemline definition post -f catalog-authenticated-endpoint.yaml
+bin/lemline instance start examples catalog-authenticated-endpoint
+bin/lemline definition post -f catalog-local-formatter.yaml
+bin/lemline instance start examples catalog-local-formatter --input '{"productId":"SKU-2"}'
+```
 
-Runtimes *may* provide a **Default Catalog**. This is a special, implicitly available catalog that doesn't need to be
-explicitly defined in `use.catalogs`. It allows runtime administrators or platform providers to make common functions (
-or potentially other resources) readily available to all workflows without extra configuration.
+Check the individual results in the worker terminal.
 
-To call a function from the default catalog, use the reserved name `default` as the catalog name:
+| Example | Expected result |
+|---|---|
+| `catalog-read-product` | The product `SKU-1` (Garden hose). |
+| `catalog-direct-url` | The product `SKU-2` (Watering can). |
+| `catalog-override-global` | The product `SKU-3` (Pruning shears) from the shop catalog. |
+| `catalog-authenticated-endpoint` | Registers, then faults on the private catalog’s endpoint authentication. |
+| `catalog-local-formatter` | `{"label":"Product SKU-2"}` |
 
-`{functionName}:{functionVersion}@default`
+When the instances finish, use the command below in the source checkout to stop the shop.
 
-**Example:**
+```bash
+docker compose -f examples/tutorial-services/compose.yaml down
+```
 
-<code-block lang="yaml" src="workflows/dsl-resource-catalog/default-catalog.yaml" include-lines="6-12"/>
+## Related Resources
 
-How the runtime manages and resolves resources in the default catalog is implementation-specific (e.g., database, local
-files, pre-configured remote repository).
-
-## Additional Examples
-
-### Example: Defining Multiple Catalogs with Authentication
-
-<code-block lang="yaml" src="workflows/dsl-resource-catalog/example-defining-multiple-catalogs-with-authentication.yaml"/>
-
-### Example: Using a Local File-Based Catalog
-
-<code-block lang="yaml" src="workflows/dsl-resource-catalog/example-using-a-local-file-based-catalog.yaml"/>
-
-## Creating and Publishing Resources
-
-The process for creating and sharing resources involves defining the resource in a structured way and making it
-accessible via a catalog endpoint.
-
-While the most concrete example provided by the specification is for [Functions](dsl-call-function.md), the general
-steps apply to any resource type potentially supported by a catalog:
-
-1. **Define the Resource**: Create a definition file (e.g., `function.yaml` for functions) that describes the resource
-   according to the Open Workflow Specification. This file typically includes:
-    * Metadata (like name, version, description).
-    * Input/Output schemas (if applicable, highly recommended for clarity and validation).
-    * The core configuration or logic of the resource (e.g., the `run` definition for a function, the properties of an
-      authentication policy).
-
-2. **Structure the Catalog**: Place the definition file within a directory structure that follows the
-   recommended [Catalog Structure](#catalog-structure). This typically involves grouping resources by type (e.g.,
-   `functions/`, `authentications/`) and then by name and version.
-
-3. **Host the Catalog**: Make the catalog directory structure accessible via a URI (e.g., host it in a Git repository,
-   on a web server, or in a shared file system accessible by the runtime).
-
-4. **Publish (Optional)**:
-    * For broader visibility and reuse, consider contributing your resource definitions to a public catalog, like the
-      official [Open Workflow Catalog](https://github.com/open-workflow-specification/catalog).
-    * For internal use, ensure the catalog is hosted where your organization's workflows can access it (e.g., an
-      internal Git server, artifact repository).
-
-**Example: Function Definition File (`function.yaml`)**
-
-<code-block lang="yaml" src="workflows/dsl-resource-catalog/creating-and-publishing-resources.yaml" include-lines="8-24"/>
-
-For a detailed walkthrough of creating a *custom function* and its `function.yaml` file, refer to the DSL concepts
-documentation regarding function creation. The principles outlined there for definition and structure can be adapted for
-other potential resource types based on future catalog specifications. 
+- [Function Calls](dsl-call-function.md)
+- [Catalogs in the Open Workflow reference](https://github.com/open-workflow-specification/specification/blob/v1.0.3/dsl-reference.md#catalog)

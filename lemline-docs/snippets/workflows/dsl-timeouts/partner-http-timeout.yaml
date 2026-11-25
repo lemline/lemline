@@ -1,0 +1,15 @@
+document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: partner-http-timeout
+  version: '1.0.0'
+do:
+  - readStock:
+      call: http
+      with:
+        method: get
+        endpoint: http://127.0.0.1:8787/stock
+        query:
+          delayMs: '2000'
+      timeout:
+        after: PT1S

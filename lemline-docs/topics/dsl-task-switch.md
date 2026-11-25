@@ -19,7 +19,7 @@ It's primarily used for:
 
 Here's an example of routing based on an input status field:
 
-<code-block lang="yaml" src="workflows/dsl-task-switch/basic-usage.yaml"/>
+<code-block lang="yaml" src="workflows/dsl-task-switch/switch-basic.yaml"/>
 
 In this example, the `decideNextStep` task inspects the `.status` field of its input. If it's "Approved", execution
 jumps to `processApproved`. If it's "Rejected", it jumps to `processRejected`. Otherwise, the default case triggers,
@@ -60,3 +60,26 @@ Targeted tasks typically have a `then: exit` to prevent further execution.
 <include from="_common-task-flow_control.md" element-id="common-flow-control"/>
 **Note**: The `Switch` task has unique flow control. Instead of using its own `then` property, flow continues based on the `then` property of the *matched* `case` within the `switch` block. If no case matches, flow follows the `Switch` task's own `then` property.
 
+## Run the Examples
+
+Complete the [SQLite setup](lemline-tutorial-setup.md) and leave the worker running. In the setup directory, save each workflow under the file name used below. Use the worker terminal to check the output of each instance.
+
+Run these registration and start commands from the setup directory.
+
+```bash
+bin/lemline definition post -f switch-basic.yaml
+bin/lemline instance start examples switch-basic --input '{"status":"Approved"}'
+bin/lemline instance start examples switch-basic --input '{"status":"Rejected"}'
+bin/lemline instance start examples switch-basic --input '{"status":"Pending"}'
+bin/lemline definition post -f validate-and-route-order.yaml
+bin/lemline instance start examples validate-and-route-order --input '{"orderId":"O-100","total":1250}'
+bin/lemline instance start examples validate-and-route-order --input '{"orderId":"O-101","total":75}'
+```
+
+| Example | Expected output |
+|---|---|
+| `switch-basic` with `{"status":"Approved"}` | `{"route":"approved"}` |
+| `switch-basic` with `{"status":"Rejected"}` | `{"route":"rejected"}` |
+| `switch-basic` with `{"status":"Pending"}` | `{"route":"manual-review"}` |
+| `validate-and-route-order` with `{"orderId":"O-100","total":1250}` | `{"orderId":"O-100","status":"needs-review"}` |
+| `validate-and-route-order` with `{"orderId":"O-101","total":75}` | `{"orderId":"O-101","status":"accepted"}` |

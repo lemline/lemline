@@ -1,0 +1,15 @@
+document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: http-decode-body
+  version: '1.0.0'
+do:
+  - downloadStock:
+      call: http
+      with:
+        method: get
+        endpoint: http://127.0.0.1:8787/stock
+        output: raw
+  - decodeStock:
+      set:
+        sku: ${ . | @base64d | fromjson | .sku }

@@ -1,0 +1,13 @@
+document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: fork-output-array
+  version: '1.0.0'
+do:
+  - gatherInfo:
+      fork:
+        branches:
+          - getUserProfile:
+              set: { profile: { name: Alice, id: 123 } }
+          - getUserOrders:
+              set: { orders: [ { orderId: O-100 }, { orderId: O-101 } ] }

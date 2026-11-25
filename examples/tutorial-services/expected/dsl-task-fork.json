@@ -1,0 +1,39 @@
+{
+  "instances": [
+    {
+      "type": "workflowCompleted",
+      "output": {
+        "customer": "Ada Lovelace",
+        "productId": "SKU-1"
+      }
+    },
+    {
+      "type": "workflowCompleted",
+      "output": {
+        "carrier": "express",
+        "price": 9
+      }
+    },
+    {
+      "type": "workflowCompleted",
+      "output": [
+        {
+          "profile": {
+            "name": "Alice",
+            "id": 123
+          }
+        },
+        {
+          "orders": [
+            {
+              "orderId": "O-100"
+            },
+            {
+              "orderId": "O-101"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

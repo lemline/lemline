@@ -1,0 +1,14 @@
+document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: for-loop-basic
+  version: '1.0.0'
+do:
+  - processNumbers:
+      for:
+        in: ${ .numbers }
+      do:
+        - describeNumber:
+            set:
+              position: ${ $index }
+              doubled: ${ $item * 2 }

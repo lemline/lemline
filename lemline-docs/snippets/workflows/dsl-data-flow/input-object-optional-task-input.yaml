@@ -1,19 +1,22 @@
 document:
-  dsl: 1.0.3
+  dsl: '1.0.3'
   namespace: examples
   name: input-object-optional-task-input
-  version: 1.0.0
+  version: '1.0.0'
 do:
-  - taskA:
-      set:
-        doubled: ${ $input.value * 2 }
+  - double:
       input:
         from: ${ .data }
         schema:
+          format: json
           document:
             type: object
-            required:
-              - data
+            required: [data]
             properties:
-              value:
-                type: number
+              data:
+                type: object
+                required: [value]
+                properties:
+                  value: { type: number }
+      set:
+        doubled: ${ $input.value * 2 }

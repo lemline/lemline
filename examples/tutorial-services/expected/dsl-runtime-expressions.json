@@ -1,0 +1,32 @@
+{
+  "instances": [
+    {
+      "type": "workflowCompleted",
+      "output": {
+        "message": "Ada selected SKU-1",
+        "quantity": 1
+      }
+    },
+    {
+      "type": "workflowCompleted",
+      "output": {
+        "orderId": "O-100",
+        "adjustedCount": 3,
+        "originalCount": 2
+      }
+    },
+    {
+      "type": "workflowCompleted",
+      "output": {
+        "quantity": 3
+      }
+    },
+    {
+      "type": "workflowCompleted",
+      "output": {
+        "status": 400,
+        "type": "~errors/expression$"
+      }
+    }
+  ]
+}

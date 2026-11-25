@@ -8,7 +8,6 @@ do:
       set:
         orderData:
           id: '${ $workflow.input.orderId // $workflow.id }'
-          createdAt: '${ (now | todateiso8601) }'
           status: "PENDING"
           customerName: ${ $workflow.input.customer.firstName + " " + $workflow.input.customer.lastName }
           priority: '${ $workflow.input.priority // "normal" }'
