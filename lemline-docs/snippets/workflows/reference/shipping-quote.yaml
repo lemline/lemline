@@ -4,8 +4,12 @@ document:
   name: shipping-quote
   version: '1.0.0'
 do:
-  - quote:
-      set:
-        orderId: ${ .orderId }
-        amount: 12.5
-        currency: EUR
+  - requestQuote:
+      call: http
+      with:
+        method: post
+        endpoint: http://127.0.0.1:8787/quotes/economy
+        body:
+          orderId: ${ .orderId }
+      output:
+        as: '${ { orderId: .orderId, carrier: .carrier, price: .price } }'

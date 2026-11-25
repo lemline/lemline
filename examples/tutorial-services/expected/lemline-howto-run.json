@@ -1,0 +1,9 @@
+{ "instances": [
+  { "type": "workflowCompleted", "output": "~^valid\\s*$" },
+  { "type": "workflowCompleted", "output": "~^invalid\\s*$" },
+  { "type": "workflowCompleted", "output": "~^valid\\s*$" },
+  { "type": "workflowCompleted", "output": "~^invalid\\s*$" },
+  { "type": "workflowFaulted", "error": { "title": "~Unknown run task type: RunContainer" } },
+  { "type": "workflowCompleted", "output": { "quote": { "orderId": "ORD-42", "carrier": "economy", "price": 5 } } }
+],
+  "state": { "quotes": [{ "orderId": "ORD-42", "carrier": "economy", "attempts": 1 }] } }
