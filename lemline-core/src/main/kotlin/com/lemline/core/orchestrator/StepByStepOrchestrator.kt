@@ -15,6 +15,7 @@ import com.lemline.core.nodes.Node
 import com.lemline.core.orchestrator.StepByStepOrchestrator.completeTask
 import com.lemline.core.orchestrator.StepByStepOrchestrator.processTaskFaulted
 import com.lemline.core.orchestrator.StepByStepOrchestrator.tryCatch
+import com.lemline.core.processors.RootProcessor
 import com.lemline.core.processors.TryProcessor
 import com.lemline.core.processors.scope.taskScope
 import com.lemline.core.states.ExtensionPhase
@@ -132,15 +133,18 @@ object StepByStepOrchestrator {
         val event = try {
             val node = workflow.getNode(command.nodePosition, functionResolver)
             when (command) {
-                is WorkflowCommand.ResumeFromTask -> resumeFromTask(
-                    nodeStack = nodeStack,
-                    node = node,
-                    rawInput = command.rawInput,
-                    flowDirective = command.flowDirective?.toJava(),
-                    extensionReturn = command.extensionReturn,
-                    workflowInfo = workflowInfo,
-                    lifecycleHook = lifecycleHook,
-                )
+                is WorkflowCommand.ResumeFromTask -> when (node.isWorkflowEntry(nodeStack)) {
+                    true -> startWorkflow(workflow, nodeStack, node, command, workflowInfo, lifecycleHook, functionResolver)
+                    false -> resumeFromTask(
+                        nodeStack = nodeStack,
+                        node = node,
+                        rawInput = command.rawInput,
+                        flowDirective = command.flowDirective?.toJava(),
+                        extensionReturn = command.extensionReturn,
+                        workflowInfo = workflowInfo,
+                        lifecycleHook = lifecycleHook,
+                    )
+                }
 
                 is WorkflowCommand.ResumeWithCompletedTask -> resumeFromCompletedTask(
                     nodeStack = nodeStack,
@@ -171,6 +175,45 @@ object StepByStepOrchestrator {
         // Failed selection/initialization has no resumable continuation. Close lifecycle
         // events above before dropping its transient pending frame from the terminal message.
         return if (event is WorkflowFaulted) event.copy(nodeStack = NodeStack(event.nodeStack.filter { it.state !is PendingTaskState })) else event
+    }
+
+    /** True when the workflow is about to enter its first task: `/do` has no frame yet. */
+    private fun Node<*>.isWorkflowEntry(nodeStack: NodeStack) =
+        position == NodePosition.doRoot && nodeStack[position] == null
+
+    /**
+     * Starts the workflow: applies the workflow-level `input.from`, then enters `/do` with the
+     * result. `$workflow.input` keeps the original input.
+     *
+     * A failing `input.from` faults the workflow at its root, since no task has started yet;
+     * `workflow.started` is still emitted first so that the lifecycle stays well-formed.
+     */
+    private suspend fun startWorkflow(
+        workflow: Workflow,
+        nodeStack: NodeStack,
+        doNode: Node<*>,
+        command: WorkflowCommand.ResumeFromTask,
+        workflowInfo: WorkflowInfo,
+        lifecycleHook: LifecycleEventHook,
+        functionResolver: suspend (String) -> Task,
+    ): WorkflowEvent {
+        val rootProcessor = workflow.getNode(NodePosition.root, functionResolver).processor as RootProcessor
+        val input = try {
+            rootProcessor.transformWorkflowInput(nodeStack, command.rawInput)
+        } catch (e: InternalException) {
+            val faultedAt = Clock.System.now()
+            lifecycleHook.onWorkflowStarted(workflowInfo, nodeStack, faultedAt)
+            return WorkflowFaulted(nodeStack, command.rawInput, null, null, e.error, faultedAt)
+        }
+        return resumeFromTask(
+            nodeStack = nodeStack,
+            node = doNode,
+            rawInput = input,
+            flowDirective = command.flowDirective?.toJava(),
+            extensionReturn = command.extensionReturn,
+            workflowInfo = workflowInfo,
+            lifecycleHook = lifecycleHook,
+        )
     }
 
     /**

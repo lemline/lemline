@@ -64,7 +64,7 @@ The body is serialized as JSON and sent with `Content-Type: application/json`. I
 
 ### Error Status Handling
 
-A response whose status is not 2xx makes the task fail with a `runtime` error whose title contains the status code and the response body (for example `HTTP 404: ...`). Network failures fail the task the same way. Catch them with `try`:
+A response whose status is not 2xx makes the task fail with a `communication` error. Its `status` is the HTTP status and its title contains the status code and the response body (for example `HTTP 404: ...`). A call that gets no response (unknown host, refused connection, timeout) also fails with a `communication` error, with status 500 and a title naming the server (for example `Unable to reach https://api.example.com: unresolved host`). Catch them with `try`, and add `status` to the filter to handle one status only:
 
 <code-block lang="yaml" src="workflows/lemline-ref-http/error-status-handling.yaml"/>
 

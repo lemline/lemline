@@ -64,6 +64,13 @@ bin/lemline instance start examples load-external-script --input '{"email":"not-
 The instances complete with `valid` and `invalid`. A `source.endpoint` that is not a `file://` URI faults with
 `Unsupported scheme for script source`.
 
+The endpoint is either a plain string or an object with a `uri` property. Both accept a
+runtime expression, for example `endpoint: ${ .scriptUri }`.
+
+The runner needs Node.js 22 or later for `js` scripts and Python 3.8 or later for `python`
+scripts.
+
+
 ## Run a container
 
 Set `run.container.image` and, if needed, a `command` and `volumes`.

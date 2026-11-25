@@ -95,6 +95,5 @@ Save it as `order-event-schedule.yaml`. Register it before starting the worker, 
 a workflow with `schedule.on` cannot be started with `instance start`. Each matching event starts a new instance,
 whose input is the list of events that started it; the workflow-level `input.from` takes the first one.
 The [emit example](#emit-an-order-event) shows it in action.
-
 See [Event Correlation](https://github.com/open-workflow-specification/specification/blob/v1.0.3/dsl-reference.md#correlation) for the expression scopes involved
 and the [Listen Task](https://github.com/open-workflow-specification/specification/blob/v1.0.3/dsl-reference.md#listen) for matching strategies and read modes.

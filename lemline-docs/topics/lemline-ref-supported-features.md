@@ -44,8 +44,7 @@ Lemline implements a subset of the Open Workflow DSL 1.0 specification, with mor
 | GraphQL | ✅ Supported | Send the query and variables as the body of a `call: http` POST |
 | Expression Evaluation | ✅ Supported | Via `set` construct |
 | Container Execution | ❌ Not supported | Parsed, but no runtime executor: a `run.container` task fails when it runs |
-| Script Execution | ⚠️ Partial | Inline `code`, or a `source.endpoint` with an absolute `file://` URI, in JavaScript or Python; other URI schemes are refused |
-| Event Emission | ✅ Supported | Via `emit` construct |
+| Script Execution | ⚠️ Partial | Inline `code`, or a `source.endpoint` with an absolute `file://` URI, in JavaScript or Python; other URI schemes are refused || Event Emission | ✅ Supported | Via `emit` construct |
 | Wait/Delay | ✅ Supported | Via `wait` construct |
 | Custom Function Calls | ⚠️ Partial | Functions declared under `use.functions` run; catalogs declared under `use.catalogs` are ignored ([issue 111](https://github.com/lemline/lemline/issues/111)) |
 

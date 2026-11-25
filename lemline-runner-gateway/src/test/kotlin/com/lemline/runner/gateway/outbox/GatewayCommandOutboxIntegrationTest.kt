@@ -210,15 +210,20 @@ abstract class GatewayCommandOutboxIntegrationTestBase(private val testDb: Orche
 
         immediateOutbox(emitter).processNow(entry.id)
 
+        // Wait for the recorded outcome, not for the attempt count: SQLite counts the attempt when
+        // it claims the row, before the send, so the count alone does not say the send happened.
         withTimeout(5_000) {
-            while (outboxRepository.findById(entry.id)?.outboxAttemptCount != 1) delay(10)
+            while (outboxRepository.findById(entry.id)?.outboxErrorClass == null) delay(10)
         }
         coVerify(exactly = 1) { emitter.send(any(), entry.id) }
         val stored = outboxRepository.findById(entry.id)!!
         stored.outboxCompletedAt shouldBe null
         stored.outboxFailedAt shouldBe null
         stored.outboxAttemptCount shouldBe 1
+        stored.outboxErrorClass shouldBe IllegalStateException::class.qualifiedName
+        // The retry backoff (5s +/- 20%), not the 60s deadline of a SQLite claim still in flight.
         stored.outboxDelayedUntil shouldNotBe null
+        (stored.outboxDelayedUntil!! < Clock.System.now() + 30.seconds) shouldBe true
         Unit
     }
 

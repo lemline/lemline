@@ -163,6 +163,24 @@ class DefinitionPostCommandTest {
         }
 
         @Test
+        fun `should return failure when the workflow is rejected`() {
+            coEvery { mockedDefinitionService.save(workflowModel, false) } throws
+                IllegalArgumentException("Task name call is reserved")
+
+            cmd.execute("--file", workflowFile.absolutePath) shouldBeGreaterThan 0
+            errStream.toString() shouldContain workflowFile.absolutePath
+            errStream.toString() shouldContain "Task name call is reserved"
+        }
+
+        @Test
+        fun `should return failure when the workflow could not be stored`() {
+            coEvery { mockedDefinitionService.save(workflowModel, false) } returns SaveResult.FAILED
+
+            cmd.execute("--file", workflowFile.absolutePath) shouldBeGreaterThan 0
+            errStream.toString() shouldContain "Failed to save workflow"
+        }
+
+        @Test
         fun `should handle non-existent file`() {
             // Given
             val nonExistentFile = File(tempDir, "non-existent.yaml")
@@ -228,6 +246,17 @@ class DefinitionPostCommandTest {
             outStream.toString() shouldContain "recursively"
             // Should process all 3 files (2 in main dir + 1 in nested dir)
             coVerify(exactly = 3) { mockedDefinitionService.save(workflowModel, false) }
+        }
+
+        @Test
+        fun `should process all files and return failure when one fails`() {
+            workflowFile1.writeText("invalid workflow")
+            every { DefinitionModel.from("invalid workflow") } throws IllegalArgumentException("Invalid workflow")
+
+            cmd.execute("--directory", workflowDir.absolutePath) shouldBeGreaterThan 0
+            errStream.toString() shouldContain workflowFile1.absolutePath
+            outStream.toString() shouldContain "successfully created"
+            coVerify(exactly = 1) { mockedDefinitionService.save(workflowModel, false) }
         }
 
         @Test

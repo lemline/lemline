@@ -7,6 +7,7 @@ import com.lemline.common.json.LemlineJson
 import com.lemline.common.logger.logger
 import com.lemline.core.activities.ActivityExecutor
 import com.lemline.core.cloudevents.CloudEventFactory
+import com.lemline.core.errors.CommunicationException
 import com.lemline.core.processors.CallHttpConfig
 import com.lemline.core.processors.EmitConfig
 import com.lemline.core.processors.HttpAuthentication
@@ -32,6 +33,8 @@ import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.serverlessworkflow.api.types.HTTPArguments.HTTPOutput
 import java.io.File
+import java.io.IOException
+import java.nio.channels.UnresolvedAddressException
 import java.util.*
 
 /**
@@ -65,15 +68,20 @@ class DefaultActivityExecutor(
                 connectTimeoutMillis = 15000
                 socketTimeoutMillis = 30000
             }
-            install(HttpRedirect) {
-                checkHttpMethod = false
-                allowHttpsDowngrade = true
-            }
             followRedirects = false
         }
     }
 
-    private val a2a by lazy { A2AActivity(httpClient) }
+    private val redirectingHttpClient by lazy {
+        httpClient.config {
+            install(HttpRedirect) {
+                checkHttpMethod = false
+                allowHttpsDowngrade = true
+            }
+        }
+    }
+
+    private val a2a by lazy { A2AActivity(redirectingHttpClient) }
 
     override suspend fun execute(event: ActivityStarted): JsonNode = when (event) {
         is EmitStarted -> executeEmit(event.config, event.input)
@@ -114,21 +122,22 @@ class DefaultActivityExecutor(
         val url = urlBuilder.build()
         logger.debug { "Executing HTTP ${config.method} $url (query=${config.query}, redirect=${config.redirect})" }
 
-        val response: HttpResponse = httpClient.config {
-            followRedirects = config.redirect
-        }.request(url) {
-            this.method = method
+        val response: HttpResponse = reaching(url) {
+            val client = if (config.redirect) redirectingHttpClient else httpClient
+            client.request(url) {
+                this.method = method
 
-            // Set headers
-            config.headers.forEach { (key, value) -> header(key, value) }
+                // Set headers
+                config.headers.forEach { (key, value) -> header(key, value) }
 
-            // Set authentication
-            config.authentication?.let { header(HttpHeaders.Authorization, it.authorizationHeader()) }
+                // Set authentication
+                config.authentication?.let { header(HttpHeaders.Authorization, it.authorizationHeader()) }
 
-            // Set body
-            if (config.body != null && (method == HttpMethod.Post || method == HttpMethod.Put || method == HttpMethod.Patch)) {
-                contentType(ContentType.Application.Json)
-                setBody(config.body.toString())
+                // Set body
+                if (config.body != null && (method == HttpMethod.Post || method == HttpMethod.Put || method == HttpMethod.Patch)) {
+                    contentType(ContentType.Application.Json)
+                    setBody(config.body.toString())
+                }
             }
         }
 
@@ -137,7 +146,7 @@ class DefaultActivityExecutor(
         // Check status
         if (!response.status.isSuccess()) {
             val body = response.bodyAsText()
-            throw RuntimeException("HTTP ${response.status.value}: $body")
+            throw CommunicationException("HTTP ${response.status.value}: $body", response.status.value)
         }
 
         val result = when (config.output) {
@@ -166,6 +175,25 @@ class DefaultActivityExecutor(
         }
         logger.debug { "HTTP response parsed as ${config.output}: $result" }
         return result
+    }
+
+    /**
+     * Reports a service that gave no answer (unknown host, refused connection, timeout)
+     * as a communication failure. The message names the server only: the path and the
+     * query of the URL may carry credentials.
+     */
+    private suspend fun <T> reaching(url: Url, call: suspend () -> T): T {
+        fun unreachable(reason: String?, cause: Exception): Nothing = throw CommunicationException(
+            "Unable to reach ${url.protocol.name}://${url.hostWithPortIfSpecified}: ${reason ?: cause::class.simpleName}",
+            cause = cause,
+        )
+        return try {
+            call()
+        } catch (e: UnresolvedAddressException) {
+            unreachable("unresolved host", e)
+        } catch (e: IOException) {
+            unreachable(e.message, e)
+        }
     }
 
     private suspend fun parseResponseContent(response: HttpResponse): JsonNode {

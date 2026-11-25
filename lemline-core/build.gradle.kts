@@ -82,9 +82,6 @@ dependencies {
     implementation("io.ktor:ktor-serialization-jackson")
     implementation("io.ktor:ktor-client-auth")
 
-    // YAML support for Kotlin serialization
-    implementation("com.charleskorn.kaml:kaml:0.104.0")
-
     // XML support for Kotlin serialization
     implementation("io.github.pdvrieze.xmlutil:core-jvmcommon:1.0.2.1")
     implementation("io.github.pdvrieze.xmlutil:serialization-jvm:1.0.2.1")

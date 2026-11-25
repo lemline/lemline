@@ -7,6 +7,7 @@ import com.lemline.common.json.*
 import com.lemline.common.logger.logger
 import com.lemline.core.activities.ActivityExecutor
 import com.lemline.core.cloudevents.CloudEventFactory
+import com.lemline.core.errors.CommunicationException
 import com.lemline.core.states.WorkflowEvent.ActivityStarted
 import com.lemline.core.states.WorkflowEvent.CallA2AStarted
 import com.lemline.core.states.WorkflowEvent.CallHttpStarted
@@ -80,8 +81,13 @@ class MockActivityExecutor(
 
         logger.debug { "Mock: HTTP mock matched for ${config.method} ${config.url}" }
 
-        if (mock.response.error != null) {
-            throw MockedActivityException(mock.response.error)
+        // Fail as a real call does: a communication error carrying the HTTP status.
+        // An error without a failing status models a call that got no response.
+        val status = mock.response.status
+        val failed = status !in 200..299
+        if (failed || mock.response.error != null) {
+            val title = mock.response.error ?: "HTTP $status: ${mock.response.body ?: ""}"
+            throw if (failed) CommunicationException(title, status) else CommunicationException(title)
         }
 
         return mock.response.body ?: ObjectNode(emptyMap())

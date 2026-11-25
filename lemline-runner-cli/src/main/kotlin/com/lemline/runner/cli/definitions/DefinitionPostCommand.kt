@@ -8,9 +8,11 @@ import com.lemline.runner.definitions.DefinitionService.SaveResult
 import io.quarkus.arc.Unremovable
 import jakarta.inject.Inject
 import java.io.File
+import java.util.concurrent.Callable
 import kotlinx.coroutines.runBlocking
 import picocli.CommandLine
 import picocli.CommandLine.Command
+import picocli.CommandLine.ExitCode
 import picocli.CommandLine.Mixin
 import picocli.CommandLine.Option
 
@@ -19,7 +21,7 @@ import picocli.CommandLine.Option
     name = "post",
     description = ["Create or update workflows from definition files."],
 )
-class DefinitionPostCommand : Runnable {
+class DefinitionPostCommand : Callable<Int> {
 
     @Mixin
     lateinit var mixin: GlobalMixin
@@ -54,7 +56,7 @@ class DefinitionPostCommand : Runnable {
     )
     var force: Boolean = false
 
-    override fun run() = runBlocking {
+    override fun call(): Int = runBlocking {
 
         // Validate that the recursive option is used with directories
         if (recursive && directories.isEmpty()) {
@@ -72,18 +74,17 @@ class DefinitionPostCommand : Runnable {
             )
         }
 
-        // Process files if provided
+        var successful = true
         files.forEach { file ->
-            processSingleFile(file)
+            if (!processSingleFile(file)) successful = false
         }
-
-        // Process directories if provided
         directories.forEach { directory ->
-            processDirectory(directory)
+            if (!processDirectory(directory)) successful = false
         }
+        if (successful) ExitCode.OK else ExitCode.SOFTWARE
     }
 
-    private suspend fun processSingleFile(file: File) {
+    private suspend fun processSingleFile(file: File): Boolean {
         if (!file.exists()) {
             throw CommandLine.ParameterException(
                 CommandLine(this@DefinitionPostCommand),
@@ -96,10 +97,10 @@ class DefinitionPostCommand : Runnable {
                 "The specified path is not a regular file: ${file.absolutePath}"
             )
         }
-        processWorkflowFile(file)
+        return processWorkflowFile(file)
     }
 
-    internal suspend fun processDirectory(directory: File) {
+    internal suspend fun processDirectory(directory: File): Boolean {
         if (!directory.exists()) {
             throw CommandLine.ParameterException(
                 CommandLine(this@DefinitionPostCommand),
@@ -114,6 +115,7 @@ class DefinitionPostCommand : Runnable {
         }
         println("Processing files in directory: ${directory.absolutePath}" + if (recursive) " (recursively)" else "")
 
+        var successful = true
         var filesProcessed = 0
         val filesToProcess = when (recursive) {
             true -> directory.walkTopDown().filter { it.isFile }
@@ -121,34 +123,37 @@ class DefinitionPostCommand : Runnable {
         }
 
         filesToProcess.forEach { file ->
-            processWorkflowFile(file)
+            if (!processWorkflowFile(file)) successful = false
             filesProcessed++
         }
 
         if (filesProcessed == 0) {
             println("No files found in directory: ${directory.absolutePath}")
         }
+        return successful
     }
 
     /**
      * Processes a single workflow definition file.
      */
-    internal suspend fun processWorkflowFile(file: File) {
+    internal suspend fun processWorkflowFile(file: File): Boolean {
         val prefix = "  ->"
-        try {
+        return try {
             val content = file.readText()
             val model = DefinitionModel.from(content)
             val workflowName = "'${model.name}' (version '${model.version}')"
 
-            when (definitionService.save(model, force)) {
+            val result = definitionService.save(model, force)
+            when (result) {
                 SaveResult.CREATED -> println("$prefix Workflow successfully created: $workflowName")
                 SaveResult.UPDATED -> println("$prefix Workflow successfully updated: $workflowName")
                 SaveResult.ALREADY_EXISTS -> println("$prefix Workflow already exists (use --force to overwrite): $workflowName")
                 SaveResult.FAILED -> System.err.println("$prefix Failed to save workflow: $workflowName")
             }
+            result != SaveResult.FAILED
         } catch (e: Exception) {
-            // Log error for the specific file but continue if processing a directory
             System.err.println("ERROR processing file '${file.absolutePath}': ${e.message}")
+            false
         }
     }
 }

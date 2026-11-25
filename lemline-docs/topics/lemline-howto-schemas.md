@@ -96,7 +96,6 @@ bin/lemline instance start examples default-workflow-input --input '{"orderId":"
 ```
 
 Expect `{"orderId":"ORD-2","priority":"NORMAL","currency":"USD"}`, then `{"orderId":"ORD-3","priority":"NORMAL","currency":"EUR"}`.
-
 The workflow-level `input.from` expression merges defaults with the input before the first task runs. Values supplied by the caller take precedence. `$workflow.input` still holds the input as the caller supplied it.
 
 ### Accessing Validated Input

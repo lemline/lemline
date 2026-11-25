@@ -23,6 +23,7 @@ import com.sun.net.httpserver.HttpServer
 import io.serverlessworkflow.api.types.A2AArguments.WithA2AMethod
 import java.io.File
 import java.net.InetSocketAddress
+import java.net.ServerSocket
 import java.net.URI
 import java.nio.file.Path
 import java.util.UUID
@@ -40,6 +41,7 @@ class A2AActivityTest {
     private val document = "document: {dsl: '1.0.3', namespace: test, name: a2a, version: '1.0.0'}\n"
     private val observe = """  - observe: {set: {observed: '${'$'}{ . }'}}"""
     private val runtime = "https://serverlessworkflow.io/spec/1.0.0/errors/runtime"
+    private val communication = "https://serverlessworkflow.io/spec/1.0.0/errors/communication"
     private val executor = DefaultActivityExecutor()
 
     private class Agent(val v1: Boolean = false) : AutoCloseable {
@@ -244,11 +246,65 @@ class A2AActivityTest {
                     val e = assertFailsWith<InternalException> {
                         run(workflow(method, agent.base), parseJson("""{"params":{"id":"t"}}"""))
                     }
-                    assertEquals(runtime, e.error.type)
+                    assertEquals(communication, e.error.type)
                     assertEquals("/do/0/ask", e.error.position)
                     assertEquals(listOf(method), agent.calls.map { it["method"].asText() })
                 }
             }
+        }
+    }
+
+    @TestFactory
+    fun `an agent answering a failing HTTP status raises a communication error carrying that status`() =
+        listOf("message/send", "message/stream").map { method ->
+            dynamicTest(method) {
+                runBlocking {
+                    Agent().use { agent ->
+                        agent.reply = { exchange, _ -> exchange.respond("application/json", """{"error":"busy"}""", status = 503) }
+                        val e = assertFailsWith<InternalException> {
+                            run(workflow(method, agent.base), parseJson("""{"params":{"message":{"parts":[]}}}"""))
+                        }
+                        assertEquals(communication, e.error.type)
+                        assertEquals(503, e.error.status)
+                        assertEquals("/do/0/ask", e.error.position)
+                        assertContains(e.error.details.orEmpty(), """HTTP 503: {"error":"busy"}""")
+                    }
+                }
+            }
+        }
+
+    @Test
+    fun `an unreachable agent raises a communication error`() = runBlocking {
+        // Bind then release a port so that nothing listens on it.
+        val port = ServerSocket(0).use { it.localPort }
+        val e = assertFailsWith<InternalException> {
+            run(workflow("tasks/list", "http://127.0.0.1:$port"), parseJson("""{"params":{}}"""))
+        }
+        assertEquals(communication, e.error.type)
+        assertEquals(500, e.error.status)
+        assertContains(e.error.details.orEmpty(), "Unable to reach http://127.0.0.1:$port")
+    }
+
+    @Test
+    fun `DSL catch filters agent failures on the communication type and the HTTP status`() = runBlocking {
+        Agent().use { agent ->
+            agent.reply = { exchange, request ->
+                if (agent.calls.size == 1) exchange.respond("application/json", "busy", status = 503)
+                else exchange.respond("application/json", """{"jsonrpc":"2.0","id":${request["id"]},"result":{"reply":"ok"}}""")
+            }
+            val yaml = document + """
+                do:
+                  - guarded:
+                      try:
+                        - ask:
+                            call: a2a
+                            with: {method: tasks/get, server: '${agent.base}', parameters: {id: t}}
+                      catch:
+                        errors: {with: {type: '$communication', status: 503}}
+                        retry: {delay: {milliseconds: 1}, limit: {attempt: {count: 1}}}
+            """.trimIndent() + "\n" + observe
+            assertEquals(parseJson("""{"reply":"ok"}"""), run(yaml)["observed"])
+            assertEquals(2, agent.calls.size)
         }
     }
 
@@ -528,10 +584,10 @@ class A2AActivityTest {
             respond("text/event-stream", body, if (truncate) 100 else 0)
         }
 
-        private fun HttpExchange.respond(type: String, body: String, missingBytes: Int = 0) {
+        private fun HttpExchange.respond(type: String, body: String, missingBytes: Int = 0, status: Int = 200) {
             val bytes = body.toByteArray()
             responseHeaders.add("Content-Type", type)
-            sendResponseHeaders(200, bytes.size.toLong() + missingBytes)
+            sendResponseHeaders(status, bytes.size.toLong() + missingBytes)
             responseBody.write(bytes)
         }
     }

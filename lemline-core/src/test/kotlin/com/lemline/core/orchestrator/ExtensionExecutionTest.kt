@@ -351,10 +351,14 @@ class ExtensionExecutionTest {
                                 - result: { set: { stopped: true }, then: $directive }
                           - finish: { set: { ignored: true } }
                 do:
-                  - owner: { set: { body: true } }
+                  - owner:
+                      set: { body: true }
+                      output: { as: '§{ { owner: . } }' }
                   - last: { set: { last: true } }
+                output:
+                  as: '§{ { result: . } }'
             """)
-            assertEquals(parseJson(if (directive == "end") """{"stopped":true}""" else """{"last":true}"""), run(workflow))
+            assertEquals(parseJson(if (directive == "end") """{"result":{"stopped":true}}""" else """{"result":{"last":true}}"""), run(workflow))
         }
     }
 
