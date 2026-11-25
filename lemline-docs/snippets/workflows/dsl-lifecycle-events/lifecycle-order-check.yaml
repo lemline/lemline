@@ -1,0 +1,37 @@
+document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: lifecycle-order-check
+  version: '1.0.0'
+do:
+  - rejectOrder:
+      if: ${ .mode == "fault" }
+      raise:
+        error:
+          type: https://errors.example.com/order-rejected
+          status: 422
+          title: Order rejected
+  - processOrder:
+      try:
+        - transientCheck:
+            if: ${ .mode == "retry" }
+            raise:
+              error:
+                type: https://errors.example.com/temporary-order-check
+                status: 503
+                title: Temporary check failure
+        - approve:
+            set:
+              orderId: ${ .orderId }
+              status: approved
+      catch:
+        retry:
+          delay: PT1S
+          limit:
+            attempt:
+              count: 1
+        do:
+          - recover:
+              set:
+                orderId: ${ $workflow.input.orderId }
+                status: recovered
