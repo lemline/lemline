@@ -44,7 +44,7 @@ Lemline implements a subset of the Open Workflow DSL 1.0 specification, with mor
 | GraphQL | ⚠️ Planned | On roadmap for future release |
 | Expression Evaluation | ✅ Supported | Via `set` construct |
 | Container Execution | ⚠️ Partial | Basic support via `run` construct |
-| Script Execution | ⚠️ Partial | Basic JavaScript support |
+| Script Execution | ⚠️ Partial | JavaScript and Python, inline or loaded from a `file://` endpoint |
 | Event Emission | ✅ Supported | Via `emit` construct |
 | Wait/Delay | ✅ Supported | Via `wait` construct |
 | Custom Function Calls | ✅ Supported | Via function catalog |
