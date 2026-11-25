@@ -1,9 +1,12 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.activities.mock
 
-import com.charleskorn.kaml.Yaml
-import com.charleskorn.kaml.YamlConfiguration
+import com.fasterxml.jackson.databind.DeserializationFeature
+import com.fasterxml.jackson.dataformat.yaml.YAMLParser
+import com.lemline.common.json.LemlineJson
+import com.lemline.common.json.toKotlinTree
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.decodeFromJsonElement
 import java.io.File
 
 /**
@@ -12,15 +15,13 @@ import java.io.File
  * Supports both YAML and JSON formats. The format is automatically detected
  * based on file extension (.yaml, .yml for YAML; .json for JSON).
  *
- * Uses kotlinx.serialization with kaml for YAML support.
+ * YAML is read as a data tree before decoding with the same serializers as JSON.
  */
 object MockConfigurationParser {
 
-    private val yaml = Yaml(
-        configuration = YamlConfiguration(
-            strictMode = false
-        )
-    )
+    private val yaml = LemlineJson.yamlMapper.reader()
+        .with(YAMLParser.Feature.PARSE_BOOLEAN_LIKE_WORDS_AS_STRINGS)
+        .with(DeserializationFeature.FAIL_ON_READING_DUP_TREE_KEY, DeserializationFeature.FAIL_ON_TRAILING_TOKENS)
 
     private val json = Json {
         ignoreUnknownKeys = true
@@ -61,7 +62,7 @@ object MockConfigurationParser {
      */
     fun fromYaml(content: String): MockConfiguration {
         if (content.isBlank()) return MockConfiguration.empty()
-        return yaml.decodeFromString(MockConfiguration.serializer(), content)
+        return json.decodeFromJsonElement(yaml.readTree(content).toKotlinTree())
     }
 
     /**
