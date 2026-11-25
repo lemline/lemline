@@ -33,6 +33,14 @@
         "quantity": 4,
         "canReserve": true
       }
+    },
+    {
+      "workflow": "examples/child-stock-check:1.0.0",
+      "type": "workflowCompleted",
+      "output": {
+        "quantity": 5,
+        "canReserve": true
+      }
     }
   ],
   "instances": [
@@ -65,10 +73,17 @@
     {
       "type": "workflowCompleted",
       "output": {
-        "quantity": 4,
-        "canReserve": true
+        "code": 0,
+        "stdout": "{\"quantity\":4,\"canReserve\":true}",
+        "stderr": ""
       }
     },
-    null
+    {
+      "type": "workflowCompleted",
+      "output": {
+        "quantity": 5,
+        "canReserve": true
+      }
+    }
   ]
 }

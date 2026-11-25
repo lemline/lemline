@@ -33,15 +33,10 @@ This parent catches the error raised by the child when the quantity is zero.
 
 ## Select the Latest Version
 
-The DSL uses `version: latest` to select the current version when starting the child.
+Use `version: latest` to select the latest registered version of the child in the named namespace
+when starting it.
 
 <code-block lang="yaml" src="workflows/dsl-run-workflow/parent-latest-stock-check.yaml"/>
-
-> **Lemline**
->
-> The worker currently looks for a definition with the literal version `latest`. It logs that the
-> child definition was not found and the waiting parent does not complete. Use an explicit version, as in
-> `parent-stock-check`. [Issue #122](https://github.com/lemline/lemline/issues/122) tracks version resolution.
 
 ## Request All Process Results
 
@@ -51,8 +46,8 @@ For an awaited process, `return: all` asks for the exit code and the standard re
 
 > **Lemline**
 >
-> For a child workflow, `return: all` currently returns the child’s output directly. A child
-> fault propagates as an error and can be caught in the parent. [Issue #123](https://github.com/lemline/lemline/issues/123) tracks the result format.
+> A successful child returns `code: 0`, its output as text in `stdout`, and an empty `stderr`.
+> Structured output is serialized as JSON. A child fault propagates to the parent’s error handlers.
 
 ## Configuration Options
 
@@ -107,10 +102,10 @@ sleep 20
 | `parent-stock-check` | Awaits its child and returns `{"canReserve":true}`. |
 | `parent-submit-stock-check` | Returns `{"submittedQuantity":3}`. The child independently returns `{"quantity":3,"canReserve":true}`. |
 | `parent-handle-stock-error` | The child faults. The parent returns `{"status":422,"reason":"Quantity must be positive"}`. |
-| `parent-stock-result` | Lemline returns the child’s raw output, `{"quantity":4,"canReserve":true}`. |
-| `parent-latest-stock-check` | The worker logs `Workflow child-stock-check (version=latest) not found` and the waiting parent produces no result. |
+| `parent-stock-result` | Returns `{"code":0,"stdout":"{\"quantity\":4,\"canReserve\":true}","stderr":""}`. |
+| `parent-latest-stock-check` | Runs the registered version of `child-stock-check` and returns `{"quantity":5,"canReserve":true}`. |
 
-Use the worker terminal to check the four runnable parents and the lookup error for the final example. When those results are visible, stop the shop from the source checkout.
+When the parent and child results are visible in the worker terminal, stop the shop from the source checkout.
 
 ```bash
 docker compose -f examples/tutorial-services/compose.yaml down
