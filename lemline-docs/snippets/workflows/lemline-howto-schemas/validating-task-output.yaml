@@ -1,8 +1,8 @@
 document:
-  dsl: 1.0.3
+  dsl: '1.0.3'
   namespace: examples
   name: validating-task-output
-  version: 1.0.0
+  version: '1.0.0'
 do:
   - GenerateOrderSummary:
       set:
@@ -59,4 +59,3 @@ do:
                   total:
                     type: number
                     minimum: 0
-      then: end

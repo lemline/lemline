@@ -1,8 +1,8 @@
 document:
-  dsl: 1.0.3
+  dsl: '1.0.3'
   namespace: examples
   name: accessing-validated-input
-  version: 1.0.0
+  version: '1.0.0'
 do:
   - ProcessCustomer:
       set:
@@ -12,4 +12,3 @@ do:
           address: ${ $workflow.input.address }
           phone: ${ $workflow.input.phoneNumber // "Not provided" }
           preferredContact: ${ $workflow.input.preferredContact }
-      then: end

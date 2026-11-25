@@ -1,16 +1,18 @@
 document:
-  dsl: 1.0.3
+  dsl: '1.0.3'
   namespace: examples
   name: output-transformation-and-validation
-  version: 1.0.0
+  version: '1.0.0'
 do:
-  - ProcessAPIResponse:
-      call: externalAPI
+  - findProducts:
+      call: http
       with:
-        endpoint: /data
-        parameters: ${ .queryParams }
+        method: get
+        endpoint: http://127.0.0.1:8787/products
+        query:
+          category: ${ .category }
       output:
-        as: '${ if .code == 200 then { status: "SUCCESS", data: .body.data } else { status: "ERROR", error: .body.error } end }'
+        as: '${ if (.items | length) > 0 then { status: "SUCCESS", data: { items: [.items[].id] } } else { status: "ERROR", error: { message: "No products in this category" } } end }'
         schema:
           document:
             type: object
@@ -44,4 +46,3 @@ do:
                 then:
                   required:
                     - error
-      then: end

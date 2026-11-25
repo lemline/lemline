@@ -1,15 +1,17 @@
 document:
-  dsl: 1.0.3
+  dsl: '1.0.3'
   namespace: examples
   name: validating-task-input
-  version: 1.0.0
+  version: '1.0.0'
 do:
-  - ProcessPayment:
-      call: paymentService
+  - requestPayment:
+      call: http
       with:
-        amount: ${ .amount }
-        currency: ${ .currency }
-        paymentMethod: ${ .paymentMethod }
+        method: post
+        endpoint: http://127.0.0.1:8787/audit
+        body:
+          reference: ${ .paymentMethod.token }
+          message: '${ "Payment of \(.amount) \(.currency) requested" }'
       input:
         schema:
           document:
@@ -42,4 +44,3 @@ do:
                       - BANK_TRANSFER
                   token:
                     type: string
-      then: end

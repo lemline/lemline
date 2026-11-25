@@ -1,16 +1,17 @@
 document:
-  dsl: 1.0.3
+  dsl: '1.0.3'
   namespace: examples
   name: export-schema-validation
-  version: 1.0.0
+  version: '1.0.0'
 do:
-  - FetchCustomerData:
-      call: customerService
+  - fetchCustomerData:
+      call: http
       with:
-        customerId: ${ .customerId }
+        method: get
+        endpoint: ${ "http://127.0.0.1:8787/customers/" + .customerId }
       export:
         as:
-          customer: ${ .data }
+          customer: ${ . }
         schema:
           document:
             type: object
@@ -23,7 +24,7 @@ do:
                   - id
                   - name
                   - email
-                  - status
+                  - tier
                 properties:
                   id:
                     type: string
@@ -32,10 +33,11 @@ do:
                   email:
                     type: string
                     format: email
-                  status:
+                  tier:
                     type: string
                     enum:
-                      - ACTIVE
-                      - INACTIVE
-                      - PENDING
-      then: end
+                      - gold
+                      - standard
+  - greetCustomer:
+      set:
+        greeting: ${ "Hello " + $context.customer.name }
