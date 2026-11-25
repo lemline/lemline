@@ -66,7 +66,7 @@ class ForkService {
         val workflow = workflowInfo.getWorkflow() ?: error("Workflow definition not found: $workflowInfo")
 
         @Suppress("UNCHECKED_CAST")
-        val forkNode = workflow.getNode(forkStarted.nodePosition, functionResolver::resolve) as Node<ForkTask>
+        val forkNode = workflow.getNode(forkStarted.nodePosition, functionResolver.forWorkflow(workflow)) as Node<ForkTask>
         val isCompete = forkNode.task.fork.isCompete
         val branches = forkNode.branches
 

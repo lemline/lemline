@@ -4,6 +4,8 @@ package com.lemline.runner.listeners
 import com.lemline.common.json.*
 import com.lemline.common.values.WorkflowNamespace
 import com.lemline.common.values.info
+import com.lemline.core.activities.mock.MockConfiguration
+import com.lemline.core.activities.mock.MockFunctionResolver
 import com.lemline.core.workflows.WorkflowCache
 import io.cloudevents.CloudEvent
 import io.cloudevents.core.builder.CloudEventBuilder
@@ -2406,10 +2408,9 @@ class DefinitionListenServiceTest {
                 healthy.info to com.lemline.common.values.NodePosition("/_fn/https:~1~1example.com~1listen.yaml/do/0/ready"),
             )
         }
-        service.functionResolver = io.mockk.mockk {
-            io.mockk.coEvery { resolve("https://example.com/missing.yaml") } throws IllegalStateException("unavailable")
-            io.mockk.coEvery { resolve("https://example.com/listen.yaml") } returns function
-        }
+        service.functionResolver = MockFunctionResolver(
+            MockConfiguration(functionDefinitions = mapOf("https://example.com/listen.yaml" to function))
+        )
 
         service.prepareFunctionListeners(namespace)
 
