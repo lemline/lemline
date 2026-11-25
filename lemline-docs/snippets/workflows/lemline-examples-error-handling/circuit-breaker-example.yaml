@@ -1,8 +1,8 @@
 document:
-  dsl: 1.0.3
+  dsl: '1.0.3'
   namespace: examples
   name: circuit-breaker
-  version: 0.1.0
+  version: '1.0.0'
 use:
   retries:
     circuitBreaker:
@@ -20,7 +20,10 @@ do:
             call: http
             with:
               method: get
-              endpoint: https://api.example.com/data
+              endpoint: http://127.0.0.1:8787/stock
+              query:
+                fail: '503'
+                key: ${ $workflow.id }
       catch:
         errors:
           with:

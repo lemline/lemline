@@ -2,23 +2,26 @@ document:
   dsl: '1.0.3'
   namespace: examples
   name: conditional-retry
-  version: '0.1.0'
+  version: '1.0.0'
 do:
-  - tryProcessPayment:
+  - tryReadStock:
       try:
-        - processPayment:
+        - readStock:
             call: http
             with:
-              method: post
-              endpoint: https://payments.example.com/api/process
-              body: ${ .paymentDetails }
+              method: get
+              endpoint: http://127.0.0.1:8787/stock
+              query:
+                fail: ${ .failStatus | tostring }
+                failTimes: '1'
+                key: ${ $workflow.id }
       catch:
         errors:
           with:
             type: https://open-workflow-specification.org/spec/1.0.0/errors/runtime
-        as: paymentError
+        as: stockError
         retry:
-          when: '${ $paymentError.title | test("^HTTP (5[0-9][0-9]|429)") }'
+          when: '${ $stockError.title | test("^HTTP (5[0-9][0-9]|429)") }'
           delay:
             seconds: 2
           backoff:

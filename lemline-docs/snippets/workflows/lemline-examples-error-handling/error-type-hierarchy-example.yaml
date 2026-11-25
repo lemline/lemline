@@ -1,24 +1,29 @@
 document:
-  dsl: 1.0.3
+  dsl: '1.0.3'
   namespace: examples
   name: error-hierarchy
-  version: 0.1.0
+  version: '1.0.0'
 do:
-  - tryApiOperation:
+  - tryCheckEmail:
       try:
-        - callApi:
+        - checkEmail:
             call: http
             with:
               method: post
-              endpoint: https://api.example.com/resource
-              body: ${ .requestData }
-        - rejectInvalidResource:
+              endpoint: http://127.0.0.1:8787/email-checks
+              query:
+                fail: '503'
+                failTimes: ${ if .serviceDown then "1" else "0" end }
+                key: ${ $workflow.id }
+              body:
+                email: ${ .email }
+        - rejectInvalidEmail:
             if: ${ .valid == false }
             raise:
               error:
                 type: https://example.com/errors/api/validation
                 status: 422
-                title: Invalid resource
+                title: Invalid email
       catch:
         when: ${ $error.type | startswith("https://example.com/errors") }
         as: error

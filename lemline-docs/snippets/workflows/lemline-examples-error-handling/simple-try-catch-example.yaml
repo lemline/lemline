@@ -1,15 +1,15 @@
 document:
   dsl: '1.0.3'
-  namespace: default
-  name: try-catch
-  version: '0.1.0'
+  namespace: examples
+  name: catch-missing-product
+  version: '1.0.0'
 do:
-  - tryGetPet:
+  - tryGetProduct:
       try:
-        - getPet:
+        - getProduct:
             call: http
             with:
               method: get
-              endpoint: '${ "https://petstore.swagger.io/v2/pet/" + ($workflow.input.petId | tostring) }'
+              endpoint: '${ "http://127.0.0.1:8787/products/" + $workflow.input.productId + (if $workflow.input.failStatus then "?fail=\($workflow.input.failStatus)" else "" end) }'
       catch:
         when: ${ $error.title | startswith("HTTP 404") }

@@ -1,8 +1,8 @@
 document:
-  dsl: 1.0.3
+  dsl: '1.0.3'
   namespace: examples
   name: compensating-transaction
-  version: 0.1.0
+  version: '1.0.0'
 do:
   - processOrder:
       try:
@@ -10,30 +10,34 @@ do:
             call: http
             with:
               method: post
-              endpoint: https://inventory.example.com/api/reserve
-              body: ${ .orderItems }
+              endpoint: http://127.0.0.1:8787/reservations
+              body:
+                orderId: ${ .orderId }
+                items: ${ .orderItems }
             export:
               as: '${ $context + { inventoryReservation: . } }'
         - processPayment:
             call: http
             with:
               method: post
-              endpoint: https://payments.example.com/api/charge
-              body: ${ $workflow.input.paymentDetails }
+              endpoint: http://127.0.0.1:8787/charges
+              body:
+                orderId: ${ $workflow.input.orderId }
+                paymentInfo: ${ $workflow.input.paymentDetails }
       catch:
         as: paymentError
         do:
           - cancelReservation:
               call: http
               with:
-                method: post
-                endpoint: https://inventory.example.com/api/cancel-reservation
-                body: ${ $context.inventoryReservation.id }
+                method: delete
+                endpoint: '${ "http://127.0.0.1:8787/reservations/" + $context.inventoryReservation.id }'
           - notifyCustomer:
               call: http
               with:
                 method: post
-                endpoint: https://notifications.example.com/api/send
+                endpoint: http://127.0.0.1:8787/notifications
                 body:
-                  customerId: ${ $workflow.input.customerId }
-                  message: '${ "Payment failed: " + $paymentError.details }'
+                  reference: ${ $workflow.input.orderId }
+                  recipient: ${ $workflow.input.customerId }
+                  message: '${ "Payment failed: " + $paymentError.title }'
