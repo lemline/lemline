@@ -74,7 +74,9 @@ The DSL defines [lifecycle events](dsl-lifecycle-events.md) for the start and co
 
 > **Lemline**
 >
-> The listener records task and workflow completion after matching the event. [Issue #125](https://github.com/lemline/lemline/issues/125) tracks the missing correlation lifecycle events.
+> Lemline emits `workflow.correlation-started` when the listener begins waiting for a correlated
+> event and `workflow.correlation-completed` when the correlated wait succeeds. Both events
+> identify the same workflow instance.
 
 ## Run the Examples
 
@@ -123,3 +125,34 @@ bin/lemline instance start examples tutorial-publisher --input '{"type":"com.exa
 | `correlate-ready-status` | Returns the status update for `sensor-1` with `status: "Ready"`. |
 | `correlate-shipment-provider` | Returns only the confirmation for `S-150` and provider `express`. |
 | `tutorial-publisher` | Each publisher instance completes after emitting its event. |
+
+### Inspect Correlation Lifecycle Events
+
+With Node.js 22.13 or later, query `analytics.db` from the setup directory after the examples finish.
+
+```bash
+sleep 20
+node --input-type=module <<'EOF'
+import { DatabaseSync } from 'node:sqlite';
+
+const db = new DatabaseSync('analytics.db', { readOnly: true });
+const rows = db.prepare(`
+  SELECT lemline_workflow_name AS workflow,
+         lemline_workflow_id AS instance,
+         json_extract(payload, '$.type') AS event
+  FROM lemline_lifecycle_events
+  WHERE lemline_workflow_name IN (
+    'correlate-payment-order', 'correlate-ready-status', 'correlate-shipment-provider'
+  )
+    AND json_extract(payload, '$.data.type') IN (
+      'workflowCorrelationStarted', 'workflowCorrelationCompleted'
+    )
+  ORDER BY workflow, instance, id
+`).all();
+for (const row of rows) console.log(JSON.stringify(row));
+db.close();
+EOF
+```
+
+Each listener instance has a pair of events with the same instance ID, one ending in
+`workflow.correlation-started.v1` and one ending in `workflow.correlation-completed.v1`.
