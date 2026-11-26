@@ -57,15 +57,17 @@ jobs:
           unzip -O UTF-8 -qq "$DOCS_ARCHIVE" -d dir
           cp lemline-docs/images/social-preview.png dir/
           python3 lemline-docs/validation/prepare_social_preview.py dir
-          (cd dir && zip -q "../$DOCS_ARCHIVE" *.html social-preview.png)
+          mkdir -p packaged
+          (cd dir && zip -qr "../packaged/${DOCS_ARCHIVE##*/}" .)
+          cp artifacts/report.json packaged/
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v6
         with:
           name: docs
           path: |
-            artifacts/${{ steps.define-ids.outputs.artifact }}
-            artifacts/report.json
+            packaged/${{ steps.define-ids.outputs.artifact }}
+            packaged/report.json
           retention-days: 7
 
       - name: Check Writerside build report
