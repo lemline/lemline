@@ -1,0 +1,183 @@
+<!DOCTYPE html SYSTEM "about:legacy-compat">
+<html lang="en-US" data-preset="contrast" data-primary-color="#2E6F7E"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="robots" content="noindex"><meta name="built-on" content="2026-11-26T17:17:49.001103243"><title>Lemline Examples Library | Lemline documentation</title><script type="application/json" id="virtual-toc-data">[{"id":"run-the-tutorial-shop","level":0,"title":"Run the tutorial shop","anchor":"#run-the-tutorial-shop"},{"id":"run-the-examples","level":0,"title":"Run the Examples","anchor":"#run-the-examples"},{"id":"introduction","level":0,"title":"Introduction","anchor":"#introduction"},{"id":"example-categories","level":0,"title":"Example Categories","anchor":"#example-categories"},{"id":"basic-workflow-patterns","level":0,"title":"Basic Workflow Patterns","anchor":"#basic-workflow-patterns"},{"id":"external-service-integration","level":0,"title":"External Service Integration","anchor":"#external-service-integration"},{"id":"error-handling-and-resilience","level":0,"title":"Error Handling and Resilience","anchor":"#error-handling-and-resilience"},{"id":"data-transformation","level":0,"title":"Data Transformation","anchor":"#data-transformation"},{"id":"event-processing","level":0,"title":"Event Processing","anchor":"#event-processing"},{"id":"real-world-examples","level":0,"title":"Real-world Examples","anchor":"#real-world-examples"},{"id":"running-the-examples","level":0,"title":"Running the Examples","anchor":"#running-the-examples"},{"id":"conclusion","level":0,"title":"Conclusion","anchor":"#conclusion"}]</script><script type="application/json" id="topic-shortcuts"></script><link href="https://resources.jetbrains.com/writerside/apidoc/6.22.0-b776/app.css" rel="stylesheet"><link href="static/custom.css" rel="stylesheet"><link rel="icon" type="image/png" sizes="16x16" href="images/lemly.png"><meta name="image" content="https://docs.lemline.com/social-preview.png"><!-- Open Graph --><meta property="og:title" content="Lemline Examples Library | Lemline documentation"><meta property="og:description" content=""><meta property="og:image" content="https://docs.lemline.com/social-preview.png"><meta property="og:site_name" content="Lemline documentation Help"><meta property="og:type" content="website"><meta property="og:locale" content="en_US"><meta property="og:url" content="https://docs.lemline.com/lemline-examples-library.html"><!-- End Open Graph --><!-- Twitter Card --><meta name="twitter:card" content="summary_large_image"><meta name="twitter:site" content=""><meta name="twitter:title" content="Lemline Examples Library | Lemline documentation"><meta name="twitter:description" content=""><meta name="twitter:creator" content=""><meta name="twitter:image:src" content="https://docs.lemline.com/social-preview.png"><!-- End Twitter Card --><!-- Schema.org WebPage --><script type="application/ld+json">{
+    "@context": "http://schema.org",
+    "@type": "WebPage",
+    "@id": "https://docs.lemline.com/lemline-examples-library.html#webpage",
+    "url": "https://docs.lemline.com/lemline-examples-library.html",
+    "name": "Lemline Examples Library | Lemline documentation",
+    "description": "",
+    "image": "https://docs.lemline.com/social-preview.png",
+    "inLanguage":"en-US"
+}</script><!-- End Schema.org --><!-- Schema.org WebSite --><script type="application/ld+json">{
+    "@type": "WebSite",
+    "@id": "https://docs.lemline.com/#website",
+    "url": "https://docs.lemline.com/",
+    "name": "Lemline documentation Help"
+}</script><!-- End Schema.org --></head><body data-id="lemline-examples-library" data-main-title="Lemline Examples Library" data-article-props="{&quot;seeAlsoStyle&quot;:&quot;links&quot;}" data-template="article" data-breadcrumbs="Examples Library"><div class="wrapper"><main class="panel _main"><header class="panel__header"><div class="container"><h3>Lemline documentation  Help</h3><div class="panel-trigger"></div></div></header><section class="panel__content"><div class="container"><article class="article" data-shortcut-switcher="inactive"><h1 data-toc="lemline-examples-library" id="lemline-examples-library.md">Lemline Examples Library</h1><p id="-i00e8r_3">This document provides an overview of the examples available in the Lemline project, organized by category and use case. Each example demonstrates key features of the Open Workflow DSL as implemented by Lemline.</p><section class="chapter"><h2 id="run-the-tutorial-shop" data-toc="run-the-tutorial-shop">Run the tutorial shop</h2><p id="-i00e8r_16">Start with <a href="lemline-tutorial-hello.html" id="-i00e8r_17" data-tooltip="Complete the SQLite setup. Keep the worker running and use a second terminal in the setup directory. Substitute java -jar lemline.jar for bin/lemline if using the JAR. Each definition below is a new version of the same workflow. Save each in turn as acknowledge-order.yaml.">an order acknowledgement</a>, then <a href="lemline-tutorial-order-processing.html" id="-i00e8r_18" data-tooltip="Complete the SQLite setup and keep the worker running on the host. In a separate terminal, open the root of the Lemline source checkout matching these docs (the directory containing examples/tutorial-services). With Docker Compose running, start the single shop container:">reserve, charge and ship an order</a>. The same shop displays the customer confirmation and the <a href="lemline-tutorial-iot.html" id="-i00e8r_19" data-tooltip="Complete the SQLite setup and stop the worker with Ctrl+C before registering the event schedules. In a separate terminal, open the root of the Lemline source checkout matching these docs (the directory containing examples/tutorial-services). With Docker Compose running, start the…">warehouse manager's temperature alerts</a>. Each tutorial includes its inputs and expected results.</p></section><section class="chapter"><h2 id="run-the-examples" data-toc="run-the-examples">Run the Examples</h2><p id="-i00e8r_20">Each example on this page is a complete workflow. Complete <a href="lemline-tutorial-setup.html" id="-i00e8r_25" data-tooltip="Run Lemline on one machine with SQLite. Lemline stores workflow definitions, queued messages, and workflow history in local files. Use a writable directory on a local filesystem.">the SQLite setup</a> and keep its worker running. Run the commands from a second terminal in the setup directory. With the JAR, substitute <code class="code" id="-i00e8r_26">java -jar lemline.jar</code> for <code class="code" id="-i00e8r_27">bin/lemline</code>. Start the tutorial shop from the root of the Lemline source checkout:</p><div class="code-block" data-lang="bash">
+docker compose -f examples/tutorial-services/compose.yaml up -d
+</div><p id="-i00e8r_22">The event example also needs the tutorial publisher. Save it as <code class="code" id="-i00e8r_28">tutorial-publisher.yaml</code> and register it:</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: tutorial-publisher
+  version: '1.0.0'
+do:
+  - publish:
+      emit:
+        event:
+          with:
+            type: ${ .type }
+            source: https://events.example.com/tutorial
+            data: ${ .data }
+</div><div class="code-block" data-lang="bash">
+bin/lemline definition post -f tutorial-publisher.yaml
+</div></section><section class="chapter"><h2 id="introduction" data-toc="introduction">Introduction</h2><p id="-i00e8r_29">The examples in this library showcase how to implement various workflow patterns using the Open Workflow DSL. These examples range from simple, focused demonstrations of specific features to complex, real-world scenarios that combine multiple features.</p><p id="-i00e8r_30">Each example follows a consistent pattern:</p><ul class="list _bullet" id="-i00e8r_31"><li class="list__item" id="-i00e8r_32"><p id="-i00e8r_35"><span class="control" id="-i00e8r_36">Document metadata</span>: Defines the DSL version, namespace, workflow name, and version</p></li><li class="list__item" id="-i00e8r_33"><p id="-i00e8r_37"><span class="control" id="-i00e8r_38">Workflow structure</span>: Shows the actual workflow definition with tasks, control flow, error handling, etc.</p></li><li class="list__item" id="-i00e8r_34"><p id="-i00e8r_39"><span class="control" id="-i00e8r_40">Sample input/output</span>: Where applicable, includes sample input data and expected output</p></li></ul></section><section class="chapter"><h2 id="example-categories" data-toc="example-categories">Example Categories</h2><p id="-i00e8r_41">The examples are organized into the following categories:</p><ol class="list _decimal" id="-i00e8r_42" type="1"><li class="list__item" id="-i00e8r_43"><p id="-i00e8r_49"><a href="#basic-workflow-patterns" id="-i00e8r_50" data-tooltip="Basic workflow patterns demonstrate the fundamental building blocks of Open Workflow, such as:">Basic Workflow Patterns</a></p></li><li class="list__item" id="-i00e8r_44"><p id="-i00e8r_51"><a href="#external-service-integration" id="-i00e8r_52" data-tooltip="These examples demonstrate how to integrate with external services through various protocols:">External Service Integration</a></p></li><li class="list__item" id="-i00e8r_45"><p id="-i00e8r_53"><a href="#error-handling-and-resilience" id="-i00e8r_54" data-tooltip="These examples show how to implement robust error handling and resilience patterns:">Error Handling and Resilience</a></p></li><li class="list__item" id="-i00e8r_46"><p id="-i00e8r_55"><a href="#data-transformation" id="-i00e8r_56" data-tooltip="These examples demonstrate data manipulation and transformation techniques:">Data Transformation</a></p></li><li class="list__item" id="-i00e8r_47"><p id="-i00e8r_57"><a href="#event-processing" id="-i00e8r_58" data-tooltip="These examples show how to handle events in workflows:">Event Processing</a></p></li><li class="list__item" id="-i00e8r_48"><p id="-i00e8r_59"><a href="#real-world-examples" id="-i00e8r_60" data-tooltip="These examples combine multiple features to demonstrate realistic use cases:">Real-world Examples</a></p></li></ol></section><section class="chapter"><h2 id="basic-workflow-patterns" data-toc="basic-workflow-patterns">Basic Workflow Patterns</h2><p id="-i00e8r_61">Basic workflow patterns demonstrate the fundamental building blocks of Open Workflow, such as:</p><ul class="list _bullet" id="-i00e8r_62"><li class="list__item" id="-i00e8r_69"><p id="-i00e8r_74">Sequential task execution</p></li><li class="list__item" id="-i00e8r_70"><p id="-i00e8r_75">Conditional logic with <code class="code" id="-i00e8r_76">switch</code> statements</p></li><li class="list__item" id="-i00e8r_71"><p id="-i00e8r_77">Loops with <code class="code" id="-i00e8r_78">for</code> and <code class="code" id="-i00e8r_79">do</code> constructs</p></li><li class="list__item" id="-i00e8r_72"><p id="-i00e8r_80">Nested task execution</p></li><li class="list__item" id="-i00e8r_73"><p id="-i00e8r_81">Variable setting with <code class="code" id="-i00e8r_82">set</code></p></li></ul><p id="-i00e8r_63">Read the available stock in a nested task and pass the result to its parent:</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: stock-summary
+  version: '1.0.0'
+do:
+  - check:
+      do:
+        - readStock:
+            call: http
+            with:
+              method: get
+              endpoint: http://127.0.0.1:8787/stock
+        - showAvailability:
+            set:
+              available: ${ .available }
+  - summarize:
+      set:
+        message: '${ &quot;SKU-1 available: &quot; + (.available | tostring) }'
+</div><p id="-i00e8r_65">Save it as <code class="code" id="-i00e8r_83">nested-tasks-example.yaml</code>:</p><div class="code-block" data-lang="bash">
+bin/lemline definition post -f nested-tasks-example.yaml
+bin/lemline instance start examples stock-summary
+</div><p id="-i00e8r_67">The inner list reads the stock and passes it to its parent: expect <code class="code" id="-i00e8r_84">{&quot;message&quot;:&quot;SKU-1 available: 100&quot;}</code> on a fresh shop.</p><p id="-i00e8r_68">For more basic patterns, see the <a href="lemline-examples-basic-patterns.html" id="-i00e8r_85" data-tooltip="This document provides examples of fundamental workflow patterns implemented in the Open Workflow DSL as supported by Lemline. These basic patterns serve as building blocks for creating more complex workflows.">Basic Patterns Examples</a> document.</p></section><section class="chapter"><h2 id="external-service-integration" data-toc="external-service-integration">External Service Integration</h2><p id="-i00e8r_86">These examples demonstrate how to integrate with external services through various protocols:</p><ul class="list _bullet" id="-i00e8r_87"><li class="list__item" id="-i00e8r_94"><p id="-i00e8r_99">HTTP/REST API calls</p></li><li class="list__item" id="-i00e8r_95"><p id="-i00e8r_100">OpenAPI integration</p></li><li class="list__item" id="-i00e8r_96"><p id="-i00e8r_101">gRPC service calls</p></li><li class="list__item" id="-i00e8r_97"><p id="-i00e8r_102">AsyncAPI for message-based communication</p></li><li class="list__item" id="-i00e8r_98"><p id="-i00e8r_103">Custom function execution</p></li></ul><p id="-i00e8r_88">This example chains two HTTP calls: it searches the catalog, then reads the product it found:</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: product-lookup
+  version: '1.0.0'
+do:
+  - findProduct:
+      call: http
+      with:
+        method: get
+        endpoint: http://127.0.0.1:8787/products
+        query:
+          search: ${ .search }
+        output: response
+      export:
+        as:
+          productId: ${ .content.items[0].id }
+  - getProduct:
+      call: http
+      with:
+        method: get
+        endpoint: ${ &quot;http://127.0.0.1:8787/products/&quot; + $context.productId }
+</div><p id="-i00e8r_90">Save it as <code class="code" id="-i00e8r_104">external-service-integration.yaml</code>:</p><div class="code-block" data-lang="bash">
+bin/lemline definition post -f external-service-integration.yaml
+bin/lemline instance start examples product-lookup --input '{&quot;search&quot;:&quot;lamp&quot;}'
+</div><p id="-i00e8r_92">The first call returns the full response; the workflow exports the ID found in its <code class="code" id="-i00e8r_105">content</code>, then reads that product: expect the desk lamp, <code class="code" id="-i00e8r_106">{&quot;id&quot;:&quot;SKU-4&quot;,&quot;name&quot;:&quot;Desk lamp&quot;,&quot;category&quot;:&quot;home&quot;,&quot;price&quot;:30,&quot;available&quot;:10}</code>.</p><p id="-i00e8r_93">For more integration examples, see the <a href="lemline-examples-integrations.html" id="-i00e8r_107" data-tooltip="Runtime support: some examples on this page use call: openapi, call: asyncapi, call: grpc or OAuth 2.0 authentication. Lemline registers them but does not execute them yet: such a task fails when it runs, with the error shown under each example. Write those calls with call: http and…">Integration Examples</a> document.</p></section><section class="chapter"><h2 id="error-handling-and-resilience" data-toc="error-handling-and-resilience">Error Handling and Resilience</h2><p id="-i00e8r_108">These examples show how to implement robust error handling and resilience patterns:</p><ul class="list _bullet" id="-i00e8r_109"><li class="list__item" id="-i00e8r_116"><p id="-i00e8r_120">Try-catch blocks for error handling</p></li><li class="list__item" id="-i00e8r_117"><p id="-i00e8r_121">Retry mechanisms with backoff strategies</p></li><li class="list__item" id="-i00e8r_118"><p id="-i00e8r_122">Error type classifications</p></li><li class="list__item" id="-i00e8r_119"><p id="-i00e8r_123">Compensating transactions</p></li></ul><p id="-i00e8r_110">This example retries a failing call with exponential backoff:</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: stock-with-retry
+  version: '1.0.0'
+do:
+  - tryGetStock:
+      try:
+        - getStock:
+            call: http
+            with:
+              method: get
+              endpoint: http://127.0.0.1:8787/stock
+              query:
+                fail: '503'
+                failTimes: ${ .failures // 0 | tostring }
+                key: ${ $workflow.id }
+      catch:
+        errors:
+          with:
+            type: https://open-workflow-specification.org/spec/1.0.0/errors/communication
+        retry:
+          delay:
+            seconds: 1
+          backoff:
+            exponential: { }
+          limit:
+            attempt:
+              count: 3
+</div><p id="-i00e8r_112">Save it as <code class="code" id="-i00e8r_124">error-handling-and-resilience.yaml</code>:</p><div class="code-block" data-lang="bash">
+bin/lemline definition post -f error-handling-and-resilience.yaml
+bin/lemline instance start examples stock-with-retry --input '{&quot;failures&quot;:2}'
+</div><p id="-i00e8r_114">The shop answers HTTP 503 twice; the catch matches the <code class="code" id="-i00e8r_125">communication</code> error that a failed HTTP call raises, retries after about 1 and 2 seconds, and the workflow returns the stock. Allow about 30 seconds: the worker picks up retries every 10 seconds.</p><p id="-i00e8r_115">For more error handling examples, see the <a href="lemline-examples-error-handling.html" id="-i00e8r_126" data-tooltip="This document provides examples of error handling and resilience patterns in Lemline workflows. Robust error handling is essential for building reliable workflows that can gracefully recover from failures when interacting with external systems, processing data, or executing business…">Error Handling Examples</a> document.</p></section><section class="chapter"><h2 id="data-transformation" data-toc="data-transformation">Data Transformation</h2><p id="-i00e8r_127">These examples demonstrate data manipulation and transformation techniques:</p><ul class="list _bullet" id="-i00e8r_128"><li class="list__item" id="-i00e8r_134"><p id="-i00e8r_138">JQ expressions for JSON transformation</p></li><li class="list__item" id="-i00e8r_135"><p id="-i00e8r_139">Variable setting and manipulation</p></li><li class="list__item" id="-i00e8r_136"><p id="-i00e8r_140">Data mapping between tasks</p></li><li class="list__item" id="-i00e8r_137"><p id="-i00e8r_141">Complex transformation patterns</p></li></ul><p id="-i00e8r_129">This example sets a value and transforms it in the next task:</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: transform-user
+  version: '0.1.0'
+do:
+  - initData:
+      set:
+        user:
+          name: &quot;Ada Lovelace&quot;
+          role: &quot;admin&quot;
+  - transformData:
+      set:
+        transformedUser: '${ .user + { lastAccess: (now | todateiso8601) } }'
+</div><p id="-i00e8r_131">Save it as <code class="code" id="-i00e8r_142">data-transformation.yaml</code>:</p><div class="code-block" data-lang="bash">
+bin/lemline definition post -f data-transformation.yaml
+bin/lemline instance start examples transform-user
+</div><p id="-i00e8r_133">Expect <code class="code" id="-i00e8r_143">{&quot;transformedUser&quot;:{&quot;name&quot;:&quot;Ada Lovelace&quot;,&quot;role&quot;:&quot;admin&quot;,&quot;lastAccess&quot;:&quot;&lt;current time&gt;&quot;}}</code>, with the time as an ISO 8601 string.</p></section><section class="chapter"><h2 id="event-processing" data-toc="event-processing">Event Processing</h2><p id="-i00e8r_144">These examples show how to handle events in workflows:</p><ul class="list _bullet" id="-i00e8r_145"><li class="list__item" id="-i00e8r_153"><p id="-i00e8r_157">Event listening patterns</p></li><li class="list__item" id="-i00e8r_154"><p id="-i00e8r_158">Event correlation</p></li><li class="list__item" id="-i00e8r_155"><p id="-i00e8r_159">Event-driven workflows</p></li><li class="list__item" id="-i00e8r_156"><p id="-i00e8r_160">Message consumption strategies</p></li></ul><p id="-i00e8r_146">This example waits for the first of two event types:</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: listen-to-any-example
+  version: '0.1.0'
+do:
+  - waitForEvent:
+      listen:
+        to:
+          any:
+            - with:
+                type: com.example.order.created
+            - with:
+                type: com.example.order.cancelled
+      timeout:
+        after:
+          seconds: 30
+</div><p id="-i00e8r_148">Save it as <code class="code" id="-i00e8r_161">event-processing.yaml</code>:</p><div class="code-block" data-lang="bash">
+bin/lemline definition post -f event-processing.yaml
+bin/lemline instance start examples listen-to-any-example
+bin/lemline instance start examples listen-to-any-example
+</div><p id="-i00e8r_150">Both instances wait. Publish one order event:</p><div class="code-block" data-lang="bash">
+bin/lemline instance start examples tutorial-publisher --input '{&quot;type&quot;:&quot;com.example.order.cancelled&quot;,&quot;data&quot;:{&quot;orderId&quot;:&quot;ORD-1003&quot;}}'
+</div><p id="-i00e8r_152">The event resumes both listeners: each completes with <code class="code" id="-i00e8r_162">[{&quot;orderId&quot;:&quot;ORD-1003&quot;}]</code>. A listener that receives no event within 30 seconds faults with a <code class="code" id="-i00e8r_163">timeout</code> error 30 to 40 seconds after it started.</p></section><section class="chapter"><h2 id="real-world-examples" data-toc="real-world-examples">Real-world Examples</h2><p id="-i00e8r_164">These examples combine multiple features to demonstrate realistic use cases:</p><ul class="list _bullet" id="-i00e8r_165"><li class="list__item" id="-i00e8r_172"><p id="-i00e8r_176">Order processing workflows</p></li><li class="list__item" id="-i00e8r_173"><p id="-i00e8r_177">Multi-step approval processes</p></li><li class="list__item" id="-i00e8r_174"><p id="-i00e8r_178">Data enrichment pipelines</p></li><li class="list__item" id="-i00e8r_175"><p id="-i00e8r_179">Notification systems</p></li></ul><p id="-i00e8r_166">This smaller example routes a digital or physical order to a different fulfillment method:</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: order-fulfillment
+  version: '1.0.0'
+
+do:
+  - checkItemType:
+      switch:
+        - ifDigital:
+            when: ${ .itemType == &quot;digital&quot; }
+            then: processDigitalOrder
+        - default:
+            then: checkPhysicalOrderLogic
+
+  - processDigitalOrder:
+      set:
+        fulfillment: digital-delivery
+      then: end
+  - checkPhysicalOrderLogic:
+      set:
+        fulfillment: physical-shipping
+</div><p id="-i00e8r_168">Save it as <code class="code" id="-i00e8r_180">real-world-examples.yaml</code>:</p><div class="code-block" data-lang="bash">
+bin/lemline definition post -f real-world-examples.yaml
+bin/lemline instance start examples order-fulfillment --input '{&quot;itemType&quot;:&quot;digital&quot;}'
+bin/lemline instance start examples order-fulfillment --input '{&quot;itemType&quot;:&quot;physical&quot;}'
+</div><p id="-i00e8r_170">Expect <code class="code" id="-i00e8r_181">{&quot;fulfillment&quot;:&quot;digital-delivery&quot;}</code>, then <code class="code" id="-i00e8r_182">{&quot;fulfillment&quot;:&quot;physical-shipping&quot;}</code>.</p><p id="-i00e8r_171">For more complex examples, see the <a href="lemline-examples-real-world.html" id="-i00e8r_183" data-tooltip="These examples model common orchestration patterns on the tutorial shop. Complete the SQLite setup and run the commands from the setup directory. With the JAR, substitute java -jar lemline.jar for bin/lemline. Start the tutorial shop from the root of the Lemline source checkout:">Real-world Examples</a> document.</p></section><section class="chapter"><h2 id="running-the-examples" data-toc="running-the-examples">Running the Examples</h2><p id="-i00e8r_184">The general form of the commands used above is:</p><div class="code-block" data-lang="none">
+bin/lemline definition post -f &lt;file.yaml&gt;
+bin/lemline instance start &lt;namespace&gt; &lt;name&gt; [&lt;version&gt;] --input '&lt;json&gt;'
+</div><p id="-i00e8r_186">The worker started with <code class="code" id="-i00e8r_188">bin/lemline listen</code> runs the instance. Stop the shop when you are done:</p><div class="code-block" data-lang="bash">
+docker compose -f examples/tutorial-services/compose.yaml down
+</div></section><section class="chapter"><h2 id="conclusion" data-toc="conclusion">Conclusion</h2><p id="-i00e8r_189">These examples demonstrate the flexibility and power of the Open Workflow DSL as implemented by Lemline. Use them as a reference when building your own workflows, adapting and combining patterns to suit your specific use cases.</p><p id="-i00e8r_190">For more detailed explanations of specific patterns, refer to the category-specific documents linked above.</p></section><div class="last-modified">25 November 2026</div><div data-feedback-placeholder="true"></div><div class="navigation-links _bottom"><a href="lemline-explain-scaling.html" class="navigation-links__prev">Understanding Scaling in Lemline</a><a href="lemline-examples-basic-patterns.html" class="navigation-links__next">Lemline Basic Workflow Patterns</a></div></article><div id="disqus_thread"></div></div></section></main></div><script src="https://resources.jetbrains.com/writerside/apidoc/6.22.0-b776/app.js"></script></body></html>

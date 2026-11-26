@@ -1,0 +1,353 @@
+<!DOCTYPE html SYSTEM "about:legacy-compat">
+<html lang="en-US" data-preset="contrast" data-primary-color="#2E6F7E"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="robots" content="noindex"><meta name="built-on" content="2026-11-26T17:17:48.566056412"><title>Understanding Error Handling in Lemline | Lemline documentation</title><script type="application/json" id="virtual-toc-data">[{"id":"error-handling-philosophy","level":0,"title":"Error Handling Philosophy","anchor":"#error-handling-philosophy"},{"id":"error-structure","level":0,"title":"Error Structure","anchor":"#error-structure"},{"id":"error-type-hierarchy","level":0,"title":"Error Type Hierarchy","anchor":"#error-type-hierarchy"},{"id":"error-sources","level":0,"title":"Error Sources","anchor":"#error-sources"},{"id":"error-propagation","level":0,"title":"Error Propagation","anchor":"#error-propagation"},{"id":"error-handling-mechanisms","level":0,"title":"Error Handling Mechanisms","anchor":"#error-handling-mechanisms"},{"id":"designing-error-resilient-workflows","level":0,"title":"Designing Error-Resilient Workflows","anchor":"#designing-error-resilient-workflows"},{"id":"debugging-and-monitoring-errors","level":0,"title":"Debugging and Monitoring Errors","anchor":"#debugging-and-monitoring-errors"},{"id":"run-the-examples","level":0,"title":"Run the Examples","anchor":"#run-the-examples"},{"id":"related-resources","level":0,"title":"Related Resources","anchor":"#related-resources"}]</script><script type="application/json" id="topic-shortcuts"></script><link href="https://resources.jetbrains.com/writerside/apidoc/6.22.0-b776/app.css" rel="stylesheet"><link href="static/custom.css" rel="stylesheet"><link rel="icon" type="image/png" sizes="16x16" href="images/lemly.png"><meta name="image" content="https://docs.lemline.com/social-preview.png"><!-- Open Graph --><meta property="og:title" content="Understanding Error Handling in Lemline | Lemline documentation"><meta property="og:description" content=""><meta property="og:image" content="https://docs.lemline.com/social-preview.png"><meta property="og:site_name" content="Lemline documentation Help"><meta property="og:type" content="website"><meta property="og:locale" content="en_US"><meta property="og:url" content="https://docs.lemline.com/lemline-explain-errors.html"><!-- End Open Graph --><!-- Twitter Card --><meta name="twitter:card" content="summary_large_image"><meta name="twitter:site" content=""><meta name="twitter:title" content="Understanding Error Handling in Lemline | Lemline documentation"><meta name="twitter:description" content=""><meta name="twitter:creator" content=""><meta name="twitter:image:src" content="https://docs.lemline.com/social-preview.png"><!-- End Twitter Card --><!-- Schema.org WebPage --><script type="application/ld+json">{
+    "@context": "http://schema.org",
+    "@type": "WebPage",
+    "@id": "https://docs.lemline.com/lemline-explain-errors.html#webpage",
+    "url": "https://docs.lemline.com/lemline-explain-errors.html",
+    "name": "Understanding Error Handling in Lemline | Lemline documentation",
+    "description": "",
+    "image": "https://docs.lemline.com/social-preview.png",
+    "inLanguage":"en-US"
+}</script><!-- End Schema.org --><!-- Schema.org WebSite --><script type="application/ld+json">{
+    "@type": "WebSite",
+    "@id": "https://docs.lemline.com/#website",
+    "url": "https://docs.lemline.com/",
+    "name": "Lemline documentation Help"
+}</script><!-- End Schema.org --></head><body data-id="lemline-explain-errors" data-main-title="Understanding Error Handling in Lemline" data-article-props="{&quot;seeAlsoStyle&quot;:&quot;links&quot;}" data-template="article" data-breadcrumbs="Explanations"><div class="wrapper"><main class="panel _main"><header class="panel__header"><div class="container"><h3>Lemline documentation  Help</h3><div class="panel-trigger"></div></div></header><section class="panel__content"><div class="container"><article class="article" data-shortcut-switcher="inactive"><h1 data-toc="lemline-explain-errors" id="lemline-explain-errors.md">Understanding Error Handling in Lemline</h1><p id="-hwc09x_3">This document explains how errors are managed, propagated, and handled throughout the Lemline workflow system.</p><section class="chapter"><h2 id="error-handling-philosophy" data-toc="error-handling-philosophy">Error Handling Philosophy</h2><p id="-hwc09x_14">Lemline's error handling is designed around a few key principles:</p><ol class="list _decimal" id="-hwc09x_15" type="1"><li class="list__item" id="-hwc09x_16"><p id="-hwc09x_21"><span class="control" id="-hwc09x_22">Structured errors</span>: All errors have a consistent structure with rich metadata</p></li><li class="list__item" id="-hwc09x_17"><p id="-hwc09x_23"><span class="control" id="-hwc09x_24">Typed exceptions</span>: Errors are categorized by type for precise handling</p></li><li class="list__item" id="-hwc09x_18"><p id="-hwc09x_25"><span class="control" id="-hwc09x_26">Hierarchical propagation</span>: Errors bubble up through the workflow structure</p></li><li class="list__item" id="-hwc09x_19"><p id="-hwc09x_27"><span class="control" id="-hwc09x_28">Recovery mechanisms</span>: Multiple strategies for handling and recovering from failures</p></li><li class="list__item" id="-hwc09x_20"><p id="-hwc09x_29"><span class="control" id="-hwc09x_30">Transparent reporting</span>: Clear error information for debugging and monitoring</p></li></ol></section><section class="chapter"><h2 id="error-structure" data-toc="error-structure">Error Structure</h2><p id="-hwc09x_31">Lemline implements the RFC 7807 Problem Details specification for consistent error representation:</p><div class="code-block" data-lang="json">
+{
+  &quot;type&quot;: &quot;https://open-workflow-specification.org/spec/1.0.0/errors/validation&quot;,
+  &quot;status&quot;: 400,
+  &quot;instance&quot;: &quot;/do/0/validateInput&quot;,
+  &quot;title&quot;: &quot;Input Validation Failed&quot;,
+  &quot;detail&quot;: &quot;The 'amount' field must be a positive number&quot;
+}
+</div><p id="-hwc09x_33">This structure provides:</p><ul class="list _bullet" id="-hwc09x_34"><li class="list__item" id="-hwc09x_35"><p id="-hwc09x_40"><span class="control" id="-hwc09x_41">type</span>: URI identifier for the error category</p></li><li class="list__item" id="-hwc09x_36"><p id="-hwc09x_42"><span class="control" id="-hwc09x_43">status</span>: Numeric code similar to HTTP status codes</p></li><li class="list__item" id="-hwc09x_37"><p id="-hwc09x_44"><span class="control" id="-hwc09x_45">instance</span>: JSON pointer to the location in the workflow where the error occurred</p></li><li class="list__item" id="-hwc09x_38"><p id="-hwc09x_46"><span class="control" id="-hwc09x_47">title</span>: Short human-readable error summary</p></li><li class="list__item" id="-hwc09x_39"><p id="-hwc09x_48"><span class="control" id="-hwc09x_49">detail</span>: Detailed explanation specific to this occurrence</p></li></ul></section><section class="chapter"><h2 id="error-type-hierarchy" data-toc="error-type-hierarchy">Error Type Hierarchy</h2><p id="-hwc09x_50">Lemline organizes errors into a hierarchy:</p><div class="code-block" data-lang="none">
+WorkflowError
+├── Configuration (400)
+│   └── Schema validation errors, invalid workflow definition
+├── Validation (400)
+│   └── Input/output data validation failures
+├── Expression (400)
+│   └── JQ expression evaluation errors
+├── Authentication (401)
+│   └── Authentication failures
+├── Authorization (403)
+│   └── Permission/access denied errors
+├── Timeout (408)
+│   └── Execution timeout errors
+├── Communication (500)
+│   └── External service communication failures
+└── Runtime (500)
+    └── General runtime execution errors
+</div><p id="-hwc09x_52">Each error type has:</p><ul class="list _bullet" id="-hwc09x_53"><li class="list__item" id="-hwc09x_54"><p id="-hwc09x_57">A unique URI identifier (e.g., <code class="code" id="-hwc09x_58">https://open-workflow-specification.org/spec/1.0.0/errors/timeout</code>)</p></li><li class="list__item" id="-hwc09x_55"><p id="-hwc09x_59">A default status code</p></li><li class="list__item" id="-hwc09x_56"><p id="-hwc09x_60">Specific handling semantics</p></li></ul></section><section class="chapter"><h2 id="error-sources" data-toc="error-sources">Error Sources</h2><p id="-hwc09x_61">Errors can originate from multiple sources:</p><section class="chapter"><h3 id="1-system-generated-errors" data-toc="1-system-generated-errors">1. System-Generated Errors</h3><p id="-hwc09x_65">The Lemline runtime automatically generates errors for common failure scenarios:</p><ul class="list _bullet" id="-hwc09x_66"><li class="list__item" id="-hwc09x_67"><p id="-hwc09x_71"><span class="control" id="-hwc09x_73">Schema Validation</span>: When input/output doesn't match the schema</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: validate-and-route-order
+  version: '1.0.0'
+input:
+  schema:
+    format: json
+    document:
+      type: object
+      required: [orderId, total]
+      properties:
+        orderId:
+          type: string
+        total:
+          type: number
+          minimum: 0
+do:
+  - routeOrder:
+      switch:
+        - largeOrder:
+            when: ${ .total &gt;= 1000 }
+            then: requestReview
+        - automatic:
+            then: acceptOrder
+  - requestReview:
+      set:
+        status: needs-review
+      then: exit
+  - acceptOrder:
+      set:
+        status: accepted
+output:
+  as: '${ { orderId: $workflow.input.orderId, status: .status } }'
+</div></li><li class="list__item" id="-hwc09x_68"><p id="-hwc09x_74"><span class="control" id="-hwc09x_76">Expression Evaluation</span>: When JQ expressions fail</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: 1-system-generated-errors
+  version: '1.0.0'
+do:
+  - example:
+      set:
+        total: ${ [.items[].price] | add }
+        # If .items isn't an array, the expression raises an expression error
+</div></li><li class="list__item" id="-hwc09x_69"><p id="-hwc09x_77"><span class="control" id="-hwc09x_79">HTTP Communication</span>: When API calls fail</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: check-stock
+  version: '0.1.0'
+  title: Check the shop stock
+do:
+  - getStock:
+      call: http
+      with:
+        method: get
+        endpoint: http://127.0.0.1:8787/stock
+</div></li><li class="list__item" id="-hwc09x_70"><p id="-hwc09x_80"><span class="control" id="-hwc09x_83">Timeout Violations</span>: When operations exceed their timeouts</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: 1.0.3
+  namespace: examples
+  name: 1-system-generated-errors-2
+  version: 1.0.0
+do:
+  - example:
+      wait: PT30S
+      timeout:
+        after: PT1M
+</div><aside class="prompt" data-type="tip" data-title="" id="-hwc09x_82"><p id="-hwc09x_84"><span class="control" id="-hwc09x_85">Lemline runtime:</span> only <code class="code" id="-hwc09x_86">listen</code> task timeouts are enforced. Workflow-level timeouts and timeouts on other tasks are accepted but ignored for now. HTTP calls use fixed client limits instead: 15 seconds to connect, 30 seconds per request.</p></aside></li></ul></section><section class="chapter"><h3 id="2-explicitly-raised-errors" data-toc="2-explicitly-raised-errors">2. Explicitly Raised Errors</h3><p id="-hwc09x_87">Workflows can explicitly raise errors using the <code class="code" id="-hwc09x_90">raise</code> task:</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: typed-error
+  version: '1.0.0'
+use:
+  errors:
+    invalidOrder:
+      type: https://errors.example.com/invalid-order
+      status: 422
+      title: Invalid order
+do:
+  - validateOrder:
+      if: ${ (.orderId // &quot;&quot;) == &quot;&quot; }
+      raise:
+        error: invalidOrder
+  - acceptOrder:
+      set:
+        status: accepted
+</div><p id="-hwc09x_89">This allows for domain-specific error conditions.</p></section><section class="chapter"><h3 id="3-external-system-errors" data-toc="3-external-system-errors">3. External System Errors</h3><p id="-hwc09x_91">Errors from external systems are translated to Lemline's error model:</p><ul class="list _bullet" id="-hwc09x_92"><li class="list__item" id="-hwc09x_93"><p id="-hwc09x_96"><span class="control" id="-hwc09x_98">HTTP Status Codes</span>: Mapped to appropriate error types</p><ul class="list _bullet" id="-hwc09x_97"><li class="list__item" id="-hwc09x_99"><p id="-hwc09x_101">400-499: Typically ValidationError or related types</p></li><li class="list__item" id="-hwc09x_100"><p id="-hwc09x_102">500-599: Typically CommunicationError or RuntimeError</p></li></ul></li><li class="list__item" id="-hwc09x_94"><p id="-hwc09x_103"><span class="control" id="-hwc09x_104">Database Errors</span>: Wrapped as SystemErrors with appropriate context</p></li><li class="list__item" id="-hwc09x_95"><p id="-hwc09x_105"><span class="control" id="-hwc09x_106">Messaging System Errors</span>: Wrapped as CommunicationErrors</p></li></ul></section></section><section class="chapter"><h2 id="error-propagation" data-toc="error-propagation">Error Propagation</h2><p id="-hwc09x_107">When an error occurs, it follows a defined propagation path:</p><div class="code-block" data-lang="none">
+┌────────────┐     ┌────────────┐     ┌────────────┐     ┌────────────┐
+│ Error      │     │ Check      │     │ Search for │     │ Workflow   │
+│ Occurs     │ ──&gt; │ Local Try  │ ──&gt; │ Parent Try │ ──&gt; │ Fails      │
+│ at Node    │     │ Blocks     │     │ Blocks     │     │ (if not    │
+└────────────┘     └────────────┘     └────────────┘     │ caught)    │
+                                                         └────────────┘
+</div><ol class="list _decimal" id="-hwc09x_109" type="1"><li class="list__item" id="-hwc09x_110"><p id="-hwc09x_114">The error occurs at a specific node</p></li><li class="list__item" id="-hwc09x_111"><p id="-hwc09x_115">Lemline checks if the node is within a <code class="code" id="-hwc09x_116">try</code> block with a matching <code class="code" id="-hwc09x_117">catch</code></p></li><li class="list__item" id="-hwc09x_112"><p id="-hwc09x_118">If not caught, the error propagates up to any parent <code class="code" id="-hwc09x_119">try</code> blocks</p></li><li class="list__item" id="-hwc09x_113"><p id="-hwc09x_120">If no matching handler is found, the workflow execution fails</p></li></ol></section><section class="chapter"><h2 id="error-handling-mechanisms" data-toc="error-handling-mechanisms">Error Handling Mechanisms</h2><p id="-hwc09x_121">Lemline provides several mechanisms for handling errors:</p><section class="chapter"><h3 id="1-try-catch-blocks" data-toc="1-try-catch-blocks">1. Try-Catch Blocks</h3><p id="-hwc09x_126">The primary error handling mechanism:</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: 1-try-catch-blocks
+  version: '1.0.0'
+do:
+  - processPayment:
+      try:
+        - chargeCard:
+            call: http
+            with:
+              method: post
+              endpoint: http://127.0.0.1:8787/charges?fail=503
+              body:
+                orderId: ${ .orderId }
+      catch:
+        errors:
+          with:
+            type: https://open-workflow-specification.org/spec/1.0.0/errors/communication
+            status: 503
+        as: paymentError
+        do:
+          - logError:
+              set:
+                errorMessage: '${ &quot;Payment service unavailable: \($paymentError.title)&quot; }'
+</div><p id="-hwc09x_128">Key components:</p><ul class="list _bullet" id="-hwc09x_129"><li class="list__item" id="-hwc09x_130"><p id="-hwc09x_135"><span class="control" id="-hwc09x_136">try</span>: Contains tasks that might fail</p></li><li class="list__item" id="-hwc09x_131"><p id="-hwc09x_137"><span class="control" id="-hwc09x_138">catch</span>: Defines how to handle specific errors</p></li><li class="list__item" id="-hwc09x_132"><p id="-hwc09x_139"><span class="control" id="-hwc09x_140">errors.with</span>: Criteria for matching errors</p></li><li class="list__item" id="-hwc09x_133"><p id="-hwc09x_141"><span class="control" id="-hwc09x_142">as</span>: Variable name to store the caught error</p></li><li class="list__item" id="-hwc09x_134"><p id="-hwc09x_143"><span class="control" id="-hwc09x_144">do</span>: Compensation logic when an error is caught</p></li></ul></section><section class="chapter"><h3 id="2-retry-policies" data-toc="2-retry-policies">2. Retry Policies</h3><p id="-hwc09x_145">Automated retry for transient failures:</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: 2-retry-policies
+  version: '1.0.0'
+do:
+  - readStock:
+      try:
+        - requestStock:
+            call: http
+            with:
+              method: get
+              endpoint: '${ &quot;http://127.0.0.1:8787/stock?fail=503&amp;failTimes=2&amp;key=\($workflow.id)&quot; }'
+      catch:
+        retry:
+          delay:
+            seconds: 1
+          backoff:
+            exponential: {}
+          limit:
+            attempt:
+              count: 3
+</div><p id="-hwc09x_147">When an error occurs:</p><ol class="list _decimal" id="-hwc09x_148" type="1"><li class="list__item" id="-hwc09x_149"><p id="-hwc09x_153">The error is caught</p></li><li class="list__item" id="-hwc09x_150"><p id="-hwc09x_154">The retry policy is evaluated</p></li><li class="list__item" id="-hwc09x_151"><p id="-hwc09x_155">If retries remain, the system waits according to the backoff strategy</p></li><li class="list__item" id="-hwc09x_152"><p id="-hwc09x_156">The entire <code class="code" id="-hwc09x_157">try</code> block is re-executed</p></li></ol></section><section class="chapter"><h3 id="3-fallback-patterns" data-toc="3-fallback-patterns">3. Fallback Patterns</h3><p id="-hwc09x_158">Define explicit fallback behavior:</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: 3-fallback-patterns
+  version: '1.0.0'
+do:
+  - getCustomerProfile:
+      try:
+        - fetchFromApi:
+            call: http
+            with:
+              endpoint: '${ &quot;http://127.0.0.1:8787/customers/\(.customerId)&quot; + (if .apiDown then &quot;?fail=503&quot; else &quot;&quot; end) }'
+              method: get
+      catch:
+        do:
+          - useCachedData:
+              call: http
+              with:
+                endpoint: ${ &quot;http://127.0.0.1:8787/customers/\($workflow.input.customerId)&quot; }
+                method: get
+          - markStale:
+              set:
+                name: ${ .name }
+                dataSource: cache
+                isFresh: false
+</div><p id="-hwc09x_160">This pattern allows graceful degradation when preferred data sources fail.</p></section><section class="chapter"><h3 id="4-dead-letter-queues" data-toc="4-dead-letter-queues">4. Dead Letter Queues</h3><p id="-hwc09x_161">Dead letter queues are a runner feature, not a workflow setting. When a runner cannot process a message from the broker, the message goes to a dead-letter destination (for Kafka, <code class="code" id="-hwc09x_162">&lt;source-topic&gt;.dlq</code>; for RabbitMQ and PGMQ, the configured or derived DLQ queue). Messages received for a namespace that no runner serves are parked in the failures table and can be re-sent with <code class="code" id="-hwc09x_163">lemline failures replay</code>.</p></section></section><section class="chapter"><h2 id="designing-error-resilient-workflows" data-toc="designing-error-resilient-workflows">Designing Error-Resilient Workflows</h2><p id="-hwc09x_164">Best practices for error-resilient workflows:</p><section class="chapter"><h3 id="1-define-expected-errors" data-toc="1-define-expected-errors">1. Define Expected Errors</h3><p id="-hwc09x_170">Explicitly define expected error conditions:</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: 1-define-expected-errors
+  version: '1.0.0'
+use:
+  errors:
+    paymentDeclined:
+      type: https://example.com/errors/payment-declined
+      status: 400
+      title: Payment Method Declined
+    insufficientInventory:
+      type: https://example.com/errors/insufficient-inventory
+      status: 409
+      title: Insufficient Inventory
+do:
+  - readStock:
+      call: http
+      with:
+        method: get
+        endpoint: http://127.0.0.1:8787/stock
+  - checkInventory:
+      if: ${ .available &lt; $workflow.input.quantity }
+      raise:
+        error: insufficientInventory
+  - accept:
+      set:
+        accepted: ${ $workflow.input.quantity }
+</div></section><section class="chapter"><h3 id="2-implement-structured-error-handling" data-toc="2-implement-structured-error-handling">2. Implement Structured Error Handling</h3><p id="-hwc09x_172">Structure your workflow with proper error handling:</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: 2-implement-structured-error-handling
+  version: '1.0.0'
+do:
+  - mainFlow:
+      try:
+        - validateInput:
+            set:
+              orderId: ${ .orderId }
+              token: ${ .token }
+        - processOrder:
+            try:
+              - reserveInventory:
+                  set:
+                    reserved: true
+              - processPayment:
+                  if: ${ $workflow.input.token == &quot;declined&quot; }
+                  raise:
+                    error:
+                      type: https://example.com/errors/payment-declined
+                      status: 400
+                      title: Payment declined
+            catch:
+              errors:
+                with:
+                  type: https://example.com/errors/payment-declined
+              do:
+                - handleError:
+                    set:
+                      paymentDeclined: true
+        - fulfillOrder:
+            set:
+              fulfilled: ${ (.paymentDeclined // false) | not }
+      catch: {}
+</div></section><section class="chapter"><h3 id="3-use-appropriate-retry-strategies" data-toc="3-use-appropriate-retry-strategies">3. Use Appropriate Retry Strategies</h3><p id="-hwc09x_174">Choose retry strategies based on error types:</p><ul class="list _bullet" id="-hwc09x_175"><li class="list__item" id="-hwc09x_176"><p id="-hwc09x_180"><span class="control" id="-hwc09x_181">Immediate retry</span>: For race conditions</p></li><li class="list__item" id="-hwc09x_177"><p id="-hwc09x_182"><span class="control" id="-hwc09x_183">Constant delay</span>: For brief outages</p></li><li class="list__item" id="-hwc09x_178"><p id="-hwc09x_184"><span class="control" id="-hwc09x_185">Exponential backoff</span>: For congested services</p></li><li class="list__item" id="-hwc09x_179"><p id="-hwc09x_186"><span class="control" id="-hwc09x_187">Exponential backoff with jitter</span>: For distributed systems</p></li></ul></section><section class="chapter"><h3 id="4-implement-graceful-degradation" data-toc="4-implement-graceful-degradation">4. Implement Graceful Degradation</h3><p id="-hwc09x_188">Design workflows to handle partial failures:</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: 4-implement-graceful-degradation
+  version: '1.0.0'
+do:
+  - customerDashboard:
+      fork:
+        branches:
+          - loadProfile:
+              try:
+                - fetchCustomerProfile:
+                    call: http
+                    with:
+                      method: get
+                      endpoint: '${ &quot;http://127.0.0.1:8787/customers/\(.customerId)&quot; + (if .profileDown then &quot;?fail=503&quot; else &quot;&quot; end) }'
+                    output:
+                      as: '${ { profile: .name } }'
+              catch:
+                do:
+                  - setDefaultProfile:
+                      set:
+                        profile: Guest
+          - loadRecommendations:
+              try:
+                - fetchRecommendations:
+                    call: http
+                    with:
+                      method: get
+                      endpoint: '${ &quot;http://127.0.0.1:8787/products?category=garden&quot; + (if .recommendationsDown then &quot;&amp;fail=503&quot; else &quot;&quot; end) }'
+                    output:
+                      as: '${ { recommendations: [.items[].id] } }'
+              catch:
+                do:
+                  - setEmptyRecommendations:
+                      set:
+                        recommendations: []
+</div></section><section class="chapter"><h3 id="5-provide-comprehensive-error-context" data-toc="5-provide-comprehensive-error-context">5. Provide Comprehensive Error Context</h3><p id="-hwc09x_190">Ensure errors contain useful diagnostic information:</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: 1.0.3
+  namespace: examples
+  name: 5-provide-comprehensive-error-context
+  version: 1.0.0
+do:
+  - processRecord:
+      raise:
+        error:
+          type: https://example.com/errors/validation
+          status: 400
+          title: Invalid Record Type
+          detail: ${ &quot;Record ID \(.recordId) has invalid type '\(.recordType)'&quot; }
+      if: '${ .recordType == &quot;invalid&quot; }'
+</div></section></section><section class="chapter"><h2 id="debugging-and-monitoring-errors" data-toc="debugging-and-monitoring-errors">Debugging and Monitoring Errors</h2><p id="-hwc09x_192">Lemline provides tools for error analysis:</p><section class="chapter"><h3 id="error-logging" data-toc="error-logging">Error Logging</h3><p id="-hwc09x_196">Detailed contextual logging:</p><p id="-hwc09x_197">Every runner log line is prefixed with the workflow namespace, name, version and instance id, for example:</p><div class="code-block" data-lang="none">
+2023-06-15 14:32:45.123 ERROR [acme/order-processing:1.0.0] [123e4567-e89b-12d3-a456-426614174000] [c.l.c.p.AbstractProcessor] ...
+</div></section><section class="chapter"><h3 id="error-metrics" data-toc="error-metrics">Error Metrics</h3><p id="-hwc09x_199">Runners expose processing metrics at <code class="code" id="-hwc09x_200">/q/metrics</code>, including failure counters per channel such as <code class="code" id="-hwc09x_201">lemline_messaging_commands_processing_failed_total</code>, tagged by reason, workflow name and version. Faulted instances and retried tasks are visible through the <code class="code" id="-hwc09x_202">workflow.faulted</code>, <code class="code" id="-hwc09x_203">task.faulted</code> and <code class="code" id="-hwc09x_204">task.retried</code> lifecycle events.</p></section><section class="chapter"><h3 id="error-tracing" data-toc="error-tracing">Error Tracing</h3><p id="-hwc09x_205">The <code class="code" id="-hwc09x_206">workflow.faulted</code> and <code class="code" id="-hwc09x_207">task.faulted</code> lifecycle events of an instance carry the full error (<code class="code" id="-hwc09x_208">type</code>, <code class="code" id="-hwc09x_209">status</code>, <code class="code" id="-hwc09x_210">title</code>, <code class="code" id="-hwc09x_211">instance</code>, <code class="code" id="-hwc09x_212">detail</code>), where <code class="code" id="-hwc09x_213">instance</code> is the position of the failing task in the workflow. They are visible in the dashboard and, with lifecycle analytics enabled, stored in the analytics database.</p></section></section><section class="chapter"><h2 id="run-the-examples" data-toc="run-the-examples">Run the Examples</h2><p id="-hwc09x_214">Every example on this page is a complete workflow. Complete <a href="lemline-tutorial-setup.html" id="-hwc09x_222" data-tooltip="Run Lemline on one machine with SQLite. Lemline stores workflow definitions, queued messages, and workflow history in local files. Use a writable directory on a local filesystem.">the SQLite setup</a>, save each example under the file name used below, and run the commands from the setup directory. With the JAR, substitute <code class="code" id="-hwc09x_223">java -jar lemline.jar</code> for <code class="code" id="-hwc09x_224">bin/lemline</code>.</p><p id="-hwc09x_215">Start the <a href="lemline-tutorial-order-processing.html#start-the-tutorial-shop" id="-hwc09x_225" data-tooltip="Complete the SQLite setup and keep the worker running on the host. In a separate terminal, open the root of the Lemline source checkout matching these docs (the directory containing examples/tutorial-services). With Docker Compose running, start the single shop container:">tutorial shop</a> from the root of the Lemline source checkout:</p><div class="code-block" data-lang="bash">
+docker compose -f examples/tutorial-services/compose.yaml up -d
+</div><p id="-hwc09x_217">Keep the setup worker running and use a second terminal in the setup directory.</p><div class="code-block" data-lang="bash">
+bin/lemline definition post -f validate-and-route-order.yaml
+bin/lemline instance start examples validate-and-route-order --input '{&quot;orderId&quot;:&quot;ORD-303&quot;,&quot;total&quot;:-1}'
+bin/lemline definition post -f 1-system-generated-errors.yaml
+bin/lemline instance start examples 1-system-generated-errors --input '{&quot;items&quot;:&quot;none&quot;}'
+bin/lemline definition post -f connect-to-http-services.yaml
+bin/lemline instance start examples check-stock
+bin/lemline definition post -f 1-system-generated-errors-2.yaml
+bin/lemline instance start examples 1-system-generated-errors-2
+bin/lemline definition post -f typed-error.yaml
+bin/lemline instance start examples typed-error
+bin/lemline definition post -f 1-try-catch-blocks.yaml
+bin/lemline instance start examples 1-try-catch-blocks --input '{&quot;orderId&quot;:&quot;ORD-1802&quot;}'
+bin/lemline definition post -f 2-retry-policies.yaml
+bin/lemline instance start examples 2-retry-policies
+bin/lemline definition post -f 3-fallback-patterns.yaml
+bin/lemline instance start examples 3-fallback-patterns --input '{&quot;customerId&quot;:&quot;C-100&quot;,&quot;apiDown&quot;:true}'
+bin/lemline definition post -f 1-define-expected-errors.yaml
+bin/lemline instance start examples 1-define-expected-errors --input '{&quot;quantity&quot;:500}'
+bin/lemline definition post -f 2-implement-structured-error-handling.yaml
+bin/lemline instance start examples 2-implement-structured-error-handling --input '{&quot;orderId&quot;:&quot;ORD-1803&quot;,&quot;token&quot;:&quot;approved&quot;}'
+bin/lemline instance start examples 2-implement-structured-error-handling --input '{&quot;orderId&quot;:&quot;ORD-1804&quot;,&quot;token&quot;:&quot;declined&quot;}'
+bin/lemline definition post -f 4-implement-graceful-degradation.yaml
+bin/lemline instance start examples 4-implement-graceful-degradation --input '{&quot;customerId&quot;:&quot;C-100&quot;,&quot;recommendationsDown&quot;:true}'
+bin/lemline definition post -f 5-provide-comprehensive-error-context.yaml
+bin/lemline instance start examples 5-provide-comprehensive-error-context --input '{&quot;recordId&quot;:&quot;R-9&quot;,&quot;recordType&quot;:&quot;invalid&quot;}'
+</div><div class="table-wrapper"><table class="wide" id="-hwc09x_219"><thead><tr class="ijRowHead" id="-hwc09x_226"><th id="-hwc09x_239"><p>Example</p></th><th id="-hwc09x_240"><p>Expected result</p></th></tr></thead><tbody><tr id="-hwc09x_227"><td id="-hwc09x_241"><p><code class="code" id="-hwc09x_243">validate-and-route-order</code> with a negative total</p></td><td id="-hwc09x_242"><p>Refused by <code class="code" id="-hwc09x_244">instance start</code>: the total must be at least 0</p></td></tr><tr id="-hwc09x_228"><td id="-hwc09x_245"><p><code class="code" id="-hwc09x_247">1-system-generated-errors</code></p></td><td id="-hwc09x_246"><p>Faults with an <code class="code" id="-hwc09x_248">expression</code> error: <code class="code" id="-hwc09x_249">items</code> is not an array</p></td></tr><tr id="-hwc09x_229"><td id="-hwc09x_250"><p><code class="code" id="-hwc09x_252">check-stock</code></p></td><td id="-hwc09x_251"><p>The stock</p></td></tr><tr id="-hwc09x_230"><td id="-hwc09x_253"><p><code class="code" id="-hwc09x_255">1-system-generated-errors-2</code></p></td><td id="-hwc09x_254"><p>Completes after 30 to 40 seconds</p></td></tr><tr id="-hwc09x_231"><td id="-hwc09x_256"><p><code class="code" id="-hwc09x_258">typed-error</code></p></td><td id="-hwc09x_257"><p>Faults with <code class="code" id="-hwc09x_259">invalid-order</code>, status 422</p></td></tr><tr id="-hwc09x_232"><td id="-hwc09x_260"><p><code class="code" id="-hwc09x_262">1-try-catch-blocks</code></p></td><td id="-hwc09x_261"><p><code class="code" id="-hwc09x_263">{&quot;errorMessage&quot;:&quot;Payment service unavailable: HTTP 503: &hellip;&quot;}</code></p></td></tr><tr id="-hwc09x_233"><td id="-hwc09x_264"><p><code class="code" id="-hwc09x_266">2-retry-policies</code></p></td><td id="-hwc09x_265"><p>The stock after two retries</p></td></tr><tr id="-hwc09x_234"><td id="-hwc09x_267"><p><code class="code" id="-hwc09x_269">3-fallback-patterns</code></p></td><td id="-hwc09x_268"><p><code class="code" id="-hwc09x_270">{&quot;name&quot;:&quot;Ada Lovelace&quot;,&quot;dataSource&quot;:&quot;cache&quot;,&quot;isFresh&quot;:false}</code></p></td></tr><tr id="-hwc09x_235"><td id="-hwc09x_271"><p><code class="code" id="-hwc09x_273">1-define-expected-errors</code></p></td><td id="-hwc09x_272"><p>Faults with <code class="code" id="-hwc09x_274">insufficient-inventory</code>, status 409, title <code class="code" id="-hwc09x_275">Insufficient Inventory</code></p></td></tr><tr id="-hwc09x_236"><td id="-hwc09x_276"><p><code class="code" id="-hwc09x_278">2-implement-structured-error-handling</code></p></td><td id="-hwc09x_277"><p><code class="code" id="-hwc09x_279">{&quot;fulfilled&quot;:true}</code> for ORD-1803, <code class="code" id="-hwc09x_280">{&quot;fulfilled&quot;:false}</code> for ORD-1804</p></td></tr><tr id="-hwc09x_237"><td id="-hwc09x_281"><p><code class="code" id="-hwc09x_283">4-implement-graceful-degradation</code></p></td><td id="-hwc09x_282"><p><code class="code" id="-hwc09x_284">[{&quot;profile&quot;:&quot;Ada Lovelace&quot;},{&quot;recommendations&quot;:[]}]</code></p></td></tr><tr id="-hwc09x_238"><td id="-hwc09x_285"><p><code class="code" id="-hwc09x_287">5-provide-comprehensive-error-context</code></p></td><td id="-hwc09x_286"><p>Faults with <code class="code" id="-hwc09x_288">Invalid Record Type</code> and detail <code class="code" id="-hwc09x_289">Record ID R-9 has invalid type 'invalid'</code></p></td></tr></tbody></table></div><p id="-hwc09x_220">Stop the shop when you are done:</p><div class="code-block" data-lang="bash">
+docker compose -f examples/tutorial-services/compose.yaml down
+</div></section><section class="chapter"><h2 id="related-resources" data-toc="related-resources">Related Resources</h2><ul class="list _bullet" id="-hwc09x_290"><li class="list__item" id="-hwc09x_291"><p id="-hwc09x_296"><a href="lemline-howto-try-catch.html" id="-hwc09x_297" data-tooltip="A try task runs a list of tasks. If a task fails, catch can filter the error, retry the try block, or execute a fallback list.">Error Handling with Try-Catch</a></p></li><li class="list__item" id="-hwc09x_292"><p id="-hwc09x_298"><a href="lemline-howto-retry.html" id="-hwc09x_299" data-tooltip="Configure retries under catch.retry on a try task. Use delay for the initial interval and limit.attempt.count to bound attempts. With a backoff configured, the runner derives subsequent intervals from the configured strategy.">Implementing Retry Mechanisms</a></p></li><li class="list__item" id="-hwc09x_293"><p id="-hwc09x_300"><a href="lemline-howto-custom-errors.html" id="-hwc09x_301" data-tooltip="Workflow errors carry a URI identifying the error type and a numeric status. Optional fields include title, detail and instance.">Custom Error Types</a></p></li><li class="list__item" id="-hwc09x_294"><p id="-hwc09x_302"><a href="lemline-howto-debug.html" id="-hwc09x_303" data-tooltip="This guide provides techniques and best practices for debugging workflows when they don't behave as expected.">Debugging Workflows</a></p></li><li class="list__item" id="-hwc09x_295"><p id="-hwc09x_304"><a href="dsl-resilience-patterns.html" id="-hwc09x_305" data-tooltip="In distributed systems, failures are inevitable. This page shows how to make workflows handle failures with the tools Lemline provides: retries, error catching with fallbacks, timeouts on event waits, and the durability of the runtime itself.">Resilience Patterns</a></p></li></ul></section><div class="last-modified">25 November 2026</div><div data-feedback-placeholder="true"></div><div class="navigation-links _bottom"><a href="lemline-explain-time.html" class="navigation-links__prev">Time in workflows</a><a href="lemline-explain-jq.html" class="navigation-links__next">jq expressions in workflows</a></div></article><div id="disqus_thread"></div></div></section></main></div><script src="https://resources.jetbrains.com/writerside/apidoc/6.22.0-b776/app.js"></script></body></html>

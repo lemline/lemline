@@ -1,0 +1,89 @@
+<!DOCTYPE html SYSTEM "about:legacy-compat">
+<html lang="en-US" data-preset="contrast" data-primary-color="#2E6F7E"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="robots" content="noindex"><meta name="built-on" content="2026-11-26T17:17:49.282964947"><title>Defining and using custom errors | Lemline documentation</title><script type="application/json" id="virtual-toc-data">[{"id":"define-and-raise-a-named-error","level":0,"title":"Define and raise a named error","anchor":"#define-and-raise-a-named-error"},{"id":"construct-an-error-with-dynamic-details","level":0,"title":"Construct an error with dynamic details","anchor":"#construct-an-error-with-dynamic-details"},{"id":"read-or-map-a-caught-error","level":0,"title":"Read or map a caught error","anchor":"#read-or-map-a-caught-error"}]</script><script type="application/json" id="topic-shortcuts"></script><link href="https://resources.jetbrains.com/writerside/apidoc/6.22.0-b776/app.css" rel="stylesheet"><link href="static/custom.css" rel="stylesheet"><link rel="icon" type="image/png" sizes="16x16" href="images/lemly.png"><meta name="image" content="https://docs.lemline.com/social-preview.png"><!-- Open Graph --><meta property="og:title" content="Defining and using custom errors | Lemline documentation"><meta property="og:description" content=""><meta property="og:image" content="https://docs.lemline.com/social-preview.png"><meta property="og:site_name" content="Lemline documentation Help"><meta property="og:type" content="website"><meta property="og:locale" content="en_US"><meta property="og:url" content="https://docs.lemline.com/lemline-howto-custom-errors.html"><!-- End Open Graph --><!-- Twitter Card --><meta name="twitter:card" content="summary_large_image"><meta name="twitter:site" content=""><meta name="twitter:title" content="Defining and using custom errors | Lemline documentation"><meta name="twitter:description" content=""><meta name="twitter:creator" content=""><meta name="twitter:image:src" content="https://docs.lemline.com/social-preview.png"><!-- End Twitter Card --><!-- Schema.org WebPage --><script type="application/ld+json">{
+    "@context": "http://schema.org",
+    "@type": "WebPage",
+    "@id": "https://docs.lemline.com/lemline-howto-custom-errors.html#webpage",
+    "url": "https://docs.lemline.com/lemline-howto-custom-errors.html",
+    "name": "Defining and using custom errors | Lemline documentation",
+    "description": "",
+    "image": "https://docs.lemline.com/social-preview.png",
+    "inLanguage":"en-US"
+}</script><!-- End Schema.org --><!-- Schema.org WebSite --><script type="application/ld+json">{
+    "@type": "WebSite",
+    "@id": "https://docs.lemline.com/#website",
+    "url": "https://docs.lemline.com/",
+    "name": "Lemline documentation Help"
+}</script><!-- End Schema.org --></head><body data-id="lemline-howto-custom-errors" data-main-title="Defining and using custom errors" data-article-props="{&quot;seeAlsoStyle&quot;:&quot;links&quot;}" data-template="article" data-breadcrumbs="How-to Guides///Resilience and Error Handling"><div class="wrapper"><main class="panel _main"><header class="panel__header"><div class="container"><h3>Lemline documentation  Help</h3><div class="panel-trigger"></div></div></header><section class="panel__content"><div class="container"><article class="article" data-shortcut-switcher="inactive"><h1 data-toc="lemline-howto-custom-errors" id="lemline-howto-custom-errors.md">Defining and using custom errors</h1><p id="-hvwrav_3">Workflow errors carry a URI identifying the error type and a numeric status. Optional fields include <code class="code" id="-hvwrav_7">title</code>, <code class="code" id="-hvwrav_8">detail</code> and <code class="code" id="-hvwrav_9">instance</code>.</p><section class="chapter"><h2 id="define-and-raise-a-named-error" data-toc="define-and-raise-a-named-error">Define and raise a named error</h2><p id="-hvwrav_10">Put reusable errors under <code class="code" id="-hvwrav_17">use.errors</code>. Reference a named definition with <code class="code" id="-hvwrav_18">raise.error</code>.</p><p id="-hvwrav_11">Complete <a href="lemline-tutorial-setup.html" id="-hvwrav_19" data-tooltip="Run Lemline on one machine with SQLite. Lemline stores workflow definitions, queued messages, and workflow history in local files. Use a writable directory on a local filesystem.">the SQLite setup</a> and keep its worker running. Run the commands from a second terminal in the setup directory. With the JAR, substitute <code class="code" id="-hvwrav_20">java -jar lemline.jar</code> for <code class="code" id="-hvwrav_21">bin/lemline</code>. The HTTP examples call the <a href="lemline-tutorial-order-processing.html#start-the-tutorial-shop" id="-hvwrav_22" data-tooltip="Complete the SQLite setup and keep the worker running on the host. In a separate terminal, open the root of the Lemline source checkout matching these docs (the directory containing examples/tutorial-services). With Docker Compose running, start the single shop container:">tutorial shop</a>; start it from the root of the Lemline source checkout:</p><div class="code-block" data-lang="bash">
+docker compose -f examples/tutorial-services/compose.yaml up -d
+</div><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: typed-error
+  version: '1.0.0'
+use:
+  errors:
+    invalidOrder:
+      type: https://errors.example.com/invalid-order
+      status: 422
+      title: Invalid order
+do:
+  - validateOrder:
+      if: ${ (.orderId // &quot;&quot;) == &quot;&quot; }
+      raise:
+        error: invalidOrder
+  - acceptOrder:
+      set:
+        status: accepted
+</div><p id="-hvwrav_14">Save it as <code class="code" id="-hvwrav_23">typed-error.yaml</code>:</p><div class="code-block" data-lang="bash">
+bin/lemline definition post -f typed-error.yaml
+bin/lemline instance start examples typed-error --input '{&quot;orderId&quot;:&quot;ORD-905&quot;}'
+bin/lemline instance start examples typed-error
+</div><p id="-hvwrav_16">The first instance completes with <code class="code" id="-hvwrav_24">{&quot;status&quot;:&quot;accepted&quot;}</code>. The second faults with the named error: type <code class="code" id="-hvwrav_25">https://errors.example.com/invalid-order</code>, status 422, title <code class="code" id="-hvwrav_26">Invalid order</code>.</p></section><section class="chapter"><h2 id="construct-an-error-with-dynamic-details" data-toc="construct-an-error-with-dynamic-details">Construct an error with dynamic details</h2><p id="-hvwrav_27">Use an inline error object when fields depend on the current task input.</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: raise-order-error
+  version: '1.0.0'
+do:
+  - checkStock:
+      if: ${ .stock &lt; .quantity }
+      raise:
+        error:
+          type: https://errors.example.com/out-of-stock
+          status: 409
+          title: Insufficient stock
+          detail: '${ &quot;Requested \(.quantity); available \(.stock)&quot; }'
+</div><p id="-hvwrav_29">Save it as <code class="code" id="-hvwrav_32">raise-order-error.yaml</code>:</p><div class="code-block" data-lang="bash">
+bin/lemline definition post -f raise-order-error.yaml
+bin/lemline instance start examples raise-order-error --input '{&quot;stock&quot;:1,&quot;quantity&quot;:3}'
+bin/lemline instance start examples raise-order-error --input '{&quot;stock&quot;:5,&quot;quantity&quot;:3}'
+</div><p id="-hvwrav_31">The first instance faults with status 409, title <code class="code" id="-hvwrav_33">Insufficient stock</code> and detail <code class="code" id="-hvwrav_34">Requested 3; available 1</code>. The second has enough stock: the <code class="code" id="-hvwrav_35">if</code> skips the raise and the instance completes with its input.</p></section><section class="chapter"><h2 id="read-or-map-a-caught-error" data-toc="read-or-map-a-caught-error">Read or map a caught error</h2><p id="-hvwrav_36">Inside <code class="code" id="-hvwrav_44">catch.do</code>, read the error variable when constructing a fallback result. To handle only one error type, add <code class="code" id="-hvwrav_45">catch.errors.with.type</code> to the <code class="code" id="-hvwrav_46">catch</code>.</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: format-error-result
+  version: '1.0.0'
+do:
+  - submitOrder:
+      try:
+        - submit:
+            call: http
+            with:
+              method: post
+              endpoint: http://127.0.0.1:8787/reservations
+              body: ${ . }
+      catch:
+        as: orderError
+        do:
+          - formatFailure:
+              set:
+                success: false
+                status: ${ $orderError.status }
+                errorType: ${ $orderError.type }
+                reason: ${ $orderError.title }
+</div><p id="-hvwrav_38">Save it as <code class="code" id="-hvwrav_47">format-error-result.yaml</code>. Send one valid reservation and two the shop refuses:</p><div class="code-block" data-lang="bash">
+bin/lemline definition post -f format-error-result.yaml
+bin/lemline instance start examples format-error-result --input '{&quot;orderId&quot;:&quot;ORD-901&quot;,&quot;items&quot;:[{&quot;id&quot;:&quot;SKU-1&quot;,&quot;quantity&quot;:1}]}'
+bin/lemline instance start examples format-error-result --input '{&quot;orderId&quot;:&quot;ORD-902&quot;,&quot;items&quot;:[{&quot;id&quot;:&quot;SKU-9&quot;,&quot;quantity&quot;:1}]}'
+bin/lemline instance start examples format-error-result --input '{&quot;orderId&quot;:&quot;ORD-903&quot;,&quot;items&quot;:[{&quot;id&quot;:&quot;SKU-1&quot;,&quot;quantity&quot;:500}]}'
+</div><p id="-hvwrav_40">The first instance returns the reservation. The shop answers HTTP 400 to the second and HTTP 409 to the third; both complete with <code class="code" id="-hvwrav_48">success: false</code>, the <code class="code" id="-hvwrav_49">communication</code> error type, the HTTP status (<code class="code" id="-hvwrav_50">400</code>, then <code class="code" id="-hvwrav_51">409</code>) and a <code class="code" id="-hvwrav_52">reason</code> that starts with <code class="code" id="-hvwrav_53">HTTP 400: {&quot;error&quot;:&quot;Invalid items&quot;</code> and <code class="code" id="-hvwrav_54">HTTP 409: {&quot;error&quot;:&quot;Out of stock&quot;</code> respectively.</p><p id="-hvwrav_41">Stop the shop when you are done:</p><div class="code-block" data-lang="bash">
+docker compose -f examples/tutorial-services/compose.yaml down
+</div><p id="-hvwrav_43">See <a href="lemline-howto-try-catch.html" id="-hvwrav_55" data-tooltip="A try task runs a list of tasks. If a task fails, catch can filter the error, retry the try block, or execute a fallback list.">Error Handling with Try-Catch</a> for filtering and retries.</p></section><div class="last-modified">25 November 2026</div><div data-feedback-placeholder="true"></div><div class="navigation-links _bottom"><a href="lemline-howto-retry.html" class="navigation-links__prev">Retrying failed workflow tasks</a><a href="lemline-howto-debug.html" class="navigation-links__next">Debugging Lemline Workflows</a></div></article><div id="disqus_thread"></div></div></section></main></div><script src="https://resources.jetbrains.com/writerside/apidoc/6.22.0-b776/app.js"></script></body></html>

@@ -1,0 +1,50 @@
+<!DOCTYPE html SYSTEM "about:legacy-compat">
+<html lang="en-US" data-preset="contrast" data-primary-color="#2E6F7E"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="robots" content="noindex"><meta name="built-on" content="2026-11-26T17:17:49.627259478"><title>Configuring OAuth 2.0 Authentication | Lemline documentation</title><script type="application/json" id="virtual-toc-data">[{"id":"client-credentials-grant","level":0,"title":"Client credentials grant","anchor":"#client-credentials-grant"},{"id":"see-what-lemline-does-with-it","level":0,"title":"See what Lemline does with it","anchor":"#see-what-lemline-does-with-it"}]</script><script type="application/json" id="topic-shortcuts"></script><link href="https://resources.jetbrains.com/writerside/apidoc/6.22.0-b776/app.css" rel="stylesheet"><link href="static/custom.css" rel="stylesheet"><link rel="icon" type="image/png" sizes="16x16" href="images/lemly.png"><meta name="image" content="https://docs.lemline.com/social-preview.png"><!-- Open Graph --><meta property="og:title" content="Configuring OAuth 2.0 Authentication | Lemline documentation"><meta property="og:description" content=""><meta property="og:image" content="https://docs.lemline.com/social-preview.png"><meta property="og:site_name" content="Lemline documentation Help"><meta property="og:type" content="website"><meta property="og:locale" content="en_US"><meta property="og:url" content="https://docs.lemline.com/lemline-howto-oauth2.html"><!-- End Open Graph --><!-- Twitter Card --><meta name="twitter:card" content="summary_large_image"><meta name="twitter:site" content=""><meta name="twitter:title" content="Configuring OAuth 2.0 Authentication | Lemline documentation"><meta name="twitter:description" content=""><meta name="twitter:creator" content=""><meta name="twitter:image:src" content="https://docs.lemline.com/social-preview.png"><!-- End Twitter Card --><!-- Schema.org WebPage --><script type="application/ld+json">{
+    "@context": "http://schema.org",
+    "@type": "WebPage",
+    "@id": "https://docs.lemline.com/lemline-howto-oauth2.html#webpage",
+    "url": "https://docs.lemline.com/lemline-howto-oauth2.html",
+    "name": "Configuring OAuth 2.0 Authentication | Lemline documentation",
+    "description": "",
+    "image": "https://docs.lemline.com/social-preview.png",
+    "inLanguage":"en-US"
+}</script><!-- End Schema.org --><!-- Schema.org WebSite --><script type="application/ld+json">{
+    "@type": "WebSite",
+    "@id": "https://docs.lemline.com/#website",
+    "url": "https://docs.lemline.com/",
+    "name": "Lemline documentation Help"
+}</script><!-- End Schema.org --></head><body data-id="lemline-howto-oauth2" data-main-title="Configuring OAuth 2.0 Authentication" data-article-props="{&quot;seeAlsoStyle&quot;:&quot;links&quot;}" data-template="article" data-breadcrumbs="How-to Guides///Authentication and Secrets"><div class="wrapper"><main class="panel _main"><header class="panel__header"><div class="container"><h3>Lemline documentation  Help</h3><div class="panel-trigger"></div></div></header><section class="panel__content"><div class="container"><article class="article" data-shortcut-switcher="inactive"><h1 data-toc="lemline-howto-oauth2" id="lemline-howto-oauth2.md">Configuring OAuth 2.0 Authentication</h1><p id="-7yjnq9_3">The Open Workflow DSL can describe an OAuth 2.0 client credentials grant. Lemline registers such a definition, but its HTTP executor supports only basic and bearer authentication: an instance faults before sending any request. See <a href="lemline-ref-supported-features.html" id="-7yjnq9_6" data-tooltip="This reference documents which features of the Open Workflow DSL v1.0 are currently supported in Lemline, and any implementation-specific details or limitations.">Supported Features</a>. Until OAuth 2.0 is supported, obtain the token outside the workflow and send it with <a href="lemline-howto-api-keys.html#send-a-bearer-token" id="-7yjnq9_7" data-tooltip="For an API that expects Authorization: Bearer ..., use a named bearer authentication policy and reference it from with.endpoint.authentication.use.">bearer authentication</a>.</p><section class="chapter"><h2 id="client-credentials-grant" data-toc="client-credentials-grant">Client credentials grant</h2><p id="-7yjnq9_8">Place the <code class="code" id="-7yjnq9_11">oauth2</code> authentication policy on the endpoint, with the authority, grant and client configuration. The token endpoint can be specified under <code class="code" id="-7yjnq9_12">endpoints</code>.</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: http-with-oauth2
+  version: '0.1.0'
+use:
+  secrets:
+    - clientSecret
+do:
+  - getPartnerStock:
+      call: http
+      with:
+        method: get
+        endpoint:
+          uri: http://127.0.0.1:8787/partner/stock
+          authentication:
+            oauth2:
+              authority: http://127.0.0.1:8787
+              endpoints:
+                token: /oauth2/token
+              grant: client_credentials
+              client:
+                id: shop-workflows
+                secret: ${ $secrets.clientSecret }
+</div><p id="-7yjnq9_10">The client secret stays outside the definition: the policy reads it from the declared <code class="code" id="-7yjnq9_13">clientSecret</code> secret.</p></section><section class="chapter"><h2 id="see-what-lemline-does-with-it" data-toc="see-what-lemline-does-with-it">See what Lemline does with it</h2><p id="-7yjnq9_14">Complete <a href="lemline-tutorial-setup.html" id="-7yjnq9_22" data-tooltip="Run Lemline on one machine with SQLite. Lemline stores workflow definitions, queued messages, and workflow history in local files. Use a writable directory on a local filesystem.">the SQLite setup</a> and start the <a href="lemline-tutorial-order-processing.html#start-the-tutorial-shop" id="-7yjnq9_23" data-tooltip="Complete the SQLite setup and keep the worker running on the host. In a separate terminal, open the root of the Lemline source checkout matching these docs (the directory containing examples/tutorial-services). With Docker Compose running, start the single shop container:">tutorial shop</a> from the root of the Lemline source checkout. The shop has no token endpoint; the request never gets that far. With the JAR, substitute <code class="code" id="-7yjnq9_24">java -jar lemline.jar</code> for <code class="code" id="-7yjnq9_25">bin/lemline</code>.</p><div class="code-block" data-lang="bash">
+docker compose -f examples/tutorial-services/compose.yaml up -d
+</div><p id="-7yjnq9_16">Stop the setup worker with Ctrl+C, export the secret, and start the worker again:</p><div class="code-block" data-lang="bash">
+export clientSecret='demo-secret'
+bin/lemline listen --debug
+</div><p id="-7yjnq9_18">From a second terminal in the setup directory, save the definition as <code class="code" id="-7yjnq9_26">http-with-authentication.yaml</code> and run it:</p><div class="code-block" data-lang="bash">
+bin/lemline definition post -f http-with-authentication.yaml
+bin/lemline instance start examples http-with-oauth2
+</div><p id="-7yjnq9_20">The definition registers. The instance faults with a <code class="code" id="-7yjnq9_27">runtime</code> error titled <code class="code" id="-7yjnq9_28">Unsupported OAuth2 authentication</code>, and the shop receives no request. Stop the shop when you are done:</p><div class="code-block" data-lang="bash">
+docker compose -f examples/tutorial-services/compose.yaml down
+</div></section><div class="last-modified">25 November 2026</div><div data-feedback-placeholder="true"></div><div class="navigation-links _bottom"><a href="dsl-resilience-patterns.html" class="navigation-links__prev">Resilience Patterns</a><a href="lemline-howto-secrets.html" class="navigation-links__next">Managing Secrets in Lemline</a></div></article><div id="disqus_thread"></div></div></section></main></div><script src="https://resources.jetbrains.com/writerside/apidoc/6.22.0-b776/app.js"></script></body></html>

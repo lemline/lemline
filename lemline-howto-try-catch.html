@@ -1,0 +1,176 @@
+<!DOCTYPE html SYSTEM "about:legacy-compat">
+<html lang="en-US" data-preset="contrast" data-primary-color="#2E6F7E"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="robots" content="noindex"><meta name="built-on" content="2026-11-26T17:17:49.114075079"><title>Error Handling with Try-Catch | Lemline documentation</title><script type="application/json" id="virtual-toc-data">[{"id":"filter-an-error-and-retry","level":0,"title":"Filter an error and retry","anchor":"#filter-an-error-and-retry"},{"id":"read-the-caught-error","level":0,"title":"Read the caught error","anchor":"#read-the-caught-error"},{"id":"propagate-failures","level":0,"title":"Propagate failures","anchor":"#propagate-failures"}]</script><script type="application/json" id="topic-shortcuts"></script><link href="https://resources.jetbrains.com/writerside/apidoc/6.22.0-b776/app.css" rel="stylesheet"><link href="static/custom.css" rel="stylesheet"><link rel="icon" type="image/png" sizes="16x16" href="images/lemly.png"><meta name="image" content="https://docs.lemline.com/social-preview.png"><!-- Open Graph --><meta property="og:title" content="Error Handling with Try-Catch | Lemline documentation"><meta property="og:description" content=""><meta property="og:image" content="https://docs.lemline.com/social-preview.png"><meta property="og:site_name" content="Lemline documentation Help"><meta property="og:type" content="website"><meta property="og:locale" content="en_US"><meta property="og:url" content="https://docs.lemline.com/lemline-howto-try-catch.html"><!-- End Open Graph --><!-- Twitter Card --><meta name="twitter:card" content="summary_large_image"><meta name="twitter:site" content=""><meta name="twitter:title" content="Error Handling with Try-Catch | Lemline documentation"><meta name="twitter:description" content=""><meta name="twitter:creator" content=""><meta name="twitter:image:src" content="https://docs.lemline.com/social-preview.png"><!-- End Twitter Card --><!-- Schema.org WebPage --><script type="application/ld+json">{
+    "@context": "http://schema.org",
+    "@type": "WebPage",
+    "@id": "https://docs.lemline.com/lemline-howto-try-catch.html#webpage",
+    "url": "https://docs.lemline.com/lemline-howto-try-catch.html",
+    "name": "Error Handling with Try-Catch | Lemline documentation",
+    "description": "",
+    "image": "https://docs.lemline.com/social-preview.png",
+    "inLanguage":"en-US"
+}</script><!-- End Schema.org --><!-- Schema.org WebSite --><script type="application/ld+json">{
+    "@type": "WebSite",
+    "@id": "https://docs.lemline.com/#website",
+    "url": "https://docs.lemline.com/",
+    "name": "Lemline documentation Help"
+}</script><!-- End Schema.org --></head><body data-id="lemline-howto-try-catch" data-main-title="Error Handling with Try-Catch" data-article-props="{&quot;seeAlsoStyle&quot;:&quot;links&quot;}" data-template="article" data-breadcrumbs="How-to Guides///Resilience and Error Handling"><div class="wrapper"><main class="panel _main"><header class="panel__header"><div class="container"><h3>Lemline documentation  Help</h3><div class="panel-trigger"></div></div></header><section class="panel__content"><div class="container"><article class="article" data-shortcut-switcher="inactive"><h1 data-toc="lemline-howto-try-catch" id="lemline-howto-try-catch.md">Error Handling with Try-Catch</h1><p id="-w445p5_3">A <code class="code" id="-w445p5_9">try</code> task runs a list of tasks. If a task fails, <code class="code" id="-w445p5_10">catch</code> can filter the error, retry the try block, or execute a fallback list.</p><p id="-w445p5_4">Complete <a href="lemline-tutorial-setup.html" id="-w445p5_11" data-tooltip="Run Lemline on one machine with SQLite. Lemline stores workflow definitions, queued messages, and workflow history in local files. Use a writable directory on a local filesystem.">the SQLite setup</a> and keep its worker running. Run the commands from a second terminal in the setup directory. With the JAR, substitute <code class="code" id="-w445p5_12">java -jar lemline.jar</code> for <code class="code" id="-w445p5_13">bin/lemline</code>. The HTTP examples call the <a href="lemline-tutorial-order-processing.html#start-the-tutorial-shop" id="-w445p5_14" data-tooltip="Complete the SQLite setup and keep the worker running on the host. In a separate terminal, open the root of the Lemline source checkout matching these docs (the directory containing examples/tutorial-services). With Docker Compose running, start the single shop container:">tutorial shop</a>; start it from the root of the Lemline source checkout:</p><div class="code-block" data-lang="bash">
+docker compose -f examples/tutorial-services/compose.yaml up -d
+</div><section class="chapter"><h2 id="filter-an-error-and-retry" data-toc="filter-an-error-and-retry">Filter an error and retry</h2><p id="-w445p5_15">Set <code class="code" id="-w445p5_20">catch.errors.with</code> to match predefined fields such as the error type or status. Use <code class="code" id="-w445p5_21">catch.when</code> for a jq predicate over the error when the field filter is insufficient. A failed HTTP call is a <code class="code" id="-w445p5_22">communication</code> error whose <code class="code" id="-w445p5_23">status</code> is the HTTP status, so the example below filters on both.</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: retry-and-fallback
+  version: '1.0.0'
+use:
+  retries:
+    transient:
+      delay: PT2S
+      backoff:
+        exponential: {}
+      limit:
+        attempt:
+          count: 3
+do:
+  - fetchInventory:
+      try:
+        - requestInventory:
+            call: http
+            with:
+              method: get
+              endpoint: http://127.0.0.1:8787/stock
+              query:
+                fail: '503'
+                failTimes: ${ .failures // 0 | tostring }
+                key: ${ $workflow.id }
+      catch:
+        errors:
+          with:
+            type: https://open-workflow-specification.org/spec/1.0.0/errors/communication
+            status: 503
+        retry: transient
+        do:
+          - useCachedInventory:
+              set:
+                inventory: []
+                stale: true
+</div><p id="-w445p5_17">Save it as <code class="code" id="-w445p5_24">retry-and-fallback.yaml</code>. The <code class="code" id="-w445p5_25">failures</code> input makes the shop answer HTTP 503 that many times:</p><div class="code-block" data-lang="bash">
+bin/lemline definition post -f retry-and-fallback.yaml
+bin/lemline instance start examples retry-and-fallback --input '{&quot;failures&quot;:1}'
+bin/lemline instance start examples retry-and-fallback --input '{&quot;failures&quot;:5}'
+</div><p id="-w445p5_19">The first instance returns the stock after one retry. The second fails four times and returns <code class="code" id="-w445p5_26">{&quot;inventory&quot;:[],&quot;stale&quot;:true}</code>. Allow about a minute: the worker picks up delayed retries every 10 seconds.</p></section><section class="chapter"><h2 id="read-the-caught-error" data-toc="read-the-caught-error">Read the caught error</h2><p id="-w445p5_27">The caught error is available as <code class="code" id="-w445p5_32">$error</code> by default. Use <code class="code" id="-w445p5_33">catch.as</code> to choose another name. The following example reads error fields inside the catch task list.</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: format-error-result
+  version: '1.0.0'
+do:
+  - submitOrder:
+      try:
+        - submit:
+            call: http
+            with:
+              method: post
+              endpoint: http://127.0.0.1:8787/reservations
+              body: ${ . }
+      catch:
+        as: orderError
+        do:
+          - formatFailure:
+              set:
+                success: false
+                status: ${ $orderError.status }
+                errorType: ${ $orderError.type }
+                reason: ${ $orderError.title }
+</div><p id="-w445p5_29">Save it as <code class="code" id="-w445p5_34">format-error-result.yaml</code>. Send one valid reservation and two the shop refuses:</p><div class="code-block" data-lang="bash">
+bin/lemline definition post -f format-error-result.yaml
+bin/lemline instance start examples format-error-result --input '{&quot;orderId&quot;:&quot;ORD-901&quot;,&quot;items&quot;:[{&quot;id&quot;:&quot;SKU-1&quot;,&quot;quantity&quot;:1}]}'
+bin/lemline instance start examples format-error-result --input '{&quot;orderId&quot;:&quot;ORD-902&quot;,&quot;items&quot;:[{&quot;id&quot;:&quot;SKU-9&quot;,&quot;quantity&quot;:1}]}'
+bin/lemline instance start examples format-error-result --input '{&quot;orderId&quot;:&quot;ORD-903&quot;,&quot;items&quot;:[{&quot;id&quot;:&quot;SKU-1&quot;,&quot;quantity&quot;:500}]}'
+</div><p id="-w445p5_31">The first instance returns the reservation. The shop answers HTTP 400 to the second and HTTP 409 to the third; both complete with <code class="code" id="-w445p5_35">success: false</code>, the <code class="code" id="-w445p5_36">communication</code> error type, the HTTP status (<code class="code" id="-w445p5_37">400</code>, then <code class="code" id="-w445p5_38">409</code>) and a <code class="code" id="-w445p5_39">reason</code> that starts with <code class="code" id="-w445p5_40">HTTP 400: {&quot;error&quot;:&quot;Invalid items&quot;</code> and <code class="code" id="-w445p5_41">HTTP 409: {&quot;error&quot;:&quot;Out of stock&quot;</code> respectively.</p></section><section class="chapter"><h2 id="propagate-failures" data-toc="propagate-failures">Propagate failures</h2><p id="-w445p5_42">Errors that do not match the filter propagate to the surrounding task scope. A fallback can also raise an error if the workflow should fault after cleanup.</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: compensate-reservation
+  version: '1.0.0'
+do:
+  - reserveInventory:
+      call: http
+      with:
+        method: post
+        endpoint: http://127.0.0.1:8787/reservations
+        body:
+          orderId: ${ $workflow.input.orderId }
+          items: ${ $workflow.input.items }
+      export:
+        as: '${ $context + { reservationId: .id } }'
+  - completeOrder:
+      try:
+        - chargePayment:
+            call: http
+            with:
+              method: post
+              endpoint: http://127.0.0.1:8787/charges
+              body:
+                orderId: ${ $workflow.input.orderId }
+                paymentInfo: ${ $workflow.input.paymentInfo }
+      catch:
+        do:
+          - releaseInventory:
+              call: http
+              with:
+                method: delete
+                endpoint: '${ &quot;http://127.0.0.1:8787/reservations/\($context.reservationId | @uri)&quot; }'
+          - reportFailure:
+              raise:
+                error:
+                  type: https://errors.example.com/order-failed
+                  status: 502
+                  title: Order completion failed
+  - compareCarriers:
+      fork:
+        branches:
+          - economy:
+              try:
+                - quote:
+                    call: http
+                    with:
+                      method: post
+                      endpoint: http://127.0.0.1:8787/quotes/economy
+                      body:
+                        orderId: ${ $workflow.input.orderId }
+                        failTwice: ${ $workflow.input.failTwice // false }
+              catch:
+                retry:
+                  delay: { seconds: 1 }
+                  limit:
+                    attempt: { count: 3 }
+          - express:
+              call: http
+              with:
+                method: post
+                endpoint: http://127.0.0.1:8787/quotes/express
+                body:
+                  orderId: ${ $workflow.input.orderId }
+  - selectCarrier:
+      set:
+        carrier: ${ min_by(.price).carrier }
+  - bookShipment:
+      call: http
+      with:
+        method: post
+        endpoint: http://127.0.0.1:8787/shipments
+        body:
+          orderId: ${ $workflow.input.orderId }
+          carrier: ${ .carrier }
+  - confirmShipment:
+      call: http
+      with:
+        method: post
+        endpoint: http://127.0.0.1:8787/notifications
+        body:
+          reference: ${ .orderId }
+          recipient: customer
+          message: '${ &quot;Shipment booked with &quot; + .carrier }'
+</div><p id="-w445p5_44">Save it as <code class="code" id="-w445p5_51">compensate-reservation.yaml</code> and send a declined payment:</p><div class="code-block" data-lang="bash">
+bin/lemline definition post -f compensate-reservation.yaml
+bin/lemline instance start examples compensate-reservation --input '{&quot;orderId&quot;:&quot;ORD-904&quot;,&quot;items&quot;:[{&quot;id&quot;:&quot;SKU-1&quot;,&quot;quantity&quot;:2}],&quot;paymentInfo&quot;:{&quot;token&quot;:&quot;declined&quot;}}'
+</div><p id="-w445p5_46">The charge fails with HTTP 402, the catch releases the reservation, then raises <code class="code" id="-w445p5_52">Order completion failed</code>: the instance faults with that title and status 502, and the shop shows the <code class="code" id="-w445p5_53">ORD-904</code> reservation as <code class="code" id="-w445p5_54">released</code>.</p><p id="-w445p5_47">Stop the shop when you are done:</p><div class="code-block" data-lang="bash">
+docker compose -f examples/tutorial-services/compose.yaml down
+</div><p id="-w445p5_49">See <a href="lemline-howto-retry.html" id="-w445p5_55" data-tooltip="Configure retries under catch.retry on a try task. Use delay for the initial interval and limit.attempt.count to bound attempts. With a backoff configured, the runner derives subsequent intervals from the configured strategy.">Retry Mechanism</a> and <a href="lemline-howto-custom-errors.html" id="-w445p5_56" data-tooltip="Workflow errors carry a URI identifying the error type and a numeric status. Optional fields include title, detail and instance.">Custom Errors</a>.</p><p id="-w445p5_50">Run the <a href="lemline-tutorial-order-processing.html" id="-w445p5_57" data-tooltip="Complete the SQLite setup and keep the worker running on the host. In a separate terminal, open the root of the Lemline source checkout matching these docs (the directory containing examples/tutorial-services). With Docker Compose running, start the single shop container:">shop checkout tutorial</a> to observe the release before the workflow faults.</p></section><div class="last-modified">25 November 2026</div><div data-feedback-placeholder="true"></div><div class="navigation-links _bottom"><a href="lemline-howto-schemas.html" class="navigation-links__prev">How to validate inputs and outputs with schemas</a><a href="lemline-howto-retry.html" class="navigation-links__next">Retrying failed workflow tasks</a></div></article><div id="disqus_thread"></div></div></section></main></div><script src="https://resources.jetbrains.com/writerside/apidoc/6.22.0-b776/app.js"></script></body></html>

@@ -1,0 +1,686 @@
+<!DOCTYPE html SYSTEM "about:legacy-compat">
+<html lang="en-US" data-preset="contrast" data-primary-color="#2E6F7E"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="robots" content="noindex"><meta name="built-on" content="2026-11-26T17:17:48.922934263"><title>How to validate inputs and outputs with schemas | Lemline documentation</title><script type="application/json" id="virtual-toc-data">[{"id":"run-the-examples","level":0,"title":"Run the Examples","anchor":"#run-the-examples"},{"id":"understanding-schema-validation-in-lemline","level":0,"title":"Understanding Schema Validation in Lemline","anchor":"#understanding-schema-validation-in-lemline"},{"id":"basic-schema-structure","level":0,"title":"Basic Schema Structure","anchor":"#basic-schema-structure"},{"id":"validating-workflow-input","level":0,"title":"Validating Workflow Input","anchor":"#validating-workflow-input"},{"id":"task-input-validation","level":0,"title":"Task Input Validation","anchor":"#task-input-validation"},{"id":"task-output-validation","level":0,"title":"Task Output Validation","anchor":"#task-output-validation"},{"id":"validating-exported-data","level":0,"title":"Validating Exported Data","anchor":"#validating-exported-data"},{"id":"advanced-schema-features","level":0,"title":"Advanced Schema Features","anchor":"#advanced-schema-features"},{"id":"example-order-processing","level":0,"title":"Example: Order Processing","anchor":"#example-order-processing"},{"id":"schema-reuse-and-references","level":0,"title":"Schema Reuse and References","anchor":"#schema-reuse-and-references"},{"id":"best-practices-for-schema-validation","level":0,"title":"Best Practices for Schema Validation","anchor":"#best-practices-for-schema-validation"},{"id":"troubleshooting-schema-validation","level":0,"title":"Troubleshooting Schema Validation","anchor":"#troubleshooting-schema-validation"},{"id":"next-steps","level":0,"title":"Next Steps","anchor":"#next-steps"}]</script><script type="application/json" id="topic-shortcuts"></script><link href="https://resources.jetbrains.com/writerside/apidoc/6.22.0-b776/app.css" rel="stylesheet"><link href="static/custom.css" rel="stylesheet"><link rel="icon" type="image/png" sizes="16x16" href="images/lemly.png"><meta name="image" content="https://docs.lemline.com/social-preview.png"><!-- Open Graph --><meta property="og:title" content="How to validate inputs and outputs with schemas | Lemline documentation"><meta property="og:description" content=""><meta property="og:image" content="https://docs.lemline.com/social-preview.png"><meta property="og:site_name" content="Lemline documentation Help"><meta property="og:type" content="website"><meta property="og:locale" content="en_US"><meta property="og:url" content="https://docs.lemline.com/lemline-howto-schemas.html"><!-- End Open Graph --><!-- Twitter Card --><meta name="twitter:card" content="summary_large_image"><meta name="twitter:site" content=""><meta name="twitter:title" content="How to validate inputs and outputs with schemas | Lemline documentation"><meta name="twitter:description" content=""><meta name="twitter:creator" content=""><meta name="twitter:image:src" content="https://docs.lemline.com/social-preview.png"><!-- End Twitter Card --><!-- Schema.org WebPage --><script type="application/ld+json">{
+    "@context": "http://schema.org",
+    "@type": "WebPage",
+    "@id": "https://docs.lemline.com/lemline-howto-schemas.html#webpage",
+    "url": "https://docs.lemline.com/lemline-howto-schemas.html",
+    "name": "How to validate inputs and outputs with schemas | Lemline documentation",
+    "description": "",
+    "image": "https://docs.lemline.com/social-preview.png",
+    "inLanguage":"en-US"
+}</script><!-- End Schema.org --><!-- Schema.org WebSite --><script type="application/ld+json">{
+    "@type": "WebSite",
+    "@id": "https://docs.lemline.com/#website",
+    "url": "https://docs.lemline.com/",
+    "name": "Lemline documentation Help"
+}</script><!-- End Schema.org --></head><body data-id="lemline-howto-schemas" data-main-title="How to validate inputs and outputs with schemas" data-article-props="{&quot;seeAlsoStyle&quot;:&quot;links&quot;}" data-template="article" data-breadcrumbs="How-to Guides///Data Management"><div class="wrapper"><main class="panel _main"><header class="panel__header"><div class="container"><h3>Lemline documentation  Help</h3><div class="panel-trigger"></div></div></header><section class="panel__content"><div class="container"><article class="article" data-shortcut-switcher="inactive"><h1 data-toc="lemline-howto-schemas" id="lemline-howto-schemas.md">How to validate inputs and outputs with schemas</h1><p id="c4i5q6_3">This guide explains how to implement data validation in Lemline workflows using JSON Schema. You'll learn how to validate workflow inputs, task inputs and outputs, and exported data to ensure data quality and prevent errors.</p><section class="chapter"><h2 id="run-the-examples" data-toc="run-the-examples">Run the Examples</h2><p id="c4i5q6_17">Each example below is a complete workflow. Complete <a href="lemline-tutorial-setup.html" id="c4i5q6_19" data-tooltip="Run Lemline on one machine with SQLite. Lemline stores workflow definitions, queued messages, and workflow history in local files. Use a writable directory on a local filesystem.">the SQLite setup</a> and keep its worker running. Run the commands from a second terminal in the setup directory. With the JAR, substitute <code class="code" id="c4i5q6_20">java -jar lemline.jar</code> for <code class="code" id="c4i5q6_21">bin/lemline</code>. A workflow-level schema is checked by <code class="code" id="c4i5q6_22">instance start</code>, so an invalid input is refused on the command line; a task-level schema is checked when the task runs, so the instance faults with a <code class="code" id="c4i5q6_23">validation</code> error. Some examples call the <a href="lemline-tutorial-order-processing.html#start-the-tutorial-shop" id="c4i5q6_24" data-tooltip="Complete the SQLite setup and keep the worker running on the host. In a separate terminal, open the root of the Lemline source checkout matching these docs (the directory containing examples/tutorial-services). With Docker Compose running, start the single shop container:">tutorial shop</a>; start it from the root of the Lemline source checkout:</p><div class="code-block" data-lang="bash">
+docker compose -f examples/tutorial-services/compose.yaml up -d
+</div></section><section class="chapter"><h2 id="understanding-schema-validation-in-lemline" data-toc="understanding-schema-validation-in-lemline">Understanding Schema Validation in Lemline</h2><p id="c4i5q6_25">Schema validation allows you to define the expected structure, types, and constraints for your data. Lemline uses JSON Schema 2020-12 for validation at various points in the workflow:</p><ul class="list _bullet" id="c4i5q6_26"><li class="list__item" id="c4i5q6_28"><p id="c4i5q6_32"><span class="control" id="c4i5q6_33">Workflow Input</span>: Validating data passed to the workflow</p></li><li class="list__item" id="c4i5q6_29"><p id="c4i5q6_34"><span class="control" id="c4i5q6_35">Task Input</span>: Validating data before task execution</p></li><li class="list__item" id="c4i5q6_30"><p id="c4i5q6_36"><span class="control" id="c4i5q6_37">Task Output</span>: Validating data produced by a task</p></li><li class="list__item" id="c4i5q6_31"><p id="c4i5q6_38"><span class="control" id="c4i5q6_39">Export Data</span>: Validating data promoted to the global context</p></li></ul><p id="c4i5q6_27">By defining schemas, you can catch data issues early, before they cause problems downstream, making your workflows more robust and reliable.</p></section><section class="chapter"><h2 id="basic-schema-structure" data-toc="basic-schema-structure">Basic Schema Structure</h2><p id="c4i5q6_40">A JSON Schema defines the structure and constraints for JSON data:</p><div class="code-block" data-lang="json">
+{
+  &quot;type&quot;: &quot;object&quot;,
+  &quot;required&quot;: [&quot;name&quot;, &quot;email&quot;],
+  &quot;properties&quot;: {
+    &quot;name&quot;: {
+      &quot;type&quot;: &quot;string&quot;,
+      &quot;minLength&quot;: 1
+    },
+    &quot;email&quot;: {
+      &quot;type&quot;: &quot;string&quot;,
+      &quot;format&quot;: &quot;email&quot;
+    },
+    &quot;age&quot;: {
+      &quot;type&quot;: &quot;integer&quot;,
+      &quot;minimum&quot;: 18
+    }
+  }
+}
+</div><p id="c4i5q6_42">This schema validates an object with:</p><ul class="list _bullet" id="c4i5q6_43"><li class="list__item" id="c4i5q6_44"><p id="c4i5q6_48">Required <code class="code" id="c4i5q6_49">name</code> and <code class="code" id="c4i5q6_50">email</code> properties</p></li><li class="list__item" id="c4i5q6_45"><p id="c4i5q6_51"><code class="code" id="c4i5q6_52">name</code> must be a non-empty string</p></li><li class="list__item" id="c4i5q6_46"><p id="c4i5q6_53"><code class="code" id="c4i5q6_54">email</code> must be a valid email address</p></li><li class="list__item" id="c4i5q6_47"><p id="c4i5q6_55">Optional <code class="code" id="c4i5q6_56">age</code> must be an integer of at least 18 if present</p></li></ul></section><section class="chapter"><h2 id="validating-workflow-input" data-toc="validating-workflow-input">Validating Workflow Input</h2><section class="chapter"><h3 id="adding-an-input-schema" data-toc="adding-an-input-schema">Adding an Input Schema</h3><p id="c4i5q6_60">To validate data passed to your workflow, define an input schema:</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: customer-onboarding
+  version: '1.0.0'
+  title: Customer Onboarding Workflow
+input:
+  schema:
+    document:
+      type: object
+      required:
+        - name
+        - email
+        - address
+      properties:
+        name:
+          type: string
+          minLength: 1
+        email:
+          type: string
+          format: email
+        address:
+          type: object
+          required:
+            - street
+            - city
+            - zipCode
+          properties:
+            street:
+              type: string
+            city:
+              type: string
+            state:
+              type: string
+            zipCode:
+              type: string
+              pattern: ^\d{5}(-\d{4})?$
+        phoneNumber:
+          type: string
+          pattern: ^\+?[1-9]\d{1,14}$
+do:
+  - acceptCustomer:
+      set:
+        accepted: ${ .email }
+</div><p id="c4i5q6_62">Save it as <code class="code" id="c4i5q6_65">adding-an-input-schema.yaml</code>:</p><div class="code-block" data-lang="bash">
+bin/lemline definition post -f adding-an-input-schema.yaml
+bin/lemline instance start examples customer-onboarding --input '{&quot;name&quot;:&quot;Ada Lovelace&quot;,&quot;email&quot;:&quot;ada@example.com&quot;,&quot;address&quot;:{&quot;street&quot;:&quot;12 Main St&quot;,&quot;city&quot;:&quot;Springfield&quot;,&quot;zipCode&quot;:&quot;12345&quot;}}'
+bin/lemline instance start examples customer-onboarding --input '{&quot;name&quot;:&quot;Ada Lovelace&quot;,&quot;email&quot;:&quot;ada-at-example&quot;,&quot;address&quot;:{&quot;street&quot;:&quot;12 Main St&quot;,&quot;city&quot;:&quot;Springfield&quot;,&quot;zipCode&quot;:&quot;12345&quot;}}'
+</div><p id="c4i5q6_64">The first instance completes with <code class="code" id="c4i5q6_66">{&quot;accepted&quot;:&quot;ada@example.com&quot;}</code>. The second is refused: <code class="code" id="c4i5q6_67">ada-at-example</code> is not a valid email. Refused inputs never become instances: the CLI prints <code class="code" id="c4i5q6_68">Input validation failed against workflow schema</code> and the rule that failed.</p></section><section class="chapter"><h3 id="providing-default-values" data-toc="providing-default-values">Providing Default Values</h3><p id="c4i5q6_69">You can specify default values for optional fields:</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: default-workflow-input
+  version: '1.0.0'
+input:
+  from: '${ { priority: &quot;NORMAL&quot;, currency: &quot;USD&quot; } + . }'
+do:
+  - recordOrder:
+      set:
+        orderId: ${ .orderId }
+        priority: ${ .priority }
+        currency: ${ .currency }
+</div><p id="c4i5q6_71">Save it as <code class="code" id="c4i5q6_74">default-workflow-input.yaml</code>:</p><div class="code-block" data-lang="bash">
+bin/lemline definition post -f default-workflow-input.yaml
+bin/lemline instance start examples default-workflow-input --input '{&quot;orderId&quot;:&quot;ORD-2&quot;}'
+bin/lemline instance start examples default-workflow-input --input '{&quot;orderId&quot;:&quot;ORD-3&quot;,&quot;currency&quot;:&quot;EUR&quot;}'
+</div><p id="c4i5q6_73">Expect <code class="code" id="c4i5q6_75">{&quot;orderId&quot;:&quot;ORD-2&quot;,&quot;priority&quot;:&quot;NORMAL&quot;,&quot;currency&quot;:&quot;USD&quot;}</code>, then <code class="code" id="c4i5q6_76">{&quot;orderId&quot;:&quot;ORD-3&quot;,&quot;priority&quot;:&quot;NORMAL&quot;,&quot;currency&quot;:&quot;EUR&quot;}</code>. The workflow-level <code class="code" id="c4i5q6_77">input.from</code> expression merges defaults with the input before the first task runs. Values supplied by the caller take precedence. <code class="code" id="c4i5q6_78">$workflow.input</code> still holds the input as the caller supplied it.</p></section><section class="chapter"><h3 id="accessing-validated-input" data-toc="accessing-validated-input">Accessing Validated Input</h3><p id="c4i5q6_79">After validation, you can access the input data in your workflow:</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: accessing-validated-input
+  version: '1.0.0'
+do:
+  - ProcessCustomer:
+      set:
+        customer:
+          name: ${ $workflow.input.name }
+          email: ${ $workflow.input.email }
+          address: ${ $workflow.input.address }
+          phone: ${ $workflow.input.phoneNumber // &quot;Not provided&quot; }
+          preferredContact: ${ $workflow.input.preferredContact }
+</div><p id="c4i5q6_81">Save it as <code class="code" id="c4i5q6_84">accessing-validated-input.yaml</code>:</p><div class="code-block" data-lang="bash">
+bin/lemline definition post -f accessing-validated-input.yaml
+bin/lemline instance start examples accessing-validated-input --input '{&quot;name&quot;:&quot;Ada Lovelace&quot;,&quot;email&quot;:&quot;ada@example.com&quot;,&quot;address&quot;:{&quot;city&quot;:&quot;Springfield&quot;},&quot;preferredContact&quot;:&quot;email&quot;}'
+</div><p id="c4i5q6_83">Expect the customer with <code class="code" id="c4i5q6_85">&quot;phone&quot;:&quot;Not provided&quot;</code>, the fallback for the missing phone number.</p></section></section><section class="chapter"><h2 id="task-input-validation" data-toc="task-input-validation">Task Input Validation</h2><section class="chapter"><h3 id="validating-task-input" data-toc="validating-task-input">Validating Task Input</h3><p id="c4i5q6_88">To validate data before a task executes:</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: validating-task-input
+  version: '1.0.0'
+do:
+  - requestPayment:
+      call: http
+      with:
+        method: post
+        endpoint: http://127.0.0.1:8787/audit
+        body:
+          reference: ${ .paymentMethod.token }
+          message: '${ &quot;Payment of \(.amount) \(.currency) requested&quot; }'
+      input:
+        schema:
+          document:
+            type: object
+            required:
+              - amount
+              - currency
+              - paymentMethod
+            properties:
+              amount:
+                type: number
+                exclusiveMinimum: 0
+              currency:
+                type: string
+                enum:
+                  - USD
+                  - EUR
+                  - GBP
+              paymentMethod:
+                type: object
+                required:
+                  - type
+                  - token
+                properties:
+                  type:
+                    type: string
+                    enum:
+                      - CREDIT_CARD
+                      - PAYPAL
+                      - BANK_TRANSFER
+                  token:
+                    type: string
+</div><p id="c4i5q6_90">Save it as <code class="code" id="c4i5q6_94">validating-task-input.yaml</code>:</p><div class="code-block" data-lang="bash">
+bin/lemline definition post -f validating-task-input.yaml
+bin/lemline instance start examples validating-task-input --input '{&quot;amount&quot;:25,&quot;currency&quot;:&quot;EUR&quot;,&quot;paymentMethod&quot;:{&quot;type&quot;:&quot;CREDIT_CARD&quot;,&quot;token&quot;:&quot;tok-1&quot;}}'
+bin/lemline instance start examples validating-task-input --input '{&quot;amount&quot;:0,&quot;currency&quot;:&quot;EUR&quot;,&quot;paymentMethod&quot;:{&quot;type&quot;:&quot;CREDIT_CARD&quot;,&quot;token&quot;:&quot;tok-2&quot;}}'
+</div><p id="c4i5q6_92">The first instance records <code class="code" id="c4i5q6_95">Payment of 25 EUR requested</code> in the shop's audit list. The second faults with a <code class="code" id="c4i5q6_96">validation</code> error before the call: the amount must be greater than 0, and the shop receives nothing for <code class="code" id="c4i5q6_97">tok-2</code>.</p><p id="c4i5q6_93">If the input doesn't match the schema, a validation error is raised before the task executes.</p></section><section class="chapter"><h3 id="input-transformation-and-validation" data-toc="input-transformation-and-validation">Input Transformation and Validation</h3><p id="c4i5q6_98">You can combine transformation with validation:</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: input-transformation-and-validation
+  version: '1.0.0'
+do:
+  - FormatUserData:
+      set:
+        userProfile: ${ .formattedUser }
+        isAdult: ${ .formattedUser.age &gt;= 18 }
+      input:
+        schema:
+          document:
+            type: object
+            required:
+              - userId
+              - firstName
+              - lastName
+              - email
+            properties:
+              userId:
+                type: string
+              firstName:
+                type: string
+                minLength: 1
+              lastName:
+                type: string
+                minLength: 1
+              email:
+                type: string
+                format: email
+              age:
+                type: integer
+                minimum: 13
+        from:
+          formattedUser:
+            id: ${ .userId }
+            fullName: ${ .firstName + &quot; &quot; + .lastName }
+            email: ${ .email | ascii_downcase }
+            age: ${ .age }
+</div><p id="c4i5q6_100">Save it as <code class="code" id="c4i5q6_104">input-transformation-and-validation.yaml</code>:</p><div class="code-block" data-lang="bash">
+bin/lemline definition post -f input-transformation-and-validation.yaml
+bin/lemline instance start examples input-transformation-and-validation --input '{&quot;userId&quot;:&quot;C-100&quot;,&quot;firstName&quot;:&quot;Ada&quot;,&quot;lastName&quot;:&quot;Lovelace&quot;,&quot;email&quot;:&quot;Ada@Example.com&quot;,&quot;age&quot;:36}'
+bin/lemline instance start examples input-transformation-and-validation --input '{&quot;userId&quot;:&quot;C-100&quot;,&quot;firstName&quot;:&quot;&quot;,&quot;lastName&quot;:&quot;Lovelace&quot;,&quot;email&quot;:&quot;ada@example.com&quot;}'
+</div><p id="c4i5q6_102">The schema checks the raw input; <code class="code" id="c4i5q6_105">input.from</code> then reshapes it. The first instance completes with <code class="code" id="c4i5q6_106">{&quot;userProfile&quot;:{&quot;id&quot;:&quot;C-100&quot;,&quot;fullName&quot;:&quot;Ada Lovelace&quot;,&quot;email&quot;:&quot;ada@example.com&quot;,&quot;age&quot;:36},&quot;isAdult&quot;:true}</code>. The second faults with a <code class="code" id="c4i5q6_107">validation</code> error: <code class="code" id="c4i5q6_108">firstName</code> is empty.</p><p id="c4i5q6_103">This example validates the input, then transforms it: <code class="code" id="c4i5q6_109">input.schema</code> is checked against the data the task receives, before <code class="code" id="c4i5q6_110">input.from</code> is applied.</p></section></section><section class="chapter"><h2 id="task-output-validation" data-toc="task-output-validation">Task Output Validation</h2><section class="chapter"><h3 id="validating-task-output" data-toc="validating-task-output">Validating Task Output</h3><p id="c4i5q6_113">To validate data produced by a task:</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: validating-task-output
+  version: '1.0.0'
+do:
+  - GenerateOrderSummary:
+      set:
+        orderSummary:
+          id: ${ .orderId }
+          customer:
+            id: ${ .customerId }
+            name: ${ .customerName }
+          items: '${ .items | map({ id: .productId, name: .productName, quantity: .quantity, price: .price
+            }) }'
+          subtotal: ${ .items | map(.price * .quantity) | add }
+          tax: ${ .items | map(.price * .quantity) | add * 0.08 }
+          total: ${ .items | map(.price * .quantity) | add * 1.08 }
+      output:
+        schema:
+          document:
+            type: object
+            required:
+              - orderSummary
+            properties:
+              orderSummary:
+                type: object
+                required:
+                  - id
+                  - customer
+                  - items
+                  - subtotal
+                  - tax
+                  - total
+                properties:
+                  id:
+                    type: string
+                  customer:
+                    type: object
+                    required:
+                      - id
+                      - name
+                  items:
+                    type: array
+                    minItems: 1
+                    items:
+                      type: object
+                      required:
+                        - id
+                        - name
+                        - quantity
+                        - price
+                  subtotal:
+                    type: number
+                    minimum: 0
+                  tax:
+                    type: number
+                    minimum: 0
+                  total:
+                    type: number
+                    minimum: 0
+</div><p id="c4i5q6_115">Save it as <code class="code" id="c4i5q6_119">validating-task-output.yaml</code>:</p><div class="code-block" data-lang="bash">
+bin/lemline definition post -f validating-task-output.yaml
+bin/lemline instance start examples validating-task-output --input '{&quot;orderId&quot;:&quot;ORD-1&quot;,&quot;customerId&quot;:&quot;C-100&quot;,&quot;customerName&quot;:&quot;Ada Lovelace&quot;,&quot;items&quot;:[{&quot;productId&quot;:&quot;SKU-1&quot;,&quot;productName&quot;:&quot;Garden hose&quot;,&quot;quantity&quot;:2,&quot;price&quot;:25}]}'
+bin/lemline instance start examples validating-task-output --input '{&quot;orderId&quot;:&quot;ORD-2&quot;,&quot;customerId&quot;:&quot;C-100&quot;,&quot;customerName&quot;:&quot;Ada Lovelace&quot;,&quot;items&quot;:[{&quot;productId&quot;:&quot;SKU-1&quot;,&quot;productName&quot;:&quot;Garden hose&quot;,&quot;quantity&quot;:2,&quot;price&quot;:-25}]}'
+</div><p id="c4i5q6_117">The first instance returns the summary with <code class="code" id="c4i5q6_120">subtotal</code> 50, <code class="code" id="c4i5q6_121">tax</code> 4 and <code class="code" id="c4i5q6_122">total</code> 54. In the second, the price is negative: the computed <code class="code" id="c4i5q6_123">subtotal</code> breaks <code class="code" id="c4i5q6_124">minimum: 0</code> and the task faults with a <code class="code" id="c4i5q6_125">validation</code> error.</p><p id="c4i5q6_118">If the output doesn't match the schema, a validation error is raised after the task executes.</p></section><section class="chapter"><h3 id="output-transformation-and-validation" data-toc="output-transformation-and-validation">Output Transformation and Validation</h3><p id="c4i5q6_126">Combine transformation with validation:</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: output-transformation-and-validation
+  version: '1.0.0'
+do:
+  - findProducts:
+      call: http
+      with:
+        method: get
+        endpoint: http://127.0.0.1:8787/products
+        query:
+          category: ${ .category }
+      output:
+        as: '${ if (.items | length) &gt; 0 then { status: &quot;SUCCESS&quot;, data: { items: [.items[].id] } } else { status: &quot;ERROR&quot;, error: { message: &quot;No products in this category&quot; } } end }'
+        schema:
+          document:
+            type: object
+            required:
+              - status
+            properties:
+              status:
+                type: string
+                enum:
+                  - SUCCESS
+                  - ERROR
+              data:
+                type: object
+                if:
+                  properties:
+                    status:
+                      const: SUCCESS
+                  required:
+                    - status
+                then:
+                  required:
+                    - data
+              error:
+                type: object
+                if:
+                  properties:
+                    status:
+                      const: ERROR
+                  required:
+                    - status
+                then:
+                  required:
+                    - error
+</div><p id="c4i5q6_128">Save it as <code class="code" id="c4i5q6_132">output-transformation-and-validation.yaml</code>:</p><div class="code-block" data-lang="bash">
+bin/lemline definition post -f output-transformation-and-validation.yaml
+bin/lemline instance start examples output-transformation-and-validation --input '{&quot;category&quot;:&quot;garden&quot;}'
+bin/lemline instance start examples output-transformation-and-validation --input '{&quot;category&quot;:&quot;toys&quot;}'
+</div><p id="c4i5q6_130">Expect <code class="code" id="c4i5q6_133">{&quot;status&quot;:&quot;SUCCESS&quot;,&quot;data&quot;:{&quot;items&quot;:[&quot;SKU-1&quot;,&quot;SKU-2&quot;,&quot;SKU-3&quot;]}}</code>, then <code class="code" id="c4i5q6_134">{&quot;status&quot;:&quot;ERROR&quot;,&quot;error&quot;:{&quot;message&quot;:&quot;No products in this category&quot;}}</code>. Both outputs satisfy the schema.</p><p id="c4i5q6_131">This transforms the API response into a standardized format and validates the structure.</p></section></section><section class="chapter"><h2 id="validating-exported-data" data-toc="validating-exported-data">Validating Exported Data</h2><section class="chapter"><h3 id="export-schema-validation" data-toc="export-schema-validation">Export Schema Validation</h3><p id="c4i5q6_136">To validate data being exported to the global context:</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: export-schema-validation
+  version: '1.0.0'
+do:
+  - fetchCustomerData:
+      call: http
+      with:
+        method: get
+        endpoint: ${ &quot;http://127.0.0.1:8787/customers/&quot; + .customerId }
+      export:
+        as:
+          customer: ${ . }
+        schema:
+          document:
+            type: object
+            required:
+              - customer
+            properties:
+              customer:
+                type: object
+                required:
+                  - id
+                  - name
+                  - email
+                  - tier
+                properties:
+                  id:
+                    type: string
+                  name:
+                    type: string
+                  email:
+                    type: string
+                    format: email
+                  tier:
+                    type: string
+                    enum:
+                      - gold
+                      - standard
+  - greetCustomer:
+      set:
+        greeting: ${ &quot;Hello &quot; + $context.customer.name }
+</div><p id="c4i5q6_138">Save it as <code class="code" id="c4i5q6_142">export-schema-validation.yaml</code>:</p><div class="code-block" data-lang="bash">
+bin/lemline definition post -f export-schema-validation.yaml
+bin/lemline instance start examples export-schema-validation --input '{&quot;customerId&quot;:&quot;C-100&quot;}'
+bin/lemline instance start examples export-schema-validation --input '{&quot;customerId&quot;:&quot;C-300&quot;}'
+</div><p id="c4i5q6_140">C-100 passes and the next task greets <code class="code" id="c4i5q6_143">Ada Lovelace</code>. The shop stores C-300 with the email <code class="code" id="c4i5q6_144">not-an-email</code>: the export breaks <code class="code" id="c4i5q6_145">format: email</code> and the task faults with a <code class="code" id="c4i5q6_146">validation</code> error.</p><p id="c4i5q6_141">This ensures that only valid customer data is exported to the global context.</p></section></section><section class="chapter"><h2 id="advanced-schema-features" data-toc="advanced-schema-features">Advanced Schema Features</h2><section class="chapter"><h3 id="complex-property-dependencies" data-toc="complex-property-dependencies">Complex Property Dependencies</h3><p id="c4i5q6_153">You can define dependencies between properties:</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: schema-property-dependencies
+  version: '1.0.0'
+input:
+  schema:
+    document:
+      type: object
+      properties:
+        shippingMethod:
+          type: string
+          enum:
+            - STANDARD
+            - EXPRESS
+            - SAME_DAY
+        deliveryDate:
+          type: string
+          format: date
+      dependentSchemas:
+        shippingMethod:
+          oneOf:
+            - properties:
+                shippingMethod:
+                  enum:
+                    - SAME_DAY
+                deliveryDate:
+                  type: string
+              required:
+                - deliveryDate
+            - properties:
+                shippingMethod:
+                  enum:
+                    - EXPRESS
+                    - STANDARD
+do:
+  - example:
+      set:
+        ready: true
+</div><p id="c4i5q6_155">Save it as <code class="code" id="c4i5q6_159">schema-property-dependencies.yaml</code>:</p><div class="code-block" data-lang="bash">
+bin/lemline definition post -f schema-property-dependencies.yaml
+bin/lemline instance start examples schema-property-dependencies --input '{&quot;shippingMethod&quot;:&quot;SAME_DAY&quot;,&quot;deliveryDate&quot;:&quot;2026-12-01&quot;}'
+bin/lemline instance start examples schema-property-dependencies --input '{&quot;shippingMethod&quot;:&quot;EXPRESS&quot;}'
+bin/lemline instance start examples schema-property-dependencies --input '{&quot;shippingMethod&quot;:&quot;SAME_DAY&quot;}'
+</div><p id="c4i5q6_157">The first two start. The third is refused: a same-day delivery needs a <code class="code" id="c4i5q6_160">deliveryDate</code>. Refused inputs never become instances: the CLI prints <code class="code" id="c4i5q6_161">Input validation failed against workflow schema</code> and the rule that failed.</p><p id="c4i5q6_158">This schema requires <code class="code" id="c4i5q6_162">deliveryDate</code> only when <code class="code" id="c4i5q6_163">shippingMethod</code> is &quot;SAME_DAY&quot;.</p></section><section class="chapter"><h3 id="conditional-schemas-with-if-then-else" data-toc="conditional-schemas-with-if-then-else">Conditional Schemas with if/then/else</h3><p id="c4i5q6_164">You can apply different validations based on conditions:</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: schema-conditional-validation
+  version: '1.0.0'
+input:
+  schema:
+    document:
+      type: object
+      properties:
+        paymentMethod:
+          type: string
+          enum:
+            - CREDIT_CARD
+            - BANK_TRANSFER
+            - PAYPAL
+        cardNumber:
+          type: string
+        expiryDate:
+          type: string
+        accountNumber:
+          type: string
+        routingNumber:
+          type: string
+        paypalEmail:
+          type: string
+      required:
+        - paymentMethod
+      if:
+        properties:
+          paymentMethod:
+            enum:
+              - CREDIT_CARD
+        required:
+          - paymentMethod
+      then:
+        required:
+          - cardNumber
+          - expiryDate
+      else:
+        if:
+          properties:
+            paymentMethod:
+              enum:
+                - BANK_TRANSFER
+          required:
+            - paymentMethod
+        then:
+          required:
+            - accountNumber
+            - routingNumber
+        else:
+          required:
+            - paypalEmail
+do:
+  - example:
+      set:
+        ready: true
+</div><p id="c4i5q6_166">Save it as <code class="code" id="c4i5q6_170">schema-conditional-validation.yaml</code>:</p><div class="code-block" data-lang="bash">
+bin/lemline definition post -f schema-conditional-validation.yaml
+bin/lemline instance start examples schema-conditional-validation --input '{&quot;paymentMethod&quot;:&quot;CREDIT_CARD&quot;,&quot;cardNumber&quot;:&quot;4111111111111111&quot;,&quot;expiryDate&quot;:&quot;12/30&quot;}'
+bin/lemline instance start examples schema-conditional-validation --input '{&quot;paymentMethod&quot;:&quot;CREDIT_CARD&quot;}'
+bin/lemline instance start examples schema-conditional-validation --input '{&quot;paymentMethod&quot;:&quot;PAYPAL&quot;}'
+</div><p id="c4i5q6_168">The first starts. The second is refused for the missing <code class="code" id="c4i5q6_171">cardNumber</code>, the third for the missing <code class="code" id="c4i5q6_172">paypalEmail</code>.</p><p id="c4i5q6_169">This schema requires different fields based on the payment method selected.</p></section><section class="chapter"><h3 id="pattern-properties" data-toc="pattern-properties">Pattern Properties</h3><p id="c4i5q6_173">You can validate properties that match a pattern:</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: schema-pattern-properties
+  version: '1.0.0'
+input:
+  schema:
+    document:
+      type: object
+      properties:
+        name:
+          type: string
+      patternProperties:
+        ^custom_:
+          type: string
+      additionalProperties: false
+do:
+  - example:
+      set:
+        ready: true
+</div><p id="c4i5q6_175">Save it as <code class="code" id="c4i5q6_179">schema-pattern-properties.yaml</code>:</p><div class="code-block" data-lang="bash">
+bin/lemline definition post -f schema-pattern-properties.yaml
+bin/lemline instance start examples schema-pattern-properties --input '{&quot;name&quot;:&quot;Garden hose&quot;,&quot;custom_color&quot;:&quot;green&quot;}'
+bin/lemline instance start examples schema-pattern-properties --input '{&quot;name&quot;:&quot;Garden hose&quot;,&quot;color&quot;:&quot;green&quot;}'
+</div><p id="c4i5q6_177">The first starts. The second is refused: <code class="code" id="c4i5q6_180">color</code> does not start with <code class="code" id="c4i5q6_181">custom_</code> and additional properties are not allowed.</p><p id="c4i5q6_178">This schema allows any property that starts with &quot;custom_&quot; (and requires it to be a string), plus the &quot;name&quot; property, but no others.</p></section><section class="chapter"><h3 id="advanced-string-formats" data-toc="advanced-string-formats">Advanced String Formats</h3><p id="c4i5q6_182">JSON Schema supports several built-in formats for string validation:</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: schema-string-formats
+  version: '1.0.0'
+input:
+  schema:
+    document:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+        website:
+          type: string
+          format: uri
+        date:
+          type: string
+          format: date
+        time:
+          type: string
+          format: time
+        dateTime:
+          type: string
+          format: date-time
+        ipAddress:
+          type: string
+          format: ipv4
+        uuid:
+          type: string
+          format: uuid
+do:
+  - example:
+      set:
+        ready: true
+</div><p id="c4i5q6_184">Save it as <code class="code" id="c4i5q6_187">schema-string-formats.yaml</code>:</p><div class="code-block" data-lang="bash">
+bin/lemline definition post -f schema-string-formats.yaml
+bin/lemline instance start examples schema-string-formats --input '{&quot;email&quot;:&quot;ada@example.com&quot;,&quot;website&quot;:&quot;https://shop.example&quot;,&quot;date&quot;:&quot;2026-12-01&quot;,&quot;dateTime&quot;:&quot;2026-12-01T10:00:00Z&quot;,&quot;ipAddress&quot;:&quot;127.0.0.1&quot;}'
+bin/lemline instance start examples schema-string-formats --input '{&quot;date&quot;:&quot;2026-13-45&quot;}'
+bin/lemline instance start examples schema-string-formats --input '{&quot;email&quot;:&quot;not-an-email&quot;}'
+</div><p id="c4i5q6_186">Lemline checks formats: the first starts, the second is refused as not a valid RFC 3339 full-date, the third as not a valid RFC 5321 mailbox. <code class="code" id="c4i5q6_188">uri</code>, <code class="code" id="c4i5q6_189">time</code>, <code class="code" id="c4i5q6_190">ipv4</code> and <code class="code" id="c4i5q6_191">uuid</code> are checked the same way.</p></section><section class="chapter"><h3 id="array-validation" data-toc="array-validation">Array Validation</h3><p id="c4i5q6_192">For validating arrays and their contents:</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: schema-array-validation
+  version: '1.0.0'
+input:
+  schema:
+    document:
+      type: object
+      properties:
+        tags:
+          type: array
+          minItems: 1
+          maxItems: 5
+          uniqueItems: true
+          items:
+            type: string
+            minLength: 2
+        matrix:
+          type: array
+          items:
+            type: array
+            items:
+              type: number
+        coordinates:
+          type: array
+          items:
+            type: number
+          minItems: 2
+          maxItems: 3
+do:
+  - example:
+      set:
+        ready: true
+</div><p id="c4i5q6_194">Save it as <code class="code" id="c4i5q6_197">schema-array-validation.yaml</code>:</p><div class="code-block" data-lang="bash">
+bin/lemline definition post -f schema-array-validation.yaml
+bin/lemline instance start examples schema-array-validation --input '{&quot;tags&quot;:[&quot;garden&quot;,&quot;sale&quot;],&quot;coordinates&quot;:[45.7,4.8]}'
+bin/lemline instance start examples schema-array-validation --input '{&quot;tags&quot;:[&quot;sale&quot;,&quot;sale&quot;]}'
+bin/lemline instance start examples schema-array-validation --input '{&quot;coordinates&quot;:[45.7]}'
+</div><p id="c4i5q6_196">The first starts. The second is refused because the tags are not unique, the third because a coordinate needs at least two numbers.</p></section><section class="chapter"><h3 id="content-media-type" data-toc="content-media-type">Content Media Type</h3><p id="c4i5q6_198">You can specify the expected media type for string content:</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: schema-media-type
+  version: '1.0.0'
+input:
+  schema:
+    document:
+      type: object
+      properties:
+        htmlContent:
+          type: string
+          contentMediaType: text/html
+        csvData:
+          type: string
+          contentMediaType: text/csv
+        jsonData:
+          type: string
+          contentMediaType: application/json
+do:
+  - example:
+      set:
+        ready: true
+</div><p id="c4i5q6_200">Save it as <code class="code" id="c4i5q6_203">schema-media-type.yaml</code>:</p><div class="code-block" data-lang="bash">
+bin/lemline definition post -f schema-media-type.yaml
+bin/lemline instance start examples schema-media-type --input '{&quot;jsonData&quot;:&quot;{\&quot;sku\&quot;:\&quot;SKU-1\&quot;}&quot;}'
+bin/lemline instance start examples schema-media-type --input '{&quot;jsonData&quot;:&quot;not json&quot;}'
+</div><p id="c4i5q6_202">Both start. <code class="code" id="c4i5q6_204">contentMediaType</code> is an annotation in JSON Schema 2020-12: Lemline does not check that the string holds JSON, HTML or CSV. Parse it in an expression, for example with <code class="code" id="c4i5q6_205">fromjson</code>, if the workflow needs it.</p></section></section><section class="chapter"><h2 id="example-order-processing" data-toc="example-order-processing">Example: Order Processing</h2><p id="c4i5q6_206">The input schema requires an order ID and a nonnegative total. The workflow validates the input before choosing a processing path.</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: validate-and-route-order
+  version: '1.0.0'
+input:
+  schema:
+    format: json
+    document:
+      type: object
+      required: [orderId, total]
+      properties:
+        orderId:
+          type: string
+        total:
+          type: number
+          minimum: 0
+do:
+  - routeOrder:
+      switch:
+        - largeOrder:
+            when: ${ .total &gt;= 1000 }
+            then: requestReview
+        - automatic:
+            then: acceptOrder
+  - requestReview:
+      set:
+        status: needs-review
+      then: exit
+  - acceptOrder:
+      set:
+        status: accepted
+output:
+  as: '${ { orderId: $workflow.input.orderId, status: .status } }'
+</div><p id="c4i5q6_208">Save it as <code class="code" id="c4i5q6_211">validate-and-route-order.yaml</code>:</p><div class="code-block" data-lang="bash">
+bin/lemline definition post -f validate-and-route-order.yaml
+bin/lemline instance start examples validate-and-route-order --input '{&quot;orderId&quot;:&quot;ORD-301&quot;,&quot;total&quot;:250}'
+bin/lemline instance start examples validate-and-route-order --input '{&quot;orderId&quot;:&quot;ORD-303&quot;,&quot;total&quot;:-5}'
+</div><p id="c4i5q6_210">The first completes with <code class="code" id="c4i5q6_212">{&quot;orderId&quot;:&quot;ORD-301&quot;,&quot;status&quot;:&quot;accepted&quot;}</code>. The second is refused: the total must be at least 0.</p></section><section class="chapter"><h2 id="schema-reuse-and-references" data-toc="schema-reuse-and-references">Schema Reuse and References</h2><p id="c4i5q6_213">For complex schemas that are used in multiple places, you can use references:</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: schema-with-address-definition
+  version: '1.0.0'
+input:
+  schema:
+    document:
+      type: object
+      required: [billing, shipping]
+      properties:
+        billing:
+          $ref: '#/$defs/address'
+        shipping:
+          $ref: '#/$defs/address'
+      $defs:
+        address:
+          type: object
+          required: [street, postalCode]
+          properties:
+            street:
+              type: string
+            postalCode:
+              type: string
+do:
+  - acceptOrder:
+      set:
+        valid: true
+</div><p id="c4i5q6_215">Save it as <code class="code" id="c4i5q6_220">schema-with-address-definition.yaml</code>:</p><div class="code-block" data-lang="bash">
+bin/lemline definition post -f schema-with-address-definition.yaml
+bin/lemline instance start examples schema-with-address-definition --input '{&quot;billing&quot;:{&quot;street&quot;:&quot;1 Main St&quot;,&quot;postalCode&quot;:&quot;69001&quot;},&quot;shipping&quot;:{&quot;street&quot;:&quot;2 Side St&quot;,&quot;postalCode&quot;:&quot;69002&quot;}}'
+bin/lemline instance start examples schema-with-address-definition --input '{&quot;billing&quot;:{&quot;street&quot;:&quot;1 Main St&quot;},&quot;shipping&quot;:{&quot;street&quot;:&quot;2 Side St&quot;,&quot;postalCode&quot;:&quot;69002&quot;}}'
+</div><p id="c4i5q6_217">The first completes with <code class="code" id="c4i5q6_221">{&quot;valid&quot;:true}</code>. The second is refused: the billing address has no <code class="code" id="c4i5q6_222">postalCode</code>.</p><p id="c4i5q6_218">Stop the shop when you are done:</p><div class="code-block" data-lang="bash">
+docker compose -f examples/tutorial-services/compose.yaml down
+</div></section><section class="chapter"><h2 id="best-practices-for-schema-validation" data-toc="best-practices-for-schema-validation">Best Practices for Schema Validation</h2><ol class="list _decimal" id="c4i5q6_223" type="1"><li class="list__item" id="c4i5q6_224"><p id="c4i5q6_234"><span class="control" id="c4i5q6_235">Validate Early</span>: Add schema validation as early as possible in the workflow</p></li><li class="list__item" id="c4i5q6_225"><p id="c4i5q6_236"><span class="control" id="c4i5q6_237">Be Specific</span>: Create detailed, specific schemas that precisely define your data requirements</p></li><li class="list__item" id="c4i5q6_226"><p id="c4i5q6_238"><span class="control" id="c4i5q6_239">Default Values</span>: Provide defaults for optional fields when appropriate</p></li><li class="list__item" id="c4i5q6_227"><p id="c4i5q6_240"><span class="control" id="c4i5q6_241">Schema Reuse</span>: Use schema references to avoid duplication</p></li><li class="list__item" id="c4i5q6_228"><p id="c4i5q6_242"><span class="control" id="c4i5q6_243">Document Schemas</span>: Add comments to explain complex validation requirements</p></li><li class="list__item" id="c4i5q6_229"><p id="c4i5q6_244"><span class="control" id="c4i5q6_245">Incremental Validation</span>: Validate at multiple points to catch issues early</p></li><li class="list__item" id="c4i5q6_230"><p id="c4i5q6_246"><span class="control" id="c4i5q6_247">Performance Consideration</span>: Balance validation thoroughness with performance needs</p></li><li class="list__item" id="c4i5q6_231"><p id="c4i5q6_248"><span class="control" id="c4i5q6_249">Version Schemas</span>: Include version information for evolving schemas</p></li><li class="list__item" id="c4i5q6_232"><p id="c4i5q6_250"><span class="control" id="c4i5q6_251">Error Messages</span>: Configure clear, helpful validation error messages</p></li><li class="list__item" id="c4i5q6_233"><p id="c4i5q6_252"><span class="control" id="c4i5q6_253">Test Edge Cases</span>: Test your schemas with both valid and invalid data</p></li></ol></section><section class="chapter"><h2 id="troubleshooting-schema-validation" data-toc="troubleshooting-schema-validation">Troubleshooting Schema Validation</h2><section class="chapter"><h3 id="common-validation-errors" data-toc="common-validation-errors">Common Validation Errors</h3><p id="c4i5q6_256">The error names the rule that failed. These messages come from the examples above:</p><div class="table-wrapper"><table class="wide" id="c4i5q6_257"><thead><tr class="ijRowHead" id="c4i5q6_259"><th id="c4i5q6_267"><p>Problem</p></th><th id="c4i5q6_268"><p>Message</p></th></tr></thead><tbody><tr id="c4i5q6_260"><td id="c4i5q6_269"><p>Missing required property</p></td><td id="c4i5q6_270"><p><code class="code" id="c4i5q6_271">required property 'postalCode' not found</code></p></td></tr><tr id="c4i5q6_261"><td id="c4i5q6_272"><p>Wrong type</p></td><td id="c4i5q6_273"><p><code class="code" id="c4i5q6_274">integer found, string expected</code></p></td></tr><tr id="c4i5q6_262"><td id="c4i5q6_275"><p>Too few array items</p></td><td id="c4i5q6_276"><p><code class="code" id="c4i5q6_277">must have at least 1 items but found 0</code></p></td></tr><tr id="c4i5q6_263"><td id="c4i5q6_278"><p>Duplicate array items</p></td><td id="c4i5q6_279"><p><code class="code" id="c4i5q6_280">must have only unique items in the array</code></p></td></tr><tr id="c4i5q6_264"><td id="c4i5q6_281"><p>Invalid format</p></td><td id="c4i5q6_282"><p><code class="code" id="c4i5q6_283">does not match the date pattern must be a valid RFC 3339 full-date</code></p></td></tr><tr id="c4i5q6_265"><td id="c4i5q6_284"><p>Property not allowed</p></td><td id="c4i5q6_285"><p><code class="code" id="c4i5q6_286">property 'color' is not defined in the schema and the schema does not allow additional properties</code></p></td></tr><tr id="c4i5q6_266"><td id="c4i5q6_287"><p>No matching <code class="code" id="c4i5q6_289">oneOf</code> branch</p></td><td id="c4i5q6_288"><p><code class="code" id="c4i5q6_290">must be valid to one and only one schema, but 0 are valid</code></p></td></tr></tbody></table></div><p id="c4i5q6_258">For a workflow-level schema, <code class="code" id="c4i5q6_291">instance start</code> prints the message after <code class="code" id="c4i5q6_292">Input validation failed against workflow schema</code>. For a task-level schema, the instance faults with a <code class="code" id="c4i5q6_293">validation</code> error that carries it.</p></section><section class="chapter"><h3 id="debugging-validation-issues" data-toc="debugging-validation-issues">Debugging Validation Issues</h3><p id="c4i5q6_294">When troubleshooting validation problems:</p><ol class="list _decimal" id="c4i5q6_295" type="1"><li class="list__item" id="c4i5q6_296"><p id="c4i5q6_301"><span class="control" id="c4i5q6_302">Add Diagnostic Tasks</span>: Insert temporary tasks to inspect data before validation</p></li><li class="list__item" id="c4i5q6_297"><p id="c4i5q6_303"><span class="control" id="c4i5q6_304">Simplify Schemas</span>: Temporarily simplify complex schemas to isolate issues</p></li><li class="list__item" id="c4i5q6_298"><p id="c4i5q6_305"><span class="control" id="c4i5q6_306">Check Data Types</span>: Verify that data types match schema requirements</p></li><li class="list__item" id="c4i5q6_299"><p id="c4i5q6_307"><span class="control" id="c4i5q6_308">Inspect Transformations</span>: Ensure transformations produce data matching the schema</p></li><li class="list__item" id="c4i5q6_300"><p id="c4i5q6_309"><span class="control" id="c4i5q6_310">Validate Externally</span>: Use online JSON Schema validators to test schemas independently</p></li></ol></section></section><section class="chapter"><h2 id="next-steps" data-toc="next-steps">Next Steps</h2><ul class="list _bullet" id="c4i5q6_311"><li class="list__item" id="c4i5q6_312"><p id="c4i5q6_316">Learn about <a href="lemline-howto-jq.html" id="c4i5q6_317" data-tooltip="Write expressions as ${ ... }. Start with current task input ., move through fields with jq, and use pipes to break a transformation into steps.">writing jq runtime expressions</a></p></li><li class="list__item" id="c4i5q6_313"><p id="c4i5q6_318">Explore <a href="lemline-howto-io.html" id="c4i5q6_319" data-tooltip="This guide explains how to work with data flow in Lemline workflows, focusing on input validation, output transformation, and exporting data to the global context. You'll learn how to control data as it flows through your workflow.">input, output, and export</a></p></li><li class="list__item" id="c4i5q6_314"><p id="c4i5q6_320">Understand <a href="lemline-howto-data-passing.html" id="c4i5q6_321" data-tooltip="By default, the transformed output of one task becomes the input of the next task. Use input.from when a task needs to select or reshape its input, and output.as when a task needs to adapt its result for the following step.">how to pass data between tasks</a></p></li><li class="list__item" id="c4i5q6_315"><p id="c4i5q6_322">Dive deeper into <a href="lemline-explain-jq.html" id="c4i5q6_323" data-tooltip="Write a workflow expression as ${ ... }. Lemline evaluates expressions using jq. The current input is .. Use $workflow.input for the original input and $context for values exported by earlier tasks.">data flow concepts</a></p></li></ul></section><div class="last-modified">25 November 2026</div><div data-feedback-placeholder="true"></div><div class="navigation-links _bottom"><a href="lemline-howto-jq.html" class="navigation-links__prev">How to write jq runtime expressions</a><a href="lemline-howto-try-catch.html" class="navigation-links__next">Error Handling with Try-Catch</a></div></article><div id="disqus_thread"></div></div></section></main></div><script src="https://resources.jetbrains.com/writerside/apidoc/6.22.0-b776/app.js"></script></body></html>

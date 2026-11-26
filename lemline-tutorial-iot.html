@@ -1,0 +1,92 @@
+<!DOCTYPE html SYSTEM "about:legacy-compat">
+<html lang="en-US" data-preset="contrast" data-primary-color="#2E6F7E"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="robots" content="noindex"><meta name="built-on" content="2026-11-26T17:17:49.173249392"><title>Monitor the warehouse temperature | Lemline documentation</title><script type="application/json" id="virtual-toc-data">[{"id":"start-the-tutorial-shop","level":0,"title":"Start the tutorial shop","anchor":"#start-the-tutorial-shop"},{"id":"register-the-sensor-and-notification-workflows","level":0,"title":"Register the sensor and notification workflows","anchor":"#register-the-sensor-and-notification-workflows"},{"id":"exercise-both-paths","level":0,"title":"Exercise both paths","anchor":"#exercise-both-paths"}]</script><script type="application/json" id="topic-shortcuts"></script><link href="https://resources.jetbrains.com/writerside/apidoc/6.22.0-b776/app.css" rel="stylesheet"><link href="static/custom.css" rel="stylesheet"><meta name="description" content="Monitor warehouse temperature events and trigger a workflow when the warehouse overheats."><link rel="icon" type="image/png" sizes="16x16" href="images/lemly.png"><meta name="image" content="https://docs.lemline.com/social-preview.png"><!-- Open Graph --><meta property="og:title" content="Monitor the warehouse temperature | Lemline documentation"><meta property="og:description" content="Monitor warehouse temperature events and trigger a workflow when the warehouse overheats."><meta property="og:image" content="https://docs.lemline.com/social-preview.png"><meta property="og:site_name" content="Lemline documentation Help"><meta property="og:type" content="website"><meta property="og:locale" content="en_US"><meta property="og:url" content="https://docs.lemline.com/lemline-tutorial-iot.html"><!-- End Open Graph --><!-- Twitter Card --><meta name="twitter:card" content="summary_large_image"><meta name="twitter:site" content=""><meta name="twitter:title" content="Monitor the warehouse temperature | Lemline documentation"><meta name="twitter:description" content="Monitor warehouse temperature events and trigger a workflow when the warehouse overheats."><meta name="twitter:creator" content=""><meta name="twitter:image:src" content="https://docs.lemline.com/social-preview.png"><!-- End Twitter Card --><!-- Schema.org WebPage --><script type="application/ld+json">{
+    "@context": "http://schema.org",
+    "@type": "WebPage",
+    "@id": "https://docs.lemline.com/lemline-tutorial-iot.html#webpage",
+    "url": "https://docs.lemline.com/lemline-tutorial-iot.html",
+    "name": "Monitor the warehouse temperature | Lemline documentation",
+    "description": "",
+    "image": "https://docs.lemline.com/social-preview.png",
+    "inLanguage":"en-US"
+}</script><!-- End Schema.org --><!-- Schema.org WebSite --><script type="application/ld+json">{
+    "@type": "WebSite",
+    "@id": "https://docs.lemline.com/#website",
+    "url": "https://docs.lemline.com/",
+    "name": "Lemline documentation Help"
+}</script><!-- End Schema.org --></head><body data-id="lemline-tutorial-iot" data-main-title="Monitor the warehouse temperature" data-article-props="{&quot;seeAlsoStyle&quot;:&quot;links&quot;}" data-template="article" data-breadcrumbs="Tutorials: Run a shop with Lemline"><div class="wrapper"><main class="panel _main"><header class="panel__header"><div class="container"><h3>Lemline documentation  Help</h3><div class="panel-trigger"></div></div></header><section class="panel__content"><div class="container"><article class="article" data-shortcut-switcher="inactive"><h1 data-toc="lemline-tutorial-iot" id="lemline-tutorial-iot.md">Monitor the warehouse temperature</h1><section class="chapter"><h2 id="start-the-tutorial-shop" data-toc="start-the-tutorial-shop">Start the tutorial shop</h2><p id="-adm45f_7">Complete <a href="lemline-tutorial-setup.html" id="-adm45f_11" data-tooltip="Run Lemline on one machine with SQLite. Lemline stores workflow definitions, queued messages, and workflow history in local files. Use a writable directory on a local filesystem.">the SQLite setup</a> and stop the worker with Ctrl+C before registering the event schedules. In a separate terminal, open the root of the <a href="https://github.com/lemline/lemline" id="-adm45f_12" data-external="true" rel="noopener noreferrer" target="_blank">Lemline source checkout</a> matching these docs (the directory containing <code class="code" id="-adm45f_13">examples/tutorial-services</code>). With Docker Compose running, start the single shop container:</p><div class="code-block" data-lang="bash">
+docker compose -f examples/tutorial-services/compose.yaml up -d
+</div><p id="-adm45f_9">Open <a href="http://127.0.0.1:8787" id="-adm45f_14" data-external="true" rel="noopener noreferrer" target="_blank">the shop</a>. The stock starts at 100 units of SKU-1. To repeat this exercise, wait for outstanding workflows to finish, then reset the tutorial shop:</p><div class="code-block" data-lang="bash">
+curl -X POST http://127.0.0.1:8787/reset
+</div></section><section class="chapter"><h2 id="register-the-sensor-and-notification-workflows" data-toc="register-the-sensor-and-notification-workflows">Register the sensor and notification workflows</h2><p id="-adm45f_15">The sensor workflow runs once per reading. Above 80 it emits a high-temperature event on the worker's SQLite event channel.</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: device-telemetry
+  version: '1.0.0'
+schedule:
+  on:
+    one:
+      with:
+        type: com.example.device.telemetry.received
+input:
+  from: ${ .[0] }
+do:
+  - inspectReading:
+      switch:
+        - highTemperature:
+            when: ${ .temperature &gt; 80 }
+            then: raiseAlert
+        - other:
+            then: end
+  - raiseAlert:
+      emit:
+        event:
+          with:
+            type: com.example.device.temperature.high
+            source: https://events.example.com/telemetry
+            subject: ${ .deviceId }
+            data: '${ { deviceId, temperature } }'
+</div><p id="-adm45f_17">A second workflow subscribes to that event and delivers the reading to the warehouse manager's inbox.</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: warehouse-alert
+  version: '1.0.0'
+schedule:
+  on:
+    one:
+      with:
+        type: com.example.device.temperature.high
+do:
+  - notifyManager:
+      call: http
+      with:
+        method: post
+        endpoint: http://127.0.0.1:8787/notifications
+        body:
+          reference: ${ .[0].deviceId }
+          recipient: warehouse-manager
+          message: '${ &quot;High temperature: &quot; + (.[0].temperature | tostring) }'
+</div><p id="-adm45f_19">The publisher injects readings through the same channel.</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: tutorial-publisher
+  version: '1.0.0'
+do:
+  - publish:
+      emit:
+        event:
+          with:
+            type: ${ .type }
+            source: https://events.example.com/tutorial
+            data: ${ .data }
+</div><p id="-adm45f_21">Save the three definitions under the filenames below. From the setup directory (using <code class="code" id="-adm45f_25">java -jar lemline.jar</code> in place of <code class="code" id="-adm45f_26">bin/lemline</code> with the JAR), register them before publishing any reading. Skip definitions already registered at this version.</p><div class="code-block" data-lang="bash">
+bin/lemline definition post -f warehouse-alert.yaml
+bin/lemline definition post -f device-telemetry.yaml
+bin/lemline definition post -f tutorial-publisher.yaml
+</div><p id="-adm45f_23">Start the host worker after registering both schedules so it loads the subscriptions before the first reading arrives. Leave it running and publish from another terminal in the setup directory.</p><div class="code-block" data-lang="bash">
+bin/lemline listen --debug
+</div></section><section class="chapter"><h2 id="exercise-both-paths" data-toc="exercise-both-paths">Exercise both paths</h2><p id="-adm45f_27">Publish the first reading, wait for the sensor workflow to finish, and refresh the shop. The inbox should be empty. Publish the second reading and refresh again.</p><p id="-adm45f_28">The worker picks up events for scheduled workflows every 10 seconds. Allow about 10 seconds for the sensor workflow to finish after a reading, and about 20 seconds for the alert to reach the inbox.</p><div class="code-block" data-lang="bash">
+bin/lemline instance start examples tutorial-publisher --input '{&quot;type&quot;:&quot;com.example.device.telemetry.received&quot;,&quot;data&quot;:{&quot;deviceId&quot;:&quot;sensor-1&quot;,&quot;temperature&quot;:70}}'
+bin/lemline instance start examples tutorial-publisher --input '{&quot;type&quot;:&quot;com.example.device.telemetry.received&quot;,&quot;data&quot;:{&quot;deviceId&quot;:&quot;sensor-1&quot;,&quot;temperature&quot;:90}}'
+</div><p id="-adm45f_30">Filter by <code class="code" id="-adm45f_33">sensor-1</code>. Expect one entry for <code class="code" id="-adm45f_34">warehouse-manager</code> with the message <code class="code" id="-adm45f_35">High temperature: 90</code>. The cooler reading produces no alert. To repeat, reset the shop before sending both readings again.</p><p id="-adm45f_31">From the checkout root, stop the shop when finished:</p><div class="code-block" data-lang="bash">
+docker compose -f examples/tutorial-services/compose.yaml down
+</div></section><div class="last-modified">26 November 2026</div><div data-feedback-placeholder="true"></div><div class="navigation-links _bottom"><a href="lemline-tutorial-waits.html" class="navigation-links__prev">&quot;Wait for payments and collect order checks</a><a href="lemline-howto-define-workflow.html" class="navigation-links__next">How to define a workflow</a></div></article><div id="disqus_thread"></div></div></section></main></div><script src="https://resources.jetbrains.com/writerside/apidoc/6.22.0-b776/app.js"></script></body></html>

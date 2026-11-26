@@ -1,0 +1,77 @@
+<!DOCTYPE html SYSTEM "about:legacy-compat">
+<html lang="en-US" data-preset="contrast" data-primary-color="#2E6F7E"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="robots" content="noindex"><meta name="built-on" content="2026-11-26T17:17:48.478039768"><title>Workflow extensions | Lemline documentation</title><script type="application/json" id="virtual-toc-data">[{"id":"short-circuiting-and-navigation","level":0,"title":"Short-circuiting and navigation","anchor":"#short-circuiting-and-navigation"},{"id":"errors-retries-and-durable-execution","level":0,"title":"Errors, retries, and durable execution","anchor":"#errors-retries-and-durable-execution"},{"id":"deployment","level":0,"title":"Deployment","anchor":"#deployment"},{"id":"run-the-examples","level":0,"title":"Run the Examples","anchor":"#run-the-examples"}]</script><script type="application/json" id="topic-shortcuts"></script><link href="https://resources.jetbrains.com/writerside/apidoc/6.22.0-b776/app.css" rel="stylesheet"><link href="static/custom.css" rel="stylesheet"><link rel="icon" type="image/png" sizes="16x16" href="images/lemly.png"><meta name="image" content="https://docs.lemline.com/social-preview.png"><!-- Open Graph --><meta property="og:title" content="Workflow extensions | Lemline documentation"><meta property="og:description" content=""><meta property="og:image" content="https://docs.lemline.com/social-preview.png"><meta property="og:site_name" content="Lemline documentation Help"><meta property="og:type" content="website"><meta property="og:locale" content="en_US"><meta property="og:url" content="https://docs.lemline.com/dsl-use-extensions.html"><!-- End Open Graph --><!-- Twitter Card --><meta name="twitter:card" content="summary_large_image"><meta name="twitter:site" content=""><meta name="twitter:title" content="Workflow extensions | Lemline documentation"><meta name="twitter:description" content=""><meta name="twitter:creator" content=""><meta name="twitter:image:src" content="https://docs.lemline.com/social-preview.png"><!-- End Twitter Card --><!-- Schema.org WebPage --><script type="application/ld+json">{
+    "@context": "http://schema.org",
+    "@type": "WebPage",
+    "@id": "https://docs.lemline.com/dsl-use-extensions.html#webpage",
+    "url": "https://docs.lemline.com/dsl-use-extensions.html",
+    "name": "Workflow extensions | Lemline documentation",
+    "description": "",
+    "image": "https://docs.lemline.com/social-preview.png",
+    "inLanguage":"en-US"
+}</script><!-- End Schema.org --><!-- Schema.org WebSite --><script type="application/ld+json">{
+    "@type": "WebSite",
+    "@id": "https://docs.lemline.com/#website",
+    "url": "https://docs.lemline.com/",
+    "name": "Lemline documentation Help"
+}</script><!-- End Schema.org --></head><body data-id="dsl-use-extensions" data-main-title="Workflow extensions" data-article-props="{&quot;seeAlsoStyle&quot;:&quot;links&quot;}" data-template="article" data-breadcrumbs="Reference///DSL Reference"><div class="wrapper"><main class="panel _main"><header class="panel__header"><div class="container"><h3>Lemline documentation  Help</h3><div class="panel-trigger"></div></div></header><section class="panel__content"><div class="container"><article class="article" data-shortcut-switcher="inactive"><h1 data-toc="dsl-use-extensions" id="dsl-use-extensions.md">Workflow extensions</h1><p id="z8f7mtz_3">DSL 1.0.3 <code class="code" id="z8f7mtz_13">use.extensions</code> adds tasks before and after selected tasks without moving the original task's execution position.</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: workflow-extensions
+  version: '1.0.0'
+use:
+  extensions:
+    - audit:
+        extend: call
+        when: '${ $task.definition.call == &quot;http&quot; }'
+        before:
+          - recordRequest:
+              set:
+                reference: '${ $task.reference }'
+              export:
+                as: '${ $context + {lastRequest: .reference} }'
+        after:
+          - recordResponse:
+              call: http
+              with:
+                method: post
+                endpoint: http://127.0.0.1:8787/audit
+                body:
+                  reference: '${ $task.reference }'
+                  message: '${ &quot;Response with \($task.output.available) units&quot; }'
+do:
+  - getStock:
+      call: http
+      with:
+        method: get
+        endpoint: http://127.0.0.1:8787/stock
+</div><p id="z8f7mtz_5"><code class="code" id="z8f7mtz_14">extend</code> accepts <code class="code" id="z8f7mtz_15">call</code>, <code class="code" id="z8f7mtz_16">composite</code>, <code class="code" id="z8f7mtz_17">emit</code>, <code class="code" id="z8f7mtz_18">for</code>, <code class="code" id="z8f7mtz_19">listen</code>, <code class="code" id="z8f7mtz_20">raise</code>, <code class="code" id="z8f7mtz_21">run</code>, <code class="code" id="z8f7mtz_22">set</code>, <code class="code" id="z8f7mtz_23">switch</code>, <code class="code" id="z8f7mtz_24">try</code>, <code class="code" id="z8f7mtz_25">wait</code>, and <code class="code" id="z8f7mtz_26">all</code>. <code class="code" id="z8f7mtz_27">composite</code> matches declared <code class="code" id="z8f7mtz_28">do</code> and <code class="code" id="z8f7mtz_29">fork</code> tasks. Reusable function calls match <code class="code" id="z8f7mtz_30">call</code>; their declared body tasks can also have extensions. Internal execution blocks are excluded.</p><p id="z8f7mtz_6">The engine evaluates the task's <code class="code" id="z8f7mtz_31">if</code> and input transformation before selecting extensions. All <code class="code" id="z8f7mtz_32">when</code> expressions are evaluated once, before any <code class="code" id="z8f7mtz_33">before</code> runs. A false <code class="code" id="z8f7mtz_34">if</code> skips extensions. Invalid or non-boolean <code class="code" id="z8f7mtz_35">when</code> results fail the task.</p><p id="z8f7mtz_7">For two selected extensions, the order is <code class="code" id="z8f7mtz_36">before 1</code>, <code class="code" id="z8f7mtz_37">before 2</code>, body, <code class="code" id="z8f7mtz_38">after 2</code>, <code class="code" id="z8f7mtz_39">after 1</code>. Every <code class="code" id="z8f7mtz_40">before</code> block receives the task's transformed input; every <code class="code" id="z8f7mtz_41">after</code> receives its prepared output. A block's final result is ignored, while explicit exports update the shared context. The body is initialized after the <code class="code" id="z8f7mtz_42">before</code> blocks, so a loop can read a collection they exported.</p><p id="z8f7mtz_8">Within extension expressions, <code class="code" id="z8f7mtz_43">$task</code> describes the owner, including its original definition, raw input, start time, and raw output when available. Use <code class="code" id="z8f7mtz_44">$task.definition.call</code> and <code class="code" id="z8f7mtz_45">$task.definition.with</code>. The current dataset, <code class="code" id="z8f7mtz_46">$input</code>, <code class="code" id="z8f7mtz_47">$output</code>, and local variables belong to the executing step. Extension descendants, including functions they call, never receive additional extensions. Child workflows use their own definitions.</p><section class="chapter"><h2 id="short-circuiting-and-navigation" data-toc="short-circuiting-and-navigation">Short-circuiting and navigation</h2><p id="z8f7mtz_48">A top-level <code class="code" id="z8f7mtz_51">before</code> step with <code class="code" id="z8f7mtz_52">then: exit</code> returns a simulated raw result, skips the body and remaining extensions, and applies the owner's output transformation, validation, and export once. The owner's own <code class="code" id="z8f7mtz_53">then</code> is still honored.</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: short-circuiting-and-navigation
+  version: '1.0.0'
+use:
+  extensions:
+    - simulate:
+        extend: call
+        when: '${ $task.definition.call == &quot;http&quot; and $task.definition.with.endpoint == &quot;http://127.0.0.1:8787/stock&quot; and $workflow.input.simulate == true }'
+        before:
+          - fakeStock:
+              set: { sku: SKU-1, available: 0, simulated: true }
+              then: exit
+do:
+  - getStock:
+      call: http
+      with:
+        method: get
+        endpoint: http://127.0.0.1:8787/stock
+</div><p id="z8f7mtz_50">A nested <code class="code" id="z8f7mtz_54">exit</code> remains local to its nested block. A top-level <code class="code" id="z8f7mtz_55">after</code> exit skips remaining after blocks and keeps the owner's result. <code class="code" id="z8f7mtz_56">end</code> terminates the workflow without executing additional after blocks.</p></section><section class="chapter"><h2 id="errors-retries-and-durable-execution" data-toc="errors-retries-and-durable-execution">Errors, retries, and durable execution</h2><p id="z8f7mtz_57">After blocks run only after the body actually finishes, including HTTP, waits, listeners, forks, and awaited child workflows. They are not <code class="code" id="z8f7mtz_61">finally</code> blocks. Unhandled failures stop the extension sequence and fail the owner. A <code class="code" id="z8f7mtz_62">try</code> protects its body, not its own extensions.</p><p id="z8f7mtz_58">Put a retry inside an after block to retry only that block's protected work. An outer retry can execute the business operation again: if payment succeeds and auditing fails, an outer retry can charge again. Existing exports and external effects are not rolled back.</p><p id="z8f7mtz_59">Suspension messages preserve selection, phase, inputs, and prepared results. Resuming does not re-evaluate <code class="code" id="z8f7mtz_63">when</code> or reapply output transformations. A new invocation caused by a retry selects extensions again.</p><p id="z8f7mtz_60">The owner's lifecycle spans all its extensions. Declared extension steps have their own CloudEvents and appear beneath the owner in the dashboard, with the extension name, phase, type, errors, and attempts. The owner's success is published only after its final after block succeeds.</p></section><section class="chapter"><h2 id="deployment" data-toc="deployment">Deployment</h2><p id="z8f7mtz_64">Deploy workers supporting extension continuations before enabling workflows that use them. Older workers cannot process <code class="code" id="z8f7mtz_65">_ext</code> positions or pending task state. Do not route these executions to older workers during a mixed deployment. New workers continue to read messages without extension fields; already active legacy frames are not retroactively extended.</p></section><section class="chapter"><h2 id="run-the-examples" data-toc="run-the-examples">Run the Examples</h2><p id="z8f7mtz_66">Every example on this page is a complete workflow. Complete <a href="lemline-tutorial-setup.html" id="z8f7mtz_74" data-tooltip="Run Lemline on one machine with SQLite. Lemline stores workflow definitions, queued messages, and workflow history in local files. Use a writable directory on a local filesystem.">the SQLite setup</a>, save each example under the file name used below, and run the commands from the setup directory. With the JAR, substitute <code class="code" id="z8f7mtz_75">java -jar lemline.jar</code> for <code class="code" id="z8f7mtz_76">bin/lemline</code>.</p><p id="z8f7mtz_67">Start the <a href="lemline-tutorial-order-processing.html#start-the-tutorial-shop" id="z8f7mtz_77" data-tooltip="Complete the SQLite setup and keep the worker running on the host. In a separate terminal, open the root of the Lemline source checkout matching these docs (the directory containing examples/tutorial-services). With Docker Compose running, start the single shop container:">tutorial shop</a> from the root of the Lemline source checkout:</p><div class="code-block" data-lang="bash">
+docker compose -f examples/tutorial-services/compose.yaml up -d
+</div><p id="z8f7mtz_69">Keep the setup worker running and use a second terminal in the setup directory.</p><div class="code-block" data-lang="bash">
+bin/lemline definition post -f workflow-extensions.yaml
+bin/lemline instance start examples workflow-extensions
+bin/lemline definition post -f short-circuiting-and-navigation.yaml
+bin/lemline instance start examples short-circuiting-and-navigation --input '{&quot;simulate&quot;:false}'
+bin/lemline instance start examples short-circuiting-and-navigation --input '{&quot;simulate&quot;:true}'
+</div><div class="table-wrapper"><table class="wide" id="z8f7mtz_71"><thead><tr class="ijRowHead" id="z8f7mtz_78"><th id="z8f7mtz_82"><p>Example</p></th><th id="z8f7mtz_83"><p>Expected result</p></th></tr></thead><tbody><tr id="z8f7mtz_79"><td id="z8f7mtz_84"><p><code class="code" id="z8f7mtz_86">workflow-extensions</code></p></td><td id="z8f7mtz_85"><p>The stock; the extension records <code class="code" id="z8f7mtz_87">Response with 100 units</code> for the HTTP task in the shop's audit list</p></td></tr><tr id="z8f7mtz_80"><td id="z8f7mtz_88"><p><code class="code" id="z8f7mtz_90">short-circuiting-and-navigation</code>, <code class="code" id="z8f7mtz_91">simulate</code> false</p></td><td id="z8f7mtz_89"><p>The real stock</p></td></tr><tr id="z8f7mtz_81"><td id="z8f7mtz_92"><p><code class="code" id="z8f7mtz_94">short-circuiting-and-navigation</code>, <code class="code" id="z8f7mtz_95">simulate</code> true</p></td><td id="z8f7mtz_93"><p><code class="code" id="z8f7mtz_96">{&quot;sku&quot;:&quot;SKU-1&quot;,&quot;available&quot;:0,&quot;simulated&quot;:true}</code>: the HTTP call is skipped and the shop receives no request</p></td></tr></tbody></table></div><p id="z8f7mtz_72">Stop the shop when you are done:</p><div class="code-block" data-lang="bash">
+docker compose -f examples/tutorial-services/compose.yaml down
+</div></section><div class="last-modified">25 November 2026</div><div data-feedback-placeholder="true"></div><div class="navigation-links _bottom"><a href="lemline-ref-task-types.html" class="navigation-links__prev">Workflow Task Types</a><a href="lemline-ref-supported-features.html" class="navigation-links__next">Open Workflow DSL Supported Features</a></div></article><div id="disqus_thread"></div></div></section></main></div><script src="https://resources.jetbrains.com/writerside/apidoc/6.22.0-b776/app.js"></script></body></html>

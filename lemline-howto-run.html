@@ -1,0 +1,124 @@
+<!DOCTYPE html SYSTEM "about:legacy-compat">
+<html lang="en-US" data-preset="contrast" data-primary-color="#2E6F7E"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="robots" content="noindex"><meta name="built-on" content="2026-11-26T17:17:49.999756554"><title>How to run scripts or containers | Lemline documentation</title><script type="application/json" id="virtual-toc-data">[{"id":"prepare-the-examples","level":0,"title":"Prepare the examples","anchor":"#prepare-the-examples"},{"id":"run-an-inline-script","level":0,"title":"Run an inline script","anchor":"#run-an-inline-script"},{"id":"load-an-external-script","level":0,"title":"Load an external script","anchor":"#load-an-external-script"},{"id":"run-a-container","level":0,"title":"Run a container","anchor":"#run-a-container"},{"id":"invoke-a-child-workflow","level":0,"title":"Invoke a child workflow","anchor":"#invoke-a-child-workflow"}]</script><script type="application/json" id="topic-shortcuts"></script><link href="https://resources.jetbrains.com/writerside/apidoc/6.22.0-b776/app.css" rel="stylesheet"><link href="static/custom.css" rel="stylesheet"><link rel="icon" type="image/png" sizes="16x16" href="images/lemly.png"><meta name="image" content="https://docs.lemline.com/social-preview.png"><!-- Open Graph --><meta property="og:title" content="How to run scripts or containers | Lemline documentation"><meta property="og:description" content=""><meta property="og:image" content="https://docs.lemline.com/social-preview.png"><meta property="og:site_name" content="Lemline documentation Help"><meta property="og:type" content="website"><meta property="og:locale" content="en_US"><meta property="og:url" content="https://docs.lemline.com/lemline-howto-run.html"><!-- End Open Graph --><!-- Twitter Card --><meta name="twitter:card" content="summary_large_image"><meta name="twitter:site" content=""><meta name="twitter:title" content="How to run scripts or containers | Lemline documentation"><meta name="twitter:description" content=""><meta name="twitter:creator" content=""><meta name="twitter:image:src" content="https://docs.lemline.com/social-preview.png"><!-- End Twitter Card --><!-- Schema.org WebPage --><script type="application/ld+json">{
+    "@context": "http://schema.org",
+    "@type": "WebPage",
+    "@id": "https://docs.lemline.com/lemline-howto-run.html#webpage",
+    "url": "https://docs.lemline.com/lemline-howto-run.html",
+    "name": "How to run scripts or containers | Lemline documentation",
+    "description": "",
+    "image": "https://docs.lemline.com/social-preview.png",
+    "inLanguage":"en-US"
+}</script><!-- End Schema.org --><!-- Schema.org WebSite --><script type="application/ld+json">{
+    "@type": "WebSite",
+    "@id": "https://docs.lemline.com/#website",
+    "url": "https://docs.lemline.com/",
+    "name": "Lemline documentation Help"
+}</script><!-- End Schema.org --></head><body data-id="lemline-howto-run" data-main-title="How to run scripts or containers" data-article-props="{&quot;seeAlsoStyle&quot;:&quot;links&quot;}" data-template="article" data-breadcrumbs="How-to Guides///Working with Tasks"><div class="wrapper"><main class="panel _main"><header class="panel__header"><div class="container"><h3>Lemline documentation  Help</h3><div class="panel-trigger"></div></div></header><section class="panel__content"><div class="container"><article class="article" data-shortcut-switcher="inactive"><h1 data-toc="lemline-howto-run" id="lemline-howto-run.md">How to run scripts or containers</h1><p id="o1jnwl_3">Open Workflow defines a <code class="code" id="o1jnwl_9">run</code> task for shell commands, scripts, containers and child workflows. See <a href="lemline-ref-supported-features.html" id="o1jnwl_10" data-tooltip="This reference documents which features of the Open Workflow DSL v1.0 are currently supported in Lemline, and any implementation-specific details or limitations.">Supported Features</a> for Lemline's runtime support for each variant.</p><section class="chapter"><h2 id="prepare-the-examples" data-toc="prepare-the-examples">Prepare the examples</h2><p id="o1jnwl_11">Complete <a href="lemline-tutorial-setup.html" id="o1jnwl_12" data-tooltip="Run Lemline on one machine with SQLite. Lemline stores workflow definitions, queued messages, and workflow history in local files. Use a writable directory on a local filesystem.">the SQLite setup</a> and keep its worker running. Run the commands from a second terminal in the setup directory. With the JAR, substitute <code class="code" id="o1jnwl_13">java -jar lemline.jar</code> for <code class="code" id="o1jnwl_14">bin/lemline</code>. The script example needs Python 3.8 or later on the worker's machine (<code class="code" id="o1jnwl_15">python3</code> on the path, or <code class="code" id="o1jnwl_16">LEMLINE_PYTHON_EXEC</code> set).</p></section><section class="chapter"><h2 id="run-an-inline-script" data-toc="run-an-inline-script">Run an inline script</h2><p id="o1jnwl_17">Put the script in <code class="code" id="o1jnwl_22">run.script.code</code>, set <code class="code" id="o1jnwl_23">language</code> (<code class="code" id="o1jnwl_24">python</code> or <code class="code" id="o1jnwl_25">js</code>) and pass inputs as named <code class="code" id="o1jnwl_26">arguments</code>. Lemline writes the code to a temporary file and starts it with each argument as a name followed by its value, so the script below reads <code class="code" id="o1jnwl_27">sys.argv</code> as pairs. With <code class="code" id="o1jnwl_28">return: stdout</code>, the task output is what the script prints.</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: inline-email-check
+  version: '1.0.0'
+do:
+  - validateEmail:
+      run:
+        script:
+          language: python
+          code: |
+            import re
+            import sys
+            args = dict(zip(sys.argv[1::2], sys.argv[2::2]))
+            valid = re.fullmatch(r&quot;[^@\s]+@[^@\s]+\.[^@\s]+&quot;, args[&quot;email&quot;])
+            print(&quot;valid&quot; if valid else &quot;invalid&quot;)
+          arguments:
+            email: ${ .email }
+        return: stdout
+</div><p id="o1jnwl_19">Save it as <code class="code" id="o1jnwl_29">inline-email-check.yaml</code>:</p><div class="code-block" data-lang="bash">
+bin/lemline definition post -f inline-email-check.yaml
+bin/lemline instance start examples inline-email-check --input '{&quot;email&quot;:&quot;ada@example.com&quot;}'
+bin/lemline instance start examples inline-email-check --input '{&quot;email&quot;:&quot;not-an-email&quot;}'
+</div><p id="o1jnwl_21">The instances complete with the printed line as a string, <code class="code" id="o1jnwl_30">&quot;valid&quot;</code> and then <code class="code" id="o1jnwl_31">&quot;invalid&quot;</code>.</p></section><section class="chapter"><h2 id="load-an-external-script" data-toc="load-an-external-script">Load an external script</h2><p id="o1jnwl_32">Use <code class="code" id="o1jnwl_41">run.script.source.endpoint</code> to reference a script instead of inlining it. Lemline reads the script from the file system of the runner that executes the task: use an absolute <code class="code" id="o1jnwl_42">file://</code> URI and place the script at that path on every runner. This example reads it from <code class="code" id="o1jnwl_43">/tmp/lemline-scripts</code>; on Windows, use a path such as <code class="code" id="o1jnwl_44">file:///C:/lemline-scripts/email-validator.py</code>.</p><p id="o1jnwl_33">Create the script with the same email check as above:</p><div class="code-block" data-lang="bash">
+mkdir -p /tmp/lemline-scripts
+cat &gt; /tmp/lemline-scripts/email-validator.py &lt;&lt;'EOF'
+import re
+import sys
+args = dict(zip(sys.argv[1::2], sys.argv[2::2]))
+valid = re.fullmatch(r&quot;[^@\s]+@[^@\s]+\.[^@\s]+&quot;, args[&quot;email&quot;])
+print(&quot;valid&quot; if valid else &quot;invalid&quot;)
+EOF
+</div><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: load-external-script
+  version: '1.0.0'
+do:
+  - validateEmail:
+      run:
+        script:
+          language: python
+          source:
+            endpoint: file:///tmp/lemline-scripts/email-validator.py
+          arguments:
+            email: ${ .email }
+        return: stdout
+</div><p id="o1jnwl_36">Save it as <code class="code" id="o1jnwl_45">load-external-script.yaml</code>:</p><div class="code-block" data-lang="bash">
+bin/lemline definition post -f load-external-script.yaml
+bin/lemline instance start examples load-external-script --input '{&quot;email&quot;:&quot;ada@example.com&quot;}'
+bin/lemline instance start examples load-external-script --input '{&quot;email&quot;:&quot;not-an-email&quot;}'
+</div><p id="o1jnwl_38">The instances complete with <code class="code" id="o1jnwl_46">valid</code> and <code class="code" id="o1jnwl_47">invalid</code>. A <code class="code" id="o1jnwl_48">source.endpoint</code> that is not a <code class="code" id="o1jnwl_49">file://</code> URI faults with <code class="code" id="o1jnwl_50">Unsupported scheme for script source</code>.</p><p id="o1jnwl_39">The endpoint is either a plain string or an object with a <code class="code" id="o1jnwl_51">uri</code> property. Both accept a runtime expression, for example <code class="code" id="o1jnwl_52">endpoint: ${ .scriptUri }</code>.</p><p id="o1jnwl_40">The runner needs Node.js 22 or later for <code class="code" id="o1jnwl_53">js</code> scripts and Python 3.8 or later for <code class="code" id="o1jnwl_54">python</code> scripts.</p></section><section class="chapter"><h2 id="run-a-container" data-toc="run-a-container">Run a container</h2><p id="o1jnwl_55">Set <code class="code" id="o1jnwl_60">run.container.image</code> and, if needed, a <code class="code" id="o1jnwl_61">command</code> and <code class="code" id="o1jnwl_62">volumes</code>. The referenced volume path has to be available to the executor.</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: run-container-with-volume
+  version: '1.0.0'
+do:
+  - listReports:
+      run:
+        container:
+          image: alpine:3.22
+          command: ls /reports
+          volumes:
+            /host/reports: /reports
+        return: stdout
+</div><aside class="prompt" data-type="tip" data-title="" id="o1jnwl_57"><p id="o1jnwl_63"><span class="control" id="o1jnwl_64">Runtime support:</span> Lemline accepts this definition but has no container executor yet. The task fails with <code class="code" id="o1jnwl_65">Unknown run task type: RunContainer</code>. Use an inline script, or call a service over HTTP, instead.</p></aside><p id="o1jnwl_58">Save it as <code class="code" id="o1jnwl_66">run-container-with-volume.yaml</code> to see the failure:</p><div class="code-block" data-lang="bash">
+bin/lemline definition post -f run-container-with-volume.yaml
+bin/lemline instance start examples run-container-with-volume
+</div></section><section class="chapter"><h2 id="invoke-a-child-workflow" data-toc="invoke-a-child-workflow">Invoke a child workflow</h2><p id="o1jnwl_67">Identify the child by namespace, name and version. Use <code class="code" id="o1jnwl_77">run.workflow.input</code> to supply named values for the child workflow. Register the child definition before starting the parent. This child asks the <a href="lemline-tutorial-order-processing.html#start-the-tutorial-shop" id="o1jnwl_78" data-tooltip="Complete the SQLite setup and keep the worker running on the host. In a separate terminal, open the root of the Lemline source checkout matching these docs (the directory containing examples/tutorial-services). With Docker Compose running, start the single shop container:">tutorial shop</a> for an economy quote. Start the shop from the root of the Lemline source checkout:</p><div class="code-block" data-lang="bash">
+docker compose -f examples/tutorial-services/compose.yaml up -d
+</div><p id="o1jnwl_69">Save the child as <code class="code" id="o1jnwl_79">shipping-quote.yaml</code>:</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: shipping-quote
+  version: '1.0.0'
+do:
+  - requestQuote:
+      call: http
+      with:
+        method: post
+        endpoint: http://127.0.0.1:8787/quotes/economy
+        body:
+          orderId: ${ .orderId }
+      output:
+        as: '${ { orderId: .orderId, carrier: .carrier, price: .price } }'
+</div><p id="o1jnwl_71">The parent waits for the child and receives its output. Save it as <code class="code" id="o1jnwl_80">invoke-order-workflow.yaml</code>:</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: invoke-order-workflow
+  version: '1.0.0'
+do:
+  - calculateShipping:
+      run:
+        workflow:
+          namespace: examples
+          name: shipping-quote
+          version: '1.0.0'
+          input:
+            orderId: ${ .orderId }
+  - recordQuote:
+      set:
+        quote: ${ . }
+</div><div class="code-block" data-lang="bash">
+bin/lemline definition post -f shipping-quote.yaml
+bin/lemline definition post -f invoke-order-workflow.yaml
+bin/lemline instance start examples invoke-order-workflow --input '{&quot;orderId&quot;:&quot;ORD-42&quot;}'
+</div><p id="o1jnwl_74">The parent completes with the child's quote, <code class="code" id="o1jnwl_81">{&quot;quote&quot;:{&quot;orderId&quot;:&quot;ORD-42&quot;,&quot;carrier&quot;:&quot;economy&quot;,&quot;price&quot;:5}}</code>, and the shop lists one economy quote for <code class="code" id="o1jnwl_82">ORD-42</code>. Stop the shop when you are done:</p><div class="code-block" data-lang="bash">
+docker compose -f examples/tutorial-services/compose.yaml down
+</div><p id="o1jnwl_76">See <a href="https://github.com/open-workflow-specification/specification/blob/v1.0.3/dsl-reference.md#workflow-process" id="o1jnwl_83" data-external="true" rel="noopener noreferrer" target="_blank">Run Workflow</a> for awaiting completion and handling results.</p></section><div class="last-modified">25 November 2026</div><div data-feedback-placeholder="true"></div><div class="navigation-links _bottom"><a href="lemline-howto-openapi.html" class="navigation-links__prev">How to use OpenAPI-defined services</a><a href="lemline-howto-grpc.html" class="navigation-links__next">How to call gRPC functions</a></div></article><div id="disqus_thread"></div></div></section></main></div><script src="https://resources.jetbrains.com/writerside/apidoc/6.22.0-b776/app.js"></script></body></html>

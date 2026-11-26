@@ -1,0 +1,362 @@
+<!DOCTYPE html SYSTEM "about:legacy-compat">
+<html lang="en-US" data-preset="contrast" data-primary-color="#2E6F7E"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="robots" content="noindex"><meta name="built-on" content="2026-11-26T17:17:50.013296311"><title>Compensation Pattern Examples | Lemline documentation</title><script type="application/json" id="virtual-toc-data">[{"id":"run-the-examples","level":0,"title":"Run the Examples","anchor":"#run-the-examples"},{"id":"basic-compensation-pattern","level":0,"title":"Basic Compensation Pattern","anchor":"#basic-compensation-pattern"},{"id":"multi-step-transaction-compensation","level":0,"title":"Multi-Step Transaction Compensation","anchor":"#multi-step-transaction-compensation"},{"id":"compensation-with-retry","level":0,"title":"Compensation with Retry","anchor":"#compensation-with-retry"},{"id":"compensation-strategies-for-different-resource-types","level":0,"title":"Compensation Strategies for Different Resource Types","anchor":"#compensation-strategies-for-different-resource-types"},{"id":"asynchronous-compensation","level":0,"title":"Asynchronous Compensation","anchor":"#asynchronous-compensation"},{"id":"best-practices-for-compensation-patterns","level":0,"title":"Best Practices for Compensation Patterns","anchor":"#best-practices-for-compensation-patterns"},{"id":"conclusion","level":0,"title":"Conclusion","anchor":"#conclusion"}]</script><script type="application/json" id="topic-shortcuts"></script><link href="https://resources.jetbrains.com/writerside/apidoc/6.22.0-b776/app.css" rel="stylesheet"><link href="static/custom.css" rel="stylesheet"><link rel="icon" type="image/png" sizes="16x16" href="images/lemly.png"><meta name="image" content="https://docs.lemline.com/social-preview.png"><!-- Open Graph --><meta property="og:title" content="Compensation Pattern Examples | Lemline documentation"><meta property="og:description" content=""><meta property="og:image" content="https://docs.lemline.com/social-preview.png"><meta property="og:site_name" content="Lemline documentation Help"><meta property="og:type" content="website"><meta property="og:locale" content="en_US"><meta property="og:url" content="https://docs.lemline.com/lemline-example-compensation.html"><!-- End Open Graph --><!-- Twitter Card --><meta name="twitter:card" content="summary_large_image"><meta name="twitter:site" content=""><meta name="twitter:title" content="Compensation Pattern Examples | Lemline documentation"><meta name="twitter:description" content=""><meta name="twitter:creator" content=""><meta name="twitter:image:src" content="https://docs.lemline.com/social-preview.png"><!-- End Twitter Card --><!-- Schema.org WebPage --><script type="application/ld+json">{
+    "@context": "http://schema.org",
+    "@type": "WebPage",
+    "@id": "https://docs.lemline.com/lemline-example-compensation.html#webpage",
+    "url": "https://docs.lemline.com/lemline-example-compensation.html",
+    "name": "Compensation Pattern Examples | Lemline documentation",
+    "description": "",
+    "image": "https://docs.lemline.com/social-preview.png",
+    "inLanguage":"en-US"
+}</script><!-- End Schema.org --><!-- Schema.org WebSite --><script type="application/ld+json">{
+    "@type": "WebSite",
+    "@id": "https://docs.lemline.com/#website",
+    "url": "https://docs.lemline.com/",
+    "name": "Lemline documentation Help"
+}</script><!-- End Schema.org --></head><body data-id="lemline-example-compensation" data-main-title="Compensation Pattern Examples" data-article-props="{&quot;seeAlsoStyle&quot;:&quot;links&quot;}" data-template="article" data-breadcrumbs="Examples Library"><div class="wrapper"><main class="panel _main"><header class="panel__header"><div class="container"><h3>Lemline documentation  Help</h3><div class="panel-trigger"></div></div></header><section class="panel__content"><div class="container"><article class="article" data-shortcut-switcher="inactive"><h1 data-toc="lemline-example-compensation" id="lemline-example-compensation.md">Compensation Pattern Examples</h1><p id="z141rlr_3">This document provides examples of implementing compensation patterns in Lemline workflows. Compensation patterns are essential for maintaining data consistency and handling partial failures in distributed systems by implementing actions that &quot;undo&quot; or &quot;compensate&quot; for previously completed steps when errors occur.</p><section class="chapter"><h2 id="run-the-examples" data-toc="run-the-examples">Run the Examples</h2><p id="z141rlr_12">Complete <a href="lemline-tutorial-setup.html" id="z141rlr_17" data-tooltip="Run Lemline on one machine with SQLite. Lemline stores workflow definitions, queued messages, and workflow history in local files. Use a writable directory on a local filesystem.">the SQLite setup</a> and keep its worker running. Run the commands from a second terminal in the setup directory. With the JAR, substitute <code class="code" id="z141rlr_18">java -jar lemline.jar</code> for <code class="code" id="z141rlr_19">bin/lemline</code>. Start the <a href="lemline-tutorial-order-processing.html#start-the-tutorial-shop" id="z141rlr_20" data-tooltip="Complete the SQLite setup and keep the worker running on the host. In a separate terminal, open the root of the Lemline source checkout matching these docs (the directory containing examples/tutorial-services). With Docker Compose running, start the single shop container:">tutorial shop</a> from the root of the Lemline source checkout and keep <a href="http://127.0.0.1:8787" id="z141rlr_21" data-external="true" rel="noopener noreferrer" target="_blank">its page</a> open to follow reservations, charges, refunds and documents:</p><div class="code-block" data-lang="bash">
+docker compose -f examples/tutorial-services/compose.yaml up -d
+</div><p id="z141rlr_14">The asynchronous example also needs the tutorial publisher. Save it as <code class="code" id="z141rlr_22">tutorial-publisher.yaml</code> and register it:</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: tutorial-publisher
+  version: '1.0.0'
+do:
+  - publish:
+      emit:
+        event:
+          with:
+            type: ${ .type }
+            source: https://events.example.com/tutorial
+            data: ${ .data }
+</div><div class="code-block" data-lang="bash">
+bin/lemline definition post -f tutorial-publisher.yaml
+</div></section><section class="chapter"><h2 id="basic-compensation-pattern" data-toc="basic-compensation-pattern">Basic Compensation Pattern</h2><section class="chapter"><h3 id="simple-two-phase-workflow-with-compensation" data-toc="simple-two-phase-workflow-with-compensation">Simple Two-Phase Workflow with Compensation</h3><p id="z141rlr_24">This example demonstrates a simple order processing workflow with reservation and charge steps, with compensation for the reservation if the charge fails.</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: simple-compensation
+  version: '1.0.0'
+input:
+  schema:
+    document:
+      type: object
+      required: [orderId, items, paymentInfo]
+do:
+  - processOrder:
+      try:
+        - reserveInventory:
+            call: http
+            with:
+              method: post
+              endpoint: http://127.0.0.1:8787/reservations
+              body:
+                orderId: ${ .orderId }
+                items: ${ .items }
+            export:
+              as: '${ $context + { reservationId: .id } }'
+        - chargePayment:
+            call: http
+            with:
+              method: post
+              endpoint: http://127.0.0.1:8787/charges
+              body:
+                orderId: ${ $workflow.input.orderId }
+                paymentInfo: ${ $workflow.input.paymentInfo }
+        - returnSuccess:
+            set:
+              success: true
+              orderId: ${ $workflow.input.orderId }
+              reservationId: ${ $context.reservationId }
+              paymentId: ${ .id }
+      catch:
+        as: orderError
+        do:
+          - releaseReservation:
+              if: ${ $context.reservationId != null }
+              call: http
+              with:
+                method: delete
+                endpoint: '${ &quot;http://127.0.0.1:8787/reservations/\($context.reservationId | @uri)&quot; }'
+          - returnFailure:
+              set:
+                success: false
+                orderId: ${ $workflow.input.orderId }
+                errorType: ${ $orderError.type }
+</div><p id="z141rlr_26">Save it as <code class="code" id="z141rlr_29">simple-two-phase-workflow-with-compensation.yaml</code>:</p><div class="code-block" data-lang="bash">
+bin/lemline definition post -f simple-two-phase-workflow-with-compensation.yaml
+bin/lemline instance start examples simple-compensation --input '{&quot;orderId&quot;:&quot;ORD-1501&quot;,&quot;items&quot;:[{&quot;id&quot;:&quot;SKU-1&quot;,&quot;quantity&quot;:1}],&quot;paymentInfo&quot;:{&quot;token&quot;:&quot;approved&quot;}}'
+bin/lemline instance start examples simple-compensation --input '{&quot;orderId&quot;:&quot;ORD-1502&quot;,&quot;items&quot;:[{&quot;id&quot;:&quot;SKU-1&quot;,&quot;quantity&quot;:1}],&quot;paymentInfo&quot;:{&quot;token&quot;:&quot;declined&quot;}}'
+</div><p id="z141rlr_28">ORD-1501 returns <code class="code" id="z141rlr_30">success: true</code> with its reservation and the charge ID. For ORD-1502 the charge answers HTTP 402: the catch releases the reservation and returns <code class="code" id="z141rlr_31">success: false</code> with the <code class="code" id="z141rlr_32">communication</code> error type.</p></section></section><section class="chapter"><h2 id="multi-step-transaction-compensation" data-toc="multi-step-transaction-compensation">Multi-Step Transaction Compensation</h2><section class="chapter"><h3 id="saga-pattern-implementation" data-toc="saga-pattern-implementation">Saga Pattern Implementation</h3><p id="z141rlr_34">This example implements the Saga pattern for a multi-step business process with compensation actions for each step.</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: order-saga
+  version: '1.0.0'
+do:
+  - fulfillOrder:
+      try:
+        - reserveInventory:
+            call: http
+            with:
+              method: post
+              endpoint: http://127.0.0.1:8787/reservations
+              body:
+                orderId: ${ $workflow.input.orderId }
+                items: ${ $workflow.input.items }
+            export:
+              as: '${ $context + { reservationId: .id } }'
+        - chargeCustomer:
+            call: http
+            with:
+              method: post
+              endpoint: http://127.0.0.1:8787/charges
+              body:
+                orderId: ${ $workflow.input.orderId }
+                paymentInfo: ${ $workflow.input.paymentInfo }
+            export:
+              as: '${ $context + { paymentId: .id } }'
+        - quoteShipping:
+            call: http
+            with:
+              method: post
+              endpoint: http://127.0.0.1:8787/quotes/express
+              body:
+                orderId: ${ $workflow.input.orderId }
+        - createShipment:
+            call: http
+            with:
+              method: post
+              endpoint: http://127.0.0.1:8787/shipments
+              query:
+                fail: '503'
+                failTimes: ${ if $workflow.input.shippingDown then &quot;1&quot; else &quot;0&quot; end }
+              body:
+                orderId: ${ $workflow.input.orderId }
+                carrier: express
+      catch:
+        as: fulfillmentError
+        do:
+          - attemptRefundPayment:
+              if: ${ $context.paymentId != null }
+              try:
+                - refundPayment:
+                    call: http
+                    with:
+                      method: post
+                      endpoint: http://127.0.0.1:8787/refunds
+                      query:
+                        fail: '500'
+                        failTimes: ${ if $workflow.input.refundsDown then &quot;1&quot; else &quot;0&quot; end }
+                      body:
+                        orderId: ${ $workflow.input.orderId }
+              catch:
+                do:
+                  - recordCleanupFailure:
+                      set:
+                        action: refundPayment
+                      export:
+                        as: '${ $context + { cleanupFailed: (($context.cleanupFailed // []) + [.action]) } }'
+          - attemptReleaseInventory:
+              if: ${ $context.reservationId != null }
+              try:
+                - releaseInventory:
+                    call: http
+                    with:
+                      method: delete
+                      endpoint: '${ &quot;http://127.0.0.1:8787/reservations/\($context.reservationId | @uri)&quot; }'
+              catch:
+                do:
+                  - recordCleanupFailure:
+                      set:
+                        action: releaseInventory
+                      export:
+                        as: '${ $context + { cleanupFailed: (($context.cleanupFailed // []) + [.action]) } }'
+          - reportFailure:
+              set:
+                success: false
+                cleanupFailed: ${ $context.cleanupFailed // [] }
+                errorType: ${ $fulfillmentError.type }
+</div><p id="z141rlr_36">Save it as <code class="code" id="z141rlr_40">saga-pattern-implementation.yaml</code>:</p><div class="code-block" data-lang="bash">
+bin/lemline definition post -f saga-pattern-implementation.yaml
+bin/lemline instance start examples order-saga --input '{&quot;orderId&quot;:&quot;ORD-1503&quot;,&quot;items&quot;:[{&quot;id&quot;:&quot;SKU-1&quot;,&quot;quantity&quot;:1}],&quot;paymentInfo&quot;:{&quot;token&quot;:&quot;approved&quot;}}'
+bin/lemline instance start examples order-saga --input '{&quot;orderId&quot;:&quot;ORD-1504&quot;,&quot;items&quot;:[{&quot;id&quot;:&quot;SKU-1&quot;,&quot;quantity&quot;:1}],&quot;paymentInfo&quot;:{&quot;token&quot;:&quot;approved&quot;},&quot;shippingDown&quot;:true}'
+bin/lemline instance start examples order-saga --input '{&quot;orderId&quot;:&quot;ORD-1505&quot;,&quot;items&quot;:[{&quot;id&quot;:&quot;SKU-1&quot;,&quot;quantity&quot;:1}],&quot;paymentInfo&quot;:{&quot;token&quot;:&quot;approved&quot;},&quot;shippingDown&quot;:true,&quot;refundsDown&quot;:true}'
+bin/lemline instance start examples order-saga --input '{&quot;orderId&quot;:&quot;ORD-1506&quot;,&quot;items&quot;:[{&quot;id&quot;:&quot;SKU-1&quot;,&quot;quantity&quot;:1}],&quot;paymentInfo&quot;:{&quot;token&quot;:&quot;declined&quot;}}'
+</div><div class="table-wrapper"><table class="wide" id="z141rlr_38"><thead><tr class="ijRowHead" id="z141rlr_41"><th id="z141rlr_46"><p>Order</p></th><th id="z141rlr_47"><p>What fails</p></th><th id="z141rlr_48"><p>Compensation in the shop</p></th><th id="z141rlr_49"><p>Result</p></th></tr></thead><tbody><tr id="z141rlr_42"><td id="z141rlr_50"><p>ORD-1503</p></td><td id="z141rlr_51"><p>Nothing</p></td><td id="z141rlr_52"><p>None: the order ships with express</p></td><td id="z141rlr_53"><p>The shipment</p></td></tr><tr id="z141rlr_43"><td id="z141rlr_54"><p>ORD-1504</p></td><td id="z141rlr_55"><p>The shipment (HTTP 503)</p></td><td id="z141rlr_56"><p>Payment refunded, then reservation released</p></td><td id="z141rlr_57"><p><code class="code" id="z141rlr_58">success: false</code>, <code class="code" id="z141rlr_59">cleanupFailed: []</code></p></td></tr><tr id="z141rlr_44"><td id="z141rlr_60"><p>ORD-1505</p></td><td id="z141rlr_61"><p>The shipment, then the refund (HTTP 500)</p></td><td id="z141rlr_62"><p>Reservation released; the charge stays</p></td><td id="z141rlr_63"><p><code class="code" id="z141rlr_64">cleanupFailed: [&quot;refundPayment&quot;]</code></p></td></tr><tr id="z141rlr_45"><td id="z141rlr_65"><p>ORD-1506</p></td><td id="z141rlr_66"><p>The charge (HTTP 402)</p></td><td id="z141rlr_67"><p>No refund to make; reservation released</p></td><td id="z141rlr_68"><p><code class="code" id="z141rlr_69">cleanupFailed: []</code></p></td></tr></tbody></table></div><p id="z141rlr_39">Compensations run in reverse order of the steps, and each one is attempted even when an earlier one fails.</p></section></section><section class="chapter"><h2 id="compensation-with-retry" data-toc="compensation-with-retry">Compensation with Retry</h2><section class="chapter"><h3 id="resilient-order-processing-with-retries-and-compensation" data-toc="resilient-order-processing-with-retries-and-compensation">Resilient Order Processing with Retries and Compensation</h3><p id="z141rlr_71">This example demonstrates combining retry policies with compensation actions for a more resilient workflow.</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: resilient-order-processing
+  version: '1.0.0'
+do:
+  - reserveInventory:
+      call: http
+      with:
+        method: post
+        endpoint: http://127.0.0.1:8787/reservations
+        body:
+          orderId: ${ $workflow.input.orderId }
+          items: ${ $workflow.input.items }
+      export:
+        as: '${ $context + { reservationId: .id } }'
+  - chargeOrder:
+      try:
+        - chargePayment:
+            call: http
+            with:
+              method: post
+              endpoint: http://127.0.0.1:8787/charges
+              headers:
+                Idempotency-Key: ${ $workflow.id }
+              query:
+                fail: '503'
+                failTimes: ${ $workflow.input.paymentFailures // 0 | tostring }
+              body:
+                orderId: ${ $workflow.input.orderId }
+                paymentInfo: ${ $workflow.input.paymentInfo }
+      catch:
+        as: paymentError
+        retry:
+          delay: PT2S
+          limit:
+            attempt:
+              count: 3
+        do:
+          - releaseInventory:
+              call: http
+              with:
+                method: delete
+                endpoint: '${ &quot;http://127.0.0.1:8787/reservations/\($context.reservationId | @uri)&quot; }'
+          - reportFailure:
+              set:
+                success: false
+                errorType: ${ $paymentError.type }
+</div><p id="z141rlr_73">Save it as <code class="code" id="z141rlr_76">resilient-order-processing-with-retries-and-compensation.yaml</code>:</p><div class="code-block" data-lang="bash">
+bin/lemline definition post -f resilient-order-processing-with-retries-and-compensation.yaml
+bin/lemline instance start examples resilient-order-processing --input '{&quot;orderId&quot;:&quot;ORD-1507&quot;,&quot;items&quot;:[{&quot;id&quot;:&quot;SKU-1&quot;,&quot;quantity&quot;:1}],&quot;paymentInfo&quot;:{&quot;token&quot;:&quot;approved&quot;},&quot;paymentFailures&quot;:2}'
+bin/lemline instance start examples resilient-order-processing --input '{&quot;orderId&quot;:&quot;ORD-1508&quot;,&quot;items&quot;:[{&quot;id&quot;:&quot;SKU-1&quot;,&quot;quantity&quot;:1}],&quot;paymentInfo&quot;:{&quot;token&quot;:&quot;declined&quot;}}'
+</div><p id="z141rlr_75">ORD-1507 fails twice with HTTP 503, then is charged on the second retry; the reservation stays. ORD-1508 is declined on the call and on all three retries; the catch then releases the reservation and returns <code class="code" id="z141rlr_77">success: false</code>. The <code class="code" id="z141rlr_78">Idempotency-Key</code> header, visible in the shop's request list, lets a payment service recognize a retried charge. Allow about a minute: the worker picks up retries every 10 seconds.</p></section></section><section class="chapter"><h2 id="compensation-strategies-for-different-resource-types" data-toc="compensation-strategies-for-different-resource-types">Compensation Strategies for Different Resource Types</h2><section class="chapter"><h3 id="transaction-management-with-mixed-resource-types" data-toc="transaction-management-with-mixed-resource-types">Transaction Management with Mixed Resource Types</h3><p id="z141rlr_80">This example allocates two kinds of resources (a record and a file) and, when a later step fails, deletes each resource that was created.</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: allocate-mixed-resources
+  version: '1.0.0'
+do:
+  - storeDocument:
+      try:
+        - allocateRecord:
+            call: http
+            with:
+              method: post
+              endpoint: http://127.0.0.1:8787/documents
+              body: '${ { reference: $workflow.input.name, title: &quot;Record&quot;, content: $workflow.input.name } }'
+            export:
+              as: '${ $context + { recordId: .id } }'
+        - allocateFile:
+            call: http
+            with:
+              method: post
+              endpoint: http://127.0.0.1:8787/documents
+              body: '${ { reference: $workflow.input.name, title: &quot;File&quot;, content: $workflow.input.content } }'
+            export:
+              as: '${ $context + { fileId: .id } }'
+        - attachFile:
+            call: http
+            with:
+              method: patch
+              endpoint: '${ &quot;http://127.0.0.1:8787/documents/\($context.recordId | @uri)&quot; + (if $workflow.input.attachFails then &quot;?fail=503&quot; else &quot;&quot; end) }'
+              body: '${ { attachmentId: $context.fileId } }'
+      catch:
+        as: allocationError
+        do:
+          - attemptDeleteFile:
+              if: ${ $context.fileId != null }
+              try:
+                - deleteFile:
+                    call: http
+                    with:
+                      method: delete
+                      endpoint: '${ &quot;http://127.0.0.1:8787/documents/\($context.fileId | @uri)&quot; }'
+              catch:
+                do:
+                  - recordCleanupFailure:
+                      set:
+                        action: deleteFile
+                      export:
+                        as: '${ $context + { cleanupFailed: (($context.cleanupFailed // []) + [.action]) } }'
+          - attemptDeleteRecord:
+              if: ${ $context.recordId != null }
+              try:
+                - deleteRecord:
+                    call: http
+                    with:
+                      method: delete
+                      endpoint: '${ &quot;http://127.0.0.1:8787/documents/\($context.recordId | @uri)&quot; }'
+              catch:
+                do:
+                  - recordCleanupFailure:
+                      set:
+                        action: deleteRecord
+                      export:
+                        as: '${ $context + { cleanupFailed: (($context.cleanupFailed // []) + [.action]) } }'
+          - reportFailure:
+              set:
+                success: false
+                cleanupFailed: ${ $context.cleanupFailed // [] }
+                errorType: ${ $allocationError.type }
+</div><p id="z141rlr_82">Save it as <code class="code" id="z141rlr_85">transaction-management-with-mixed-resource-types.yaml</code>:</p><div class="code-block" data-lang="bash">
+bin/lemline definition post -f transaction-management-with-mixed-resource-types.yaml
+bin/lemline instance start examples allocate-mixed-resources --input '{&quot;name&quot;:&quot;invoice-1509&quot;,&quot;content&quot;:&quot;Invoice for ORD-1509&quot;}'
+bin/lemline instance start examples allocate-mixed-resources --input '{&quot;name&quot;:&quot;invoice-1510&quot;,&quot;content&quot;:&quot;Invoice for ORD-1510&quot;,&quot;attachFails&quot;:true}'
+</div><p id="z141rlr_84">For <code class="code" id="z141rlr_86">invoice-1509</code>, the shop holds a record whose <code class="code" id="z141rlr_87">attachmentId</code> points to the file. For <code class="code" id="z141rlr_88">invoice-1510</code>, attaching fails with HTTP 503: the catch deletes the file, then the record, and both documents show <code class="code" id="z141rlr_89">status: deleted</code>.</p></section></section><section class="chapter"><h2 id="asynchronous-compensation" data-toc="asynchronous-compensation">Asynchronous Compensation</h2><section class="chapter"><h3 id="long-running-process-with-asynchronous-compensation" data-toc="long-running-process-with-asynchronous-compensation">Long-Running Process with Asynchronous Compensation</h3><p id="z141rlr_91">This example reserves stock, then waits up to 30 seconds for a payment confirmation event; a real payment would get minutes. If no confirmation arrives, the <code class="code" id="z141rlr_101">listen</code> task times out and the <code class="code" id="z141rlr_102">catch</code> releases the reservation.</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: asynchronous-compensation
+  version: '1.0.0'
+do:
+  - reserveInventory:
+      call: http
+      with:
+        method: post
+        endpoint: http://127.0.0.1:8787/reservations
+        body:
+          orderId: ${ $workflow.input.orderId }
+          items: ${ $workflow.input.items }
+      export:
+        as: '${ $context + { reservationId: .id } }'
+  - awaitPayment:
+      try:
+        - waitForPaymentConfirmation:
+            listen:
+              to:
+                one:
+                  with:
+                    type: com.example.payment.confirmed
+                  correlate:
+                    orderId:
+                      from: ${ .orderId }
+                      expect: ${ $workflow.input.orderId }
+            timeout:
+              after: PT30S
+        - confirmOrder:
+            set:
+              status: confirmed
+      catch:
+        errors:
+          with:
+            type: https://open-workflow-specification.org/spec/1.0.0/errors/timeout
+        do:
+          - releaseInventory:
+              call: http
+              with:
+                method: delete
+                endpoint: '${ &quot;http://127.0.0.1:8787/reservations/\($context.reservationId | @uri)&quot; }'
+          - reportExpiry:
+              set:
+                status: expired
+</div><p id="z141rlr_93">Save it as <code class="code" id="z141rlr_103">long-running-process-with-asynchronous-compensation.yaml</code>:</p><div class="code-block" data-lang="bash">
+bin/lemline definition post -f long-running-process-with-asynchronous-compensation.yaml
+bin/lemline instance start examples asynchronous-compensation --input '{&quot;orderId&quot;:&quot;ORD-1511&quot;,&quot;items&quot;:[{&quot;id&quot;:&quot;SKU-1&quot;,&quot;quantity&quot;:1}]}'
+</div><p id="z141rlr_95">Confirm the payment while it waits:</p><div class="code-block" data-lang="bash">
+bin/lemline instance start examples tutorial-publisher --input '{&quot;type&quot;:&quot;com.example.payment.confirmed&quot;,&quot;data&quot;:{&quot;orderId&quot;:&quot;ORD-1511&quot;}}'
+</div><p id="z141rlr_97">The instance completes with <code class="code" id="z141rlr_104">{&quot;status&quot;:&quot;confirmed&quot;}</code> and the reservation stays. Start a second order and send nothing:</p><div class="code-block" data-lang="bash">
+bin/lemline instance start examples asynchronous-compensation --input '{&quot;orderId&quot;:&quot;ORD-1512&quot;,&quot;items&quot;:[{&quot;id&quot;:&quot;SKU-1&quot;,&quot;quantity&quot;:1}]}'
+</div><p id="z141rlr_99">After 30 to 40 seconds the listener times out, the catch releases the reservation, and the instance completes with <code class="code" id="z141rlr_105">{&quot;status&quot;:&quot;expired&quot;}</code>. Stop the shop when you are done:</p><div class="code-block" data-lang="bash">
+docker compose -f examples/tutorial-services/compose.yaml down
+</div></section></section><section class="chapter"><h2 id="best-practices-for-compensation-patterns" data-toc="best-practices-for-compensation-patterns">Best Practices for Compensation Patterns</h2><p id="z141rlr_106">When implementing compensation patterns in Lemline workflows, consider these best practices:</p><ol class="list _decimal" id="z141rlr_107" type="1"><li class="list__item" id="z141rlr_108"><p id="z141rlr_118"><span class="control" id="z141rlr_119">Resource Tracking</span>: Keep track of all resources allocated during workflow execution</p></li><li class="list__item" id="z141rlr_109"><p id="z141rlr_120"><span class="control" id="z141rlr_121">Compensate in Reverse Order</span>: Apply compensating actions in reverse order of the original operations</p></li><li class="list__item" id="z141rlr_110"><p id="z141rlr_122"><span class="control" id="z141rlr_123">Idempotent Compensation</span>: Design compensation actions to be safely retryable</p></li><li class="list__item" id="z141rlr_111"><p id="z141rlr_124"><span class="control" id="z141rlr_125">Partial Compensation</span>: Handle scenarios where only some steps need compensation</p></li><li class="list__item" id="z141rlr_112"><p id="z141rlr_126"><span class="control" id="z141rlr_127">Async Compensation</span>: For long-running processes, implement asynchronous compensation</p></li><li class="list__item" id="z141rlr_113"><p id="z141rlr_128"><span class="control" id="z141rlr_129">Compensation Logging</span>: Log all compensation actions for auditing and troubleshooting</p></li><li class="list__item" id="z141rlr_114"><p id="z141rlr_130"><span class="control" id="z141rlr_131">Escalation Policy</span>: Define clear escalation paths when compensation fails</p></li><li class="list__item" id="z141rlr_115"><p id="z141rlr_132"><span class="control" id="z141rlr_133">Independent Compensation</span>: Design compensation actions that don't depend on workflow state</p></li><li class="list__item" id="z141rlr_116"><p id="z141rlr_134"><span class="control" id="z141rlr_135">Explicit Cleanup</span>: Always explicitly clean up resources, don't rely on implicit cleanup</p></li><li class="list__item" id="z141rlr_117"><p id="z141rlr_136"><span class="control" id="z141rlr_137">Timeouts for Compensation</span>: Set appropriate timeouts for compensation actions (Lemline only enforces timeouts on <code class="code" id="z141rlr_138">listen</code> tasks; HTTP calls use fixed limits of 15 s to connect and 30 s per request)</p></li></ol></section><section class="chapter"><h2 id="conclusion" data-toc="conclusion">Conclusion</h2><p id="z141rlr_139">These examples demonstrate various compensation patterns for handling partial failures and maintaining data consistency in distributed workflows. By implementing proper compensation strategies, you can build resilient workflows that gracefully handle failures at any stage of execution.</p><p id="z141rlr_140">Compensation patterns are essential for maintaining data integrity in distributed systems, preventing resource leaks, and ensuring that business processes remain in a consistent state even when technical failures occur.</p><p id="z141rlr_141">For more examples of error handling and resilience patterns, see the <a href="lemline-examples-error-handling.html" id="z141rlr_142" data-tooltip="This document provides examples of error handling and resilience patterns in Lemline workflows. Robust error handling is essential for building reliable workflows that can gracefully recover from failures when interacting with external systems, processing data, or executing business…">Error Handling Examples</a> document.</p></section><div class="last-modified">25 November 2026</div><div data-feedback-placeholder="true"></div><div class="navigation-links _bottom"><a href="lemline-examples-timeouts.html" class="navigation-links__prev">Timeout Handling Examples</a><a href="lemline-observability-lifecycle.html" class="navigation-links__next">Workflow Lifecycle Observability</a></div></article><div id="disqus_thread"></div></div></section></main></div><script src="https://resources.jetbrains.com/writerside/apidoc/6.22.0-b776/app.js"></script></body></html>

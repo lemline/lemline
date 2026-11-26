@@ -1,0 +1,110 @@
+<!DOCTYPE html SYSTEM "about:legacy-compat">
+<html lang="en-US" data-preset="contrast" data-primary-color="#2E6F7E"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="robots" content="noindex"><meta name="built-on" content="2026-11-26T17:17:49.071086309"><title>Reserve, charge and ship an order | Lemline documentation</title><script type="application/json" id="virtual-toc-data">[{"id":"start-the-tutorial-shop","level":0,"title":"Start the tutorial shop","anchor":"#start-the-tutorial-shop"},{"id":"register-checkout","level":0,"title":"Register checkout","anchor":"#register-checkout"},{"id":"ship-a-paid-order","level":0,"title":"Ship a paid order","anchor":"#ship-a-paid-order"},{"id":"compensate-a-declined-payment","level":0,"title":"Compensate a declined payment","anchor":"#compensate-a-declined-payment"}]</script><script type="application/json" id="topic-shortcuts"></script><link href="https://resources.jetbrains.com/writerside/apidoc/6.22.0-b776/app.css" rel="stylesheet"><link href="static/custom.css" rel="stylesheet"><meta name="description" content="Reserve items, charge a payment, compare shipping quotes, and release the reservation if payment fails."><link rel="icon" type="image/png" sizes="16x16" href="images/lemly.png"><meta name="image" content="https://docs.lemline.com/social-preview.png"><!-- Open Graph --><meta property="og:title" content="Reserve, charge and ship an order | Lemline documentation"><meta property="og:description" content="Reserve items, charge a payment, compare shipping quotes, and release the reservation if payment fails."><meta property="og:image" content="https://docs.lemline.com/social-preview.png"><meta property="og:site_name" content="Lemline documentation Help"><meta property="og:type" content="website"><meta property="og:locale" content="en_US"><meta property="og:url" content="https://docs.lemline.com/lemline-tutorial-order-processing.html"><!-- End Open Graph --><!-- Twitter Card --><meta name="twitter:card" content="summary_large_image"><meta name="twitter:site" content=""><meta name="twitter:title" content="Reserve, charge and ship an order | Lemline documentation"><meta name="twitter:description" content="Reserve items, charge a payment, compare shipping quotes, and release the reservation if payment fails."><meta name="twitter:creator" content=""><meta name="twitter:image:src" content="https://docs.lemline.com/social-preview.png"><!-- End Twitter Card --><!-- Schema.org WebPage --><script type="application/ld+json">{
+    "@context": "http://schema.org",
+    "@type": "WebPage",
+    "@id": "https://docs.lemline.com/lemline-tutorial-order-processing.html#webpage",
+    "url": "https://docs.lemline.com/lemline-tutorial-order-processing.html",
+    "name": "Reserve, charge and ship an order | Lemline documentation",
+    "description": "",
+    "image": "https://docs.lemline.com/social-preview.png",
+    "inLanguage":"en-US"
+}</script><!-- End Schema.org --><!-- Schema.org WebSite --><script type="application/ld+json">{
+    "@type": "WebSite",
+    "@id": "https://docs.lemline.com/#website",
+    "url": "https://docs.lemline.com/",
+    "name": "Lemline documentation Help"
+}</script><!-- End Schema.org --></head><body data-id="lemline-tutorial-order-processing" data-main-title="Reserve, charge and ship an order" data-article-props="{&quot;seeAlsoStyle&quot;:&quot;links&quot;}" data-template="article" data-breadcrumbs="Tutorials: Run a shop with Lemline"><div class="wrapper"><main class="panel _main"><header class="panel__header"><div class="container"><h3>Lemline documentation  Help</h3><div class="panel-trigger"></div></div></header><section class="panel__content"><div class="container"><article class="article" data-shortcut-switcher="inactive"><h1 data-toc="lemline-tutorial-order-processing" id="lemline-tutorial-order-processing.md">Reserve, charge and ship an order</h1><section class="chapter"><h2 id="start-the-tutorial-shop" data-toc="start-the-tutorial-shop">Start the tutorial shop</h2><p id="-pqtkxf_8">Complete <a href="lemline-tutorial-setup.html" id="-pqtkxf_12" data-tooltip="Run Lemline on one machine with SQLite. Lemline stores workflow definitions, queued messages, and workflow history in local files. Use a writable directory on a local filesystem.">the SQLite setup</a> and keep the worker running on the host. In a separate terminal, open the root of the <a href="https://github.com/lemline/lemline" id="-pqtkxf_13" data-external="true" rel="noopener noreferrer" target="_blank">Lemline source checkout</a> matching these docs (the directory containing <code class="code" id="-pqtkxf_14">examples/tutorial-services</code>). With Docker Compose running, start the single shop container:</p><div class="code-block" data-lang="bash">
+docker compose -f examples/tutorial-services/compose.yaml up -d
+</div><p id="-pqtkxf_10">Open <a href="http://127.0.0.1:8787" id="-pqtkxf_15" data-external="true" rel="noopener noreferrer" target="_blank">the shop</a>. The stock starts at 100 units of SKU-1. To repeat this exercise, wait for outstanding workflows to finish, then reset the tutorial shop:</p><div class="code-block" data-lang="bash">
+curl -X POST http://127.0.0.1:8787/reset
+</div></section><section class="chapter"><h2 id="register-checkout" data-toc="register-checkout">Register checkout</h2><p id="-pqtkxf_16">From the setup directory, save this definition as <code class="code" id="-pqtkxf_20">compensate-reservation.yaml</code>. With the JAR, substitute <code class="code" id="-pqtkxf_21">java -jar lemline.jar</code> for <code class="code" id="-pqtkxf_22">bin/lemline</code>. The workflow sends real HTTP requests to the local shop.</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: compensate-reservation
+  version: '1.0.0'
+do:
+  - reserveInventory:
+      call: http
+      with:
+        method: post
+        endpoint: http://127.0.0.1:8787/reservations
+        body:
+          orderId: ${ $workflow.input.orderId }
+          items: ${ $workflow.input.items }
+      export:
+        as: '${ $context + { reservationId: .id } }'
+  - completeOrder:
+      try:
+        - chargePayment:
+            call: http
+            with:
+              method: post
+              endpoint: http://127.0.0.1:8787/charges
+              body:
+                orderId: ${ $workflow.input.orderId }
+                paymentInfo: ${ $workflow.input.paymentInfo }
+      catch:
+        do:
+          - releaseInventory:
+              call: http
+              with:
+                method: delete
+                endpoint: '${ &quot;http://127.0.0.1:8787/reservations/\($context.reservationId | @uri)&quot; }'
+          - reportFailure:
+              raise:
+                error:
+                  type: https://errors.example.com/order-failed
+                  status: 502
+                  title: Order completion failed
+  - compareCarriers:
+      fork:
+        branches:
+          - economy:
+              try:
+                - quote:
+                    call: http
+                    with:
+                      method: post
+                      endpoint: http://127.0.0.1:8787/quotes/economy
+                      body:
+                        orderId: ${ $workflow.input.orderId }
+                        failTwice: ${ $workflow.input.failTwice // false }
+              catch:
+                retry:
+                  delay: { seconds: 1 }
+                  limit:
+                    attempt: { count: 3 }
+          - express:
+              call: http
+              with:
+                method: post
+                endpoint: http://127.0.0.1:8787/quotes/express
+                body:
+                  orderId: ${ $workflow.input.orderId }
+  - selectCarrier:
+      set:
+        carrier: ${ min_by(.price).carrier }
+  - bookShipment:
+      call: http
+      with:
+        method: post
+        endpoint: http://127.0.0.1:8787/shipments
+        body:
+          orderId: ${ $workflow.input.orderId }
+          carrier: ${ .carrier }
+  - confirmShipment:
+      call: http
+      with:
+        method: post
+        endpoint: http://127.0.0.1:8787/notifications
+        body:
+          reference: ${ .orderId }
+          recipient: customer
+          message: '${ &quot;Shipment booked with &quot; + .carrier }'
+</div><div class="code-block" data-lang="bash">
+bin/lemline definition post -f compensate-reservation.yaml
+</div><p id="-pqtkxf_19">The reservation response replaces the task input. The workflow exports its ID to context for compensation and reads the original payment details from <code class="code" id="-pqtkxf_23">$workflow.input</code>.</p></section><section class="chapter"><h2 id="ship-a-paid-order" data-toc="ship-a-paid-order">Ship a paid order</h2><div class="code-block" data-lang="bash">
+bin/lemline instance start examples compensate-reservation --input '{&quot;orderId&quot;:&quot;ORD-201&quot;,&quot;items&quot;:[{&quot;id&quot;:&quot;SKU-1&quot;,&quot;quantity&quot;:2}],&quot;paymentInfo&quot;:{&quot;token&quot;:&quot;approved&quot;},&quot;failTwice&quot;:true}'
+</div><p id="-pqtkxf_25">Refresh the shop and filter by <code class="code" id="-pqtkxf_26">ORD-201</code>. Expect 98 units in stock and one reserved record. The fork requests both quotes. Express succeeds once at 9, while economy returns 503 twice before succeeding at 5. The workflow compares the prices, books economy and writes one customer confirmation to the inbox. The order of the first two carrier requests can vary.</p></section><section class="chapter"><h2 id="compensate-a-declined-payment" data-toc="compensate-a-declined-payment">Compensate a declined payment</h2><div class="code-block" data-lang="bash">
+bin/lemline instance start examples compensate-reservation --input '{&quot;orderId&quot;:&quot;ORD-202&quot;,&quot;items&quot;:[{&quot;id&quot;:&quot;SKU-1&quot;,&quot;quantity&quot;:2}],&quot;paymentInfo&quot;:{&quot;token&quot;:&quot;declined&quot;}}'
+</div><p id="-pqtkxf_28">Filter by <code class="code" id="-pqtkxf_30">ORD-202</code>. The reservation is released, the charge is declined, and shipments and inbox are empty for this order. Total available stock returns to 98. The workflow raises <code class="code" id="-pqtkxf_31">Order completion failed</code> after the release. Repeat both paths from a reset shop with the same inputs.</p><p id="-pqtkxf_29">Continue with <a href="lemline-tutorial-waits.html" id="-pqtkxf_32" data-tooltip="A wait pauses an existing instance for a duration. A listen pauses it until matching events arrive. The runner persists pending operations so it can resume an instance after a restart.">Wait for payments and collect order checks</a>.</p></section><div class="last-modified">26 November 2026</div><div data-feedback-placeholder="true"></div><div class="navigation-links _bottom"><a href="lemline-tutorial-gateway.html" class="navigation-links__prev">Start and follow an order through the gRPC gateway</a><a href="lemline-tutorial-waits.html" class="navigation-links__next">&quot;Wait for payments and collect order checks</a></div></article><div id="disqus_thread"></div></div></section></main></div><script src="https://resources.jetbrains.com/writerside/apidoc/6.22.0-b776/app.js"></script></body></html>

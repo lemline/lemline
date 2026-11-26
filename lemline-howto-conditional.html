@@ -1,0 +1,649 @@
+<!DOCTYPE html SYSTEM "about:legacy-compat">
+<html lang="en-US" data-preset="contrast" data-primary-color="#2E6F7E"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="robots" content="noindex"><meta name="built-on" content="2026-11-26T17:17:49.669336026"><title>How to define conditional branches (switch) | Lemline documentation</title><script type="application/json" id="virtual-toc-data">[{"id":"understanding-the-switch-task","level":0,"title":"Understanding the Switch Task","anchor":"#understanding-the-switch-task"},{"id":"run-the-examples","level":0,"title":"Run the Examples","anchor":"#run-the-examples"},{"id":"basic-switch-structure","level":0,"title":"Basic Switch Structure","anchor":"#basic-switch-structure"},{"id":"simple-binary-decision","level":0,"title":"Simple Binary Decision","anchor":"#simple-binary-decision"},{"id":"multiple-conditions","level":0,"title":"Multiple Conditions","anchor":"#multiple-conditions"},{"id":"using-complex-expressions","level":0,"title":"Using Complex Expressions","anchor":"#using-complex-expressions"},{"id":"default-fallback","level":0,"title":"Default Fallback","anchor":"#default-fallback"},{"id":"working-with-arrays-and-objects","level":0,"title":"Working with Arrays and Objects","anchor":"#working-with-arrays-and-objects"},{"id":"combining-multiple-variables","level":0,"title":"Combining Multiple Variables","anchor":"#combining-multiple-variables"},{"id":"nested-decision-making","level":0,"title":"Nested Decision Making","anchor":"#nested-decision-making"},{"id":"using-data-transformations-before-switching","level":0,"title":"Using Data Transformations before Switching","anchor":"#using-data-transformations-before-switching"},{"id":"error-handling-in-switch-tasks","level":0,"title":"Error Handling in Switch Tasks","anchor":"#error-handling-in-switch-tasks"},{"id":"combining-switch-with-try-catch","level":0,"title":"Combining Switch with Try/Catch","anchor":"#combining-switch-with-try-catch"},{"id":"real-world-example-order-processing","level":0,"title":"Real-World Example: Order Processing","anchor":"#real-world-example-order-processing"},{"id":"best-practices-for-switch-tasks","level":0,"title":"Best Practices for Switch Tasks","anchor":"#best-practices-for-switch-tasks"},{"id":"next-steps","level":0,"title":"Next Steps","anchor":"#next-steps"}]</script><script type="application/json" id="topic-shortcuts"></script><link href="https://resources.jetbrains.com/writerside/apidoc/6.22.0-b776/app.css" rel="stylesheet"><link href="static/custom.css" rel="stylesheet"><link rel="icon" type="image/png" sizes="16x16" href="images/lemly.png"><meta name="image" content="https://docs.lemline.com/social-preview.png"><!-- Open Graph --><meta property="og:title" content="How to define conditional branches (switch) | Lemline documentation"><meta property="og:description" content=""><meta property="og:image" content="https://docs.lemline.com/social-preview.png"><meta property="og:site_name" content="Lemline documentation Help"><meta property="og:type" content="website"><meta property="og:locale" content="en_US"><meta property="og:url" content="https://docs.lemline.com/lemline-howto-conditional.html"><!-- End Open Graph --><!-- Twitter Card --><meta name="twitter:card" content="summary_large_image"><meta name="twitter:site" content=""><meta name="twitter:title" content="How to define conditional branches (switch) | Lemline documentation"><meta name="twitter:description" content=""><meta name="twitter:creator" content=""><meta name="twitter:image:src" content="https://docs.lemline.com/social-preview.png"><!-- End Twitter Card --><!-- Schema.org WebPage --><script type="application/ld+json">{
+    "@context": "http://schema.org",
+    "@type": "WebPage",
+    "@id": "https://docs.lemline.com/lemline-howto-conditional.html#webpage",
+    "url": "https://docs.lemline.com/lemline-howto-conditional.html",
+    "name": "How to define conditional branches (switch) | Lemline documentation",
+    "description": "",
+    "image": "https://docs.lemline.com/social-preview.png",
+    "inLanguage":"en-US"
+}</script><!-- End Schema.org --><!-- Schema.org WebSite --><script type="application/ld+json">{
+    "@type": "WebSite",
+    "@id": "https://docs.lemline.com/#website",
+    "url": "https://docs.lemline.com/",
+    "name": "Lemline documentation Help"
+}</script><!-- End Schema.org --></head><body data-id="lemline-howto-conditional" data-main-title="How to define conditional branches (switch)" data-article-props="{&quot;seeAlsoStyle&quot;:&quot;links&quot;}" data-template="article" data-breadcrumbs="How-to Guides///Flow Control"><div class="wrapper"><main class="panel _main"><header class="panel__header"><div class="container"><h3>Lemline documentation  Help</h3><div class="panel-trigger"></div></div></header><section class="panel__content"><div class="container"><article class="article" data-shortcut-switcher="inactive"><h1 data-toc="lemline-howto-conditional" id="lemline-howto-conditional.md">How to define conditional branches (switch)</h1><p id="chxiay_3">This guide shows you how to implement conditional logic in your Lemline workflows using the <code class="code" id="chxiay_20">switch</code> task. You'll learn how to create dynamic branching based on workflow data, evaluate conditions using JQ expressions, and implement complex decision trees.</p><section class="chapter"><h2 id="understanding-the-switch-task" data-toc="understanding-the-switch-task">Understanding the Switch Task</h2><p id="chxiay_21">The <code class="code" id="chxiay_22">switch</code> task lets you create conditional branches in your workflow based on runtime data. It evaluates a list of conditions in order and directs the workflow to the first matching branch.</p></section><section class="chapter"><h2 id="run-the-examples" data-toc="run-the-examples">Run the Examples</h2><p id="chxiay_23">Each example below is a complete workflow. Complete <a href="lemline-tutorial-setup.html" id="chxiay_26" data-tooltip="Run Lemline on one machine with SQLite. Lemline stores workflow definitions, queued messages, and workflow history in local files. Use a writable directory on a local filesystem.">the SQLite setup</a> and keep its worker running. Run the commands from a second terminal in the setup directory. With the JAR, substitute <code class="code" id="chxiay_27">java -jar lemline.jar</code> for <code class="code" id="chxiay_28">bin/lemline</code>. The worker logs <code class="code" id="chxiay_29">Workflow completed with output</code> with each result. The examples that call HTTP services use the <a href="lemline-tutorial-order-processing.html#start-the-tutorial-shop" id="chxiay_30" data-tooltip="Complete the SQLite setup and keep the worker running on the host. In a separate terminal, open the root of the Lemline source checkout matching these docs (the directory containing examples/tutorial-services). With Docker Compose running, start the single shop container:">tutorial shop</a>. Start it now from the root of the Lemline source checkout:</p><div class="code-block" data-lang="bash">
+docker compose -f examples/tutorial-services/compose.yaml up -d
+</div><p id="chxiay_25">Each branch target is a task that records the decision. All but the last one end with <code class="code" id="chxiay_31">then: exit</code>, which leaves the task list instead of falling through to the next target.</p></section><section class="chapter"><h2 id="basic-switch-structure" data-toc="basic-switch-structure">Basic Switch Structure</h2><p id="chxiay_32">Here is the basic structure of a <code class="code" id="chxiay_37">switch</code> task. It chooses how to treat a warehouse temperature reading:</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: basic-switch-structure
+  version: '1.0.0'
+do:
+  - checkTemperature:
+      switch:
+        - hot:
+            when: ${ .temperature &gt; 30 }
+            then: coolWarehouse
+        - cold:
+            when: ${ .temperature &lt; 10 }
+            then: heatWarehouse
+        - mild:
+            then: keepSettings
+  - coolWarehouse:
+      set:
+        action: cooling
+      then: exit
+  - heatWarehouse:
+      set:
+        action: heating
+      then: exit
+  - keepSettings:
+      set:
+        action: unchanged
+</div><p id="chxiay_34">Save it as <code class="code" id="chxiay_38">basic-switch-structure.yaml</code> and run one instance per branch:</p><div class="code-block" data-lang="bash">
+bin/lemline definition post -f basic-switch-structure.yaml
+bin/lemline instance start examples basic-switch-structure --input '{&quot;temperature&quot;:35}'
+bin/lemline instance start examples basic-switch-structure --input '{&quot;temperature&quot;:5}'
+bin/lemline instance start examples basic-switch-structure --input '{&quot;temperature&quot;:20}'
+</div><p id="chxiay_36">Expect <code class="code" id="chxiay_39">{&quot;action&quot;:&quot;cooling&quot;}</code>, <code class="code" id="chxiay_40">{&quot;action&quot;:&quot;heating&quot;}</code> and <code class="code" id="chxiay_41">{&quot;action&quot;:&quot;unchanged&quot;}</code>. Each condition is a jq expression that evaluates to a boolean. The first condition that evaluates to <code class="code" id="chxiay_42">true</code> determines the next task. The last case has no <code class="code" id="chxiay_43">when</code>, so it always matches.</p></section><section class="chapter"><h2 id="simple-binary-decision" data-toc="simple-binary-decision">Simple Binary Decision</h2><p id="chxiay_44">Let's start with a simple yes/no decision. The workflow reads a product from the shop and compares its available units with the requested quantity, kept in <code class="code" id="chxiay_49">$context</code>:</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: simple-binary-decision
+  version: '1.0.0'
+do:
+  - checkInventory:
+      call: http
+      with:
+        method: get
+        endpoint: ${ &quot;http://127.0.0.1:8787/products/&quot; + .productId }
+      export:
+        as: '${ $context + { requested: $workflow.input.quantity } }'
+  - evaluateInventory:
+      switch:
+        - inStock:
+            when: ${ .available &gt;= $context.requested }
+            then: processOrder
+        - outOfStock:
+            then: handleOutOfStock
+  - processOrder:
+      set:
+        decision: process
+      then: exit
+  - handleOutOfStock:
+      set:
+        decision: backorder
+</div><p id="chxiay_46">Save it as <code class="code" id="chxiay_50">simple-binary-decision.yaml</code> and run one instance per branch:</p><div class="code-block" data-lang="bash">
+bin/lemline definition post -f simple-binary-decision.yaml
+bin/lemline instance start examples simple-binary-decision --input '{&quot;productId&quot;:&quot;SKU-1&quot;,&quot;quantity&quot;:2}'
+bin/lemline instance start examples simple-binary-decision --input '{&quot;productId&quot;:&quot;SKU-2&quot;,&quot;quantity&quot;:20}'
+</div><p id="chxiay_48">The shop has 100 units of SKU-1 and 10 of every other product, so expect <code class="code" id="chxiay_51">{&quot;decision&quot;:&quot;process&quot;}</code> then <code class="code" id="chxiay_52">{&quot;decision&quot;:&quot;backorder&quot;}</code>.</p></section><section class="chapter"><h2 id="multiple-conditions" data-toc="multiple-conditions">Multiple Conditions</h2><p id="chxiay_53">You can define multiple conditions for more complex decision trees. This example assigns a loyalty tier from a customer's points:</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: multiple-conditions
+  version: '1.0.0'
+do:
+  - assignLoyaltyTier:
+      switch:
+        - gold:
+            when: ${ .points &gt;= 80 }
+            then: setGold
+        - silver:
+            when: ${ .points &gt;= 50 and .points &lt; 80 }
+            then: setSilver
+        - bronze:
+            when: ${ .points &gt;= 20 and .points &lt; 50 }
+            then: setBronze
+        - basic:
+            then: setBasic
+  - setGold:
+      set:
+        tier: gold
+      then: exit
+  - setSilver:
+      set:
+        tier: silver
+      then: exit
+  - setBronze:
+      set:
+        tier: bronze
+      then: exit
+  - setBasic:
+      set:
+        tier: basic
+</div><p id="chxiay_55">Save it as <code class="code" id="chxiay_58">multiple-conditions.yaml</code> and run one instance per branch:</p><div class="code-block" data-lang="bash">
+bin/lemline definition post -f multiple-conditions.yaml
+bin/lemline instance start examples multiple-conditions --input '{&quot;points&quot;:90}'
+bin/lemline instance start examples multiple-conditions --input '{&quot;points&quot;:60}'
+bin/lemline instance start examples multiple-conditions --input '{&quot;points&quot;:30}'
+bin/lemline instance start examples multiple-conditions --input '{&quot;points&quot;:5}'
+</div><p id="chxiay_57">Expect the tiers <code class="code" id="chxiay_59">gold</code>, <code class="code" id="chxiay_60">silver</code>, <code class="code" id="chxiay_61">bronze</code> and <code class="code" id="chxiay_62">basic</code>.</p></section><section class="chapter"><h2 id="using-complex-expressions" data-toc="using-complex-expressions">Using Complex Expressions</h2><p id="chxiay_63">jq expressions in conditions can be complex logical statements. This example routes customer service requests:</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: using-complex-expressions
+  version: '1.0.0'
+do:
+  - routeCustomerRequest:
+      switch:
+        - largeRefund:
+            when: ${ .type == &quot;refund&quot; and .amount &gt; 1000 }
+            then: escalateToSupervisor
+        - lateRefund:
+            when: ${ .type == &quot;refund&quot; and .daysSincePurchase &gt; 30 }
+            then: applyReturnPolicy
+        - refund:
+            when: ${ .type == &quot;refund&quot; }
+            then: processStandardRefund
+        - defectiveExchange:
+            when: ${ .type == &quot;exchange&quot; and .reason == &quot;defective&quot; }
+            then: processDefectiveExchange
+        - exchange:
+            when: ${ .type == &quot;exchange&quot; }
+            then: processStandardExchange
+        - other:
+            then: handleGenericRequest
+  - escalateToSupervisor:
+      set:
+        route: supervisor
+      then: exit
+  - applyReturnPolicy:
+      set:
+        route: return-policy
+      then: exit
+  - processStandardRefund:
+      set:
+        route: standard-refund
+      then: exit
+  - processDefectiveExchange:
+      set:
+        route: defective-exchange
+      then: exit
+  - processStandardExchange:
+      set:
+        route: standard-exchange
+      then: exit
+  - handleGenericRequest:
+      set:
+        route: generic
+</div><p id="chxiay_65">Save it as <code class="code" id="chxiay_68">using-complex-expressions.yaml</code> and run one instance per branch:</p><div class="code-block" data-lang="bash">
+bin/lemline definition post -f using-complex-expressions.yaml
+bin/lemline instance start examples using-complex-expressions --input '{&quot;type&quot;:&quot;refund&quot;,&quot;amount&quot;:1500,&quot;daysSincePurchase&quot;:3}'
+bin/lemline instance start examples using-complex-expressions --input '{&quot;type&quot;:&quot;refund&quot;,&quot;amount&quot;:200,&quot;daysSincePurchase&quot;:45}'
+bin/lemline instance start examples using-complex-expressions --input '{&quot;type&quot;:&quot;refund&quot;,&quot;amount&quot;:200,&quot;daysSincePurchase&quot;:10}'
+bin/lemline instance start examples using-complex-expressions --input '{&quot;type&quot;:&quot;exchange&quot;,&quot;reason&quot;:&quot;defective&quot;}'
+bin/lemline instance start examples using-complex-expressions --input '{&quot;type&quot;:&quot;exchange&quot;,&quot;reason&quot;:&quot;wrong size&quot;}'
+bin/lemline instance start examples using-complex-expressions --input '{&quot;type&quot;:&quot;question&quot;}'
+</div><p id="chxiay_67">Expect the routes <code class="code" id="chxiay_69">supervisor</code>, <code class="code" id="chxiay_70">return-policy</code>, <code class="code" id="chxiay_71">standard-refund</code>, <code class="code" id="chxiay_72">defective-exchange</code>, <code class="code" id="chxiay_73">standard-exchange</code> and <code class="code" id="chxiay_74">generic</code>. A large refund matches the first case even when it is also late, because only the first matching case is selected.</p></section><section class="chapter"><h2 id="default-fallback" data-toc="default-fallback">Default Fallback</h2><p id="chxiay_75">Always include a default condition as the last one in your switch task to ensure the workflow always has a path forward:</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: default-fallback
+  version: '1.0.0'
+do:
+  - checkOrderStatus:
+      switch:
+        - approved:
+            when: ${ .status == &quot;approved&quot; }
+            then: processApprovedOrder
+        - pending:
+            when: ${ .status == &quot;pending&quot; }
+            then: waitForApproval
+        - rejected:
+            when: ${ .status == &quot;rejected&quot; }
+            then: handleRejectedOrder
+        - unknown:
+            then: handleUnknownStatus
+  - processApprovedOrder:
+      set:
+        next: ship
+      then: exit
+  - waitForApproval:
+      set:
+        next: wait
+      then: exit
+  - handleRejectedOrder:
+      set:
+        next: cancel
+      then: exit
+  - handleUnknownStatus:
+      set:
+        next: investigate
+</div><p id="chxiay_77">Save it as <code class="code" id="chxiay_80">default-fallback.yaml</code> and run one instance per branch:</p><div class="code-block" data-lang="bash">
+bin/lemline definition post -f default-fallback.yaml
+bin/lemline instance start examples default-fallback --input '{&quot;status&quot;:&quot;approved&quot;}'
+bin/lemline instance start examples default-fallback --input '{&quot;status&quot;:&quot;pending&quot;}'
+bin/lemline instance start examples default-fallback --input '{&quot;status&quot;:&quot;rejected&quot;}'
+bin/lemline instance start examples default-fallback --input '{&quot;status&quot;:&quot;lost&quot;}'
+</div><p id="chxiay_79">Expect <code class="code" id="chxiay_81">ship</code>, <code class="code" id="chxiay_82">wait</code>, <code class="code" id="chxiay_83">cancel</code> and, for the unexpected status, <code class="code" id="chxiay_84">investigate</code>. The last case has no <code class="code" id="chxiay_85">when</code>, so it always matches: there's always a path, even if none of the explicit conditions match.</p></section><section class="chapter"><h2 id="working-with-arrays-and-objects" data-toc="working-with-arrays-and-objects">Working with Arrays and Objects</h2><p id="chxiay_86">jq expressions can work with complex data structures. This example chooses a shipping method from item weights, the shipping preferences and the customer tier:</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: working-with-arrays-and-objects
+  version: '1.0.0'
+do:
+  - determineShippingMethod:
+      switch:
+        - heavy:
+            when: ${ .items | map(.weight) | add &gt; 20 }
+            then: arrangeFreightShipping
+        - express:
+            when: ${ .shipping.express == true }
+            then: arrangeExpressShipping
+        - premium:
+            when: ${ .customer.tier == &quot;premium&quot; }
+            then: arrangePriorityShipping
+        - standard:
+            then: arrangeStandardShipping
+  - arrangeFreightShipping:
+      set:
+        shipping: freight
+      then: exit
+  - arrangeExpressShipping:
+      set:
+        shipping: express
+      then: exit
+  - arrangePriorityShipping:
+      set:
+        shipping: priority
+      then: exit
+  - arrangeStandardShipping:
+      set:
+        shipping: standard
+</div><p id="chxiay_88">Save it as <code class="code" id="chxiay_91">working-with-arrays-and-objects.yaml</code> and run one instance per branch:</p><div class="code-block" data-lang="bash">
+bin/lemline definition post -f working-with-arrays-and-objects.yaml
+bin/lemline instance start examples working-with-arrays-and-objects --input '{&quot;items&quot;:[{&quot;weight&quot;:15},{&quot;weight&quot;:10}]}'
+bin/lemline instance start examples working-with-arrays-and-objects --input '{&quot;items&quot;:[{&quot;weight&quot;:2}],&quot;shipping&quot;:{&quot;express&quot;:true}}'
+bin/lemline instance start examples working-with-arrays-and-objects --input '{&quot;items&quot;:[{&quot;weight&quot;:2}],&quot;customer&quot;:{&quot;tier&quot;:&quot;premium&quot;}}'
+bin/lemline instance start examples working-with-arrays-and-objects --input '{&quot;items&quot;:[{&quot;weight&quot;:2}]}'
+</div><p id="chxiay_90">Expect <code class="code" id="chxiay_92">freight</code>, <code class="code" id="chxiay_93">express</code>, <code class="code" id="chxiay_94">priority</code> and <code class="code" id="chxiay_95">standard</code>. A missing field such as <code class="code" id="chxiay_96">.shipping.express</code> is <code class="code" id="chxiay_97">null</code>, so its condition is simply false.</p></section><section class="chapter"><h2 id="combining-multiple-variables" data-toc="combining-multiple-variables">Combining Multiple Variables</h2><p id="chxiay_98">You can reference multiple variables in a single condition:</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: combining-multiple-variables
+  version: '1.0.0'
+do:
+  - applyDiscount:
+      switch:
+        - premium:
+            when: ${ .customer.loyaltyYears &gt;= 5 and .order.total &gt; 100 }
+            then: applyPremiumDiscount
+        - standard:
+            when: ${ .customer.loyaltyYears &gt;= 2 or .order.total &gt; 200 }
+            then: applyStandardDiscount
+        - sale:
+            when: ${ .order.items | map(select(.category == &quot;sale&quot;)) | length &gt; 0 }
+            then: applySaleDiscount
+        - none:
+            then: noDiscount
+  - applyPremiumDiscount:
+      set:
+        discountPercent: 20
+      then: exit
+  - applyStandardDiscount:
+      set:
+        discountPercent: 10
+      then: exit
+  - applySaleDiscount:
+      set:
+        discountPercent: 5
+      then: exit
+  - noDiscount:
+      set:
+        discountPercent: 0
+</div><p id="chxiay_100">Save it as <code class="code" id="chxiay_103">combining-multiple-variables.yaml</code> and run one instance per branch:</p><div class="code-block" data-lang="bash">
+bin/lemline definition post -f combining-multiple-variables.yaml
+bin/lemline instance start examples combining-multiple-variables --input '{&quot;customer&quot;:{&quot;loyaltyYears&quot;:6},&quot;order&quot;:{&quot;total&quot;:150,&quot;items&quot;:[]}}'
+bin/lemline instance start examples combining-multiple-variables --input '{&quot;customer&quot;:{&quot;loyaltyYears&quot;:3},&quot;order&quot;:{&quot;total&quot;:50,&quot;items&quot;:[]}}'
+bin/lemline instance start examples combining-multiple-variables --input '{&quot;customer&quot;:{&quot;loyaltyYears&quot;:0},&quot;order&quot;:{&quot;total&quot;:50,&quot;items&quot;:[{&quot;category&quot;:&quot;sale&quot;}]}}'
+bin/lemline instance start examples combining-multiple-variables --input '{&quot;customer&quot;:{&quot;loyaltyYears&quot;:0},&quot;order&quot;:{&quot;total&quot;:50,&quot;items&quot;:[{&quot;category&quot;:&quot;garden&quot;}]}}'
+</div><p id="chxiay_102">This example determines discounts based on customer loyalty, order total, and item categories. Expect <code class="code" id="chxiay_104">discountPercent</code> 20, 10, 5 and 0.</p></section><section class="chapter"><h2 id="nested-decision-making" data-toc="nested-decision-making">Nested Decision Making</h2><p id="chxiay_105">For complex decision making, you can use multiple switch tasks in sequence:</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: nested-decision-making
+  version: '1.0.0'
+do:
+  - evaluateRiskLevel:
+      switch:
+        - highValue:
+            when: ${ .transaction.amount &gt; 10000 }
+            then: highValueCheck
+        - other:
+            then: standardCheck
+  - highValueCheck:
+      switch:
+        - flagged:
+            when: ${ .customer.history.flags | length &gt; 0 }
+            then: manualReview
+        - established:
+            when: ${ .customer.accountAgeDays &gt;= 90 }
+            then: autoApprove
+        - recent:
+            then: additionalVerification
+  - manualReview:
+      set:
+        decision: manual-review
+      then: exit
+  - additionalVerification:
+      set:
+        decision: verification
+      then: exit
+  - autoApprove:
+      set:
+        decision: approved
+      then: exit
+  - standardCheck:
+      set:
+        decision: standard
+</div><p id="chxiay_107">Save it as <code class="code" id="chxiay_110">nested-decision-making.yaml</code> and run one instance per branch:</p><div class="code-block" data-lang="bash">
+bin/lemline definition post -f nested-decision-making.yaml
+bin/lemline instance start examples nested-decision-making --input '{&quot;transaction&quot;:{&quot;amount&quot;:20000},&quot;customer&quot;:{&quot;history&quot;:{&quot;flags&quot;:[&quot;chargeback&quot;]},&quot;accountAgeDays&quot;:400}}'
+bin/lemline instance start examples nested-decision-making --input '{&quot;transaction&quot;:{&quot;amount&quot;:20000},&quot;customer&quot;:{&quot;history&quot;:{&quot;flags&quot;:[]},&quot;accountAgeDays&quot;:400}}'
+bin/lemline instance start examples nested-decision-making --input '{&quot;transaction&quot;:{&quot;amount&quot;:20000},&quot;customer&quot;:{&quot;history&quot;:{&quot;flags&quot;:[]},&quot;accountAgeDays&quot;:10}}'
+bin/lemline instance start examples nested-decision-making --input '{&quot;transaction&quot;:{&quot;amount&quot;:500}}'
+</div><p id="chxiay_109">This example implements a two-level decision tree for risk evaluation. Expect the decisions <code class="code" id="chxiay_111">manual-review</code>, <code class="code" id="chxiay_112">approved</code>, <code class="code" id="chxiay_113">verification</code> and <code class="code" id="chxiay_114">standard</code>.</p></section><section class="chapter"><h2 id="using-data-transformations-before-switching" data-toc="using-data-transformations-before-switching">Using Data Transformations before Switching</h2><p id="chxiay_115">You can use a <code class="code" id="chxiay_120">set</code> task to prepare data for a switch decision:</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: using-data-transformations-before-switching
+  version: '1.0.0'
+do:
+  - prepareDecisionData:
+      set:
+        isNewCustomer: ${ (.orderDate | fromdateiso8601) - (.customer.joinDate | fromdateiso8601) &lt; 30 * 24 * 3600 }
+        isHighValue: ${ .order.total &gt; 1000 }
+        hasRiskyItems: ${ .order.items | map(select(.category == &quot;restricted&quot;)) | length &gt; 0 }
+  - routeOrder:
+      switch:
+        - restricted:
+            when: ${ .hasRiskyItems == true }
+            then: complianceReview
+        - newAndLarge:
+            when: ${ .isNewCustomer == true and .isHighValue == true }
+            then: verificationProcess
+        - large:
+            when: ${ .isHighValue == true }
+            then: priorityProcessing
+        - other:
+            then: standardProcessing
+  - complianceReview:
+      set:
+        route: compliance
+      then: exit
+  - verificationProcess:
+      set:
+        route: verification
+      then: exit
+  - priorityProcessing:
+      set:
+        route: priority
+      then: exit
+  - standardProcessing:
+      set:
+        route: standard
+</div><p id="chxiay_117">Save it as <code class="code" id="chxiay_121">using-data-transformations-before-switching.yaml</code> and run one instance per branch:</p><div class="code-block" data-lang="bash">
+bin/lemline definition post -f using-data-transformations-before-switching.yaml
+bin/lemline instance start examples using-data-transformations-before-switching --input '{&quot;orderDate&quot;:&quot;2026-03-01T00:00:00Z&quot;,&quot;customer&quot;:{&quot;joinDate&quot;:&quot;2020-01-01T00:00:00Z&quot;},&quot;order&quot;:{&quot;total&quot;:50,&quot;items&quot;:[{&quot;category&quot;:&quot;restricted&quot;}]}}'
+bin/lemline instance start examples using-data-transformations-before-switching --input '{&quot;orderDate&quot;:&quot;2026-03-01T00:00:00Z&quot;,&quot;customer&quot;:{&quot;joinDate&quot;:&quot;2026-02-20T00:00:00Z&quot;},&quot;order&quot;:{&quot;total&quot;:1500,&quot;items&quot;:[]}}'
+bin/lemline instance start examples using-data-transformations-before-switching --input '{&quot;orderDate&quot;:&quot;2026-03-01T00:00:00Z&quot;,&quot;customer&quot;:{&quot;joinDate&quot;:&quot;2020-01-01T00:00:00Z&quot;},&quot;order&quot;:{&quot;total&quot;:1500,&quot;items&quot;:[]}}'
+bin/lemline instance start examples using-data-transformations-before-switching --input '{&quot;orderDate&quot;:&quot;2026-03-01T00:00:00Z&quot;,&quot;customer&quot;:{&quot;joinDate&quot;:&quot;2020-01-01T00:00:00Z&quot;},&quot;order&quot;:{&quot;total&quot;:50,&quot;items&quot;:[]}}'
+</div><p id="chxiay_119">This pattern improves readability by computing derived values before the switch. A customer is new when they joined less than 30 days before the order date. Expect the routes <code class="code" id="chxiay_122">compliance</code>, <code class="code" id="chxiay_123">verification</code>, <code class="code" id="chxiay_124">priority</code> and <code class="code" id="chxiay_125">standard</code>.</p></section><section class="chapter"><h2 id="error-handling-in-switch-tasks" data-toc="error-handling-in-switch-tasks">Error Handling in Switch Tasks</h2><p id="chxiay_126">If an expression in a condition fails, the switch task raises an expression error. Wrap the expression in jq's <code class="code" id="chxiay_131">try ... catch false</code> to treat a failure as <code class="code" id="chxiay_132">false</code>:</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: error-handling-in-switch-tasks
+  version: '1.0.0'
+do:
+  - processPayment:
+      switch:
+        - paid:
+            when: '${ try (.paymentResult.status == &quot;success&quot;) catch false }'
+            then: completeOrder
+        - pending:
+            when: '${ try (.paymentResult.status == &quot;pending&quot;) catch false }'
+            then: waitForPayment
+        - failed:
+            then: handlePaymentFailure
+  - completeOrder:
+      set:
+        orderStatus: completed
+      then: exit
+  - waitForPayment:
+      set:
+        orderStatus: waiting
+      then: exit
+  - handlePaymentFailure:
+      set:
+        orderStatus: payment-failed
+</div><p id="chxiay_128">Save it as <code class="code" id="chxiay_133">error-handling-in-switch-tasks.yaml</code> and run one instance per branch:</p><div class="code-block" data-lang="bash">
+bin/lemline definition post -f error-handling-in-switch-tasks.yaml
+bin/lemline instance start examples error-handling-in-switch-tasks --input '{&quot;paymentResult&quot;:{&quot;status&quot;:&quot;success&quot;}}'
+bin/lemline instance start examples error-handling-in-switch-tasks --input '{&quot;paymentResult&quot;:{&quot;status&quot;:&quot;pending&quot;}}'
+bin/lemline instance start examples error-handling-in-switch-tasks --input '{&quot;paymentResult&quot;:&quot;timeout&quot;}'
+</div><p id="chxiay_130">Expect <code class="code" id="chxiay_134">completed</code>, <code class="code" id="chxiay_135">waiting</code> and <code class="code" id="chxiay_136">payment-failed</code>. In the third input <code class="code" id="chxiay_137">paymentResult</code> is a string: reading <code class="code" id="chxiay_138">.status</code> from it fails, <code class="code" id="chxiay_139">try</code> turns the failure into <code class="code" id="chxiay_140">false</code>, and the default case handles the order.</p></section><section class="chapter"><h2 id="combining-switch-with-try-catch" data-toc="combining-switch-with-try-catch">Combining Switch with Try/Catch</h2><p id="chxiay_141">For robust conditional handling, combine switch with try/catch. This workflow reserves one unit, charges the order in the shop, then routes on the charge status:</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: combining-switch-with-try-catch
+  version: '1.0.0'
+do:
+  - reserveStock:
+      call: http
+      with:
+        method: post
+        endpoint: http://127.0.0.1:8787/reservations
+        body:
+          orderId: ${ .orderId }
+          items: [{ id: SKU-1, quantity: 1 }]
+  - processOrder:
+      try:
+        - attemptPayment:
+            call: http
+            with:
+              method: post
+              endpoint: http://127.0.0.1:8787/charges
+              query:
+                fail: '503'
+                failTimes: ${ $workflow.input.failures // 0 | tostring }
+              body:
+                orderId: ${ $workflow.input.orderId }
+                paymentInfo:
+                  token: ${ $workflow.input.token }
+        - evaluatePayment:
+            switch:
+              - success:
+                  when: ${ .status == &quot;approved&quot; }
+                  then: completeOrder
+              - review:
+                  when: ${ .status == &quot;review&quot; }
+                  then: flagForReview
+              - default:
+                  then: handleFailure
+        - completeOrder:
+            set:
+              orderStatus: completed
+            then: exit
+        - flagForReview:
+            set:
+              orderStatus: in-review
+            then: exit
+        - handleFailure:
+            set:
+              orderStatus: payment-failed
+      catch:
+        retry:
+          delay:
+            seconds: 1
+          limit:
+            attempt:
+              count: 3
+        do:
+          - handleError:
+              set:
+                orderStatus: error
+</div><p id="chxiay_143">The <code class="code" id="chxiay_146">switch</code> routes on the payment result. If the payment call fails, the <code class="code" id="chxiay_147">catch</code> retries the <code class="code" id="chxiay_148">try</code> block up to three times, then runs <code class="code" id="chxiay_149">handleError</code>. The shop answers <code class="code" id="chxiay_150">approved</code> or <code class="code" id="chxiay_151">review</code>, so the default case is only a safeguard. The <code class="code" id="chxiay_152">failures</code> input makes the shop answer HTTP 503 that many times before it accepts the charge. Save it as <code class="code" id="chxiay_153">combining-switch-with-try-catch.yaml</code> and run four orders:</p><div class="code-block" data-lang="bash">
+bin/lemline definition post -f combining-switch-with-try-catch.yaml
+bin/lemline instance start examples combining-switch-with-try-catch --input '{&quot;orderId&quot;:&quot;ORD-501&quot;,&quot;token&quot;:&quot;approved&quot;}'
+bin/lemline instance start examples combining-switch-with-try-catch --input '{&quot;orderId&quot;:&quot;ORD-502&quot;,&quot;token&quot;:&quot;review&quot;}'
+bin/lemline instance start examples combining-switch-with-try-catch --input '{&quot;orderId&quot;:&quot;ORD-503&quot;,&quot;token&quot;:&quot;approved&quot;,&quot;failures&quot;:2}'
+bin/lemline instance start examples combining-switch-with-try-catch --input '{&quot;orderId&quot;:&quot;ORD-504&quot;,&quot;token&quot;:&quot;declined&quot;}'
+</div><p id="chxiay_145">Expect <code class="code" id="chxiay_154">completed</code> and <code class="code" id="chxiay_155">in-review</code> at once. ORD-503 completes after two retries. ORD-504 is declined with HTTP 402 on every attempt and ends with <code class="code" id="chxiay_156">{&quot;orderStatus&quot;:&quot;error&quot;}</code> after the third retry. The worker picks up retries every 10 seconds, so allow about a minute for the last two.</p></section><section class="chapter"><h2 id="real-world-example-order-processing" data-toc="real-world-example-order-processing">Real-World Example: Order Processing</h2><p id="chxiay_157">Here's a complete example of an order processing workflow with multiple decision points. It reserves the stock, asks both carriers for a quote, applies the customer's shipping choice, charges the payment and books the shipment:</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: shop-order-routing
+  version: '1.0.0'
+  title: Order Processing Workflow
+do:
+  - validateOrder:
+      set:
+        isValid: ${ .items | length &gt; 0 }
+      output:
+        as: '${ $input + . }'
+      export:
+        as: '${ $context + { order: . } }'
+  - checkOrderValidity:
+      switch:
+        - invalid:
+            when: ${ .isValid == false }
+            then: rejectOrder
+        - valid:
+            then: reserveStock
+  - reserveStock:
+      try:
+        - requestReservation:
+            call: http
+            with:
+              method: post
+              endpoint: http://127.0.0.1:8787/reservations
+              body:
+                orderId: ${ .orderId }
+                items: ${ .items }
+            output:
+              as: '${ { reserved: true, reservationId: .id } }'
+      catch:
+        do:
+          - markUnavailable:
+              set:
+                reserved: false
+      output:
+        as: '${ $context.order + . }'
+      export:
+        as: '${ $context + { order: . } }'
+  - evaluateInventory:
+      switch:
+        - available:
+            when: ${ .reserved == true }
+            then: getQuotes
+        - unavailable:
+            then: handleOutOfStock
+  - getQuotes:
+      fork:
+        branches:
+          - express:
+              call: http
+              with:
+                method: post
+                endpoint: http://127.0.0.1:8787/quotes/express
+                body:
+                  orderId: ${ .orderId }
+          - economy:
+              call: http
+              with:
+                method: post
+                endpoint: http://127.0.0.1:8787/quotes/economy
+                body:
+                  orderId: ${ .orderId }
+      output:
+        as: '${ $context.order + { quotes: . } }'
+      export:
+        as: '${ $context + { order: . } }'
+  - determineShippingMethod:
+      switch:
+        - express:
+            when: ${ .express == true }
+            then: applyExpressShipping
+        - economy:
+            then: applyEconomyShipping
+  - applyExpressShipping:
+      set:
+        carrier: express
+        shippingCost: ${ .quotes | map(select(.carrier == &quot;express&quot;)) | .[0].price }
+      output:
+        as: '${ $context.order + . }'
+      export:
+        as: '${ $context + { order: . } }'
+      then: processPayment
+  - applyEconomyShipping:
+      set:
+        carrier: economy
+        shippingCost: ${ .quotes | map(select(.carrier == &quot;economy&quot;)) | .[0].price }
+      output:
+        as: '${ $context.order + . }'
+      export:
+        as: '${ $context + { order: . } }'
+  - processPayment:
+      try:
+        - charge:
+            call: http
+            with:
+              method: post
+              endpoint: http://127.0.0.1:8787/charges
+              body:
+                orderId: ${ .orderId }
+                paymentInfo: ${ .paymentInfo }
+      catch:
+        do:
+          - markDeclined:
+              set:
+                status: declined
+      output:
+        as: '${ $context.order + { payment: . } }'
+      export:
+        as: '${ $context + { order: . } }'
+  - evaluatePayment:
+      switch:
+        - approved:
+            when: ${ .payment.status == &quot;approved&quot; }
+            then: bookShipment
+        - review:
+            when: ${ .payment.status == &quot;review&quot; }
+            then: flagForReview
+        - declined:
+            then: handleDeclinedPayment
+  - bookShipment:
+      call: http
+      with:
+        method: post
+        endpoint: http://127.0.0.1:8787/shipments
+        body:
+          orderId: ${ .orderId }
+          carrier: ${ .carrier }
+  - completeOrder:
+      set:
+        orderStatus: CONFIRMED
+        message: ${ &quot;Your order has been confirmed and will ship via &quot; + .carrier + &quot;.&quot; }
+      then: end
+  - rejectOrder:
+      set:
+        orderStatus: REJECTED
+        message: Your order could not be processed because it contains no items.
+      then: end
+  - handleOutOfStock:
+      set:
+        orderStatus: REJECTED
+        message: Your order could not be processed because some items are out of stock.
+      then: end
+  - flagForReview:
+      set:
+        orderStatus: PENDING_REVIEW
+        message: Your order requires additional review. We will contact you shortly.
+      then: end
+  - handleDeclinedPayment:
+      set:
+        orderStatus: PAYMENT_DECLINED
+        message: Your payment was declined. Please try a different payment method.
+</div><p id="chxiay_159">A task replaces the data it received with its own result. To keep the order available to later tasks, each task that produces data merges its result into the order kept in <code class="code" id="chxiay_164">$context.order</code>. Save it as <code class="code" id="chxiay_165">real-world-example-order-processing.yaml</code> and run one order per outcome:</p><div class="code-block" data-lang="bash">
+bin/lemline definition post -f real-world-example-order-processing.yaml
+bin/lemline instance start examples shop-order-routing --input '{&quot;orderId&quot;:&quot;ORD-601&quot;,&quot;items&quot;:[{&quot;id&quot;:&quot;SKU-1&quot;,&quot;quantity&quot;:1}],&quot;express&quot;:true,&quot;paymentInfo&quot;:{&quot;token&quot;:&quot;approved&quot;}}'
+bin/lemline instance start examples shop-order-routing --input '{&quot;orderId&quot;:&quot;ORD-602&quot;,&quot;items&quot;:[{&quot;id&quot;:&quot;SKU-1&quot;,&quot;quantity&quot;:1}],&quot;express&quot;:false,&quot;paymentInfo&quot;:{&quot;token&quot;:&quot;approved&quot;}}'
+bin/lemline instance start examples shop-order-routing --input '{&quot;orderId&quot;:&quot;ORD-603&quot;,&quot;items&quot;:[{&quot;id&quot;:&quot;SKU-1&quot;,&quot;quantity&quot;:1}],&quot;express&quot;:false,&quot;paymentInfo&quot;:{&quot;token&quot;:&quot;review&quot;}}'
+bin/lemline instance start examples shop-order-routing --input '{&quot;orderId&quot;:&quot;ORD-604&quot;,&quot;items&quot;:[{&quot;id&quot;:&quot;SKU-1&quot;,&quot;quantity&quot;:1}],&quot;express&quot;:false,&quot;paymentInfo&quot;:{&quot;token&quot;:&quot;declined&quot;}}'
+bin/lemline instance start examples shop-order-routing --input '{&quot;orderId&quot;:&quot;ORD-605&quot;,&quot;items&quot;:[],&quot;paymentInfo&quot;:{&quot;token&quot;:&quot;approved&quot;}}'
+bin/lemline instance start examples shop-order-routing --input '{&quot;orderId&quot;:&quot;ORD-606&quot;,&quot;items&quot;:[{&quot;id&quot;:&quot;SKU-1&quot;,&quot;quantity&quot;:500}],&quot;paymentInfo&quot;:{&quot;token&quot;:&quot;approved&quot;}}'
+</div><div class="table-wrapper"><table class="wide" id="chxiay_161"><thead><tr class="ijRowHead" id="chxiay_166"><th id="chxiay_173"><p>Order</p></th><th id="chxiay_174"><p>Expected <code class="code" id="chxiay_176">orderStatus</code></p></th><th id="chxiay_175"><p>What the shop shows</p></th></tr></thead><tbody><tr id="chxiay_167"><td id="chxiay_177"><p>ORD-601</p></td><td id="chxiay_178"><p><code class="code" id="chxiay_180">CONFIRMED</code>, message ending <code class="code" id="chxiay_181">ship via express.</code></p></td><td id="chxiay_179"><p>Reservation, approved charge, express shipment</p></td></tr><tr id="chxiay_168"><td id="chxiay_182"><p>ORD-602</p></td><td id="chxiay_183"><p><code class="code" id="chxiay_185">CONFIRMED</code>, message ending <code class="code" id="chxiay_186">ship via economy.</code></p></td><td id="chxiay_184"><p>Reservation, approved charge, economy shipment</p></td></tr><tr id="chxiay_169"><td id="chxiay_187"><p>ORD-603</p></td><td id="chxiay_188"><p><code class="code" id="chxiay_190">PENDING_REVIEW</code></p></td><td id="chxiay_189"><p>Reservation and a charge with status <code class="code" id="chxiay_191">review</code>, no shipment</p></td></tr><tr id="chxiay_170"><td id="chxiay_192"><p>ORD-604</p></td><td id="chxiay_193"><p><code class="code" id="chxiay_195">PAYMENT_DECLINED</code></p></td><td id="chxiay_194"><p>Reservation and a declined charge, no shipment</p></td></tr><tr id="chxiay_171"><td id="chxiay_196"><p>ORD-605</p></td><td id="chxiay_197"><p><code class="code" id="chxiay_199">REJECTED</code>, no items</p></td><td id="chxiay_198"><p>Nothing</p></td></tr><tr id="chxiay_172"><td id="chxiay_200"><p>ORD-606</p></td><td id="chxiay_201"><p><code class="code" id="chxiay_203">REJECTED</code>, out of stock</p></td><td id="chxiay_202"><p>Nothing: the shop refuses the reservation with HTTP 409</p></td></tr></tbody></table></div><p id="chxiay_162">This example does not release the stock of orders that are not shipped. See <a href="lemline-example-compensation.html" id="chxiay_204" data-tooltip="This document provides examples of implementing compensation patterns in Lemline workflows. Compensation patterns are essential for maintaining data consistency and handling partial failures in distributed systems by implementing actions that &quot;undo&quot; or…">the compensation example</a> for that. Stop the shop when you are done:</p><div class="code-block" data-lang="bash">
+docker compose -f examples/tutorial-services/compose.yaml down
+</div></section><section class="chapter"><h2 id="best-practices-for-switch-tasks" data-toc="best-practices-for-switch-tasks">Best Practices for Switch Tasks</h2><ol class="list _decimal" id="chxiay_205" type="1"><li class="list__item" id="chxiay_206"><p id="chxiay_214"><span class="control" id="chxiay_215">Order conditions from specific to general</span>: Put more specific conditions first</p></li><li class="list__item" id="chxiay_207"><p id="chxiay_216"><span class="control" id="chxiay_217">Always include a default case</span>: End the switch with a case that has no <code class="code" id="chxiay_218">when</code></p></li><li class="list__item" id="chxiay_208"><p id="chxiay_219"><span class="control" id="chxiay_220">Preprocess data when needed</span>: Use a <code class="code" id="chxiay_221">set</code> task before complex switching</p></li><li class="list__item" id="chxiay_209"><p id="chxiay_222"><span class="control" id="chxiay_223">Keep conditions readable</span>: Break complex conditions into separate variables</p></li><li class="list__item" id="chxiay_210"><p id="chxiay_224"><span class="control" id="chxiay_225">Avoid deep nesting</span>: Prefer multiple sequential switch tasks over deeply nested logic</p></li><li class="list__item" id="chxiay_211"><p id="chxiay_226"><span class="control" id="chxiay_227">Use meaningful task names</span>: Name tasks according to the decision they represent</p></li><li class="list__item" id="chxiay_212"><p id="chxiay_228"><span class="control" id="chxiay_229">Handle all edge cases</span>: Consider what happens if data is missing or unexpected</p></li><li class="list__item" id="chxiay_213"><p id="chxiay_230"><span class="control" id="chxiay_231">Document complex logic</span>: Add comments explaining business rules</p></li></ol></section><section class="chapter"><h2 id="next-steps" data-toc="next-steps">Next Steps</h2><ul class="list _bullet" id="chxiay_232"><li class="list__item" id="chxiay_233"><p id="chxiay_236">Learn about <a href="lemline-howto-parallel.html" id="chxiay_237" data-tooltip="Use fork.branches to run independent branches concurrently. Each branch has its own task input. By default, a fork waits for all branches.">executing tasks in parallel</a></p></li><li class="list__item" id="chxiay_234"><p id="chxiay_238">Explore <a href="lemline-howto-loops.html" id="chxiay_239" data-tooltip="Use a for task to iterate over an array. The in expression selects the collection, each binds an item and at binds its index. The body is a nested do list.">running loops in workflows</a></p></li><li class="list__item" id="chxiay_235"><p id="chxiay_240">Understand <a href="lemline-howto-try-catch.html" id="chxiay_241" data-tooltip="A try task runs a list of tasks. If a task fails, catch can filter the error, retry the try block, or execute a fallback list.">how to use try/catch for error handling</a></p></li></ul></section><div class="last-modified">25 November 2026</div><div data-feedback-placeholder="true"></div><div class="navigation-links _bottom"><a href="lemline-howto-lifecycle.html" class="navigation-links__prev">How to cancel, resume, or suspend a workflow</a><a href="lemline-howto-parallel.html" class="navigation-links__next">How to execute tasks in parallel (fork)</a></div></article><div id="disqus_thread"></div></div></section></main></div><script src="https://resources.jetbrains.com/writerside/apidoc/6.22.0-b776/app.js"></script></body></html>

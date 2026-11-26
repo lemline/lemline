@@ -1,0 +1,70 @@
+<!DOCTYPE html SYSTEM "about:legacy-compat">
+<html lang="en-US" data-preset="contrast" data-primary-color="#2E6F7E"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="robots" content="noindex"><meta name="built-on" content="2026-11-26T17:17:49.835576591"><title>Authentication Reference | Lemline documentation</title><script type="application/json" id="virtual-toc-data">[{"id":"policy-placement","level":0,"title":"Policy placement","anchor":"#policy-placement"},{"id":"inline-basic-authentication","level":0,"title":"Inline basic authentication","anchor":"#inline-basic-authentication"},{"id":"api-keys-and-oauth-2-0","level":0,"title":"API keys and OAuth 2.0","anchor":"#api-keys-and-oauth-2-0"},{"id":"run-the-examples","level":0,"title":"Run the Examples","anchor":"#run-the-examples"}]</script><script type="application/json" id="topic-shortcuts"></script><link href="https://resources.jetbrains.com/writerside/apidoc/6.22.0-b776/app.css" rel="stylesheet"><link href="static/custom.css" rel="stylesheet"><link rel="icon" type="image/png" sizes="16x16" href="images/lemly.png"><meta name="image" content="https://docs.lemline.com/social-preview.png"><!-- Open Graph --><meta property="og:title" content="Authentication Reference | Lemline documentation"><meta property="og:description" content=""><meta property="og:image" content="https://docs.lemline.com/social-preview.png"><meta property="og:site_name" content="Lemline documentation Help"><meta property="og:type" content="website"><meta property="og:locale" content="en_US"><meta property="og:url" content="https://docs.lemline.com/lemline-ref-auth.html"><!-- End Open Graph --><!-- Twitter Card --><meta name="twitter:card" content="summary_large_image"><meta name="twitter:site" content=""><meta name="twitter:title" content="Authentication Reference | Lemline documentation"><meta name="twitter:description" content=""><meta name="twitter:creator" content=""><meta name="twitter:image:src" content="https://docs.lemline.com/social-preview.png"><!-- End Twitter Card --><!-- Schema.org WebPage --><script type="application/ld+json">{
+    "@context": "http://schema.org",
+    "@type": "WebPage",
+    "@id": "https://docs.lemline.com/lemline-ref-auth.html#webpage",
+    "url": "https://docs.lemline.com/lemline-ref-auth.html",
+    "name": "Authentication Reference | Lemline documentation",
+    "description": "",
+    "image": "https://docs.lemline.com/social-preview.png",
+    "inLanguage":"en-US"
+}</script><!-- End Schema.org --><!-- Schema.org WebSite --><script type="application/ld+json">{
+    "@type": "WebSite",
+    "@id": "https://docs.lemline.com/#website",
+    "url": "https://docs.lemline.com/",
+    "name": "Lemline documentation Help"
+}</script><!-- End Schema.org --></head><body data-id="lemline-ref-auth" data-main-title="Authentication Reference" data-article-props="{&quot;seeAlsoStyle&quot;:&quot;links&quot;}" data-template="article" data-breadcrumbs="Reference///Auth &amp; Secrets Reference"><div class="wrapper"><main class="panel _main"><header class="panel__header"><div class="container"><h3>Lemline documentation  Help</h3><div class="panel-trigger"></div></div></header><section class="panel__content"><div class="container"><article class="article" data-shortcut-switcher="inactive"><h1 data-toc="lemline-ref-auth" id="lemline-ref-auth.md">Authentication Reference</h1><p id="-7lan3a_3">Authentication policies are part of the Open Workflow DSL. Lemline supports basic and bearer authentication for its HTTP executor. See <a href="lemline-ref-supported-features.html" id="-7lan3a_8" data-tooltip="This reference documents which features of the Open Workflow DSL v1.0 are currently supported in Lemline, and any implementation-specific details or limitations.">Supported Features</a> for runtime support by protocol and authentication type.</p><section class="chapter"><h2 id="policy-placement" data-toc="policy-placement">Policy placement</h2><p id="-7lan3a_9">Define a named policy under <code class="code" id="-7lan3a_11">use.authentications</code> and reference it from the endpoint with <code class="code" id="-7lan3a_12">authentication.use</code>. Declare referenced secret names under <code class="code" id="-7lan3a_13">use.secrets</code>.</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: bearer-authentication
+  version: '1.0.0'
+use:
+  secrets:
+    - apiToken
+  authentications:
+    partnerAuth:
+      bearer:
+        token: ${ $secrets.apiToken }
+do:
+  - getPartnerStock:
+      call: http
+      with:
+        method: get
+        endpoint:
+          uri: http://127.0.0.1:8787/partner/stock
+          authentication:
+            use: partnerAuth
+</div></section><section class="chapter"><h2 id="inline-basic-authentication" data-toc="inline-basic-authentication">Inline basic authentication</h2><p id="-7lan3a_14">Alternatively, configure <code class="code" id="-7lan3a_16">authentication.basic</code> directly on the endpoint. The <code class="code" id="-7lan3a_17">username</code> and <code class="code" id="-7lan3a_18">password</code> fields supply the credentials.</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: inline-authentication
+  version: '1.0.0'
+use:
+  secrets:
+    - tempPassword
+do:
+  - callServiceWithInlineAuth:
+      call: http
+      with:
+        method: get
+        endpoint:
+          uri: http://127.0.0.1:8787/partner/stock
+          # Define authentication directly here
+          authentication:
+            basic:
+              username: demo
+              password: ${ $secrets.tempPassword }
+</div></section><section class="chapter"><h2 id="api-keys-and-oauth-2-0" data-toc="api-keys-and-oauth-2-0">API keys and OAuth 2.0</h2><p id="-7lan3a_19">For a service-specific API key, see <a href="lemline-howto-api-keys.html" id="-7lan3a_21" data-tooltip="Declare the key in use.secrets and supply its value through your Lemline secrets configuration.">How to Use API Keys</a> for request headers and query parameters. The <a href="lemline-howto-oauth2.html" id="-7lan3a_22" data-tooltip="The Open Workflow DSL can describe an OAuth 2.0 client credentials grant. Lemline registers such a definition, but its HTTP executor supports only basic and bearer authentication: an instance faults before sending any request. See Supported Features. Until OAuth 2.0 is supported,…">OAuth 2.0 guide</a> shows the specification's client credentials configuration and describes the runtime limitation.</p><p id="-7lan3a_20">Use the <a href="lemline-ref-secrets.html" id="-7lan3a_23" data-tooltip="This page summarizes how Lemline resolves workflow secrets. For a step-by-step guide, see Managing Secrets in Lemline.">Secrets Reference</a> to configure secret values outside the document.</p></section><section class="chapter"><h2 id="run-the-examples" data-toc="run-the-examples">Run the Examples</h2><p id="-7lan3a_24">Every example on this page is a complete workflow. Complete <a href="lemline-tutorial-setup.html" id="-7lan3a_34" data-tooltip="Run Lemline on one machine with SQLite. Lemline stores workflow definitions, queued messages, and workflow history in local files. Use a writable directory on a local filesystem.">the SQLite setup</a>, save each example under the file name used below, and run the commands from the setup directory. With the JAR, substitute <code class="code" id="-7lan3a_35">java -jar lemline.jar</code> for <code class="code" id="-7lan3a_36">bin/lemline</code>.</p><p id="-7lan3a_25">Start the <a href="lemline-tutorial-order-processing.html#start-the-tutorial-shop" id="-7lan3a_37" data-tooltip="Complete the SQLite setup and keep the worker running on the host. In a separate terminal, open the root of the Lemline source checkout matching these docs (the directory containing examples/tutorial-services). With Docker Compose running, start the single shop container:">tutorial shop</a> from the root of the Lemline source checkout:</p><div class="code-block" data-lang="bash">
+docker compose -f examples/tutorial-services/compose.yaml up -d
+</div><p id="-7lan3a_27">The examples read secrets from the worker's environment. Stop the setup worker with Ctrl+C, export the values, and start it again:</p><div class="code-block" data-lang="bash">
+export apiToken='demo-token'
+export tempPassword='demo-password'
+bin/lemline listen --debug
+</div><p id="-7lan3a_29">Run the next commands from a second terminal in the setup directory.</p><div class="code-block" data-lang="bash">
+bin/lemline definition post -f bearer-authentication.yaml
+bin/lemline instance start examples bearer-authentication
+bin/lemline definition post -f inline-authentication.yaml
+bin/lemline instance start examples inline-authentication
+</div><div class="table-wrapper"><table class="wide" id="-7lan3a_31"><thead><tr class="ijRowHead" id="-7lan3a_38"><th id="-7lan3a_41"><p>Example</p></th><th id="-7lan3a_42"><p>Expected result</p></th></tr></thead><tbody><tr id="-7lan3a_39"><td id="-7lan3a_43"><p><code class="code" id="-7lan3a_45">bearer-authentication</code></p></td><td id="-7lan3a_44"><p>The partner stock with <code class="code" id="-7lan3a_46">&quot;authenticatedWith&quot;:&quot;bearer&quot;</code></p></td></tr><tr id="-7lan3a_40"><td id="-7lan3a_47"><p><code class="code" id="-7lan3a_49">inline-authentication</code></p></td><td id="-7lan3a_48"><p>The partner stock with <code class="code" id="-7lan3a_50">&quot;authenticatedWith&quot;:&quot;basic&quot;</code></p></td></tr></tbody></table></div><p id="-7lan3a_32">Stop the shop when you are done:</p><div class="code-block" data-lang="bash">
+docker compose -f examples/tutorial-services/compose.yaml down
+</div></section><div class="last-modified">25 November 2026</div><div data-feedback-placeholder="true"></div><div class="navigation-links _bottom"><a href="lemline-ref-errors.html" class="navigation-links__prev">Error Reference</a><a href="lemline-ref-secrets.html" class="navigation-links__next">Secrets Reference</a></div></article><div id="disqus_thread"></div></div></section></main></div><script src="https://resources.jetbrains.com/writerside/apidoc/6.22.0-b776/app.js"></script></body></html>

@@ -1,0 +1,83 @@
+<!DOCTYPE html SYSTEM "about:legacy-compat">
+<html lang="en-US" data-preset="contrast" data-primary-color="#2E6F7E"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="robots" content="noindex"><meta name="built-on" content="2026-11-26T17:17:48.732208958"><title>jq expressions in workflows | Lemline documentation</title><script type="application/json" id="virtual-toc-data">[{"id":"transform-data","level":0,"title":"Transform data","anchor":"#transform-data"},{"id":"compare-values-and-branch","level":0,"title":"Compare values and branch","anchor":"#compare-values-and-branch"},{"id":"construct-strings-for-integrations","level":0,"title":"Construct strings for integrations","anchor":"#construct-strings-for-integrations"},{"id":"run-the-examples","level":0,"title":"Run the Examples","anchor":"#run-the-examples"}]</script><script type="application/json" id="topic-shortcuts"></script><link href="https://resources.jetbrains.com/writerside/apidoc/6.22.0-b776/app.css" rel="stylesheet"><link href="static/custom.css" rel="stylesheet"><link rel="icon" type="image/png" sizes="16x16" href="images/lemly.png"><meta name="image" content="https://docs.lemline.com/social-preview.png"><!-- Open Graph --><meta property="og:title" content="jq expressions in workflows | Lemline documentation"><meta property="og:description" content=""><meta property="og:image" content="https://docs.lemline.com/social-preview.png"><meta property="og:site_name" content="Lemline documentation Help"><meta property="og:type" content="website"><meta property="og:locale" content="en_US"><meta property="og:url" content="https://docs.lemline.com/lemline-explain-jq.html"><!-- End Open Graph --><!-- Twitter Card --><meta name="twitter:card" content="summary_large_image"><meta name="twitter:site" content=""><meta name="twitter:title" content="jq expressions in workflows | Lemline documentation"><meta name="twitter:description" content=""><meta name="twitter:creator" content=""><meta name="twitter:image:src" content="https://docs.lemline.com/social-preview.png"><!-- End Twitter Card --><!-- Schema.org WebPage --><script type="application/ld+json">{
+    "@context": "http://schema.org",
+    "@type": "WebPage",
+    "@id": "https://docs.lemline.com/lemline-explain-jq.html#webpage",
+    "url": "https://docs.lemline.com/lemline-explain-jq.html",
+    "name": "jq expressions in workflows | Lemline documentation",
+    "description": "",
+    "image": "https://docs.lemline.com/social-preview.png",
+    "inLanguage":"en-US"
+}</script><!-- End Schema.org --><!-- Schema.org WebSite --><script type="application/ld+json">{
+    "@type": "WebSite",
+    "@id": "https://docs.lemline.com/#website",
+    "url": "https://docs.lemline.com/",
+    "name": "Lemline documentation Help"
+}</script><!-- End Schema.org --></head><body data-id="lemline-explain-jq" data-main-title="jq expressions in workflows" data-article-props="{&quot;seeAlsoStyle&quot;:&quot;links&quot;}" data-template="article" data-breadcrumbs="Explanations"><div class="wrapper"><main class="panel _main"><header class="panel__header"><div class="container"><h3>Lemline documentation  Help</h3><div class="panel-trigger"></div></div></header><section class="panel__content"><div class="container"><article class="article" data-shortcut-switcher="inactive"><h1 data-toc="lemline-explain-jq" id="lemline-explain-jq.md">jq expressions in workflows</h1><p id="dtyke7_3">Write a workflow expression as <code class="code" id="dtyke7_8">${ ... }</code>. Lemline evaluates expressions using jq. The current input is <code class="code" id="dtyke7_9">.</code>. Use <code class="code" id="dtyke7_10">$workflow.input</code> for the original input and <code class="code" id="dtyke7_11">$context</code> for values exported by earlier tasks.</p><section class="chapter"><h2 id="transform-data" data-toc="transform-data">Transform data</h2><p id="dtyke7_12">Object construction, arrays, filters and pipes are useful for selecting and reshaping data. This task counts items and computes the order total with <code class="code" id="dtyke7_14">map</code>-style iteration and <code class="code" id="dtyke7_15">add</code>.</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: aggregate-order-data
+  version: '1.0.0'
+do:
+  - summarizeOrder:
+      set:
+        orderId: ${ .orderId }
+        total: ${ [.items[] | .quantity * .price] | add // 0 }
+        itemCount: ${ .items | length }
+</div></section><section class="chapter"><h2 id="compare-values-and-branch" data-toc="compare-values-and-branch">Compare values and branch</h2><p id="dtyke7_16">Use jq comparisons inside <code class="code" id="dtyke7_18">if</code> or <code class="code" id="dtyke7_19">switch.when</code>. A switch case without a condition provides a fallback.</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: validate-and-route-order
+  version: '1.0.0'
+input:
+  schema:
+    format: json
+    document:
+      type: object
+      required: [orderId, total]
+      properties:
+        orderId:
+          type: string
+        total:
+          type: number
+          minimum: 0
+do:
+  - routeOrder:
+      switch:
+        - largeOrder:
+            when: ${ .total &gt;= 1000 }
+            then: requestReview
+        - automatic:
+            then: acceptOrder
+  - requestReview:
+      set:
+        status: needs-review
+      then: exit
+  - acceptOrder:
+      set:
+        status: accepted
+output:
+  as: '${ { orderId: $workflow.input.orderId, status: .status } }'
+</div></section><section class="chapter"><h2 id="construct-strings-for-integrations" data-toc="construct-strings-for-integrations">Construct strings for integrations</h2><p id="dtyke7_20">Use jq string interpolation for dynamic URLs and <code class="code" id="dtyke7_23">@uri</code> to escape values used in the path.</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: dynamic-http-endpoint
+  version: '1.0.0'
+do:
+  - getProduct:
+      call: http
+      with:
+        method: get
+        endpoint: '${ &quot;http://127.0.0.1:8787/products/\(.productId | @uri)&quot; }'
+</div><p id="dtyke7_22">See <a href="https://github.com/open-workflow-specification/specification/blob/v1.0.3/dsl.md#runtime-expressions" id="dtyke7_24" data-external="true" rel="noopener noreferrer" target="_blank">Runtime Expressions</a> for other variables and <a href="lemline-explain-time.html" id="dtyke7_25" data-tooltip="Workflows can compare timestamps in expressions, resume after a duration or start on a schedule. Lemline persists pending work so it can resume after a runner restart.">Time in Workflows</a> for timestamp comparisons.</p></section><section class="chapter"><h2 id="run-the-examples" data-toc="run-the-examples">Run the Examples</h2><p id="dtyke7_26">Every example on this page is a complete workflow. Complete <a href="lemline-tutorial-setup.html" id="dtyke7_34" data-tooltip="Run Lemline on one machine with SQLite. Lemline stores workflow definitions, queued messages, and workflow history in local files. Use a writable directory on a local filesystem.">the SQLite setup</a>, save each example under the file name used below, and run the commands from the setup directory. With the JAR, substitute <code class="code" id="dtyke7_35">java -jar lemline.jar</code> for <code class="code" id="dtyke7_36">bin/lemline</code>.</p><p id="dtyke7_27">Start the <a href="lemline-tutorial-order-processing.html#start-the-tutorial-shop" id="dtyke7_37" data-tooltip="Complete the SQLite setup and keep the worker running on the host. In a separate terminal, open the root of the Lemline source checkout matching these docs (the directory containing examples/tutorial-services). With Docker Compose running, start the single shop container:">tutorial shop</a> from the root of the Lemline source checkout:</p><div class="code-block" data-lang="bash">
+docker compose -f examples/tutorial-services/compose.yaml up -d
+</div><p id="dtyke7_29">Keep the setup worker running and use a second terminal in the setup directory.</p><div class="code-block" data-lang="bash">
+bin/lemline definition post -f aggregate-order-data.yaml
+bin/lemline instance start examples aggregate-order-data --input '{&quot;orderId&quot;:&quot;ORD-801&quot;,&quot;items&quot;:[{&quot;quantity&quot;:2,&quot;price&quot;:12.5},{&quot;quantity&quot;:1,&quot;price&quot;:5}]}'
+bin/lemline definition post -f validate-and-route-order.yaml
+bin/lemline instance start examples validate-and-route-order --input '{&quot;orderId&quot;:&quot;ORD-302&quot;,&quot;total&quot;:1500}'
+bin/lemline definition post -f dynamic-http-endpoint.yaml
+bin/lemline instance start examples dynamic-http-endpoint --input '{&quot;productId&quot;:&quot;SKU-2&quot;}'
+</div><div class="table-wrapper"><table class="wide" id="dtyke7_31"><thead><tr class="ijRowHead" id="dtyke7_38"><th id="dtyke7_42"><p>Example</p></th><th id="dtyke7_43"><p>Expected result</p></th></tr></thead><tbody><tr id="dtyke7_39"><td id="dtyke7_44"><p><code class="code" id="dtyke7_46">aggregate-order-data</code></p></td><td id="dtyke7_45"><p><code class="code" id="dtyke7_47">{&quot;orderId&quot;:&quot;ORD-801&quot;,&quot;total&quot;:30,&quot;itemCount&quot;:2}</code></p></td></tr><tr id="dtyke7_40"><td id="dtyke7_48"><p><code class="code" id="dtyke7_50">validate-and-route-order</code></p></td><td id="dtyke7_49"><p><code class="code" id="dtyke7_51">{&quot;orderId&quot;:&quot;ORD-302&quot;,&quot;status&quot;:&quot;needs-review&quot;}</code></p></td></tr><tr id="dtyke7_41"><td id="dtyke7_52"><p><code class="code" id="dtyke7_54">dynamic-http-endpoint</code></p></td><td id="dtyke7_53"><p>The watering can</p></td></tr></tbody></table></div><p id="dtyke7_32">Stop the shop when you are done:</p><div class="code-block" data-lang="bash">
+docker compose -f examples/tutorial-services/compose.yaml down
+</div></section><div class="last-modified">25 November 2026</div><div data-feedback-placeholder="true"></div><div class="navigation-links _bottom"><a href="lemline-explain-errors.html" class="navigation-links__prev">Understanding Error Handling in Lemline</a><a href="lemline-explain-security.html" class="navigation-links__next">Understanding Security in Lemline</a></div></article><div id="disqus_thread"></div></div></section></main></div><script src="https://resources.jetbrains.com/writerside/apidoc/6.22.0-b776/app.js"></script></body></html>

@@ -1,0 +1,292 @@
+<!DOCTYPE html SYSTEM "about:legacy-compat">
+<html lang="en-US" data-preset="contrast" data-primary-color="#2E6F7E"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="robots" content="noindex"><meta name="built-on" content="2026-11-26T17:17:49.259687128"><title>Lemline Integration Examples | Lemline documentation</title><script type="application/json" id="virtual-toc-data">[{"id":"run-the-examples","level":0,"title":"Run the Examples","anchor":"#run-the-examples"},{"id":"http-rest-api-integration","level":0,"title":"HTTP/REST API Integration","anchor":"#http-rest-api-integration"},{"id":"openapi-integration","level":0,"title":"OpenAPI Integration","anchor":"#openapi-integration"},{"id":"grpc-integration","level":0,"title":"gRPC Integration","anchor":"#grpc-integration"},{"id":"asyncapi-integration","level":0,"title":"AsyncAPI Integration","anchor":"#asyncapi-integration"},{"id":"custom-function-integration","level":0,"title":"Custom Function Integration","anchor":"#custom-function-integration"},{"id":"best-practices-for-integrations","level":0,"title":"Best Practices for Integrations","anchor":"#best-practices-for-integrations"},{"id":"complex-integration-example","level":0,"title":"Complex Integration Example","anchor":"#complex-integration-example"},{"id":"conclusion","level":0,"title":"Conclusion","anchor":"#conclusion"}]</script><script type="application/json" id="topic-shortcuts"></script><link href="https://resources.jetbrains.com/writerside/apidoc/6.22.0-b776/app.css" rel="stylesheet"><link href="static/custom.css" rel="stylesheet"><link rel="icon" type="image/png" sizes="16x16" href="images/lemly.png"><meta name="image" content="https://docs.lemline.com/social-preview.png"><!-- Open Graph --><meta property="og:title" content="Lemline Integration Examples | Lemline documentation"><meta property="og:description" content=""><meta property="og:image" content="https://docs.lemline.com/social-preview.png"><meta property="og:site_name" content="Lemline documentation Help"><meta property="og:type" content="website"><meta property="og:locale" content="en_US"><meta property="og:url" content="https://docs.lemline.com/lemline-examples-integrations.html"><!-- End Open Graph --><!-- Twitter Card --><meta name="twitter:card" content="summary_large_image"><meta name="twitter:site" content=""><meta name="twitter:title" content="Lemline Integration Examples | Lemline documentation"><meta name="twitter:description" content=""><meta name="twitter:creator" content=""><meta name="twitter:image:src" content="https://docs.lemline.com/social-preview.png"><!-- End Twitter Card --><!-- Schema.org WebPage --><script type="application/ld+json">{
+    "@context": "http://schema.org",
+    "@type": "WebPage",
+    "@id": "https://docs.lemline.com/lemline-examples-integrations.html#webpage",
+    "url": "https://docs.lemline.com/lemline-examples-integrations.html",
+    "name": "Lemline Integration Examples | Lemline documentation",
+    "description": "",
+    "image": "https://docs.lemline.com/social-preview.png",
+    "inLanguage":"en-US"
+}</script><!-- End Schema.org --><!-- Schema.org WebSite --><script type="application/ld+json">{
+    "@type": "WebSite",
+    "@id": "https://docs.lemline.com/#website",
+    "url": "https://docs.lemline.com/",
+    "name": "Lemline documentation Help"
+}</script><!-- End Schema.org --></head><body data-id="lemline-examples-integrations" data-main-title="Lemline Integration Examples" data-article-props="{&quot;seeAlsoStyle&quot;:&quot;links&quot;}" data-template="article" data-breadcrumbs="Examples Library"><div class="wrapper"><main class="panel _main"><header class="panel__header"><div class="container"><h3>Lemline documentation  Help</h3><div class="panel-trigger"></div></div></header><section class="panel__content"><div class="container"><article class="article" data-shortcut-switcher="inactive"><h1 data-toc="lemline-examples-integrations" id="lemline-examples-integrations.md">Lemline Integration Examples</h1><aside class="prompt" data-type="tip" data-title="" id="v5y2cr_3"><p id="v5y2cr_13"><span class="control" id="v5y2cr_14">Runtime support:</span> some examples on this page use <code class="code" id="v5y2cr_15">call: openapi</code>, <code class="code" id="v5y2cr_16">call: asyncapi</code>, <code class="code" id="v5y2cr_17">call: grpc</code> or OAuth 2.0 authentication. Lemline registers them but does not execute them yet: such a task fails when it runs, with the error shown under each example. Write those calls with <code class="code" id="v5y2cr_18">call: http</code> and <code class="code" id="v5y2cr_19">basic</code> or <code class="code" id="v5y2cr_20">bearer</code> authentication, as in the HTTP examples, or exchange events with <code class="code" id="v5y2cr_21">emit</code> and <code class="code" id="v5y2cr_22">listen</code>.</p></aside><section class="chapter"><h2 id="run-the-examples" data-toc="run-the-examples">Run the Examples</h2><p id="v5y2cr_23">Complete <a href="lemline-tutorial-setup.html" id="v5y2cr_26" data-tooltip="Run Lemline on one machine with SQLite. Lemline stores workflow definitions, queued messages, and workflow history in local files. Use a writable directory on a local filesystem.">the SQLite setup</a> and keep its worker running. Run the commands from a second terminal in the setup directory. With the JAR, substitute <code class="code" id="v5y2cr_27">java -jar lemline.jar</code> for <code class="code" id="v5y2cr_28">bin/lemline</code>. Start the <a href="lemline-tutorial-order-processing.html#start-the-tutorial-shop" id="v5y2cr_29" data-tooltip="Complete the SQLite setup and keep the worker running on the host. In a separate terminal, open the root of the Lemline source checkout matching these docs (the directory containing examples/tutorial-services). With Docker Compose running, start the single shop container:">tutorial shop</a> from the root of the Lemline source checkout:</p><div class="code-block" data-lang="bash">
+docker compose -f examples/tutorial-services/compose.yaml up -d
+</div><p id="v5y2cr_25">This document provides examples of integrating Lemline workflows with external services using various protocols and standards. These integration patterns enable workflows to interact with APIs, services, and messaging systems.</p></section><section class="chapter"><h2 id="http-rest-api-integration" data-toc="http-rest-api-integration">HTTP/REST API Integration</h2><p id="v5y2cr_30">HTTP/REST is one of the most common integration methods for connecting workflows to external services.</p><section class="chapter"><h3 id="basic-http-call" data-toc="basic-http-call">Basic HTTP Call</h3><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: call-http-shorthand-endpoint
+  version: '0.1.0'
+do:
+  - getProduct:
+      call: http
+      with:
+        method: get
+        endpoint: '${ &quot;http://127.0.0.1:8787/products/&quot; + .productId }'
+</div><p id="v5y2cr_35">Save it as <code class="code" id="v5y2cr_40">basic-http-call.yaml</code>:</p><div class="code-block" data-lang="bash">
+bin/lemline definition post -f basic-http-call.yaml
+bin/lemline instance start examples call-http-shorthand-endpoint --input '{&quot;productId&quot;:&quot;SKU-3&quot;}'
+</div><p id="v5y2cr_37">Expect the pruning shears: <code class="code" id="v5y2cr_41">{&quot;id&quot;:&quot;SKU-3&quot;,&quot;name&quot;:&quot;Pruning shears&quot;,&quot;category&quot;:&quot;garden&quot;,&quot;price&quot;:18,&quot;available&quot;:10}</code>.</p><p id="v5y2cr_38">This example demonstrates:</p><ul class="list _bullet" id="v5y2cr_39"><li class="list__item" id="v5y2cr_42"><p id="v5y2cr_44">A simple HTTP GET request</p></li><li class="list__item" id="v5y2cr_43"><p id="v5y2cr_45">A URI built from the <code class="code" id="v5y2cr_46">productId</code> workflow input with a runtime expression</p></li></ul></section><section class="chapter"><h3 id="http-with-query-parameters" data-toc="http-with-query-parameters">HTTP with Query Parameters</h3><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: http-query-params
+  version: '1.0.0'
+input:
+  schema:
+    format: json
+    document:
+      type: object
+      required:
+        - searchQuery
+      properties:
+        searchQuery:
+          type: string
+do:
+  - searchProducts:
+      call: http
+      with:
+        method: get
+        endpoint: http://127.0.0.1:8787/products
+        query:
+          search: ${ .searchQuery }
+</div><p id="v5y2cr_48">Save it as <code class="code" id="v5y2cr_53">http-with-query-parameters.yaml</code>:</p><div class="code-block" data-lang="bash">
+bin/lemline definition post -f http-with-query-parameters.yaml
+bin/lemline instance start examples http-query-params --input '{&quot;searchQuery&quot;:&quot;hose&quot;}'
+bin/lemline instance start examples http-query-params --input '{}'
+</div><p id="v5y2cr_50">The first instance returns one page with the garden hose (<code class="code" id="v5y2cr_54">items</code> lists <code class="code" id="v5y2cr_55">SKU-1</code>, <code class="code" id="v5y2cr_56">total</code> is 1). The second is refused by the input schema before any instance exists: <code class="code" id="v5y2cr_57">Missing required field(s): 'searchQuery'</code>.</p><p id="v5y2cr_51">This example shows:</p><ul class="list _bullet" id="v5y2cr_52"><li class="list__item" id="v5y2cr_58"><p id="v5y2cr_61">Using query parameters with the <code class="code" id="v5y2cr_62">query</code> property</p></li><li class="list__item" id="v5y2cr_59"><p id="v5y2cr_63">Dynamic query values using expressions</p></li><li class="list__item" id="v5y2cr_60"><p id="v5y2cr_64">Input schema validation</p></li></ul></section><section class="chapter"><h3 id="http-with-authentication" data-toc="http-with-authentication">HTTP with Authentication</h3><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: http-with-oauth2
+  version: '0.1.0'
+use:
+  secrets:
+    - clientSecret
+do:
+  - getPartnerStock:
+      call: http
+      with:
+        method: get
+        endpoint:
+          uri: http://127.0.0.1:8787/partner/stock
+          authentication:
+            oauth2:
+              authority: http://127.0.0.1:8787
+              endpoints:
+                token: /oauth2/token
+              grant: client_credentials
+              client:
+                id: shop-workflows
+                secret: ${ $secrets.clientSecret }
+</div><p id="v5y2cr_66">Lemline registers this definition but cannot run it: the instance faults with <code class="code" id="v5y2cr_69">Unsupported OAuth2 authentication</code> before any request. See <a href="lemline-howto-oauth2.html" id="v5y2cr_70" data-tooltip="The Open Workflow DSL can describe an OAuth 2.0 client credentials grant. Lemline registers such a definition, but its HTTP executor supports only basic and bearer authentication: an instance faults before sending any request. See Supported Features. Until OAuth 2.0 is supported,…">Configuring OAuth 2.0 Authentication</a> to see it, and <a href="lemline-howto-api-keys.html" id="v5y2cr_71" data-tooltip="Declare the key in use.secrets and supply its value through your Lemline secrets configuration.">How to use API keys</a> for the methods that work: bearer token, basic authentication and keys in headers or query parameters.</p><p id="v5y2cr_67">This example demonstrates:</p><ul class="list _bullet" id="v5y2cr_68"><li class="list__item" id="v5y2cr_72"><p id="v5y2cr_75">OAuth2 authentication for HTTP calls</p></li><li class="list__item" id="v5y2cr_73"><p id="v5y2cr_76">Client credentials grant type</p></li><li class="list__item" id="v5y2cr_74"><p id="v5y2cr_77">Custom token endpoints</p></li></ul></section></section><section class="chapter"><h2 id="openapi-integration" data-toc="openapi-integration">OpenAPI Integration</h2><p id="v5y2cr_78">OpenAPI integration allows workflows to interact with services described by OpenAPI specifications.</p><section class="chapter"><h3 id="basic-openapi-call" data-toc="basic-openapi-call">Basic OpenAPI Call</h3><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: openapi-list-products
+  version: '0.1.0'
+do:
+  - findGardenProducts:
+      call: openapi
+      with:
+        document:
+          endpoint: http://127.0.0.1:8787/openapi.json
+        operationId: listProducts
+        parameters:
+          category: garden
+</div><p id="v5y2cr_81">Save it as <code class="code" id="v5y2cr_88">basic-openapi-call.yaml</code>:</p><div class="code-block" data-lang="bash">
+bin/lemline definition post -f basic-openapi-call.yaml
+bin/lemline instance start examples openapi-list-products
+</div><p id="v5y2cr_83">The definition registers; the instance faults with <code class="code" id="v5y2cr_89">Unknown task type: CallOpenAPI</code>. <a href="lemline-howto-openapi.html" id="v5y2cr_90" data-tooltip="Open Workflow defines call: openapi. Lemline registers such a definition, but it has no OpenAPI executor yet: an instance faults at the OpenAPI task with Unknown task type: CallOpenAPI. Until it does, call the operation with an HTTP task, as shown at the end of this page. See…">How to describe an OpenAPI call</a> shows the same operation written as an HTTP call.</p><p id="v5y2cr_84">This example demonstrates:</p><ul class="list _bullet" id="v5y2cr_85"><li class="list__item" id="v5y2cr_91"><p id="v5y2cr_94">Referencing an OpenAPI specification document</p></li><li class="list__item" id="v5y2cr_92"><p id="v5y2cr_95">Calling an operation by its <code class="code" id="v5y2cr_96">operationId</code></p></li><li class="list__item" id="v5y2cr_93"><p id="v5y2cr_97">Passing operation parameters</p></li></ul><p id="v5y2cr_86">Benefits of using OpenAPI integration:</p><ul class="list _bullet" id="v5y2cr_87"><li class="list__item" id="v5y2cr_98"><p id="v5y2cr_102">Type-safe API interactions</p></li><li class="list__item" id="v5y2cr_99"><p id="v5y2cr_103">Automatic request/response serialization</p></li><li class="list__item" id="v5y2cr_100"><p id="v5y2cr_104">Simplified parameter handling</p></li><li class="list__item" id="v5y2cr_101"><p id="v5y2cr_105">API discoverability</p></li></ul></section></section><section class="chapter"><h2 id="grpc-integration" data-toc="grpc-integration">gRPC Integration</h2><p id="v5y2cr_106">gRPC integration enables workflows to communicate with gRPC services.</p><section class="chapter"><h3 id="basic-grpc-call" data-toc="basic-grpc-call">Basic gRPC Call</h3><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: grpc-get-stock
+  version: '0.1.0'
+do:
+  - getStock:
+      call: grpc
+      with:
+        proto:
+          endpoint: file:///opt/shop/inventory.proto
+        service:
+          name: shop.InventoryService
+          host: localhost
+          port: 50051
+        method: GetStock
+        arguments:
+          sku: ${ .sku }
+</div><p id="v5y2cr_109">Save it as <code class="code" id="v5y2cr_116">basic-grpc-call.yaml</code>:</p><div class="code-block" data-lang="bash">
+bin/lemline definition post -f basic-grpc-call.yaml
+bin/lemline instance start examples grpc-get-stock --input '{&quot;sku&quot;:&quot;SKU-1&quot;}'
+</div><p id="v5y2cr_111">The definition registers; the instance faults with <code class="code" id="v5y2cr_117">Unknown task type: CallGRPC</code>. The shop has no gRPC server.</p><p id="v5y2cr_112">This example demonstrates:</p><ul class="list _bullet" id="v5y2cr_113"><li class="list__item" id="v5y2cr_118"><p id="v5y2cr_122">Referencing a Protocol Buffers (.proto) file</p></li><li class="list__item" id="v5y2cr_119"><p id="v5y2cr_123">Specifying the service name, host, and port</p></li><li class="list__item" id="v5y2cr_120"><p id="v5y2cr_124">Calling a specific method</p></li><li class="list__item" id="v5y2cr_121"><p id="v5y2cr_125">Passing arguments from workflow data</p></li></ul><p id="v5y2cr_114">Benefits of using gRPC:</p><ul class="list _bullet" id="v5y2cr_115"><li class="list__item" id="v5y2cr_126"><p id="v5y2cr_130">Efficient binary communication</p></li><li class="list__item" id="v5y2cr_127"><p id="v5y2cr_131">Strongly typed contracts</p></li><li class="list__item" id="v5y2cr_128"><p id="v5y2cr_132">Support for streaming (unary, server, client, or bidirectional)</p></li><li class="list__item" id="v5y2cr_129"><p id="v5y2cr_133">Built-in compression</p></li></ul></section></section><section class="chapter"><h2 id="asyncapi-integration" data-toc="asyncapi-integration">AsyncAPI Integration</h2><p id="v5y2cr_134">AsyncAPI integration allows workflows to interact with event-driven and message-based systems.</p><section class="chapter"><h3 id="publishing-messages" data-toc="publishing-messages">Publishing Messages</h3><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: asyncapi-publish
+  version: '0.1.0'
+do:
+  - findPet:
+      call: asyncapi
+      with:
+        document:
+          endpoint: https://events.example.com/docs/asyncapi.json
+        operation: findPetsByStatus
+        server:
+          name: staging
+        message:
+          payload:
+            petId: ${ .pet.id }
+        authentication:
+          bearer:
+            token: ${ .token }
+</div><p id="v5y2cr_139">Lemline has no AsyncAPI executor: the task fails with <code class="code" id="v5y2cr_142">Unknown task type: CallAsyncAPI</code>. To publish an event from a workflow, use an <a href="lemline-howto-events.html#emit-an-order-event" id="v5y2cr_143" data-tooltip="Set the CloudEvent type and source in emit.event.with. You can include business data in data and use subject to identify the business entity."><code class="code" id="v5y2cr_144">emit</code> task</a>.</p><p id="v5y2cr_140">This example demonstrates:</p><ul class="list _bullet" id="v5y2cr_141"><li class="list__item" id="v5y2cr_145"><p id="v5y2cr_149">Referencing an AsyncAPI specification</p></li><li class="list__item" id="v5y2cr_146"><p id="v5y2cr_150">Publishing a message to a specific server</p></li><li class="list__item" id="v5y2cr_147"><p id="v5y2cr_151">Specifying the message payload</p></li><li class="list__item" id="v5y2cr_148"><p id="v5y2cr_152">Including authentication</p></li></ul></section><section class="chapter"><h3 id="subscribing-to-messages" data-toc="subscribing-to-messages">Subscribing to Messages</h3><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: asyncapi-subscribe
+  version: '0.1.0'
+do:
+  - getNotifications:
+      call: asyncapi
+      with:
+        document:
+          endpoint: https://events.example.com/docs/asyncapi.json
+        operation: getNotifications
+        protocol: ws
+        subscription:
+          filter: '${ .correlationId == $context.userId and .payload.from.firstName == $context.contact.firstName and .payload.from.lastName == $context.contact.lastName }'
+          consume:
+            amount: 5
+</div><p id="v5y2cr_154">This one fails the same way. To wait for events, use a <a href="lemline-howto-events.html#wait-for-a-correlated-event" id="v5y2cr_157" data-tooltip="Use listen.to.one to match a single event. Use correlate to compare a value taken from the event with a value from the workflow, such as an order ID. Set timeout.after to bound the wait."><code class="code" id="v5y2cr_158">listen</code> task</a>.</p><p id="v5y2cr_155">This example demonstrates:</p><ul class="list _bullet" id="v5y2cr_156"><li class="list__item" id="v5y2cr_159"><p id="v5y2cr_162">Subscribing to messages using WebSocket protocol</p></li><li class="list__item" id="v5y2cr_160"><p id="v5y2cr_163">Applying a filter expression to incoming messages</p></li><li class="list__item" id="v5y2cr_161"><p id="v5y2cr_164">Consuming a specific amount of messages</p></li></ul></section><section class="chapter"><h3 id="other-subscription-patterns" data-toc="other-subscription-patterns">Other Subscription Patterns</h3><p id="v5y2cr_165">AsyncAPI integration supports various message consumption patterns:</p><ol class="list _decimal" id="v5y2cr_166" type="1"><li class="list__item" id="v5y2cr_168"><p id="v5y2cr_171"><span class="control" id="v5y2cr_173">Consume a specific amount</span>:</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">        subscription:
+          consume:
+            amount: 5</div></li><li class="list__item" id="v5y2cr_169"><p id="v5y2cr_174"><span class="control" id="v5y2cr_176">Consume until a condition is met</span>:</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">        subscription:
+          consume:
+            until: '${ .status == &quot;completed&quot; }'</div></li><li class="list__item" id="v5y2cr_170"><p id="v5y2cr_177"><span class="control" id="v5y2cr_179">Consume while a condition is true</span>:</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">        subscription:
+          consume:
+            while: '${ .status == &quot;processing&quot; }'</div></li></ol><p id="v5y2cr_167">Add <code class="code" id="v5y2cr_180">consume.for</code> to limit how long an amount, while or until policy can run. Use <code class="code" id="v5y2cr_181">subscription.foreach</code> to process each consumed message.</p></section></section><section class="chapter"><h2 id="custom-function-integration" data-toc="custom-function-integration">Custom Function Integration</h2><p id="v5y2cr_182">Custom functions allow reusing integration patterns across workflows.</p><section class="chapter"><h3 id="inline-custom-function" data-toc="inline-custom-function">Inline Custom Function</h3><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: call-custom-function-inline
+  version: '0.1.0'
+use:
+  functions:
+    getProductById:
+      input:
+        schema:
+          document:
+            type: object
+            properties:
+              productId:
+                type: string
+            required: [ productId ]
+      call: http
+      with:
+        method: get
+        endpoint: '${ &quot;http://127.0.0.1:8787/products/&quot; + .productId }'
+do:
+  - getProduct:
+      call: getProductById
+      with:
+        productId: SKU-2
+</div><p id="v5y2cr_186">Save it as <code class="code" id="v5y2cr_191">inline-custom-function.yaml</code>:</p><div class="code-block" data-lang="bash">
+bin/lemline definition post -f inline-custom-function.yaml
+bin/lemline instance start examples call-custom-function-inline
+</div><p id="v5y2cr_188">The function validates its input, then calls the shop: expect the watering can, <code class="code" id="v5y2cr_192">{&quot;id&quot;:&quot;SKU-2&quot;,&quot;name&quot;:&quot;Watering can&quot;,&quot;category&quot;:&quot;garden&quot;,&quot;price&quot;:12,&quot;available&quot;:10}</code>.</p><p id="v5y2cr_189">This example demonstrates:</p><ul class="list _bullet" id="v5y2cr_190"><li class="list__item" id="v5y2cr_193"><p id="v5y2cr_196">Defining a custom function inline</p></li><li class="list__item" id="v5y2cr_194"><p id="v5y2cr_197">Adding input schema validation</p></li><li class="list__item" id="v5y2cr_195"><p id="v5y2cr_198">Reusing the function within the workflow</p></li></ul></section><section class="chapter"><h3 id="cataloged-function" data-toc="cataloged-function">Cataloged Function</h3><p id="v5y2cr_199">Custom functions can also be defined in a separate catalog and referenced across multiple workflows:</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: call-custom-function-cataloged
+  version: '0.1.0'
+use:
+  catalogs:
+    shop-catalog:
+      endpoint: http://127.0.0.1:8787/catalog/
+do:
+  - getProduct:
+      call: get-product:1.0.0@shop-catalog
+      with:
+        productId: SKU-2
+</div><p id="v5y2cr_201">Save it as <code class="code" id="v5y2cr_206">cataloged-function.yaml</code>:</p><div class="code-block" data-lang="bash">
+bin/lemline definition post -f cataloged-function.yaml
+bin/lemline instance start examples call-custom-function-cataloged
+</div><p id="v5y2cr_203">A catalog function is called as <code class="code" id="v5y2cr_207">name:version@catalog</code>, with lowercase names. The catalog endpoint is the catalog root: Lemline reads <code class="code" id="v5y2cr_208">get-product:1.0.0@shop-catalog</code> from <code class="code" id="v5y2cr_209">http://127.0.0.1:8787/catalog/functions/get-product/1.0.0/function.yaml</code>, which the tutorial shop serves. That definition is the same as the inline function: it validates <code class="code" id="v5y2cr_210">productId</code>, then calls the shop. Expect the watering can, <code class="code" id="v5y2cr_211">{&quot;id&quot;:&quot;SKU-2&quot;,&quot;name&quot;:&quot;Watering can&quot;,&quot;category&quot;:&quot;garden&quot;,&quot;price&quot;:12,&quot;available&quot;:10}</code>. Catalog endpoints can also be <code class="code" id="v5y2cr_212">file://</code> URLs; an endpoint with authentication is not supported yet.</p><p id="v5y2cr_204">This enables:</p><ul class="list _bullet" id="v5y2cr_205"><li class="list__item" id="v5y2cr_213"><p id="v5y2cr_216">Function reuse across multiple workflows</p></li><li class="list__item" id="v5y2cr_214"><p id="v5y2cr_217">Centralized integration pattern maintenance</p></li><li class="list__item" id="v5y2cr_215"><p id="v5y2cr_218">Consistent API access patterns</p></li></ul></section></section><section class="chapter"><h2 id="best-practices-for-integrations" data-toc="best-practices-for-integrations">Best Practices for Integrations</h2><p id="v5y2cr_219">When implementing integration patterns in Lemline:</p><ol class="list _decimal" id="v5y2cr_220" type="1"><li class="list__item" id="v5y2cr_221"><p id="v5y2cr_228"><span class="control" id="v5y2cr_229">Error handling</span>: Always implement error handling for external service calls using try-catch blocks</p></li><li class="list__item" id="v5y2cr_222"><p id="v5y2cr_230"><span class="control" id="v5y2cr_231">Timeouts</span>: Set appropriate timeouts for service calls to prevent workflow hangs (Lemline only enforces timeouts on <code class="code" id="v5y2cr_232">listen</code> tasks; HTTP calls use fixed limits of 15 s to connect and 30 s per request)</p></li><li class="list__item" id="v5y2cr_223"><p id="v5y2cr_233"><span class="control" id="v5y2cr_234">Retry strategies</span>: Use retry mechanisms with backoff for transient failures</p></li><li class="list__item" id="v5y2cr_224"><p id="v5y2cr_235"><span class="control" id="v5y2cr_236">Authentication</span>: Securely manage credentials using secrets management</p></li><li class="list__item" id="v5y2cr_225"><p id="v5y2cr_237"><span class="control" id="v5y2cr_238">Data validation</span>: Validate inputs and outputs using schemas</p></li><li class="list__item" id="v5y2cr_226"><p id="v5y2cr_239"><span class="control" id="v5y2cr_240">Monitoring</span>: Add appropriate logging for external service interactions</p></li><li class="list__item" id="v5y2cr_227"><p id="v5y2cr_241"><span class="control" id="v5y2cr_242">Idempotency</span>: Design integrations to be idempotent to handle retries safely</p></li></ol></section><section class="chapter"><h2 id="complex-integration-example" data-toc="complex-integration-example">Complex Integration Example</h2><p id="v5y2cr_243">This example combines several integration patterns that Lemline runs:</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: complex-integration
+  version: '1.0.0'
+use:
+  functions:
+    getCustomer:
+      call: http
+      with:
+        method: get
+        endpoint: '${ &quot;http://127.0.0.1:8787/customers/&quot; + .customerId }'
+do:
+  - getCustomerData:
+      call: getCustomer
+      with:
+        customerId: ${ .customerId }
+      export:
+        as: '${ $context + { customerData: . } }'
+  - processPurchaseOrder:
+      try:
+        - validateInventory:
+            call: http
+            with:
+              method: post
+              endpoint: http://127.0.0.1:8787/reservations
+              body:
+                orderId: ${ $workflow.input.orderId }
+                items: ${ $workflow.input.orderItems }
+        - processPayment:
+            call: http
+            with:
+              method: post
+              endpoint: http://127.0.0.1:8787/charges
+              body:
+                orderId: ${ $workflow.input.orderId }
+                paymentInfo:
+                  token: ${ $workflow.input.paymentToken }
+        - notifyShipping:
+            emit:
+              event:
+                with:
+                  type: com.example.shipping.requested
+                  source: https://events.example.com/order-service
+                  data:
+                    orderId: ${ $workflow.input.orderId }
+                    customer: ${ $context.customerData.name }
+                    items: ${ $workflow.input.orderItems }
+      catch:
+        as: error
+        do:
+          - routeByErrorType:
+              switch:
+                - paymentDeclined:
+                    when: ${ $error.status == 402 }
+                    then: notifyCustomer
+                - default:
+                    then: logError
+          - notifyCustomer:
+              call: http
+              with:
+                method: post
+                endpoint: http://127.0.0.1:8787/notifications
+                body:
+                  reference: ${ $workflow.input.orderId }
+                  recipient: customer
+                  message: Your payment was declined. Please update payment information.
+              then: exit
+          - logError:
+              call: http
+              with:
+                method: post
+                endpoint: http://127.0.0.1:8787/audit
+                body:
+                  reference: ${ $workflow.input.orderId }
+                  message: ${ $error.title }
+</div><p id="v5y2cr_245">Save it as <code class="code" id="v5y2cr_252">complex-integration-example.yaml</code>:</p><div class="code-block" data-lang="bash">
+bin/lemline definition post -f complex-integration-example.yaml
+bin/lemline instance start examples complex-integration --input '{&quot;orderId&quot;:&quot;ORD-1101&quot;,&quot;customerId&quot;:&quot;C-100&quot;,&quot;orderItems&quot;:[{&quot;id&quot;:&quot;SKU-1&quot;,&quot;quantity&quot;:1}],&quot;paymentToken&quot;:&quot;approved&quot;}'
+bin/lemline instance start examples complex-integration --input '{&quot;orderId&quot;:&quot;ORD-1102&quot;,&quot;customerId&quot;:&quot;C-100&quot;,&quot;orderItems&quot;:[{&quot;id&quot;:&quot;SKU-1&quot;,&quot;quantity&quot;:1}],&quot;paymentToken&quot;:&quot;declined&quot;}'
+bin/lemline instance start examples complex-integration --input '{&quot;orderId&quot;:&quot;ORD-1103&quot;,&quot;customerId&quot;:&quot;C-100&quot;,&quot;orderItems&quot;:[{&quot;id&quot;:&quot;SKU-1&quot;,&quot;quantity&quot;:500}],&quot;paymentToken&quot;:&quot;approved&quot;}'
+</div><div class="table-wrapper"><table class="wide" id="v5y2cr_247"><thead><tr class="ijRowHead" id="v5y2cr_253"><th id="v5y2cr_257"><p>Order</p></th><th id="v5y2cr_258"><p>What happens</p></th><th id="v5y2cr_259"><p>Where to see it</p></th></tr></thead><tbody><tr id="v5y2cr_254"><td id="v5y2cr_260"><p>ORD-1101</p></td><td id="v5y2cr_261"><p>Stock reserved, payment approved, <code class="code" id="v5y2cr_263">com.example.shipping.requested</code> emitted with the customer name</p></td><td id="v5y2cr_262"><p>The shop's reservations and charges</p></td></tr><tr id="v5y2cr_255"><td id="v5y2cr_264"><p>ORD-1102</p></td><td id="v5y2cr_265"><p>The charge answers HTTP 402; the error routes to <code class="code" id="v5y2cr_267">notifyCustomer</code></p></td><td id="v5y2cr_266"><p>A customer inbox entry for <code class="code" id="v5y2cr_268">ORD-1102</code></p></td></tr><tr id="v5y2cr_256"><td id="v5y2cr_269"><p>ORD-1103</p></td><td id="v5y2cr_270"><p>The reservation answers HTTP 409; the error routes to <code class="code" id="v5y2cr_272">logError</code></p></td><td id="v5y2cr_271"><p>An audit entry for <code class="code" id="v5y2cr_273">ORD-1103</code> starting with <code class="code" id="v5y2cr_274">HTTP 409</code></p></td></tr></tbody></table></div><p id="v5y2cr_248">All three instances complete. Stop the shop when you are done:</p><div class="code-block" data-lang="bash">
+docker compose -f examples/tutorial-services/compose.yaml down
+</div><p id="v5y2cr_250">This complex example demonstrates:</p><ul class="list _bullet" id="v5y2cr_251"><li class="list__item" id="v5y2cr_275"><p id="v5y2cr_280">A reusable function declared under <code class="code" id="v5y2cr_281">use.functions</code></p></li><li class="list__item" id="v5y2cr_276"><p id="v5y2cr_282">HTTP calls to several shop services</p></li><li class="list__item" id="v5y2cr_277"><p id="v5y2cr_283">An event emitted for the shipping service</p></li><li class="list__item" id="v5y2cr_278"><p id="v5y2cr_284">Error routing on the failure that occurred</p></li><li class="list__item" id="v5y2cr_279"><p id="v5y2cr_285">Data shared through <code class="code" id="v5y2cr_286">$context</code></p></li></ul></section><section class="chapter"><h2 id="conclusion" data-toc="conclusion">Conclusion</h2><p id="v5y2cr_287">These integration examples showcase Lemline's ability to connect with various external services and systems. By leveraging these patterns, you can build workflows that:</p><ul class="list _bullet" id="v5y2cr_288"><li class="list__item" id="v5y2cr_290"><p id="v5y2cr_295">Integrate with diverse APIs and services</p></li><li class="list__item" id="v5y2cr_291"><p id="v5y2cr_296">Process events and messages</p></li><li class="list__item" id="v5y2cr_292"><p id="v5y2cr_297">Reuse integration logic across workflows</p></li><li class="list__item" id="v5y2cr_293"><p id="v5y2cr_298">Handle errors and retries gracefully</p></li><li class="list__item" id="v5y2cr_294"><p id="v5y2cr_299">Ensure secure communication with external systems</p></li></ul><p id="v5y2cr_289">For examples of error handling and resilience patterns, see the <a href="lemline-examples-error-handling.html" id="v5y2cr_300" data-tooltip="This document provides examples of error handling and resilience patterns in Lemline workflows. Robust error handling is essential for building reliable workflows that can gracefully recover from failures when interacting with external systems, processing data, or executing business…">Error Handling Examples</a> document.</p></section><div class="last-modified">25 November 2026</div><div data-feedback-placeholder="true"></div><div class="navigation-links _bottom"><a href="lemline-examples-basic-patterns.html" class="navigation-links__prev">Lemline Basic Workflow Patterns</a><a href="lemline-examples-error-handling.html" class="navigation-links__next">Lemline Error Handling Examples</a></div></article><div id="disqus_thread"></div></div></section></main></div><script src="https://resources.jetbrains.com/writerside/apidoc/6.22.0-b776/app.js"></script></body></html>

@@ -1,0 +1,220 @@
+<!DOCTYPE html SYSTEM "about:legacy-compat">
+<html lang="en-US" data-preset="contrast" data-primary-color="#2E6F7E"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="robots" content="noindex"><meta name="built-on" content="2026-11-26T17:17:49.619039284"><title>Real-world workflow examples | Lemline documentation</title><script type="application/json" id="virtual-toc-data">[{"id":"e-commerce-order-processing","level":0,"title":"E-commerce order processing","anchor":"#e-commerce-order-processing"},{"id":"customer-registration","level":0,"title":"Customer registration","anchor":"#customer-registration"},{"id":"order-review-routing","level":0,"title":"Order review routing","anchor":"#order-review-routing"},{"id":"iot-device-provisioning-and-monitoring","level":0,"title":"IoT device provisioning and monitoring","anchor":"#iot-device-provisioning-and-monitoring"}]</script><script type="application/json" id="topic-shortcuts"></script><link href="https://resources.jetbrains.com/writerside/apidoc/6.22.0-b776/app.css" rel="stylesheet"><link href="static/custom.css" rel="stylesheet"><link rel="icon" type="image/png" sizes="16x16" href="images/lemly.png"><meta name="image" content="https://docs.lemline.com/social-preview.png"><!-- Open Graph --><meta property="og:title" content="Real-world workflow examples | Lemline documentation"><meta property="og:description" content=""><meta property="og:image" content="https://docs.lemline.com/social-preview.png"><meta property="og:site_name" content="Lemline documentation Help"><meta property="og:type" content="website"><meta property="og:locale" content="en_US"><meta property="og:url" content="https://docs.lemline.com/lemline-examples-real-world.html"><!-- End Open Graph --><!-- Twitter Card --><meta name="twitter:card" content="summary_large_image"><meta name="twitter:site" content=""><meta name="twitter:title" content="Real-world workflow examples | Lemline documentation"><meta name="twitter:description" content=""><meta name="twitter:creator" content=""><meta name="twitter:image:src" content="https://docs.lemline.com/social-preview.png"><!-- End Twitter Card --><!-- Schema.org WebPage --><script type="application/ld+json">{
+    "@context": "http://schema.org",
+    "@type": "WebPage",
+    "@id": "https://docs.lemline.com/lemline-examples-real-world.html#webpage",
+    "url": "https://docs.lemline.com/lemline-examples-real-world.html",
+    "name": "Real-world workflow examples | Lemline documentation",
+    "description": "",
+    "image": "https://docs.lemline.com/social-preview.png",
+    "inLanguage":"en-US"
+}</script><!-- End Schema.org --><!-- Schema.org WebSite --><script type="application/ld+json">{
+    "@type": "WebSite",
+    "@id": "https://docs.lemline.com/#website",
+    "url": "https://docs.lemline.com/",
+    "name": "Lemline documentation Help"
+}</script><!-- End Schema.org --></head><body data-id="lemline-examples-real-world" data-main-title="Real-world workflow examples" data-article-props="{&quot;seeAlsoStyle&quot;:&quot;links&quot;}" data-template="article" data-breadcrumbs="Examples Library"><div class="wrapper"><main class="panel _main"><header class="panel__header"><div class="container"><h3>Lemline documentation  Help</h3><div class="panel-trigger"></div></div></header><section class="panel__content"><div class="container"><article class="article" data-shortcut-switcher="inactive"><h1 data-toc="lemline-examples-real-world" id="lemline-examples-real-world.md">Real-world workflow examples</h1><p id="-1zr909_3">These examples model common orchestration patterns on the tutorial shop. Complete <a href="lemline-tutorial-setup.html" id="-1zr909_13" data-tooltip="Run Lemline on one machine with SQLite. Lemline stores workflow definitions, queued messages, and workflow history in local files. Use a writable directory on a local filesystem.">the SQLite setup</a> and run the commands from the setup directory. With the JAR, substitute <code class="code" id="-1zr909_14">java -jar lemline.jar</code> for <code class="code" id="-1zr909_15">bin/lemline</code>. Start the <a href="lemline-tutorial-order-processing.html#start-the-tutorial-shop" id="-1zr909_16" data-tooltip="Complete the SQLite setup and keep the worker running on the host. In a separate terminal, open the root of the Lemline source checkout matching these docs (the directory containing examples/tutorial-services). With Docker Compose running, start the single shop container:">tutorial shop</a> from the root of the Lemline source checkout:</p><div class="code-block" data-lang="bash">
+docker compose -f examples/tutorial-services/compose.yaml up -d
+</div><p id="-1zr909_5">The telemetry example at the end is started by events, so it must be registered before the worker starts. Stop the setup worker with Ctrl+C, save the <a href="#iot-device-provisioning-and-monitoring" id="-1zr909_17" data-tooltip="Use event scheduling to process independent telemetry readings and publish an alert for readings above a threshold.">telemetry workflow</a> as <code class="code" id="-1zr909_18">device-telemetry.yaml</code> and the publisher below as <code class="code" id="-1zr909_19">tutorial-publisher.yaml</code>, register both and start the worker again:</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: tutorial-publisher
+  version: '1.0.0'
+do:
+  - publish:
+      emit:
+        event:
+          with:
+            type: ${ .type }
+            source: https://events.example.com/tutorial
+            data: ${ .data }
+</div><div class="code-block" data-lang="bash">
+bin/lemline definition post -f device-telemetry.yaml
+bin/lemline definition post -f tutorial-publisher.yaml
+bin/lemline listen --debug
+</div><p id="-1zr909_8">Run the other commands from a second terminal in the setup directory.</p><section class="chapter"><h2 id="e-commerce-order-processing" data-toc="e-commerce-order-processing">E-commerce order processing</h2><p id="-1zr909_20">Reserve stock before charging the customer. If charging fails, release the reservation before raising an error. Keeping the reservation ID in workflow context makes it available to the compensating task.</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: compensate-reservation
+  version: '1.0.0'
+do:
+  - reserveInventory:
+      call: http
+      with:
+        method: post
+        endpoint: http://127.0.0.1:8787/reservations
+        body:
+          orderId: ${ $workflow.input.orderId }
+          items: ${ $workflow.input.items }
+      export:
+        as: '${ $context + { reservationId: .id } }'
+  - completeOrder:
+      try:
+        - chargePayment:
+            call: http
+            with:
+              method: post
+              endpoint: http://127.0.0.1:8787/charges
+              body:
+                orderId: ${ $workflow.input.orderId }
+                paymentInfo: ${ $workflow.input.paymentInfo }
+      catch:
+        do:
+          - releaseInventory:
+              call: http
+              with:
+                method: delete
+                endpoint: '${ &quot;http://127.0.0.1:8787/reservations/\($context.reservationId | @uri)&quot; }'
+          - reportFailure:
+              raise:
+                error:
+                  type: https://errors.example.com/order-failed
+                  status: 502
+                  title: Order completion failed
+  - compareCarriers:
+      fork:
+        branches:
+          - economy:
+              try:
+                - quote:
+                    call: http
+                    with:
+                      method: post
+                      endpoint: http://127.0.0.1:8787/quotes/economy
+                      body:
+                        orderId: ${ $workflow.input.orderId }
+                        failTwice: ${ $workflow.input.failTwice // false }
+              catch:
+                retry:
+                  delay: { seconds: 1 }
+                  limit:
+                    attempt: { count: 3 }
+          - express:
+              call: http
+              with:
+                method: post
+                endpoint: http://127.0.0.1:8787/quotes/express
+                body:
+                  orderId: ${ $workflow.input.orderId }
+  - selectCarrier:
+      set:
+        carrier: ${ min_by(.price).carrier }
+  - bookShipment:
+      call: http
+      with:
+        method: post
+        endpoint: http://127.0.0.1:8787/shipments
+        body:
+          orderId: ${ $workflow.input.orderId }
+          carrier: ${ .carrier }
+  - confirmShipment:
+      call: http
+      with:
+        method: post
+        endpoint: http://127.0.0.1:8787/notifications
+        body:
+          reference: ${ .orderId }
+          recipient: customer
+          message: '${ &quot;Shipment booked with &quot; + .carrier }'
+</div><p id="-1zr909_22">Save it as <code class="code" id="-1zr909_25">compensate-reservation.yaml</code> and run an approved and a declined order:</p><div class="code-block" data-lang="bash">
+bin/lemline definition post -f compensate-reservation.yaml
+bin/lemline instance start examples compensate-reservation --input '{&quot;orderId&quot;:&quot;ORD-1301&quot;,&quot;items&quot;:[{&quot;id&quot;:&quot;SKU-1&quot;,&quot;quantity&quot;:2}],&quot;paymentInfo&quot;:{&quot;token&quot;:&quot;approved&quot;}}'
+bin/lemline instance start examples compensate-reservation --input '{&quot;orderId&quot;:&quot;ORD-1302&quot;,&quot;items&quot;:[{&quot;id&quot;:&quot;SKU-1&quot;,&quot;quantity&quot;:2}],&quot;paymentInfo&quot;:{&quot;token&quot;:&quot;declined&quot;}}'
+</div><p id="-1zr909_24">ORD-1301 is reserved, paid, shipped with the cheaper economy carrier and confirmed in the customer inbox. ORD-1302 is declined: its reservation is released and the instance faults with <code class="code" id="-1zr909_26">Order completion failed</code>.</p></section><section class="chapter"><h2 id="customer-registration" data-toc="customer-registration">Customer registration</h2><p id="-1zr909_27">Validate the request shape, register the customer with the shop, and publish an event with the new customer identifier. Keep personal data out of the emitted notification unless the consuming service requires it.</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: customer-registration
+  version: '1.0.0'
+input:
+  schema:
+    document:
+      type: object
+      required: [name, email]
+      properties:
+        name:
+          type: string
+        email:
+          type: string
+do:
+  - registerCustomer:
+      call: http
+      with:
+        method: post
+        endpoint: http://127.0.0.1:8787/customers
+        body: '${ { name: .name, email: .email } }'
+  - publishRegistrationEvent:
+      emit:
+        event:
+          with:
+            type: com.example.customer.registered
+            source: https://events.example.com/customers
+            subject: ${ .id }
+            data:
+              customerId: ${ .id }
+</div><p id="-1zr909_29">Save it as <code class="code" id="-1zr909_32">patient-intake.yaml</code>:</p><div class="code-block" data-lang="bash">
+bin/lemline definition post -f patient-intake.yaml
+bin/lemline instance start examples customer-registration --input '{&quot;name&quot;:&quot;Katherine Johnson&quot;,&quot;email&quot;:&quot;katherine@example.com&quot;}'
+bin/lemline instance start examples customer-registration --input '{&quot;name&quot;:&quot;Katherine Johnson&quot;,&quot;email&quot;:&quot;katherine-at-example&quot;}'
+</div><p id="-1zr909_31">The first instance registers customer <code class="code" id="-1zr909_33">C-901</code> and emits <code class="code" id="-1zr909_34">com.example.customer.registered</code> with only its ID. The shop refuses the second email with HTTP 422, so the instance faults before any event is emitted.</p></section><section class="chapter"><h2 id="order-review-routing" data-toc="order-review-routing">Order review routing</h2><p id="-1zr909_35">Use the customer record returned by a service to route an order to an automatic or manual review queue.</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: order-review-routing
+  version: '1.0.0'
+do:
+  - obtainCustomerRecord:
+      call: http
+      with:
+        method: get
+        endpoint: '${ &quot;http://127.0.0.1:8787/customers/&quot; + .customerId }'
+  - routeOrder:
+      switch:
+        - needsReview:
+            when: ${ .emailValid == false or .tier != &quot;gold&quot; }
+            then: manualReview
+        - otherwise:
+            then: automaticReview
+  - manualReview:
+      set:
+        queue: manual-review
+      then: end
+  - automaticReview:
+      set:
+        queue: automatic-review
+</div><p id="-1zr909_37">Save it as <code class="code" id="-1zr909_40">loan-application-review.yaml</code>:</p><div class="code-block" data-lang="bash">
+bin/lemline definition post -f loan-application-review.yaml
+bin/lemline instance start examples order-review-routing --input '{&quot;customerId&quot;:&quot;C-100&quot;}'
+bin/lemline instance start examples order-review-routing --input '{&quot;customerId&quot;:&quot;C-300&quot;}'
+</div><p id="-1zr909_39">C-100 is a gold customer with a valid email: <code class="code" id="-1zr909_41">{&quot;queue&quot;:&quot;automatic-review&quot;}</code>. C-300 has an invalid email: <code class="code" id="-1zr909_42">{&quot;queue&quot;:&quot;manual-review&quot;}</code>.</p></section><section class="chapter"><h2 id="iot-device-provisioning-and-monitoring" data-toc="iot-device-provisioning-and-monitoring">IoT device provisioning and monitoring</h2><p id="-1zr909_43">Use event scheduling to process independent telemetry readings and publish an alert for readings above a threshold.</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: device-telemetry
+  version: '1.0.0'
+schedule:
+  on:
+    one:
+      with:
+        type: com.example.device.telemetry.received
+input:
+  from: ${ .[0] }
+do:
+  - inspectReading:
+      switch:
+        - highTemperature:
+            when: ${ .temperature &gt; 80 }
+            then: raiseAlert
+        - other:
+            then: end
+  - raiseAlert:
+      emit:
+        event:
+          with:
+            type: com.example.device.temperature.high
+            source: https://events.example.com/telemetry
+            subject: ${ .deviceId }
+            data: '${ { deviceId, temperature } }'
+</div><p id="-1zr909_45">You registered it before starting the worker. Publish a normal and a high reading:</p><div class="code-block" data-lang="bash">
+bin/lemline instance start examples tutorial-publisher --input '{&quot;type&quot;:&quot;com.example.device.telemetry.received&quot;,&quot;data&quot;:{&quot;deviceId&quot;:&quot;sensor-7&quot;,&quot;temperature&quot;:70}}'
+bin/lemline instance start examples tutorial-publisher --input '{&quot;type&quot;:&quot;com.example.device.telemetry.received&quot;,&quot;data&quot;:{&quot;deviceId&quot;:&quot;sensor-7&quot;,&quot;temperature&quot;:95}}'
+</div><p id="-1zr909_47">Each reading starts a <code class="code" id="-1zr909_51">device-telemetry</code> instance about 10 seconds later. The first ends without an alert; the second emits <code class="code" id="-1zr909_52">com.example.device.temperature.high</code> for <code class="code" id="-1zr909_53">sensor-7</code>. The <a href="lemline-tutorial-iot.html" id="-1zr909_54" data-tooltip="Complete the SQLite setup and stop the worker with Ctrl+C before registering the event schedules. In a separate terminal, open the root of the Lemline source checkout matching these docs (the directory containing examples/tutorial-services). With Docker Compose running, start the…">warehouse tutorial</a> adds a second workflow that turns that alert into a notification. Stop the shop when you are done:</p><div class="code-block" data-lang="bash">
+docker compose -f examples/tutorial-services/compose.yaml down
+</div><p id="-1zr909_49">See <a href="lemline-examples-basic-patterns.html" id="-1zr909_55" data-tooltip="This document provides examples of fundamental workflow patterns implemented in the Open Workflow DSL as supported by Lemline. These basic patterns serve as building blocks for creating more complex workflows.">Workflow Patterns</a> for smaller examples of the constructs used here.</p><p id="-1zr909_50">The <a href="lemline-tutorial-order-processing.html" id="-1zr909_56" data-tooltip="Complete the SQLite setup and keep the worker running on the host. In a separate terminal, open the root of the Lemline source checkout matching these docs (the directory containing examples/tutorial-services). With Docker Compose running, start the single shop container:">shop checkout</a> and <a href="lemline-tutorial-iot.html" id="-1zr909_57" data-tooltip="Complete the SQLite setup and stop the worker with Ctrl+C before registering the event schedules. In a separate terminal, open the root of the Lemline source checkout matching these docs (the directory containing examples/tutorial-services). With Docker Compose running, start the…">warehouse monitoring</a> examples include a local service and concrete inputs.</p></section><div class="last-modified">25 November 2026</div><div data-feedback-placeholder="true"></div><div class="navigation-links _bottom"><a href="lemline-examples-error-handling.html" class="navigation-links__prev">Lemline Error Handling Examples</a><a href="lemline-examples-order.html" class="navigation-links__next">Shop checkout workflow</a></div></article><div id="disqus_thread"></div></div></section></main></div><script src="https://resources.jetbrains.com/writerside/apidoc/6.22.0-b776/app.js"></script></body></html>

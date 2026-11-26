@@ -1,0 +1,93 @@
+<!DOCTYPE html SYSTEM "about:legacy-compat">
+<html lang="en-US" data-preset="contrast" data-primary-color="#2E6F7E"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="robots" content="noindex"><meta name="built-on" content="2026-11-26T17:17:50.016405715"><title>&quot;How to Set Up with Docker | Lemline documentation</title><script type="application/json" id="virtual-toc-data">[{"id":"prerequisites","level":0,"title":"Prerequisites","anchor":"#prerequisites"},{"id":"quick-start","level":0,"title":"Quick Start","anchor":"#quick-start"},{"id":"using-rabbitmq-instead-of-kafka","level":0,"title":"Using RabbitMQ Instead of Kafka","anchor":"#using-rabbitmq-instead-of-kafka"},{"id":"next-steps","level":0,"title":"Next Steps","anchor":"#next-steps"}]</script><script type="application/json" id="topic-shortcuts"></script><link href="https://resources.jetbrains.com/writerside/apidoc/6.22.0-b776/app.css" rel="stylesheet"><link href="static/custom.css" rel="stylesheet"><link rel="icon" type="image/png" sizes="16x16" href="images/lemly.png"><meta name="image" content="https://docs.lemline.com/social-preview.png"><!-- Open Graph --><meta property="og:title" content="&quot;How to Set Up with Docker | Lemline documentation"><meta property="og:description" content=""><meta property="og:image" content="https://docs.lemline.com/social-preview.png"><meta property="og:site_name" content="Lemline documentation Help"><meta property="og:type" content="website"><meta property="og:locale" content="en_US"><meta property="og:url" content="https://docs.lemline.com/lemline-howto-docker.html"><!-- End Open Graph --><!-- Twitter Card --><meta name="twitter:card" content="summary_large_image"><meta name="twitter:site" content=""><meta name="twitter:title" content="&quot;How to Set Up with Docker | Lemline documentation"><meta name="twitter:description" content=""><meta name="twitter:creator" content=""><meta name="twitter:image:src" content="https://docs.lemline.com/social-preview.png"><!-- End Twitter Card --><!-- Schema.org WebPage --><script type="application/ld+json">{
+    "@context": "http://schema.org",
+    "@type": "WebPage",
+    "@id": "https://docs.lemline.com/lemline-howto-docker.html#webpage",
+    "url": "https://docs.lemline.com/lemline-howto-docker.html",
+    "name": "&quot;How to Set Up with Docker | Lemline documentation",
+    "description": "",
+    "image": "https://docs.lemline.com/social-preview.png",
+    "inLanguage":"en-US"
+}</script><!-- End Schema.org --><!-- Schema.org WebSite --><script type="application/ld+json">{
+    "@type": "WebSite",
+    "@id": "https://docs.lemline.com/#website",
+    "url": "https://docs.lemline.com/",
+    "name": "Lemline documentation Help"
+}</script><!-- End Schema.org --></head><body data-id="lemline-howto-docker" data-main-title="&quot;How to Set Up with Docker" data-article-props="{&quot;seeAlsoStyle&quot;:&quot;links&quot;}" data-template="article" data-breadcrumbs="How-to Guides///Runner Configuration"><div class="wrapper"><main class="panel _main"><header class="panel__header"><div class="container"><h3>Lemline documentation  Help</h3><div class="panel-trigger"></div></div></header><section class="panel__content"><div class="container"><article class="article" data-shortcut-switcher="inactive"><h1 data-toc="lemline-howto-docker" id="lemline-howto-docker.md">&quot;How to Set Up with Docker</h1><p id="tponru_3">This guide shows how to set up a local development environment with Docker Compose using PostgreSQL and a message broker.</p><aside class="prompt" data-type="tip" data-title="" id="tponru_4"><p id="tponru_9"><span class="control" id="tponru_10">Note</span>: For quick experimentation and tutorials, use the <a href="lemline-tutorial-hello.html" id="tponru_11" data-tooltip="Complete the SQLite setup. Keep the worker running and use a second terminal in the setup directory. Substitute java -jar lemline.jar for bin/lemline if using the JAR. Each definition below is a new version of the same workflow. Save each in turn as acknowledge-order.yaml.">Acknowledge the first order</a> instead. For production deployments, use managed services (e.g., AWS RDS, Amazon MSK, CloudAMQP) or your organization's infrastructure.</p></aside><section class="chapter"><h2 id="prerequisites" data-toc="prerequisites">Prerequisites</h2><ul class="list _bullet" id="tponru_12"><li class="list__item" id="tponru_13"><p id="tponru_15">Docker and Docker Compose installed</p></li><li class="list__item" id="tponru_14"><p id="tponru_16">Basic familiarity with Docker concepts</p></li></ul></section><section class="chapter"><h2 id="quick-start" data-toc="quick-start">Quick Start</h2><p id="tponru_17">This guide uses <span class="control" id="tponru_26">PostgreSQL</span> and <span class="control" id="tponru_27">Kafka</span>. You can substitute with other supported databases (MySQL) or message brokers (RabbitMQ, PGMQ). See <a href="lemline-howto-brokers.html" id="tponru_28" data-tooltip="This guide explains how to connect Lemline to a message broker. Runners exchange workflow steps through the broker, and workflows publish and receive CloudEvents through it.">Configure Message Brokers</a> for alternatives.</p><p id="tponru_18">Create a <code class="code" id="tponru_29">docker-compose.yaml</code> file:</p><div class="code-block" data-lang="yaml">
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: lemline
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - &quot;5432:5432&quot;
+
+  kafka:
+    image: apache/kafka:latest
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      CLUSTER_ID: lemline-local-cluster
+    ports:
+      - &quot;9092:9092&quot;
+</div><p id="tponru_20">Create a <code class="code" id="tponru_30">.lemline.yaml</code> configuration file:</p><div class="code-block" data-lang="yaml">
+lemline:
+  database:
+    type: postgresql
+    migrate-at-start: true
+    postgresql:
+      host: localhost
+      port: 5432
+      database: lemline
+      username: postgres
+      password: postgres
+
+  messaging:
+    type: kafka
+    kafka:
+      brokers: localhost:9092
+</div><p id="tponru_22">Start the infrastructure:</p><div class="code-block" data-lang="bash">
+docker-compose up -d
+</div><p id="tponru_24">Run Lemline:</p><div class="code-block" data-lang="bash">
+bin/lemline listen --info
+</div></section><section class="chapter"><h2 id="using-rabbitmq-instead-of-kafka" data-toc="using-rabbitmq-instead-of-kafka">Using RabbitMQ Instead of Kafka</h2><p id="tponru_31">If you prefer RabbitMQ, replace the Kafka service in <code class="code" id="tponru_36">docker-compose.yaml</code>:</p><div class="code-block" data-lang="yaml">
+services:
+  postgres:
+    # ... same as above ...
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    ports:
+      - &quot;5672:5672&quot;
+      - &quot;15672:15672&quot;  # Management UI
+</div><p id="tponru_33">And update <code class="code" id="tponru_37">.lemline.yaml</code>:</p><div class="code-block" data-lang="yaml">
+lemline:
+  database:
+    type: postgresql
+    migrate-at-start: true
+    postgresql:
+      host: localhost
+      port: 5432
+      database: lemline
+      username: postgres
+      password: postgres
+
+  messaging:
+    type: rabbitmq
+    rabbitmq:
+      hostname: localhost
+      port: 5672
+      username: guest
+      password: guest
+</div><p id="tponru_35">Lemline names topics and queues after the namespace (for example <code class="code" id="tponru_38">lemline-default-commands</code>); you do not need to configure them.</p></section><section class="chapter"><h2 id="next-steps" data-toc="next-steps">Next Steps</h2><ul class="list _bullet" id="tponru_39"><li class="list__item" id="tponru_40"><p id="tponru_43"><a href="lemline-howto-brokers.html" id="tponru_44" data-tooltip="This guide explains how to connect Lemline to a message broker. Runners exchange workflow steps through the broker, and workflows publish and receive CloudEvents through it.">Configure message brokers</a> for advanced broker settings</p></li><li class="list__item" id="tponru_41"><p id="tponru_45"><a href="lemline-howto-scaling.html" id="tponru_46" data-tooltip="This guide shows how to add capacity to a Lemline deployment. For the reasoning behind it, see Understanding Scaling in Lemline.">Scale Lemline workers</a> for high-throughput workloads</p></li><li class="list__item" id="tponru_42"><p id="tponru_47"><a href="lemline-howto-observability.html" id="tponru_48" data-tooltip="This guide explains how to observe Lemline in operation: metrics, health checks, logs, lifecycle events and the dashboard.">Set up observability</a> for monitoring and metrics</p></li></ul></section><div class="last-modified">25 November 2026</div><div data-feedback-placeholder="true"></div><div class="navigation-links _bottom"><a href="lemline-howto-connect-dashboard.html" class="navigation-links__prev">Connect the dashboard to the gateway</a><a href="lemline-howto-brokers.html" class="navigation-links__next">How to Configure Message Brokers</a></div></article><div id="disqus_thread"></div></div></section></main></div><script src="https://resources.jetbrains.com/writerside/apidoc/6.22.0-b776/app.js"></script></body></html>

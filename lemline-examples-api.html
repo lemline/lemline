@@ -1,0 +1,612 @@
+<!DOCTYPE html SYSTEM "about:legacy-compat">
+<html lang="en-US" data-preset="contrast" data-primary-color="#2E6F7E"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="robots" content="noindex"><meta name="built-on" content="2026-11-26T17:17:49.83311817"><title>API Integration Examples | Lemline documentation</title><script type="application/json" id="virtual-toc-data">[{"id":"run-the-examples","level":0,"title":"Run the Examples","anchor":"#run-the-examples"},{"id":"rest-api-integration-examples","level":0,"title":"REST API Integration Examples","anchor":"#rest-api-integration-examples"},{"id":"openapi-integration-examples","level":0,"title":"OpenAPI Integration Examples","anchor":"#openapi-integration-examples"},{"id":"graphql-integration-examples","level":0,"title":"GraphQL Integration Examples","anchor":"#graphql-integration-examples"},{"id":"grpc-integration-examples","level":0,"title":"gRPC Integration Examples","anchor":"#grpc-integration-examples"},{"id":"asyncapi-integration-examples","level":0,"title":"AsyncAPI Integration Examples","anchor":"#asyncapi-integration-examples"},{"id":"api-integration-best-practices","level":0,"title":"API Integration Best Practices","anchor":"#api-integration-best-practices"},{"id":"conclusion","level":0,"title":"Conclusion","anchor":"#conclusion"}]</script><script type="application/json" id="topic-shortcuts"></script><link href="https://resources.jetbrains.com/writerside/apidoc/6.22.0-b776/app.css" rel="stylesheet"><link href="static/custom.css" rel="stylesheet"><link rel="icon" type="image/png" sizes="16x16" href="images/lemly.png"><meta name="image" content="https://docs.lemline.com/social-preview.png"><!-- Open Graph --><meta property="og:title" content="API Integration Examples | Lemline documentation"><meta property="og:description" content=""><meta property="og:image" content="https://docs.lemline.com/social-preview.png"><meta property="og:site_name" content="Lemline documentation Help"><meta property="og:type" content="website"><meta property="og:locale" content="en_US"><meta property="og:url" content="https://docs.lemline.com/lemline-examples-api.html"><!-- End Open Graph --><!-- Twitter Card --><meta name="twitter:card" content="summary_large_image"><meta name="twitter:site" content=""><meta name="twitter:title" content="API Integration Examples | Lemline documentation"><meta name="twitter:description" content=""><meta name="twitter:creator" content=""><meta name="twitter:image:src" content="https://docs.lemline.com/social-preview.png"><!-- End Twitter Card --><!-- Schema.org WebPage --><script type="application/ld+json">{
+    "@context": "http://schema.org",
+    "@type": "WebPage",
+    "@id": "https://docs.lemline.com/lemline-examples-api.html#webpage",
+    "url": "https://docs.lemline.com/lemline-examples-api.html",
+    "name": "API Integration Examples | Lemline documentation",
+    "description": "",
+    "image": "https://docs.lemline.com/social-preview.png",
+    "inLanguage":"en-US"
+}</script><!-- End Schema.org --><!-- Schema.org WebSite --><script type="application/ld+json">{
+    "@type": "WebSite",
+    "@id": "https://docs.lemline.com/#website",
+    "url": "https://docs.lemline.com/",
+    "name": "Lemline documentation Help"
+}</script><!-- End Schema.org --></head><body data-id="lemline-examples-api" data-main-title="API Integration Examples" data-article-props="{&quot;seeAlsoStyle&quot;:&quot;links&quot;}" data-template="article" data-breadcrumbs="Examples Library"><div class="wrapper"><main class="panel _main"><header class="panel__header"><div class="container"><h3>Lemline documentation  Help</h3><div class="panel-trigger"></div></div></header><section class="panel__content"><div class="container"><article class="article" data-shortcut-switcher="inactive"><h1 data-toc="lemline-examples-api" id="lemline-examples-api.md">API Integration Examples</h1><aside class="prompt" data-type="tip" data-title="" id="job7om_3"><p id="job7om_13"><span class="control" id="job7om_14">Runtime support:</span> the OpenAPI, gRPC and AsyncAPI examples on this page use <code class="code" id="job7om_15">call: openapi</code>, <code class="code" id="job7om_16">call: grpc</code> and <code class="code" id="job7om_17">call: asyncapi</code>, and one of them OAuth 2.0 authentication. Lemline registers them but does not execute them yet: such a task fails when it runs, with <code class="code" id="job7om_18">Unknown task type: CallOpenAPI</code>, <code class="code" id="job7om_19">CallGRPC</code> or <code class="code" id="job7om_20">CallAsyncAPI</code>. The REST and GraphQL examples run against the tutorial shop.</p></aside><p id="job7om_4">This document provides practical examples of API integrations in Lemline workflows. It demonstrates different approaches to connecting with REST APIs, GraphQL, OpenAPI, gRPC, and other API types, covering authentication, error handling, and data transformation.</p><section class="chapter"><h2 id="run-the-examples" data-toc="run-the-examples">Run the Examples</h2><p id="job7om_21">Complete <a href="lemline-tutorial-setup.html" id="job7om_26" data-tooltip="Run Lemline on one machine with SQLite. Lemline stores workflow definitions, queued messages, and workflow history in local files. Use a writable directory on a local filesystem.">the SQLite setup</a> and run the commands from the setup directory. With the JAR, substitute <code class="code" id="job7om_27">java -jar lemline.jar</code> for <code class="code" id="job7om_28">bin/lemline</code>. Start the <a href="lemline-tutorial-order-processing.html#start-the-tutorial-shop" id="job7om_29" data-tooltip="Complete the SQLite setup and keep the worker running on the host. In a separate terminal, open the root of the Lemline source checkout matching these docs (the directory containing examples/tutorial-services). With Docker Compose running, start the single shop container:">tutorial shop</a> from the root of the Lemline source checkout:</p><div class="code-block" data-lang="bash">
+docker compose -f examples/tutorial-services/compose.yaml up -d
+</div><p id="job7om_23">The examples read their API keys and tokens from secrets. The shop accepts any value on these routes and lists the headers it received under <span class="control" id="job7om_30">Requests</span>. Stop the setup worker with Ctrl+C, export demo values, and start it again:</p><div class="code-block" data-lang="bash">
+export API_KEY='demo-api-key'
+export EMAIL_SERVICE_TOKEN='demo-token'
+export API_TOKEN='demo-token'
+bin/lemline listen --debug
+</div><p id="job7om_25">Run the other commands from a second terminal in the setup directory.</p></section><section class="chapter"><h2 id="rest-api-integration-examples" data-toc="rest-api-integration-examples">REST API Integration Examples</h2><section class="chapter"><h3 id="basic-rest-api-workflow" data-toc="basic-rest-api-workflow">Basic REST API Workflow</h3><p id="job7om_34">This example demonstrates a simple workflow that interacts with multiple REST endpoints.</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: register-customer
+  version: '1.0.0'
+input:
+  schema:
+    format: json
+    document:
+      type: object
+      required:
+        - email
+        - name
+      properties:
+        email:
+          type: string
+          format: email
+        name:
+          type: string
+use:
+  secrets:
+    - API_KEY
+    - EMAIL_SERVICE_TOKEN
+do:
+  - validateEmail:
+      call: http
+      with:
+        method: post
+        endpoint: http://127.0.0.1:8787/email-checks
+        body:
+          email: ${ .email }
+      export:
+        as: '${ $context + { emailValidation: . } }'
+  - createUserAccount:
+      do:
+        - route:
+            switch:
+              - validEmail:
+                  when: ${ $context.emailValidation.valid == true }
+                  then: validEmailAction
+              - default:
+                  then: defaultAction
+        - validEmailAction:
+            do:
+              - registerUser:
+                  call: http
+                  with:
+                    method: post
+                    endpoint: http://127.0.0.1:8787/customers
+                    headers:
+                      Content-Type: application/json
+                      X-API-Key: ${ $secrets.API_KEY }
+                    body:
+                      email: ${ $workflow.input.email }
+                      name: ${ $workflow.input.name }
+                  export:
+                    as: '${ $context + { userAccount: . } }'
+              - sendWelcomeEmail:
+                  call: http
+                  with:
+                    method: post
+                    endpoint: http://127.0.0.1:8787/notifications
+                    headers:
+                      Content-Type: application/json
+                      Authorization: Bearer ${ $secrets.EMAIL_SERVICE_TOKEN }
+                    body:
+                      reference: ${ $context.userAccount.id }
+                      recipient: ${ $workflow.input.email }
+                      message: '${ &quot;Welcome, &quot; + $workflow.input.name }'
+            then: exit
+        - defaultAction:
+            do:
+              - notifyInvalidEmail:
+                  set:
+                    result:
+                      success: false
+                      reason: Invalid email address
+                      email: ${ $context.emailValidation.email }
+            then: exit
+</div><p id="job7om_36">Save it as <code class="code" id="job7om_39">basic-rest-api-workflow.yaml</code>:</p><div class="code-block" data-lang="bash">
+bin/lemline definition post -f basic-rest-api-workflow.yaml
+bin/lemline instance start examples register-customer --input '{&quot;email&quot;:&quot;katherine@example.com&quot;,&quot;name&quot;:&quot;Katherine Johnson&quot;}'
+bin/lemline instance start examples register-customer --input '{&quot;email&quot;:&quot;katherine@localhost&quot;,&quot;name&quot;:&quot;Katherine Johnson&quot;}'
+</div><p id="job7om_38">The first email is valid for the shop: the customer is created as <code class="code" id="job7om_40">C-901</code> and a <code class="code" id="job7om_41">Welcome, Katherine Johnson</code> message reaches their inbox. The workflow input schema accepts <code class="code" id="job7om_42">katherine@localhost</code>, but the shop's check requires a domain with a dot: the second instance completes with <code class="code" id="job7om_43">{&quot;result&quot;:{&quot;success&quot;:false,&quot;reason&quot;:&quot;Invalid email address&quot;,&quot;email&quot;:&quot;katherine@localhost&quot;}}</code>.</p></section><section class="chapter"><h3 id="pagination-handling" data-toc="pagination-handling">Pagination Handling</h3><p id="job7om_44">This example shows how to handle paginated API responses.</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: pagination-handling
+  version: '1.0.0'
+do:
+  - initializeProductList:
+      set:
+        allProducts: []
+        nextPage: 1
+        hasMorePages: true
+      export:
+        as: '${ $context + { allProducts: [], nextPage: 1, hasMorePages: true } }'
+  - fetchAllPages:
+      for:
+        in: ${ range(0; 10000) }
+      while: ${ $context.hasMorePages }
+      do:
+        - fetchNextProductPage:
+            call: http
+            with:
+              method: get
+              endpoint: http://127.0.0.1:8787/products
+              query:
+                page: ${ $context.nextPage | tostring }
+                size: '3'
+            export:
+              as: '${ $context + { pageResult: . } }'
+        - processPage:
+            set:
+              allProducts: ${ $context.allProducts + $context.pageResult.items }
+              nextPage: ${ $context.nextPage + 1 }
+              hasMorePages: ${ $context.pageResult.hasMore }
+            export:
+              as: '${ $context + { allProducts: ($context.allProducts + $context.pageResult.items), nextPage: ($context.nextPage
+                + 1), hasMorePages: $context.pageResult.hasMore } }'
+  - processFinalResult:
+      set:
+        result:
+          totalProducts: ${ $context.allProducts | length }
+          productIds: ${ [$context.allProducts[].id] }
+</div><p id="job7om_46">Save it as <code class="code" id="job7om_49">pagination-handling.yaml</code>:</p><div class="code-block" data-lang="bash">
+bin/lemline definition post -f pagination-handling.yaml
+bin/lemline instance start examples pagination-handling
+</div><p id="job7om_48">The shop returns three products per page. The loop reads pages 1 to 3 and stops when <code class="code" id="job7om_50">hasMore</code> is false: expect <code class="code" id="job7om_51">totalProducts</code> 7 and the seven IDs from <code class="code" id="job7om_52">SKU-1</code> to <code class="code" id="job7om_53">SKU-7</code>.</p></section><section class="chapter"><h3 id="request-throttling" data-toc="request-throttling">Request Throttling</h3><p id="job7om_54">This example demonstrates how to implement API request throttling to respect rate limits.</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: request-throttling
+  version: '1.0.0'
+input:
+  schema:
+    format: json
+    document:
+      type: object
+      required:
+        - items
+      properties:
+        items:
+          type: array
+          items:
+            type: string
+use:
+  secrets:
+    - API_TOKEN
+do:
+  - initializeContext:
+      set:
+        processedItems: []
+        failures: []
+      export:
+        as: '${ $context + { processedItems: [], failures: [] } }'
+  - processBatches:
+      for:
+        in: '${ $workflow.input.items as $items | [range(0; ($items | length); 5) as $i | $items[$i:$i + 5]] }'
+        each: batch
+      do:
+        - processBatch:
+            for:
+              in: ${ $batch }
+              each: item
+            do:
+              - processItem:
+                  try:
+                    - callRateLimitedAPI:
+                        call: http
+                        with:
+                          method: get
+                          endpoint: '${ &quot;http://127.0.0.1:8787/products/\($item)?fail=429&amp;failTimes=\(if $item == &quot;SKU-2&quot; then 1 else 0 end)&amp;key=\($workflow.id)&quot; }'
+                          headers:
+                            Authorization: Bearer ${ $secrets.API_TOKEN }
+                        export:
+                          as: '${ $context + { processedItems: ($context.processedItems + [.]) } }'
+                  catch:
+                    errors:
+                      with:
+                        type: https://open-workflow-specification.org/spec/1.0.0/errors/communication
+                    as: apiError
+                    retry:
+                      when: ${ $apiError.status == 429 }
+                      delay:
+                        seconds: 10
+                      backoff:
+                        exponential: {}
+                      limit:
+                        attempt:
+                          count: 3
+                    do:
+                      - recordFailure:
+                          set:
+                            failure:
+                              item: ${ $item }
+                              error: ${ $apiError }
+                          export:
+                            as: '${ $context + { failures: ($context.failures + [.failure]) } }'
+        - throttleBetweenBatches:
+            wait:
+              seconds: 2
+  - summarizeResults:
+      set:
+        result:
+          succeeded: ${ $context.processedItems | length }
+          failed: ${ $context.failures | length }
+          processedItems: ${ $context.processedItems }
+          failures: ${ $context.failures }
+</div><p id="job7om_56">Save it as <code class="code" id="job7om_59">request-throttling.yaml</code>:</p><div class="code-block" data-lang="bash">
+bin/lemline definition post -f request-throttling.yaml
+bin/lemline instance start examples request-throttling --input '{&quot;items&quot;:[&quot;SKU-1&quot;,&quot;SKU-2&quot;,&quot;SKU-3&quot;,&quot;SKU-4&quot;,&quot;SKU-5&quot;,&quot;SKU-404&quot;]}'
+</div><p id="job7om_58">The items are processed in batches of five, with a 2-second pause after each batch. The shop answers HTTP 429 once for <code class="code" id="job7om_60">SKU-2</code>: that call is retried after 10 seconds and succeeds. <code class="code" id="job7om_61">SKU-404</code> gets HTTP 404, which is not retried and is recorded as a failure. Expect <code class="code" id="job7om_62">succeeded: 5</code> and <code class="code" id="job7om_63">failed: 1</code>. Allow about a minute: the worker picks up retries every 10 seconds.</p></section></section><section class="chapter"><h2 id="openapi-integration-examples" data-toc="openapi-integration-examples">OpenAPI Integration Examples</h2><section class="chapter"><h3 id="openapi-specification-integration" data-toc="openapi-specification-integration">OpenAPI Specification Integration</h3><p id="job7om_66">This example demonstrates how to use an OpenAPI specification for API integration.</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: 1.0.3
+  namespace: examples
+  name: catalog-openapi
+  version: 1.0.0
+do:
+  - listGardenProducts:
+      call: openapi
+      with:
+        document:
+          endpoint: http://127.0.0.1:8787/openapi.json
+        operationId: listProducts
+        parameters:
+          category: garden
+      export:
+        as: '${ $context + { gardenProducts: . } }'
+  - retrieveFirstProduct:
+      call: openapi
+      with:
+        document:
+          endpoint: http://127.0.0.1:8787/openapi.json
+        operationId: getProduct
+        parameters:
+          productId: ${ $context.gardenProducts.items[0].id }
+      export:
+        as: '${ $context + { firstProduct: . } }'
+</div><p id="job7om_68">Save it as <code class="code" id="job7om_71">openapi-specification-integration.yaml</code>:</p><div class="code-block" data-lang="bash">
+bin/lemline definition post -f openapi-specification-integration.yaml
+bin/lemline instance start examples catalog-openapi
+</div><p id="job7om_70">The definition targets the shop's OpenAPI document; the instance faults with <code class="code" id="job7om_72">Unknown task type: CallOpenAPI</code>.</p></section><section class="chapter"><h3 id="openapi-with-authentication" data-toc="openapi-with-authentication">OpenAPI with Authentication</h3><p id="job7om_73">This example shows OpenAPI integration with different authentication methods.</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: 1.0.3
+  namespace: examples
+  name: openapi-auth
+  version: 1.0.0
+use:
+  secrets:
+    - CLIENT_ID
+    - CLIENT_SECRET
+    - USERNAME
+    - PASSWORD
+do:
+  - callWithOAuth2:
+      call: openapi
+      with:
+        document:
+          endpoint: http://127.0.0.1:8787/openapi.json
+        operationId: createResource
+        authentication:
+          oauth2:
+            authority: http://127.0.0.1:8787/oauth2
+            grant: client_credentials
+            client:
+              id: ${ $secrets.CLIENT_ID }
+              secret: ${ $secrets.CLIENT_SECRET }
+            scopes:
+              - resource.write
+        parameters:
+          body:
+            name: Example Resource
+            type: test
+      export:
+        as: '${ $context + { oauth2Result: . } }'
+  - callWithBasicAuth:
+      call: openapi
+      with:
+        document:
+          endpoint: http://127.0.0.1:8787/openapi.json
+        operationId: deleteResource
+        authentication:
+          basic:
+            username: ${ $secrets.USERNAME }
+            password: ${ $secrets.PASSWORD }
+        parameters:
+          resourceId: ${ $context.oauth2Result.id }
+</div><p id="job7om_75">Lemline cannot run this one either: besides the OpenAPI call, it has no OAuth 2.0 support.</p></section></section><section class="chapter"><h2 id="graphql-integration-examples" data-toc="graphql-integration-examples">GraphQL Integration Examples</h2><section class="chapter"><h3 id="basic-graphql-query" data-toc="basic-graphql-query">Basic GraphQL Query</h3><p id="job7om_78">This example demonstrates a basic GraphQL query using HTTP integration.</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: customer-graphql-query
+  version: '1.0.0'
+input:
+  schema:
+    format: json
+    document:
+      type: object
+      required:
+        - customerId
+      properties:
+        customerId:
+          type: string
+use:
+  secrets:
+    - API_TOKEN
+do:
+  - fetchCustomerData:
+      call: http
+      with:
+        method: post
+        endpoint: http://127.0.0.1:8787/graphql
+        headers:
+          Content-Type: application/json
+          Authorization: Bearer ${ $secrets.API_TOKEN }
+        body:
+          query: |
+            query GetCustomer($id: ID!) {
+              customer(id: $id) {
+                id
+                name
+                email
+                reviews {
+                  id
+                  rating
+                  title
+                }
+                orders {
+                  totalCount
+                }
+              }
+            }
+          variables:
+            id: ${ .customerId }
+      export:
+        as: '${ $context + { graphqlResponse: . } }'
+  - processCustomerData:
+      set:
+        customerName: ${ $context.graphqlResponse.data.customer.name }
+        totalReviews: ${ $context.graphqlResponse.data.customer.reviews | length }
+        orderCount: ${ $context.graphqlResponse.data.customer.orders.totalCount }
+</div><p id="job7om_80">Save it as <code class="code" id="job7om_83">basic-graphql-query.yaml</code>:</p><div class="code-block" data-lang="bash">
+bin/lemline definition post -f basic-graphql-query.yaml
+bin/lemline instance start examples customer-graphql-query --input '{&quot;customerId&quot;:&quot;C-100&quot;}'
+</div><p id="job7om_82">The shop's GraphQL stand-in answers the <code class="code" id="job7om_84">customer</code> query: expect <code class="code" id="job7om_85">{&quot;customerName&quot;:&quot;Ada Lovelace&quot;,&quot;totalReviews&quot;:2,&quot;orderCount&quot;:0}</code>.</p></section><section class="chapter"><h3 id="graphql-mutation" data-toc="graphql-mutation">GraphQL Mutation</h3><p id="job7om_86">This example demonstrates a GraphQL mutation.</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: add-review-mutation
+  version: '1.0.0'
+input:
+  schema:
+    format: json
+    document:
+      type: object
+      required:
+        - review
+      properties:
+        review:
+          type: object
+          required:
+            - customerId
+            - productId
+            - rating
+use:
+  secrets:
+    - API_TOKEN
+do:
+  - addReview:
+      call: http
+      with:
+        method: post
+        endpoint: http://127.0.0.1:8787/graphql
+        headers:
+          Content-Type: application/json
+          Authorization: Bearer ${ $secrets.API_TOKEN }
+        body:
+          query: |
+            mutation AddReview($review: ReviewInput!) {
+              addReview(review: $review) {
+                id
+                rating
+                title
+              }
+            }
+          variables:
+            review: ${ .review }
+      export:
+        as: '${ $context + { graphqlResponse: . } }'
+  - processResult:
+      do:
+        - route:
+            switch:
+              - hasErrors:
+                  when: ${ ($context.graphqlResponse.errors // []) | length &gt; 0 }
+                  then: hasErrorsAction
+              - default:
+                  then: defaultAction
+        - hasErrorsAction:
+            do:
+              - handleErrors:
+                  set:
+                    result:
+                      success: false
+                      errors: ${ [$context.graphqlResponse.errors[].message] }
+            then: exit
+        - defaultAction:
+            do:
+              - handleSuccess:
+                  set:
+                    result:
+                      success: true
+                      review: ${ $context.graphqlResponse.data.addReview }
+            then: exit
+</div><p id="job7om_88">Save it as <code class="code" id="job7om_91">graphql-mutation.yaml</code>:</p><div class="code-block" data-lang="bash">
+bin/lemline definition post -f graphql-mutation.yaml
+bin/lemline instance start examples add-review-mutation --input '{&quot;review&quot;:{&quot;customerId&quot;:&quot;C-200&quot;,&quot;productId&quot;:&quot;SKU-2&quot;,&quot;rating&quot;:4,&quot;title&quot;:&quot;Good can&quot;}}'
+bin/lemline instance start examples add-review-mutation --input '{&quot;review&quot;:{&quot;customerId&quot;:&quot;C-200&quot;,&quot;productId&quot;:&quot;SKU-404&quot;,&quot;rating&quot;:9}}'
+</div><p id="job7om_90">The first instance returns <code class="code" id="job7om_92">{&quot;result&quot;:{&quot;success&quot;:true,&quot;review&quot;:{&quot;id&quot;:&quot;R-3&quot;,&quot;rating&quot;:4,&quot;title&quot;:&quot;Good can&quot;}}}</code>. The second gets GraphQL errors for the unknown product and the rating: <code class="code" id="job7om_93">{&quot;result&quot;:{&quot;success&quot;:false,&quot;errors&quot;:[&quot;Unknown product SKU-404&quot;,&quot;Rating must be from 1 to 5&quot;]}}</code>.</p></section></section><section class="chapter"><h2 id="grpc-integration-examples" data-toc="grpc-integration-examples">gRPC Integration Examples</h2><section class="chapter"><h3 id="basic-grpc-service-call" data-toc="basic-grpc-service-call">Basic gRPC Service Call</h3><p id="job7om_96">This example demonstrates integrating with a gRPC service.</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: 1.0.3
+  namespace: examples
+  name: grpc-integration
+  version: 1.0.0
+input:
+  schema:
+    format: json
+    document:
+      type: object
+      required:
+        - username
+      properties:
+        username:
+          type: string
+do:
+  - greetUser:
+      call: grpc
+      with:
+        proto:
+          endpoint: file:///protos/greeter.proto
+        service:
+          name: Greeter
+          host: grpc-example
+          port: 50051
+        method: SayHello
+        arguments:
+          name: ${ .username }
+      export:
+        as: '${ $context + { greeting: . } }'
+  - getUserProfile:
+      call: grpc
+      with:
+        proto:
+          endpoint: file:///protos/user_service.proto
+        service:
+          name: UserService
+          host: grpc-example
+          port: 50051
+        method: GetUserProfile
+        arguments:
+          username: ${ $workflow.input.username }
+      export:
+        as: '${ $context + { userProfile: . } }'
+  - combineResults:
+      set:
+        result:
+          greeting: ${ $context.greeting.message }
+          profile:
+            userId: ${ $context.userProfile.id }
+            displayName: ${ $context.userProfile.displayName }
+            email: ${ $context.userProfile.email }
+            joinDate: ${ $context.userProfile.joinDate }
+</div><p id="job7om_98">Lemline registers this definition; an instance faults with <code class="code" id="job7om_99">Unknown task type: CallGRPC</code>. See <a href="lemline-howto-grpc.html" id="job7om_100" data-tooltip="Open Workflow defines call: grpc. Lemline registers such a definition, but it has no gRPC executor yet: an instance faults at the gRPC task with Unknown task type: CallGRPC. The examples below describe a stock service of the tutorial shop that exists only as an illustration: the…">How to describe a gRPC call</a> for the HTTP equivalent on the shop.</p></section><section class="chapter"><h3 id="grpc-with-authentication" data-toc="grpc-with-authentication">gRPC with Authentication</h3><p id="job7om_101">This example demonstrates a gRPC call authenticated with OAuth2 client credentials.</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: grpc-auth-example
+  version: '0.1.0'
+use:
+  secrets:
+    - apiToken
+  authentications:
+    inventoryAuth:
+      bearer:
+        token: ${ $secrets.apiToken }
+do:
+  - getStock:
+      call: grpc
+      with:
+        proto:
+          endpoint: file:///opt/shop/inventory.proto
+        service:
+          name: shop.InventoryService
+          host: localhost
+          port: 50051
+          authentication:
+            use: inventoryAuth
+        method: GetStock
+        arguments:
+          sku: ${ .sku }
+  - recordStock:
+      set:
+        checked: true
+</div><p id="job7om_103">This one fails the same way.</p></section></section><section class="chapter"><h2 id="asyncapi-integration-examples" data-toc="asyncapi-integration-examples">AsyncAPI Integration Examples</h2><section class="chapter"><h3 id="event-driven-api-integration" data-toc="event-driven-api-integration">Event-Driven API Integration</h3><p id="job7om_106">This example demonstrates AsyncAPI integration for event-driven architectures.</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: 1.0.3
+  namespace: examples
+  name: event-driven-workflow
+  version: 1.0.0
+do:
+  - listenForOrder:
+      call: asyncapi
+      with:
+        document:
+          endpoint: file:///apis/order-service.asyncapi.json
+        operation: receiveOrder
+        subscription:
+          filter: ${ .type == &quot;new-order&quot; }
+          consume:
+            amount: 1
+      export:
+        as: '${ $context + { order: . } }'
+  - processOrder:
+      call: http
+      with:
+        method: post
+        endpoint: https://inventory.example/api/check-availability
+        body:
+          orderId: ${ $context.order.id }
+          items: ${ $context.order.items }
+      export:
+        as: '${ $context + { availabilityCheck: . } }'
+  - publishOrderStatus:
+      call: asyncapi
+      with:
+        document:
+          endpoint: file:///apis/order-service.asyncapi.json
+        operation: publishOrderStatus
+        message:
+          payload:
+            orderId: ${ $context.order.id }
+            status: '${ if $context.availabilityCheck.allItemsAvailable then &quot;confirmed&quot; else &quot;backorder&quot; end }'
+            availableItems: ${ $context.availabilityCheck.availableItems }
+            unavailableItems: ${ $context.availabilityCheck.unavailableItems }
+</div><p id="job7om_108">Lemline has no AsyncAPI executor: the task fails with <code class="code" id="job7om_109">Unknown task type: CallAsyncAPI</code>. Use <code class="code" id="job7om_110">emit</code> and <code class="code" id="job7om_111">listen</code>, as in <a href="lemline-howto-events.html" id="job7om_112" data-tooltip="An emit task publishes a CloudEvent. A listen task resumes an existing workflow when the selected event filters match. To start independent instances on matching events, configure schedule.on at the workflow level.">How to emit and listen for events</a>, to exchange events on Lemline's own channel.</p></section><section class="chapter"><h3 id="message-streaming-with-asyncapi" data-toc="message-streaming-with-asyncapi">Message Streaming with AsyncAPI</h3><p id="job7om_113">This example shows how to process a stream of messages with AsyncAPI: each sensor reading is sent to an analysis service, and an alert is published when the analysis asks for one. A failed call is retried up to three times.</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: 1.0.3
+  namespace: examples
+  name: stream-processing
+  version: 1.0.0
+do:
+  - processTelemetryStream:
+      call: asyncapi
+      with:
+        document:
+          endpoint: file:///apis/telemetry.asyncapi.json
+        operation: subscribeTelemetry
+        subscription:
+          filter: '${ .deviceType == &quot;sensor&quot; }'
+          consume:
+            while: ${ true }
+          foreach:
+            item: reading
+            do:
+              - processReading:
+                  try:
+                    - analyzeTelemetry:
+                        call: http
+                        with:
+                          method: post
+                          endpoint: https://analytics.example/api/analyze
+                          body: ${ $reading }
+                    - triggerAlert:
+                        if: ${ .alertRequired == true }
+                        call: asyncapi
+                        with:
+                          document:
+                            endpoint: file:///apis/telemetry.asyncapi.json
+                          operation: publishAlert
+                          message:
+                            payload:
+                              deviceId: ${ $reading.deviceId }
+                              alertType: ${ .alertType }
+                              severity: ${ .severity }
+                              value: ${ $reading.value }
+                              timestamp: ${ $reading.timestamp }
+                  catch:
+                    errors:
+                      with:
+                        type: https://open-workflow-specification.org/spec/1.0.0/errors/communication
+                    retry:
+                      delay:
+                        seconds: 2
+                      limit:
+                        attempt:
+                          count: 3
+</div><p id="job7om_115">This one fails the same way. Stop the shop when you are done:</p><div class="code-block" data-lang="bash">
+docker compose -f examples/tutorial-services/compose.yaml down
+</div></section></section><section class="chapter"><h2 id="api-integration-best-practices" data-toc="api-integration-best-practices">API Integration Best Practices</h2><p id="job7om_117">When implementing API integrations in Lemline workflows, consider these best practices:</p><ol class="list _decimal" id="job7om_118" type="1"><li class="list__item" id="job7om_119"><p id="job7om_129"><span class="control" id="job7om_130">Authentication Management</span>: Use secrets for managing API credentials securely</p></li><li class="list__item" id="job7om_120"><p id="job7om_131"><span class="control" id="job7om_132">Request Validation</span>: Validate input data before making API calls</p></li><li class="list__item" id="job7om_121"><p id="job7om_133"><span class="control" id="job7om_134">Response Validation</span>: Validate API responses against expected schemas</p></li><li class="list__item" id="job7om_122"><p id="job7om_135"><span class="control" id="job7om_136">Error Handling</span>: Implement robust error handling with appropriate retry policies</p></li><li class="list__item" id="job7om_123"><p id="job7om_137"><span class="control" id="job7om_138">Rate Limiting</span>: Respect API rate limits by implementing throttling or backoff strategies</p></li><li class="list__item" id="job7om_124"><p id="job7om_139"><span class="control" id="job7om_140">Pagination</span>: Handle paginated API responses properly</p></li><li class="list__item" id="job7om_125"><p id="job7om_141"><span class="control" id="job7om_142">Idempotency</span>: Design workflows to handle API call retries safely</p></li><li class="list__item" id="job7om_126"><p id="job7om_143"><span class="control" id="job7om_144">Circuit Breaking</span>: Implement circuit breaking for failing endpoints</p></li><li class="list__item" id="job7om_127"><p id="job7om_145"><span class="control" id="job7om_146">Monitoring</span>: Include appropriate logging for API interactions</p></li><li class="list__item" id="job7om_128"><p id="job7om_147"><span class="control" id="job7om_148">Timeout Handling</span>: Set appropriate timeouts for API calls (Lemline only enforces timeouts on <code class="code" id="job7om_149">listen</code> tasks; HTTP calls use fixed limits of 15 s to connect and 30 s per request)</p></li></ol></section><section class="chapter"><h2 id="conclusion" data-toc="conclusion">Conclusion</h2><p id="job7om_150">These examples demonstrate how to implement various API integration patterns in Lemline workflows. By leveraging the Open Workflow DSL's capabilities, you can build robust API integrations that handle authentication, error conditions, pagination, and other common challenges.</p><p id="job7om_151">Whether you're working with REST APIs, GraphQL, OpenAPI specifications, gRPC services, or event-driven AsyncAPI definitions, Lemline provides a consistent approach to API integration that emphasizes reliability, security, and maintainability.</p><p id="job7om_152">For more examples of error handling in API integrations, see the <a href="lemline-examples-error-handling.html" id="job7om_153" data-tooltip="This document provides examples of error handling and resilience patterns in Lemline workflows. Robust error handling is essential for building reliable workflows that can gracefully recover from failures when interacting with external systems, processing data, or executing business…">Error Handling Examples</a> document.</p></section><div class="last-modified">25 November 2026</div><div data-feedback-placeholder="true"></div><div class="navigation-links _bottom"><a href="lemline-examples-iot.html" class="navigation-links__prev">IoT Workflow Examples</a><a href="lemline-examples-timeouts.html" class="navigation-links__next">Timeout Handling Examples</a></div></article><div id="disqus_thread"></div></div></section></main></div><script src="https://resources.jetbrains.com/writerside/apidoc/6.22.0-b776/app.js"></script></body></html>

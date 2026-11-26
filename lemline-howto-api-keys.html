@@ -1,0 +1,91 @@
+<!DOCTYPE html SYSTEM "about:legacy-compat">
+<html lang="en-US" data-preset="contrast" data-primary-color="#2E6F7E"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="robots" content="noindex"><meta name="built-on" content="2026-11-26T17:17:49.750427045"><title>How to use API keys | Lemline documentation</title><script type="application/json" id="virtual-toc-data">[{"id":"prepare-the-examples","level":0,"title":"Prepare the examples","anchor":"#prepare-the-examples"},{"id":"send-a-key-in-a-header","level":0,"title":"Send a key in a header","anchor":"#send-a-key-in-a-header"},{"id":"send-a-key-in-a-query-parameter","level":0,"title":"Send a key in a query parameter","anchor":"#send-a-key-in-a-query-parameter"},{"id":"send-a-bearer-token","level":0,"title":"Send a bearer token","anchor":"#send-a-bearer-token"}]</script><script type="application/json" id="topic-shortcuts"></script><link href="https://resources.jetbrains.com/writerside/apidoc/6.22.0-b776/app.css" rel="stylesheet"><link href="static/custom.css" rel="stylesheet"><link rel="icon" type="image/png" sizes="16x16" href="images/lemly.png"><meta name="image" content="https://docs.lemline.com/social-preview.png"><!-- Open Graph --><meta property="og:title" content="How to use API keys | Lemline documentation"><meta property="og:description" content=""><meta property="og:image" content="https://docs.lemline.com/social-preview.png"><meta property="og:site_name" content="Lemline documentation Help"><meta property="og:type" content="website"><meta property="og:locale" content="en_US"><meta property="og:url" content="https://docs.lemline.com/lemline-howto-api-keys.html"><!-- End Open Graph --><!-- Twitter Card --><meta name="twitter:card" content="summary_large_image"><meta name="twitter:site" content=""><meta name="twitter:title" content="How to use API keys | Lemline documentation"><meta name="twitter:description" content=""><meta name="twitter:creator" content=""><meta name="twitter:image:src" content="https://docs.lemline.com/social-preview.png"><!-- End Twitter Card --><!-- Schema.org WebPage --><script type="application/ld+json">{
+    "@context": "http://schema.org",
+    "@type": "WebPage",
+    "@id": "https://docs.lemline.com/lemline-howto-api-keys.html#webpage",
+    "url": "https://docs.lemline.com/lemline-howto-api-keys.html",
+    "name": "How to use API keys | Lemline documentation",
+    "description": "",
+    "image": "https://docs.lemline.com/social-preview.png",
+    "inLanguage":"en-US"
+}</script><!-- End Schema.org --><!-- Schema.org WebSite --><script type="application/ld+json">{
+    "@type": "WebSite",
+    "@id": "https://docs.lemline.com/#website",
+    "url": "https://docs.lemline.com/",
+    "name": "Lemline documentation Help"
+}</script><!-- End Schema.org --></head><body data-id="lemline-howto-api-keys" data-main-title="How to use API keys" data-article-props="{&quot;seeAlsoStyle&quot;:&quot;links&quot;}" data-template="article" data-breadcrumbs="How-to Guides///Authentication and Secrets"><div class="wrapper"><main class="panel _main"><header class="panel__header"><div class="container"><h3>Lemline documentation  Help</h3><div class="panel-trigger"></div></div></header><section class="panel__content"><div class="container"><article class="article" data-shortcut-switcher="inactive"><h1 data-toc="lemline-howto-api-keys" id="lemline-howto-api-keys.md">How to use API keys</h1><p id="-leuv3h_3">Declare the key in <code class="code" id="-leuv3h_8">use.secrets</code> and supply its value through your <a href="lemline-howto-secrets.html" id="-leuv3h_9" data-tooltip="This guide explains how to give your workflows access to API keys, passwords, and tokens without writing them in workflow definitions.">Lemline secrets configuration</a>.</p><section class="chapter"><h2 id="prepare-the-examples" data-toc="prepare-the-examples">Prepare the examples</h2><p id="-leuv3h_10">Complete <a href="lemline-tutorial-setup.html" id="-leuv3h_15" data-tooltip="Run Lemline on one machine with SQLite. Lemline stores workflow definitions, queued messages, and workflow history in local files. Use a writable directory on a local filesystem.">the SQLite setup</a>. The examples call the partner route of the <a href="lemline-tutorial-order-processing.html#start-the-tutorial-shop" id="-leuv3h_16" data-tooltip="Complete the SQLite setup and keep the worker running on the host. In a separate terminal, open the root of the Lemline source checkout matching these docs (the directory containing examples/tutorial-services). With Docker Compose running, start the single shop container:">tutorial shop</a>, <code class="code" id="-leuv3h_17">GET /partner/stock</code>. It answers HTTP 401 without credentials and HTTP 403 with a wrong value, and lists every request it received, with its headers and query, under <span class="control" id="-leuv3h_18">Requests</span> on the shop page. Start it from the root of the Lemline source checkout:</p><div class="code-block" data-lang="bash">
+docker compose -f examples/tutorial-services/compose.yaml up -d
+</div><p id="-leuv3h_12">Run the other commands from the setup directory. With the JAR, substitute <code class="code" id="-leuv3h_19">java -jar lemline.jar</code> for <code class="code" id="-leuv3h_20">bin/lemline</code>. The worker reads secrets from its environment when it starts, so each example below stops the worker with Ctrl+C, exports the value, and starts the worker again in the same terminal. Run the <code class="code" id="-leuv3h_21">definition</code> and <code class="code" id="-leuv3h_22">instance</code> commands from a second terminal.</p><p id="-leuv3h_13">Export the shop's demo values, <code class="code" id="-leuv3h_23">demo-api-key</code> as <code class="code" id="-leuv3h_24">apiKey</code> and <code class="code" id="-leuv3h_25">demo-token</code> as <code class="code" id="-leuv3h_26">apiToken</code>, and start the worker:</p><div class="code-block" data-lang="bash">
+export apiKey='demo-api-key'
+export apiToken='demo-token'
+bin/lemline listen --debug
+</div></section><section class="chapter"><h2 id="send-a-key-in-a-header" data-toc="send-a-key-in-a-header">Send a key in a header</h2><p id="-leuv3h_27">Set the header required by your service in <code class="code" id="-leuv3h_32">with.headers</code>. The expression resolves the secret when the task runs.</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: http-request-with-api-key
+  version: '1.0.0'
+use:
+  secrets:
+    - apiKey
+do:
+  - getPartnerStock:
+      call: http
+      with:
+        method: get
+        endpoint: http://127.0.0.1:8787/partner/stock
+        headers:
+          X-API-Key: ${ $secrets.apiKey }
+</div><p id="-leuv3h_29">Save it as <code class="code" id="-leuv3h_33">http-request-with-api-key.yaml</code>:</p><div class="code-block" data-lang="bash">
+bin/lemline definition post -f http-request-with-api-key.yaml
+bin/lemline instance start examples http-request-with-api-key
+</div><p id="-leuv3h_31">Expect <code class="code" id="-leuv3h_34">{&quot;sku&quot;:&quot;SKU-1&quot;,&quot;available&quot;:100,&quot;authenticatedWith&quot;:&quot;api-key-header&quot;}</code>. The shop lists the <code class="code" id="-leuv3h_35">x-api-key</code> header it received.</p></section><section class="chapter"><h2 id="send-a-key-in-a-query-parameter" data-toc="send-a-key-in-a-query-parameter">Send a key in a query parameter</h2><p id="-leuv3h_36">Use <code class="code" id="-leuv3h_41">with.query</code> if the service requires a query parameter. Headers are preferable where the service supports them because URLs often appear in access logs.</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: http-request-with-query-key
+  version: '1.0.0'
+use:
+  secrets:
+    - apiKey
+do:
+  - getPartnerStock:
+      call: http
+      with:
+        method: get
+        endpoint: http://127.0.0.1:8787/partner/stock
+        query:
+          api_key: ${ $secrets.apiKey }
+</div><p id="-leuv3h_38">Save it as <code class="code" id="-leuv3h_42">http-request-with-query-key.yaml</code>:</p><div class="code-block" data-lang="bash">
+bin/lemline definition post -f http-request-with-query-key.yaml
+bin/lemline instance start examples http-request-with-query-key
+</div><p id="-leuv3h_40">Expect <code class="code" id="-leuv3h_43">{&quot;sku&quot;:&quot;SKU-1&quot;,&quot;available&quot;:100,&quot;authenticatedWith&quot;:&quot;api-key-query&quot;}</code>. The shop lists the request with <code class="code" id="-leuv3h_44">api_key=demo-api-key</code> in its query: the key also appears in the worker log line of the request URL.</p></section><section class="chapter"><h2 id="send-a-bearer-token" data-toc="send-a-bearer-token">Send a bearer token</h2><p id="-leuv3h_45">For an API that expects <code class="code" id="-leuv3h_56">Authorization: Bearer ...</code>, use a named bearer authentication policy and reference it from <code class="code" id="-leuv3h_57">with.endpoint.authentication.use</code>.</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: bearer-authentication
+  version: '1.0.0'
+use:
+  secrets:
+    - apiToken
+  authentications:
+    partnerAuth:
+      bearer:
+        token: ${ $secrets.apiToken }
+do:
+  - getPartnerStock:
+      call: http
+      with:
+        method: get
+        endpoint:
+          uri: http://127.0.0.1:8787/partner/stock
+          authentication:
+            use: partnerAuth
+</div><p id="-leuv3h_47">Save it as <code class="code" id="-leuv3h_58">bearer-authentication.yaml</code>:</p><div class="code-block" data-lang="bash">
+bin/lemline definition post -f bearer-authentication.yaml
+bin/lemline instance start examples bearer-authentication
+</div><p id="-leuv3h_49">Expect <code class="code" id="-leuv3h_59">{&quot;sku&quot;:&quot;SKU-1&quot;,&quot;available&quot;:100,&quot;authenticatedWith&quot;:&quot;bearer&quot;}</code>. The shop lists the <code class="code" id="-leuv3h_60">authorization</code> header <code class="code" id="-leuv3h_61">Bearer demo-token</code>.</p><p id="-leuv3h_50">A missing or wrong value is the service's answer, not Lemline's. Stop the worker, export a wrong key, start the worker again and repeat the first example:</p><div class="code-block" data-lang="bash">
+export apiKey='wrong-key'
+bin/lemline listen --debug
+</div><div class="code-block" data-lang="bash">
+bin/lemline instance start examples http-request-with-api-key
+</div><p id="-leuv3h_53">The shop answers HTTP 403 and the instance faults with a <code class="code" id="-leuv3h_62">communication</code> error, status 403, titled <code class="code" id="-leuv3h_63">HTTP 403: {&quot;error&quot;:&quot;Invalid credentials for api-key-header&quot;</code>. Stop the shop when you are done:</p><div class="code-block" data-lang="bash">
+docker compose -f examples/tutorial-services/compose.yaml down
+</div><p id="-leuv3h_55">See the <a href="lemline-ref-auth.html" id="-leuv3h_64" data-tooltip="Authentication policies are part of the Open Workflow DSL. Lemline supports basic and bearer authentication for its HTTP executor. See Supported Features for runtime support by protocol and authentication type.">Authentication Reference</a> for policy placement and secret reuse.</p></section><div class="last-modified">25 November 2026</div><div data-feedback-placeholder="true"></div><div class="navigation-links _bottom"><a href="lemline-howto-secrets.html" class="navigation-links__prev">Managing Secrets in Lemline</a><a href="lemline-howto-tls.html" class="navigation-links__next">Configuring TLS for Secure Communications</a></div></article><div id="disqus_thread"></div></div></section></main></div><script src="https://resources.jetbrains.com/writerside/apidoc/6.22.0-b776/app.js"></script></body></html>

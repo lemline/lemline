@@ -1,9 +1,0 @@
-document:
-  dsl: '1.0.3'
-  namespace: team-b
-  name: child
-  version: '0.1.0'
-do:
-  - work:
-      set:
-        handledBy: team-b

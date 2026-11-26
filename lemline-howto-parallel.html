@@ -1,0 +1,121 @@
+<!DOCTYPE html SYSTEM "about:legacy-compat">
+<html lang="en-US" data-preset="contrast" data-primary-color="#2E6F7E"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="robots" content="noindex"><meta name="built-on" content="2026-11-26T17:17:49.768403093"><title>How to execute tasks in parallel (fork) | Lemline documentation</title><script type="application/json" id="virtual-toc-data">[{"id":"handle-errors-around-a-fork","level":0,"title":"Handle errors around a fork","anchor":"#handle-errors-around-a-fork"},{"id":"wait-for-outcomes-published-as-events","level":0,"title":"Wait for outcomes published as events","anchor":"#wait-for-outcomes-published-as-events"}]</script><script type="application/json" id="topic-shortcuts"></script><link href="https://resources.jetbrains.com/writerside/apidoc/6.22.0-b776/app.css" rel="stylesheet"><link href="static/custom.css" rel="stylesheet"><link rel="icon" type="image/png" sizes="16x16" href="images/lemly.png"><meta name="image" content="https://docs.lemline.com/social-preview.png"><!-- Open Graph --><meta property="og:title" content="How to execute tasks in parallel (fork) | Lemline documentation"><meta property="og:description" content=""><meta property="og:image" content="https://docs.lemline.com/social-preview.png"><meta property="og:site_name" content="Lemline documentation Help"><meta property="og:type" content="website"><meta property="og:locale" content="en_US"><meta property="og:url" content="https://docs.lemline.com/lemline-howto-parallel.html"><!-- End Open Graph --><!-- Twitter Card --><meta name="twitter:card" content="summary_large_image"><meta name="twitter:site" content=""><meta name="twitter:title" content="How to execute tasks in parallel (fork) | Lemline documentation"><meta name="twitter:description" content=""><meta name="twitter:creator" content=""><meta name="twitter:image:src" content="https://docs.lemline.com/social-preview.png"><!-- End Twitter Card --><!-- Schema.org WebPage --><script type="application/ld+json">{
+    "@context": "http://schema.org",
+    "@type": "WebPage",
+    "@id": "https://docs.lemline.com/lemline-howto-parallel.html#webpage",
+    "url": "https://docs.lemline.com/lemline-howto-parallel.html",
+    "name": "How to execute tasks in parallel (fork) | Lemline documentation",
+    "description": "",
+    "image": "https://docs.lemline.com/social-preview.png",
+    "inLanguage":"en-US"
+}</script><!-- End Schema.org --><!-- Schema.org WebSite --><script type="application/ld+json">{
+    "@type": "WebSite",
+    "@id": "https://docs.lemline.com/#website",
+    "url": "https://docs.lemline.com/",
+    "name": "Lemline documentation Help"
+}</script><!-- End Schema.org --></head><body data-id="lemline-howto-parallel" data-main-title="How to execute tasks in parallel (fork)" data-article-props="{&quot;seeAlsoStyle&quot;:&quot;links&quot;}" data-template="article" data-breadcrumbs="How-to Guides///Flow Control"><div class="wrapper"><main class="panel _main"><header class="panel__header"><div class="container"><h3>Lemline documentation  Help</h3><div class="panel-trigger"></div></div></header><section class="panel__content"><div class="container"><article class="article" data-shortcut-switcher="inactive"><h1 data-toc="lemline-howto-parallel" id="lemline-howto-parallel.md">How to execute tasks in parallel (fork)</h1><p id="-nd1ust_3">Use <code class="code" id="-nd1ust_12">fork.branches</code> to run independent branches concurrently. Each branch has its own task input. By default, a fork waits for all branches.</p><p id="-nd1ust_4">Complete <a href="lemline-tutorial-setup.html" id="-nd1ust_13" data-tooltip="Run Lemline on one machine with SQLite. Lemline stores workflow definitions, queued messages, and workflow history in local files. Use a writable directory on a local filesystem.">the SQLite setup</a> and keep its worker running. Run the commands from a second terminal in the setup directory. With the JAR, substitute <code class="code" id="-nd1ust_14">java -jar lemline.jar</code> for <code class="code" id="-nd1ust_15">bin/lemline</code>. The examples call the <a href="lemline-tutorial-order-processing.html#start-the-tutorial-shop" id="-nd1ust_16" data-tooltip="Complete the SQLite setup and keep the worker running on the host. In a separate terminal, open the root of the Lemline source checkout matching these docs (the directory containing examples/tutorial-services). With Docker Compose running, start the single shop container:">tutorial shop</a>; start it from the root of the Lemline source checkout:</p><div class="code-block" data-lang="bash">
+docker compose -f examples/tutorial-services/compose.yaml up -d
+</div><p id="-nd1ust_6">Save this definition as <code class="code" id="-nd1ust_17">parallel-order-checks.yaml</code>:</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: parallel-order-checks
+  version: '1.0.0'
+do:
+  - checkOrder:
+      fork:
+        branches:
+          - checkStock:
+              call: http
+              with:
+                method: get
+                endpoint: http://127.0.0.1:8787/stock
+              output:
+                as: '${ { available: .available } }'
+          - checkShipping:
+              call: http
+              with:
+                method: post
+                endpoint: http://127.0.0.1:8787/quotes/express
+                body: ${ . }
+      output:
+        as: '${ { checks: . } }'
+</div><div class="code-block" data-lang="bash">
+bin/lemline definition post -f parallel-order-checks.yaml
+bin/lemline instance start examples parallel-order-checks --input '{&quot;orderId&quot;:&quot;QUOTE-1&quot;}'
+</div><p id="-nd1ust_9">The fork returns the results of its branches in the order they are listed: <code class="code" id="-nd1ust_18">{&quot;checks&quot;:[{&quot;available&quot;:100},{&quot;orderId&quot;:&quot;QUOTE-1&quot;,&quot;carrier&quot;:&quot;express&quot;,&quot;attempts&quot;:1,&quot;price&quot;:9}]}</code>. For a complete checkout, <a href="lemline-tutorial-order-processing.html#ship-a-paid-order" id="-nd1ust_19" data-tooltip="Refresh the shop and filter by ORD-201. Expect 98 units in stock and one reserved record. The fork requests both quotes. Express succeeds once at 9, while economy returns 503 twice before succeeding at 5. The workflow compares the prices, books economy and writes one customer…">compare the two carriers</a>. Each branch returns its own price and <code class="code" id="-nd1ust_20">min_by(.price)</code> selects the carrier after both branches finish.</p><section class="chapter"><h2 id="handle-errors-around-a-fork" data-toc="handle-errors-around-a-fork">Handle errors around a fork</h2><p id="-nd1ust_21">Use a surrounding <code class="code" id="-nd1ust_26">try</code> task when the workflow needs a fallback for the whole group. Place a separate <code class="code" id="-nd1ust_27">try</code> inside a branch when that branch can recover independently.</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: parallel-checks-with-fallback
+  version: '1.0.0'
+do:
+  - attemptChecks:
+      try:
+        - checkOrder:
+            fork:
+              branches:
+                - inventory:
+                    call: http
+                    with:
+                      method: get
+                      endpoint: http://127.0.0.1:8787/stock
+                      query:
+                        fail: '503'
+                        failTimes: ${ .inventoryFailures // 0 | tostring }
+                        key: ${ .orderId }
+                - shipping:
+                    call: http
+                    with:
+                      method: post
+                      endpoint: http://127.0.0.1:8787/quotes/express
+                      body:
+                        orderId: ${ .orderId }
+      catch:
+        do:
+          - requestManualReview:
+              set:
+                status: needs-review
+</div><p id="-nd1ust_23">The <code class="code" id="-nd1ust_28">inventoryFailures</code> input makes the shop's stock endpoint answer HTTP 503 that many times. Save the definition as <code class="code" id="-nd1ust_29">parallel-checks-with-fallback.yaml</code> and run it with a working and a failing inventory:</p><div class="code-block" data-lang="bash">
+bin/lemline definition post -f parallel-checks-with-fallback.yaml
+bin/lemline instance start examples parallel-checks-with-fallback --input '{&quot;orderId&quot;:&quot;QUOTE-2&quot;}'
+bin/lemline instance start examples parallel-checks-with-fallback --input '{&quot;orderId&quot;:&quot;QUOTE-3&quot;,&quot;inventoryFailures&quot;:1}'
+</div><p id="-nd1ust_25">The first instance returns both branch results. In the second, the inventory branch fails, the fork fails with it, and the <code class="code" id="-nd1ust_30">catch</code> returns <code class="code" id="-nd1ust_31">{&quot;status&quot;:&quot;needs-review&quot;}</code>. The shipping branch still ran: the shop lists an express quote for <code class="code" id="-nd1ust_32">QUOTE-3</code>.</p></section><section class="chapter"><h2 id="wait-for-outcomes-published-as-events" data-toc="wait-for-outcomes-published-as-events">Wait for outcomes published as events</h2><p id="-nd1ust_33">A <code class="code" id="-nd1ust_42">listen</code> task can collect events produced by independent services. In this example, <code class="code" id="-nd1ust_43">all</code> requires one match for each filter and <code class="code" id="-nd1ust_44">timeout.after</code> bounds the wait.</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: listen-for-all-results
+  version: '1.0.0'
+do:
+  - collectResults:
+      listen:
+        to:
+          all:
+            - with:
+                type: com.example.inventory.checked
+            - with:
+                type: com.example.shipping.quoted
+      timeout:
+        after: PT5M
+  - recordResults:
+      set:
+        checks: ${ . }
+</div><p id="-nd1ust_35">This example needs the publisher from the tutorial. Save it as <code class="code" id="-nd1ust_45">tutorial-publisher.yaml</code>:</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: tutorial-publisher
+  version: '1.0.0'
+do:
+  - publish:
+      emit:
+        event:
+          with:
+            type: ${ .type }
+            source: https://events.example.com/tutorial
+            data: ${ .data }
+</div><p id="-nd1ust_37">Save the listener as <code class="code" id="-nd1ust_46">listen-for-all-results.yaml</code>, start it, then publish both events:</p><div class="code-block" data-lang="bash">
+bin/lemline definition post -f tutorial-publisher.yaml
+bin/lemline definition post -f listen-for-all-results.yaml
+bin/lemline instance start examples listen-for-all-results
+bin/lemline instance start examples tutorial-publisher --input '{&quot;type&quot;:&quot;com.example.inventory.checked&quot;,&quot;data&quot;:{&quot;stock&quot;:2}}'
+bin/lemline instance start examples tutorial-publisher --input '{&quot;type&quot;:&quot;com.example.shipping.quoted&quot;,&quot;data&quot;:{&quot;price&quot;:15}}'
+</div><p id="-nd1ust_39">After the second event the listener completes with <code class="code" id="-nd1ust_47">{&quot;checks&quot;:[{&quot;stock&quot;:2},{&quot;price&quot;:15}]}</code>. Stop the shop when you are done:</p><div class="code-block" data-lang="bash">
+docker compose -f examples/tutorial-services/compose.yaml down
+</div><p id="-nd1ust_41">Use a <a href="https://github.com/open-workflow-specification/specification/blob/v1.0.3/dsl-reference.md#for" id="-nd1ust_48" data-external="true" rel="noopener noreferrer" target="_blank">For Task</a> to iterate over a collection at runtime. See <a href="lemline-explain-fan-in.html" id="-nd1ust_49" data-tooltip="Fan-out distributes work. Fan-in brings the results together. The DSL has several ways to model these patterns, depending on where the work happens.">Fan-Out and Fan-In</a> for the difference between iteration, forking tasks and waiting for events.</p></section><div class="last-modified">25 November 2026</div><div data-feedback-placeholder="true"></div><div class="navigation-links _bottom"><a href="lemline-howto-conditional.html" class="navigation-links__prev">How to define conditional branches (switch)</a><a href="lemline-howto-loops.html" class="navigation-links__next">How to run loops (for, while)</a></div></article><div id="disqus_thread"></div></div></section></main></div><script src="https://resources.jetbrains.com/writerside/apidoc/6.22.0-b776/app.js"></script></body></html>

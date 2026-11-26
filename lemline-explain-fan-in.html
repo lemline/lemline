@@ -1,0 +1,137 @@
+<!DOCTYPE html SYSTEM "about:legacy-compat">
+<html lang="en-US" data-preset="contrast" data-primary-color="#2E6F7E"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="robots" content="noindex"><meta name="built-on" content="2026-11-26T17:17:50.406341969"><title>Fan-out and fan-in | Lemline documentation</title><script type="application/json" id="virtual-toc-data">[{"id":"run-independent-branches","level":0,"title":"Run independent branches","anchor":"#run-independent-branches"},{"id":"iterate-over-input-data","level":0,"title":"Iterate over input data","anchor":"#iterate-over-input-data"},{"id":"collect-results-from-independent-services","level":0,"title":"Collect results from independent services","anchor":"#collect-results-from-independent-services"},{"id":"recover-when-a-branch-fails","level":0,"title":"Recover when a branch fails","anchor":"#recover-when-a-branch-fails"},{"id":"run-the-examples","level":0,"title":"Run the Examples","anchor":"#run-the-examples"}]</script><script type="application/json" id="topic-shortcuts"></script><link href="https://resources.jetbrains.com/writerside/apidoc/6.22.0-b776/app.css" rel="stylesheet"><link href="static/custom.css" rel="stylesheet"><link rel="icon" type="image/png" sizes="16x16" href="images/lemly.png"><meta name="image" content="https://docs.lemline.com/social-preview.png"><!-- Open Graph --><meta property="og:title" content="Fan-out and fan-in | Lemline documentation"><meta property="og:description" content=""><meta property="og:image" content="https://docs.lemline.com/social-preview.png"><meta property="og:site_name" content="Lemline documentation Help"><meta property="og:type" content="website"><meta property="og:locale" content="en_US"><meta property="og:url" content="https://docs.lemline.com/lemline-explain-fan-in.html"><!-- End Open Graph --><!-- Twitter Card --><meta name="twitter:card" content="summary_large_image"><meta name="twitter:site" content=""><meta name="twitter:title" content="Fan-out and fan-in | Lemline documentation"><meta name="twitter:description" content=""><meta name="twitter:creator" content=""><meta name="twitter:image:src" content="https://docs.lemline.com/social-preview.png"><!-- End Twitter Card --><!-- Schema.org WebPage --><script type="application/ld+json">{
+    "@context": "http://schema.org",
+    "@type": "WebPage",
+    "@id": "https://docs.lemline.com/lemline-explain-fan-in.html#webpage",
+    "url": "https://docs.lemline.com/lemline-explain-fan-in.html",
+    "name": "Fan-out and fan-in | Lemline documentation",
+    "description": "",
+    "image": "https://docs.lemline.com/social-preview.png",
+    "inLanguage":"en-US"
+}</script><!-- End Schema.org --><!-- Schema.org WebSite --><script type="application/ld+json">{
+    "@type": "WebSite",
+    "@id": "https://docs.lemline.com/#website",
+    "url": "https://docs.lemline.com/",
+    "name": "Lemline documentation Help"
+}</script><!-- End Schema.org --></head><body data-id="lemline-explain-fan-in" data-main-title="Fan-out and fan-in" data-article-props="{&quot;seeAlsoStyle&quot;:&quot;links&quot;}" data-template="article" data-breadcrumbs="Explanations"><div class="wrapper"><main class="panel _main"><header class="panel__header"><div class="container"><h3>Lemline documentation  Help</h3><div class="panel-trigger"></div></div></header><section class="panel__content"><div class="container"><article class="article" data-shortcut-switcher="inactive"><h1 data-toc="lemline-explain-fan-in" id="lemline-explain-fan-in.md">Fan-out and fan-in</h1><p id="becvhj_3">Fan-out distributes work. Fan-in brings the results together. The DSL has several ways to model these patterns, depending on where the work happens.</p><section class="chapter"><h2 id="run-independent-branches" data-toc="run-independent-branches">Run independent branches</h2><p id="becvhj_9">A <code class="code" id="becvhj_11">fork</code> starts its branches concurrently. A non-competing fork joins their results after all branches finish. Start the <a href="lemline-tutorial-order-processing.html#start-the-tutorial-shop" id="becvhj_12" data-tooltip="Complete the SQLite setup and keep the worker running on the host. In a separate terminal, open the root of the Lemline source checkout matching these docs (the directory containing examples/tutorial-services). With Docker Compose running, start the single shop container:">tutorial shop</a> and supply <code class="code" id="becvhj_13">{&quot;orderId&quot;:&quot;QUOTE-1&quot;}</code> to request the stock level and a shipping quote.</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: parallel-order-checks
+  version: '1.0.0'
+do:
+  - checkOrder:
+      fork:
+        branches:
+          - checkStock:
+              call: http
+              with:
+                method: get
+                endpoint: http://127.0.0.1:8787/stock
+              output:
+                as: '${ { available: .available } }'
+          - checkShipping:
+              call: http
+              with:
+                method: post
+                endpoint: http://127.0.0.1:8787/quotes/express
+                body: ${ . }
+      output:
+        as: '${ { checks: . } }'
+</div></section><section class="chapter"><h2 id="iterate-over-input-data" data-toc="iterate-over-input-data">Iterate over input data</h2><p id="becvhj_14">A <code class="code" id="becvhj_16">for</code> task runs its body for each item of a collection. Bind the current value with <code class="code" id="becvhj_17">each</code> and its index with <code class="code" id="becvhj_18">at</code>.</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: map-order-items
+  version: '1.0.0'
+do:
+  - calculateTotals:
+      for:
+        each: item
+        in: ${ .items }
+        at: index
+      do:
+        - calculateLine:
+            set:
+              itemId: ${ $item.id }
+              index: ${ $index }
+              lineTotal: ${ $item.quantity * $item.price }
+</div></section><section class="chapter"><h2 id="collect-results-from-independent-services" data-toc="collect-results-from-independent-services">Collect results from independent services</h2><p id="becvhj_19">If outside services publish events, use <code class="code" id="becvhj_21">listen.to.all</code> to require every event type. Use correlation to scope matches to the current workflow instance.</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: listen-for-all-results
+  version: '1.0.0'
+do:
+  - collectResults:
+      listen:
+        to:
+          all:
+            - with:
+                type: com.example.inventory.checked
+            - with:
+                type: com.example.shipping.quoted
+      timeout:
+        after: PT5M
+  - recordResults:
+      set:
+        checks: ${ . }
+</div></section><section class="chapter"><h2 id="recover-when-a-branch-fails" data-toc="recover-when-a-branch-fails">Recover when a branch fails</h2><p id="becvhj_22">Use <code class="code" id="becvhj_25">try</code> around the fork for a group-wide fallback. To recover inside a specific branch, place the handler in that branch.</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: parallel-checks-with-fallback
+  version: '1.0.0'
+do:
+  - attemptChecks:
+      try:
+        - checkOrder:
+            fork:
+              branches:
+                - inventory:
+                    call: http
+                    with:
+                      method: get
+                      endpoint: http://127.0.0.1:8787/stock
+                      query:
+                        fail: '503'
+                        failTimes: ${ .inventoryFailures // 0 | tostring }
+                        key: ${ .orderId }
+                - shipping:
+                    call: http
+                    with:
+                      method: post
+                      endpoint: http://127.0.0.1:8787/quotes/express
+                      body:
+                        orderId: ${ .orderId }
+      catch:
+        do:
+          - requestManualReview:
+              set:
+                status: needs-review
+</div><p id="becvhj_24">See <a href="lemline-howto-parallel.html" id="becvhj_26" data-tooltip="Use fork.branches to run independent branches concurrently. Each branch has its own task input. By default, a fork waits for all branches.">Parallel Tasks</a> and <a href="https://github.com/open-workflow-specification/specification/blob/v1.0.3/dsl-reference.md#correlation" id="becvhj_27" data-external="true" rel="noopener noreferrer" target="_blank">Event Correlation</a>.</p></section><section class="chapter"><h2 id="run-the-examples" data-toc="run-the-examples">Run the Examples</h2><p id="becvhj_28">Every example on this page is a complete workflow. Complete <a href="lemline-tutorial-setup.html" id="becvhj_38" data-tooltip="Run Lemline on one machine with SQLite. Lemline stores workflow definitions, queued messages, and workflow history in local files. Use a writable directory on a local filesystem.">the SQLite setup</a>, save each example under the file name used below, and run the commands from the setup directory. With the JAR, substitute <code class="code" id="becvhj_39">java -jar lemline.jar</code> for <code class="code" id="becvhj_40">bin/lemline</code>.</p><p id="becvhj_29">Start the <a href="lemline-tutorial-order-processing.html#start-the-tutorial-shop" id="becvhj_41" data-tooltip="Complete the SQLite setup and keep the worker running on the host. In a separate terminal, open the root of the Lemline source checkout matching these docs (the directory containing examples/tutorial-services). With Docker Compose running, start the single shop container:">tutorial shop</a> from the root of the Lemline source checkout:</p><div class="code-block" data-lang="bash">
+docker compose -f examples/tutorial-services/compose.yaml up -d
+</div><p id="becvhj_31">The event examples need the tutorial publisher. Save it as <code class="code" id="becvhj_42">tutorial-publisher.yaml</code>:</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: tutorial-publisher
+  version: '1.0.0'
+do:
+  - publish:
+      emit:
+        event:
+          with:
+            type: ${ .type }
+            source: https://events.example.com/tutorial
+            data: ${ .data }
+</div><p id="becvhj_33">Keep the setup worker running and use a second terminal in the setup directory.</p><div class="code-block" data-lang="bash">
+bin/lemline definition post -f tutorial-publisher.yaml
+bin/lemline definition post -f parallel-order-checks.yaml
+bin/lemline instance start examples parallel-order-checks --input '{&quot;orderId&quot;:&quot;QUOTE-1&quot;}'
+bin/lemline definition post -f map-order-items.yaml
+bin/lemline instance start examples map-order-items --input '{&quot;items&quot;:[{&quot;id&quot;:&quot;SKU-1&quot;,&quot;quantity&quot;:2,&quot;price&quot;:25},{&quot;id&quot;:&quot;SKU-2&quot;,&quot;quantity&quot;:1,&quot;price&quot;:12}]}'
+bin/lemline definition post -f listen-for-all-results.yaml
+bin/lemline instance start examples listen-for-all-results
+bin/lemline instance start examples tutorial-publisher --input '{&quot;type&quot;:&quot;com.example.inventory.checked&quot;,&quot;data&quot;:{&quot;stock&quot;:2}}'
+bin/lemline instance start examples tutorial-publisher --input '{&quot;type&quot;:&quot;com.example.shipping.quoted&quot;,&quot;data&quot;:{&quot;price&quot;:15}}'
+bin/lemline definition post -f parallel-checks-with-fallback.yaml
+bin/lemline instance start examples parallel-checks-with-fallback --input '{&quot;orderId&quot;:&quot;QUOTE-3&quot;,&quot;inventoryFailures&quot;:1}'
+</div><div class="table-wrapper"><table class="wide" id="becvhj_35"><thead><tr class="ijRowHead" id="becvhj_43"><th id="becvhj_48"><p>Example</p></th><th id="becvhj_49"><p>Expected result</p></th></tr></thead><tbody><tr id="becvhj_44"><td id="becvhj_50"><p><code class="code" id="becvhj_52">parallel-order-checks</code></p></td><td id="becvhj_51"><p>Both branch results in <code class="code" id="becvhj_53">checks</code></p></td></tr><tr id="becvhj_45"><td id="becvhj_54"><p><code class="code" id="becvhj_56">map-order-items</code></p></td><td id="becvhj_55"><p>The last iteration, <code class="code" id="becvhj_57">{&quot;itemId&quot;:&quot;SKU-2&quot;,&quot;index&quot;:1,&quot;lineTotal&quot;:12}</code></p></td></tr><tr id="becvhj_46"><td id="becvhj_58"><p><code class="code" id="becvhj_60">listen-for-all-results</code></p></td><td id="becvhj_59"><p><code class="code" id="becvhj_61">{&quot;checks&quot;:[{&quot;stock&quot;:2},{&quot;price&quot;:15}]}</code> after both events</p></td></tr><tr id="becvhj_47"><td id="becvhj_62"><p><code class="code" id="becvhj_64">parallel-checks-with-fallback</code></p></td><td id="becvhj_63"><p><code class="code" id="becvhj_65">{&quot;status&quot;:&quot;needs-review&quot;}</code></p></td></tr></tbody></table></div><p id="becvhj_36">Stop the shop when you are done:</p><div class="code-block" data-lang="bash">
+docker compose -f examples/tutorial-services/compose.yaml down
+</div></section><div class="last-modified">25 November 2026</div><div data-feedback-placeholder="true"></div><div class="navigation-links _bottom"><a href="lemline-explain-open-workflow-dsl.html" class="navigation-links__prev">Open Workflow DSL in Lemline</a><a href="lemline-explain-time.html" class="navigation-links__next">Time in workflows</a></div></article><div id="disqus_thread"></div></div></section></main></div><script src="https://resources.jetbrains.com/writerside/apidoc/6.22.0-b776/app.js"></script></body></html>

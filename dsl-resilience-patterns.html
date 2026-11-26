@@ -1,0 +1,200 @@
+<!DOCTYPE html SYSTEM "about:legacy-compat">
+<html lang="en-US" data-preset="contrast" data-primary-color="#2E6F7E"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="robots" content="noindex"><meta name="built-on" content="2026-11-26T17:17:49.521355837"><title>Resilience Patterns | Lemline documentation</title><script type="application/json" id="virtual-toc-data">[{"id":"purpose","level":0,"title":"Purpose","anchor":"#purpose"},{"id":"run-the-examples","level":0,"title":"Run the Examples","anchor":"#run-the-examples"},{"id":"retry-pattern","level":0,"title":"Retry Pattern","anchor":"#retry-pattern"},{"id":"fallback-pattern","level":0,"title":"Fallback Pattern","anchor":"#fallback-pattern"},{"id":"timeout-pattern","level":0,"title":"Timeout Pattern","anchor":"#timeout-pattern"},{"id":"isolation-with-fork","level":0,"title":"Isolation with Fork","anchor":"#isolation-with-fork"},{"id":"durability-of-the-runtime","level":0,"title":"Durability of the Runtime","anchor":"#durability-of-the-runtime"},{"id":"example-combined-resilience","level":0,"title":"Example: Combined Resilience","anchor":"#example-combined-resilience"}]</script><script type="application/json" id="topic-shortcuts"></script><link href="https://resources.jetbrains.com/writerside/apidoc/6.22.0-b776/app.css" rel="stylesheet"><link href="static/custom.css" rel="stylesheet"><link rel="icon" type="image/png" sizes="16x16" href="images/lemly.png"><meta name="image" content="https://docs.lemline.com/social-preview.png"><!-- Open Graph --><meta property="og:title" content="Resilience Patterns | Lemline documentation"><meta property="og:description" content=""><meta property="og:image" content="https://docs.lemline.com/social-preview.png"><meta property="og:site_name" content="Lemline documentation Help"><meta property="og:type" content="website"><meta property="og:locale" content="en_US"><meta property="og:url" content="https://docs.lemline.com/dsl-resilience-patterns.html"><!-- End Open Graph --><!-- Twitter Card --><meta name="twitter:card" content="summary_large_image"><meta name="twitter:site" content=""><meta name="twitter:title" content="Resilience Patterns | Lemline documentation"><meta name="twitter:description" content=""><meta name="twitter:creator" content=""><meta name="twitter:image:src" content="https://docs.lemline.com/social-preview.png"><!-- End Twitter Card --><!-- Schema.org WebPage --><script type="application/ld+json">{
+    "@context": "http://schema.org",
+    "@type": "WebPage",
+    "@id": "https://docs.lemline.com/dsl-resilience-patterns.html#webpage",
+    "url": "https://docs.lemline.com/dsl-resilience-patterns.html",
+    "name": "Resilience Patterns | Lemline documentation",
+    "description": "",
+    "image": "https://docs.lemline.com/social-preview.png",
+    "inLanguage":"en-US"
+}</script><!-- End Schema.org --><!-- Schema.org WebSite --><script type="application/ld+json">{
+    "@type": "WebSite",
+    "@id": "https://docs.lemline.com/#website",
+    "url": "https://docs.lemline.com/",
+    "name": "Lemline documentation Help"
+}</script><!-- End Schema.org --></head><body data-id="dsl-resilience-patterns" data-main-title="Resilience Patterns" data-article-props="{&quot;seeAlsoStyle&quot;:&quot;links&quot;}" data-template="article" data-breadcrumbs="How-to Guides///Resilience and Error Handling"><div class="wrapper"><main class="panel _main"><header class="panel__header"><div class="container"><h3>Lemline documentation  Help</h3><div class="panel-trigger"></div></div></header><section class="panel__content"><div class="container"><article class="article" data-shortcut-switcher="inactive"><h1 data-toc="dsl-resilience-patterns" id="dsl-resilience-patterns.md">Resilience Patterns</h1><section class="chapter"><h2 id="purpose" data-toc="purpose">Purpose</h2><p id="z4zhuoq_11">In distributed systems, failures are inevitable. This page shows how to make workflows handle failures with the tools Lemline provides: retries, error catching with fallbacks, timeouts on event waits, and the durability of the runtime itself.</p><p id="z4zhuoq_12">Lemline does not provide circuit breakers, bulkheads, rate limiting or per-call timeouts, and has no runner settings for them.</p></section><section class="chapter"><h2 id="run-the-examples" data-toc="run-the-examples">Run the Examples</h2><p id="z4zhuoq_13">Complete <a href="lemline-tutorial-setup.html" id="z4zhuoq_15" data-tooltip="Run Lemline on one machine with SQLite. Lemline stores workflow definitions, queued messages, and workflow history in local files. Use a writable directory on a local filesystem.">the SQLite setup</a> and keep its worker running. Run the commands from a second terminal in the setup directory. With the JAR, substitute <code class="code" id="z4zhuoq_16">java -jar lemline.jar</code> for <code class="code" id="z4zhuoq_17">bin/lemline</code>. The examples call the <a href="lemline-tutorial-order-processing.html#start-the-tutorial-shop" id="z4zhuoq_18" data-tooltip="Complete the SQLite setup and keep the worker running on the host. In a separate terminal, open the root of the Lemline source checkout matching these docs (the directory containing examples/tutorial-services). With Docker Compose running, start the single shop container:">tutorial shop</a>, whose <code class="code" id="z4zhuoq_19">fail</code> and <code class="code" id="z4zhuoq_20">failTimes</code> query parameters make a call fail a chosen number of times. Start it from the root of the Lemline source checkout:</p><div class="code-block" data-lang="bash">
+docker compose -f examples/tutorial-services/compose.yaml up -d
+</div></section><section class="chapter"><h2 id="retry-pattern" data-toc="retry-pattern">Retry Pattern</h2><section class="chapter"><h3 id="retry-pattern-purpose" data-toc="retry-pattern-purpose">Purpose</h3><p id="z4zhuoq_25">Retry an operation automatically when a transient failure occurs.</p></section><section class="chapter"><h3 id="retry-pattern-implementation" data-toc="retry-pattern-implementation">Implementation</h3><p id="z4zhuoq_26">Retries are declared in the <code class="code" id="z4zhuoq_32">catch</code> clause of a <code class="code" id="z4zhuoq_33">try</code> task:</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: resilience-retry
+  version: '1.0.0'
+do:
+  - callService:
+      try:
+        - request:
+            call: http
+            with:
+              method: get
+              endpoint: http://127.0.0.1:8787/stock
+              query:
+                fail: '503'
+                failTimes: ${ .failures // 0 | tostring }
+                key: ${ $workflow.id }
+      catch:
+        errors:
+          with:
+            type: https://open-workflow-specification.org/spec/1.0.0/errors/communication
+        retry:
+          delay:
+            seconds: 2
+          backoff:
+            exponential: {}
+          jitter:
+            from:
+              milliseconds: 0
+            to:
+              milliseconds: 500
+          limit:
+            attempt:
+              count: 5
+            duration:
+              minutes: 5
+</div><p id="z4zhuoq_28">Failed HTTP calls raise a <code class="code" id="z4zhuoq_34">communication</code> error whose <code class="code" id="z4zhuoq_35">status</code> is the HTTP status. A retry policy can also be declared once in <code class="code" id="z4zhuoq_36">use.retries</code> and referenced by name (<code class="code" id="z4zhuoq_37">retry: &lt;name&gt;</code>).</p><p id="z4zhuoq_29">Save it as <code class="code" id="z4zhuoq_38">implementation.yaml</code>:</p><div class="code-block" data-lang="bash">
+bin/lemline definition post -f implementation.yaml
+bin/lemline instance start examples resilience-retry --input '{&quot;failures&quot;:2}'
+bin/lemline instance start examples resilience-retry --input '{&quot;failures&quot;:10}'
+</div><p id="z4zhuoq_31">The first instance fails twice, then returns the stock. The second fails on the call and on all five retries, six calls in all. The error still matches the <code class="code" id="z4zhuoq_39">catch</code>, so it counts as handled: with no <code class="code" id="z4zhuoq_40">do</code> list to run, the workflow continues with the task's input and completes with <code class="code" id="z4zhuoq_41">{&quot;failures&quot;:10}</code>. Add a <code class="code" id="z4zhuoq_42">do</code> list to return a fallback instead, as in the next pattern, or leave the error uncaught to make the workflow fault. Allow about two minutes for the second instance, because the delay doubles after each attempt and the worker picks up retries every 10 seconds.</p></section><section class="chapter"><h3 id="key-components" data-toc="key-components">Key Components</h3><ul class="list _bullet" id="z4zhuoq_43"><li class="list__item" id="z4zhuoq_45"><p id="z4zhuoq_50"><span class="control" id="z4zhuoq_51">Delay</span> (<code class="code" id="z4zhuoq_52">delay</code>): time to wait before retrying</p></li><li class="list__item" id="z4zhuoq_46"><p id="z4zhuoq_53"><span class="control" id="z4zhuoq_54">Backoff</span> (<code class="code" id="z4zhuoq_55">backoff</code>): <code class="code" id="z4zhuoq_56">constant</code>, <code class="code" id="z4zhuoq_57">linear</code> (the delay grows with each attempt) or <code class="code" id="z4zhuoq_58">exponential</code></p></li><li class="list__item" id="z4zhuoq_47"><p id="z4zhuoq_59"><span class="control" id="z4zhuoq_60">Jitter</span> (<code class="code" id="z4zhuoq_61">jitter</code>): random extra delay between <code class="code" id="z4zhuoq_62">from</code> and <code class="code" id="z4zhuoq_63">to</code></p></li><li class="list__item" id="z4zhuoq_48"><p id="z4zhuoq_64"><span class="control" id="z4zhuoq_65">Limits</span> (<code class="code" id="z4zhuoq_66">limit.attempt.count</code>, <code class="code" id="z4zhuoq_67">limit.duration</code>): maximum attempts and maximum total duration</p></li><li class="list__item" id="z4zhuoq_49"><p id="z4zhuoq_68"><span class="control" id="z4zhuoq_69">Conditions</span> (<code class="code" id="z4zhuoq_70">when</code>, <code class="code" id="z4zhuoq_71">exceptWhen</code>): retry only when an expression holds</p></li></ul><p id="z4zhuoq_44">While waiting for a retry, the instance is stored in the database: runners can stop or restart without losing it.</p></section><section class="chapter"><h3 id="best-practices" data-toc="best-practices">Best Practices</h3><ol class="list _decimal" id="z4zhuoq_72" type="1"><li class="list__item" id="z4zhuoq_73"><p id="z4zhuoq_78"><span class="control" id="z4zhuoq_79">Use backoff</span>: start with short delays and increase them</p></li><li class="list__item" id="z4zhuoq_74"><p id="z4zhuoq_80"><span class="control" id="z4zhuoq_81">Add jitter</span>: avoid many instances retrying at the same moment</p></li><li class="list__item" id="z4zhuoq_75"><p id="z4zhuoq_82"><span class="control" id="z4zhuoq_83">Set limits</span>: never retry indefinitely</p></li><li class="list__item" id="z4zhuoq_76"><p id="z4zhuoq_84"><span class="control" id="z4zhuoq_85">Be selective</span>: only retry errors that are likely to be transient</p></li><li class="list__item" id="z4zhuoq_77"><p id="z4zhuoq_86"><span class="control" id="z4zhuoq_87">Make calls idempotent</span>: a retried call may have reached the service the first time</p></li></ol></section></section><section class="chapter"><h2 id="fallback-pattern" data-toc="fallback-pattern">Fallback Pattern</h2><p id="z4zhuoq_88">Catch an error and continue with a default value or an alternative path:</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: resilience-fallback
+  version: '1.0.0'
+do:
+  - getRecommendations:
+      try:
+        - request:
+            call: http
+            with:
+              method: get
+              endpoint: http://127.0.0.1:8787/products
+              query:
+                category: garden
+                fail: '503'
+                failTimes: ${ if .recommendationsDown then &quot;1&quot; else &quot;0&quot; end }
+                key: ${ $workflow.id }
+            output:
+              as: '${ { recommendations: [.items[].id] } }'
+      catch:
+        as: error
+        do:
+          - useDefault:
+              set:
+                recommendations: []
+</div><p id="z4zhuoq_90">Save it as <code class="code" id="z4zhuoq_93">fallback-pattern.yaml</code>:</p><div class="code-block" data-lang="bash">
+bin/lemline definition post -f fallback-pattern.yaml
+bin/lemline instance start examples resilience-fallback --input '{&quot;recommendationsDown&quot;:false}'
+bin/lemline instance start examples resilience-fallback --input '{&quot;recommendationsDown&quot;:true}'
+</div><p id="z4zhuoq_92">Expect <code class="code" id="z4zhuoq_94">{&quot;recommendations&quot;:[&quot;SKU-1&quot;,&quot;SKU-2&quot;,&quot;SKU-3&quot;]}</code>, then the default <code class="code" id="z4zhuoq_95">{&quot;recommendations&quot;:[]}</code> when the shop answers HTTP 503.</p></section><section class="chapter"><h2 id="timeout-pattern" data-toc="timeout-pattern">Timeout Pattern</h2><section class="chapter"><h3 id="timeout-pattern-purpose" data-toc="timeout-pattern-purpose">Purpose</h3><p id="z4zhuoq_98">Avoid waiting forever.</p></section><section class="chapter"><h3 id="timeout-pattern-implementation" data-toc="timeout-pattern-implementation">Implementation</h3><ul class="list _bullet" id="z4zhuoq_99"><li class="list__item" id="z4zhuoq_105"><p id="z4zhuoq_108"><span class="control" id="z4zhuoq_109">Event waits</span>: a <code class="code" id="z4zhuoq_110">listen</code> task accepts a <code class="code" id="z4zhuoq_111">timeout</code>. When it expires, the task raises a <code class="code" id="z4zhuoq_112">timeout</code> error that can be caught.</p></li><li class="list__item" id="z4zhuoq_106"><p id="z4zhuoq_113"><span class="control" id="z4zhuoq_114">HTTP calls</span>: the runner's HTTP client stops a request after 30 seconds (15 seconds to connect). This limit is fixed.</p></li><li class="list__item" id="z4zhuoq_107"><p id="z4zhuoq_115">Task-level <code class="code" id="z4zhuoq_116">timeout</code> on other tasks and workflow-level timeouts are not applied by Lemline.</p></li></ul><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: resilience-listen-timeout
+  version: '1.0.0'
+do:
+  - waitForPayment:
+      try:
+        - listenPayment:
+            listen:
+              to:
+                one:
+                  with:
+                    type: com.example.payment.received
+            timeout:
+              after:
+                seconds: 30
+      catch:
+        errors:
+          with:
+            type: https://open-workflow-specification.org/spec/1.0.0/errors/timeout
+        do:
+          - cancelOrder:
+              set:
+                status: cancelled
+</div><p id="z4zhuoq_101">The example waits 30 seconds so that the timeout is quick to see; a real payment would get minutes or hours.</p><p id="z4zhuoq_102">Save it as <code class="code" id="z4zhuoq_117">implementation-2.yaml</code>:</p><div class="code-block" data-lang="bash">
+bin/lemline definition post -f implementation-2.yaml
+bin/lemline instance start examples resilience-listen-timeout
+</div><p id="z4zhuoq_104">Without a payment event, the instance completes with <code class="code" id="z4zhuoq_118">{&quot;status&quot;:&quot;cancelled&quot;}</code> 30 to 40 seconds later: the worker checks expired waits every 10 seconds.</p></section></section><section class="chapter"><h2 id="isolation-with-fork" data-toc="isolation-with-fork">Isolation with Fork</h2><p id="z4zhuoq_119">Branches of a <code class="code" id="z4zhuoq_124">fork</code> run in parallel. Combine <code class="code" id="z4zhuoq_125">fork</code> with <code class="code" id="z4zhuoq_126">try</code> in each branch so that the failure of one branch is handled without failing the others:</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: resilience-fork-isolation
+  version: 1.0.0
+do:
+  - processBatch:
+      fork:
+        branches:
+          - updateInventory:
+              try:
+                - reserveStock:
+                    call: http
+                    with:
+                      method: post
+                      endpoint: http://127.0.0.1:8787/reservations
+                      body:
+                        orderId: ${ .orderId }
+                        items: ${ .items }
+                    output:
+                      as: '${ { inventoryUpdated: true } }'
+              catch:
+                do:
+                  - ignore:
+                      set:
+                        inventoryUpdated: false
+          - notifyCustomer:
+              call: http
+              with:
+                method: post
+                endpoint: http://127.0.0.1:8787/notifications
+                body:
+                  reference: ${ .orderId }
+                  recipient: customer
+                  message: Order received
+</div><p id="z4zhuoq_121">Save it as <code class="code" id="z4zhuoq_127">isolation-with-fork.yaml</code>:</p><div class="code-block" data-lang="bash">
+bin/lemline definition post -f isolation-with-fork.yaml
+bin/lemline instance start examples resilience-fork-isolation --input '{&quot;orderId&quot;:&quot;ORD-951&quot;,&quot;items&quot;:[{&quot;id&quot;:&quot;SKU-1&quot;,&quot;quantity&quot;:1}]}'
+bin/lemline instance start examples resilience-fork-isolation --input '{&quot;orderId&quot;:&quot;ORD-952&quot;,&quot;items&quot;:[{&quot;id&quot;:&quot;SKU-1&quot;,&quot;quantity&quot;:500}]}'
+</div><p id="z4zhuoq_123">Both instances complete. The first returns <code class="code" id="z4zhuoq_128">{&quot;inventoryUpdated&quot;:true}</code> with the notification. For the second, the shop refuses the reservation (HTTP 409); its branch returns <code class="code" id="z4zhuoq_129">{&quot;inventoryUpdated&quot;:false}</code>, and the other branch still sends the notification: the shop's inbox has an <code class="code" id="z4zhuoq_130">Order received</code> entry for both orders.</p></section><section class="chapter"><h2 id="durability-of-the-runtime" data-toc="durability-of-the-runtime">Durability of the Runtime</h2><p id="z4zhuoq_131">Some resilience comes from the runtime itself, without anything to declare in workflows:</p><ul class="list _bullet" id="z4zhuoq_132"><li class="list__item" id="z4zhuoq_133"><p id="z4zhuoq_136">Workflow state travels in messages and is stored in the database: any runner can continue an instance, and a runner crash does not lose it.</p></li><li class="list__item" id="z4zhuoq_134"><p id="z4zhuoq_137">Messages that a runner cannot process go to a dead-letter destination (<code class="code" id="z4zhuoq_138">.dlq</code>) for inspection.</p></li><li class="list__item" id="z4zhuoq_135"><p id="z4zhuoq_139">Runners expose health checks at <code class="code" id="z4zhuoq_140">/q/health/live</code> and <code class="code" id="z4zhuoq_141">/q/health/ready</code> for orchestrators such as Kubernetes.</p></li></ul></section><section class="chapter"><h2 id="example-combined-resilience" data-toc="example-combined-resilience">Example: Combined Resilience</h2><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: resilience-combined
+  version: 1.0.0
+do:
+  - processOrder:
+      try:
+        - submitOrder:
+            call: http
+            with:
+              method: post
+              endpoint: http://127.0.0.1:8787/reservations
+              query:
+                fail: '503'
+                failTimes: ${ .failures // 0 | tostring }
+              body: ${ .order }
+      catch:
+        errors:
+          with:
+            type: https://open-workflow-specification.org/spec/1.0.0/errors/communication
+        retry:
+          backoff:
+            exponential: {}
+          delay:
+            seconds: 2
+          limit:
+            attempt:
+              count: 3
+        do:
+          - queueForLater:
+              call: http
+              with:
+                method: post
+                endpoint: http://127.0.0.1:8787/notifications
+                body:
+                  reference: ${ .order.orderId }
+                  recipient: order-desk
+                  message: Order queued for later processing
+</div><p id="z4zhuoq_143">This example retries the call with exponential backoff and, once the retries are exhausted, leaves a message in the order desk's inbox so the order can be processed later. To hand the order to another workflow instead, put an <code class="code" id="z4zhuoq_148">emit</code> task in the <code class="code" id="z4zhuoq_149">catch</code> list.</p><p id="z4zhuoq_144">Save it as <code class="code" id="z4zhuoq_150">example-combined-resilience.yaml</code>:</p><div class="code-block" data-lang="bash">
+bin/lemline definition post -f example-combined-resilience.yaml
+bin/lemline instance start examples resilience-combined --input '{&quot;order&quot;:{&quot;orderId&quot;:&quot;ORD-953&quot;,&quot;items&quot;:[{&quot;id&quot;:&quot;SKU-1&quot;,&quot;quantity&quot;:1}]},&quot;failures&quot;:1}'
+bin/lemline instance start examples resilience-combined --input '{&quot;order&quot;:{&quot;orderId&quot;:&quot;ORD-954&quot;,&quot;items&quot;:[{&quot;id&quot;:&quot;SKU-1&quot;,&quot;quantity&quot;:1}]},&quot;failures&quot;:10}'
+</div><p id="z4zhuoq_146">ORD-953 is reserved after one retry. ORD-954 fails four times; the instance then completes with the order desk entry <code class="code" id="z4zhuoq_151">Order queued for later processing</code>, and the shop has no reservation for it. Stop the shop when you are done:</p><div class="code-block" data-lang="bash">
+docker compose -f examples/tutorial-services/compose.yaml down
+</div></section><div class="last-modified">25 November 2026</div><div data-feedback-placeholder="true"></div><div class="navigation-links _bottom"><a href="lemline-howto-debug.html" class="navigation-links__prev">Debugging Lemline Workflows</a><a href="lemline-howto-oauth2.html" class="navigation-links__next">Configuring OAuth 2.0 Authentication</a></div></article><div id="disqus_thread"></div></div></section></main></div><script src="https://resources.jetbrains.com/writerside/apidoc/6.22.0-b776/app.js"></script></body></html>

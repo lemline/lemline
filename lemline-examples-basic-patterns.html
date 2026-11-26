@@ -1,0 +1,248 @@
+<!DOCTYPE html SYSTEM "about:legacy-compat">
+<html lang="en-US" data-preset="contrast" data-primary-color="#2E6F7E"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="robots" content="noindex"><meta name="built-on" content="2026-11-26T17:17:49.124112867"><title>Lemline Basic Workflow Patterns | Lemline documentation</title><script type="application/json" id="virtual-toc-data">[{"id":"run-the-examples","level":0,"title":"Run the Examples","anchor":"#run-the-examples"},{"id":"sequential-task-execution","level":0,"title":"Sequential Task Execution","anchor":"#sequential-task-execution"},{"id":"nested-task-execution","level":0,"title":"Nested Task Execution","anchor":"#nested-task-execution"},{"id":"conditional-logic-with-switch","level":0,"title":"Conditional Logic with Switch","anchor":"#conditional-logic-with-switch"},{"id":"loop-patterns","level":0,"title":"Loop Patterns","anchor":"#loop-patterns"},{"id":"data-manipulation-with-set","level":0,"title":"Data Manipulation with Set","anchor":"#data-manipulation-with-set"},{"id":"advanced-set-example","level":0,"title":"Advanced Set Example","anchor":"#advanced-set-example"},{"id":"combining-patterns","level":0,"title":"Combining Patterns","anchor":"#combining-patterns"},{"id":"best-practices","level":0,"title":"Best Practices","anchor":"#best-practices"},{"id":"conclusion","level":0,"title":"Conclusion","anchor":"#conclusion"}]</script><script type="application/json" id="topic-shortcuts"></script><link href="https://resources.jetbrains.com/writerside/apidoc/6.22.0-b776/app.css" rel="stylesheet"><link href="static/custom.css" rel="stylesheet"><link rel="icon" type="image/png" sizes="16x16" href="images/lemly.png"><meta name="image" content="https://docs.lemline.com/social-preview.png"><!-- Open Graph --><meta property="og:title" content="Lemline Basic Workflow Patterns | Lemline documentation"><meta property="og:description" content=""><meta property="og:image" content="https://docs.lemline.com/social-preview.png"><meta property="og:site_name" content="Lemline documentation Help"><meta property="og:type" content="website"><meta property="og:locale" content="en_US"><meta property="og:url" content="https://docs.lemline.com/lemline-examples-basic-patterns.html"><!-- End Open Graph --><!-- Twitter Card --><meta name="twitter:card" content="summary_large_image"><meta name="twitter:site" content=""><meta name="twitter:title" content="Lemline Basic Workflow Patterns | Lemline documentation"><meta name="twitter:description" content=""><meta name="twitter:creator" content=""><meta name="twitter:image:src" content="https://docs.lemline.com/social-preview.png"><!-- End Twitter Card --><!-- Schema.org WebPage --><script type="application/ld+json">{
+    "@context": "http://schema.org",
+    "@type": "WebPage",
+    "@id": "https://docs.lemline.com/lemline-examples-basic-patterns.html#webpage",
+    "url": "https://docs.lemline.com/lemline-examples-basic-patterns.html",
+    "name": "Lemline Basic Workflow Patterns | Lemline documentation",
+    "description": "",
+    "image": "https://docs.lemline.com/social-preview.png",
+    "inLanguage":"en-US"
+}</script><!-- End Schema.org --><!-- Schema.org WebSite --><script type="application/ld+json">{
+    "@type": "WebSite",
+    "@id": "https://docs.lemline.com/#website",
+    "url": "https://docs.lemline.com/",
+    "name": "Lemline documentation Help"
+}</script><!-- End Schema.org --></head><body data-id="lemline-examples-basic-patterns" data-main-title="Lemline Basic Workflow Patterns" data-article-props="{&quot;seeAlsoStyle&quot;:&quot;links&quot;}" data-template="article" data-breadcrumbs="Examples Library"><div class="wrapper"><main class="panel _main"><header class="panel__header"><div class="container"><h3>Lemline documentation  Help</h3><div class="panel-trigger"></div></div></header><section class="panel__content"><div class="container"><article class="article" data-shortcut-switcher="inactive"><h1 data-toc="lemline-examples-basic-patterns" id="lemline-examples-basic-patterns.md">Lemline Basic Workflow Patterns</h1><p id="-zeazaw_3">This document provides examples of fundamental workflow patterns implemented in the Open Workflow DSL as supported by Lemline. These basic patterns serve as building blocks for creating more complex workflows.</p><section class="chapter"><h2 id="run-the-examples" data-toc="run-the-examples">Run the Examples</h2><p id="-zeazaw_14">Each example below is a complete workflow. Complete <a href="lemline-tutorial-setup.html" id="-zeazaw_21" data-tooltip="Run Lemline on one machine with SQLite. Lemline stores workflow definitions, queued messages, and workflow history in local files. Use a writable directory on a local filesystem.">the SQLite setup</a> and run the commands from the setup directory. With the JAR, substitute <code class="code" id="-zeazaw_22">java -jar lemline.jar</code> for <code class="code" id="-zeazaw_23">bin/lemline</code>. Start the <a href="lemline-tutorial-order-processing.html#start-the-tutorial-shop" id="-zeazaw_24" data-tooltip="Complete the SQLite setup and keep the worker running on the host. In a separate terminal, open the root of the Lemline source checkout matching these docs (the directory containing examples/tutorial-services). With Docker Compose running, start the single shop container:">tutorial shop</a> from the root of the Lemline source checkout:</p><div class="code-block" data-lang="bash">
+docker compose -f examples/tutorial-services/compose.yaml up -d
+</div><p id="-zeazaw_16">The <a href="#set-example" id="-zeazaw_25" data-tooltip="You registered it before starting the worker. Publish its event:">set example</a> is started by an event, and the <a href="#for-loop-example" id="-zeazaw_26" data-tooltip="Save it as for-loop-example.yaml:">for loop example</a> waits for events. Both need the tutorial publisher, saved as <code class="code" id="-zeazaw_27">tutorial-publisher.yaml</code>:</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: tutorial-publisher
+  version: '1.0.0'
+do:
+  - publish:
+      emit:
+        event:
+          with:
+            type: ${ .type }
+            source: https://events.example.com/tutorial
+            data: ${ .data }
+</div><p id="-zeazaw_18">A workflow started by an event must be registered before the worker starts. Stop the setup worker with Ctrl+C, save the set example below as <code class="code" id="-zeazaw_28">set-example.yaml</code>, then register both and start the worker again:</p><div class="code-block" data-lang="bash">
+bin/lemline definition post -f tutorial-publisher.yaml
+bin/lemline definition post -f set-example.yaml
+bin/lemline listen --debug
+</div><p id="-zeazaw_20">Run the other commands from a second terminal in the setup directory. The worker logs <code class="code" id="-zeazaw_29">Workflow completed with output</code> with each result.</p></section><section class="chapter"><h2 id="sequential-task-execution" data-toc="sequential-task-execution">Sequential Task Execution</h2><p id="-zeazaw_30">The simplest workflow pattern is a sequence of tasks executed one after another. This is achieved using the <code class="code" id="-zeazaw_33">do</code> construct.</p><section class="chapter"><h3 id="single-task-example" data-toc="single-task-example">Single Task Example</h3><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: read-stock
+  version: '1.0.0'
+do:
+  - readStock:
+      call: http
+      with:
+        method: get
+        endpoint: http://127.0.0.1:8787/stock
+</div><p id="-zeazaw_35">Save it as <code class="code" id="-zeazaw_39">single-task-example.yaml</code>:</p><div class="code-block" data-lang="bash">
+bin/lemline definition post -f single-task-example.yaml
+bin/lemline instance start examples read-stock
+</div><p id="-zeazaw_37">Expect <code class="code" id="-zeazaw_40">{&quot;sku&quot;:&quot;SKU-1&quot;,&quot;available&quot;:100,&quot;reserved&quot;:0}</code> on a fresh shop.</p><p id="-zeazaw_38">A single GET returns the stock of the tutorial shop.</p></section><section class="chapter"><h3 id="multiple-sequential-tasks-example" data-toc="multiple-sequential-tasks-example">Multiple Sequential Tasks Example</h3><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: stock-availability
+  version: '1.0.0'
+do:
+  - readStock:
+      call: http
+      with:
+        method: get
+        endpoint: http://127.0.0.1:8787/stock
+  - showAvailability:
+      set:
+        available: ${ .available }
+</div><p id="-zeazaw_42">Save it as <code class="code" id="-zeazaw_46">multiple-sequential-tasks-example.yaml</code>:</p><div class="code-block" data-lang="bash">
+bin/lemline definition post -f multiple-sequential-tasks-example.yaml
+bin/lemline instance start examples stock-availability
+</div><p id="-zeazaw_44">Expect <code class="code" id="-zeazaw_47">{&quot;available&quot;:100}</code>.</p><p id="-zeazaw_45">The first task reads the stock. The second returns the stock level as <code class="code" id="-zeazaw_48">available</code>.</p></section></section><section class="chapter"><h2 id="nested-task-execution" data-toc="nested-task-execution">Nested Task Execution</h2><p id="-zeazaw_49">Tasks can be nested to group related operations and create hierarchical structures.</p><section class="chapter"><h3 id="nested-tasks-example" data-toc="nested-tasks-example">Nested Tasks Example</h3><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: stock-summary
+  version: '1.0.0'
+do:
+  - check:
+      do:
+        - readStock:
+            call: http
+            with:
+              method: get
+              endpoint: http://127.0.0.1:8787/stock
+        - showAvailability:
+            set:
+              available: ${ .available }
+  - summarize:
+      set:
+        message: '${ &quot;SKU-1 available: &quot; + (.available | tostring) }'
+</div><p id="-zeazaw_52">Save it as <code class="code" id="-zeazaw_58">nested-tasks-example.yaml</code>:</p><div class="code-block" data-lang="bash">
+bin/lemline definition post -f nested-tasks-example.yaml
+bin/lemline instance start examples stock-summary
+</div><p id="-zeazaw_54">Expect <code class="code" id="-zeazaw_59">{&quot;message&quot;:&quot;SKU-1 available: 100&quot;}</code>.</p><p id="-zeazaw_55">The nested task reads the stock and extracts the level. The final task formats the count as a message.</p><p id="-zeazaw_56">Nesting is useful for:</p><ul class="list _bullet" id="-zeazaw_57"><li class="list__item" id="-zeazaw_60"><p id="-zeazaw_63">Grouping related operations</p></li><li class="list__item" id="-zeazaw_61"><p id="-zeazaw_64">Localizing variable scope</p></li><li class="list__item" id="-zeazaw_62"><p id="-zeazaw_65">Creating reusable task patterns</p></li></ul></section></section><section class="chapter"><h2 id="conditional-logic-with-switch" data-toc="conditional-logic-with-switch">Conditional Logic with Switch</h2><p id="-zeazaw_66">The <code class="code" id="-zeazaw_68">switch</code> construct allows workflows to implement conditional logic, executing different tasks based on data conditions.</p><section class="chapter"><h3 id="switch-example" data-toc="switch-example">Switch Example</h3><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: order-type-routing
+  version: '0.1.0'
+do:
+  - processOrder:
+      switch:
+        - case1:
+            when: ${ .orderType == &quot;electronic&quot; }
+            then: processElectronicOrder
+        - case2:
+            when: ${ .orderType == &quot;physical&quot; }
+            then: processPhysicalOrder
+        - default:
+            then: handleUnknownOrderType
+  - processElectronicOrder:
+      set:
+        validate: true
+        status: fulfilled
+      then: exit
+  - processPhysicalOrder:
+      set:
+        inventory: clear
+        items: 1
+        address: 12 Main St
+      then: exit
+  - handleUnknownOrderType:
+      set:
+        log: warn
+        message: Unknown order type
+</div><p id="-zeazaw_70">Save it as <code class="code" id="-zeazaw_77">switch-example.yaml</code>:</p><div class="code-block" data-lang="bash">
+bin/lemline definition post -f switch-example.yaml
+bin/lemline instance start examples order-type-routing --input '{&quot;orderType&quot;:&quot;electronic&quot;}'
+bin/lemline instance start examples order-type-routing --input '{&quot;orderType&quot;:&quot;physical&quot;}'
+bin/lemline instance start examples order-type-routing --input '{&quot;orderType&quot;:&quot;gift-card&quot;}'
+</div><p id="-zeazaw_72">Expect <code class="code" id="-zeazaw_78">{&quot;validate&quot;:true,&quot;status&quot;:&quot;fulfilled&quot;}</code>, then <code class="code" id="-zeazaw_79">{&quot;inventory&quot;:&quot;clear&quot;,&quot;items&quot;:1,&quot;address&quot;:&quot;12 Main St&quot;}</code>, then <code class="code" id="-zeazaw_80">{&quot;log&quot;:&quot;warn&quot;,&quot;message&quot;:&quot;Unknown order type&quot;}</code>.</p><p id="-zeazaw_73">This example demonstrates:</p><ol class="list _decimal" id="-zeazaw_74" type="1"><li class="list__item" id="-zeazaw_81"><p id="-zeazaw_85">A switch statement evaluating <code class="code" id="-zeazaw_86">.orderType</code></p></li><li class="list__item" id="-zeazaw_82"><p id="-zeazaw_87">Three different paths based on the condition</p></li><li class="list__item" id="-zeazaw_83"><p id="-zeazaw_88">Each path setting different variables and potentially ending the workflow</p></li><li class="list__item" id="-zeazaw_84"><p id="-zeazaw_89">A default case for handling unknown types</p></li></ol><p id="-zeazaw_75">Key aspects of <code class="code" id="-zeazaw_90">switch</code>:</p><ul class="list _bullet" id="-zeazaw_76"><li class="list__item" id="-zeazaw_91"><p id="-zeazaw_95">Multiple conditions can be evaluated in sequence</p></li><li class="list__item" id="-zeazaw_92"><p id="-zeazaw_96">The first matching condition is executed</p></li><li class="list__item" id="-zeazaw_93"><p id="-zeazaw_97">The <code class="code" id="-zeazaw_98">default</code> case handles situations where no conditions match</p></li><li class="list__item" id="-zeazaw_94"><p id="-zeazaw_99"><code class="code" id="-zeazaw_100">then</code> can direct flow to other named tasks in the workflow</p></li></ul></section></section><section class="chapter"><h2 id="loop-patterns" data-toc="loop-patterns">Loop Patterns</h2><p id="-zeazaw_101">Workflows often need to iterate over collections of data or repeat tasks until certain conditions are met.</p><section class="chapter"><h3 id="for-loop-example" data-toc="for-loop-example">For Loop Example</h3><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: pack-order-items
+  version: '0.1.0'
+do:
+  - packItems:
+      for:
+        each: item
+        in: ${ $workflow.input.items }
+        at: index
+      while: ${ (.stop // false) | not }
+      do:
+        - waitForPacking:
+            listen:
+              to:
+                one:
+                  with:
+                    type: com.example.item.packed
+        - recordPacking:
+            set:
+              lastPacked: ${ $item.id }
+              position: ${ $index }
+              stop: ${ .[0].lastItem // false }
+</div><p id="-zeazaw_104">Save it as <code class="code" id="-zeazaw_113">for-loop-example.yaml</code>:</p><div class="code-block" data-lang="bash">
+bin/lemline definition post -f for-loop-example.yaml
+bin/lemline instance start examples pack-order-items --input '{&quot;items&quot;:[{&quot;id&quot;:&quot;SKU-1&quot;},{&quot;id&quot;:&quot;SKU-2&quot;},{&quot;id&quot;:&quot;SKU-3&quot;}]}'
+</div><p id="-zeazaw_106">The instance waits for the first item. Publish two packing events, the second marked as the last item:</p><div class="code-block" data-lang="bash">
+bin/lemline instance start examples tutorial-publisher --input '{&quot;type&quot;:&quot;com.example.item.packed&quot;,&quot;data&quot;:{&quot;lastItem&quot;:false}}'
+bin/lemline instance start examples tutorial-publisher --input '{&quot;type&quot;:&quot;com.example.item.packed&quot;,&quot;data&quot;:{&quot;lastItem&quot;:true}}'
+</div><p id="-zeazaw_108">Wait about 10 seconds between the two events: the second iteration starts listening only after the first event has been consumed, and an event resumes only the instances already waiting for it. The <code class="code" id="-zeazaw_114">while</code> condition is checked before each item; after the second event, <code class="code" id="-zeazaw_115">stop</code> is true, so the loop ends without waiting for SKU-3. Expect <code class="code" id="-zeazaw_116">{&quot;lastPacked&quot;:&quot;SKU-2&quot;,&quot;position&quot;:1,&quot;stop&quot;:true}</code>.</p><p id="-zeazaw_109">This example demonstrates:</p><ol class="list _decimal" id="-zeazaw_110" type="1"><li class="list__item" id="-zeazaw_117"><p id="-zeazaw_123">Iterating over a collection (<code class="code" id="-zeazaw_124">$workflow.input.items</code>)</p></li><li class="list__item" id="-zeazaw_118"><p id="-zeazaw_125">The current item is accessible as <code class="code" id="-zeazaw_126">$item</code></p></li><li class="list__item" id="-zeazaw_119"><p id="-zeazaw_127">The index is accessible as <code class="code" id="-zeazaw_128">$index</code></p></li><li class="list__item" id="-zeazaw_120"><p id="-zeazaw_129">A condition (<code class="code" id="-zeazaw_130">while</code>) is checked before each iteration and can end the loop early</p></li><li class="list__item" id="-zeazaw_121"><p id="-zeazaw_131">Inside the loop, an event listener waits for a specific event</p></li><li class="list__item" id="-zeazaw_122"><p id="-zeazaw_132">Each iteration's result is the next iteration's input</p></li></ol><p id="-zeazaw_111">Key aspects of <code class="code" id="-zeazaw_133">for</code>:</p><ul class="list _bullet" id="-zeazaw_112"><li class="list__item" id="-zeazaw_134"><p id="-zeazaw_138">Iterates over arrays or objects</p></li><li class="list__item" id="-zeazaw_135"><p id="-zeazaw_139">Can track iteration index with the <code class="code" id="-zeazaw_140">at</code> property</p></li><li class="list__item" id="-zeazaw_136"><p id="-zeazaw_141">Can include additional conditions with <code class="code" id="-zeazaw_142">while</code></p></li><li class="list__item" id="-zeazaw_137"><p id="-zeazaw_143">Contains a <code class="code" id="-zeazaw_144">do</code> block with tasks to execute for each iteration</p></li></ul></section></section><section class="chapter"><h2 id="data-manipulation-with-set" data-toc="data-manipulation-with-set">Data Manipulation with Set</h2><p id="-zeazaw_145">The <code class="code" id="-zeazaw_147">set</code> construct allows workflows to create or modify variables.</p><section class="chapter"><h3 id="set-example" data-toc="set-example">Set Example</h3><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: started-by-event
+  version: '0.1.0'
+schedule:
+  on:
+    one:
+      with:
+        type: com.example.basic.triggered
+do:
+  - initialize:
+      set:
+        startEvent: ${ $workflow.input[0] }
+</div><p id="-zeazaw_149">You registered it before starting the worker. Publish its event:</p><div class="code-block" data-lang="bash">
+bin/lemline instance start examples tutorial-publisher --input '{&quot;type&quot;:&quot;com.example.basic.triggered&quot;,&quot;data&quot;:{&quot;orderId&quot;:&quot;ORD-1004&quot;}}'
+</div><p id="-zeazaw_151">About 10 seconds later, a <code class="code" id="-zeazaw_156">started-by-event</code> instance completes with <code class="code" id="-zeazaw_157">{&quot;startEvent&quot;:{&quot;orderId&quot;:&quot;ORD-1004&quot;}}</code>: the worker picks up events for event-started workflows every 10 seconds, and the workflow input is the list of events that started it.</p><p id="-zeazaw_152">This example demonstrates:</p><ol class="list _decimal" id="-zeazaw_153" type="1"><li class="list__item" id="-zeazaw_158"><p id="-zeazaw_160">Setting a variable <code class="code" id="-zeazaw_161">startEvent</code> to the first element of the workflow input</p></li><li class="list__item" id="-zeazaw_159"><p id="-zeazaw_162">The workflow is triggered by an event</p></li></ol><p id="-zeazaw_154">Additional <code class="code" id="-zeazaw_163">set</code> capabilities:</p><ul class="list _bullet" id="-zeazaw_155"><li class="list__item" id="-zeazaw_164"><p id="-zeazaw_167">Set multiple variables in a single step</p></li><li class="list__item" id="-zeazaw_165"><p id="-zeazaw_168">Use JQ expressions for data transformation</p></li><li class="list__item" id="-zeazaw_166"><p id="-zeazaw_169">Reference existing variables and workflow context</p></li></ul></section></section><section class="chapter"><h2 id="advanced-set-example" data-toc="advanced-set-example">Advanced Set Example</h2><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: advanced-set
+  version: '0.1.0'
+do:
+  - initData:
+      set:
+        user:
+          name: &quot;Ada Lovelace&quot;
+          role: &quot;admin&quot;
+          permissions: [&quot;read&quot;, &quot;write&quot;]
+        timestamp: '${ now }'
+  - transformData:
+      set:
+        enrichedUser: &quot;${ .user + { \n  lastAccess: .timestamp,\n  isAdmin: (.user.role == \&quot;admin\&quot;),\n  permissionCount:
+          ((.user.permissions | length))} }&quot;
+</div><p id="-zeazaw_171">Save it as <code class="code" id="-zeazaw_176">advanced-set-example.yaml</code>:</p><div class="code-block" data-lang="bash">
+bin/lemline definition post -f advanced-set-example.yaml
+bin/lemline instance start examples advanced-set
+</div><p id="-zeazaw_173">Expect <code class="code" id="-zeazaw_177">enrichedUser</code> with the user fields, <code class="code" id="-zeazaw_178">lastAccess</code> set to the timestamp as a number of seconds, <code class="code" id="-zeazaw_179">isAdmin: true</code> and <code class="code" id="-zeazaw_180">permissionCount: 2</code>.</p><p id="-zeazaw_174">This advanced example shows:</p><ol class="list _decimal" id="-zeazaw_175" type="1"><li class="list__item" id="-zeazaw_181"><p id="-zeazaw_185">Setting nested object structures</p></li><li class="list__item" id="-zeazaw_182"><p id="-zeazaw_186">Using the JQ expression language for data manipulation</p></li><li class="list__item" id="-zeazaw_183"><p id="-zeazaw_187">Combining and transforming existing variables</p></li><li class="list__item" id="-zeazaw_184"><p id="-zeazaw_188">Using built-in functions like <code class="code" id="-zeazaw_189">now()</code> and <code class="code" id="-zeazaw_190">length()</code></p></li></ol></section><section class="chapter"><h2 id="combining-patterns" data-toc="combining-patterns">Combining Patterns</h2><p id="-zeazaw_191">These basic patterns can be combined to create more complex workflows.</p><section class="chapter"><h3 id="combined-example" data-toc="combined-example">Combined Example</h3><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: combined-patterns
+  version: '0.1.0'
+do:
+  - initialize:
+      set:
+        items:
+          - id: SKU-8
+            type: digital
+            name: E-book
+          - id: SKU-9
+            type: physical
+            name: Notebook
+          - id: SKU-10
+            type: digital
+            name: Software
+  - processItems:
+      for:
+        in: ${ .items }
+        each: item
+      do:
+        - determineProcessingType:
+            do:
+              - route:
+                  switch:
+                    - digitalItem:
+                        when: ${ $item.type == &quot;digital&quot; }
+                        then: digitalItemAction
+                    - physicalItem:
+                        when: ${ $item.type == &quot;physical&quot; }
+                        then: physicalItemAction
+              - digitalItemAction:
+                  do:
+                    - processDigital:
+                        set:
+                          processed: '${ $item + { &quot;status&quot;: &quot;processed&quot;, &quot;downloadReady&quot;: true } }'
+                  then: exit
+              - physicalItemAction:
+                  do:
+                    - processPhysical:
+                        set:
+                          processed: '${ $item + { &quot;status&quot;: &quot;processed&quot;, &quot;shippingRequired&quot;: true } }'
+                  then: exit
+        - logResult:
+            call: http
+            with:
+              method: post
+              endpoint: http://127.0.0.1:8787/audit
+              body:
+                reference: ${ .processed.id }
+                message: '${ .processed.name + &quot; processed&quot; + (if .processed.shippingRequired then &quot;, shipping required&quot; else &quot;, download ready&quot; end) }'
+</div><p id="-zeazaw_194">Save it as <code class="code" id="-zeazaw_200">combined-example.yaml</code>:</p><div class="code-block" data-lang="bash">
+bin/lemline definition post -f combined-example.yaml
+bin/lemline instance start examples combined-patterns
+</div><p id="-zeazaw_196">Each item is routed by type, then logged in the shop's audit list: <code class="code" id="-zeazaw_201">E-book processed, download ready</code>, <code class="code" id="-zeazaw_202">Notebook processed, shipping required</code> and <code class="code" id="-zeazaw_203">Software processed, download ready</code>. Stop the shop when you are done:</p><div class="code-block" data-lang="bash">
+docker compose -f examples/tutorial-services/compose.yaml down
+</div><p id="-zeazaw_198">This complex example demonstrates:</p><ol class="list _decimal" id="-zeazaw_199" type="1"><li class="list__item" id="-zeazaw_204"><p id="-zeazaw_210">Initializing a data structure with <code class="code" id="-zeazaw_211">set</code></p></li><li class="list__item" id="-zeazaw_205"><p id="-zeazaw_212">Iterating over the data with <code class="code" id="-zeazaw_213">for</code></p></li><li class="list__item" id="-zeazaw_206"><p id="-zeazaw_214">Using <code class="code" id="-zeazaw_215">switch</code> for conditional processing based on item type</p></li><li class="list__item" id="-zeazaw_207"><p id="-zeazaw_216">Nesting <code class="code" id="-zeazaw_217">do</code> blocks within conditions</p></li><li class="list__item" id="-zeazaw_208"><p id="-zeazaw_218">Transforming data based on conditions</p></li><li class="list__item" id="-zeazaw_209"><p id="-zeazaw_219">Using the transformed data in subsequent tasks</p></li></ol></section></section><section class="chapter"><h2 id="best-practices" data-toc="best-practices">Best Practices</h2><p id="-zeazaw_220">When implementing these basic patterns:</p><ol class="list _decimal" id="-zeazaw_221" type="1"><li class="list__item" id="-zeazaw_222"><p id="-zeazaw_228"><span class="control" id="-zeazaw_229">Descriptive task names</span>: Use clear, meaningful names for tasks to make workflows self-documenting</p></li><li class="list__item" id="-zeazaw_223"><p id="-zeazaw_230"><span class="control" id="-zeazaw_231">Appropriate granularity</span>: Break complex tasks into manageable steps, but avoid excessive fragmentation</p></li><li class="list__item" id="-zeazaw_224"><p id="-zeazaw_232"><span class="control" id="-zeazaw_233">Consistent data structure</span>: Maintain a predictable data structure throughout the workflow</p></li><li class="list__item" id="-zeazaw_225"><p id="-zeazaw_234"><span class="control" id="-zeazaw_235">Error handling</span>: Consider adding try-catch blocks for operations that may fail</p></li><li class="list__item" id="-zeazaw_226"><p id="-zeazaw_236"><span class="control" id="-zeazaw_237">Data validation</span>: Validate inputs early in the workflow</p></li><li class="list__item" id="-zeazaw_227"><p id="-zeazaw_238"><span class="control" id="-zeazaw_239">Modular design</span>: Group related tasks for better organization and potential reuse</p></li></ol></section><section class="chapter"><h2 id="conclusion" data-toc="conclusion">Conclusion</h2><p id="-zeazaw_240">These basic workflow patterns form the foundation for building complex business processes in Lemline. By understanding and combining these patterns, you can create workflows that are:</p><ul class="list _bullet" id="-zeazaw_241"><li class="list__item" id="-zeazaw_243"><p id="-zeazaw_247">Easy to understand</p></li><li class="list__item" id="-zeazaw_244"><p id="-zeazaw_248">Maintainable</p></li><li class="list__item" id="-zeazaw_245"><p id="-zeazaw_249">Adaptable to changing requirements</p></li><li class="list__item" id="-zeazaw_246"><p id="-zeazaw_250">Capable of handling complex business logic</p></li></ul><p id="-zeazaw_242">For examples integrating with external services, see the <a href="lemline-examples-integrations.html" id="-zeazaw_251" data-tooltip="Runtime support: some examples on this page use call: openapi, call: asyncapi, call: grpc or OAuth 2.0 authentication. Lemline registers them but does not execute them yet: such a task fails when it runs, with the error shown under each example. Write those calls with call: http and…">Integration Examples</a> document.</p></section><div class="last-modified">25 November 2026</div><div data-feedback-placeholder="true"></div><div class="navigation-links _bottom"><a href="lemline-examples-library.html" class="navigation-links__prev">Lemline Examples Library</a><a href="lemline-examples-integrations.html" class="navigation-links__next">Lemline Integration Examples</a></div></article><div id="disqus_thread"></div></div></section></main></div><script src="https://resources.jetbrains.com/writerside/apidoc/6.22.0-b776/app.js"></script></body></html>

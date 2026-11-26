@@ -1,0 +1,115 @@
+<!DOCTYPE html SYSTEM "about:legacy-compat">
+<html lang="en-US" data-preset="contrast" data-primary-color="#2E6F7E"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="robots" content="noindex"><meta name="built-on" content="2026-11-26T17:17:49.541360184"><title>How to cancel, resume, or suspend a workflow | Lemline documentation</title><script type="application/json" id="virtual-toc-data">[{"id":"current-status","level":0,"title":"Current Status","anchor":"#current-status"},{"id":"prepare-the-examples","level":0,"title":"Prepare the examples","anchor":"#prepare-the-examples"},{"id":"stopping-a-workflow-on-request","level":0,"title":"Stopping a Workflow on Request","anchor":"#stopping-a-workflow-on-request"},{"id":"bounding-how-long-a-workflow-waits","level":0,"title":"Bounding How Long a Workflow Waits","anchor":"#bounding-how-long-a-workflow-waits"},{"id":"pausing-until-an-external-signal","level":0,"title":"Pausing Until an External Signal","anchor":"#pausing-until-an-external-signal"},{"id":"recovering-from-failures","level":0,"title":"Recovering from Failures","anchor":"#recovering-from-failures"},{"id":"observing-lifecycle-changes","level":0,"title":"Observing Lifecycle Changes","anchor":"#observing-lifecycle-changes"},{"id":"next-steps","level":0,"title":"Next Steps","anchor":"#next-steps"}]</script><script type="application/json" id="topic-shortcuts"></script><link href="https://resources.jetbrains.com/writerside/apidoc/6.22.0-b776/app.css" rel="stylesheet"><link href="static/custom.css" rel="stylesheet"><link rel="icon" type="image/png" sizes="16x16" href="images/lemly.png"><meta name="image" content="https://docs.lemline.com/social-preview.png"><!-- Open Graph --><meta property="og:title" content="How to cancel, resume, or suspend a workflow | Lemline documentation"><meta property="og:description" content=""><meta property="og:image" content="https://docs.lemline.com/social-preview.png"><meta property="og:site_name" content="Lemline documentation Help"><meta property="og:type" content="website"><meta property="og:locale" content="en_US"><meta property="og:url" content="https://docs.lemline.com/lemline-howto-lifecycle.html"><!-- End Open Graph --><!-- Twitter Card --><meta name="twitter:card" content="summary_large_image"><meta name="twitter:site" content=""><meta name="twitter:title" content="How to cancel, resume, or suspend a workflow | Lemline documentation"><meta name="twitter:description" content=""><meta name="twitter:creator" content=""><meta name="twitter:image:src" content="https://docs.lemline.com/social-preview.png"><!-- End Twitter Card --><!-- Schema.org WebPage --><script type="application/ld+json">{
+    "@context": "http://schema.org",
+    "@type": "WebPage",
+    "@id": "https://docs.lemline.com/lemline-howto-lifecycle.html#webpage",
+    "url": "https://docs.lemline.com/lemline-howto-lifecycle.html",
+    "name": "How to cancel, resume, or suspend a workflow | Lemline documentation",
+    "description": "",
+    "image": "https://docs.lemline.com/social-preview.png",
+    "inLanguage":"en-US"
+}</script><!-- End Schema.org --><!-- Schema.org WebSite --><script type="application/ld+json">{
+    "@type": "WebSite",
+    "@id": "https://docs.lemline.com/#website",
+    "url": "https://docs.lemline.com/",
+    "name": "Lemline documentation Help"
+}</script><!-- End Schema.org --></head><body data-id="lemline-howto-lifecycle" data-main-title="How to cancel, resume, or suspend a workflow" data-article-props="{&quot;seeAlsoStyle&quot;:&quot;links&quot;}" data-template="article" data-breadcrumbs="How-to Guides///Core Operations"><div class="wrapper"><main class="panel _main"><header class="panel__header"><div class="container"><h3>Lemline documentation  Help</h3><div class="panel-trigger"></div></div></header><section class="panel__content"><div class="container"><article class="article" data-shortcut-switcher="inactive"><h1 data-toc="lemline-howto-lifecycle" id="lemline-howto-lifecycle.md">How to cancel, resume, or suspend a workflow</h1><p id="fvuvra_3">This guide explains what you can do today to stop, pause or recover a running workflow instance in Lemline.</p><section class="chapter"><h2 id="current-status" data-toc="current-status">Current Status</h2><p id="fvuvra_12">Lemline does not yet provide operator commands to act on a running instance. There is no CLI command, gRPC gateway call or dashboard action to cancel, suspend, resume or retry an instance.</p><div class="table-wrapper"><table class="wide" id="fvuvra_13"><thead><tr class="ijRowHead" id="fvuvra_15"><th id="fvuvra_19"><p>Operation</p></th><th id="fvuvra_20"><p>Available as an operator action</p></th><th id="fvuvra_21"><p>What to do instead</p></th></tr></thead><tbody><tr id="fvuvra_16"><td id="fvuvra_22"><p>Cancel</p></td><td id="fvuvra_23"><p>No</p></td><td id="fvuvra_24"><p>Design the workflow to stop on a cancellation event or a timeout</p></td></tr><tr id="fvuvra_17"><td id="fvuvra_25"><p>Suspend / Resume</p></td><td id="fvuvra_26"><p>No</p></td><td id="fvuvra_27"><p>Design the workflow to wait for an event before continuing</p></td></tr><tr id="fvuvra_18"><td id="fvuvra_28"><p>Retry a faulted instance</p></td><td id="fvuvra_29"><p>No</p></td><td id="fvuvra_30"><p>Use <code class="code" id="fvuvra_31">retry</code> on the failing task, or start a new instance</p></td></tr></tbody></table></div><p id="fvuvra_14">The rest of this guide shows how to build these behaviors into the workflow itself.</p></section><section class="chapter"><h2 id="prepare-the-examples" data-toc="prepare-the-examples">Prepare the examples</h2><p id="fvuvra_32">Complete <a href="lemline-tutorial-setup.html" id="fvuvra_36" data-tooltip="Run Lemline on one machine with SQLite. Lemline stores workflow definitions, queued messages, and workflow history in local files. Use a writable directory on a local filesystem.">the SQLite setup</a> and keep its worker running. Run the commands from a second terminal in the setup directory. With the JAR, substitute <code class="code" id="fvuvra_37">java -jar lemline.jar</code> for <code class="code" id="fvuvra_38">bin/lemline</code>. The examples need no shop. They react to events that this publisher sends on the worker's SQLite event channel. Save it as <code class="code" id="fvuvra_39">tutorial-publisher.yaml</code> and register it (skip it if you registered it in the tutorial):</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: tutorial-publisher
+  version: '1.0.0'
+do:
+  - publish:
+      emit:
+        event:
+          with:
+            type: ${ .type }
+            source: https://events.example.com/tutorial
+            data: ${ .data }
+</div><div class="code-block" data-lang="bash">
+bin/lemline definition post -f tutorial-publisher.yaml
+</div><p id="fvuvra_35">Start each listening instance first, then publish its event. An event only resumes the instances already waiting for it.</p></section><section class="chapter"><h2 id="stopping-a-workflow-on-request" data-toc="stopping-a-workflow-on-request">Stopping a Workflow on Request</h2><p id="fvuvra_40">Let the workflow listen for a cancellation event while it waits, and end when it arrives:</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: stopping-a-workflow-on-request
+  version: '1.0.0'
+do:
+  - waitForPaymentOrCancellation:
+      listen:
+        to:
+          any:
+            - with:
+                type: com.example.payment.received
+            - with:
+                type: com.example.order.cancelled
+        read: envelope
+  - checkCancellation:
+      switch:
+        - cancelled:
+            when: ${ .[0].type == &quot;com.example.order.cancelled&quot; }
+            then: markCancelled
+        - default:
+            then: continue
+  - markPaid:
+      set:
+        status: paid
+      then: exit
+  - markCancelled:
+      set:
+        status: cancelled
+</div><p id="fvuvra_42">Save it as <code class="code" id="fvuvra_46">stopping-a-workflow-on-request.yaml</code>. Start one instance and cancel it, then start another and pay it:</p><div class="code-block" data-lang="bash">
+bin/lemline definition post -f stopping-a-workflow-on-request.yaml
+bin/lemline instance start examples stopping-a-workflow-on-request
+bin/lemline instance start examples tutorial-publisher --input '{&quot;type&quot;:&quot;com.example.order.cancelled&quot;,&quot;data&quot;:{&quot;orderId&quot;:&quot;ORD-401&quot;}}'
+bin/lemline instance start examples stopping-a-workflow-on-request
+bin/lemline instance start examples tutorial-publisher --input '{&quot;type&quot;:&quot;com.example.payment.received&quot;,&quot;data&quot;:{&quot;orderId&quot;:&quot;ORD-402&quot;}}'
+</div><p id="fvuvra_44">The first instance completes with <code class="code" id="fvuvra_47">{&quot;status&quot;:&quot;cancelled&quot;}</code>, the second with <code class="code" id="fvuvra_48">{&quot;status&quot;:&quot;paid&quot;}</code>. Each instance resumes a few seconds after its event. This example matches events by type only, so start the second instance after the first has completed. Add a <code class="code" id="fvuvra_49">correlate</code> rule to match an order ID, as in <a href="lemline-howto-events.html" id="fvuvra_50" data-tooltip="An emit task publishes a CloudEvent. A listen task resumes an existing workflow when the selected event filters match. To start independent instances on matching events, configure schedule.on at the workflow level.">How to emit and listen for events</a>.</p><p id="fvuvra_45">Send the cancellation as a CloudEvent on the CloudEvents channel of the workflow's namespace. See <a href="lemline-howto-events.html" id="fvuvra_51" data-tooltip="An emit task publishes a CloudEvent. A listen task resumes an existing workflow when the selected event filters match. To start independent instances on matching events, configure schedule.on at the workflow level.">How to emit and listen for events</a>.</p></section><section class="chapter"><h2 id="bounding-how-long-a-workflow-waits" data-toc="bounding-how-long-a-workflow-waits">Bounding How Long a Workflow Waits</h2><p id="fvuvra_52">Lemline does not enforce workflow-level timeouts yet, nor timeouts on tasks other than <code class="code" id="fvuvra_58">listen</code>: they are accepted but ignored. To keep an instance from waiting forever for an external signal, put a timeout on the <code class="code" id="fvuvra_59">listen</code> task:</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: bounding-how-long-a-workflow-waits
+  version: '1.0.0'
+do:
+  - waitForPayment:
+      try:
+        - listenForPayment:
+            listen:
+              to:
+                one:
+                  with:
+                    type: com.example.payment.received
+            timeout:
+              after:
+                seconds: 30
+      catch:
+        errors:
+          with:
+            type: https://open-workflow-specification.org/spec/1.0.0/errors/timeout
+        do:
+          - markExpired:
+              set:
+                status: expired
+</div><p id="fvuvra_54">When the timeout expires, the task faults with a <code class="code" id="fvuvra_60">timeout</code> error (status 408), which the <code class="code" id="fvuvra_61">try</code> task catches here. The example waits 30 seconds so that you can see both outcomes; a real payment wait would use hours. See <a href="https://github.com/open-workflow-specification/specification/blob/v1.0.3/dsl.md#timeouts" id="fvuvra_62" data-external="true" rel="noopener noreferrer" target="_blank">Timeouts</a>.</p><p id="fvuvra_55">Save it as <code class="code" id="fvuvra_63">bounding-how-long-a-workflow-waits.yaml</code>. Pay the first instance in time, and let the second expire:</p><div class="code-block" data-lang="bash">
+bin/lemline definition post -f bounding-how-long-a-workflow-waits.yaml
+bin/lemline instance start examples bounding-how-long-a-workflow-waits
+bin/lemline instance start examples tutorial-publisher --input '{&quot;type&quot;:&quot;com.example.payment.received&quot;,&quot;data&quot;:{&quot;orderId&quot;:&quot;ORD-403&quot;}}'
+bin/lemline instance start examples bounding-how-long-a-workflow-waits
+</div><p id="fvuvra_57">The first instance completes with the payment data, <code class="code" id="fvuvra_64">[{&quot;orderId&quot;:&quot;ORD-403&quot;}]</code>. The second completes with <code class="code" id="fvuvra_65">{&quot;status&quot;:&quot;expired&quot;}</code> 30 to 40 seconds later: the worker checks expired waits every 10 seconds.</p></section><section class="chapter"><h2 id="pausing-until-an-external-signal" data-toc="pausing-until-an-external-signal">Pausing Until an External Signal</h2><p id="fvuvra_66">A <code class="code" id="fvuvra_71">listen</code> task pauses the instance until a matching event arrives; a <code class="code" id="fvuvra_72">wait</code> task pauses it for a fixed duration. Neither uses runner resources while waiting.</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: pausing-until-an-external-signal
+  version: '1.0.0'
+do:
+  - waitForApproval:
+      listen:
+        to:
+          one:
+            with:
+              type: com.example.order.approved
+  - recordApproval:
+      set:
+        approvedBy: ${ .[0].approver }
+</div><p id="fvuvra_68">Save it as <code class="code" id="fvuvra_73">pausing-until-an-external-signal.yaml</code>, start it, then send the approval:</p><div class="code-block" data-lang="bash">
+bin/lemline definition post -f pausing-until-an-external-signal.yaml
+bin/lemline instance start examples pausing-until-an-external-signal
+bin/lemline instance start examples tutorial-publisher --input '{&quot;type&quot;:&quot;com.example.order.approved&quot;,&quot;data&quot;:{&quot;orderId&quot;:&quot;ORD-404&quot;,&quot;approver&quot;:&quot;manager&quot;}}'
+</div><p id="fvuvra_70">The instance stays paused until the approval arrives, then completes with <code class="code" id="fvuvra_74">{&quot;approvedBy&quot;:&quot;manager&quot;}</code>.</p></section><section class="chapter"><h2 id="recovering-from-failures" data-toc="recovering-from-failures">Recovering from Failures</h2><ul class="list _bullet" id="fvuvra_75"><li class="list__item" id="fvuvra_76"><p id="fvuvra_79"><span class="control" id="fvuvra_80">Inside the workflow</span>: wrap fragile tasks in <code class="code" id="fvuvra_81">try</code> with a <code class="code" id="fvuvra_82">retry</code> policy, so temporary errors are retried automatically. See <a href="lemline-howto-retry.html" id="fvuvra_83" data-tooltip="Configure retries under catch.retry on a try task. Use delay for the initial interval and limit.attempt.count to bound attempts. With a backoff configured, the runner derives subsequent intervals from the configured strategy.">Implementing Retry Mechanisms</a>.</p></li><li class="list__item" id="fvuvra_77"><p id="fvuvra_84"><span class="control" id="fvuvra_85">After a fault</span>: a faulted instance stays faulted. Fix the cause, then start a new instance with <code class="code" id="fvuvra_86">lemline instance start</code>.</p></li><li class="list__item" id="fvuvra_78"><p id="fvuvra_87"><span class="control" id="fvuvra_88">Instances of a namespace no worker serves</span>: <code class="code" id="fvuvra_89">instance start</code> succeeds, but the instance does not run. On the SQLite setup, its message waits in the queue: add the namespace to <code class="code" id="fvuvra_90">lemline.namespaces</code> and restart the worker, and the instance runs. With a shared broker, a worker that receives a message for a namespace it does not serve parks it in the failures table; re-send it with <code class="code" id="fvuvra_91">bin/lemline failures replay</code> once a worker serves that namespace. On SQLite, <code class="code" id="fvuvra_92">failures replay --dry-run</code> answers <code class="code" id="fvuvra_93">No failures found with reason 'foreign_namespace'</code>.</p></li></ul></section><section class="chapter"><h2 id="observing-lifecycle-changes" data-toc="observing-lifecycle-changes">Observing Lifecycle Changes</h2><p id="fvuvra_94">Lemline emits lifecycle CloudEvents that external systems can consume:</p><div class="table-wrapper"><table class="wide" id="fvuvra_95"><thead><tr class="ijRowHead" id="fvuvra_97"><th id="fvuvra_107"><p>Event type</p></th><th id="fvuvra_108"><p>Emitted when</p></th></tr></thead><tbody><tr id="fvuvra_98"><td id="fvuvra_109"><p><code class="code" id="fvuvra_111">org.open-workflow-specification.workflow.created.v1</code></p></td><td id="fvuvra_110"><p>An instance is created</p></td></tr><tr id="fvuvra_99"><td id="fvuvra_112"><p><code class="code" id="fvuvra_114">org.open-workflow-specification.workflow.started.v1</code></p></td><td id="fvuvra_113"><p>An instance starts</p></td></tr><tr id="fvuvra_100"><td id="fvuvra_115"><p><code class="code" id="fvuvra_117">org.open-workflow-specification.workflow.completed.v1</code></p></td><td id="fvuvra_116"><p>An instance completes</p></td></tr><tr id="fvuvra_101"><td id="fvuvra_118"><p><code class="code" id="fvuvra_120">org.open-workflow-specification.workflow.faulted.v1</code></p></td><td id="fvuvra_119"><p>An instance faults</p></td></tr><tr id="fvuvra_102"><td id="fvuvra_121"><p><code class="code" id="fvuvra_123">org.open-workflow-specification.task.created.v1</code></p></td><td id="fvuvra_122"><p>A task is created</p></td></tr><tr id="fvuvra_103"><td id="fvuvra_124"><p><code class="code" id="fvuvra_126">org.open-workflow-specification.task.started.v1</code></p></td><td id="fvuvra_125"><p>A task starts</p></td></tr><tr id="fvuvra_104"><td id="fvuvra_127"><p><code class="code" id="fvuvra_129">org.open-workflow-specification.task.completed.v1</code></p></td><td id="fvuvra_128"><p>A task completes</p></td></tr><tr id="fvuvra_105"><td id="fvuvra_130"><p><code class="code" id="fvuvra_132">org.open-workflow-specification.task.faulted.v1</code></p></td><td id="fvuvra_131"><p>A task faults</p></td></tr><tr id="fvuvra_106"><td id="fvuvra_133"><p><code class="code" id="fvuvra_135">org.open-workflow-specification.task.retried.v1</code></p></td><td id="fvuvra_134"><p>A task is retried</p></td></tr></tbody></table></div><p id="fvuvra_96">They are published on the lifecycle events channel and shown in the dashboard. See <a href="https://github.com/open-workflow-specification/specification/blob/v1.0.3/dsl-reference.md#lifecycle-events" id="fvuvra_136" data-external="true" rel="noopener noreferrer" target="_blank">Lifecycle Events</a>.</p></section><section class="chapter"><h2 id="next-steps" data-toc="next-steps">Next Steps</h2><ul class="list _bullet" id="fvuvra_137"><li class="list__item" id="fvuvra_138"><p id="fvuvra_141">Learn about <a href="lemline-howto-monitor.html" id="fvuvra_142" data-tooltip="This guide explains how to monitor the execution of Lemline workflows, track their progress, view execution details, and set up comprehensive observability for your workflows.">monitoring workflow execution</a></p></li><li class="list__item" id="fvuvra_139"><p id="fvuvra_143">Explore <a href="lemline-howto-debug.html" id="fvuvra_144" data-tooltip="This guide provides techniques and best practices for debugging workflows when they don't behave as expected.">how to debug faults in task execution</a></p></li><li class="list__item" id="fvuvra_140"><p id="fvuvra_145">Understand <a href="lemline-howto-events.html" id="fvuvra_146" data-tooltip="An emit task publishes a CloudEvent. A listen task resumes an existing workflow when the selected event filters match. To start independent instances on matching events, configure schedule.on at the workflow level.">how to emit and listen for events</a></p></li></ul></section><div class="last-modified">25 November 2026</div><div data-feedback-placeholder="true"></div><div class="navigation-links _bottom"><a href="lemline-howto-monitor.html" class="navigation-links__prev">How to monitor workflow execution</a><a href="lemline-howto-conditional.html" class="navigation-links__next">How to define conditional branches (switch)</a></div></article><div id="disqus_thread"></div></div></section></main></div><script src="https://resources.jetbrains.com/writerside/apidoc/6.22.0-b776/app.js"></script></body></html>

@@ -1,0 +1,156 @@
+<!DOCTYPE html SYSTEM "about:legacy-compat">
+<html lang="en-US" data-preset="contrast" data-primary-color="#2E6F7E"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="robots" content="noindex"><meta name="built-on" content="2026-11-26T17:17:49.753525443"><title>Error Reference | Lemline documentation</title><script type="application/json" id="virtual-toc-data">[{"id":"standard-error-types","level":0,"title":"Standard Error Types","anchor":"#standard-error-types"},{"id":"error-structure","level":0,"title":"Error Structure","anchor":"#error-structure"},{"id":"error-titles-and-details","level":0,"title":"Error Titles and Details","anchor":"#error-titles-and-details"},{"id":"cli-exit-codes","level":0,"title":"CLI Exit Codes","anchor":"#cli-exit-codes"},{"id":"gateway-api-errors","level":0,"title":"Gateway API Errors","anchor":"#gateway-api-errors"},{"id":"java-exception-hierarchy","level":0,"title":"Java Exception Hierarchy","anchor":"#java-exception-hierarchy"},{"id":"defining-custom-errors","level":0,"title":"Defining Custom Errors","anchor":"#defining-custom-errors"},{"id":"error-handling-examples","level":0,"title":"Error Handling Examples","anchor":"#error-handling-examples"},{"id":"error-debugging","level":0,"title":"Error Debugging","anchor":"#error-debugging"},{"id":"error-handling-best-practices","level":0,"title":"Error Handling Best Practices","anchor":"#error-handling-best-practices"},{"id":"run-the-examples","level":0,"title":"Run the Examples","anchor":"#run-the-examples"},{"id":"related-resources","level":0,"title":"Related Resources","anchor":"#related-resources"}]</script><script type="application/json" id="topic-shortcuts"></script><link href="https://resources.jetbrains.com/writerside/apidoc/6.22.0-b776/app.css" rel="stylesheet"><link href="static/custom.css" rel="stylesheet"><link rel="icon" type="image/png" sizes="16x16" href="images/lemly.png"><meta name="image" content="https://docs.lemline.com/social-preview.png"><!-- Open Graph --><meta property="og:title" content="Error Reference | Lemline documentation"><meta property="og:description" content=""><meta property="og:image" content="https://docs.lemline.com/social-preview.png"><meta property="og:site_name" content="Lemline documentation Help"><meta property="og:type" content="website"><meta property="og:locale" content="en_US"><meta property="og:url" content="https://docs.lemline.com/lemline-ref-errors.html"><!-- End Open Graph --><!-- Twitter Card --><meta name="twitter:card" content="summary_large_image"><meta name="twitter:site" content=""><meta name="twitter:title" content="Error Reference | Lemline documentation"><meta name="twitter:description" content=""><meta name="twitter:creator" content=""><meta name="twitter:image:src" content="https://docs.lemline.com/social-preview.png"><!-- End Twitter Card --><!-- Schema.org WebPage --><script type="application/ld+json">{
+    "@context": "http://schema.org",
+    "@type": "WebPage",
+    "@id": "https://docs.lemline.com/lemline-ref-errors.html#webpage",
+    "url": "https://docs.lemline.com/lemline-ref-errors.html",
+    "name": "Error Reference | Lemline documentation",
+    "description": "",
+    "image": "https://docs.lemline.com/social-preview.png",
+    "inLanguage":"en-US"
+}</script><!-- End Schema.org --><!-- Schema.org WebSite --><script type="application/ld+json">{
+    "@type": "WebSite",
+    "@id": "https://docs.lemline.com/#website",
+    "url": "https://docs.lemline.com/",
+    "name": "Lemline documentation Help"
+}</script><!-- End Schema.org --></head><body data-id="lemline-ref-errors" data-main-title="Error Reference" data-article-props="{&quot;seeAlsoStyle&quot;:&quot;links&quot;}" data-template="article" data-breadcrumbs="Reference///CLI Reference"><div class="wrapper"><main class="panel _main"><header class="panel__header"><div class="container"><h3>Lemline documentation  Help</h3><div class="panel-trigger"></div></div></header><section class="panel__content"><div class="container"><article class="article" data-shortcut-switcher="inactive"><h1 data-toc="lemline-ref-errors" id="lemline-ref-errors.md">Error Reference</h1><p id="z2rjhrr_3">This reference documents the standard error types and error handling capabilities in Lemline.</p><section class="chapter"><h2 id="standard-error-types" data-toc="standard-error-types">Standard Error Types</h2><p id="z2rjhrr_16">Lemline implements the standardized error types defined in the Open Workflow Specification, with the base URI <code class="code" id="z2rjhrr_18">https://open-workflow-specification.org/spec/1.0.0/errors/</code>:</p><div class="table-wrapper"><table class="wide" id="z2rjhrr_17"><thead><tr class="ijRowHead" id="z2rjhrr_19"><th id="z2rjhrr_28"><p>Error Type</p></th><th id="z2rjhrr_29"><p>URI</p></th><th id="z2rjhrr_30"><p>Default Status</p></th><th id="z2rjhrr_31"><p>Description</p></th></tr></thead><tbody><tr id="z2rjhrr_20"><td id="z2rjhrr_32"><p>Configuration</p></td><td id="z2rjhrr_33"><p><code class="code" id="z2rjhrr_36">https://open-workflow-specification.org/spec/1.0.0/errors/configuration</code></p></td><td id="z2rjhrr_34"><p>400</p></td><td id="z2rjhrr_35"><p>Errors in workflow definition or structure</p></td></tr><tr id="z2rjhrr_21"><td id="z2rjhrr_37"><p>Validation</p></td><td id="z2rjhrr_38"><p><code class="code" id="z2rjhrr_41">https://open-workflow-specification.org/spec/1.0.0/errors/validation</code></p></td><td id="z2rjhrr_39"><p>400</p></td><td id="z2rjhrr_40"><p>Input/output data schema validation failures</p></td></tr><tr id="z2rjhrr_22"><td id="z2rjhrr_42"><p>Expression</p></td><td id="z2rjhrr_43"><p><code class="code" id="z2rjhrr_46">https://open-workflow-specification.org/spec/1.0.0/errors/expression</code></p></td><td id="z2rjhrr_44"><p>400</p></td><td id="z2rjhrr_45"><p>Expression evaluation errors (JQ syntax or execution)</p></td></tr><tr id="z2rjhrr_23"><td id="z2rjhrr_47"><p>Authentication</p></td><td id="z2rjhrr_48"><p><code class="code" id="z2rjhrr_51">https://open-workflow-specification.org/spec/1.0.0/errors/authentication</code></p></td><td id="z2rjhrr_49"><p>401</p></td><td id="z2rjhrr_50"><p>Authentication failures</p></td></tr><tr id="z2rjhrr_24"><td id="z2rjhrr_52"><p>Authorization</p></td><td id="z2rjhrr_53"><p><code class="code" id="z2rjhrr_56">https://open-workflow-specification.org/spec/1.0.0/errors/authorization</code></p></td><td id="z2rjhrr_54"><p>403</p></td><td id="z2rjhrr_55"><p>Authorization/permission failures</p></td></tr><tr id="z2rjhrr_25"><td id="z2rjhrr_57"><p>Timeout</p></td><td id="z2rjhrr_58"><p><code class="code" id="z2rjhrr_61">https://open-workflow-specification.org/spec/1.0.0/errors/timeout</code></p></td><td id="z2rjhrr_59"><p>408</p></td><td id="z2rjhrr_60"><p>Timeout violations (workflow or task)</p></td></tr><tr id="z2rjhrr_26"><td id="z2rjhrr_62"><p>Communication</p></td><td id="z2rjhrr_63"><p><code class="code" id="z2rjhrr_66">https://open-workflow-specification.org/spec/1.0.0/errors/communication</code></p></td><td id="z2rjhrr_64"><p>500</p></td><td id="z2rjhrr_65"><p>Errors communicating with external services</p></td></tr><tr id="z2rjhrr_27"><td id="z2rjhrr_67"><p>Runtime</p></td><td id="z2rjhrr_68"><p><code class="code" id="z2rjhrr_71">https://open-workflow-specification.org/spec/1.0.0/errors/runtime</code></p></td><td id="z2rjhrr_69"><p>500</p></td><td id="z2rjhrr_70"><p>General runtime execution errors</p></td></tr></tbody></table></div></section><section class="chapter"><h2 id="error-structure" data-toc="error-structure">Error Structure</h2><p id="z2rjhrr_72">All errors in Lemline follow the RFC 7807 Problem Details format:</p><div class="code-block" data-lang="json">
+{
+  &quot;type&quot;: &quot;https://open-workflow-specification.org/spec/1.0.0/errors/validation&quot;,
+  &quot;status&quot;: 400,
+  &quot;instance&quot;: &quot;/do/0/validateInput&quot;,
+  &quot;title&quot;: &quot;Input Validation Failed&quot;,
+  &quot;detail&quot;: &quot;The 'amount' field must be a positive number&quot;
+}
+</div><div class="table-wrapper"><table class="wide" id="z2rjhrr_74"><thead><tr class="ijRowHead" id="z2rjhrr_75"><th id="z2rjhrr_81"><p>Field</p></th><th id="z2rjhrr_82"><p>Required</p></th><th id="z2rjhrr_83"><p>Description</p></th></tr></thead><tbody><tr id="z2rjhrr_76"><td id="z2rjhrr_84"><p><code class="code" id="z2rjhrr_87">type</code></p></td><td id="z2rjhrr_85"><p>Yes</p></td><td id="z2rjhrr_86"><p>URI reference identifying the problem type</p></td></tr><tr id="z2rjhrr_77"><td id="z2rjhrr_88"><p><code class="code" id="z2rjhrr_91">status</code></p></td><td id="z2rjhrr_89"><p>Yes</p></td><td id="z2rjhrr_90"><p>HTTP status code (numeric) corresponding to the error</p></td></tr><tr id="z2rjhrr_78"><td id="z2rjhrr_92"><p><code class="code" id="z2rjhrr_95">instance</code></p></td><td id="z2rjhrr_93"><p>Yes</p></td><td id="z2rjhrr_94"><p>JSON pointer to the location in the workflow where the error occurred</p></td></tr><tr id="z2rjhrr_79"><td id="z2rjhrr_96"><p><code class="code" id="z2rjhrr_99">title</code></p></td><td id="z2rjhrr_97"><p>No</p></td><td id="z2rjhrr_98"><p>Short, human-readable summary of the problem</p></td></tr><tr id="z2rjhrr_80"><td id="z2rjhrr_100"><p><code class="code" id="z2rjhrr_103">detail</code></p></td><td id="z2rjhrr_101"><p>No</p></td><td id="z2rjhrr_102"><p>Detailed explanation specific to this error occurrence</p></td></tr></tbody></table></div></section><section class="chapter"><h2 id="error-titles-and-details" data-toc="error-titles-and-details">Error Titles and Details</h2><p id="z2rjhrr_104">Lemline errors carry no numeric or symbolic error code: identify them by <code class="code" id="z2rjhrr_109">type</code> (and <code class="code" id="z2rjhrr_110">status</code>), and read <code class="code" id="z2rjhrr_111">title</code> and <code class="code" id="z2rjhrr_112">detail</code> for the specific cause. For example:</p><div class="table-wrapper"><table class="wide" id="z2rjhrr_105"><thead><tr class="ijRowHead" id="z2rjhrr_113"><th id="z2rjhrr_122"><p>Situation</p></th><th id="z2rjhrr_123"><p><code class="code" id="z2rjhrr_126">type</code></p></th><th id="z2rjhrr_124"><p><code class="code" id="z2rjhrr_127">status</code></p></th><th id="z2rjhrr_125"><p>Example message</p></th></tr></thead><tbody><tr id="z2rjhrr_114"><td id="z2rjhrr_128"><p>A declared secret is not set on the runner</p></td><td id="z2rjhrr_129"><p><code class="code" id="z2rjhrr_132">authorization</code></p></td><td id="z2rjhrr_130"><p>403</p></td><td id="z2rjhrr_131"><p><code class="code" id="z2rjhrr_133">Required secret 'API_KEY' is unavailable</code></p></td></tr><tr id="z2rjhrr_115"><td id="z2rjhrr_134"><p>An HTTP call returns a non-2xx status</p></td><td id="z2rjhrr_135"><p><code class="code" id="z2rjhrr_138">communication</code></p></td><td id="z2rjhrr_136"><p>the HTTP status (for example 404)</p></td><td id="z2rjhrr_137"><p><code class="code" id="z2rjhrr_139">HTTP 404: &lt;response body&gt;</code></p></td></tr><tr id="z2rjhrr_116"><td id="z2rjhrr_140"><p>An HTTP call gets no response (unknown host, refused connection, timeout)</p></td><td id="z2rjhrr_141"><p><code class="code" id="z2rjhrr_144">communication</code></p></td><td id="z2rjhrr_142"><p>500</p></td><td id="z2rjhrr_143"><p><code class="code" id="z2rjhrr_145">Unable to reach https://api.example.com: unresolved host</code></p></td></tr><tr id="z2rjhrr_117"><td id="z2rjhrr_146"><p>An A2A call gets a non-2xx status from the agent</p></td><td id="z2rjhrr_147"><p><code class="code" id="z2rjhrr_150">communication</code> (see below)</p></td><td id="z2rjhrr_148"><p>the HTTP status</p></td><td id="z2rjhrr_149"><p>title <code class="code" id="z2rjhrr_151">A2A message/send failed</code>, <code class="code" id="z2rjhrr_152">detail</code> <code class="code" id="z2rjhrr_153">HTTP 503: &lt;response body&gt;</code></p></td></tr><tr id="z2rjhrr_118"><td id="z2rjhrr_154"><p>An A2A call gets no usable answer (unreachable agent, timeout, stream cut before its final result)</p></td><td id="z2rjhrr_155"><p><code class="code" id="z2rjhrr_158">communication</code> (see below)</p></td><td id="z2rjhrr_156"><p>500</p></td><td id="z2rjhrr_157"><p>title <code class="code" id="z2rjhrr_159">A2A message/send failed</code>, <code class="code" id="z2rjhrr_160">detail</code> <code class="code" id="z2rjhrr_161">Unable to reach https://agent.example.com: ...</code></p></td></tr><tr id="z2rjhrr_119"><td id="z2rjhrr_162"><p>A <code class="code" id="z2rjhrr_166">listen</code> task reaches its timeout</p></td><td id="z2rjhrr_163"><p><code class="code" id="z2rjhrr_167">timeout</code></p></td><td id="z2rjhrr_164"><p>408</p></td><td id="z2rjhrr_165"><p><code class="code" id="z2rjhrr_168">Listen task timed out at ...</code></p></td></tr><tr id="z2rjhrr_120"><td id="z2rjhrr_169"><p>An expression fails to evaluate</p></td><td id="z2rjhrr_170"><p><code class="code" id="z2rjhrr_173">expression</code></p></td><td id="z2rjhrr_171"><p>400</p></td><td id="z2rjhrr_172"><p>the evaluation error message</p></td></tr><tr id="z2rjhrr_121"><td id="z2rjhrr_174"><p>Input or output does not match its schema</p></td><td id="z2rjhrr_175"><p><code class="code" id="z2rjhrr_178">validation</code></p></td><td id="z2rjhrr_176"><p>400</p></td><td id="z2rjhrr_177"><p>the schema validation message</p></td></tr></tbody></table></div><p id="z2rjhrr_106">A failed HTTP call can therefore be caught by type and by status, for example <code class="code" id="z2rjhrr_179">catch.errors.with: { type: https://open-workflow-specification.org/spec/1.0.0/errors/communication, status: 503 }</code>. The <code class="code" id="z2rjhrr_180">Unable to reach</code> title names the server only, never the path or the query of the URL.</p><p id="z2rjhrr_107">Errors raised by <code class="code" id="z2rjhrr_181">call: a2a</code> use the base URI <code class="code" id="z2rjhrr_182">https://serverlessworkflow.io/spec/1.0.0/errors/</code> instead: catch <code class="code" id="z2rjhrr_183">https://serverlessworkflow.io/spec/1.0.0/errors/communication</code> for the failures above, and <code class="code" id="z2rjhrr_184">https://serverlessworkflow.io/spec/1.0.0/errors/runtime</code> for the others, such as an error returned by the agent in its JSON-RPC answer.</p><p id="z2rjhrr_108">Lemline only raises <code class="code" id="z2rjhrr_185">timeout</code> errors for <code class="code" id="z2rjhrr_186">listen</code> tasks: workflow-level timeouts and timeouts on other tasks are not enforced yet.</p></section><section class="chapter"><h2 id="cli-exit-codes" data-toc="cli-exit-codes">CLI Exit Codes</h2><div class="table-wrapper"><table class="wide" id="z2rjhrr_187"><thead><tr class="ijRowHead" id="z2rjhrr_188"><th id="z2rjhrr_192"><p>Exit Code</p></th><th id="z2rjhrr_193"><p>Description</p></th></tr></thead><tbody><tr id="z2rjhrr_189"><td id="z2rjhrr_194"><p>0</p></td><td id="z2rjhrr_195"><p>Success</p></td></tr><tr id="z2rjhrr_190"><td id="z2rjhrr_196"><p>1</p></td><td id="z2rjhrr_197"><p>Error while running the command (including a missing configuration file)</p></td></tr><tr id="z2rjhrr_191"><td id="z2rjhrr_198"><p>2</p></td><td id="z2rjhrr_199"><p>Invalid command line (unknown option, missing argument)</p></td></tr></tbody></table></div></section><section class="chapter"><h2 id="gateway-api-errors" data-toc="gateway-api-errors">Gateway API Errors</h2><p id="z2rjhrr_200">The gateway exposes gRPC (and Connect) APIs. Failed calls return standard gRPC status codes, for example <code class="code" id="z2rjhrr_201">INVALID_ARGUMENT</code> for an invalid request, <code class="code" id="z2rjhrr_202">NOT_FOUND</code> for an unknown definition or instance, <code class="code" id="z2rjhrr_203">ALREADY_EXISTS</code>, <code class="code" id="z2rjhrr_204">UNAUTHENTICATED</code>, <code class="code" id="z2rjhrr_205">PERMISSION_DENIED</code> and <code class="code" id="z2rjhrr_206">INTERNAL</code>.</p></section><section class="chapter"><h2 id="java-exception-hierarchy" data-toc="java-exception-hierarchy">Java Exception Hierarchy</h2><p id="z2rjhrr_207">For developers working on Lemline, workflow errors are carried by a single exception type:</p><div class="code-block" data-lang="none">
+java.lang.RuntimeException
+└── com.lemline.core.errors.WorkflowException (sealed)
+    └── com.lemline.core.errors.InternalException
+</div><p id="z2rjhrr_209">An activity reports a failed exchange with an external service by throwing <code class="code" id="z2rjhrr_211">com.lemline.core.errors.CommunicationException</code>, which carries the status to report; it becomes a <code class="code" id="z2rjhrr_212">communication</code> error. Any other exception thrown by an activity becomes a <code class="code" id="z2rjhrr_213">runtime</code> error with status 500.</p><p id="z2rjhrr_210"><code class="code" id="z2rjhrr_214">InternalException</code> holds an <code class="code" id="z2rjhrr_215">InternalException.Error</code> with the standard error fields (<code class="code" id="z2rjhrr_216">type</code>, <code class="code" id="z2rjhrr_217">status</code>, <code class="code" id="z2rjhrr_218">instance</code>, <code class="code" id="z2rjhrr_219">title</code>, <code class="code" id="z2rjhrr_220">detail</code>). The error type is one of the values of <code class="code" id="z2rjhrr_221">com.lemline.core.errors.WorkflowErrorType</code> (<code class="code" id="z2rjhrr_222">configuration</code>, <code class="code" id="z2rjhrr_223">validation</code>, <code class="code" id="z2rjhrr_224">expression</code>, <code class="code" id="z2rjhrr_225">authentication</code>, <code class="code" id="z2rjhrr_226">authorization</code>, <code class="code" id="z2rjhrr_227">timeout</code>, <code class="code" id="z2rjhrr_228">communication</code>, <code class="code" id="z2rjhrr_229">runtime</code>).</p></section><section class="chapter"><h2 id="defining-custom-errors" data-toc="defining-custom-errors">Defining Custom Errors</h2><p id="z2rjhrr_230">Custom error types can be defined in workflow definitions:</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: typed-error
+  version: '1.0.0'
+use:
+  errors:
+    invalidOrder:
+      type: https://errors.example.com/invalid-order
+      status: 422
+      title: Invalid order
+do:
+  - validateOrder:
+      if: ${ (.orderId // &quot;&quot;) == &quot;&quot; }
+      raise:
+        error: invalidOrder
+  - acceptOrder:
+      set:
+        status: accepted
+</div></section><section class="chapter"><h2 id="error-handling-examples" data-toc="error-handling-examples">Error Handling Examples</h2><section class="chapter"><h3 id="basic-try-catch" data-toc="basic-try-catch">Basic Try-Catch</h3><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: 1.0.3
+  namespace: examples
+  name: basic-try-catch
+  version: 1.0.0
+do:
+  - secureOperation:
+      try:
+        - riskyTask:
+            listen:
+              to:
+                one:
+                  with:
+                    type: com.example.payment.received
+            timeout:
+              after:
+                seconds: 5
+      catch:
+        errors:
+          with:
+            type: https://open-workflow-specification.org/spec/1.0.0/errors/timeout
+        as: timeoutError
+        do:
+          - handleTimeout:
+              set:
+                processed: false
+                reason: ${ $timeoutError.title }
+</div></section><section class="chapter"><h3 id="matching-multiple-error-types" data-toc="matching-multiple-error-types">Matching Multiple Error Types</h3><p id="z2rjhrr_236">A <code class="code" id="z2rjhrr_238">try</code> task has a single <code class="code" id="z2rjhrr_239">catch</code>. To handle several errors differently, catch them and route on the fields of the caught error in <code class="code" id="z2rjhrr_240">catch.do</code>:</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: matching-multiple-error-types
+  version: '1.0.0'
+do:
+  - callService:
+      try:
+        - request:
+            call: http
+            with:
+              method: get
+              endpoint: http://127.0.0.1:8787/products
+              query:
+                fail: ${ .failStatus | tostring }
+      catch:
+        as: error
+        do:
+          - routeByStatus:
+              switch:
+                - rateLimited:
+                    when: ${ $error.status == 429 }
+                    then: handleRateLimit
+                - unavailable:
+                    when: ${ $error.status == 503 }
+                    then: handleUnavailable
+                - default:
+                    then: handleOtherError
+          - handleRateLimit:
+              set:
+                outcome: rate-limited
+              then: exit
+          - handleUnavailable:
+              set:
+                outcome: unavailable
+              then: exit
+          - handleOtherError:
+              set:
+                outcome: failed
+                errorType: ${ $error.type }
+</div></section><section class="chapter"><h3 id="using-retry-policies" data-toc="using-retry-policies">Using Retry Policies</h3><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: 1.0.3
+  namespace: examples
+  name: using-retry-policies
+  version: 1.0.0
+do:
+  - readStock:
+      try:
+        - operation:
+            call: http
+            with:
+              method: get
+              endpoint: http://127.0.0.1:8787/stock
+              query:
+                fail: '503'
+                failTimes: '1'
+                key: ${ $workflow.id }
+      catch:
+        retry:
+          delay:
+            seconds: 1
+          backoff:
+            exponential: {}
+          limit:
+            attempt:
+              count: 3
+          when: ${ $error.status &gt;= 500 }
+</div></section></section><section class="chapter"><h2 id="error-debugging" data-toc="error-debugging">Error Debugging</h2><p id="z2rjhrr_242">When debugging errors:</p><ul class="list _bullet" id="z2rjhrr_243"><li class="list__item" id="z2rjhrr_244"><p id="z2rjhrr_246">Read the <code class="code" id="z2rjhrr_247">workflow.faulted</code> and <code class="code" id="z2rjhrr_248">task.faulted</code> lifecycle events of the instance in the dashboard; they carry the error <code class="code" id="z2rjhrr_249">type</code>, <code class="code" id="z2rjhrr_250">status</code>, <code class="code" id="z2rjhrr_251">title</code>, <code class="code" id="z2rjhrr_252">instance</code> (position in the workflow) and <code class="code" id="z2rjhrr_253">detail</code>.</p></li><li class="list__item" id="z2rjhrr_245"><p id="z2rjhrr_254">Run the runner with <code class="code" id="z2rjhrr_255">--debug</code> to log the input of each task. Every log line carries the workflow namespace, name, version and instance id, so you can filter on the instance.</p></li></ul></section><section class="chapter"><h2 id="error-handling-best-practices" data-toc="error-handling-best-practices">Error Handling Best Practices</h2><ol class="list _decimal" id="z2rjhrr_256" type="1"><li class="list__item" id="z2rjhrr_257"><p id="z2rjhrr_265"><span class="control" id="z2rjhrr_266">Be specific with error types</span>: Catch specific error types rather than all errors</p></li><li class="list__item" id="z2rjhrr_258"><p id="z2rjhrr_267"><span class="control" id="z2rjhrr_268">Provide fallbacks</span>: Use default values or alternative paths for common errors</p></li><li class="list__item" id="z2rjhrr_259"><p id="z2rjhrr_269"><span class="control" id="z2rjhrr_270">Use conditional retries</span>: Only retry errors that have a chance of succeeding on retry</p></li><li class="list__item" id="z2rjhrr_260"><p id="z2rjhrr_271"><span class="control" id="z2rjhrr_272">Include context in errors</span>: Use descriptive error messages with relevant details</p></li><li class="list__item" id="z2rjhrr_261"><p id="z2rjhrr_273"><span class="control" id="z2rjhrr_274">Log error details</span>: Log sufficient context for debugging</p></li><li class="list__item" id="z2rjhrr_262"><p id="z2rjhrr_275"><span class="control" id="z2rjhrr_276">Use appropriate error status codes</span>: Match HTTP status codes to semantics</p></li><li class="list__item" id="z2rjhrr_263"><p id="z2rjhrr_277"><span class="control" id="z2rjhrr_278">Define custom error types</span>: Create domain-specific error types for your application</p></li><li class="list__item" id="z2rjhrr_264"><p id="z2rjhrr_279"><span class="control" id="z2rjhrr_280">Organize errors hierarchically</span>: Use consistent type URIs that reflect hierarchy</p></li></ol></section><section class="chapter"><h2 id="run-the-examples" data-toc="run-the-examples">Run the Examples</h2><p id="z2rjhrr_281">Every example on this page is a complete workflow. Complete <a href="lemline-tutorial-setup.html" id="z2rjhrr_289" data-tooltip="Run Lemline on one machine with SQLite. Lemline stores workflow definitions, queued messages, and workflow history in local files. Use a writable directory on a local filesystem.">the SQLite setup</a>, save each example under the file name used below, and run the commands from the setup directory. With the JAR, substitute <code class="code" id="z2rjhrr_290">java -jar lemline.jar</code> for <code class="code" id="z2rjhrr_291">bin/lemline</code>.</p><p id="z2rjhrr_282">Start the <a href="lemline-tutorial-order-processing.html#start-the-tutorial-shop" id="z2rjhrr_292" data-tooltip="Complete the SQLite setup and keep the worker running on the host. In a separate terminal, open the root of the Lemline source checkout matching these docs (the directory containing examples/tutorial-services). With Docker Compose running, start the single shop container:">tutorial shop</a> from the root of the Lemline source checkout:</p><div class="code-block" data-lang="bash">
+docker compose -f examples/tutorial-services/compose.yaml up -d
+</div><p id="z2rjhrr_284">Keep the setup worker running and use a second terminal in the setup directory.</p><div class="code-block" data-lang="bash">
+bin/lemline definition post -f typed-error.yaml
+bin/lemline instance start examples typed-error
+bin/lemline definition post -f basic-try-catch.yaml
+bin/lemline instance start examples basic-try-catch
+bin/lemline definition post -f matching-multiple-error-types.yaml
+bin/lemline instance start examples matching-multiple-error-types --input '{&quot;failStatus&quot;:429}'
+bin/lemline instance start examples matching-multiple-error-types --input '{&quot;failStatus&quot;:503}'
+bin/lemline instance start examples matching-multiple-error-types --input '{&quot;failStatus&quot;:404}'
+bin/lemline definition post -f using-retry-policies.yaml
+bin/lemline instance start examples using-retry-policies
+</div><div class="table-wrapper"><table class="wide" id="z2rjhrr_286"><thead><tr class="ijRowHead" id="z2rjhrr_293"><th id="z2rjhrr_298"><p>Example</p></th><th id="z2rjhrr_299"><p>Expected result</p></th></tr></thead><tbody><tr id="z2rjhrr_294"><td id="z2rjhrr_300"><p><code class="code" id="z2rjhrr_302">typed-error</code></p></td><td id="z2rjhrr_301"><p>Faults with <code class="code" id="z2rjhrr_303">invalid-order</code>, status 422</p></td></tr><tr id="z2rjhrr_295"><td id="z2rjhrr_304"><p><code class="code" id="z2rjhrr_306">basic-try-catch</code></p></td><td id="z2rjhrr_305"><p>After 5 to 15 seconds, <code class="code" id="z2rjhrr_307">{&quot;processed&quot;:false,&quot;reason&quot;:&quot;Listen task timed out&quot;}</code></p></td></tr><tr id="z2rjhrr_296"><td id="z2rjhrr_308"><p><code class="code" id="z2rjhrr_310">matching-multiple-error-types</code></p></td><td id="z2rjhrr_309"><p><code class="code" id="z2rjhrr_311">{&quot;outcome&quot;:&quot;rate-limited&quot;}</code>, <code class="code" id="z2rjhrr_312">{&quot;outcome&quot;:&quot;unavailable&quot;}</code>, then <code class="code" id="z2rjhrr_313">{&quot;outcome&quot;:&quot;failed&quot;}</code> with the <code class="code" id="z2rjhrr_314">communication</code> error type</p></td></tr><tr id="z2rjhrr_297"><td id="z2rjhrr_315"><p><code class="code" id="z2rjhrr_317">using-retry-policies</code></p></td><td id="z2rjhrr_316"><p>The stock after one retry: the HTTP 503 has status 503, so <code class="code" id="z2rjhrr_318">when</code> holds</p></td></tr></tbody></table></div><p id="z2rjhrr_287">Stop the shop when you are done:</p><div class="code-block" data-lang="bash">
+docker compose -f examples/tutorial-services/compose.yaml down
+</div></section><section class="chapter"><h2 id="related-resources" data-toc="related-resources">Related Resources</h2><ul class="list _bullet" id="z2rjhrr_319"><li class="list__item" id="z2rjhrr_320"><p id="z2rjhrr_325"><a href="lemline-howto-try-catch.html" id="z2rjhrr_326" data-tooltip="A try task runs a list of tasks. If a task fails, catch can filter the error, retry the try block, or execute a fallback list.">Error Handling with Try-Catch</a></p></li><li class="list__item" id="z2rjhrr_321"><p id="z2rjhrr_327"><a href="lemline-howto-retry.html" id="z2rjhrr_328" data-tooltip="Configure retries under catch.retry on a try task. Use delay for the initial interval and limit.attempt.count to bound attempts. With a backoff configured, the runner derives subsequent intervals from the configured strategy.">Implementing Retry Mechanisms</a></p></li><li class="list__item" id="z2rjhrr_322"><p id="z2rjhrr_329"><a href="lemline-howto-custom-errors.html" id="z2rjhrr_330" data-tooltip="Workflow errors carry a URI identifying the error type and a numeric status. Optional fields include title, detail and instance.">Custom Error Types</a></p></li><li class="list__item" id="z2rjhrr_323"><p id="z2rjhrr_331"><a href="lemline-howto-debug.html" id="z2rjhrr_332" data-tooltip="This guide provides techniques and best practices for debugging workflows when they don't behave as expected.">Debugging Workflows</a></p></li><li class="list__item" id="z2rjhrr_324"><p id="z2rjhrr_333"><a href="dsl-resilience-patterns.html" id="z2rjhrr_334" data-tooltip="In distributed systems, failures are inevitable. This page shows how to make workflows handle failures with the tools Lemline provides: retries, error catching with fallbacks, timeouts on event waits, and the durability of the runtime itself.">Resilience Patterns</a></p></li></ul></section><div class="last-modified">25 November 2026</div><div data-feedback-placeholder="true"></div><div class="navigation-links _bottom"><a href="lemline-ref-cli.html" class="navigation-links__prev">Command Syntax and Options</a><a href="lemline-ref-auth.html" class="navigation-links__next">Authentication Reference</a></div></article><div id="disqus_thread"></div></div></section></main></div><script src="https://resources.jetbrains.com/writerside/apidoc/6.22.0-b776/app.js"></script></body></html>

@@ -1,0 +1,131 @@
+<!DOCTYPE html SYSTEM "about:legacy-compat">
+<html lang="en-US" data-preset="contrast" data-primary-color="#2E6F7E"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="robots" content="noindex"><meta name="built-on" content="2026-11-26T17:17:50.198457746"><title>DSL Syntax Reference | Lemline documentation</title><script type="application/json" id="virtual-toc-data">[{"id":"workflow-structure","level":0,"title":"Workflow structure","anchor":"#workflow-structure"},{"id":"data-and-expressions","level":0,"title":"Data and expressions","anchor":"#data-and-expressions"},{"id":"shared-resources","level":0,"title":"Shared resources","anchor":"#shared-resources"},{"id":"task-and-flow-structure","level":0,"title":"Task and flow structure","anchor":"#task-and-flow-structure"},{"id":"run-the-examples","level":0,"title":"Run the Examples","anchor":"#run-the-examples"}]</script><script type="application/json" id="topic-shortcuts"></script><link href="https://resources.jetbrains.com/writerside/apidoc/6.22.0-b776/app.css" rel="stylesheet"><link href="static/custom.css" rel="stylesheet"><link rel="icon" type="image/png" sizes="16x16" href="images/lemly.png"><meta name="image" content="https://docs.lemline.com/social-preview.png"><!-- Open Graph --><meta property="og:title" content="DSL Syntax Reference | Lemline documentation"><meta property="og:description" content=""><meta property="og:image" content="https://docs.lemline.com/social-preview.png"><meta property="og:site_name" content="Lemline documentation Help"><meta property="og:type" content="website"><meta property="og:locale" content="en_US"><meta property="og:url" content="https://docs.lemline.com/lemline-ref-dsl-syntax.html"><!-- End Open Graph --><!-- Twitter Card --><meta name="twitter:card" content="summary_large_image"><meta name="twitter:site" content=""><meta name="twitter:title" content="DSL Syntax Reference | Lemline documentation"><meta name="twitter:description" content=""><meta name="twitter:creator" content=""><meta name="twitter:image:src" content="https://docs.lemline.com/social-preview.png"><!-- End Twitter Card --><!-- Schema.org WebPage --><script type="application/ld+json">{
+    "@context": "http://schema.org",
+    "@type": "WebPage",
+    "@id": "https://docs.lemline.com/lemline-ref-dsl-syntax.html#webpage",
+    "url": "https://docs.lemline.com/lemline-ref-dsl-syntax.html",
+    "name": "DSL Syntax Reference | Lemline documentation",
+    "description": "",
+    "image": "https://docs.lemline.com/social-preview.png",
+    "inLanguage":"en-US"
+}</script><!-- End Schema.org --><!-- Schema.org WebSite --><script type="application/ld+json">{
+    "@type": "WebSite",
+    "@id": "https://docs.lemline.com/#website",
+    "url": "https://docs.lemline.com/",
+    "name": "Lemline documentation Help"
+}</script><!-- End Schema.org --></head><body data-id="lemline-ref-dsl-syntax" data-main-title="DSL Syntax Reference" data-article-props="{&quot;seeAlsoStyle&quot;:&quot;links&quot;}" data-template="article" data-breadcrumbs="Reference///DSL Reference"><div class="wrapper"><main class="panel _main"><header class="panel__header"><div class="container"><h3>Lemline documentation  Help</h3><div class="panel-trigger"></div></div></header><section class="panel__content"><div class="container"><article class="article" data-shortcut-switcher="inactive"><h1 data-toc="lemline-ref-dsl-syntax" id="lemline-ref-dsl-syntax.md">DSL Syntax Reference</h1><p id="z6l41in_3">Lemline reads Open Workflow DSL definitions in YAML and JSON. See <a href="lemline-ref-supported-features.html" id="z6l41in_9" data-tooltip="This reference documents which features of the Open Workflow DSL v1.0 are currently supported in Lemline, and any implementation-specific details or limitations.">Supported Features</a> for the subset the runner executes.</p><section class="chapter"><h2 id="workflow-structure" data-toc="workflow-structure">Workflow structure</h2><p id="z6l41in_10">A definition contains a <code class="code" id="z6l41in_12">document</code> with its identity and a <code class="code" id="z6l41in_13">do</code> list of named tasks. The optional <code class="code" id="z6l41in_14">input</code> and <code class="code" id="z6l41in_15">output</code> sections describe data validation and transformation.</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: validate-and-route-order
+  version: '1.0.0'
+input:
+  schema:
+    format: json
+    document:
+      type: object
+      required: [orderId, total]
+      properties:
+        orderId:
+          type: string
+        total:
+          type: number
+          minimum: 0
+do:
+  - routeOrder:
+      switch:
+        - largeOrder:
+            when: ${ .total &gt;= 1000 }
+            then: requestReview
+        - automatic:
+            then: acceptOrder
+  - requestReview:
+      set:
+        status: needs-review
+      then: exit
+  - acceptOrder:
+      set:
+        status: accepted
+output:
+  as: '${ { orderId: $workflow.input.orderId, status: .status } }'
+</div></section><section class="chapter"><h2 id="data-and-expressions" data-toc="data-and-expressions">Data and expressions</h2><p id="z6l41in_16">Write a jq expression as <code class="code" id="z6l41in_18">${ expression }</code>. Within a task, <code class="code" id="z6l41in_19">.</code> is the current input, <code class="code" id="z6l41in_20">$workflow.input</code> is the original workflow input, and <code class="code" id="z6l41in_21">$context</code> is the data shared by tasks through <code class="code" id="z6l41in_22">export.as</code>.</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: transform-workflow-data
+  version: '1.0.0'
+input:
+  from: '${ { customer: .user, items: .payload.items } }'
+do:
+  - summarize:
+      set:
+        customerId: ${ .customer.id }
+        itemCount: ${ .items | length }
+output:
+  as: '${ { customerId, itemCount } }'
+</div></section><section class="chapter"><h2 id="shared-resources" data-toc="shared-resources">Shared resources</h2><p id="z6l41in_23">Declare reusable authentication policies, errors, functions, retries, timeouts and catalogs under <code class="code" id="z6l41in_25">use</code>. Tasks can refer to these resources by their declared names.</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: retry-and-fallback
+  version: '1.0.0'
+use:
+  retries:
+    transient:
+      delay: PT2S
+      backoff:
+        exponential: {}
+      limit:
+        attempt:
+          count: 3
+do:
+  - fetchInventory:
+      try:
+        - requestInventory:
+            call: http
+            with:
+              method: get
+              endpoint: http://127.0.0.1:8787/stock
+              query:
+                fail: '503'
+                failTimes: ${ .failures // 0 | tostring }
+                key: ${ $workflow.id }
+      catch:
+        errors:
+          with:
+            type: https://open-workflow-specification.org/spec/1.0.0/errors/communication
+            status: 503
+        retry: transient
+        do:
+          - useCachedInventory:
+              set:
+                inventory: []
+                stale: true
+</div></section><section class="chapter"><h2 id="task-and-flow-structure" data-toc="task-and-flow-structure">Task and flow structure</h2><p id="z6l41in_26">A task list contains maps with one named task each. Constructs such as <code class="code" id="z6l41in_29">for</code>, <code class="code" id="z6l41in_30">fork</code>, <code class="code" id="z6l41in_31">switch</code> and <code class="code" id="z6l41in_32">try</code> control flow inside the list. Use <code class="code" id="z6l41in_33">then</code> to change the default sequential flow.</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: map-order-items
+  version: '1.0.0'
+do:
+  - calculateTotals:
+      for:
+        each: item
+        in: ${ .items }
+        at: index
+      do:
+        - calculateLine:
+            set:
+              itemId: ${ $item.id }
+              index: ${ $index }
+              lineTotal: ${ $item.quantity * $item.price }
+</div><p id="z6l41in_28">See <a href="lemline-ref-task-types.html" id="z6l41in_34" data-tooltip="A workflow's do list contains named tasks. Each entry has exactly one name with a task configuration beneath it. See Supported Features for which configuration variants Lemline can execute.">Task Types</a> for individual constructs, <a href="lemline-ref-auth.html" id="z6l41in_35" data-tooltip="Authentication policies are part of the Open Workflow DSL. Lemline supports basic and bearer authentication for its HTTP executor. See Supported Features for runtime support by protocol and authentication type.">Authentication</a> for credential placement, and <a href="lemline-howto-define-workflow.html" id="z6l41in_36" data-tooltip="Start with a YAML file containing a document section and a do list.">How to Define a Workflow</a> for the main authoring steps.</p></section><section class="chapter"><h2 id="run-the-examples" data-toc="run-the-examples">Run the Examples</h2><p id="z6l41in_37">Every example on this page is a complete workflow. Complete <a href="lemline-tutorial-setup.html" id="z6l41in_45" data-tooltip="Run Lemline on one machine with SQLite. Lemline stores workflow definitions, queued messages, and workflow history in local files. Use a writable directory on a local filesystem.">the SQLite setup</a>, save each example under the file name used below, and run the commands from the setup directory. With the JAR, substitute <code class="code" id="z6l41in_46">java -jar lemline.jar</code> for <code class="code" id="z6l41in_47">bin/lemline</code>.</p><p id="z6l41in_38">Start the <a href="lemline-tutorial-order-processing.html#start-the-tutorial-shop" id="z6l41in_48" data-tooltip="Complete the SQLite setup and keep the worker running on the host. In a separate terminal, open the root of the Lemline source checkout matching these docs (the directory containing examples/tutorial-services). With Docker Compose running, start the single shop container:">tutorial shop</a> from the root of the Lemline source checkout:</p><div class="code-block" data-lang="bash">
+docker compose -f examples/tutorial-services/compose.yaml up -d
+</div><p id="z6l41in_40">Keep the setup worker running and use a second terminal in the setup directory.</p><div class="code-block" data-lang="bash">
+bin/lemline definition post -f validate-and-route-order.yaml
+bin/lemline instance start examples validate-and-route-order --input '{&quot;orderId&quot;:&quot;ORD-301&quot;,&quot;total&quot;:250}'
+bin/lemline definition post -f transform-workflow-data.yaml
+bin/lemline instance start examples transform-workflow-data --input '{&quot;user&quot;:{&quot;id&quot;:&quot;C-100&quot;},&quot;payload&quot;:{&quot;items&quot;:[{&quot;id&quot;:&quot;SKU-1&quot;},{&quot;id&quot;:&quot;SKU-2&quot;}]}}'
+bin/lemline definition post -f retry-and-fallback.yaml
+bin/lemline instance start examples retry-and-fallback --input '{&quot;failures&quot;:1}'
+bin/lemline definition post -f map-order-items.yaml
+bin/lemline instance start examples map-order-items --input '{&quot;items&quot;:[{&quot;id&quot;:&quot;SKU-1&quot;,&quot;quantity&quot;:2,&quot;price&quot;:25},{&quot;id&quot;:&quot;SKU-2&quot;,&quot;quantity&quot;:1,&quot;price&quot;:12}]}'
+</div><div class="table-wrapper"><table class="wide" id="z6l41in_42"><thead><tr class="ijRowHead" id="z6l41in_49"><th id="z6l41in_54"><p>Example</p></th><th id="z6l41in_55"><p>Expected result</p></th></tr></thead><tbody><tr id="z6l41in_50"><td id="z6l41in_56"><p><code class="code" id="z6l41in_58">validate-and-route-order</code></p></td><td id="z6l41in_57"><p><code class="code" id="z6l41in_59">{&quot;orderId&quot;:&quot;ORD-301&quot;,&quot;status&quot;:&quot;accepted&quot;}</code></p></td></tr><tr id="z6l41in_51"><td id="z6l41in_60"><p><code class="code" id="z6l41in_62">transform-workflow-data</code></p></td><td id="z6l41in_61"><p><code class="code" id="z6l41in_63">{&quot;customerId&quot;:&quot;C-100&quot;,&quot;itemCount&quot;:2}</code></p></td></tr><tr id="z6l41in_52"><td id="z6l41in_64"><p><code class="code" id="z6l41in_66">retry-and-fallback</code></p></td><td id="z6l41in_65"><p>The stock, after one retry</p></td></tr><tr id="z6l41in_53"><td id="z6l41in_67"><p><code class="code" id="z6l41in_69">map-order-items</code></p></td><td id="z6l41in_68"><p>The last line, <code class="code" id="z6l41in_70">{&quot;itemId&quot;:&quot;SKU-2&quot;,&quot;index&quot;:1,&quot;lineTotal&quot;:12}</code></p></td></tr></tbody></table></div><p id="z6l41in_43">Stop the shop when you are done:</p><div class="code-block" data-lang="bash">
+docker compose -f examples/tutorial-services/compose.yaml down
+</div></section><div class="last-modified">25 November 2026</div><div data-feedback-placeholder="true"></div><div class="navigation-links _bottom"><a href="lemline-howto-scaling.html" class="navigation-links__prev">How to Configure Scaling</a><a href="lemline-ref-task-types.html" class="navigation-links__next">Workflow Task Types</a></div></article><div id="disqus_thread"></div></div></section></main></div><script src="https://resources.jetbrains.com/writerside/apidoc/6.22.0-b776/app.js"></script></body></html>

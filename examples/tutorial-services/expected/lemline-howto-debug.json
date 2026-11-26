@@ -1,6 +1,0 @@
-{ "settleSeconds": 60, "instances": [
-  { "type": "workflowFaulted", "error": { "type": "~errors/expression$", "status": 400, "title": "~^Unable to evaluate content \\{\"orderId\":\"ORD-1\"\\} using expr \\[\\.items\\[\\]" } },
-  { "type": "workflowCompleted", "output": { "sku": "SKU-1", "available": 0, "reserved": 0 } },
-  { "type": "workflowCompleted", "output": { "sku": "SKU-1", "available": 100 } },
-  { "type": "workflowFaulted", "error": { "title": "~^Socket timeout has expired .*socket_timeout=30000" } }
-], "state": { "requests": [ { "path": "/stock", "query": { "delayMs": "1000" }, "status": 200 } ] } }

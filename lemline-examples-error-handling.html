@@ -1,0 +1,399 @@
+<!DOCTYPE html SYSTEM "about:legacy-compat">
+<html lang="en-US" data-preset="contrast" data-primary-color="#2E6F7E"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="robots" content="noindex"><meta name="built-on" content="2026-11-26T17:17:49.443066054"><title>Lemline Error Handling Examples | Lemline documentation</title><script type="application/json" id="virtual-toc-data">[{"id":"run-the-examples","level":0,"title":"Run the Examples","anchor":"#run-the-examples"},{"id":"basic-try-catch-pattern","level":0,"title":"Basic Try-Catch Pattern","anchor":"#basic-try-catch-pattern"},{"id":"error-handling-with-custom-actions","level":0,"title":"Error Handling with Custom Actions","anchor":"#error-handling-with-custom-actions"},{"id":"retry-mechanisms","level":0,"title":"Retry Mechanisms","anchor":"#retry-mechanisms"},{"id":"conditional-retry","level":0,"title":"Conditional Retry","anchor":"#conditional-retry"},{"id":"error-type-hierarchies","level":0,"title":"Error Type Hierarchies","anchor":"#error-type-hierarchies"},{"id":"compensating-transactions","level":0,"title":"Compensating Transactions","anchor":"#compensating-transactions"},{"id":"circuit-breaker-pattern","level":0,"title":"Circuit Breaker Pattern","anchor":"#circuit-breaker-pattern"},{"id":"timeout-handling","level":0,"title":"Timeout Handling","anchor":"#timeout-handling"},{"id":"comprehensive-error-handling-strategy","level":0,"title":"Comprehensive Error Handling Strategy","anchor":"#comprehensive-error-handling-strategy"},{"id":"best-practices-for-error-handling","level":0,"title":"Best Practices for Error Handling","anchor":"#best-practices-for-error-handling"},{"id":"conclusion","level":0,"title":"Conclusion","anchor":"#conclusion"}]</script><script type="application/json" id="topic-shortcuts"></script><link href="https://resources.jetbrains.com/writerside/apidoc/6.22.0-b776/app.css" rel="stylesheet"><link href="static/custom.css" rel="stylesheet"><link rel="icon" type="image/png" sizes="16x16" href="images/lemly.png"><meta name="image" content="https://docs.lemline.com/social-preview.png"><!-- Open Graph --><meta property="og:title" content="Lemline Error Handling Examples | Lemline documentation"><meta property="og:description" content=""><meta property="og:image" content="https://docs.lemline.com/social-preview.png"><meta property="og:site_name" content="Lemline documentation Help"><meta property="og:type" content="website"><meta property="og:locale" content="en_US"><meta property="og:url" content="https://docs.lemline.com/lemline-examples-error-handling.html"><!-- End Open Graph --><!-- Twitter Card --><meta name="twitter:card" content="summary_large_image"><meta name="twitter:site" content=""><meta name="twitter:title" content="Lemline Error Handling Examples | Lemline documentation"><meta name="twitter:description" content=""><meta name="twitter:creator" content=""><meta name="twitter:image:src" content="https://docs.lemline.com/social-preview.png"><!-- End Twitter Card --><!-- Schema.org WebPage --><script type="application/ld+json">{
+    "@context": "http://schema.org",
+    "@type": "WebPage",
+    "@id": "https://docs.lemline.com/lemline-examples-error-handling.html#webpage",
+    "url": "https://docs.lemline.com/lemline-examples-error-handling.html",
+    "name": "Lemline Error Handling Examples | Lemline documentation",
+    "description": "",
+    "image": "https://docs.lemline.com/social-preview.png",
+    "inLanguage":"en-US"
+}</script><!-- End Schema.org --><!-- Schema.org WebSite --><script type="application/ld+json">{
+    "@type": "WebSite",
+    "@id": "https://docs.lemline.com/#website",
+    "url": "https://docs.lemline.com/",
+    "name": "Lemline documentation Help"
+}</script><!-- End Schema.org --></head><body data-id="lemline-examples-error-handling" data-main-title="Lemline Error Handling Examples" data-article-props="{&quot;seeAlsoStyle&quot;:&quot;links&quot;}" data-template="article" data-breadcrumbs="Examples Library"><div class="wrapper"><main class="panel _main"><header class="panel__header"><div class="container"><h3>Lemline documentation  Help</h3><div class="panel-trigger"></div></div></header><section class="panel__content"><div class="container"><article class="article" data-shortcut-switcher="inactive"><h1 data-toc="lemline-examples-error-handling" id="lemline-examples-error-handling.md">Lemline Error Handling Examples</h1><p id="z7tt8ps_3">This document provides examples of error handling and resilience patterns in Lemline workflows. Robust error handling is essential for building reliable workflows that can gracefully recover from failures when interacting with external systems, processing data, or executing business logic.</p><aside class="prompt" data-type="tip" data-title="" id="z7tt8ps_4"><p id="z7tt8ps_17"><span class="control" id="z7tt8ps_18">Lemline runtime:</span> a failed HTTP call raises a <code class="code" id="z7tt8ps_19">communication</code> error whose <code class="code" id="z7tt8ps_20">status</code> is the HTTP status, and whose title starts with it, for example <code class="code" id="z7tt8ps_21">HTTP 404: ...</code>. The examples on this page match HTTP failures on that type and status. See <a href="lemline-ref-errors.html" id="z7tt8ps_22" data-tooltip="This reference documents the standard error types and error handling capabilities in Lemline.">Error Reference</a>.</p></aside><section class="chapter"><h2 id="run-the-examples" data-toc="run-the-examples">Run the Examples</h2><p id="z7tt8ps_23">Each example below is a complete workflow. Complete <a href="lemline-tutorial-setup.html" id="z7tt8ps_26" data-tooltip="Run Lemline on one machine with SQLite. Lemline stores workflow definitions, queued messages, and workflow history in local files. Use a writable directory on a local filesystem.">the SQLite setup</a> and keep its worker running. Run the commands from a second terminal in the setup directory. With the JAR, substitute <code class="code" id="z7tt8ps_27">java -jar lemline.jar</code> for <code class="code" id="z7tt8ps_28">bin/lemline</code>. The examples call the <a href="lemline-tutorial-order-processing.html#start-the-tutorial-shop" id="z7tt8ps_29" data-tooltip="Complete the SQLite setup and keep the worker running on the host. In a separate terminal, open the root of the Lemline source checkout matching these docs (the directory containing examples/tutorial-services). With Docker Compose running, start the single shop container:">tutorial shop</a>, whose <code class="code" id="z7tt8ps_30">fail</code>, <code class="code" id="z7tt8ps_31">failTimes</code> and <code class="code" id="z7tt8ps_32">delayMs</code> query parameters produce the failures and the slow answer. Start it from the root of the Lemline source checkout:</p><div class="code-block" data-lang="bash">
+docker compose -f examples/tutorial-services/compose.yaml up -d
+</div><p id="z7tt8ps_25">The worker picks up delayed retries every 10 seconds, so allow a minute or two for the retry examples.</p></section><section class="chapter"><h2 id="basic-try-catch-pattern" data-toc="basic-try-catch-pattern">Basic Try-Catch Pattern</h2><p id="z7tt8ps_33">The fundamental error handling mechanism in Open Workflow DSL is the try-catch block, which allows workflows to catch and handle exceptions.</p><section class="chapter"><h3 id="simple-try-catch-example" data-toc="simple-try-catch-example">Simple Try-Catch Example</h3><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: catch-missing-product
+  version: '1.0.0'
+do:
+  - tryGetProduct:
+      try:
+        - getProduct:
+            call: http
+            with:
+              method: get
+              endpoint: '${ &quot;http://127.0.0.1:8787/products/&quot; + $workflow.input.productId + (if $workflow.input.failStatus then &quot;?fail=\($workflow.input.failStatus)&quot; else &quot;&quot; end) }'
+      catch:
+        errors:
+          with:
+            type: https://open-workflow-specification.org/spec/1.0.0/errors/communication
+            status: 404
+</div><p id="z7tt8ps_36">Save it as <code class="code" id="z7tt8ps_43">simple-try-catch-example.yaml</code>:</p><div class="code-block" data-lang="bash">
+bin/lemline definition post -f simple-try-catch-example.yaml
+bin/lemline instance start examples catch-missing-product --input '{&quot;productId&quot;:&quot;SKU-1&quot;}'
+bin/lemline instance start examples catch-missing-product --input '{&quot;productId&quot;:&quot;SKU-404&quot;}'
+bin/lemline instance start examples catch-missing-product --input '{&quot;productId&quot;:&quot;SKU-1&quot;,&quot;failStatus&quot;:500}'
+</div><p id="z7tt8ps_38">The first instance returns the garden hose. For <code class="code" id="z7tt8ps_44">SKU-404</code> the shop answers HTTP 404: the error is caught and the workflow completes with the task input, <code class="code" id="z7tt8ps_45">{&quot;productId&quot;:&quot;SKU-404&quot;}</code>. The HTTP 500 does not match the condition: the instance faults with a <code class="code" id="z7tt8ps_46">communication</code> error, status 500.</p><p id="z7tt8ps_39">This example demonstrates:</p><ul class="list _bullet" id="z7tt8ps_40"><li class="list__item" id="z7tt8ps_47"><p id="z7tt8ps_51">Wrapping a potentially failing HTTP call in a <code class="code" id="z7tt8ps_52">try</code> block</p></li><li class="list__item" id="z7tt8ps_48"><p id="z7tt8ps_53">Catching only the HTTP 404 response, with <code class="code" id="z7tt8ps_54">catch.errors.with</code> on the <code class="code" id="z7tt8ps_55">communication</code> type and status 404</p></li><li class="list__item" id="z7tt8ps_49"><p id="z7tt8ps_56">Building the request URI from the <code class="code" id="z7tt8ps_57">productId</code> workflow input</p></li><li class="list__item" id="z7tt8ps_50"><p id="z7tt8ps_58">The workflow continues after the error is caught</p></li></ul><p id="z7tt8ps_41">Key aspects of basic try-catch:</p><ul class="list _bullet" id="z7tt8ps_42"><li class="list__item" id="z7tt8ps_59"><p id="z7tt8ps_62">Execution continues after the catch block</p></li><li class="list__item" id="z7tt8ps_60"><p id="z7tt8ps_63">If an error occurs that doesn't match the <code class="code" id="z7tt8ps_64">errors</code> criteria, it will propagate up</p></li><li class="list__item" id="z7tt8ps_61"><p id="z7tt8ps_65">If no error occurs, the <code class="code" id="z7tt8ps_66">catch</code> block is skipped</p></li></ul></section></section><section class="chapter"><h2 id="error-handling-with-custom-actions" data-toc="error-handling-with-custom-actions">Error Handling with Custom Actions</h2><p id="z7tt8ps_67">When an error occurs, you often need to perform specific actions in response, such as logging, notification, or fallback behavior.</p><section class="chapter"><h3 id="try-catch-with-custom-error-handling" data-toc="try-catch-with-custom-error-handling">Try-Catch with Custom Error Handling</h3><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: reserve-known-product
+  version: '1.0.0'
+do:
+  - tryGetProduct:
+      try:
+        - getProduct:
+            call: http
+            with:
+              method: get
+              endpoint: '${ &quot;http://127.0.0.1:8787/products/&quot; + $workflow.input.productId + (if $workflow.input.failStatus then &quot;?fail=\($workflow.input.failStatus)&quot; else &quot;&quot; end) }'
+      catch:
+        errors:
+          with:
+            type: https://open-workflow-specification.org/spec/1.0.0/errors/communication
+            status: 404
+        as: error
+        do:
+          - notifySupport:
+              emit:
+                event:
+                  with:
+                    source: https://events.example.com/shop
+                    type: com.example.product.not-found
+                    data: ${ $error }
+          - setError:
+              set:
+                error: ${ $error }
+              export:
+                as: '${ $context + { error: $error } }'
+  - reserveProduct:
+      if: ${ $context.error == null }
+      call: http
+      with:
+        method: post
+        endpoint: http://127.0.0.1:8787/reservations
+        body:
+          orderId: ${ $workflow.input.orderId }
+          items:
+            - id: ${ $workflow.input.productId }
+              quantity: 1
+</div><p id="z7tt8ps_70">Save it as <code class="code" id="z7tt8ps_75">try-catch-with-custom-error-handling.yaml</code>:</p><div class="code-block" data-lang="bash">
+bin/lemline definition post -f try-catch-with-custom-error-handling.yaml
+bin/lemline instance start examples reserve-known-product --input '{&quot;productId&quot;:&quot;SKU-1&quot;,&quot;orderId&quot;:&quot;ORD-1201&quot;}'
+bin/lemline instance start examples reserve-known-product --input '{&quot;productId&quot;:&quot;SKU-404&quot;,&quot;orderId&quot;:&quot;ORD-1202&quot;}'
+</div><p id="z7tt8ps_72">For SKU-1, the product is found and one unit is reserved for <code class="code" id="z7tt8ps_76">ORD-1201</code>. For SKU-404, the catch emits <code class="code" id="z7tt8ps_77">com.example.product.not-found</code> and stores the error in the context, so <code class="code" id="z7tt8ps_78">reserveProduct</code> is skipped: the shop has no reservation for <code class="code" id="z7tt8ps_79">ORD-1202</code>.</p><p id="z7tt8ps_73">This example demonstrates:</p><ul class="list _bullet" id="z7tt8ps_74"><li class="list__item" id="z7tt8ps_80"><p id="z7tt8ps_85">Capturing the error in a variable using <code class="code" id="z7tt8ps_86">as: error</code></p></li><li class="list__item" id="z7tt8ps_81"><p id="z7tt8ps_87">Executing custom actions in the catch block using <code class="code" id="z7tt8ps_88">do</code></p></li><li class="list__item" id="z7tt8ps_82"><p id="z7tt8ps_89">Emitting an event for notification purposes</p></li><li class="list__item" id="z7tt8ps_83"><p id="z7tt8ps_90">Storing the error in the workflow context</p></li><li class="list__item" id="z7tt8ps_84"><p id="z7tt8ps_91">Conditionally executing subsequent tasks based on error state</p></li></ul></section></section><section class="chapter"><h2 id="retry-mechanisms" data-toc="retry-mechanisms">Retry Mechanisms</h2><p id="z7tt8ps_92">For transient failures, retry mechanisms allow workflows to automatically attempt the operation again after a delay.</p><section class="chapter"><h3 id="inline-retry-configuration" data-toc="inline-retry-configuration">Inline Retry Configuration</h3><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: retry-inline
+  version: '1.0.0'
+do:
+  - tryGetProduct:
+      try:
+        - getProduct:
+            call: http
+            with:
+              method: get
+              endpoint: '${ &quot;http://127.0.0.1:8787/products/&quot; + $workflow.input.productId + &quot;?fail=503&amp;failTimes=\($workflow.input.failures // 0)&amp;key=\($workflow.id)&quot; }'
+      catch:
+        errors:
+          with:
+            type: https://open-workflow-specification.org/spec/1.0.0/errors/communication
+            status: 503
+        retry:
+          delay:
+            seconds: 3
+          backoff:
+            exponential: {}
+          limit:
+            attempt:
+              count: 5
+</div><p id="z7tt8ps_96">Save it as <code class="code" id="z7tt8ps_103">inline-retry-configuration.yaml</code>:</p><div class="code-block" data-lang="bash">
+bin/lemline definition post -f inline-retry-configuration.yaml
+bin/lemline instance start examples retry-inline --input '{&quot;productId&quot;:&quot;SKU-2&quot;,&quot;failures&quot;:2}'
+</div><p id="z7tt8ps_98">The shop answers HTTP 503 twice, then returns the watering can after two retries.</p><p id="z7tt8ps_99">This example demonstrates:</p><ul class="list _bullet" id="z7tt8ps_100"><li class="list__item" id="z7tt8ps_104"><p id="z7tt8ps_108">Retrying a failed operation only for an HTTP 503 response (Service Unavailable)</p></li><li class="list__item" id="z7tt8ps_105"><p id="z7tt8ps_109">Initial delay of 3 seconds before the first retry</p></li><li class="list__item" id="z7tt8ps_106"><p id="z7tt8ps_110">Exponential backoff for subsequent retries</p></li><li class="list__item" id="z7tt8ps_107"><p id="z7tt8ps_111">Maximum of 5 retry attempts</p></li></ul><p id="z7tt8ps_101">Key aspects of retry configuration:</p><ul class="list _bullet" id="z7tt8ps_102"><li class="list__item" id="z7tt8ps_112"><p id="z7tt8ps_115"><code class="code" id="z7tt8ps_116">delay</code>: The initial delay before the first retry</p></li><li class="list__item" id="z7tt8ps_113"><p id="z7tt8ps_117"><code class="code" id="z7tt8ps_118">backoff</code>: Strategy for increasing delay between retries (exponential recommended)</p></li><li class="list__item" id="z7tt8ps_114"><p id="z7tt8ps_119"><code class="code" id="z7tt8ps_120">limit</code>: Constraints on retry attempts, typically by count or duration</p></li></ul></section><section class="chapter"><h3 id="reusable-retry-configuration" data-toc="reusable-retry-configuration">Reusable Retry Configuration</h3><p id="z7tt8ps_121">For consistent retry policies across multiple operations, define reusable retry configurations:</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: retry-reusable
+  version: '1.0.0'
+use:
+  retries:
+    default:
+      delay:
+        seconds: 3
+      backoff:
+        exponential: {}
+      limit:
+        attempt:
+          count: 5
+do:
+  - tryGetProduct:
+      try:
+        - getProduct:
+            call: http
+            with:
+              method: get
+              endpoint: '${ &quot;http://127.0.0.1:8787/products/&quot; + $workflow.input.productId + &quot;?fail=503&amp;failTimes=\($workflow.input.failures // 0)&amp;key=\($workflow.id)&quot; }'
+      catch:
+        errors:
+          with:
+            type: https://open-workflow-specification.org/spec/1.0.0/errors/communication
+            status: 503
+        retry: default
+</div><p id="z7tt8ps_123">Save it as <code class="code" id="z7tt8ps_128">reusable-retry-configuration.yaml</code>:</p><div class="code-block" data-lang="bash">
+bin/lemline definition post -f reusable-retry-configuration.yaml
+bin/lemline instance start examples retry-reusable --input '{&quot;productId&quot;:&quot;SKU-2&quot;,&quot;failures&quot;:2}'
+</div><p id="z7tt8ps_125">Same result as the inline policy: two retries, then the watering can.</p><p id="z7tt8ps_126">This example demonstrates:</p><ul class="list _bullet" id="z7tt8ps_127"><li class="list__item" id="z7tt8ps_129"><p id="z7tt8ps_132">Defining a reusable retry policy named <code class="code" id="z7tt8ps_133">default</code></p></li><li class="list__item" id="z7tt8ps_130"><p id="z7tt8ps_134">Referencing the reusable policy in catch blocks</p></li><li class="list__item" id="z7tt8ps_131"><p id="z7tt8ps_135">Maintaining consistent retry behavior across the workflow</p></li></ul></section></section><section class="chapter"><h2 id="conditional-retry" data-toc="conditional-retry">Conditional Retry</h2><p id="z7tt8ps_136">Sometimes you want to retry only under specific conditions, rather than for all errors of a certain type.</p><section class="chapter"><h3 id="conditional-retry-example" data-toc="conditional-retry-example">Conditional Retry Example</h3><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: conditional-retry
+  version: '1.0.0'
+do:
+  - tryReadStock:
+      try:
+        - readStock:
+            call: http
+            with:
+              method: get
+              endpoint: http://127.0.0.1:8787/stock
+              query:
+                fail: ${ .failStatus | tostring }
+                failTimes: '1'
+                key: ${ $workflow.id }
+      catch:
+        errors:
+          with:
+            type: https://open-workflow-specification.org/spec/1.0.0/errors/communication
+        as: stockError
+        retry:
+          when: '${ $stockError.status &gt;= 500 or $stockError.status == 429 }'
+          delay:
+            seconds: 2
+          backoff:
+            exponential: {}
+          limit:
+            attempt:
+              count: 3
+</div><p id="z7tt8ps_139">Save it as <code class="code" id="z7tt8ps_144">conditional-retry-example.yaml</code>:</p><div class="code-block" data-lang="bash">
+bin/lemline definition post -f conditional-retry-example.yaml
+bin/lemline instance start examples conditional-retry --input '{&quot;failStatus&quot;:503}'
+bin/lemline instance start examples conditional-retry --input '{&quot;failStatus&quot;:429}'
+bin/lemline instance start examples conditional-retry --input '{&quot;failStatus&quot;:400}'
+</div><p id="z7tt8ps_141">Each input makes the shop fail once. After a 503 or a 429, the call is retried and the workflow returns the stock. After a 400, <code class="code" id="z7tt8ps_145">when</code> is false: there is no retry, the error still matches the <code class="code" id="z7tt8ps_146">catch</code>, so it counts as handled and the workflow completes with its input <code class="code" id="z7tt8ps_147">{&quot;failStatus&quot;:400}</code>. The shop's request list shows two calls for each of the first two instances and one for the third.</p><p id="z7tt8ps_142">This example demonstrates:</p><ul class="list _bullet" id="z7tt8ps_143"><li class="list__item" id="z7tt8ps_148"><p id="z7tt8ps_152">Capturing the error in a variable using <code class="code" id="z7tt8ps_153">as: stockError</code></p></li><li class="list__item" id="z7tt8ps_149"><p id="z7tt8ps_154">Using a condition with <code class="code" id="z7tt8ps_155">when</code> to determine if retry should occur</p></li><li class="list__item" id="z7tt8ps_150"><p id="z7tt8ps_156">Only retrying for server errors (5xx) or rate limiting (429)</p></li><li class="list__item" id="z7tt8ps_151"><p id="z7tt8ps_157">Customizing the retry policy for these specific conditions</p></li></ul></section></section><section class="chapter"><h2 id="error-type-hierarchies" data-toc="error-type-hierarchies">Error Type Hierarchies</h2><p id="z7tt8ps_158">The DSL supports hierarchical error types, allowing for more flexible error matching.</p><section class="chapter"><h3 id="error-type-hierarchy-example" data-toc="error-type-hierarchy-example">Error Type Hierarchy Example</h3><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: error-hierarchy
+  version: '1.0.0'
+do:
+  - tryCheckEmail:
+      try:
+        - checkEmail:
+            call: http
+            with:
+              method: post
+              endpoint: http://127.0.0.1:8787/email-checks
+              query:
+                fail: '503'
+                failTimes: ${ if .serviceDown then &quot;1&quot; else &quot;0&quot; end }
+                key: ${ $workflow.id }
+              body:
+                email: ${ .email }
+        - rejectInvalidEmail:
+            if: ${ .valid == false }
+            raise:
+              error:
+                type: https://example.com/errors/api/validation
+                status: 422
+                title: Invalid email
+      catch:
+        when: ${ $error.type | startswith(&quot;https://example.com/errors&quot;) }
+        as: error
+        do:
+          - routeByErrorType:
+              switch:
+                - validationError:
+                    when: ${ $error.type | startswith(&quot;https://example.com/errors/api/validation&quot;) }
+                    then: handleValidation
+                - apiError:
+                    when: ${ $error.type | startswith(&quot;https://example.com/errors/api&quot;) }
+                    then: handleGenericApiError
+                - default:
+                    then: handleGenericError
+          - handleValidation:
+              set:
+                errorType: validation
+                errorDetails: ${ $error }
+              then: exit
+          - handleGenericApiError:
+              set:
+                errorType: api
+                errorDetails: ${ $error }
+              then: exit
+          - handleGenericError:
+              set:
+                errorType: generic
+                errorDetails: ${ $error }
+</div><p id="z7tt8ps_161">Save it as <code class="code" id="z7tt8ps_166">error-type-hierarchy-example.yaml</code>:</p><div class="code-block" data-lang="bash">
+bin/lemline definition post -f error-type-hierarchy-example.yaml
+bin/lemline instance start examples error-hierarchy --input '{&quot;email&quot;:&quot;ada@example.com&quot;}'
+bin/lemline instance start examples error-hierarchy --input '{&quot;email&quot;:&quot;not-an-email&quot;}'
+bin/lemline instance start examples error-hierarchy --input '{&quot;email&quot;:&quot;ada@example.com&quot;,&quot;serviceDown&quot;:true}'
+</div><p id="z7tt8ps_163">A valid email completes with the shop's answer. An invalid one raises the typed error, which the <code class="code" id="z7tt8ps_167">switch</code> routes to <code class="code" id="z7tt8ps_168">handleValidation</code>: <code class="code" id="z7tt8ps_169">errorType</code> is <code class="code" id="z7tt8ps_170">validation</code>. When the shop answers HTTP 503, the error is a <code class="code" id="z7tt8ps_171">communication</code> error outside <code class="code" id="z7tt8ps_172">https://example.com/errors</code>: the <code class="code" id="z7tt8ps_173">catch</code> ignores it and the instance faults.</p><p id="z7tt8ps_164">This example demonstrates:</p><ul class="list _bullet" id="z7tt8ps_165"><li class="list__item" id="z7tt8ps_174"><p id="z7tt8ps_179">A task that raises a typed error when the shop reports an invalid email</p></li><li class="list__item" id="z7tt8ps_175"><p id="z7tt8ps_180">A single <code class="code" id="z7tt8ps_181">catch</code> that only accepts errors under <code class="code" id="z7tt8ps_182">https://example.com/errors</code></p></li><li class="list__item" id="z7tt8ps_176"><p id="z7tt8ps_183">Hierarchical error matching with a <code class="code" id="z7tt8ps_184">switch</code> on the caught error's type (most specific to most generic)</p></li><li class="list__item" id="z7tt8ps_177"><p id="z7tt8ps_185">Different handling for each error category</p></li><li class="list__item" id="z7tt8ps_178"><p id="z7tt8ps_186">Switch cases are evaluated in order, and the first matching case handles the error</p></li></ul></section></section><section class="chapter"><h2 id="compensating-transactions" data-toc="compensating-transactions">Compensating Transactions</h2><p id="z7tt8ps_187">In some workflows, you need to perform cleanup actions when an error occurs after some operations have already succeeded.</p><section class="chapter"><h3 id="compensating-transaction-example" data-toc="compensating-transaction-example">Compensating Transaction Example</h3><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: compensating-transaction
+  version: '1.0.0'
+do:
+  - processOrder:
+      try:
+        - reserveInventory:
+            call: http
+            with:
+              method: post
+              endpoint: http://127.0.0.1:8787/reservations
+              body:
+                orderId: ${ .orderId }
+                items: ${ .orderItems }
+            export:
+              as: '${ $context + { inventoryReservation: . } }'
+        - processPayment:
+            call: http
+            with:
+              method: post
+              endpoint: http://127.0.0.1:8787/charges
+              body:
+                orderId: ${ $workflow.input.orderId }
+                paymentInfo: ${ $workflow.input.paymentDetails }
+      catch:
+        as: paymentError
+        do:
+          - cancelReservation:
+              call: http
+              with:
+                method: delete
+                endpoint: '${ &quot;http://127.0.0.1:8787/reservations/&quot; + $context.inventoryReservation.id }'
+          - notifyCustomer:
+              call: http
+              with:
+                method: post
+                endpoint: http://127.0.0.1:8787/notifications
+                body:
+                  reference: ${ $workflow.input.orderId }
+                  recipient: ${ $workflow.input.customerId }
+                  message: '${ &quot;Payment failed: &quot; + $paymentError.title }'
+</div><p id="z7tt8ps_190">Save it as <code class="code" id="z7tt8ps_195">compensating-transaction-example.yaml</code>:</p><div class="code-block" data-lang="bash">
+bin/lemline definition post -f compensating-transaction-example.yaml
+bin/lemline instance start examples compensating-transaction --input '{&quot;orderId&quot;:&quot;ORD-1203&quot;,&quot;customerId&quot;:&quot;C-100&quot;,&quot;orderItems&quot;:[{&quot;id&quot;:&quot;SKU-1&quot;,&quot;quantity&quot;:2}],&quot;paymentDetails&quot;:{&quot;token&quot;:&quot;approved&quot;}}'
+bin/lemline instance start examples compensating-transaction --input '{&quot;orderId&quot;:&quot;ORD-1204&quot;,&quot;customerId&quot;:&quot;C-100&quot;,&quot;orderItems&quot;:[{&quot;id&quot;:&quot;SKU-1&quot;,&quot;quantity&quot;:2}],&quot;paymentDetails&quot;:{&quot;token&quot;:&quot;declined&quot;}}'
+</div><p id="z7tt8ps_192">ORD-1203 is reserved and paid. For ORD-1204 the charge answers HTTP 402: the catch releases the reservation and leaves <code class="code" id="z7tt8ps_196">Payment failed: HTTP 402: &hellip;</code> in the inbox of <code class="code" id="z7tt8ps_197">C-100</code>. The shop's stock goes back up by 2.</p><p id="z7tt8ps_193">This example demonstrates:</p><ul class="list _bullet" id="z7tt8ps_194"><li class="list__item" id="z7tt8ps_198"><p id="z7tt8ps_203">A sequence of operations (inventory reservation, payment processing)</p></li><li class="list__item" id="z7tt8ps_199"><p id="z7tt8ps_204">Capturing the output of the first operation for later reference</p></li><li class="list__item" id="z7tt8ps_200"><p id="z7tt8ps_205">When a call in the <code class="code" id="z7tt8ps_206">try</code> block fails, executing compensating actions to clean up</p></li><li class="list__item" id="z7tt8ps_201"><p id="z7tt8ps_207">Canceling the inventory reservation to maintain consistency</p></li><li class="list__item" id="z7tt8ps_202"><p id="z7tt8ps_208">Notifying the customer about the failure</p></li></ul></section></section><section class="chapter"><h2 id="circuit-breaker-pattern" data-toc="circuit-breaker-pattern">Circuit Breaker Pattern</h2><p id="z7tt8ps_209">The circuit breaker pattern prevents repeated calls to a failing service, reducing load and allowing it to recover.</p><section class="chapter"><h3 id="circuit-breaker-example" data-toc="circuit-breaker-example">Circuit Breaker Example</h3><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: circuit-breaker
+  version: '1.0.0'
+use:
+  retries:
+    circuitBreaker:
+      backoff:
+        exponential: {}
+      delay:
+        seconds: 1
+      limit:
+        attempt:
+          count: 3
+do:
+  - callExternalService:
+      try:
+        - makeApiCall:
+            call: http
+            with:
+              method: get
+              endpoint: http://127.0.0.1:8787/stock
+              query:
+                fail: '503'
+                key: ${ $workflow.id }
+      catch:
+        errors:
+          with:
+            type: https://open-workflow-specification.org/spec/1.0.0/errors/communication
+        retry: circuitBreaker
+</div><p id="z7tt8ps_212">Save it as <code class="code" id="z7tt8ps_217">circuit-breaker-example.yaml</code>:</p><div class="code-block" data-lang="bash">
+bin/lemline definition post -f circuit-breaker-example.yaml
+bin/lemline instance start examples circuit-breaker
+</div><p id="z7tt8ps_214">The shop answers HTTP 503 every time. The workflow calls it four times (the call and three retries), then stops calling: the catch has no <code class="code" id="z7tt8ps_218">do</code> list, so the error counts as handled and the instance completes with its input.</p><p id="z7tt8ps_215">This example demonstrates:</p><ul class="list _bullet" id="z7tt8ps_216"><li class="list__item" id="z7tt8ps_219"><p id="z7tt8ps_223">A reusable retry policy named <code class="code" id="z7tt8ps_224">circuitBreaker</code> that bounds the calls to a failing service</p></li><li class="list__item" id="z7tt8ps_220"><p id="z7tt8ps_225">Exponential backoff starting at 1 second, so each retry waits longer than the previous one</p></li><li class="list__item" id="z7tt8ps_221"><p id="z7tt8ps_226"><code class="code" id="z7tt8ps_227">limit.attempt.count</code>: at most 3 retries, after which the workflow stops calling the service</p></li><li class="list__item" id="z7tt8ps_222"><p id="z7tt8ps_228">The DSL has no dedicated circuit breaker settings (failure threshold, recovery time): the retry limit is what stops the calls</p></li></ul></section></section><section class="chapter"><h2 id="timeout-handling" data-toc="timeout-handling">Timeout Handling</h2><p id="z7tt8ps_229">Timeouts prevent workflows from hanging indefinitely when external systems are unresponsive.</p><section class="chapter"><h3 id="timeout-example" data-toc="timeout-example">Timeout Example</h3><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: timeout-handling
+  version: '1.0.0'
+do:
+  - callWithTimeout:
+      try:
+        - longRunningOperation:
+            call: http
+            with:
+              method: get
+              endpoint: http://127.0.0.1:8787/stock
+              query:
+                delayMs: '5000'
+            timeout:
+              after:
+                seconds: 2
+      catch:
+        errors:
+          with:
+            type: https://open-workflow-specification.org/spec/1.0.0/errors/timeout
+        as: timeoutError
+        do:
+          - handleTimeout:
+              set:
+                status: timeout
+                message: Operation timed out after 2 seconds
+              then: exit
+</div><p id="z7tt8ps_232">Save it as <code class="code" id="z7tt8ps_239">timeout-example.yaml</code>:</p><div class="code-block" data-lang="bash">
+bin/lemline definition post -f timeout-example.yaml
+bin/lemline instance start examples timeout-handling
+</div><p id="z7tt8ps_234">The shop answers after 5 seconds. The 2-second task timeout is not applied: the call waits for the answer, the instance completes with the stock, and the catch branch does not run.</p><aside class="prompt" data-type="tip" data-title="" id="z7tt8ps_235"><p id="z7tt8ps_240"><span class="control" id="z7tt8ps_241">Lemline runtime:</span> only <code class="code" id="z7tt8ps_242">listen</code> task timeouts are enforced. Workflow-level timeouts and timeouts on other tasks are accepted but ignored for now. HTTP calls use fixed client limits instead: 15 seconds to connect, 30 seconds per request. The <code class="code" id="z7tt8ps_243">catch</code> branch of this example therefore does not run on Lemline yet.</p></aside><p id="z7tt8ps_236">This example shows how a timeout would be declared and caught:</p><ul class="list _bullet" id="z7tt8ps_237"><li class="list__item" id="z7tt8ps_244"><p id="z7tt8ps_247">Setting a timeout for an HTTP call</p></li><li class="list__item" id="z7tt8ps_245"><p id="z7tt8ps_248">Catching the specific timeout error type</p></li><li class="list__item" id="z7tt8ps_246"><p id="z7tt8ps_249">Custom handling for timeout conditions</p></li></ul><p id="z7tt8ps_238">On Lemline, use a <code class="code" id="z7tt8ps_250">listen</code> timeout, as in <a href="lemline-howto-lifecycle.html#bounding-how-long-a-workflow-waits" id="z7tt8ps_251" data-tooltip="Lemline does not enforce workflow-level timeouts yet, nor timeouts on tasks other than listen: they are accepted but ignored. To keep an instance from waiting forever for an external signal, put a timeout on the listen task:">How to cancel, resume, or suspend a workflow</a>, to bound a wait.</p></section></section><section class="chapter"><h2 id="comprehensive-error-handling-strategy" data-toc="comprehensive-error-handling-strategy">Comprehensive Error Handling Strategy</h2><p id="z7tt8ps_252">Several of these patterns combine in a single <code class="code" id="z7tt8ps_260">try</code> task:</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: retry-and-fallback
+  version: '1.0.0'
+use:
+  retries:
+    transient:
+      delay: PT2S
+      backoff:
+        exponential: {}
+      limit:
+        attempt:
+          count: 3
+do:
+  - fetchInventory:
+      try:
+        - requestInventory:
+            call: http
+            with:
+              method: get
+              endpoint: http://127.0.0.1:8787/stock
+              query:
+                fail: '503'
+                failTimes: ${ .failures // 0 | tostring }
+                key: ${ $workflow.id }
+      catch:
+        errors:
+          with:
+            type: https://open-workflow-specification.org/spec/1.0.0/errors/communication
+            status: 503
+        retry: transient
+        do:
+          - useCachedInventory:
+              set:
+                inventory: []
+                stale: true
+</div><p id="z7tt8ps_254">Save it as <code class="code" id="z7tt8ps_261">retry-and-fallback.yaml</code>:</p><div class="code-block" data-lang="bash">
+bin/lemline definition post -f retry-and-fallback.yaml
+bin/lemline instance start examples retry-and-fallback --input '{&quot;failures&quot;:5}'
+</div><p id="z7tt8ps_256">The call and its three retries fail; the workflow returns <code class="code" id="z7tt8ps_262">{&quot;inventory&quot;:[],&quot;stale&quot;:true}</code>. Stop the shop when you are done:</p><div class="code-block" data-lang="bash">
+docker compose -f examples/tutorial-services/compose.yaml down
+</div><p id="z7tt8ps_258">This example demonstrates:</p><ul class="list _bullet" id="z7tt8ps_259"><li class="list__item" id="z7tt8ps_263"><p id="z7tt8ps_267">A reusable retry definition declared in <code class="code" id="z7tt8ps_268">use.retries</code> and referenced by name</p></li><li class="list__item" id="z7tt8ps_264"><p id="z7tt8ps_269">Catching only the HTTP 503 response</p></li><li class="list__item" id="z7tt8ps_265"><p id="z7tt8ps_270">Retrying with exponential backoff, up to the attempt limit</p></li><li class="list__item" id="z7tt8ps_266"><p id="z7tt8ps_271">A fallback result set in <code class="code" id="z7tt8ps_272">catch.do</code> once the retries are exhausted</p></li></ul></section><section class="chapter"><h2 id="best-practices-for-error-handling" data-toc="best-practices-for-error-handling">Best Practices for Error Handling</h2><p id="z7tt8ps_273">When implementing error handling in Lemline workflows:</p><ol class="list _decimal" id="z7tt8ps_274" type="1"><li class="list__item" id="z7tt8ps_275"><p id="z7tt8ps_284"><span class="control" id="z7tt8ps_285">Categorize errors</span>: Distinguish between transient failures, permanent failures, and business exceptions</p></li><li class="list__item" id="z7tt8ps_276"><p id="z7tt8ps_286"><span class="control" id="z7tt8ps_287">Use hierarchy</span>: Organize error types hierarchically for flexible error matching</p></li><li class="list__item" id="z7tt8ps_277"><p id="z7tt8ps_288"><span class="control" id="z7tt8ps_289">Isolate dangerous operations</span>: Wrap risky operations in their own try-catch blocks</p></li><li class="list__item" id="z7tt8ps_278"><p id="z7tt8ps_290"><span class="control" id="z7tt8ps_291">Add context</span>: Capture and log relevant context information with errors</p></li><li class="list__item" id="z7tt8ps_279"><p id="z7tt8ps_292"><span class="control" id="z7tt8ps_293">Compensate for partial failures</span>: Always clean up after partial successes when an error occurs</p></li><li class="list__item" id="z7tt8ps_280"><p id="z7tt8ps_294"><span class="control" id="z7tt8ps_295">Consider idempotency</span>: Design operations to be safely retryable</p></li><li class="list__item" id="z7tt8ps_281"><p id="z7tt8ps_296"><span class="control" id="z7tt8ps_297">Set timeouts</span>: Prevent indefinite hanging by setting appropriate timeouts (Lemline only enforces timeouts on <code class="code" id="z7tt8ps_298">listen</code> tasks; HTTP calls use fixed limits of 15 s to connect and 30 s per request)</p></li><li class="list__item" id="z7tt8ps_282"><p id="z7tt8ps_299"><span class="control" id="z7tt8ps_300">Provide good error messages</span>: Make error messages informative for operations and customers</p></li><li class="list__item" id="z7tt8ps_283"><p id="z7tt8ps_301"><span class="control" id="z7tt8ps_302">Implement circuit breakers</span>: Protect services from overload during persistent failures</p></li></ol></section><section class="chapter"><h2 id="conclusion" data-toc="conclusion">Conclusion</h2><p id="z7tt8ps_303">These error handling examples demonstrate how to build robust, resilient workflows in Lemline. By properly implementing try-catch blocks, retries, and compensating transactions, you can create workflows that gracefully handle failures and maintain system consistency.</p><p id="z7tt8ps_304">For complex real-world examples that incorporate these error handling patterns, see the <a href="lemline-examples-real-world.html" id="z7tt8ps_305" data-tooltip="These examples model common orchestration patterns on the tutorial shop. Complete the SQLite setup and run the commands from the setup directory. With the JAR, substitute java -jar lemline.jar for bin/lemline. Start the tutorial shop from the root of the Lemline source checkout:">Real-world Examples</a> document.</p></section><div class="last-modified">25 November 2026</div><div data-feedback-placeholder="true"></div><div class="navigation-links _bottom"><a href="lemline-examples-integrations.html" class="navigation-links__prev">Lemline Integration Examples</a><a href="lemline-examples-real-world.html" class="navigation-links__next">Real-world workflow examples</a></div></article><div id="disqus_thread"></div></div></section></main></div><script src="https://resources.jetbrains.com/writerside/apidoc/6.22.0-b776/app.js"></script></body></html>

@@ -1,0 +1,91 @@
+<!DOCTYPE html SYSTEM "about:legacy-compat">
+<html lang="en-US" data-preset="contrast" data-primary-color="#2E6F7E"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="robots" content="noindex"><meta name="built-on" content="2026-11-26T17:17:49.902104572"><title>How to make an HTTP call | Lemline documentation</title><script type="application/json" id="virtual-toc-data">[{"id":"build-the-request","level":0,"title":"Build the request","anchor":"#build-the-request"},{"id":"use-a-dynamic-endpoint","level":0,"title":"Use a dynamic endpoint","anchor":"#use-a-dynamic-endpoint"},{"id":"authenticate","level":0,"title":"Authenticate","anchor":"#authenticate"},{"id":"recover-from-an-http-error","level":0,"title":"Recover from an HTTP error","anchor":"#recover-from-an-http-error"}]</script><script type="application/json" id="topic-shortcuts"></script><link href="https://resources.jetbrains.com/writerside/apidoc/6.22.0-b776/app.css" rel="stylesheet"><link href="static/custom.css" rel="stylesheet"><link rel="icon" type="image/png" sizes="16x16" href="images/lemly.png"><meta name="image" content="https://docs.lemline.com/social-preview.png"><!-- Open Graph --><meta property="og:title" content="How to make an HTTP call | Lemline documentation"><meta property="og:description" content=""><meta property="og:image" content="https://docs.lemline.com/social-preview.png"><meta property="og:site_name" content="Lemline documentation Help"><meta property="og:type" content="website"><meta property="og:locale" content="en_US"><meta property="og:url" content="https://docs.lemline.com/lemline-howto-http.html"><!-- End Open Graph --><!-- Twitter Card --><meta name="twitter:card" content="summary_large_image"><meta name="twitter:site" content=""><meta name="twitter:title" content="How to make an HTTP call | Lemline documentation"><meta name="twitter:description" content=""><meta name="twitter:creator" content=""><meta name="twitter:image:src" content="https://docs.lemline.com/social-preview.png"><!-- End Twitter Card --><!-- Schema.org WebPage --><script type="application/ld+json">{
+    "@context": "http://schema.org",
+    "@type": "WebPage",
+    "@id": "https://docs.lemline.com/lemline-howto-http.html#webpage",
+    "url": "https://docs.lemline.com/lemline-howto-http.html",
+    "name": "How to make an HTTP call | Lemline documentation",
+    "description": "",
+    "image": "https://docs.lemline.com/social-preview.png",
+    "inLanguage":"en-US"
+}</script><!-- End Schema.org --><!-- Schema.org WebSite --><script type="application/ld+json">{
+    "@type": "WebSite",
+    "@id": "https://docs.lemline.com/#website",
+    "url": "https://docs.lemline.com/",
+    "name": "Lemline documentation Help"
+}</script><!-- End Schema.org --></head><body data-id="lemline-howto-http" data-main-title="How to make an HTTP call" data-article-props="{&quot;seeAlsoStyle&quot;:&quot;links&quot;}" data-template="article" data-breadcrumbs="How-to Guides///Working with Tasks"><div class="wrapper"><main class="panel _main"><header class="panel__header"><div class="container"><h3>Lemline documentation  Help</h3><div class="panel-trigger"></div></div></header><section class="panel__content"><div class="container"><article class="article" data-shortcut-switcher="inactive"><h1 data-toc="lemline-howto-http" id="lemline-howto-http.md">How to make an HTTP call</h1><p id="tygawi_3">Set <code class="code" id="tygawi_14">call: http</code> and configure the HTTP <code class="code" id="tygawi_15">method</code> and <code class="code" id="tygawi_16">endpoint</code> under <code class="code" id="tygawi_17">with</code>.</p><p id="tygawi_4">The examples call the <a href="lemline-tutorial-order-processing.html#start-the-tutorial-shop" id="tygawi_18" data-tooltip="Complete the SQLite setup and keep the worker running on the host. In a separate terminal, open the root of the Lemline source checkout matching these docs (the directory containing examples/tutorial-services). With Docker Compose running, start the single shop container:">tutorial shop</a>. Complete <a href="lemline-tutorial-setup.html" id="tygawi_19" data-tooltip="Run Lemline on one machine with SQLite. Lemline stores workflow definitions, queued messages, and workflow history in local files. Use a writable directory on a local filesystem.">the SQLite setup</a> and keep its worker running. Start the shop from the root of the Lemline source checkout, then run the other commands from a second terminal in the setup directory. With the JAR, substitute <code class="code" id="tygawi_20">java -jar lemline.jar</code> for <code class="code" id="tygawi_21">bin/lemline</code>.</p><div class="code-block" data-lang="bash">
+docker compose -f examples/tutorial-services/compose.yaml up -d
+</div><p id="tygawi_6">Save this definition as <code class="code" id="tygawi_22">check-stock.yaml</code>:</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: check-stock
+  version: '0.1.0'
+  title: Check the shop stock
+do:
+  - getStock:
+      call: http
+      with:
+        method: get
+        endpoint: http://127.0.0.1:8787/stock
+</div><div class="code-block" data-lang="bash">
+bin/lemline definition post -f check-stock.yaml
+bin/lemline instance start examples check-stock
+</div><p id="tygawi_9">The response body becomes the task output: <code class="code" id="tygawi_23">{&quot;sku&quot;:&quot;SKU-1&quot;,&quot;available&quot;:100,&quot;reserved&quot;:0}</code>.</p><section class="chapter"><h2 id="build-the-request" data-toc="build-the-request">Build the request</h2><p id="tygawi_24">Use <code class="code" id="tygawi_25">headers</code> and <code class="code" id="tygawi_26">query</code> for request headers and query parameters. For a POST or PUT request, supply <code class="code" id="tygawi_27">body</code> as a value or a workflow expression. See the <a href="lemline-ref-http.html" id="tygawi_28" data-tooltip="This reference describes how Lemline executes call: http tasks: which arguments are supported, how requests are built, and what the task returns.">HTTP Task Reference</a> for request options and output modes.</p></section><section class="chapter"><h2 id="use-a-dynamic-endpoint" data-toc="use-a-dynamic-endpoint">Use a dynamic endpoint</h2><p id="tygawi_29">Use a jq expression for the complete endpoint when it depends on task input. Escape an input value before inserting it into the URL path.</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: dynamic-http-endpoint
+  version: '1.0.0'
+do:
+  - getProduct:
+      call: http
+      with:
+        method: get
+        endpoint: '${ &quot;http://127.0.0.1:8787/products/\(.productId | @uri)&quot; }'
+</div><p id="tygawi_31">Save it as <code class="code" id="tygawi_34">dynamic-http-endpoint.yaml</code> and read one known and one unknown product:</p><div class="code-block" data-lang="bash">
+bin/lemline definition post -f dynamic-http-endpoint.yaml
+bin/lemline instance start examples dynamic-http-endpoint --input '{&quot;productId&quot;:&quot;SKU-2&quot;}'
+bin/lemline instance start examples dynamic-http-endpoint --input '{&quot;productId&quot;:&quot;SKU 404&quot;}'
+</div><p id="tygawi_33">The first instance returns the watering can, <code class="code" id="tygawi_35">{&quot;id&quot;:&quot;SKU-2&quot;,&quot;name&quot;:&quot;Watering can&quot;,&quot;category&quot;:&quot;garden&quot;,&quot;price&quot;:12,&quot;available&quot;:10}</code>. For the second, <code class="code" id="tygawi_36">@uri</code> sends <code class="code" id="tygawi_37">/products/SKU%20404</code>; the shop answers HTTP 404 and the workflow faults with a <code class="code" id="tygawi_38">communication</code> error, status 404, whose title starts with <code class="code" id="tygawi_39">HTTP 404</code>. Write path templates such as <code class="code" id="tygawi_40">{productId}</code> as an expression like this one: Lemline does not expand URI templates.</p></section><section class="chapter"><h2 id="authenticate" data-toc="authenticate">Authenticate</h2><p id="tygawi_41">Use a service-specific header or query parameter for an <a href="lemline-howto-api-keys.html" id="tygawi_42" data-tooltip="Declare the key in use.secrets and supply its value through your Lemline secrets configuration.">API key</a>. Use an endpoint authentication policy for <a href="lemline-ref-auth.html" id="tygawi_43" data-tooltip="Authentication policies are part of the Open Workflow DSL. Lemline supports basic and bearer authentication for its HTTP executor. See Supported Features for runtime support by protocol and authentication type.">basic or bearer authentication</a>.</p></section><section class="chapter"><h2 id="recover-from-an-http-error" data-toc="recover-from-an-http-error">Recover from an HTTP error</h2><p id="tygawi_44">Wrap the call in a <code class="code" id="tygawi_51">try</code> task, select the errors to handle in <code class="code" id="tygawi_52">catch</code>, and add a retry policy or a fallback list where appropriate. A failed HTTP call raises a <code class="code" id="tygawi_53">communication</code> error whose <code class="code" id="tygawi_54">status</code> is the HTTP status and whose title is <code class="code" id="tygawi_55">HTTP &lt;code&gt;: &lt;body&gt;</code>. Match it with <code class="code" id="tygawi_56">catch.errors.with</code>, as here.</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: retry-and-fallback
+  version: '1.0.0'
+use:
+  retries:
+    transient:
+      delay: PT2S
+      backoff:
+        exponential: {}
+      limit:
+        attempt:
+          count: 3
+do:
+  - fetchInventory:
+      try:
+        - requestInventory:
+            call: http
+            with:
+              method: get
+              endpoint: http://127.0.0.1:8787/stock
+              query:
+                fail: '503'
+                failTimes: ${ .failures // 0 | tostring }
+                key: ${ $workflow.id }
+      catch:
+        errors:
+          with:
+            type: https://open-workflow-specification.org/spec/1.0.0/errors/communication
+            status: 503
+        retry: transient
+        do:
+          - useCachedInventory:
+              set:
+                inventory: []
+                stale: true
+</div><p id="tygawi_46">The <code class="code" id="tygawi_57">failures</code> input makes the shop answer HTTP 503 that many times. Save the definition as <code class="code" id="tygawi_58">retry-and-fallback.yaml</code>:</p><div class="code-block" data-lang="bash">
+bin/lemline definition post -f retry-and-fallback.yaml
+bin/lemline instance start examples retry-and-fallback --input '{&quot;failures&quot;:1}'
+bin/lemline instance start examples retry-and-fallback --input '{&quot;failures&quot;:5}'
+</div><p id="tygawi_48">The first instance returns the stock after one retry. The second fails four times, then returns <code class="code" id="tygawi_59">{&quot;inventory&quot;:[],&quot;stale&quot;:true}</code>. Allow about a minute: the worker picks up delayed retries every 10 seconds. Stop the shop when you are done:</p><div class="code-block" data-lang="bash">
+docker compose -f examples/tutorial-services/compose.yaml down
+</div><p id="tygawi_50">Run <a href="lemline-tutorial-order-processing.html" id="tygawi_60" data-tooltip="Complete the SQLite setup and keep the worker running on the host. In a separate terminal, open the root of the Lemline source checkout matching these docs (the directory containing examples/tutorial-services). With Docker Compose running, start the single shop container:">the checkout workflow</a> to see request bodies, HTTP failure handling and idempotent release against a local service.</p></section><div class="last-modified">25 November 2026</div><div data-feedback-placeholder="true"></div><div class="navigation-links _bottom"><a href="lemline-howto-jumps.html" class="navigation-links__prev">How to jump between tasks (then, exit, end)</a><a href="lemline-howto-openapi.html" class="navigation-links__next">How to use OpenAPI-defined services</a></div></article><div id="disqus_thread"></div></div></section></main></div><script src="https://resources.jetbrains.com/writerside/apidoc/6.22.0-b776/app.js"></script></body></html>

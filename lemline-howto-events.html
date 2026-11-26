@@ -1,0 +1,114 @@
+<!DOCTYPE html SYSTEM "about:legacy-compat">
+<html lang="en-US" data-preset="contrast" data-primary-color="#2E6F7E"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="robots" content="noindex"><meta name="built-on" content="2026-11-26T17:17:48.474893353"><title>How to emit and listen for events | Lemline documentation</title><script type="application/json" id="virtual-toc-data">[{"id":"prepare-the-examples","level":0,"title":"Prepare the examples","anchor":"#prepare-the-examples"},{"id":"emit-an-order-event","level":0,"title":"Emit an order event","anchor":"#emit-an-order-event"},{"id":"wait-for-a-correlated-event","level":0,"title":"Wait for a correlated event","anchor":"#wait-for-a-correlated-event"},{"id":"collect-events-and-stop-on-a-signal","level":0,"title":"Collect events and stop on a signal","anchor":"#collect-events-and-stop-on-a-signal"},{"id":"start-a-workflow-on-an-event","level":0,"title":"Start a workflow on an event","anchor":"#start-a-workflow-on-an-event"}]</script><script type="application/json" id="topic-shortcuts"></script><link href="https://resources.jetbrains.com/writerside/apidoc/6.22.0-b776/app.css" rel="stylesheet"><link href="static/custom.css" rel="stylesheet"><link rel="icon" type="image/png" sizes="16x16" href="images/lemly.png"><meta name="image" content="https://docs.lemline.com/social-preview.png"><!-- Open Graph --><meta property="og:title" content="How to emit and listen for events | Lemline documentation"><meta property="og:description" content=""><meta property="og:image" content="https://docs.lemline.com/social-preview.png"><meta property="og:site_name" content="Lemline documentation Help"><meta property="og:type" content="website"><meta property="og:locale" content="en_US"><meta property="og:url" content="https://docs.lemline.com/lemline-howto-events.html"><!-- End Open Graph --><!-- Twitter Card --><meta name="twitter:card" content="summary_large_image"><meta name="twitter:site" content=""><meta name="twitter:title" content="How to emit and listen for events | Lemline documentation"><meta name="twitter:description" content=""><meta name="twitter:creator" content=""><meta name="twitter:image:src" content="https://docs.lemline.com/social-preview.png"><!-- End Twitter Card --><!-- Schema.org WebPage --><script type="application/ld+json">{
+    "@context": "http://schema.org",
+    "@type": "WebPage",
+    "@id": "https://docs.lemline.com/lemline-howto-events.html#webpage",
+    "url": "https://docs.lemline.com/lemline-howto-events.html",
+    "name": "How to emit and listen for events | Lemline documentation",
+    "description": "",
+    "image": "https://docs.lemline.com/social-preview.png",
+    "inLanguage":"en-US"
+}</script><!-- End Schema.org --><!-- Schema.org WebSite --><script type="application/ld+json">{
+    "@type": "WebSite",
+    "@id": "https://docs.lemline.com/#website",
+    "url": "https://docs.lemline.com/",
+    "name": "Lemline documentation Help"
+}</script><!-- End Schema.org --></head><body data-id="lemline-howto-events" data-main-title="How to emit and listen for events" data-article-props="{&quot;seeAlsoStyle&quot;:&quot;links&quot;}" data-template="article" data-breadcrumbs="How-to Guides///Working with Tasks"><div class="wrapper"><main class="panel _main"><header class="panel__header"><div class="container"><h3>Lemline documentation  Help</h3><div class="panel-trigger"></div></div></header><section class="panel__content"><div class="container"><article class="article" data-shortcut-switcher="inactive"><h1 data-toc="lemline-howto-events" id="lemline-howto-events.md">How to emit and listen for events</h1><p id="jhss01_3">An <code class="code" id="jhss01_9">emit</code> task publishes a CloudEvent. A <code class="code" id="jhss01_10">listen</code> task resumes an existing workflow when the selected event filters match. To start independent instances on matching events, configure <code class="code" id="jhss01_11">schedule.on</code> at the workflow level.</p><section class="chapter"><h2 id="prepare-the-examples" data-toc="prepare-the-examples">Prepare the examples</h2><p id="jhss01_12">Complete <a href="lemline-tutorial-setup.html" id="jhss01_17" data-tooltip="Run Lemline on one machine with SQLite. Lemline stores workflow definitions, queued messages, and workflow history in local files. Use a writable directory on a local filesystem.">the SQLite setup</a>. Run the commands from the setup directory. With the JAR, substitute <code class="code" id="jhss01_18">java -jar lemline.jar</code> for <code class="code" id="jhss01_19">bin/lemline</code>. The examples need no shop: events travel on the worker's SQLite event channel. This publisher sends the event type and data given as its input. Save it as <code class="code" id="jhss01_20">tutorial-publisher.yaml</code> (skip it if you registered it in the tutorial):</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: tutorial-publisher
+  version: '1.0.0'
+do:
+  - publish:
+      emit:
+        event:
+          with:
+            type: ${ .type }
+            source: https://events.example.com/tutorial
+            data: ${ .data }
+</div><p id="jhss01_14">Save the four definitions of this page under the file names used below and register them all before you start the worker, so that it loads the event-started workflow of the last section. If the setup worker is running, stop it with Ctrl+C first.</p><div class="code-block" data-lang="bash">
+bin/lemline definition post -f tutorial-publisher.yaml
+bin/lemline definition post -f emit-order-created.yaml
+bin/lemline definition post -f listen-for-payment.yaml
+bin/lemline definition post -f listen-until-complete.yaml
+bin/lemline definition post -f order-event-schedule.yaml
+bin/lemline listen --debug
+</div><p id="jhss01_16">Run the commands of each section from a second terminal in the setup directory.</p></section><section class="chapter"><h2 id="emit-an-order-event" data-toc="emit-an-order-event">Emit an order event</h2><p id="jhss01_21">Set the CloudEvent type and source in <code class="code" id="jhss01_26">emit.event.with</code>. You can include business data in <code class="code" id="jhss01_27">data</code> and use <code class="code" id="jhss01_28">subject</code> to identify the business entity.</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: emit-order-created
+  version: '1.0.0'
+do:
+  - notifyOrderCreated:
+      emit:
+        event:
+          with:
+            type: com.example.order.created
+            source: https://events.example.com/order-service
+            subject: ${ .orderId }
+            data: ${ . }
+</div><p id="jhss01_23">Save it as <code class="code" id="jhss01_29">emit-order-created.yaml</code>. It emits <code class="code" id="jhss01_30">com.example.order.created</code>, the event that starts the workflow of <a href="#start-a-workflow-on-an-event" id="jhss01_31" data-tooltip="Use a workflow-level schedule for event-triggered instances.">the last section</a>:</p><div class="code-block" data-lang="bash">
+bin/lemline instance start examples emit-order-created --input '{&quot;orderId&quot;:&quot;ORD-1001&quot;}'
+</div><p id="jhss01_25">The emitting instance completes at once. About 10 seconds later, the worker logs a new <code class="code" id="jhss01_32">order-event-schedule</code> instance that completes with <code class="code" id="jhss01_33">{&quot;orderId&quot;:&quot;ORD-1001&quot;,&quot;status&quot;:&quot;received&quot;}</code>: the worker picks up events for event-started workflows every 10 seconds.</p></section><section class="chapter"><h2 id="wait-for-a-correlated-event" data-toc="wait-for-a-correlated-event">Wait for a correlated event</h2><p id="jhss01_34">Use <code class="code" id="jhss01_39">listen.to.one</code> to match a single event. Use <code class="code" id="jhss01_40">correlate</code> to compare a value taken from the event with a value from the workflow, such as an order ID. Set <code class="code" id="jhss01_41">timeout.after</code> to bound the wait.</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: listen-for-payment
+  version: '1.0.0'
+do:
+  - awaitPayment:
+      listen:
+        to:
+          one:
+            with:
+              type: com.example.payment.received
+            correlate:
+              orderId:
+                from: ${ .orderId }
+                expect: ${ $workflow.input.orderId }
+      timeout:
+        after: PT30M
+</div><p id="jhss01_36">Save it as <code class="code" id="jhss01_42">listen-for-payment.yaml</code>. Start a listener for <code class="code" id="jhss01_43">ORD-123</code>, then publish a payment for another order and one for <code class="code" id="jhss01_44">ORD-123</code>:</p><div class="code-block" data-lang="bash">
+bin/lemline instance start examples listen-for-payment --input '{&quot;orderId&quot;:&quot;ORD-123&quot;}'
+bin/lemline instance start examples tutorial-publisher --input '{&quot;type&quot;:&quot;com.example.payment.received&quot;,&quot;data&quot;:{&quot;orderId&quot;:&quot;OTHER&quot;}}'
+bin/lemline instance start examples tutorial-publisher --input '{&quot;type&quot;:&quot;com.example.payment.received&quot;,&quot;data&quot;:{&quot;orderId&quot;:&quot;ORD-123&quot;}}'
+</div><p id="jhss01_38">The payment for <code class="code" id="jhss01_45">OTHER</code> leaves the listener waiting. The second payment completes it with <code class="code" id="jhss01_46">[{&quot;orderId&quot;:&quot;ORD-123&quot;}]</code>.</p></section><section class="chapter"><h2 id="collect-events-and-stop-on-a-signal" data-toc="collect-events-and-stop-on-a-signal">Collect events and stop on a signal</h2><p id="jhss01_47">Use <code class="code" id="jhss01_52">any</code> to collect matching updates and <code class="code" id="jhss01_53">until</code> to stop listening on a separate event. Use <code class="code" id="jhss01_54">all</code> when every configured filter must match.</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: listen-until-complete
+  version: '1.0.0'
+do:
+  - collectUpdates:
+      listen:
+        to:
+          any:
+            - with:
+                type: com.example.order.updated
+          until:
+            one:
+              with:
+                type: com.example.order.completed
+      timeout:
+        after: PT30M
+</div><p id="jhss01_49">Save it as <code class="code" id="jhss01_55">listen-until-complete.yaml</code>. Start it, send two updates, then the completion signal:</p><div class="code-block" data-lang="bash">
+bin/lemline instance start examples listen-until-complete
+bin/lemline instance start examples tutorial-publisher --input '{&quot;type&quot;:&quot;com.example.order.updated&quot;,&quot;data&quot;:{&quot;step&quot;:&quot;packed&quot;}}'
+bin/lemline instance start examples tutorial-publisher --input '{&quot;type&quot;:&quot;com.example.order.updated&quot;,&quot;data&quot;:{&quot;step&quot;:&quot;labelled&quot;}}'
+bin/lemline instance start examples tutorial-publisher --input '{&quot;type&quot;:&quot;com.example.order.completed&quot;,&quot;data&quot;:{&quot;orderId&quot;:&quot;ORD-1002&quot;}}'
+</div><p id="jhss01_51">The instance completes after the completion event with the two collected updates, <code class="code" id="jhss01_56">[{&quot;step&quot;:&quot;packed&quot;},{&quot;step&quot;:&quot;labelled&quot;}]</code>.</p></section><section class="chapter"><h2 id="start-a-workflow-on-an-event" data-toc="start-a-workflow-on-an-event">Start a workflow on an event</h2><p id="jhss01_57">Use a workflow-level schedule for event-triggered instances.</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: order-event-schedule
+  version: '1.0.0'
+schedule:
+  on:
+    one:
+      with:
+        type: com.example.order.created
+input:
+  from: ${ .[0] }
+do:
+  - recordOrder:
+      set:
+        orderId: ${ .orderId }
+        status: received
+</div><p id="jhss01_59">Save it as <code class="code" id="jhss01_60">order-event-schedule.yaml</code>. Register it before starting the worker, as in <a href="#prepare-the-examples" id="jhss01_61" data-tooltip="Complete the SQLite setup. Run the commands from the setup directory. With the JAR, substitute java -jar lemline.jar for bin/lemline. The examples need no shop: events travel on the worker's SQLite event channel. This publisher sends the event type and data given as its input. Save…">the preparation</a>: a workflow with <code class="code" id="jhss01_62">schedule.on</code> cannot be started with <code class="code" id="jhss01_63">instance start</code>. Each matching event starts a new instance, whose input is the list of events that started it; the workflow-level <code class="code" id="jhss01_64">input.from</code> takes the first one. The <a href="#emit-an-order-event" id="jhss01_65" data-tooltip="Set the CloudEvent type and source in emit.event.with. You can include business data in data and use subject to identify the business entity.">emit example</a> shows it in action. See <a href="https://github.com/open-workflow-specification/specification/blob/v1.0.3/dsl-reference.md#correlation" id="jhss01_66" data-external="true" rel="noopener noreferrer" target="_blank">Event Correlation</a> for the expression scopes involved and the <a href="https://github.com/open-workflow-specification/specification/blob/v1.0.3/dsl-reference.md#listen" id="jhss01_67" data-external="true" rel="noopener noreferrer" target="_blank">Listen Task</a> for matching strategies and read modes.</p></section><div class="last-modified">25 November 2026</div><div data-feedback-placeholder="true"></div><div class="navigation-links _bottom"><a href="lemline-howto-grpc.html" class="navigation-links__prev">How to call gRPC functions</a><a href="lemline-howto-data-passing.html" class="navigation-links__next">How to pass data between tasks</a></div></article><div id="disqus_thread"></div></div></section></main></div><script src="https://resources.jetbrains.com/writerside/apidoc/6.22.0-b776/app.js"></script></body></html>

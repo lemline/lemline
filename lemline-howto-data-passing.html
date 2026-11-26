@@ -1,0 +1,51 @@
+<!DOCTYPE html SYSTEM "about:legacy-compat">
+<html lang="en-US" data-preset="contrast" data-primary-color="#2E6F7E"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="robots" content="noindex"><meta name="built-on" content="2026-11-26T17:17:48.569492513"><title>How to pass data between tasks | Lemline documentation</title><script type="application/json" id="virtual-toc-data">[{"id":"shape-input-and-output","level":0,"title":"Shape input and output","anchor":"#shape-input-and-output"},{"id":"share-a-value-across-tasks","level":0,"title":"Share a value across tasks","anchor":"#share-a-value-across-tasks"}]</script><script type="application/json" id="topic-shortcuts"></script><link href="https://resources.jetbrains.com/writerside/apidoc/6.22.0-b776/app.css" rel="stylesheet"><link href="static/custom.css" rel="stylesheet"><link rel="icon" type="image/png" sizes="16x16" href="images/lemly.png"><meta name="image" content="https://docs.lemline.com/social-preview.png"><!-- Open Graph --><meta property="og:title" content="How to pass data between tasks | Lemline documentation"><meta property="og:description" content=""><meta property="og:image" content="https://docs.lemline.com/social-preview.png"><meta property="og:site_name" content="Lemline documentation Help"><meta property="og:type" content="website"><meta property="og:locale" content="en_US"><meta property="og:url" content="https://docs.lemline.com/lemline-howto-data-passing.html"><!-- End Open Graph --><!-- Twitter Card --><meta name="twitter:card" content="summary_large_image"><meta name="twitter:site" content=""><meta name="twitter:title" content="How to pass data between tasks | Lemline documentation"><meta name="twitter:description" content=""><meta name="twitter:creator" content=""><meta name="twitter:image:src" content="https://docs.lemline.com/social-preview.png"><!-- End Twitter Card --><!-- Schema.org WebPage --><script type="application/ld+json">{
+    "@context": "http://schema.org",
+    "@type": "WebPage",
+    "@id": "https://docs.lemline.com/lemline-howto-data-passing.html#webpage",
+    "url": "https://docs.lemline.com/lemline-howto-data-passing.html",
+    "name": "How to pass data between tasks | Lemline documentation",
+    "description": "",
+    "image": "https://docs.lemline.com/social-preview.png",
+    "inLanguage":"en-US"
+}</script><!-- End Schema.org --><!-- Schema.org WebSite --><script type="application/ld+json">{
+    "@type": "WebSite",
+    "@id": "https://docs.lemline.com/#website",
+    "url": "https://docs.lemline.com/",
+    "name": "Lemline documentation Help"
+}</script><!-- End Schema.org --></head><body data-id="lemline-howto-data-passing" data-main-title="How to pass data between tasks" data-article-props="{&quot;seeAlsoStyle&quot;:&quot;links&quot;}" data-template="article" data-breadcrumbs="How-to Guides///Data Management"><div class="wrapper"><main class="panel _main"><header class="panel__header"><div class="container"><h3>Lemline documentation  Help</h3><div class="panel-trigger"></div></div></header><section class="panel__content"><div class="container"><article class="article" data-shortcut-switcher="inactive"><h1 data-toc="lemline-howto-data-passing" id="lemline-howto-data-passing.md">How to pass data between tasks</h1><p id="mhqbxo_3">By default, the transformed output of one task becomes the input of the next task. Use <code class="code" id="mhqbxo_6">input.from</code> when a task needs to select or reshape its input, and <code class="code" id="mhqbxo_7">output.as</code> when a task needs to adapt its result for the following step.</p><section class="chapter"><h2 id="shape-input-and-output" data-toc="shape-input-and-output">Shape input and output</h2><p id="mhqbxo_8">The workflow below transforms its input, calculates a result and returns selected fields in its output.</p><p id="mhqbxo_9">Complete <a href="lemline-tutorial-setup.html" id="mhqbxo_13" data-tooltip="Run Lemline on one machine with SQLite. Lemline stores workflow definitions, queued messages, and workflow history in local files. Use a writable directory on a local filesystem.">the SQLite setup</a> and keep its worker running. Run the commands from a second terminal in the setup directory. With the JAR, substitute <code class="code" id="mhqbxo_14">java -jar lemline.jar</code> for <code class="code" id="mhqbxo_15">bin/lemline</code>. Save the definition as <code class="code" id="mhqbxo_16">transform-workflow-data.yaml</code>:</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: transform-workflow-data
+  version: '1.0.0'
+input:
+  from: '${ { customer: .user, items: .payload.items } }'
+do:
+  - summarize:
+      set:
+        customerId: ${ .customer.id }
+        itemCount: ${ .items | length }
+output:
+  as: '${ { customerId, itemCount } }'
+</div><div class="code-block" data-lang="bash">
+bin/lemline definition post -f transform-workflow-data.yaml
+bin/lemline instance start examples transform-workflow-data --input '{&quot;user&quot;:{&quot;id&quot;:&quot;C-100&quot;,&quot;name&quot;:&quot;Ada Lovelace&quot;},&quot;payload&quot;:{&quot;items&quot;:[{&quot;id&quot;:&quot;SKU-1&quot;},{&quot;id&quot;:&quot;SKU-2&quot;}]}}'
+</div><p id="mhqbxo_12">The workflow-level <code class="code" id="mhqbxo_17">input.from</code> keeps only <code class="code" id="mhqbxo_18">customer</code> and <code class="code" id="mhqbxo_19">items</code>, the task counts the items, and <code class="code" id="mhqbxo_20">output.as</code> keeps two fields: expect <code class="code" id="mhqbxo_21">{&quot;customerId&quot;:&quot;C-100&quot;,&quot;itemCount&quot;:2}</code>.</p></section><section class="chapter"><h2 id="share-a-value-across-tasks" data-toc="share-a-value-across-tasks">Share a value across tasks</h2><p id="mhqbxo_22">Use <code class="code" id="mhqbxo_28">export.as</code> to update <code class="code" id="mhqbxo_29">$context</code>. Merge the new value with the existing context when earlier context entries must remain accessible. Use <code class="code" id="mhqbxo_30">$workflow.input</code> to read values supplied when the workflow started.</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: share-order-context
+  version: '1.0.0'
+do:
+  - identifyCustomer:
+      set:
+        customerId: ${ .customer.id }
+      export:
+        as: '${ $context + { customerId: .customerId } }'
+  - prepareOrder:
+      set:
+        orderId: ${ $workflow.input.orderId }
+        customerId: ${ $context.customerId }
+</div><p id="mhqbxo_24">Save it as <code class="code" id="mhqbxo_31">share-order-context.yaml</code>:</p><div class="code-block" data-lang="bash">
+bin/lemline definition post -f share-order-context.yaml
+bin/lemline instance start examples share-order-context --input '{&quot;orderId&quot;:&quot;ORD-803&quot;,&quot;customer&quot;:{&quot;id&quot;:&quot;C-100&quot;}}'
+</div><p id="mhqbxo_26">The second task reads the customer from <code class="code" id="mhqbxo_32">$context</code> and the order ID from <code class="code" id="mhqbxo_33">$workflow.input</code>: expect <code class="code" id="mhqbxo_34">{&quot;orderId&quot;:&quot;ORD-803&quot;,&quot;customerId&quot;:&quot;C-100&quot;}</code>.</p><p id="mhqbxo_27">See <a href="https://github.com/open-workflow-specification/specification/blob/v1.0.3/dsl.md#data-flow" id="mhqbxo_35" data-external="true" rel="noopener noreferrer" target="_blank">Data Flow</a> for validation order and expression scopes.</p></section><div class="last-modified">25 November 2026</div><div data-feedback-placeholder="true"></div><div class="navigation-links _bottom"><a href="lemline-howto-events.html" class="navigation-links__prev">How to emit and listen for events</a><a href="lemline-howto-io.html" class="navigation-links__next">How to use input, output, and export</a></div></article><div id="disqus_thread"></div></div></section></main></div><script src="https://resources.jetbrains.com/writerside/apidoc/6.22.0-b776/app.js"></script></body></html>

@@ -1,0 +1,97 @@
+<!DOCTYPE html SYSTEM "about:legacy-compat">
+<html lang="en-US" data-preset="contrast" data-primary-color="#2E6F7E"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="robots" content="noindex"><meta name="built-on" content="2026-11-26T17:17:48.315073976"><title>Time in workflows | Lemline documentation</title><script type="application/json" id="virtual-toc-data">[{"id":"compare-timestamps-in-jq","level":0,"title":"Compare timestamps in jq","anchor":"#compare-timestamps-in-jq"},{"id":"delay-an-existing-workflow-instance","level":0,"title":"Delay an existing workflow instance","anchor":"#delay-an-existing-workflow-instance"},{"id":"schedule-new-instances","level":0,"title":"Schedule new instances","anchor":"#schedule-new-instances"},{"id":"bound-a-wait-for-an-event","level":0,"title":"Bound a wait for an event","anchor":"#bound-a-wait-for-an-event"},{"id":"run-the-examples","level":0,"title":"Run the Examples","anchor":"#run-the-examples"}]</script><script type="application/json" id="topic-shortcuts"></script><link href="https://resources.jetbrains.com/writerside/apidoc/6.22.0-b776/app.css" rel="stylesheet"><link href="static/custom.css" rel="stylesheet"><link rel="icon" type="image/png" sizes="16x16" href="images/lemly.png"><meta name="image" content="https://docs.lemline.com/social-preview.png"><!-- Open Graph --><meta property="og:title" content="Time in workflows | Lemline documentation"><meta property="og:description" content=""><meta property="og:image" content="https://docs.lemline.com/social-preview.png"><meta property="og:site_name" content="Lemline documentation Help"><meta property="og:type" content="website"><meta property="og:locale" content="en_US"><meta property="og:url" content="https://docs.lemline.com/lemline-explain-time.html"><!-- End Open Graph --><!-- Twitter Card --><meta name="twitter:card" content="summary_large_image"><meta name="twitter:site" content=""><meta name="twitter:title" content="Time in workflows | Lemline documentation"><meta name="twitter:description" content=""><meta name="twitter:creator" content=""><meta name="twitter:image:src" content="https://docs.lemline.com/social-preview.png"><!-- End Twitter Card --><!-- Schema.org WebPage --><script type="application/ld+json">{
+    "@context": "http://schema.org",
+    "@type": "WebPage",
+    "@id": "https://docs.lemline.com/lemline-explain-time.html#webpage",
+    "url": "https://docs.lemline.com/lemline-explain-time.html",
+    "name": "Time in workflows | Lemline documentation",
+    "description": "",
+    "image": "https://docs.lemline.com/social-preview.png",
+    "inLanguage":"en-US"
+}</script><!-- End Schema.org --><!-- Schema.org WebSite --><script type="application/ld+json">{
+    "@type": "WebSite",
+    "@id": "https://docs.lemline.com/#website",
+    "url": "https://docs.lemline.com/",
+    "name": "Lemline documentation Help"
+}</script><!-- End Schema.org --></head><body data-id="lemline-explain-time" data-main-title="Time in workflows" data-article-props="{&quot;seeAlsoStyle&quot;:&quot;links&quot;}" data-template="article" data-breadcrumbs="Explanations"><div class="wrapper"><main class="panel _main"><header class="panel__header"><div class="container"><h3>Lemline documentation  Help</h3><div class="panel-trigger"></div></div></header><section class="panel__content"><div class="container"><article class="article" data-shortcut-switcher="inactive"><h1 data-toc="lemline-explain-time" id="lemline-explain-time.md">Time in workflows</h1><p id="bviss9_3">Workflows can compare timestamps in expressions, resume after a duration or start on a schedule. Lemline persists pending work so it can resume after a runner restart.</p><section class="chapter"><h2 id="compare-timestamps-in-jq" data-toc="compare-timestamps-in-jq">Compare timestamps in jq</h2><p id="bviss9_9">Use <code class="code" id="bviss9_11">now</code> for Unix time in seconds and <code class="code" id="bviss9_12">fromdateiso8601</code> to convert an ISO 8601 UTC timestamp before comparing it.</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: interpret-deadline
+  version: '1.0.0'
+do:
+  - markOverdue:
+      if: ${ now &gt;= (.deadline | fromdateiso8601) }
+      set:
+        overdue: true
+</div></section><section class="chapter"><h2 id="delay-an-existing-workflow-instance" data-toc="delay-an-existing-workflow-instance">Delay an existing workflow instance</h2><p id="bviss9_13">Use an ISO 8601 duration in a <code class="code" id="bviss9_15">wait</code> task to pause before continuing. The runner resumes the same instance.</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: delayed-processing
+  version: '1.0.0'
+do:
+  - pause:
+      wait: PT30S
+  - resume:
+      set:
+        state: resumed
+</div></section><section class="chapter"><h2 id="schedule-new-instances" data-toc="schedule-new-instances">Schedule new instances</h2><p id="bviss9_16">Use <code class="code" id="bviss9_18">schedule.cron</code> when each matching time should start a new instance.</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: scheduled-processing
+  version: '1.0.0'
+schedule:
+  cron: '0 9 * * 1-5'
+do:
+  - startDailyReport:
+      set:
+        report: daily
+</div></section><section class="chapter"><h2 id="bound-a-wait-for-an-event" data-toc="bound-a-wait-for-an-event">Bound a wait for an event</h2><p id="bviss9_19">Use <code class="code" id="bviss9_22">timeout.after</code> on a listen task to bound how long it waits. If the task times out, an enclosing try task can read the error and return a fallback.</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: timeout-listen-fallback
+  version: '1.0.0'
+do:
+  - collectApproval:
+      try:
+        - waitForApproval:
+            listen:
+              to:
+                one:
+                  with:
+                    type: com.example.request.approved
+            timeout:
+              after: PT30S
+      catch:
+        errors:
+          with:
+            type: https://open-workflow-specification.org/spec/1.0.0/errors/timeout
+        do:
+          - expireRequest:
+              set:
+                status: expired
+</div><p id="bviss9_21">See <a href="lemline-ref-supported-features.html" id="bviss9_23" data-tooltip="This reference documents which features of the Open Workflow DSL v1.0 are currently supported in Lemline, and any implementation-specific details or limitations.">Supported Features</a> for timeout behavior on other task types.</p></section><section class="chapter"><h2 id="run-the-examples" data-toc="run-the-examples">Run the Examples</h2><p id="bviss9_24">Every example on this page is a complete workflow. Complete <a href="lemline-tutorial-setup.html" id="bviss9_30" data-tooltip="Run Lemline on one machine with SQLite. Lemline stores workflow definitions, queued messages, and workflow history in local files. Use a writable directory on a local filesystem.">the SQLite setup</a>, save each example under the file name used below, and run the commands from the setup directory. With the JAR, substitute <code class="code" id="bviss9_31">java -jar lemline.jar</code> for <code class="code" id="bviss9_32">bin/lemline</code>.</p><p id="bviss9_25">The event examples need the tutorial publisher. Save it as <code class="code" id="bviss9_33">tutorial-publisher.yaml</code>:</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: tutorial-publisher
+  version: '1.0.0'
+do:
+  - publish:
+      emit:
+        event:
+          with:
+            type: ${ .type }
+            source: https://events.example.com/tutorial
+            data: ${ .data }
+</div><p id="bviss9_27">Keep the setup worker running and use a second terminal in the setup directory.</p><div class="code-block" data-lang="bash">
+bin/lemline definition post -f tutorial-publisher.yaml
+bin/lemline definition post -f interpret-deadline.yaml
+bin/lemline instance start examples interpret-deadline --input '{&quot;deadline&quot;:&quot;2020-01-01T00:00:00Z&quot;}'
+bin/lemline instance start examples interpret-deadline --input '{&quot;deadline&quot;:&quot;2999-01-01T00:00:00Z&quot;}'
+bin/lemline definition post -f delayed-processing.yaml
+bin/lemline instance start examples delayed-processing
+bin/lemline definition post -f timeout-listen-fallback.yaml
+bin/lemline instance start examples timeout-listen-fallback
+bin/lemline definition post -f scheduled-processing.yaml
+bin/lemline instance start examples scheduled-processing
+sqlite3 orchestration.db &quot;SELECT COUNT(*) FROM lemline_schedules&quot;
+</div><div class="table-wrapper"><table class="wide" id="bviss9_29"><thead><tr class="ijRowHead" id="bviss9_34"><th id="bviss9_40"><p>Example</p></th><th id="bviss9_41"><p>Expected result</p></th></tr></thead><tbody><tr id="bviss9_35"><td id="bviss9_42"><p><code class="code" id="bviss9_44">interpret-deadline</code>, past deadline</p></td><td id="bviss9_43"><p><code class="code" id="bviss9_45">{&quot;overdue&quot;:true}</code></p></td></tr><tr id="bviss9_36"><td id="bviss9_46"><p><code class="code" id="bviss9_48">interpret-deadline</code>, future deadline</p></td><td id="bviss9_47"><p>The input unchanged: the <code class="code" id="bviss9_49">if</code> skips the task</p></td></tr><tr id="bviss9_37"><td id="bviss9_50"><p><code class="code" id="bviss9_52">delayed-processing</code></p></td><td id="bviss9_51"><p><code class="code" id="bviss9_53">{&quot;state&quot;:&quot;resumed&quot;}</code> 30 to 40 seconds later</p></td></tr><tr id="bviss9_38"><td id="bviss9_54"><p><code class="code" id="bviss9_56">timeout-listen-fallback</code></p></td><td id="bviss9_55"><p><code class="code" id="bviss9_57">{&quot;status&quot;:&quot;expired&quot;}</code> 30 to 40 seconds later, with no approval event</p></td></tr><tr id="bviss9_39"><td id="bviss9_58"><p><code class="code" id="bviss9_60">scheduled-processing</code></p></td><td id="bviss9_59"><p><code class="code" id="bviss9_61">instance start</code> registers the schedule: the query counts one schedule. No instance runs before the next weekday at 9:00.</p></td></tr></tbody></table></div></section><div class="last-modified">25 November 2026</div><div data-feedback-placeholder="true"></div><div class="navigation-links _bottom"><a href="lemline-explain-fan-in.html" class="navigation-links__prev">Fan-out and fan-in</a><a href="lemline-explain-errors.html" class="navigation-links__next">Understanding Error Handling in Lemline</a></div></article><div id="disqus_thread"></div></div></section></main></div><script src="https://resources.jetbrains.com/writerside/apidoc/6.22.0-b776/app.js"></script></body></html>

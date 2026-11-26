@@ -1,0 +1,80 @@
+<!DOCTYPE html SYSTEM "about:legacy-compat">
+<html lang="en-US" data-preset="contrast" data-primary-color="#2E6F7E"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="robots" content="noindex"><meta name="built-on" content="2026-11-26T17:17:49.857724456"><title>How to jump between tasks (then, exit, end) | Lemline documentation</title><script type="application/json" id="virtual-toc-data">[{"id":"select-a-task-with-switch","level":0,"title":"Select a task with switch","anchor":"#select-a-task-with-switch"},{"id":"exit-a-nested-task-list","level":0,"title":"Exit a nested task list","anchor":"#exit-a-nested-task-list"}]</script><script type="application/json" id="topic-shortcuts"></script><link href="https://resources.jetbrains.com/writerside/apidoc/6.22.0-b776/app.css" rel="stylesheet"><link href="static/custom.css" rel="stylesheet"><link rel="icon" type="image/png" sizes="16x16" href="images/lemly.png"><meta name="image" content="https://docs.lemline.com/social-preview.png"><!-- Open Graph --><meta property="og:title" content="How to jump between tasks (then, exit, end) | Lemline documentation"><meta property="og:description" content=""><meta property="og:image" content="https://docs.lemline.com/social-preview.png"><meta property="og:site_name" content="Lemline documentation Help"><meta property="og:type" content="website"><meta property="og:locale" content="en_US"><meta property="og:url" content="https://docs.lemline.com/lemline-howto-jumps.html"><!-- End Open Graph --><!-- Twitter Card --><meta name="twitter:card" content="summary_large_image"><meta name="twitter:site" content=""><meta name="twitter:title" content="How to jump between tasks (then, exit, end) | Lemline documentation"><meta name="twitter:description" content=""><meta name="twitter:creator" content=""><meta name="twitter:image:src" content="https://docs.lemline.com/social-preview.png"><!-- End Twitter Card --><!-- Schema.org WebPage --><script type="application/ld+json">{
+    "@context": "http://schema.org",
+    "@type": "WebPage",
+    "@id": "https://docs.lemline.com/lemline-howto-jumps.html#webpage",
+    "url": "https://docs.lemline.com/lemline-howto-jumps.html",
+    "name": "How to jump between tasks (then, exit, end) | Lemline documentation",
+    "description": "",
+    "image": "https://docs.lemline.com/social-preview.png",
+    "inLanguage":"en-US"
+}</script><!-- End Schema.org --><!-- Schema.org WebSite --><script type="application/ld+json">{
+    "@type": "WebSite",
+    "@id": "https://docs.lemline.com/#website",
+    "url": "https://docs.lemline.com/",
+    "name": "Lemline documentation Help"
+}</script><!-- End Schema.org --></head><body data-id="lemline-howto-jumps" data-main-title="How to jump between tasks (then, exit, end)" data-article-props="{&quot;seeAlsoStyle&quot;:&quot;links&quot;}" data-template="article" data-breadcrumbs="How-to Guides///Flow Control"><div class="wrapper"><main class="panel _main"><header class="panel__header"><div class="container"><h3>Lemline documentation  Help</h3><div class="panel-trigger"></div></div></header><section class="panel__content"><div class="container"><article class="article" data-shortcut-switcher="inactive"><h1 data-toc="lemline-howto-jumps" id="lemline-howto-jumps.md">How to jump between tasks (then, exit, end)</h1><p id="z39z9l7_3">Tasks run in the order listed in <code class="code" id="z39z9l7_7">do</code>. Use a flow directive to override that order.</p><div class="table-wrapper"><table class="wide" id="z39z9l7_4"><thead><tr class="ijRowHead" id="z39z9l7_8"><th id="z39z9l7_13"><p>Directive</p></th><th id="z39z9l7_14"><p>Effect</p></th></tr></thead><tbody><tr id="z39z9l7_9"><td id="z39z9l7_15"><p><code class="code" id="z39z9l7_17">continue</code></p></td><td id="z39z9l7_16"><p>Advance to the next task in the current list</p></td></tr><tr id="z39z9l7_10"><td id="z39z9l7_18"><p>Task name</p></td><td id="z39z9l7_19"><p>Move to the named task in the current list</p></td></tr><tr id="z39z9l7_11"><td id="z39z9l7_20"><p><code class="code" id="z39z9l7_22">exit</code></p></td><td id="z39z9l7_21"><p>Leave the current task list and return to its parent</p></td></tr><tr id="z39z9l7_12"><td id="z39z9l7_23"><p><code class="code" id="z39z9l7_25">end</code></p></td><td id="z39z9l7_24"><p>End the workflow</p></td></tr></tbody></table></div><section class="chapter"><h2 id="select-a-task-with-switch" data-toc="select-a-task-with-switch">Select a task with switch</h2><p id="z39z9l7_26">Each named case has a <code class="code" id="z39z9l7_32">then</code> directive. The first case whose <code class="code" id="z39z9l7_33">when</code> condition matches wins. A final case without a condition provides a fallback.</p><p id="z39z9l7_27">Complete <a href="lemline-tutorial-setup.html" id="z39z9l7_34" data-tooltip="Run Lemline on one machine with SQLite. Lemline stores workflow definitions, queued messages, and workflow history in local files. Use a writable directory on a local filesystem.">the SQLite setup</a> and keep its worker running. Run the commands from a second terminal in the setup directory. With the JAR, substitute <code class="code" id="z39z9l7_35">java -jar lemline.jar</code> for <code class="code" id="z39z9l7_36">bin/lemline</code>. The worker logs <code class="code" id="z39z9l7_37">Workflow completed with output</code> with each result. Save each definition under the file name used in its <code class="code" id="z39z9l7_38">definition post</code> command.</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: validate-and-route-order
+  version: '1.0.0'
+input:
+  schema:
+    format: json
+    document:
+      type: object
+      required: [orderId, total]
+      properties:
+        orderId:
+          type: string
+        total:
+          type: number
+          minimum: 0
+do:
+  - routeOrder:
+      switch:
+        - largeOrder:
+            when: ${ .total &gt;= 1000 }
+            then: requestReview
+        - automatic:
+            then: acceptOrder
+  - requestReview:
+      set:
+        status: needs-review
+      then: exit
+  - acceptOrder:
+      set:
+        status: accepted
+output:
+  as: '${ { orderId: $workflow.input.orderId, status: .status } }'
+</div><div class="code-block" data-lang="bash">
+bin/lemline definition post -f validate-and-route-order.yaml
+bin/lemline instance start examples validate-and-route-order --input '{&quot;orderId&quot;:&quot;ORD-301&quot;,&quot;total&quot;:250}'
+bin/lemline instance start examples validate-and-route-order --input '{&quot;orderId&quot;:&quot;ORD-302&quot;,&quot;total&quot;:1500}'
+</div><p id="z39z9l7_30">Expect <code class="code" id="z39z9l7_39">{&quot;orderId&quot;:&quot;ORD-301&quot;,&quot;status&quot;:&quot;accepted&quot;}</code> and <code class="code" id="z39z9l7_40">{&quot;orderId&quot;:&quot;ORD-302&quot;,&quot;status&quot;:&quot;needs-review&quot;}</code>.</p><p id="z39z9l7_31">After setting its status, the manual-review path uses <code class="code" id="z39z9l7_41">then: exit</code> to leave the task list instead of falling through to the automatic path. The workflow's <code class="code" id="z39z9l7_42">output.as</code> still runs, as it does after <code class="code" id="z39z9l7_43">then: end</code>.</p></section><section class="chapter"><h2 id="exit-a-nested-task-list" data-toc="exit-a-nested-task-list">Exit a nested task list</h2><p id="z39z9l7_44">Here a missing order ID exits the inner <code class="code" id="z39z9l7_49">do</code> list. The outer list resumes at <code class="code" id="z39z9l7_50">finalize</code>.</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: exit-nested-scope
+  version: '1.0.0'
+do:
+  - processOrder:
+      do:
+        - checkOrder:
+            switch:
+              - invalid:
+                  when: ${ .orderId == null }
+                  then: exit
+              - valid:
+                  then: recordOrder
+        - recordOrder:
+            set:
+              status: received
+  - finalize:
+      set:
+        completed: true
+        status: ${ .status // &quot;skipped&quot; }
+</div><div class="code-block" data-lang="bash">
+bin/lemline definition post -f exit-nested-scope.yaml
+bin/lemline instance start examples exit-nested-scope --input '{&quot;orderId&quot;:&quot;ORD-1&quot;}'
+bin/lemline instance start examples exit-nested-scope
+</div><p id="z39z9l7_47">With an order ID, <code class="code" id="z39z9l7_51">recordOrder</code> runs and the result is <code class="code" id="z39z9l7_52">{&quot;completed&quot;:true,&quot;status&quot;:&quot;received&quot;}</code>. Without one, the inner list exits before <code class="code" id="z39z9l7_53">recordOrder</code> and the result is <code class="code" id="z39z9l7_54">{&quot;completed&quot;:true,&quot;status&quot;:&quot;skipped&quot;}</code>.</p><p id="z39z9l7_48">See <a href="https://github.com/open-workflow-specification/specification/blob/v1.0.3/dsl.md#task-flow" id="z39z9l7_55" data-external="true" rel="noopener noreferrer" target="_blank">Flow Control</a> for task and workflow completion behavior.</p></section><div class="last-modified">25 November 2026</div><div data-feedback-placeholder="true"></div><div class="navigation-links _bottom"><a href="lemline-howto-loops.html" class="navigation-links__prev">How to run loops (for, while)</a><a href="lemline-howto-http.html" class="navigation-links__next">How to make an HTTP call</a></div></article><div id="disqus_thread"></div></div></section></main></div><script src="https://resources.jetbrains.com/writerside/apidoc/6.22.0-b776/app.js"></script></body></html>

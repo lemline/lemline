@@ -1,0 +1,425 @@
+<!DOCTYPE html SYSTEM "about:legacy-compat">
+<html lang="en-US" data-preset="contrast" data-primary-color="#2E6F7E"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="robots" content="noindex"><meta name="built-on" content="2026-11-26T17:17:49.742096383"><title>IoT Workflow Examples | Lemline documentation</title><script type="application/json" id="virtual-toc-data">[{"id":"run-the-examples","level":0,"title":"Run the Examples","anchor":"#run-the-examples"},{"id":"device-provisioning-workflow","level":0,"title":"Device Provisioning Workflow","anchor":"#device-provisioning-workflow"},{"id":"telemetry-processing-workflow","level":0,"title":"Telemetry Processing Workflow","anchor":"#telemetry-processing-workflow"},{"id":"firmware-update-workflow","level":0,"title":"Firmware Update Workflow","anchor":"#firmware-update-workflow"},{"id":"predictive-maintenance-workflow","level":0,"title":"Predictive Maintenance Workflow","anchor":"#predictive-maintenance-workflow"},{"id":"energy-optimization-workflow","level":0,"title":"Energy Optimization Workflow","anchor":"#energy-optimization-workflow"},{"id":"best-practices-for-iot-workflows","level":0,"title":"Best Practices for IoT Workflows","anchor":"#best-practices-for-iot-workflows"},{"id":"conclusion","level":0,"title":"Conclusion","anchor":"#conclusion"}]</script><script type="application/json" id="topic-shortcuts"></script><link href="https://resources.jetbrains.com/writerside/apidoc/6.22.0-b776/app.css" rel="stylesheet"><link href="static/custom.css" rel="stylesheet"><link rel="icon" type="image/png" sizes="16x16" href="images/lemly.png"><meta name="image" content="https://docs.lemline.com/social-preview.png"><!-- Open Graph --><meta property="og:title" content="IoT Workflow Examples | Lemline documentation"><meta property="og:description" content=""><meta property="og:image" content="https://docs.lemline.com/social-preview.png"><meta property="og:site_name" content="Lemline documentation Help"><meta property="og:type" content="website"><meta property="og:locale" content="en_US"><meta property="og:url" content="https://docs.lemline.com/lemline-examples-iot.html"><!-- End Open Graph --><!-- Twitter Card --><meta name="twitter:card" content="summary_large_image"><meta name="twitter:site" content=""><meta name="twitter:title" content="IoT Workflow Examples | Lemline documentation"><meta name="twitter:description" content=""><meta name="twitter:creator" content=""><meta name="twitter:image:src" content="https://docs.lemline.com/social-preview.png"><!-- End Twitter Card --><!-- Schema.org WebPage --><script type="application/ld+json">{
+    "@context": "http://schema.org",
+    "@type": "WebPage",
+    "@id": "https://docs.lemline.com/lemline-examples-iot.html#webpage",
+    "url": "https://docs.lemline.com/lemline-examples-iot.html",
+    "name": "IoT Workflow Examples | Lemline documentation",
+    "description": "",
+    "image": "https://docs.lemline.com/social-preview.png",
+    "inLanguage":"en-US"
+}</script><!-- End Schema.org --><!-- Schema.org WebSite --><script type="application/ld+json">{
+    "@type": "WebSite",
+    "@id": "https://docs.lemline.com/#website",
+    "url": "https://docs.lemline.com/",
+    "name": "Lemline documentation Help"
+}</script><!-- End Schema.org --></head><body data-id="lemline-examples-iot" data-main-title="IoT Workflow Examples" data-article-props="{&quot;seeAlsoStyle&quot;:&quot;links&quot;}" data-template="article" data-breadcrumbs="Examples Library"><div class="wrapper"><main class="panel _main"><header class="panel__header"><div class="container"><h3>Lemline documentation  Help</h3><div class="panel-trigger"></div></div></header><section class="panel__content"><div class="container"><article class="article" data-shortcut-switcher="inactive"><h1 data-toc="lemline-examples-iot" id="lemline-examples-iot.md">IoT Workflow Examples</h1><p id="ngbf3m_3">This document provides practical examples of workflows for Internet of Things (IoT) applications using Lemline. They manage the sensors of the tutorial shop's warehouse: device provisioning, telemetry processing, firmware updates, predictive maintenance and energy optimization.</p><section class="chapter"><h2 id="run-the-examples" data-toc="run-the-examples">Run the Examples</h2><p id="ngbf3m_12">Complete <a href="lemline-tutorial-setup.html" id="ngbf3m_18" data-tooltip="Run Lemline on one machine with SQLite. Lemline stores workflow definitions, queued messages, and workflow history in local files. Use a writable directory on a local filesystem.">the SQLite setup</a> and run the commands from the setup directory. With the JAR, substitute <code class="code" id="ngbf3m_19">java -jar lemline.jar</code> for <code class="code" id="ngbf3m_20">bin/lemline</code>. Start the <a href="lemline-tutorial-order-processing.html#start-the-tutorial-shop" id="ngbf3m_21" data-tooltip="Complete the SQLite setup and keep the worker running on the host. In a separate terminal, open the root of the Lemline source checkout matching these docs (the directory containing examples/tutorial-services). With Docker Compose running, start the single shop container:">tutorial shop</a> from the root of the Lemline source checkout. Its <code class="code" id="ngbf3m_22">/devices</code> routes hold three warehouse sensors; the shop page lists them under <span class="control" id="ngbf3m_23">Devices</span>.</p><div class="code-block" data-lang="bash">
+docker compose -f examples/tutorial-services/compose.yaml up -d
+</div><p id="ngbf3m_14">Devices answer through events, which the tutorial publisher sends for you. The telemetry workflow is started by events, so it must be registered before the worker starts. Stop the setup worker with Ctrl+C, save the publisher below as <code class="code" id="ngbf3m_24">tutorial-publisher.yaml</code> and the <a href="#telemetry-processing-workflow" id="ngbf3m_25" data-tooltip="This workflow starts on each telemetry event received from a device and emits an alert event when the reported temperature is above 80.">telemetry workflow</a> as <code class="code" id="ngbf3m_26">device-telemetry.yaml</code>, register both and start the worker again:</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: tutorial-publisher
+  version: '1.0.0'
+do:
+  - publish:
+      emit:
+        event:
+          with:
+            type: ${ .type }
+            source: https://events.example.com/tutorial
+            data: ${ .data }
+</div><div class="code-block" data-lang="bash">
+bin/lemline definition post -f tutorial-publisher.yaml
+bin/lemline definition post -f device-telemetry.yaml
+bin/lemline listen --debug
+</div><p id="ngbf3m_17">Run the other commands from a second terminal in the setup directory. Publish each device event only after the instance that waits for it has started waiting: an event only resumes the instances already listening.</p></section><section class="chapter"><h2 id="device-provisioning-workflow" data-toc="device-provisioning-workflow">Device Provisioning Workflow</h2><p id="ngbf3m_27">This example provisions a new warehouse sensor: it registers it if the shop does not know it, obtains credentials, stores its configuration, asks the device to activate and waits for its confirmation.</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: device-provisioning
+  version: '1.0.0'
+input:
+  schema:
+    format: json
+    document:
+      type: object
+      required:
+        - deviceId
+        - deviceType
+        - location
+      properties:
+        deviceId:
+          type: string
+        deviceType:
+          type: string
+          enum:
+            - sensor
+            - gateway
+            - controller
+        location:
+          type: object
+          required:
+            - siteId
+            - zone
+do:
+  - validateDevice:
+      try:
+        - checkDeviceExists:
+            call: http
+            with:
+              method: get
+              endpoint: ${ &quot;http://127.0.0.1:8787/devices/\(.deviceId)&quot; }
+      catch:
+        errors:
+          with:
+            type: https://open-workflow-specification.org/spec/1.0.0/errors/communication
+            status: 404
+        as: notFoundError
+        do:
+          - createDeviceRecord:
+              call: http
+              with:
+                method: post
+                endpoint: http://127.0.0.1:8787/devices
+                body:
+                  deviceId: ${ .deviceId }
+                  deviceType: ${ .deviceType }
+                  location: ${ .location }
+                  status: provisioning
+              export:
+                as: '${ $context + { deviceRegistry: . } }'
+  - generateCredentials:
+      try:
+        - createCredentials:
+            call: http
+            with:
+              method: post
+              endpoint: ${ &quot;http://127.0.0.1:8787/devices/\($workflow.input.deviceId)/credentials&quot; }
+            export:
+              as: '${ $context + { credentials: . } }'
+      catch:
+        errors:
+          with:
+            type: https://open-workflow-specification.org/spec/1.0.0/errors/communication
+        retry:
+          delay:
+            seconds: 5
+          limit:
+            attempt:
+              count: 3
+  - configureDevice:
+      call: http
+      with:
+        method: patch
+        endpoint: ${ &quot;http://127.0.0.1:8787/devices/\($workflow.input.deviceId)&quot; }
+        body:
+          config:
+            reportingIntervalSeconds: 60
+            zone: ${ $workflow.input.location.zone }
+      export:
+        as: '${ $context + { deviceConfig: .config } }'
+  - activateDevice:
+      emit:
+        event:
+          with:
+            type: com.example.iot.device.activation.requested
+            source: https://events.example.com/warehouse
+            data:
+              deviceId: ${ $workflow.input.deviceId }
+              config: ${ $context.deviceConfig }
+  - waitForDeviceActivation:
+      listen:
+        to:
+          one:
+            with:
+              type: com.example.iot.device.activated
+            correlate:
+              deviceId:
+                from: ${ .deviceId }
+                expect: ${ $workflow.input.deviceId }
+      timeout:
+        after:
+          minutes: 15
+  - finalizeProvisioning:
+      call: http
+      with:
+        method: patch
+        endpoint: ${ &quot;http://127.0.0.1:8787/devices/\($workflow.input.deviceId)&quot; }
+        body:
+          status: active
+          lastPing: ${ .[0].timestamp }
+</div><p id="ngbf3m_29">Save it as <code class="code" id="ngbf3m_35">device-provisioning-workflow.yaml</code>:</p><div class="code-block" data-lang="bash">
+bin/lemline definition post -f device-provisioning-workflow.yaml
+bin/lemline instance start examples device-provisioning --input '{&quot;deviceId&quot;:&quot;sensor-4&quot;,&quot;deviceType&quot;:&quot;sensor&quot;,&quot;location&quot;:{&quot;siteId&quot;:&quot;warehouse-1&quot;,&quot;zone&quot;:&quot;office&quot;}}'
+</div><p id="ngbf3m_31">The shop answers HTTP 404 for the unknown <code class="code" id="ngbf3m_36">sensor-4</code>, so the catch registers it. The instance then waits for the activation. Send it as the device would:</p><div class="code-block" data-lang="bash">
+bin/lemline instance start examples tutorial-publisher --input '{&quot;type&quot;:&quot;com.example.iot.device.activated&quot;,&quot;data&quot;:{&quot;deviceId&quot;:&quot;sensor-4&quot;,&quot;timestamp&quot;:&quot;2026-11-25T10:00:00Z&quot;}}'
+</div><p id="ngbf3m_33">The instance completes, and the shop shows <code class="code" id="ngbf3m_37">sensor-4</code> with status <code class="code" id="ngbf3m_38">active</code>, its configuration and the <code class="code" id="ngbf3m_39">lastPing</code> of the event.</p><aside class="prompt" data-type="tip" data-title="" id="ngbf3m_34"><p id="ngbf3m_40"><span class="control" id="ngbf3m_41">Lemline runtime:</span> only <code class="code" id="ngbf3m_42">listen</code> task timeouts are enforced. Workflow-level timeouts and timeouts on other tasks are accepted but ignored for now. HTTP calls use fixed client limits instead: 15 seconds to connect, 30 seconds per request.</p></aside></section><section class="chapter"><h2 id="telemetry-processing-workflow" data-toc="telemetry-processing-workflow">Telemetry Processing Workflow</h2><p id="ngbf3m_43">This workflow starts on each telemetry event received from a device and emits an alert event when the reported temperature is above 80.</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: device-telemetry
+  version: '1.0.0'
+schedule:
+  on:
+    one:
+      with:
+        type: com.example.device.telemetry.received
+input:
+  from: ${ .[0] }
+do:
+  - inspectReading:
+      switch:
+        - highTemperature:
+            when: ${ .temperature &gt; 80 }
+            then: raiseAlert
+        - other:
+            then: end
+  - raiseAlert:
+      emit:
+        event:
+          with:
+            type: com.example.device.temperature.high
+            source: https://events.example.com/telemetry
+            subject: ${ .deviceId }
+            data: '${ { deviceId, temperature } }'
+</div><p id="ngbf3m_45">You registered it before starting the worker. Publish a normal and a high reading:</p><div class="code-block" data-lang="bash">
+bin/lemline instance start examples tutorial-publisher --input '{&quot;type&quot;:&quot;com.example.device.telemetry.received&quot;,&quot;data&quot;:{&quot;deviceId&quot;:&quot;sensor-2&quot;,&quot;temperature&quot;:19}}'
+bin/lemline instance start examples tutorial-publisher --input '{&quot;type&quot;:&quot;com.example.device.telemetry.received&quot;,&quot;data&quot;:{&quot;deviceId&quot;:&quot;sensor-2&quot;,&quot;temperature&quot;:85}}'
+</div><p id="ngbf3m_47">Each reading starts a <code class="code" id="ngbf3m_48">device-telemetry</code> instance about 10 seconds later; only the second emits <code class="code" id="ngbf3m_49">com.example.device.temperature.high</code>.</p></section><section class="chapter"><h2 id="firmware-update-workflow" data-toc="firmware-update-workflow">Firmware Update Workflow</h2><p id="ngbf3m_50">This workflow requests a firmware update for each eligible device of a zone, those whose firmware is older than the target version. For each one it waits for a status event matching the campaign and the device, then records the installed version. If no status arrives within 60 seconds, it reads the device's current state from the shop instead. A real campaign would wait hours.</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: firmware-update
+  version: '1.0.0'
+input:
+  schema:
+    document:
+      type: object
+      required: [firmwareVersion, campaignId, zone]
+      properties:
+        firmwareVersion:
+          type: string
+        campaignId:
+          type: string
+        zone:
+          type: string
+do:
+  - findEligibleDevices:
+      call: http
+      with:
+        method: get
+        endpoint: http://127.0.0.1:8787/devices
+        query:
+          zone: ${ .zone }
+          firmwareBelow: ${ .firmwareVersion }
+  - updateDevices:
+      for:
+        in: ${ .items }
+        each: device
+      do:
+        - rememberDevice:
+            set:
+              deviceId: ${ $device.deviceId }
+            export:
+              as: '${ $context + { deviceId: .deviceId } }'
+        - dispatchUpdate:
+            emit:
+              event:
+                with:
+                  type: com.example.iot.firmware.requested
+                  source: https://events.example.com/warehouse
+                  data:
+                    campaignId: ${ $workflow.input.campaignId }
+                    deviceId: ${ $device.deviceId }
+                    firmwareVersion: ${ $workflow.input.firmwareVersion }
+        - awaitStatus:
+            try:
+              - waitForStatus:
+                  listen:
+                    to:
+                      one:
+                        with:
+                          type: com.example.iot.firmware.status
+                        correlate:
+                          campaignId:
+                            from: ${ .campaignId }
+                            expect: ${ $workflow.input.campaignId }
+                          deviceId:
+                            from: ${ .deviceId }
+                            expect: ${ $context.deviceId }
+                  timeout:
+                    after:
+                      seconds: 60
+                  output:
+                    as: ${ .[0] }
+            catch:
+              errors:
+                with:
+                  type: https://open-workflow-specification.org/spec/1.0.0/errors/timeout
+              do:
+                - readDurableStatus:
+                    call: http
+                    with:
+                      method: get
+                      endpoint: '${ &quot;http://127.0.0.1:8787/devices/\($context.deviceId | @uri)&quot; }'
+        - recordStatus:
+            call: http
+            with:
+              method: patch
+              endpoint: '${ &quot;http://127.0.0.1:8787/devices/\($context.deviceId | @uri)&quot; }'
+              body:
+                firmware: ${ .version // .firmware }
+</div><p id="ngbf3m_52">Save it as <code class="code" id="ngbf3m_59">firmware-update-workflow.yaml</code>:</p><div class="code-block" data-lang="bash">
+bin/lemline definition post -f firmware-update-workflow.yaml
+bin/lemline instance start examples firmware-update --input '{&quot;firmwareVersion&quot;:&quot;1.1.0&quot;,&quot;campaignId&quot;:&quot;CMP-1&quot;,&quot;zone&quot;:&quot;dock&quot;}'
+</div><p id="ngbf3m_54">In the dock, only <code class="code" id="ngbf3m_60">sensor-2</code> runs a firmware older than 1.1.0. Once the instance waits for it, report the installation:</p><div class="code-block" data-lang="bash">
+bin/lemline instance start examples tutorial-publisher --input '{&quot;type&quot;:&quot;com.example.iot.firmware.status&quot;,&quot;data&quot;:{&quot;campaignId&quot;:&quot;CMP-1&quot;,&quot;deviceId&quot;:&quot;sensor-2&quot;,&quot;status&quot;:&quot;installed&quot;,&quot;version&quot;:&quot;1.1.0&quot;}}'
+</div><p id="ngbf3m_56">The shop now shows <code class="code" id="ngbf3m_61">sensor-2</code> with firmware <code class="code" id="ngbf3m_62">1.1.0</code>. To see the fallback, start a campaign for the cold room and send no status:</p><div class="code-block" data-lang="bash">
+bin/lemline instance start examples firmware-update --input '{&quot;firmwareVersion&quot;:&quot;1.1.0&quot;,&quot;campaignId&quot;:&quot;CMP-2&quot;,&quot;zone&quot;:&quot;cold-room&quot;}'
+</div><p id="ngbf3m_58">After 60 to 70 seconds the listener times out, the workflow reads <code class="code" id="ngbf3m_63">sensor-1</code> from the shop, and its firmware stays <code class="code" id="ngbf3m_64">1.0.0</code>.</p></section><section class="chapter"><h2 id="predictive-maintenance-workflow" data-toc="predictive-maintenance-workflow">Predictive Maintenance Workflow</h2><p id="ngbf3m_65">This workflow runs every 24 hours. For each device it asks the shop for a failure prediction, then opens a maintenance ticket above 0.7, warns the maintenance team above 0.4, and does nothing otherwise. <code class="code" id="ngbf3m_70">schedule.every</code> runs it once when it is started, then at each interval; <code class="code" id="ngbf3m_71">schedule.cron</code> would wait for the next matching time instead.</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: predictive-maintenance
+  version: '1.0.0'
+schedule:
+  every:
+    hours: 24
+do:
+  - retrieveDevices:
+      call: http
+      with:
+        method: get
+        endpoint: http://127.0.0.1:8787/devices
+  - reviewDevices:
+      for:
+        in: ${ .items }
+        each: device
+      do:
+        - predictMaintenance:
+            call: http
+            with:
+              method: post
+              endpoint: ${ &quot;http://127.0.0.1:8787/devices/\($device.deviceId)/predictions&quot; }
+        - routePrediction:
+            switch:
+              - maintenanceNeeded:
+                  when: ${ .probabilityOfFailure &gt; 0.7 }
+                  then: createTicket
+              - warning:
+                  when: ${ .probabilityOfFailure &gt; 0.4 }
+                  then: notifyMaintenance
+              - healthy:
+                  then: exit
+        - createTicket:
+            call: http
+            with:
+              method: post
+              endpoint: http://127.0.0.1:8787/documents
+              body:
+                reference: ${ $device.deviceId }
+                title: Maintenance ticket
+                content: '${ &quot;Failure probability \(.probabilityOfFailure)&quot; }'
+            then: exit
+        - notifyMaintenance:
+            call: http
+            with:
+              method: post
+              endpoint: http://127.0.0.1:8787/notifications
+              body:
+                reference: ${ $device.deviceId }
+                recipient: maintenance
+                message: '${ &quot;Failure probability \(.probabilityOfFailure)&quot; }'
+</div><p id="ngbf3m_67">Save it as <code class="code" id="ngbf3m_72">predictive-maintenance-workflow.yaml</code>:</p><div class="code-block" data-lang="bash">
+bin/lemline definition post -f predictive-maintenance-workflow.yaml
+bin/lemline instance start examples predictive-maintenance
+</div><p id="ngbf3m_69">The predictions are 0.13 for <code class="code" id="ngbf3m_73">sensor-1</code>, 0.78 for <code class="code" id="ngbf3m_74">sensor-2</code> and 0.42 for <code class="code" id="ngbf3m_75">sensor-3</code>: the run opens a <code class="code" id="ngbf3m_76">Maintenance ticket</code> document for <code class="code" id="ngbf3m_77">sensor-2</code> and leaves a <code class="code" id="ngbf3m_78">Failure probability 0.42</code> message for <code class="code" id="ngbf3m_79">maintenance</code> about <code class="code" id="ngbf3m_80">sensor-3</code>. The schedule repeats every 24 hours while a worker runs.</p></section><section class="chapter"><h2 id="energy-optimization-workflow" data-toc="energy-optimization-workflow">Energy Optimization Workflow</h2><p id="ngbf3m_81">This workflow runs every 15 minutes. It asks the shop for a plan based on the zone's sensor readings, requests the HVAC and lighting changes with two events, and waits up to five minutes for both devices to confirm the same request. Without both confirmations it records the optimization with none.</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: energy-optimization
+  version: '1.0.0'
+schedule:
+  every:
+    minutes: 15
+input:
+  from: '${ { zone: &quot;dock&quot; } + (. // {}) }'
+do:
+  - rememberZone:
+      set:
+        zone: ${ .zone }
+      export:
+        as: '${ $context + { zone: .zone } }'
+  - calculateSettings:
+      call: http
+      with:
+        method: post
+        endpoint: http://127.0.0.1:8787/energy-plans
+        body:
+          zone: ${ .zone }
+      export:
+        as: '${ $context + { settings: . } }'
+  - updateHvac:
+      emit:
+        event:
+          with:
+            type: com.example.iot.settings.requested
+            source: https://events.example.com/energy
+            data:
+              requestId: ${ $workflow.input.requestId }
+              zone: ${ $context.zone }
+              deviceType: hvac
+              setpoint: ${ $context.settings.hvacSetpoint }
+  - updateLighting:
+      emit:
+        event:
+          with:
+            type: com.example.iot.settings.requested
+            source: https://events.example.com/energy
+            data:
+              requestId: ${ $workflow.input.requestId }
+              zone: ${ $context.zone }
+              deviceType: lighting
+              level: ${ $context.settings.lightingLevel }
+  - getConfirmations:
+      try:
+        - waitForConfirmations:
+            listen:
+              to:
+                all:
+                  - with:
+                      type: com.example.iot.settings.applied
+                      data: ${ .deviceType == &quot;hvac&quot; }
+                    correlate:
+                      requestId:
+                        from: ${ .requestId }
+                        expect: ${ $workflow.input.requestId }
+                  - with:
+                      type: com.example.iot.settings.applied
+                      data: ${ .deviceType == &quot;lighting&quot; }
+                    correlate:
+                      requestId:
+                        from: ${ .requestId }
+                        expect: ${ $workflow.input.requestId }
+            timeout:
+              after: PT5M
+      catch:
+        errors:
+          with:
+            type: https://open-workflow-specification.org/spec/1.0.0/errors/timeout
+        do:
+          - markUnconfirmed:
+              set:
+                confirmations: []
+  - recordOptimization:
+      call: http
+      with:
+        method: post
+        endpoint: http://127.0.0.1:8787/audit
+        body:
+          reference: ${ $context.zone }
+          message: '${ &quot;Optimization applied: hvac \($context.settings.hvacSetpoint), lighting \($context.settings.lightingLevel), \(if type == &quot;array&quot; then length else 0 end) confirmations&quot; }'
+</div><p id="ngbf3m_83">Save it as <code class="code" id="ngbf3m_89">energy-optimization-workflow.yaml</code>:</p><div class="code-block" data-lang="bash">
+bin/lemline definition post -f energy-optimization-workflow.yaml
+bin/lemline instance start examples energy-optimization --input '{&quot;zone&quot;:&quot;dock&quot;,&quot;requestId&quot;:&quot;REQ-1&quot;}'
+</div><p id="ngbf3m_85">The dock's two sensors average 20 &deg;C, so the plan sets the HVAC to 19 and the lighting to 70. Confirm both changes:</p><div class="code-block" data-lang="bash">
+bin/lemline instance start examples tutorial-publisher --input '{&quot;type&quot;:&quot;com.example.iot.settings.applied&quot;,&quot;data&quot;:{&quot;requestId&quot;:&quot;REQ-1&quot;,&quot;deviceType&quot;:&quot;hvac&quot;}}'
+bin/lemline instance start examples tutorial-publisher --input '{&quot;type&quot;:&quot;com.example.iot.settings.applied&quot;,&quot;data&quot;:{&quot;requestId&quot;:&quot;REQ-1&quot;,&quot;deviceType&quot;:&quot;lighting&quot;}}'
+</div><p id="ngbf3m_87">The instance completes and the shop's audit list shows <code class="code" id="ngbf3m_90">Optimization applied: hvac 19, lighting 70, 2 confirmations</code> for the dock. The schedule repeats every 15 minutes while a worker runs; stop the worker when you are done. Stop the shop too:</p><div class="code-block" data-lang="bash">
+docker compose -f examples/tutorial-services/compose.yaml down
+</div></section><section class="chapter"><h2 id="best-practices-for-iot-workflows" data-toc="best-practices-for-iot-workflows">Best Practices for IoT Workflows</h2><p id="ngbf3m_91">When implementing IoT workflows with Lemline, consider these best practices:</p><ol class="list _decimal" id="ngbf3m_92" type="1"><li class="list__item" id="ngbf3m_93"><p id="ngbf3m_103"><span class="control" id="ngbf3m_104">Device Identity Management</span>: Implement secure device identity and credential management</p></li><li class="list__item" id="ngbf3m_94"><p id="ngbf3m_105"><span class="control" id="ngbf3m_106">Batch Processing</span>: Process telemetry data in batches for efficiency</p></li><li class="list__item" id="ngbf3m_95"><p id="ngbf3m_107"><span class="control" id="ngbf3m_108">Error Handling</span>: Use robust error handling and retry mechanisms for device communications</p></li><li class="list__item" id="ngbf3m_96"><p id="ngbf3m_109"><span class="control" id="ngbf3m_110">Correlation</span>: Properly correlate events from the same device across different workflows</p></li><li class="list__item" id="ngbf3m_97"><p id="ngbf3m_111"><span class="control" id="ngbf3m_112">Timeouts</span>: Set appropriate timeouts for device communication, which may be unstable (Lemline only enforces timeouts on <code class="code" id="ngbf3m_113">listen</code> tasks; HTTP calls use fixed limits of 15 s to connect and 30 s per request)</p></li><li class="list__item" id="ngbf3m_98"><p id="ngbf3m_114"><span class="control" id="ngbf3m_115">Stateful Workflows</span>: Use workflow context for maintaining state about devices</p></li><li class="list__item" id="ngbf3m_99"><p id="ngbf3m_116"><span class="control" id="ngbf3m_117">Digital Twins</span>: Update digital twin representations with the latest device state</p></li><li class="list__item" id="ngbf3m_100"><p id="ngbf3m_118"><span class="control" id="ngbf3m_119">Progressive Deployment</span>: Implement batched or phased deployments for firmware updates</p></li><li class="list__item" id="ngbf3m_101"><p id="ngbf3m_120"><span class="control" id="ngbf3m_121">Monitoring</span>: Include appropriate logging and monitoring for device interactions</p></li><li class="list__item" id="ngbf3m_102"><p id="ngbf3m_122"><span class="control" id="ngbf3m_123">Data Validation</span>: Always validate incoming telemetry data before processing</p></li></ol></section><section class="chapter"><h2 id="conclusion" data-toc="conclusion">Conclusion</h2><p id="ngbf3m_124">These examples demonstrate how to implement common IoT patterns as workflows using Lemline. The workflows cover the entire IoT lifecycle, from device provisioning to telemetry processing, firmware updates, predictive maintenance, and energy optimization.</p><p id="ngbf3m_125">By leveraging Lemline's workflow capabilities, you can build robust, scalable IoT solutions that handle complex device management and data processing requirements while maintaining reliability and performance.</p><p id="ngbf3m_126">For more examples of specific integrations, see the <a href="lemline-examples-integrations.html" id="ngbf3m_128" data-tooltip="Runtime support: some examples on this page use call: openapi, call: asyncapi, call: grpc or OAuth 2.0 authentication. Lemline registers them but does not execute them yet: such a task fails when it runs, with the error shown under each example. Write those calls with call: http and…">Integration Examples</a> document.</p><p id="ngbf3m_127">Run the <a href="lemline-tutorial-iot.html" id="ngbf3m_129" data-tooltip="Complete the SQLite setup and stop the worker with Ctrl+C before registering the event schedules. In a separate terminal, open the root of the Lemline source checkout matching these docs (the directory containing examples/tutorial-services). With Docker Compose running, start the…">warehouse exercise</a> to deliver a real event to the manager&rsquo;s inbox.</p></section><div class="last-modified">25 November 2026</div><div data-feedback-placeholder="true"></div><div class="navigation-links _bottom"><a href="lemline-examples-order.html" class="navigation-links__prev">Shop checkout workflow</a><a href="lemline-examples-api.html" class="navigation-links__next">API Integration Examples</a></div></article><div id="disqus_thread"></div></div></section></main></div><script src="https://resources.jetbrains.com/writerside/apidoc/6.22.0-b776/app.js"></script></body></html>

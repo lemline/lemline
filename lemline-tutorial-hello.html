@@ -1,0 +1,108 @@
+<!DOCTYPE html SYSTEM "about:legacy-compat">
+<html lang="en-US" data-preset="contrast" data-primary-color="#2E6F7E"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="robots" content="noindex"><meta name="built-on" content="2026-11-26T17:17:48.98245462"><title>Acknowledge the first order | Lemline documentation</title><script type="application/json" id="virtual-toc-data">[{"id":"return-an-acknowledgement","level":0,"title":"Return an acknowledgement","anchor":"#return-an-acknowledgement"},{"id":"pass-data-between-tasks","level":0,"title":"Pass data between tasks","anchor":"#pass-data-between-tasks"},{"id":"accept-the-customer-s-order-id","level":0,"title":"Accept the customer\u0027s order ID","anchor":"#accept-the-customer-s-order-id"},{"id":"add-conditional-logic","level":0,"title":"Add conditional logic","anchor":"#add-conditional-logic"}]</script><script type="application/json" id="topic-shortcuts"></script><link href="https://resources.jetbrains.com/writerside/apidoc/6.22.0-b776/app.css" rel="stylesheet"><link href="static/custom.css" rel="stylesheet"><meta name="description" content="Build an order acknowledgement workflow, pass data between tasks, and run it with the Lemline CLI."><link rel="icon" type="image/png" sizes="16x16" href="images/lemly.png"><meta name="image" content="https://docs.lemline.com/social-preview.png"><!-- Open Graph --><meta property="og:title" content="Acknowledge the first order | Lemline documentation"><meta property="og:description" content="Build an order acknowledgement workflow, pass data between tasks, and run it with the Lemline CLI."><meta property="og:image" content="https://docs.lemline.com/social-preview.png"><meta property="og:site_name" content="Lemline documentation Help"><meta property="og:type" content="website"><meta property="og:locale" content="en_US"><meta property="og:url" content="https://docs.lemline.com/lemline-tutorial-hello.html"><!-- End Open Graph --><!-- Twitter Card --><meta name="twitter:card" content="summary_large_image"><meta name="twitter:site" content=""><meta name="twitter:title" content="Acknowledge the first order | Lemline documentation"><meta name="twitter:description" content="Build an order acknowledgement workflow, pass data between tasks, and run it with the Lemline CLI."><meta name="twitter:creator" content=""><meta name="twitter:image:src" content="https://docs.lemline.com/social-preview.png"><!-- End Twitter Card --><!-- Schema.org WebPage --><script type="application/ld+json">{
+    "@context": "http://schema.org",
+    "@type": "WebPage",
+    "@id": "https://docs.lemline.com/lemline-tutorial-hello.html#webpage",
+    "url": "https://docs.lemline.com/lemline-tutorial-hello.html",
+    "name": "Acknowledge the first order | Lemline documentation",
+    "description": "",
+    "image": "https://docs.lemline.com/social-preview.png",
+    "inLanguage":"en-US"
+}</script><!-- End Schema.org --><!-- Schema.org WebSite --><script type="application/ld+json">{
+    "@type": "WebSite",
+    "@id": "https://docs.lemline.com/#website",
+    "url": "https://docs.lemline.com/",
+    "name": "Lemline documentation Help"
+}</script><!-- End Schema.org --></head><body data-id="lemline-tutorial-hello" data-main-title="Acknowledge the first order" data-article-props="{&quot;seeAlsoStyle&quot;:&quot;links&quot;}" data-template="article" data-breadcrumbs="Tutorials: Run a shop with Lemline"><div class="wrapper"><main class="panel _main"><header class="panel__header"><div class="container"><h3>Lemline documentation  Help</h3><div class="panel-trigger"></div></div></header><section class="panel__content"><div class="container"><article class="article" data-shortcut-switcher="inactive"><h1 data-toc="lemline-tutorial-hello" id="lemline-tutorial-hello.md">Acknowledge the first order</h1><p id="z5jw8u1_4">Complete <a href="lemline-tutorial-setup.html" id="z5jw8u1_9" data-tooltip="Run Lemline on one machine with SQLite. Lemline stores workflow definitions, queued messages, and workflow history in local files. Use a writable directory on a local filesystem.">the SQLite setup</a>. Keep the worker running and use a second terminal in the setup directory. Substitute <code class="code" id="z5jw8u1_10">java -jar lemline.jar</code> for <code class="code" id="z5jw8u1_11">bin/lemline</code> if using the JAR. Each definition below is a new version of the same workflow. Save each in turn as <code class="code" id="z5jw8u1_12">acknowledge-order.yaml</code>.</p><section class="chapter"><h2 id="return-an-acknowledgement" data-toc="return-an-acknowledgement">Return an acknowledgement</h2><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: tutorial
+  name: acknowledge-order
+  version: '0.1.0'
+do:
+  - acknowledge:
+      set:
+        message: Order received
+</div><div class="code-block" data-lang="bash">
+bin/lemline definition post -f acknowledge-order.yaml
+bin/lemline instance start tutorial acknowledge-order 0.1.0
+</div><p id="z5jw8u1_15">The CLI prints the instance ID. In the worker terminal, find that ID and the line <code class="code" id="z5jw8u1_16">Workflow completed with output</code>. The worker completes the workflow with <code class="code" id="z5jw8u1_17">{&quot;message&quot;:&quot;Order received&quot;}</code>.</p></section><section class="chapter"><h2 id="pass-data-between-tasks" data-toc="pass-data-between-tasks">Pass data between tasks</h2><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: tutorial
+  name: acknowledge-order
+  version: '0.1.1'
+do:
+  - prepare:
+      set:
+        orderId: ORD-100
+  - acknowledge:
+      set:
+        message: ${ &quot;Order received for &quot; + .orderId }
+</div><div class="code-block" data-lang="bash">
+bin/lemline definition post -f acknowledge-order.yaml
+bin/lemline instance start tutorial acknowledge-order 0.1.1
+</div><p id="z5jw8u1_20">The second task reads the first task's output and returns <code class="code" id="z5jw8u1_21">Order received for ORD-100</code> in the message.</p></section><section class="chapter"><h2 id="accept-the-customer-s-order-id" data-toc="accept-the-customer-s-order-id">Accept the customer's order ID</h2><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: 1.0.3
+  namespace: tutorial
+  name: acknowledge-order
+  version: '0.1.2'
+input:
+  schema:
+    document:
+      type: object
+      required: [orderId]
+      properties:
+        orderId:
+          type: string
+do:
+  - acknowledge:
+      set:
+        message: ${ &quot;Order received for &quot; + .orderId + &quot;!&quot; }
+</div><div class="code-block" data-lang="bash">
+bin/lemline definition post -f acknowledge-order.yaml
+bin/lemline instance start tutorial acknowledge-order 0.1.2 --input '{&quot;orderId&quot;:&quot;ORD-101&quot;}'
+</div><p id="z5jw8u1_24">The message now contains the ID supplied at startup.</p></section><section class="chapter"><h2 id="add-conditional-logic" data-toc="add-conditional-logic">Add conditional logic</h2><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: 1.0.3
+  namespace: tutorial
+  name: acknowledge-order
+  version: '0.1.3'
+input:
+  schema:
+    document:
+      type: object
+      required: [orderId, hour]
+      properties:
+        orderId:
+          type: string
+        hour:
+          type: integer
+do:
+  - chooseGreeting:
+      switch:
+        - case1:
+            when: ${ .hour &lt; 12 }
+            then: setMorningGreeting
+        - case2:
+            when: ${ .hour &lt; 18 }
+            then: setAfternoonGreeting
+        - case3:
+            then: setEveningGreeting
+  - setMorningGreeting:
+      set:
+        greeting: Good morning
+      then: createMessage
+  - setAfternoonGreeting:
+      set:
+        greeting: Good afternoon
+      then: createMessage
+  - setEveningGreeting:
+      set:
+        greeting: Good evening
+  - createMessage:
+      set:
+        message: '${ .greeting + &quot;: order received for &quot; + $workflow.input.orderId + &quot;!&quot; }'
+</div><div class="code-block" data-lang="bash">
+bin/lemline definition post -f acknowledge-order.yaml
+bin/lemline instance start tutorial acknowledge-order 0.1.3 --input '{&quot;orderId&quot;:&quot;ORD-101&quot;,&quot;hour&quot;:10}'
+bin/lemline instance start tutorial acknowledge-order 0.1.3 --input '{&quot;orderId&quot;:&quot;ORD-102&quot;,&quot;hour&quot;:15}'
+bin/lemline instance start tutorial acknowledge-order 0.1.3 --input '{&quot;orderId&quot;:&quot;ORD-103&quot;,&quot;hour&quot;:20}'
+</div><p id="z5jw8u1_27">Expect messages starting with <code class="code" id="z5jw8u1_29">Good morning</code>, <code class="code" id="z5jw8u1_30">Good afternoon</code> and <code class="code" id="z5jw8u1_31">Good evening</code>, respectively. The switch enters one branch. The morning and afternoon tasks jump to <code class="code" id="z5jw8u1_32">createMessage</code> to skip subsequent greetings. The evening task reaches it as the next task in sequence.</p><p id="z5jw8u1_28">Continue with <a href="lemline-tutorial-order-processing.html" id="z5jw8u1_33" data-tooltip="Complete the SQLite setup and keep the worker running on the host. In a separate terminal, open the root of the Lemline source checkout matching these docs (the directory containing examples/tutorial-services). With Docker Compose running, start the single shop container:">Reserve, charge and ship an order</a>.</p></section><div class="last-modified">26 November 2026</div><div data-feedback-placeholder="true"></div><div class="navigation-links _bottom"><a href="lemline-tutorial-setup.html" class="navigation-links__prev">Setting Up A Local Environment</a><a href="lemline-tutorial-gateway.html" class="navigation-links__next">Start and follow an order through the gRPC gateway</a></div></article><div id="disqus_thread"></div></div></section></main></div><script src="https://resources.jetbrains.com/writerside/apidoc/6.22.0-b776/app.js"></script></body></html>

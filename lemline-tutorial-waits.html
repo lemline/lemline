@@ -1,0 +1,93 @@
+<!DOCTYPE html SYSTEM "about:legacy-compat">
+<html lang="en-US" data-preset="contrast" data-primary-color="#2E6F7E"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="robots" content="noindex"><meta name="built-on" content="2026-11-26T17:17:49.133531635"><title>&quot;Wait for payments and collect order checks | Lemline documentation</title><script type="application/json" id="virtual-toc-data">[{"id":"prepare-the-runner","level":0,"title":"Prepare the runner","anchor":"#prepare-the-runner"},{"id":"resume-after-a-duration","level":0,"title":"Resume after a duration","anchor":"#resume-after-a-duration"},{"id":"publish-test-events","level":0,"title":"Publish test events","anchor":"#publish-test-events"},{"id":"resume-when-a-payment-arrives","level":0,"title":"Resume when a payment arrives","anchor":"#resume-when-a-payment-arrives"},{"id":"collect-multiple-results","level":0,"title":"Collect multiple results","anchor":"#collect-multiple-results"}]</script><script type="application/json" id="topic-shortcuts"></script><link href="https://resources.jetbrains.com/writerside/apidoc/6.22.0-b776/app.css" rel="stylesheet"><link href="static/custom.css" rel="stylesheet"><meta name="description" content="Wait for a payment event, collect order checks, and resume a workflow when its conditions are met."><link rel="icon" type="image/png" sizes="16x16" href="images/lemly.png"><meta name="image" content="https://docs.lemline.com/social-preview.png"><!-- Open Graph --><meta property="og:title" content="&quot;Wait for payments and collect order checks | Lemline documentation"><meta property="og:description" content="Wait for a payment event, collect order checks, and resume a workflow when its conditions are met."><meta property="og:image" content="https://docs.lemline.com/social-preview.png"><meta property="og:site_name" content="Lemline documentation Help"><meta property="og:type" content="website"><meta property="og:locale" content="en_US"><meta property="og:url" content="https://docs.lemline.com/lemline-tutorial-waits.html"><!-- End Open Graph --><!-- Twitter Card --><meta name="twitter:card" content="summary_large_image"><meta name="twitter:site" content=""><meta name="twitter:title" content="&quot;Wait for payments and collect order checks | Lemline documentation"><meta name="twitter:description" content="Wait for a payment event, collect order checks, and resume a workflow when its conditions are met."><meta name="twitter:creator" content=""><meta name="twitter:image:src" content="https://docs.lemline.com/social-preview.png"><!-- End Twitter Card --><!-- Schema.org WebPage --><script type="application/ld+json">{
+    "@context": "http://schema.org",
+    "@type": "WebPage",
+    "@id": "https://docs.lemline.com/lemline-tutorial-waits.html#webpage",
+    "url": "https://docs.lemline.com/lemline-tutorial-waits.html",
+    "name": "&quot;Wait for payments and collect order checks | Lemline documentation",
+    "description": "",
+    "image": "https://docs.lemline.com/social-preview.png",
+    "inLanguage":"en-US"
+}</script><!-- End Schema.org --><!-- Schema.org WebSite --><script type="application/ld+json">{
+    "@type": "WebSite",
+    "@id": "https://docs.lemline.com/#website",
+    "url": "https://docs.lemline.com/",
+    "name": "Lemline documentation Help"
+}</script><!-- End Schema.org --></head><body data-id="lemline-tutorial-waits" data-main-title="&quot;Wait for payments and collect order checks" data-article-props="{&quot;seeAlsoStyle&quot;:&quot;links&quot;}" data-template="article" data-breadcrumbs="Tutorials: Run a shop with Lemline"><div class="wrapper"><main class="panel _main"><header class="panel__header"><div class="container"><h3>Lemline documentation  Help</h3><div class="panel-trigger"></div></div></header><section class="panel__content"><div class="container"><article class="article" data-shortcut-switcher="inactive"><h1 data-toc="lemline-tutorial-waits" id="lemline-tutorial-waits.md">&quot;Wait for payments and collect order checks</h1><p id="mqfzhp_4">A wait pauses an existing instance for a duration. A listen pauses it until matching events arrive. The runner persists pending operations so it can resume an instance after a restart.</p><p id="mqfzhp_5">Run the commands from the setup directory. With the JAR, replace <code class="code" id="mqfzhp_11">bin/lemline</code> with <code class="code" id="mqfzhp_12">java -jar lemline.jar</code>. In PowerShell, use <code class="code" id="mqfzhp_13">.\bin\lemline.exe</code>.</p><section class="chapter"><h2 id="prepare-the-runner" data-toc="prepare-the-runner">Prepare the runner</h2><p id="mqfzhp_14">Follow <a href="lemline-tutorial-setup.html" id="mqfzhp_15" data-tooltip="Run Lemline on one machine with SQLite. Lemline stores workflow definitions, queued messages, and workflow history in local files. Use a writable directory on a local filesystem.">the SQLite setup</a> to prepare a local runner that serves the <code class="code" id="mqfzhp_16">examples</code> namespace. Leave the worker running. This exercise uses SQLite events and can run independently of the shop.</p></section><section class="chapter"><h2 id="resume-after-a-duration" data-toc="resume-after-a-duration">Resume after a duration</h2><p id="mqfzhp_17">Save the definition as <code class="code" id="mqfzhp_20">delayed-processing.yaml</code>. Its first task waits 30 seconds. The next task returns a resumed state.</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: delayed-processing
+  version: '1.0.0'
+do:
+  - pause:
+      wait: PT30S
+  - resume:
+      set:
+        state: resumed
+</div><div class="code-block" data-lang="bash">
+bin/lemline definition post -f delayed-processing.yaml
+bin/lemline instance start examples delayed-processing
+</div></section><section class="chapter"><h2 id="publish-test-events" data-toc="publish-test-events">Publish test events</h2><p id="mqfzhp_21">Save this definition as <code class="code" id="mqfzhp_24">tutorial-publisher.yaml</code> and register it. It publishes the event type and data supplied as workflow input through the same SQLite messaging channel as the runner.</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: tutorial-publisher
+  version: '1.0.0'
+do:
+  - publish:
+      emit:
+        event:
+          with:
+            type: ${ .type }
+            source: https://events.example.com/tutorial
+            data: ${ .data }
+</div><div class="code-block" data-lang="bash">
+bin/lemline definition post -f tutorial-publisher.yaml
+</div></section><section class="chapter"><h2 id="resume-when-a-payment-arrives" data-toc="resume-when-a-payment-arrives">Resume when a payment arrives</h2><p id="mqfzhp_25">Register the next definition and start it with an order ID in the workflow input. Publish an event of type <code class="code" id="mqfzhp_31">com.example.payment.received</code> with the same <code class="code" id="mqfzhp_32">orderId</code> in its payload. A payment for another order leaves this instance waiting.</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: listen-for-payment
+  version: '1.0.0'
+do:
+  - awaitPayment:
+      listen:
+        to:
+          one:
+            with:
+              type: com.example.payment.received
+            correlate:
+              orderId:
+                from: ${ .orderId }
+                expect: ${ $workflow.input.orderId }
+      timeout:
+        after: PT30M
+</div><p id="mqfzhp_27">Save the definition as <code class="code" id="mqfzhp_33">listen-for-payment.yaml</code> and run:</p><div class="code-block" data-lang="bash">
+bin/lemline definition post -f listen-for-payment.yaml
+bin/lemline instance start examples listen-for-payment --input '{&quot;orderId&quot;:&quot;ORD-123&quot;}'
+</div><p id="mqfzhp_29">Once the listener is waiting, publish these events in order:</p><div class="code-block" data-lang="bash">
+bin/lemline instance start examples tutorial-publisher --input '{&quot;type&quot;:&quot;com.example.payment.received&quot;,&quot;data&quot;:{&quot;orderId&quot;:&quot;OTHER&quot;}}'
+bin/lemline instance start examples tutorial-publisher --input '{&quot;type&quot;:&quot;com.example.payment.received&quot;,&quot;data&quot;:{&quot;orderId&quot;:&quot;ORD-123&quot;}}'
+</div></section><section class="chapter"><h2 id="collect-multiple-results" data-toc="collect-multiple-results">Collect multiple results</h2><p id="mqfzhp_34">Start an instance of this workflow and publish an inventory check and shipping quote. The listener waits for both types before continuing.</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: listen-for-all-results
+  version: '1.0.0'
+do:
+  - collectResults:
+      listen:
+        to:
+          all:
+            - with:
+                type: com.example.inventory.checked
+            - with:
+                type: com.example.shipping.quoted
+      timeout:
+        after: PT5M
+  - recordResults:
+      set:
+        checks: ${ . }
+</div><p id="mqfzhp_36">Save the definition as <code class="code" id="mqfzhp_40">listen-for-all-results.yaml</code>. Start the listener, then publish both events after it is waiting:</p><div class="code-block" data-lang="bash">
+bin/lemline definition post -f listen-for-all-results.yaml
+bin/lemline instance start examples listen-for-all-results
+bin/lemline instance start examples tutorial-publisher --input '{&quot;type&quot;:&quot;com.example.inventory.checked&quot;,&quot;data&quot;:{&quot;stock&quot;:2}}'
+bin/lemline instance start examples tutorial-publisher --input '{&quot;type&quot;:&quot;com.example.shipping.quoted&quot;,&quot;data&quot;:{&quot;price&quot;:15}}'
+</div><p id="mqfzhp_38">After both events arrive, the instance completes with both results in <code class="code" id="mqfzhp_41">checks</code>. Continue with <a href="lemline-tutorial-iot.html" id="mqfzhp_42" data-tooltip="Complete the SQLite setup and stop the worker with Ctrl+C before registering the event schedules. In a separate terminal, open the root of the Lemline source checkout matching these docs (the directory containing examples/tutorial-services). With Docker Compose running, start the…">Monitor the warehouse temperature</a>.</p><p id="mqfzhp_39">See <a href="https://github.com/open-workflow-specification/specification/blob/v1.0.3/dsl-reference.md#correlation" id="mqfzhp_43" data-external="true" rel="noopener noreferrer" target="_blank">Event Correlation</a> and <a href="https://github.com/open-workflow-specification/specification/blob/v1.0.3/dsl.md#timeouts" id="mqfzhp_44" data-external="true" rel="noopener noreferrer" target="_blank">Timeouts</a> for matching and bounded waits.</p></section><div class="last-modified">26 November 2026</div><div data-feedback-placeholder="true"></div><div class="navigation-links _bottom"><a href="lemline-tutorial-order-processing.html" class="navigation-links__prev">Reserve, charge and ship an order</a><a href="lemline-tutorial-iot.html" class="navigation-links__next">Monitor the warehouse temperature</a></div></article><div id="disqus_thread"></div></div></section></main></div><script src="https://resources.jetbrains.com/writerside/apidoc/6.22.0-b776/app.js"></script></body></html>

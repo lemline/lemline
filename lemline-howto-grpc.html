@@ -1,0 +1,87 @@
+<!DOCTYPE html SYSTEM "about:legacy-compat">
+<html lang="en-US" data-preset="contrast" data-primary-color="#2E6F7E"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="robots" content="noindex"><meta name="built-on" content="2026-11-26T17:17:48.314795606"><title>How to call gRPC functions | Lemline documentation</title><script type="application/json" id="virtual-toc-data">[{"id":"define-a-unary-call","level":0,"title":"Define a unary call","anchor":"#define-a-unary-call"},{"id":"configure-authentication","level":0,"title":"Configure authentication","anchor":"#configure-authentication"},{"id":"call-an-http-equivalent","level":0,"title":"Call an HTTP equivalent","anchor":"#call-an-http-equivalent"}]</script><script type="application/json" id="topic-shortcuts"></script><link href="https://resources.jetbrains.com/writerside/apidoc/6.22.0-b776/app.css" rel="stylesheet"><link href="static/custom.css" rel="stylesheet"><link rel="icon" type="image/png" sizes="16x16" href="images/lemly.png"><meta name="image" content="https://docs.lemline.com/social-preview.png"><!-- Open Graph --><meta property="og:title" content="How to call gRPC functions | Lemline documentation"><meta property="og:description" content=""><meta property="og:image" content="https://docs.lemline.com/social-preview.png"><meta property="og:site_name" content="Lemline documentation Help"><meta property="og:type" content="website"><meta property="og:locale" content="en_US"><meta property="og:url" content="https://docs.lemline.com/lemline-howto-grpc.html"><!-- End Open Graph --><!-- Twitter Card --><meta name="twitter:card" content="summary_large_image"><meta name="twitter:site" content=""><meta name="twitter:title" content="How to call gRPC functions | Lemline documentation"><meta name="twitter:description" content=""><meta name="twitter:creator" content=""><meta name="twitter:image:src" content="https://docs.lemline.com/social-preview.png"><!-- End Twitter Card --><!-- Schema.org WebPage --><script type="application/ld+json">{
+    "@context": "http://schema.org",
+    "@type": "WebPage",
+    "@id": "https://docs.lemline.com/lemline-howto-grpc.html#webpage",
+    "url": "https://docs.lemline.com/lemline-howto-grpc.html",
+    "name": "How to call gRPC functions | Lemline documentation",
+    "description": "",
+    "image": "https://docs.lemline.com/social-preview.png",
+    "inLanguage":"en-US"
+}</script><!-- End Schema.org --><!-- Schema.org WebSite --><script type="application/ld+json">{
+    "@type": "WebSite",
+    "@id": "https://docs.lemline.com/#website",
+    "url": "https://docs.lemline.com/",
+    "name": "Lemline documentation Help"
+}</script><!-- End Schema.org --></head><body data-id="lemline-howto-grpc" data-main-title="How to call gRPC functions" data-article-props="{&quot;seeAlsoStyle&quot;:&quot;links&quot;}" data-template="article" data-breadcrumbs="How-to Guides///Working with Tasks"><div class="wrapper"><main class="panel _main"><header class="panel__header"><div class="container"><h3>Lemline documentation  Help</h3><div class="panel-trigger"></div></div></header><section class="panel__content"><div class="container"><article class="article" data-shortcut-switcher="inactive"><h1 data-toc="lemline-howto-grpc" id="lemline-howto-grpc.md">How to call gRPC functions</h1><p id="e9jaos_3">Open Workflow defines <code class="code" id="e9jaos_8">call: grpc</code>. Lemline registers such a definition, but it has no gRPC executor yet: an instance faults at the gRPC task with <code class="code" id="e9jaos_9">Unknown task type: CallGRPC</code>. The examples below describe a stock service of the tutorial shop that exists only as an illustration: the shop has no gRPC server. Until Lemline supports gRPC, call an HTTP equivalent of the service, as shown at the end of this page. See <a href="lemline-ref-supported-features.html" id="e9jaos_10" data-tooltip="This reference documents which features of the Open Workflow DSL v1.0 are currently supported in Lemline, and any implementation-specific details or limitations.">Supported Features</a>.</p><p id="e9jaos_4">To check the registration, complete <a href="lemline-tutorial-setup.html" id="e9jaos_11" data-tooltip="Run Lemline on one machine with SQLite. Lemline stores workflow definitions, queued messages, and workflow history in local files. Use a writable directory on a local filesystem.">the SQLite setup</a>, keep its worker running and use a second terminal in the setup directory. With the JAR, substitute <code class="code" id="e9jaos_12">java -jar lemline.jar</code> for <code class="code" id="e9jaos_13">bin/lemline</code>.</p><section class="chapter"><h2 id="define-a-unary-call" data-toc="define-a-unary-call">Define a unary call</h2><p id="e9jaos_14">Identify the protobuf resource, service and method. Set <code class="code" id="e9jaos_19">arguments</code> to the request message fields.</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: grpc-get-stock
+  version: '0.1.0'
+do:
+  - getStock:
+      call: grpc
+      with:
+        proto:
+          endpoint: file:///opt/shop/inventory.proto
+        service:
+          name: shop.InventoryService
+          host: localhost
+          port: 50051
+        method: GetStock
+        arguments:
+          sku: ${ .sku }
+</div><p id="e9jaos_16">Save it as <code class="code" id="e9jaos_20">basic-grpc-call.yaml</code>:</p><div class="code-block" data-lang="bash">
+bin/lemline definition post -f basic-grpc-call.yaml
+bin/lemline instance start examples grpc-get-stock --input '{&quot;sku&quot;:&quot;SKU-1&quot;}'
+</div><p id="e9jaos_18">The definition registers. The instance faults with a <code class="code" id="e9jaos_21">runtime</code> error titled <code class="code" id="e9jaos_22">Unknown task type: CallGRPC</code>.</p></section><section class="chapter"><h2 id="configure-authentication" data-toc="configure-authentication">Configure authentication</h2><p id="e9jaos_23">Attach a policy to the service where the executing runtime supports it. This one sends a bearer token read from the <code class="code" id="e9jaos_27">apiToken</code> secret:</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: grpc-auth-example
+  version: '0.1.0'
+use:
+  secrets:
+    - apiToken
+  authentications:
+    inventoryAuth:
+      bearer:
+        token: ${ $secrets.apiToken }
+do:
+  - getStock:
+      call: grpc
+      with:
+        proto:
+          endpoint: file:///opt/shop/inventory.proto
+        service:
+          name: shop.InventoryService
+          host: localhost
+          port: 50051
+          authentication:
+            use: inventoryAuth
+        method: GetStock
+        arguments:
+          sku: ${ .sku }
+  - recordStock:
+      set:
+        checked: true
+</div><p id="e9jaos_25">Save it as <code class="code" id="e9jaos_28">example-using-authentication.yaml</code>. Register it to check the definition; it cannot run on Lemline either:</p><div class="code-block" data-lang="bash">
+bin/lemline definition post -f example-using-authentication.yaml
+</div></section><section class="chapter"><h2 id="call-an-http-equivalent" data-toc="call-an-http-equivalent">Call an HTTP equivalent</h2><p id="e9jaos_29">Start the <a href="lemline-tutorial-order-processing.html#start-the-tutorial-shop" id="e9jaos_37" data-tooltip="Complete the SQLite setup and keep the worker running on the host. In a separate terminal, open the root of the Lemline source checkout matching these docs (the directory containing examples/tutorial-services). With Docker Compose running, start the single shop container:">tutorial shop</a> from the root of the Lemline source checkout. Its product endpoint returns the same stock information over HTTP:</p><div class="code-block" data-lang="bash">
+docker compose -f examples/tutorial-services/compose.yaml up -d
+</div><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: grpc-alternative
+  version: '1.0.0'
+do:
+  - getStock:
+      call: http
+      with:
+        method: get
+        endpoint: '${ &quot;http://127.0.0.1:8787/products/\(.sku | @uri)&quot; }'
+</div><p id="e9jaos_32">Save it as <code class="code" id="e9jaos_38">alternative.yaml</code>:</p><div class="code-block" data-lang="bash">
+bin/lemline definition post -f alternative.yaml
+bin/lemline instance start examples grpc-alternative --input '{&quot;sku&quot;:&quot;SKU-1&quot;}'
+</div><p id="e9jaos_34">The instance completes with the product and its stock, <code class="code" id="e9jaos_39">{&quot;id&quot;:&quot;SKU-1&quot;,&quot;name&quot;:&quot;Garden hose&quot;,&quot;category&quot;:&quot;garden&quot;,&quot;price&quot;:25,&quot;available&quot;:100}</code>. Stop the shop when you are done:</p><div class="code-block" data-lang="bash">
+docker compose -f examples/tutorial-services/compose.yaml down
+</div><p id="e9jaos_36">See the <a href="https://github.com/open-workflow-specification/specification/blob/v1.0.3/dsl-reference.md#grpc-call" id="e9jaos_40" data-external="true" rel="noopener noreferrer" target="_blank">gRPC Task</a> for configuration fields.</p></section><div class="last-modified">25 November 2026</div><div data-feedback-placeholder="true"></div><div class="navigation-links _bottom"><a href="lemline-howto-run.html" class="navigation-links__prev">How to run scripts or containers</a><a href="lemline-howto-events.html" class="navigation-links__next">How to emit and listen for events</a></div></article><div id="disqus_thread"></div></div></section></main></div><script src="https://resources.jetbrains.com/writerside/apidoc/6.22.0-b776/app.js"></script></body></html>

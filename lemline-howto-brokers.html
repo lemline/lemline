@@ -1,0 +1,117 @@
+<!DOCTYPE html SYSTEM "about:legacy-compat">
+<html lang="en-US" data-preset="contrast" data-primary-color="#2E6F7E"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="robots" content="noindex"><meta name="built-on" content="2026-11-26T17:17:50.071134142"><title>How to Configure Message Brokers | Lemline documentation</title><script type="application/json" id="virtual-toc-data">[{"id":"supported-message-brokers","level":0,"title":"Supported Message Brokers","anchor":"#supported-message-brokers"},{"id":"kafka-configuration","level":0,"title":"Kafka Configuration","anchor":"#kafka-configuration"},{"id":"rabbitmq-configuration","level":0,"title":"RabbitMQ Configuration","anchor":"#rabbitmq-configuration"},{"id":"pgmq-configuration","level":0,"title":"PGMQ Configuration","anchor":"#pgmq-configuration"},{"id":"sqlite-configuration","level":0,"title":"SQLite Configuration","anchor":"#sqlite-configuration"},{"id":"destination-names","level":0,"title":"Destination Names","anchor":"#destination-names"},{"id":"dead-letter-destinations","level":0,"title":"Dead-Letter Destinations","anchor":"#dead-letter-destinations"},{"id":"consumer-concurrency","level":0,"title":"Consumer Concurrency","anchor":"#consumer-concurrency"},{"id":"implementing-event-driven-workflows","level":0,"title":"Implementing Event-Driven Workflows","anchor":"#implementing-event-driven-workflows"},{"id":"testing-with-the-in-memory-broker","level":0,"title":"Testing with the In-Memory Broker","anchor":"#testing-with-the-in-memory-broker"},{"id":"common-issues-and-solutions","level":0,"title":"Common Issues and Solutions","anchor":"#common-issues-and-solutions"},{"id":"best-practices","level":0,"title":"Best Practices","anchor":"#best-practices"},{"id":"related-information","level":0,"title":"Related Information","anchor":"#related-information"}]</script><script type="application/json" id="topic-shortcuts"></script><link href="https://resources.jetbrains.com/writerside/apidoc/6.22.0-b776/app.css" rel="stylesheet"><link href="static/custom.css" rel="stylesheet"><link rel="icon" type="image/png" sizes="16x16" href="images/lemly.png"><meta name="image" content="https://docs.lemline.com/social-preview.png"><!-- Open Graph --><meta property="og:title" content="How to Configure Message Brokers | Lemline documentation"><meta property="og:description" content=""><meta property="og:image" content="https://docs.lemline.com/social-preview.png"><meta property="og:site_name" content="Lemline documentation Help"><meta property="og:type" content="website"><meta property="og:locale" content="en_US"><meta property="og:url" content="https://docs.lemline.com/lemline-howto-brokers.html"><!-- End Open Graph --><!-- Twitter Card --><meta name="twitter:card" content="summary_large_image"><meta name="twitter:site" content=""><meta name="twitter:title" content="How to Configure Message Brokers | Lemline documentation"><meta name="twitter:description" content=""><meta name="twitter:creator" content=""><meta name="twitter:image:src" content="https://docs.lemline.com/social-preview.png"><!-- End Twitter Card --><!-- Schema.org WebPage --><script type="application/ld+json">{
+    "@context": "http://schema.org",
+    "@type": "WebPage",
+    "@id": "https://docs.lemline.com/lemline-howto-brokers.html#webpage",
+    "url": "https://docs.lemline.com/lemline-howto-brokers.html",
+    "name": "How to Configure Message Brokers | Lemline documentation",
+    "description": "",
+    "image": "https://docs.lemline.com/social-preview.png",
+    "inLanguage":"en-US"
+}</script><!-- End Schema.org --><!-- Schema.org WebSite --><script type="application/ld+json">{
+    "@type": "WebSite",
+    "@id": "https://docs.lemline.com/#website",
+    "url": "https://docs.lemline.com/",
+    "name": "Lemline documentation Help"
+}</script><!-- End Schema.org --></head><body data-id="lemline-howto-brokers" data-main-title="How to Configure Message Brokers" data-article-props="{&quot;seeAlsoStyle&quot;:&quot;links&quot;}" data-template="article" data-breadcrumbs="How-to Guides///Runner Configuration"><div class="wrapper"><main class="panel _main"><header class="panel__header"><div class="container"><h3>Lemline documentation  Help</h3><div class="panel-trigger"></div></div></header><section class="panel__content"><div class="container"><article class="article" data-shortcut-switcher="inactive"><h1 data-toc="lemline-howto-brokers" id="lemline-howto-brokers.md">How to Configure Message Brokers</h1><p id="-noc4zu_3">This guide explains how to connect Lemline to a message broker. Runners exchange workflow steps through the broker, and workflows publish and receive CloudEvents through it.</p><section class="chapter"><h2 id="supported-message-brokers" data-toc="supported-message-brokers">Supported Message Brokers</h2><div class="table-wrapper"><table class="wide" id="-noc4zu_17"><thead><tr class="ijRowHead" id="-noc4zu_19"><th id="-noc4zu_25"><p>Broker</p></th><th id="-noc4zu_26"><p><code class="code" id="-noc4zu_28">lemline.messaging.type</code></p></th><th id="-noc4zu_27"><p>Use</p></th></tr></thead><tbody><tr id="-noc4zu_20"><td id="-noc4zu_29"><p>Kafka</p></td><td id="-noc4zu_30"><p><code class="code" id="-noc4zu_32">kafka</code></p></td><td id="-noc4zu_31"><p>Production, high throughput</p></td></tr><tr id="-noc4zu_21"><td id="-noc4zu_33"><p>RabbitMQ</p></td><td id="-noc4zu_34"><p><code class="code" id="-noc4zu_36">rabbitmq</code></p></td><td id="-noc4zu_35"><p>Production</p></td></tr><tr id="-noc4zu_22"><td id="-noc4zu_37"><p>PGMQ (PostgreSQL Message Queue)</p></td><td id="-noc4zu_38"><p><code class="code" id="-noc4zu_40">pgmq</code></p></td><td id="-noc4zu_39"><p>Production without a dedicated broker; runs on a standard PostgreSQL, no extension needed</p></td></tr><tr id="-noc4zu_23"><td id="-noc4zu_41"><p>SQLite</p></td><td id="-noc4zu_42"><p><code class="code" id="-noc4zu_44">sqlite</code></p></td><td id="-noc4zu_43"><p>Single host without a broker or a queue server; messages are kept in a local file</p></td></tr><tr id="-noc4zu_24"><td id="-noc4zu_45"><p>In-memory</p></td><td id="-noc4zu_46"><p><code class="code" id="-noc4zu_48">in-memory</code></p></td><td id="-noc4zu_47"><p>Single process only, for local tests</p></td></tr></tbody></table></div><p id="-noc4zu_18">If <code class="code" id="-noc4zu_49">lemline.messaging.type</code> is not set, Lemline uses the broker whose settings block (<code class="code" id="-noc4zu_50">lemline.messaging.kafka</code>, <code class="code" id="-noc4zu_51">rabbitmq</code> or <code class="code" id="-noc4zu_52">pgmq</code>) is present, and in-memory messaging when there is none. SQLite is never selected this way: set <code class="code" id="-noc4zu_53">type: sqlite</code> explicitly. At startup, the runner checks that the broker is reachable and stops with an explicit error if it is not.</p></section><section class="chapter"><h2 id="kafka-configuration" data-toc="kafka-configuration">Kafka Configuration</h2><div class="code-block" data-lang="yaml">
+lemline:
+  messaging:
+    type: kafka
+    kafka:
+      brokers: localhost:9092
+      # Optional security settings
+      security-protocol: SASL_SSL
+      sasl-mechanism: PLAIN
+      sasl-username: lemline
+      sasl-password: change-me
+      commands:
+        consumer:
+          group-id: lemline-group
+          offset-reset: earliest
+          concurrency: 64
+</div><p id="-noc4zu_55">When both <code class="code" id="-noc4zu_57">sasl-username</code> and <code class="code" id="-noc4zu_58">sasl-password</code> are set, Lemline configures the PLAIN login module and defaults <code class="code" id="-noc4zu_59">sasl-mechanism</code> to <code class="code" id="-noc4zu_60">PLAIN</code>.</p><p id="-noc4zu_56">Each channel (<code class="code" id="-noc4zu_61">commands</code>, <code class="code" id="-noc4zu_62">events</code>, <code class="code" id="-noc4zu_63">cloudevents</code>, <code class="code" id="-noc4zu_64">lifecycleevents</code>) accepts <code class="code" id="-noc4zu_65">consumer.group-id</code>, <code class="code" id="-noc4zu_66">consumer.offset-reset</code> (<code class="code" id="-noc4zu_67">earliest</code> or <code class="code" id="-noc4zu_68">latest</code>) and <code class="code" id="-noc4zu_69">consumer.concurrency</code>.</p></section><section class="chapter"><h2 id="rabbitmq-configuration" data-toc="rabbitmq-configuration">RabbitMQ Configuration</h2><div class="code-block" data-lang="yaml">
+lemline:
+  messaging:
+    type: rabbitmq
+    rabbitmq:
+      hostname: localhost
+      port: 5672
+      username: guest
+      password: guest
+      virtual-host: /
+      ssl-enabled: false
+</div><p id="-noc4zu_71">Lemline declares its exchanges and queues itself. Each channel accepts <code class="code" id="-noc4zu_72">consumer.concurrency</code>, <code class="code" id="-noc4zu_73">consumer.queue-dlq</code> and, for <code class="code" id="-noc4zu_74">commands</code>, <code class="code" id="-noc4zu_75">events</code> and <code class="code" id="-noc4zu_76">cloudevents</code>, a <code class="code" id="-noc4zu_77">queue</code> name override.</p></section><section class="chapter"><h2 id="pgmq-configuration" data-toc="pgmq-configuration">PGMQ Configuration</h2><div class="code-block" data-lang="yaml">
+lemline:
+  messaging:
+    type: pgmq
+    pgmq:
+      host: localhost
+      port: 5432
+      database: lemline
+      username: postgres
+      password: postgres
+      commands:
+        consumer:
+          concurrency: 64
+          batch-size: 10
+          poll-interval: 100       # milliseconds
+          visibility-timeout: 30   # seconds
+          max-retries: 3
+</div></section><section class="chapter"><h2 id="sqlite-configuration" data-toc="sqlite-configuration">SQLite Configuration</h2><div class="code-block" data-lang="yaml">
+lemline:
+  messaging:
+    type: sqlite
+    sqlite:
+      path: /var/lib/lemline/messaging.db
+      batch-size: 10
+      poll-interval: 50        # milliseconds
+      visibility-timeout: 30   # seconds
+      max-retries: 3
+</div><p id="-noc4zu_80">All Lemline processes that share the queue must run on the same host and open the same file. A relative <code class="code" id="-noc4zu_82">path</code> is resolved against the directory each process is started from, so prefer an absolute path. The parent directory must already exist; Lemline creates the file and its tables itself.</p><p id="-noc4zu_81">A message that a runner holds longer than <code class="code" id="-noc4zu_83">visibility-timeout</code> is delivered again to another consumer. Raise it above the longest time one workflow step can take, for example a slow HTTP call.</p></section><section class="chapter"><h2 id="destination-names" data-toc="destination-names">Destination Names</h2><p id="-noc4zu_84">Lemline derives destination names from the namespace of each workflow:</p><div class="code-block" data-lang="none">
+&lt;prefix&gt;-&lt;namespace&gt;-&lt;type&gt;
+</div><ul class="list _bullet" id="-noc4zu_86"><li class="list__item" id="-noc4zu_89"><p id="-noc4zu_91"><code class="code" id="-noc4zu_92">&lt;prefix&gt;</code> is <code class="code" id="-noc4zu_93">lemline.messaging.prefix</code> (default <code class="code" id="-noc4zu_94">lemline</code>).</p></li><li class="list__item" id="-noc4zu_90"><p id="-noc4zu_95"><code class="code" id="-noc4zu_96">&lt;type&gt;</code> is <code class="code" id="-noc4zu_97">commands</code>, <code class="code" id="-noc4zu_98">events</code> or <code class="code" id="-noc4zu_99">cloudevents</code>.</p></li></ul><p id="-noc4zu_87">For example, workflows of the <code class="code" id="-noc4zu_100">default</code> namespace use <code class="code" id="-noc4zu_101">lemline-default-commands</code>. Topic names cannot be set per channel. Lifecycle events go to a single shared destination, <code class="code" id="-noc4zu_102">lemline-lifecycle-events</code> by default (<code class="code" id="-noc4zu_103">lemline.messaging.&lt;broker&gt;.lifecycleevents.topic</code> or <code class="code" id="-noc4zu_104">.queue</code>).</p><p id="-noc4zu_88">A runner only consumes the namespaces listed in <code class="code" id="-noc4zu_105">lemline.namespaces</code> (default: <code class="code" id="-noc4zu_106">default</code>).</p></section><section class="chapter"><h2 id="dead-letter-destinations" data-toc="dead-letter-destinations">Dead-Letter Destinations</h2><p id="-noc4zu_107">A message that cannot be processed is moved to a dead-letter destination named after its source with a <code class="code" id="-noc4zu_108">.dlq</code> suffix, for example <code class="code" id="-noc4zu_109">lemline-default-commands.dlq</code>. With PGMQ and SQLite, a message goes there after <code class="code" id="-noc4zu_110">max-retries</code> deliveries.</p></section><section class="chapter"><h2 id="consumer-concurrency" data-toc="consumer-concurrency">Consumer Concurrency</h2><p id="-noc4zu_111">Each runner processes up to 64 messages in parallel per channel. Change it per channel, under the broker you use:</p><div class="code-block" data-lang="yaml">
+lemline:
+  messaging:
+    kafka:          # or rabbitmq, pgmq
+      commands:
+        consumer:
+          concurrency: 32
+</div><p id="-noc4zu_113">The broker-independent <code class="code" id="-noc4zu_114">lemline.messaging.&lt;channel&gt;.consumer.concurrency</code> only applies to in-memory messaging; with a broker it is overwritten by <code class="code" id="-noc4zu_115">lemline.messaging.&lt;broker&gt;.&lt;channel&gt;.consumer.concurrency</code>. To process more messages, start more runners: they share the work.</p></section><section class="chapter"><h2 id="implementing-event-driven-workflows" data-toc="implementing-event-driven-workflows">Implementing Event-Driven Workflows</h2><p id="-noc4zu_116">Both examples run on <a href="lemline-tutorial-setup.html" id="-noc4zu_123" data-tooltip="Run Lemline on one machine with SQLite. Lemline stores workflow definitions, queued messages, and workflow history in local files. Use a writable directory on a local filesystem.">the SQLite setup</a>, whose messaging channel carries the events. With the JAR, substitute <code class="code" id="-noc4zu_124">java -jar lemline.jar</code> for <code class="code" id="-noc4zu_125">bin/lemline</code>. Save them as <code class="code" id="-noc4zu_126">emitting-events.yaml</code> and <code class="code" id="-noc4zu_127">listening-for-events.yaml</code>. The listener is started by an event, so register both before the worker starts: stop the setup worker with Ctrl+C, then run from the setup directory:</p><div class="code-block" data-lang="bash">
+bin/lemline definition post -f emitting-events.yaml
+bin/lemline definition post -f listening-for-events.yaml
+bin/lemline listen --debug
+</div><p id="-noc4zu_118">From a second terminal in the setup directory, emit one event:</p><div class="code-block" data-lang="bash">
+bin/lemline instance start examples order-workflow --input '{&quot;orderId&quot;:&quot;ORD-1001&quot;}'
+</div><p id="-noc4zu_120">About 10 seconds later, the event starts a <code class="code" id="-noc4zu_128">shipping-workflow</code> instance that completes with <code class="code" id="-noc4zu_129">{&quot;received&quot;:[{&quot;orderId&quot;:&quot;ORD-1001&quot;}]}</code>: the worker picks up events for event-started workflows every 10 seconds.</p><section class="chapter"><h3 id="emitting-events" data-toc="emitting-events">Emitting Events</h3><p id="-noc4zu_130"><code class="code" id="-noc4zu_132">emit</code> tasks publish a CloudEvent on the <code class="code" id="-noc4zu_133">cloudevents</code> destination of the workflow's namespace:</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: 1.0.3
+  namespace: examples
+  name: order-workflow
+  version: 0.1.0
+do:
+  - notifyShipping:
+      emit:
+        event:
+          with:
+            type: order.shipped
+            source: https://events.example.com/order-service
+            data:
+              orderId: ${ .orderId }
+</div></section><section class="chapter"><h3 id="listening-for-events" data-toc="listening-for-events">Listening for Events</h3><p id="-noc4zu_134"><code class="code" id="-noc4zu_137">listen</code> tasks wait for CloudEvents received on the same destination. A workflow can also be started by an event with <code class="code" id="-noc4zu_138">schedule.on</code>:</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: shipping-workflow
+  version: '0.1.0'
+schedule:
+  on:
+    one:
+      with:
+        type: order.shipped
+do:
+  - processShippingNotification:
+      set:
+        received: ${ . }
+</div><p id="-noc4zu_136">See <a href="https://github.com/open-workflow-specification/specification/blob/v1.0.3/dsl-reference.md#listen" id="-noc4zu_139" data-external="true" rel="noopener noreferrer" target="_blank">Listen behavior</a>.</p></section></section><section class="chapter"><h2 id="testing-with-the-in-memory-broker" data-toc="testing-with-the-in-memory-broker">Testing with the In-Memory Broker</h2><div class="code-block" data-lang="yaml">
+lemline:
+  messaging:
+    type: in-memory
+</div><p id="-noc4zu_141">Messages only travel inside one process and are lost when it stops, so a separate <code class="code" id="-noc4zu_142">lemline instance start</code> cannot reach a <code class="code" id="-noc4zu_143">lemline listen</code> runner through it. Use it for tests that run everything in one process only.</p></section><section class="chapter"><h2 id="common-issues-and-solutions" data-toc="common-issues-and-solutions">Common Issues and Solutions</h2><section class="chapter"><h3 id="the-runner-stops-at-startup-with-a-broker-error" data-toc="the-runner-stops-at-startup-with-a-broker-error">The runner stops at startup with a broker error</h3><ul class="list _bullet" id="-noc4zu_147"><li class="list__item" id="-noc4zu_148"><p id="-noc4zu_151">Check the host and port (<code class="code" id="-noc4zu_152">brokers</code> for Kafka, <code class="code" id="-noc4zu_153">hostname</code> and <code class="code" id="-noc4zu_154">port</code> for RabbitMQ, <code class="code" id="-noc4zu_155">host</code> and <code class="code" id="-noc4zu_156">port</code> for PGMQ).</p></li><li class="list__item" id="-noc4zu_149"><p id="-noc4zu_157">Check credentials and network access.</p></li><li class="list__item" id="-noc4zu_150"><p id="-noc4zu_158">For PGMQ, check that the database migrations have run (<code class="code" id="-noc4zu_159">lemline migrate</code>, or <code class="code" id="-noc4zu_160">lemline migrate status</code> to list them): they create the <code class="code" id="-noc4zu_161">pgmq</code> schema and functions in SQL, without the PostgreSQL extension, so managed PostgreSQL services work too.</p></li></ul></section><section class="chapter"><h3 id="messages-are-not-processed" data-toc="messages-are-not-processed">Messages are not processed</h3><ul class="list _bullet" id="-noc4zu_162"><li class="list__item" id="-noc4zu_163"><p id="-noc4zu_166">Check that a runner is running (<code class="code" id="-noc4zu_167">lemline listen</code>) and serves the workflow's namespace (<code class="code" id="-noc4zu_168">lemline.namespaces</code>).</p></li><li class="list__item" id="-noc4zu_164"><p id="-noc4zu_169">Check the <code class="code" id="-noc4zu_170">.dlq</code> destinations for messages that failed.</p></li><li class="list__item" id="-noc4zu_165"><p id="-noc4zu_171">With Kafka, check that runners sharing the work use the same <code class="code" id="-noc4zu_172">group-id</code>.</p></li></ul></section><section class="chapter"><h3 id="processing-is-slow" data-toc="processing-is-slow">Processing is slow</h3><ul class="list _bullet" id="-noc4zu_173"><li class="list__item" id="-noc4zu_174"><p id="-noc4zu_176">Start more runners.</p></li><li class="list__item" id="-noc4zu_175"><p id="-noc4zu_177">Increase <code class="code" id="-noc4zu_178">lemline.messaging.&lt;broker&gt;.&lt;channel&gt;.consumer.concurrency</code> if runners have spare CPU.</p></li></ul></section></section><section class="chapter"><h2 id="best-practices" data-toc="best-practices">Best Practices</h2><ol class="list _decimal" id="-noc4zu_179" type="1"><li class="list__item" id="-noc4zu_180"><p id="-noc4zu_184"><span class="control" id="-noc4zu_185">Set <code class="code" id="-noc4zu_186">lemline.messaging.type</code> explicitly</span> in production.</p></li><li class="list__item" id="-noc4zu_181"><p id="-noc4zu_187"><span class="control" id="-noc4zu_188">Monitor the <code class="code" id="-noc4zu_189">.dlq</code> destinations</span>.</p></li><li class="list__item" id="-noc4zu_182"><p id="-noc4zu_190"><span class="control" id="-noc4zu_191">Use TLS and authentication</span> on the broker connection (<code class="code" id="-noc4zu_192">security-protocol</code> and SASL for Kafka, <code class="code" id="-noc4zu_193">ssl-enabled</code> for RabbitMQ).</p></li><li class="list__item" id="-noc4zu_183"><p id="-noc4zu_194"><span class="control" id="-noc4zu_195">Pass passwords as environment variables</span>, for example <code class="code" id="-noc4zu_196">LEMLINE_MESSAGING_KAFKA_SASL_PASSWORD</code>.</p></li></ol></section><section class="chapter"><h2 id="related-information" data-toc="related-information">Related Information</h2><ul class="list _bullet" id="-noc4zu_197"><li class="list__item" id="-noc4zu_198"><p id="-noc4zu_201"><a href="lemline-ref-config.html" id="-noc4zu_202" data-tooltip="This reference lists every lemline.* configuration property the Lemline runner reads. Properties that are not listed here are not recognized by Lemline.">Runner Configuration Reference</a></p></li><li class="list__item" id="-noc4zu_199"><p id="-noc4zu_203"><a href="lemline-howto-events.html" id="-noc4zu_204" data-tooltip="An emit task publishes a CloudEvent. A listen task resumes an existing workflow when the selected event filters match. To start independent instances on matching events, configure schedule.on at the workflow level.">Event Handling Guide</a></p></li><li class="list__item" id="-noc4zu_200"><p id="-noc4zu_205"><a href="lemline-ref-asyncapi.html" id="-noc4zu_206" data-tooltip="This page describes the support of call: asyncapi tasks in Lemline.">AsyncAPI Reference</a></p></li></ul></section><div class="last-modified">25 November 2026</div><div data-feedback-placeholder="true"></div><div class="navigation-links _bottom"><a href="lemline-howto-docker.html" class="navigation-links__prev">&quot;How to Set Up with Docker</a><a href="lemline-howto-observability.html" class="navigation-links__next">How to Configure Observability</a></div></article><div id="disqus_thread"></div></div></section></main></div><script src="https://resources.jetbrains.com/writerside/apidoc/6.22.0-b776/app.js"></script></body></html>

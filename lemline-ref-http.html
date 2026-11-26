@@ -1,0 +1,313 @@
+<!DOCTYPE html SYSTEM "about:legacy-compat">
+<html lang="en-US" data-preset="contrast" data-primary-color="#2E6F7E"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="robots" content="noindex"><meta name="built-on" content="2026-11-26T17:17:49.94459902"><title>HTTP Protocol Reference | Lemline documentation</title><script type="application/json" id="virtual-toc-data">[{"id":"http-support-overview","level":0,"title":"HTTP Support Overview","anchor":"#http-support-overview"},{"id":"basic-http-request","level":0,"title":"Basic HTTP Request","anchor":"#basic-http-request"},{"id":"url-construction","level":0,"title":"URL Construction","anchor":"#url-construction"},{"id":"request-headers","level":0,"title":"Request Headers","anchor":"#request-headers"},{"id":"query-parameters","level":0,"title":"Query Parameters","anchor":"#query-parameters"},{"id":"request-body","level":0,"title":"Request Body","anchor":"#request-body"},{"id":"response-handling","level":0,"title":"Response Handling","anchor":"#response-handling"},{"id":"authentication","level":0,"title":"Authentication","anchor":"#authentication"},{"id":"redirects","level":0,"title":"Redirects","anchor":"#redirects"},{"id":"timeouts","level":0,"title":"Timeouts","anchor":"#timeouts"},{"id":"retry-behavior","level":0,"title":"Retry Behavior","anchor":"#retry-behavior"},{"id":"http-request-examples","level":0,"title":"HTTP Request Examples","anchor":"#http-request-examples"},{"id":"run-the-examples","level":0,"title":"Run the Examples","anchor":"#run-the-examples"},{"id":"related-resources","level":0,"title":"Related Resources","anchor":"#related-resources"}]</script><script type="application/json" id="topic-shortcuts"></script><link href="https://resources.jetbrains.com/writerside/apidoc/6.22.0-b776/app.css" rel="stylesheet"><link href="static/custom.css" rel="stylesheet"><link rel="icon" type="image/png" sizes="16x16" href="images/lemly.png"><meta name="image" content="https://docs.lemline.com/social-preview.png"><!-- Open Graph --><meta property="og:title" content="HTTP Protocol Reference | Lemline documentation"><meta property="og:description" content=""><meta property="og:image" content="https://docs.lemline.com/social-preview.png"><meta property="og:site_name" content="Lemline documentation Help"><meta property="og:type" content="website"><meta property="og:locale" content="en_US"><meta property="og:url" content="https://docs.lemline.com/lemline-ref-http.html"><!-- End Open Graph --><!-- Twitter Card --><meta name="twitter:card" content="summary_large_image"><meta name="twitter:site" content=""><meta name="twitter:title" content="HTTP Protocol Reference | Lemline documentation"><meta name="twitter:description" content=""><meta name="twitter:creator" content=""><meta name="twitter:image:src" content="https://docs.lemline.com/social-preview.png"><!-- End Twitter Card --><!-- Schema.org WebPage --><script type="application/ld+json">{
+    "@context": "http://schema.org",
+    "@type": "WebPage",
+    "@id": "https://docs.lemline.com/lemline-ref-http.html#webpage",
+    "url": "https://docs.lemline.com/lemline-ref-http.html",
+    "name": "HTTP Protocol Reference | Lemline documentation",
+    "description": "",
+    "image": "https://docs.lemline.com/social-preview.png",
+    "inLanguage":"en-US"
+}</script><!-- End Schema.org --><!-- Schema.org WebSite --><script type="application/ld+json">{
+    "@type": "WebSite",
+    "@id": "https://docs.lemline.com/#website",
+    "url": "https://docs.lemline.com/",
+    "name": "Lemline documentation Help"
+}</script><!-- End Schema.org --></head><body data-id="lemline-ref-http" data-main-title="HTTP Protocol Reference" data-article-props="{&quot;seeAlsoStyle&quot;:&quot;links&quot;}" data-template="article" data-breadcrumbs="Reference///Protocol Support Reference"><div class="wrapper"><main class="panel _main"><header class="panel__header"><div class="container"><h3>Lemline documentation  Help</h3><div class="panel-trigger"></div></div></header><section class="panel__content"><div class="container"><article class="article" data-shortcut-switcher="inactive"><h1 data-toc="lemline-ref-http" id="lemline-ref-http.md">HTTP Protocol Reference</h1><p id="nngrzu_3">This reference describes how Lemline executes <code class="code" id="nngrzu_18">call: http</code> tasks: which arguments are supported, how requests are built, and what the task returns.</p><section class="chapter"><h2 id="http-support-overview" data-toc="http-support-overview">HTTP Support Overview</h2><div class="table-wrapper"><table class="wide" id="nngrzu_19"><thead><tr class="ijRowHead" id="nngrzu_21"><th id="nngrzu_29"><p>Feature</p></th><th id="nngrzu_30"><p>Support</p></th></tr></thead><tbody><tr id="nngrzu_22"><td id="nngrzu_31"><p>Methods</p></td><td id="nngrzu_32"><p>Any HTTP method (<code class="code" id="nngrzu_33">get</code>, <code class="code" id="nngrzu_34">post</code>, <code class="code" id="nngrzu_35">put</code>, <code class="code" id="nngrzu_36">patch</code>, <code class="code" id="nngrzu_37">delete</code>, ...)</p></td></tr><tr id="nngrzu_23"><td id="nngrzu_38"><p>URL</p></td><td id="nngrzu_39"><p>Plain URL or runtime expression</p></td></tr><tr id="nngrzu_24"><td id="nngrzu_40"><p>Headers and query parameters</p></td><td id="nngrzu_41"><p>Map of values or a runtime expression returning an object</p></td></tr><tr id="nngrzu_25"><td id="nngrzu_42"><p>Request body</p></td><td id="nngrzu_43"><p>JSON, sent for <code class="code" id="nngrzu_44">post</code>, <code class="code" id="nngrzu_45">put</code> and <code class="code" id="nngrzu_46">patch</code></p></td></tr><tr id="nngrzu_26"><td id="nngrzu_47"><p>Authentication</p></td><td id="nngrzu_48"><p><code class="code" id="nngrzu_49">basic</code> and <code class="code" id="nngrzu_50">bearer</code> (inline or via <code class="code" id="nngrzu_51">use.authentications</code>)</p></td></tr><tr id="nngrzu_27"><td id="nngrzu_52"><p>Output</p></td><td id="nngrzu_53"><p><code class="code" id="nngrzu_54">content</code> (default), <code class="code" id="nngrzu_55">response</code> or <code class="code" id="nngrzu_56">raw</code></p></td></tr><tr id="nngrzu_28"><td id="nngrzu_57"><p>Redirects</p></td><td id="nngrzu_58"><p><code class="code" id="nngrzu_59">redirect: true</code> follows redirects</p></td></tr></tbody></table></div><p id="nngrzu_20">Not supported: URI template placeholders, connection definitions, form or multipart bodies, OAuth 2.0 and other authentication schemes, per-call timeouts, proxies, cookies, HTTP-level circuit breakers, and runner settings to tune the HTTP client.</p></section><section class="chapter"><h2 id="basic-http-request" data-toc="basic-http-request">Basic HTTP Request</h2><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: basic-http-request
+  version: '1.0.0'
+do:
+  - fetchCustomer:
+      call: http
+      with:
+        method: get
+        endpoint: http://127.0.0.1:8787/customers/C-100
+</div></section><section class="chapter"><h2 id="url-construction" data-toc="url-construction">URL Construction</h2><section class="chapter"><h3 id="plain-url" data-toc="plain-url">Plain URL</h3><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: http-literal-endpoint
+  version: '1.0.0'
+do:
+  - fetch:
+      call: http
+      with:
+        method: get
+        endpoint: http://127.0.0.1:8787/customers/C-100
+</div></section><section class="chapter"><h3 id="runtime-expression" data-toc="runtime-expression">Runtime Expression</h3><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: http-expression-endpoint
+  version: '1.0.0'
+do:
+  - fetch:
+      call: http
+      with:
+        method: get
+        endpoint: ${ &quot;http://127.0.0.1:8787/customers/&quot; + .customer.id }
+</div><p id="nngrzu_65">The expression must return a string. RFC 6570 placeholders such as <code class="code" id="nngrzu_66">{userId}</code> are not expanded: build dynamic URLs with an expression.</p></section></section><section class="chapter"><h2 id="request-headers" data-toc="request-headers">Request Headers</h2><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: http-request-headers
+  version: '1.0.0'
+do:
+  - fetch:
+      call: http
+      with:
+        method: get
+        endpoint: http://127.0.0.1:8787/stock
+        headers:
+          Accept: application/json
+          X-Request-Id: ${ .requestId }
+</div><p id="nngrzu_68"><code class="code" id="nngrzu_69">headers</code> can also be a single runtime expression that returns an object. Every value is sent as a string.</p></section><section class="chapter"><h2 id="query-parameters" data-toc="query-parameters">Query Parameters</h2><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: http-query-parameters
+  version: '1.0.0'
+do:
+  - fetch:
+      call: http
+      with:
+        method: get
+        endpoint: http://127.0.0.1:8787/products
+        query:
+          page: &quot;1&quot;
+          category: ${ .category }
+</div><p id="nngrzu_71">Query parameters are appended to the URL. Like <code class="code" id="nngrzu_72">headers</code>, <code class="code" id="nngrzu_73">query</code> can be a runtime expression returning an object.</p></section><section class="chapter"><h2 id="request-body" data-toc="request-body">Request Body</h2><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: request-body
+  version: '1.0.0'
+do:
+  - createCustomer:
+      call: http
+      with:
+        method: post
+        endpoint: http://127.0.0.1:8787/customers
+        body:
+          name: ${ .name }
+          email: ${ .email }
+</div><p id="nngrzu_75">The body is serialized as JSON and sent with <code class="code" id="nngrzu_76">Content-Type: application/json</code>. It is only sent for <code class="code" id="nngrzu_77">post</code>, <code class="code" id="nngrzu_78">put</code> and <code class="code" id="nngrzu_79">patch</code>.</p></section><section class="chapter"><h2 id="response-handling" data-toc="response-handling">Response Handling</h2><section class="chapter"><h3 id="output-formats" data-toc="output-formats">Output Formats</h3><div class="table-wrapper"><table class="wide" id="nngrzu_82"><thead><tr class="ijRowHead" id="nngrzu_84"><th id="nngrzu_88"><p><code class="code" id="nngrzu_90">output</code></p></th><th id="nngrzu_89"><p>Task result</p></th></tr></thead><tbody><tr id="nngrzu_85"><td id="nngrzu_91"><p><code class="code" id="nngrzu_93">content</code> (default)</p></td><td id="nngrzu_92"><p>The response body: parsed JSON when the response content type contains <code class="code" id="nngrzu_94">json</code>, a string when it contains <code class="code" id="nngrzu_95">text</code>, otherwise the body encoded in Base64</p></td></tr><tr id="nngrzu_86"><td id="nngrzu_96"><p><code class="code" id="nngrzu_98">response</code></p></td><td id="nngrzu_97"><p>An object with <code class="code" id="nngrzu_99">request</code> (<code class="code" id="nngrzu_100">method</code>, <code class="code" id="nngrzu_101">uri</code>, <code class="code" id="nngrzu_102">headers</code>), <code class="code" id="nngrzu_103">statusCode</code>, <code class="code" id="nngrzu_104">headers</code> and <code class="code" id="nngrzu_105">content</code></p></td></tr><tr id="nngrzu_87"><td id="nngrzu_106"><p><code class="code" id="nngrzu_108">raw</code></p></td><td id="nngrzu_107"><p>The response body encoded in Base64</p></td></tr></tbody></table></div><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: output-formats
+  version: '1.0.0'
+do:
+  - fetchProducts:
+      call: http
+      with:
+        method: get
+        endpoint: http://127.0.0.1:8787/products
+        output: response
+      output:
+        as: '${ { status: .statusCode, ids: [.content.items[].id] } }'
+</div></section><section class="chapter"><h3 id="error-status-handling" data-toc="error-status-handling">Error Status Handling</h3><p id="nngrzu_109">A response whose status is not 2xx makes the task fail with a <code class="code" id="nngrzu_111">communication</code> error. Its <code class="code" id="nngrzu_112">status</code> is the HTTP status and its title contains the status code and the response body (for example <code class="code" id="nngrzu_113">HTTP 404: ...</code>). A call that gets no response (unknown host, refused connection, timeout) also fails with a <code class="code" id="nngrzu_114">communication</code> error, with status 500 and a title naming the server (for example <code class="code" id="nngrzu_115">Unable to reach https://api.example.com: unresolved host</code>). Catch them with <code class="code" id="nngrzu_116">try</code>, and add <code class="code" id="nngrzu_117">status</code> to the filter to handle one status only:</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: error-status-handling
+  version: '1.0.0'
+do:
+  - fetchData:
+      try:
+        - callApi:
+            call: http
+            with:
+              method: get
+              endpoint: ${ &quot;http://127.0.0.1:8787/products/&quot; + .productId }
+      catch:
+        errors:
+          with:
+            type: https://open-workflow-specification.org/spec/1.0.0/errors/communication
+        as: apiError
+        do:
+          - fallback:
+              set:
+                data: []
+                reason: ${ $apiError.title }
+</div></section></section><section class="chapter"><h2 id="authentication" data-toc="authentication">Authentication</h2><p id="nngrzu_118">Authentication fields evaluate runtime expressions, so they can read secrets. A workflow only sees the secrets it declares in <code class="code" id="nngrzu_122">use.secrets</code>; an undeclared secret evaluates to <code class="code" id="nngrzu_123">null</code> and the task faults.</p><section class="chapter"><h3 id="basic-authentication" data-toc="basic-authentication">Basic Authentication</h3><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: http-inline-basic-authentication
+  version: '1.0.0'
+use:
+  secrets:
+    - API_USER
+    - API_PASSWORD
+do:
+  - fetch:
+      call: http
+      with:
+        method: get
+        endpoint:
+          uri: http://127.0.0.1:8787/partner/stock
+          authentication:
+            basic:
+              username: ${ $secrets.API_USER }
+              password: ${ $secrets.API_PASSWORD }
+</div></section><section class="chapter"><h3 id="bearer-token" data-toc="bearer-token">Bearer Token</h3><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: http-inline-bearer-token
+  version: '1.0.0'
+use:
+  secrets:
+    - API_TOKEN
+do:
+  - fetch:
+      call: http
+      with:
+        method: get
+        endpoint:
+          uri: http://127.0.0.1:8787/partner/stock
+          authentication:
+            bearer:
+              token: ${ $secrets.API_TOKEN }
+</div></section><section class="chapter"><h3 id="named-authentication" data-toc="named-authentication">Named Authentication</h3><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: named-authentication
+  version: '1.0.0'
+use:
+  secrets:
+    - API_TOKEN
+  authentications:
+    apiAuth:
+      bearer:
+        token: ${ $secrets.API_TOKEN }
+do:
+  - callApi:
+      call: http
+      with:
+        method: get
+        endpoint:
+          uri: http://127.0.0.1:8787/partner/stock
+          authentication:
+            use: apiAuth
+</div><p id="nngrzu_127">An API key can be sent as a regular header. OAuth 2.0 is not supported yet: a task using it fails with a <code class="code" id="nngrzu_128">runtime</code> error titled <code class="code" id="nngrzu_129">Unsupported OAuth2 authentication</code>.</p></section></section><section class="chapter"><h2 id="redirects" data-toc="redirects">Redirects</h2><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: http-follow-redirects
+  version: '1.0.0'
+do:
+  - fetch:
+      call: http
+      with:
+        method: get
+        endpoint: http://127.0.0.1:8787/old-stock
+        redirect: true
+</div><p id="nngrzu_131">Without <code class="code" id="nngrzu_133">redirect: true</code>, a redirect response (3xx) is not followed and fails the task like any other non-2xx status, as in the example below.</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: http-no-redirect
+  version: '1.0.0'
+do:
+  - fetch:
+      call: http
+      with:
+        method: get
+        endpoint: http://127.0.0.1:8787/old-stock
+</div></section><section class="chapter"><h2 id="timeouts" data-toc="timeouts">Timeouts</h2><p id="nngrzu_134">The runner's HTTP client uses fixed limits: 15 seconds to connect, 30 seconds for the whole request and 30 seconds of socket inactivity. They cannot be changed, and a task-level <code class="code" id="nngrzu_135">timeout</code> is not applied to HTTP calls.</p></section><section class="chapter"><h2 id="retry-behavior" data-toc="retry-behavior">Retry Behavior</h2><p id="nngrzu_136">HTTP calls are not retried automatically. Use <code class="code" id="nngrzu_138">try</code> with <code class="code" id="nngrzu_139">retry</code>:</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: retry-behavior
+  version: '1.0.0'
+do:
+  - fetchData:
+      try:
+        - callApi:
+            call: http
+            with:
+              method: get
+              endpoint: http://127.0.0.1:8787/stock
+              query:
+                fail: '503'
+                failTimes: ${ .failures // 0 | tostring }
+                key: ${ $workflow.id }
+      catch:
+        errors:
+          with:
+            type: https://open-workflow-specification.org/spec/1.0.0/errors/communication
+        retry:
+          delay:
+            seconds: 2
+          backoff:
+            exponential: {}
+          limit:
+            attempt:
+              count: 5
+</div></section><section class="chapter"><h2 id="http-request-examples" data-toc="http-request-examples">HTTP Request Examples</h2><section class="chapter"><h3 id="json-post-request" data-toc="json-post-request">JSON POST Request</h3><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: json-post-request
+  version: '1.0.0'
+do:
+  - createReservation:
+      call: http
+      with:
+        method: post
+        endpoint: http://127.0.0.1:8787/reservations
+        headers:
+          Idempotency-Key: ${ .orderId }
+        body:
+          orderId: ${ .orderId }
+          items: ${ .items }
+        output: response
+</div></section><section class="chapter"><h3 id="graphql-query" data-toc="graphql-query">GraphQL Query</h3><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: customer-graphql-lookup
+  version: '1.0.0'
+do:
+  - queryGraphQL:
+      call: http
+      with:
+        method: post
+        endpoint: http://127.0.0.1:8787/graphql
+        body:
+          query: &quot;query($id: ID!) { customer(id: $id) { name email } }&quot;
+          variables:
+            id: ${ .customerId }
+</div></section></section><section class="chapter"><h2 id="run-the-examples" data-toc="run-the-examples">Run the Examples</h2><p id="nngrzu_144">Every example on this page is a complete workflow that calls the <a href="lemline-tutorial-order-processing.html#start-the-tutorial-shop" id="nngrzu_153" data-tooltip="Complete the SQLite setup and keep the worker running on the host. In a separate terminal, open the root of the Lemline source checkout matching these docs (the directory containing examples/tutorial-services). With Docker Compose running, start the single shop container:">tutorial shop</a>. Complete <a href="lemline-tutorial-setup.html" id="nngrzu_154" data-tooltip="Run Lemline on one machine with SQLite. Lemline stores workflow definitions, queued messages, and workflow history in local files. Use a writable directory on a local filesystem.">the SQLite setup</a>, save each example under the file name used below, and start the shop from the root of the Lemline source checkout:</p><div class="code-block" data-lang="bash">
+docker compose -f examples/tutorial-services/compose.yaml up -d
+</div><p id="nngrzu_146">The authentication examples read the shop's demo credentials from secrets. Stop the setup worker with Ctrl+C, export them, and start the worker again (with the JAR, substitute <code class="code" id="nngrzu_155">java -jar lemline.jar</code> for <code class="code" id="nngrzu_156">bin/lemline</code>):</p><div class="code-block" data-lang="bash">
+export API_USER='demo'
+export API_PASSWORD='demo-password'
+export API_TOKEN='demo-token'
+bin/lemline listen --debug
+</div><p id="nngrzu_148">From a second terminal in the setup directory, register and start each example:</p><div class="code-block" data-lang="bash">
+bin/lemline definition post -f basic-http-request.yaml
+bin/lemline instance start examples basic-http-request
+bin/lemline definition post -f http-literal-endpoint.yaml
+bin/lemline instance start examples http-literal-endpoint
+bin/lemline definition post -f http-expression-endpoint.yaml
+bin/lemline instance start examples http-expression-endpoint --input '{&quot;customer&quot;:{&quot;id&quot;:&quot;C-200&quot;}}'
+bin/lemline definition post -f http-request-headers.yaml
+bin/lemline instance start examples http-request-headers --input '{&quot;requestId&quot;:&quot;REQ-42&quot;}'
+bin/lemline definition post -f http-query-parameters.yaml
+bin/lemline instance start examples http-query-parameters --input '{&quot;category&quot;:&quot;home&quot;}'
+bin/lemline definition post -f request-body.yaml
+bin/lemline instance start examples request-body --input '{&quot;name&quot;:&quot;Hedy Lamarr&quot;,&quot;email&quot;:&quot;hedy@example.com&quot;}'
+bin/lemline definition post -f output-formats.yaml
+bin/lemline instance start examples output-formats
+bin/lemline definition post -f error-status-handling.yaml
+bin/lemline instance start examples error-status-handling --input '{&quot;productId&quot;:&quot;SKU-404&quot;}'
+bin/lemline definition post -f http-inline-basic-authentication.yaml
+bin/lemline instance start examples http-inline-basic-authentication
+bin/lemline definition post -f http-inline-bearer-token.yaml
+bin/lemline instance start examples http-inline-bearer-token
+bin/lemline definition post -f named-authentication.yaml
+bin/lemline instance start examples named-authentication
+bin/lemline definition post -f http-follow-redirects.yaml
+bin/lemline instance start examples http-follow-redirects
+bin/lemline definition post -f http-no-redirect.yaml
+bin/lemline instance start examples http-no-redirect
+bin/lemline definition post -f retry-behavior.yaml
+bin/lemline instance start examples retry-behavior --input '{&quot;failures&quot;:2}'
+bin/lemline definition post -f json-post-request.yaml
+bin/lemline instance start examples json-post-request --input '{&quot;orderId&quot;:&quot;ORD-1601&quot;,&quot;items&quot;:[{&quot;id&quot;:&quot;SKU-1&quot;,&quot;quantity&quot;:1}]}'
+bin/lemline definition post -f graphql-query.yaml
+bin/lemline instance start examples customer-graphql-lookup --input '{&quot;customerId&quot;:&quot;C-100&quot;}'
+</div><div class="table-wrapper"><table class="wide" id="nngrzu_150"><thead><tr class="ijRowHead" id="nngrzu_157"><th id="nngrzu_172"><p>Example</p></th><th id="nngrzu_173"><p>Expected result</p></th></tr></thead><tbody><tr id="nngrzu_158"><td id="nngrzu_174"><p><code class="code" id="nngrzu_176">basic-http-request</code>, <code class="code" id="nngrzu_177">http-literal-endpoint</code></p></td><td id="nngrzu_175"><p>Customer C-100, Ada Lovelace</p></td></tr><tr id="nngrzu_159"><td id="nngrzu_178"><p><code class="code" id="nngrzu_180">http-expression-endpoint</code></p></td><td id="nngrzu_179"><p>Customer C-200, Alan Turing</p></td></tr><tr id="nngrzu_160"><td id="nngrzu_181"><p><code class="code" id="nngrzu_183">http-request-headers</code></p></td><td id="nngrzu_182"><p>The stock; the shop's request list shows <code class="code" id="nngrzu_184">x-request-id: REQ-42</code></p></td></tr><tr id="nngrzu_161"><td id="nngrzu_185"><p><code class="code" id="nngrzu_187">http-query-parameters</code></p></td><td id="nngrzu_186"><p>The home products, SKU-4 and SKU-5</p></td></tr><tr id="nngrzu_162"><td id="nngrzu_188"><p><code class="code" id="nngrzu_190">request-body</code></p></td><td id="nngrzu_189"><p>The new customer <code class="code" id="nngrzu_191">C-901</code></p></td></tr><tr id="nngrzu_163"><td id="nngrzu_192"><p><code class="code" id="nngrzu_194">output-formats</code></p></td><td id="nngrzu_193"><p><code class="code" id="nngrzu_195">{&quot;status&quot;:200,&quot;ids&quot;:[&quot;SKU-1&quot;,&quot;SKU-2&quot;,&quot;SKU-3&quot;]}</code></p></td></tr><tr id="nngrzu_164"><td id="nngrzu_196"><p><code class="code" id="nngrzu_198">error-status-handling</code></p></td><td id="nngrzu_197"><p><code class="code" id="nngrzu_199">{&quot;data&quot;:[],&quot;reason&quot;:&quot;HTTP 404: &hellip;&quot;}</code></p></td></tr><tr id="nngrzu_165"><td id="nngrzu_200"><p><code class="code" id="nngrzu_202">http-inline-basic-authentication</code></p></td><td id="nngrzu_201"><p>The partner stock with <code class="code" id="nngrzu_203">&quot;authenticatedWith&quot;:&quot;basic&quot;</code></p></td></tr><tr id="nngrzu_166"><td id="nngrzu_204"><p><code class="code" id="nngrzu_206">http-inline-bearer-token</code>, <code class="code" id="nngrzu_207">named-authentication</code></p></td><td id="nngrzu_205"><p>The partner stock with <code class="code" id="nngrzu_208">&quot;authenticatedWith&quot;:&quot;bearer&quot;</code></p></td></tr><tr id="nngrzu_167"><td id="nngrzu_209"><p><code class="code" id="nngrzu_211">http-follow-redirects</code></p></td><td id="nngrzu_210"><p>The stock, read from <code class="code" id="nngrzu_212">/stock</code> after the 301</p></td></tr><tr id="nngrzu_168"><td id="nngrzu_213"><p><code class="code" id="nngrzu_215">http-no-redirect</code></p></td><td id="nngrzu_214"><p>Faults with a <code class="code" id="nngrzu_216">communication</code> error, status 301</p></td></tr><tr id="nngrzu_169"><td id="nngrzu_217"><p><code class="code" id="nngrzu_219">retry-behavior</code></p></td><td id="nngrzu_218"><p>The stock after two retries</p></td></tr><tr id="nngrzu_170"><td id="nngrzu_220"><p><code class="code" id="nngrzu_222">json-post-request</code></p></td><td id="nngrzu_221"><p>The full response, <code class="code" id="nngrzu_223">statusCode</code> 200 with the reservation in <code class="code" id="nngrzu_224">content</code></p></td></tr><tr id="nngrzu_171"><td id="nngrzu_225"><p><code class="code" id="nngrzu_227">customer-graphql-lookup</code></p></td><td id="nngrzu_226"><p><code class="code" id="nngrzu_228">{&quot;data&quot;:{&quot;customer&quot;:{&hellip;&quot;name&quot;:&quot;Ada Lovelace&quot;&hellip;}}}</code></p></td></tr></tbody></table></div><p id="nngrzu_151">Stop the shop when you are done:</p><div class="code-block" data-lang="bash">
+docker compose -f examples/tutorial-services/compose.yaml down
+</div></section><section class="chapter"><h2 id="related-resources" data-toc="related-resources">Related Resources</h2><ul class="list _bullet" id="nngrzu_229"><li class="list__item" id="nngrzu_230"><p id="nngrzu_233"><a href="https://github.com/open-workflow-specification/specification/blob/v1.0.3/dsl-reference.md#http-call" id="nngrzu_234" data-external="true" rel="noopener noreferrer" target="_blank">Call HTTP task</a></p></li><li class="list__item" id="nngrzu_231"><p id="nngrzu_235"><a href="https://github.com/open-workflow-specification/specification/blob/v1.0.3/dsl.md#fault-tolerance" id="nngrzu_236" data-external="true" rel="noopener noreferrer" target="_blank">Error Handling</a></p></li><li class="list__item" id="nngrzu_232"><p id="nngrzu_237"><a href="lemline-explain-security.html" id="nngrzu_238" data-tooltip="This document explains which security controls Lemline provides today: how workflows authenticate to the services they call, how they use secrets, how inputs and outputs are validated, and how the gRPC gateway is protected.">Understanding Security in Lemline</a></p></li></ul></section><div class="last-modified">25 November 2026</div><div data-feedback-placeholder="true"></div><div class="navigation-links _bottom"><a href="lemline-ref-secrets.html" class="navigation-links__prev">Secrets Reference</a><a href="lemline-ref-grpc.html" class="navigation-links__next">gRPC Protocol Reference</a></div></article><div id="disqus_thread"></div></div></section></main></div><script src="https://resources.jetbrains.com/writerside/apidoc/6.22.0-b776/app.js"></script></body></html>

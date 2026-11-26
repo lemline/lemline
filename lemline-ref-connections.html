@@ -1,0 +1,99 @@
+<!DOCTYPE html SYSTEM "about:legacy-compat">
+<html lang="en-US" data-preset="contrast" data-primary-color="#2E6F7E"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="robots" content="noindex"><meta name="built-on" content="2026-11-26T17:17:50.168305596"><title>Connections Reference | Lemline documentation</title><script type="application/json" id="virtual-toc-data">[{"id":"connections-overview","level":0,"title":"Connections Overview","anchor":"#connections-overview"},{"id":"reusing-an-endpoint-s-authentication","level":0,"title":"Reusing an Endpoint\u0027s Authentication","anchor":"#reusing-an-endpoint-s-authentication"},{"id":"reusing-a-call-with-a-function","level":0,"title":"Reusing a Call with a Function","anchor":"#reusing-a-call-with-a-function"},{"id":"reusing-a-retry-policy","level":0,"title":"Reusing a Retry Policy","anchor":"#reusing-a-retry-policy"},{"id":"broker-and-database-connections","level":0,"title":"Broker and Database Connections","anchor":"#broker-and-database-connections"},{"id":"run-the-examples","level":0,"title":"Run the Examples","anchor":"#run-the-examples"},{"id":"related-resources","level":0,"title":"Related Resources","anchor":"#related-resources"}]</script><script type="application/json" id="topic-shortcuts"></script><link href="https://resources.jetbrains.com/writerside/apidoc/6.22.0-b776/app.css" rel="stylesheet"><link href="static/custom.css" rel="stylesheet"><link rel="icon" type="image/png" sizes="16x16" href="images/lemly.png"><meta name="image" content="https://docs.lemline.com/social-preview.png"><!-- Open Graph --><meta property="og:title" content="Connections Reference | Lemline documentation"><meta property="og:description" content=""><meta property="og:image" content="https://docs.lemline.com/social-preview.png"><meta property="og:site_name" content="Lemline documentation Help"><meta property="og:type" content="website"><meta property="og:locale" content="en_US"><meta property="og:url" content="https://docs.lemline.com/lemline-ref-connections.html"><!-- End Open Graph --><!-- Twitter Card --><meta name="twitter:card" content="summary_large_image"><meta name="twitter:site" content=""><meta name="twitter:title" content="Connections Reference | Lemline documentation"><meta name="twitter:description" content=""><meta name="twitter:creator" content=""><meta name="twitter:image:src" content="https://docs.lemline.com/social-preview.png"><!-- End Twitter Card --><!-- Schema.org WebPage --><script type="application/ld+json">{
+    "@context": "http://schema.org",
+    "@type": "WebPage",
+    "@id": "https://docs.lemline.com/lemline-ref-connections.html#webpage",
+    "url": "https://docs.lemline.com/lemline-ref-connections.html",
+    "name": "Connections Reference | Lemline documentation",
+    "description": "",
+    "image": "https://docs.lemline.com/social-preview.png",
+    "inLanguage":"en-US"
+}</script><!-- End Schema.org --><!-- Schema.org WebSite --><script type="application/ld+json">{
+    "@type": "WebSite",
+    "@id": "https://docs.lemline.com/#website",
+    "url": "https://docs.lemline.com/",
+    "name": "Lemline documentation Help"
+}</script><!-- End Schema.org --></head><body data-id="lemline-ref-connections" data-main-title="Connections Reference" data-article-props="{&quot;seeAlsoStyle&quot;:&quot;links&quot;}" data-template="article" data-breadcrumbs="Reference///Protocol Support Reference"><div class="wrapper"><main class="panel _main"><header class="panel__header"><div class="container"><h3>Lemline documentation  Help</h3><div class="panel-trigger"></div></div></header><section class="panel__content"><div class="container"><article class="article" data-shortcut-switcher="inactive"><h1 data-toc="lemline-ref-connections" id="lemline-ref-connections.md">Connections Reference</h1><p id="k2uf5f_3">This reference explains how workflows reuse endpoint settings in Lemline.</p><section class="chapter"><h2 id="connections-overview" data-toc="connections-overview">Connections Overview</h2><p id="k2uf5f_11">Lemline has no &quot;connection&quot; object: there is no <code class="code" id="k2uf5f_14">use.connections</code> section, no connection pools to configure, no connection health checks, failover or circuit breakers, and no <code class="code" id="k2uf5f_15">lemline.connections.*</code> runner settings.</p><p id="k2uf5f_12">Workflows reuse settings with the reusable components of the Open Workflow DSL that Lemline supports in the <code class="code" id="k2uf5f_16">use</code> section:</p><div class="table-wrapper"><table class="wide" id="k2uf5f_13"><thead><tr class="ijRowHead" id="k2uf5f_17"><th id="k2uf5f_23"><p><code class="code" id="k2uf5f_25">use</code> section</p></th><th id="k2uf5f_24"><p>Reused in</p></th></tr></thead><tbody><tr id="k2uf5f_18"><td id="k2uf5f_26"><p><code class="code" id="k2uf5f_28">authentications</code></p></td><td id="k2uf5f_27"><p><code class="code" id="k2uf5f_29">call: http</code> endpoints (<code class="code" id="k2uf5f_30">authentication.use</code>)</p></td></tr><tr id="k2uf5f_19"><td id="k2uf5f_31"><p><code class="code" id="k2uf5f_33">secrets</code></p></td><td id="k2uf5f_32"><p>Expressions, through <code class="code" id="k2uf5f_34">$secrets</code></p></td></tr><tr id="k2uf5f_20"><td id="k2uf5f_35"><p><code class="code" id="k2uf5f_37">functions</code></p></td><td id="k2uf5f_36"><p><code class="code" id="k2uf5f_38">call: &lt;function name&gt;</code></p></td></tr><tr id="k2uf5f_21"><td id="k2uf5f_39"><p><code class="code" id="k2uf5f_41">errors</code></p></td><td id="k2uf5f_40"><p><code class="code" id="k2uf5f_42">raise</code> tasks (<code class="code" id="k2uf5f_43">error: &lt;name&gt;</code>)</p></td></tr><tr id="k2uf5f_22"><td id="k2uf5f_44"><p><code class="code" id="k2uf5f_46">retries</code></p></td><td id="k2uf5f_45"><p><code class="code" id="k2uf5f_47">try</code>/<code class="code" id="k2uf5f_48">catch</code> (<code class="code" id="k2uf5f_49">retry: &lt;name&gt;</code>)</p></td></tr></tbody></table></div></section><section class="chapter"><h2 id="reusing-an-endpoint-s-authentication" data-toc="reusing-an-endpoint-s-authentication">Reusing an Endpoint's Authentication</h2><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: reusing-an-endpoint-s-authentication
+  version: '1.0.0'
+use:
+  secrets:
+    - USER_API_TOKEN
+  authentications:
+    userApi:
+      bearer:
+        token: ${ $secrets.USER_API_TOKEN }
+do:
+  - getUser:
+      call: http
+      with:
+        method: get
+        endpoint:
+          uri: http://127.0.0.1:8787/partner/stock
+          authentication:
+            use: userApi
+</div></section><section class="chapter"><h2 id="reusing-a-call-with-a-function" data-toc="reusing-a-call-with-a-function">Reusing a Call with a Function</h2><p id="k2uf5f_51">Wrap a call in a function and call it by name. The <code class="code" id="k2uf5f_53">with</code> values of the calling task are the function's input:</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: reusing-a-call-with-a-function
+  version: '1.0.0'
+use:
+  functions:
+    getCustomer:
+      do:
+        - request:
+            call: http
+            with:
+              method: get
+              endpoint: ${ &quot;http://127.0.0.1:8787/customers/&quot; + .customerId }
+do:
+  - fetchCustomer:
+      call: getCustomer
+      with:
+        customerId: ${ .id }
+</div></section><section class="chapter"><h2 id="reusing-a-retry-policy" data-toc="reusing-a-retry-policy">Reusing a Retry Policy</h2><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: reusing-a-retry-policy
+  version: '1.0.0'
+use:
+  retries:
+    standard:
+      delay:
+        seconds: 2
+      backoff:
+        exponential: {}
+      limit:
+        attempt:
+          count: 5
+do:
+  - fetchData:
+      try:
+        - callApi:
+            call: http
+            with:
+              method: get
+              endpoint: http://127.0.0.1:8787/stock
+              query:
+                fail: '503'
+                failTimes: ${ .failures // 0 | tostring }
+                key: ${ $workflow.id }
+      catch:
+        retry: standard
+</div></section><section class="chapter"><h2 id="broker-and-database-connections" data-toc="broker-and-database-connections">Broker and Database Connections</h2><p id="k2uf5f_55">The runner's own connections to the message broker and the database are set in the runner configuration, not in workflows. See <a href="lemline-ref-config.html" id="k2uf5f_56" data-tooltip="This reference lists every lemline.* configuration property the Lemline runner reads. Properties that are not listed here are not recognized by Lemline.">Runner Configuration Reference</a> and <a href="lemline-howto-brokers.html" id="k2uf5f_57" data-tooltip="This guide explains how to connect Lemline to a message broker. Runners exchange workflow steps through the broker, and workflows publish and receive CloudEvents through it.">Message Brokers</a>.</p></section><section class="chapter"><h2 id="run-the-examples" data-toc="run-the-examples">Run the Examples</h2><p id="k2uf5f_58">Every example on this page is a complete workflow. Complete <a href="lemline-tutorial-setup.html" id="k2uf5f_68" data-tooltip="Run Lemline on one machine with SQLite. Lemline stores workflow definitions, queued messages, and workflow history in local files. Use a writable directory on a local filesystem.">the SQLite setup</a>, save each example under the file name used below, and run the commands from the setup directory. With the JAR, substitute <code class="code" id="k2uf5f_69">java -jar lemline.jar</code> for <code class="code" id="k2uf5f_70">bin/lemline</code>.</p><p id="k2uf5f_59">Start the <a href="lemline-tutorial-order-processing.html#start-the-tutorial-shop" id="k2uf5f_71" data-tooltip="Complete the SQLite setup and keep the worker running on the host. In a separate terminal, open the root of the Lemline source checkout matching these docs (the directory containing examples/tutorial-services). With Docker Compose running, start the single shop container:">tutorial shop</a> from the root of the Lemline source checkout:</p><div class="code-block" data-lang="bash">
+docker compose -f examples/tutorial-services/compose.yaml up -d
+</div><p id="k2uf5f_61">The examples read secrets from the worker's environment. Stop the setup worker with Ctrl+C, export the values, and start it again:</p><div class="code-block" data-lang="bash">
+export USER_API_TOKEN='demo-token'
+bin/lemline listen --debug
+</div><p id="k2uf5f_63">Run the next commands from a second terminal in the setup directory.</p><div class="code-block" data-lang="bash">
+bin/lemline definition post -f reusing-an-endpoint-s-authentication.yaml
+bin/lemline instance start examples reusing-an-endpoint-s-authentication
+bin/lemline definition post -f reusing-a-call-with-a-function.yaml
+bin/lemline instance start examples reusing-a-call-with-a-function --input '{&quot;id&quot;:&quot;C-200&quot;}'
+bin/lemline definition post -f reusing-a-retry-policy.yaml
+bin/lemline instance start examples reusing-a-retry-policy --input '{&quot;failures&quot;:1}'
+</div><div class="table-wrapper"><table class="wide" id="k2uf5f_65"><thead><tr class="ijRowHead" id="k2uf5f_72"><th id="k2uf5f_76"><p>Example</p></th><th id="k2uf5f_77"><p>Expected result</p></th></tr></thead><tbody><tr id="k2uf5f_73"><td id="k2uf5f_78"><p><code class="code" id="k2uf5f_80">reusing-an-endpoint-s-authentication</code></p></td><td id="k2uf5f_79"><p>The partner stock with <code class="code" id="k2uf5f_81">&quot;authenticatedWith&quot;:&quot;bearer&quot;</code></p></td></tr><tr id="k2uf5f_74"><td id="k2uf5f_82"><p><code class="code" id="k2uf5f_84">reusing-a-call-with-a-function</code></p></td><td id="k2uf5f_83"><p>Customer C-200, Alan Turing</p></td></tr><tr id="k2uf5f_75"><td id="k2uf5f_85"><p><code class="code" id="k2uf5f_87">reusing-a-retry-policy</code></p></td><td id="k2uf5f_86"><p>The stock after one retry</p></td></tr></tbody></table></div><p id="k2uf5f_66">Stop the shop when you are done:</p><div class="code-block" data-lang="bash">
+docker compose -f examples/tutorial-services/compose.yaml down
+</div></section><section class="chapter"><h2 id="related-resources" data-toc="related-resources">Related Resources</h2><ul class="list _bullet" id="k2uf5f_88"><li class="list__item" id="k2uf5f_89"><p id="k2uf5f_92"><a href="lemline-ref-http.html" id="k2uf5f_93" data-tooltip="This reference describes how Lemline executes call: http tasks: which arguments are supported, how requests are built, and what the task returns.">HTTP Protocol Reference</a></p></li><li class="list__item" id="k2uf5f_90"><p id="k2uf5f_94"><a href="lemline-ref-auth.html" id="k2uf5f_95" data-tooltip="Authentication policies are part of the Open Workflow DSL. Lemline supports basic and bearer authentication for its HTTP executor. See Supported Features for runtime support by protocol and authentication type.">Authentication Reference</a></p></li><li class="list__item" id="k2uf5f_91"><p id="k2uf5f_96"><a href="lemline-ref-config.html" id="k2uf5f_97" data-tooltip="This reference lists every lemline.* configuration property the Lemline runner reads. Properties that are not listed here are not recognized by Lemline.">Runner Configuration Reference</a></p></li></ul></section><div class="last-modified">25 November 2026</div><div data-feedback-placeholder="true"></div><div class="navigation-links _bottom"><a href="lemline-ref-asyncapi.html" class="navigation-links__prev">AsyncAPI Reference</a><a href="lemline-ref-serialization.html" class="navigation-links__next">Serialization Reference</a></div></article><div id="disqus_thread"></div></div></section></main></div><script src="https://resources.jetbrains.com/writerside/apidoc/6.22.0-b776/app.js"></script></body></html>

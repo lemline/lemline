@@ -1,0 +1,345 @@
+<!DOCTYPE html SYSTEM "about:legacy-compat">
+<html lang="en-US" data-preset="contrast" data-primary-color="#2E6F7E"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="robots" content="noindex"><meta name="built-on" content="2026-11-26T17:17:49.930424308"><title>Timeout Handling Examples | Lemline documentation</title><script type="application/json" id="virtual-toc-data">[{"id":"run-the-examples","level":0,"title":"Run the Examples","anchor":"#run-the-examples"},{"id":"basic-timeout-handling","level":0,"title":"Basic Timeout Handling","anchor":"#basic-timeout-handling"},{"id":"timeouts-with-event-waiting","level":0,"title":"Timeouts with Event Waiting","anchor":"#timeouts-with-event-waiting"},{"id":"workflow-level-timeouts","level":0,"title":"Workflow-Level Timeouts","anchor":"#workflow-level-timeouts"},{"id":"timeout-strategies-for-different-services","level":0,"title":"Timeout Strategies for Different Services","anchor":"#timeout-strategies-for-different-services"},{"id":"best-practices-for-timeout-handling","level":0,"title":"Best Practices for Timeout Handling","anchor":"#best-practices-for-timeout-handling"},{"id":"conclusion","level":0,"title":"Conclusion","anchor":"#conclusion"}]</script><script type="application/json" id="topic-shortcuts"></script><link href="https://resources.jetbrains.com/writerside/apidoc/6.22.0-b776/app.css" rel="stylesheet"><link href="static/custom.css" rel="stylesheet"><link rel="icon" type="image/png" sizes="16x16" href="images/lemly.png"><meta name="image" content="https://docs.lemline.com/social-preview.png"><!-- Open Graph --><meta property="og:title" content="Timeout Handling Examples | Lemline documentation"><meta property="og:description" content=""><meta property="og:image" content="https://docs.lemline.com/social-preview.png"><meta property="og:site_name" content="Lemline documentation Help"><meta property="og:type" content="website"><meta property="og:locale" content="en_US"><meta property="og:url" content="https://docs.lemline.com/lemline-examples-timeouts.html"><!-- End Open Graph --><!-- Twitter Card --><meta name="twitter:card" content="summary_large_image"><meta name="twitter:site" content=""><meta name="twitter:title" content="Timeout Handling Examples | Lemline documentation"><meta name="twitter:description" content=""><meta name="twitter:creator" content=""><meta name="twitter:image:src" content="https://docs.lemline.com/social-preview.png"><!-- End Twitter Card --><!-- Schema.org WebPage --><script type="application/ld+json">{
+    "@context": "http://schema.org",
+    "@type": "WebPage",
+    "@id": "https://docs.lemline.com/lemline-examples-timeouts.html#webpage",
+    "url": "https://docs.lemline.com/lemline-examples-timeouts.html",
+    "name": "Timeout Handling Examples | Lemline documentation",
+    "description": "",
+    "image": "https://docs.lemline.com/social-preview.png",
+    "inLanguage":"en-US"
+}</script><!-- End Schema.org --><!-- Schema.org WebSite --><script type="application/ld+json">{
+    "@type": "WebSite",
+    "@id": "https://docs.lemline.com/#website",
+    "url": "https://docs.lemline.com/",
+    "name": "Lemline documentation Help"
+}</script><!-- End Schema.org --></head><body data-id="lemline-examples-timeouts" data-main-title="Timeout Handling Examples" data-article-props="{&quot;seeAlsoStyle&quot;:&quot;links&quot;}" data-template="article" data-breadcrumbs="Examples Library"><div class="wrapper"><main class="panel _main"><header class="panel__header"><div class="container"><h3>Lemline documentation  Help</h3><div class="panel-trigger"></div></div></header><section class="panel__content"><div class="container"><article class="article" data-shortcut-switcher="inactive"><h1 data-toc="lemline-examples-timeouts" id="lemline-examples-timeouts.md">Timeout Handling Examples</h1><p id="-due9s8_3">This document provides examples of implementing effective timeout strategies in Lemline workflows. Proper timeout handling is essential for building robust workflows that gracefully handle slow or unresponsive services, preventing workflows from hanging indefinitely and ensuring predictable execution times.</p><aside class="prompt" data-type="tip" data-title="" id="-due9s8_4"><p id="-due9s8_12"><span class="control" id="-due9s8_13">Lemline runtime:</span> only <code class="code" id="-due9s8_14">listen</code> task timeouts are enforced. Workflow-level timeouts and timeouts on other tasks are accepted but ignored for now. HTTP calls use fixed client limits instead: 15 seconds to connect, 30 seconds per request.</p></aside><section class="chapter"><h2 id="run-the-examples" data-toc="run-the-examples">Run the Examples</h2><p id="-due9s8_15">Complete <a href="lemline-tutorial-setup.html" id="-due9s8_20" data-tooltip="Run Lemline on one machine with SQLite. Lemline stores workflow definitions, queued messages, and workflow history in local files. Use a writable directory on a local filesystem.">the SQLite setup</a> and keep its worker running. Run the commands from a second terminal in the setup directory. With the JAR, substitute <code class="code" id="-due9s8_21">java -jar lemline.jar</code> for <code class="code" id="-due9s8_22">bin/lemline</code>. Start the <a href="lemline-tutorial-order-processing.html#start-the-tutorial-shop" id="-due9s8_23" data-tooltip="Complete the SQLite setup and keep the worker running on the host. In a separate terminal, open the root of the Lemline source checkout matching these docs (the directory containing examples/tutorial-services). With Docker Compose running, start the single shop container:">tutorial shop</a> from the root of the Lemline source checkout; its <code class="code" id="-due9s8_24">delayMs</code> query parameter makes an answer slow:</p><div class="code-block" data-lang="bash">
+docker compose -f examples/tutorial-services/compose.yaml up -d
+</div><p id="-due9s8_17">The event examples also need the tutorial publisher. Save it as <code class="code" id="-due9s8_25">tutorial-publisher.yaml</code> and register it:</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: tutorial-publisher
+  version: '1.0.0'
+do:
+  - publish:
+      emit:
+        event:
+          with:
+            type: ${ .type }
+            source: https://events.example.com/tutorial
+            data: ${ .data }
+</div><div class="code-block" data-lang="bash">
+bin/lemline definition post -f tutorial-publisher.yaml
+</div></section><section class="chapter"><h2 id="basic-timeout-handling" data-toc="basic-timeout-handling">Basic Timeout Handling</h2><section class="chapter"><h3 id="http-failure-fallback" data-toc="http-failure-fallback">HTTP Failure Fallback</h3><p id="-due9s8_28">This example returns the error from a failed HTTP request, including a failure from the HTTP client's own timeout.</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: http-error-fallback
+  version: '1.0.0'
+do:
+  - callExternalService:
+      try:
+        - fetchData:
+            call: http
+            with:
+              method: get
+              endpoint: http://127.0.0.1:8787/stock
+              query:
+                delayMs: ${ .delayMs // 0 | tostring }
+      catch:
+        as: requestError
+        do:
+          - returnFailure:
+              set:
+                success: false
+                reason: External HTTP request failed
+                errorType: ${ $requestError.type }
+                title: ${ $requestError.title }
+</div><p id="-due9s8_30">Save it as <code class="code" id="-due9s8_33">http-request-with-timeout.yaml</code>:</p><div class="code-block" data-lang="bash">
+bin/lemline definition post -f http-request-with-timeout.yaml
+bin/lemline instance start examples http-error-fallback --input '{&quot;delayMs&quot;:0}'
+bin/lemline instance start examples http-error-fallback --input '{&quot;delayMs&quot;:40000}'
+</div><p id="-due9s8_32">The first instance returns the stock. In the second, the shop waits 40 seconds; the HTTP client gives up after 30 and the catch returns <code class="code" id="-due9s8_34">success: false</code> with the <code class="code" id="-due9s8_35">communication</code> error titled <code class="code" id="-due9s8_36">Socket timeout has expired &hellip;</code>.</p></section><section class="chapter"><h3 id="graduated-timeouts" data-toc="graduated-timeouts">Graduated Timeouts</h3><p id="-due9s8_37">This example shows graduated timeouts for a cache, a database and a computed fallback. Lemline accepts the timeouts but does not apply them; the fallbacks run when a call fails.</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: graduated-timeouts
+  version: '1.0.0'
+do:
+  - tryCache:
+      try:
+        - lookupCache:
+            call: http
+            with:
+              method: get
+              endpoint: '${ &quot;http://127.0.0.1:8787/products/\(.itemId)&quot; + (if .cacheMiss then &quot;?fail=404&quot; else &quot;&quot; end) }'
+            timeout:
+              after:
+                milliseconds: 500
+            output:
+              as: '${ . + { source: &quot;cache&quot; } }'
+      catch:
+        errors:
+          with:
+            type: https://open-workflow-specification.org/spec/1.0.0/errors/communication
+            status: 404
+        do:
+          - lookupDatabase:
+              try:
+                - queryDatabase:
+                    call: http
+                    with:
+                      method: get
+                      endpoint: '${ &quot;http://127.0.0.1:8787/products/\($workflow.input.itemId)?delayMs=\($workflow.input.databaseDelayMs // 0)&quot; }'
+                    timeout:
+                      after:
+                        seconds: 3
+                    output:
+                      as: '${ . + { source: &quot;database&quot; } }'
+              catch:
+                do:
+                  - computeFallback:
+                      set:
+                        id: ${ $workflow.input.itemId }
+                        source: fallback
+</div><p id="-due9s8_39">Save it as <code class="code" id="-due9s8_42">graduated-timeouts.yaml</code>:</p><div class="code-block" data-lang="bash">
+bin/lemline definition post -f graduated-timeouts.yaml
+bin/lemline instance start examples graduated-timeouts --input '{&quot;itemId&quot;:&quot;SKU-2&quot;}'
+bin/lemline instance start examples graduated-timeouts --input '{&quot;itemId&quot;:&quot;SKU-2&quot;,&quot;cacheMiss&quot;:true}'
+bin/lemline instance start examples graduated-timeouts --input '{&quot;itemId&quot;:&quot;SKU-2&quot;,&quot;cacheMiss&quot;:true,&quot;databaseDelayMs&quot;:4000}'
+</div><p id="-due9s8_41">The first instance answers from the cache (<code class="code" id="-due9s8_43">source: cache</code>), the second from the database after a cache miss (<code class="code" id="-due9s8_44">source: database</code>). In the third, the database takes 4 seconds: the 3-second timeout is not applied, so the call waits and still answers with <code class="code" id="-due9s8_45">source: database</code>. Only the failure of a call, not its duration, reaches the next fallback.</p></section></section><section class="chapter"><h2 id="timeouts-with-event-waiting" data-toc="timeouts-with-event-waiting">Timeouts with Event Waiting</h2><p id="-due9s8_46">These examples receive events from the tutorial publisher on the worker's SQLite channel.</p><section class="chapter"><h3 id="event-timeout" data-toc="event-timeout">Event Timeout</h3><p id="-due9s8_49">This workflow waits up to 30 seconds for a specific process to complete; a real process would get minutes. The producer stores each status before emitting the event. On timeout, the workflow reads the stored status so it can still recover a completion sent before the listener was registered.</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: event-timeout
+  version: '1.0.0'
+input:
+  schema:
+    document:
+      type: object
+      required: [processId]
+      properties:
+        processId:
+          type: string
+do:
+  - awaitCompletion:
+      try:
+        - waitForCompletion:
+            listen:
+              to:
+                one:
+                  with:
+                    type: com.example.process.completed
+                  correlate:
+                    processId:
+                      from: ${ .processId }
+                      expect: ${ $workflow.input.processId }
+            timeout:
+              after:
+                seconds: 30
+        - processResult:
+            set:
+              success: true
+              processId: ${ $workflow.input.processId }
+              data: ${ .[0] }
+      catch:
+        errors:
+          with:
+            type: https://open-workflow-specification.org/spec/1.0.0/errors/timeout
+        do:
+          - readDurableStatus:
+              call: http
+              with:
+                method: get
+                endpoint: '${ &quot;http://127.0.0.1:8787/reservations/\($workflow.input.processId | @uri)&quot; }'
+          - summarizeStatus:
+              set:
+                success: ${ .status == &quot;reserved&quot; }
+                status: ${ .status }
+                processId: ${ $workflow.input.processId }
+</div><p id="-due9s8_51">Save it as <code class="code" id="-due9s8_58">event-timeout.yaml</code>:</p><div class="code-block" data-lang="bash">
+bin/lemline definition post -f event-timeout.yaml
+bin/lemline instance start examples event-timeout --input '{&quot;processId&quot;:&quot;ORD-1401&quot;}'
+</div><p id="-due9s8_53">Publish the completion while it waits:</p><div class="code-block" data-lang="bash">
+bin/lemline instance start examples tutorial-publisher --input '{&quot;type&quot;:&quot;com.example.process.completed&quot;,&quot;data&quot;:{&quot;processId&quot;:&quot;ORD-1401&quot;,&quot;result&quot;:&quot;shipped&quot;}}'
+</div><p id="-due9s8_55">The instance completes with <code class="code" id="-due9s8_59">success: true</code> and the event data. To see the timeout path, reserve an order in the shop, which stands for the durable status store, and start a listener for it without publishing anything:</p><div class="code-block" data-lang="bash">
+curl -X POST http://127.0.0.1:8787/reservations -d '{&quot;orderId&quot;:&quot;ORD-1402&quot;,&quot;items&quot;:[{&quot;id&quot;:&quot;SKU-1&quot;,&quot;quantity&quot;:1}]}'
+bin/lemline instance start examples event-timeout --input '{&quot;processId&quot;:&quot;ORD-1402&quot;}'
+</div><p id="-due9s8_57">After 30 to 40 seconds the listener times out, the workflow reads the stored reservation, and completes with <code class="code" id="-due9s8_60">{&quot;success&quot;:true,&quot;status&quot;:&quot;reserved&quot;,&quot;processId&quot;:&quot;ORD-1402&quot;}</code>.</p></section><section class="chapter"><h3 id="multiple-event-timeout" data-toc="multiple-event-timeout">Multiple Event Timeout</h3><p id="-due9s8_61">This example demonstrates waiting for multiple events with a timeout.</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: listen-for-all-results
+  version: '1.0.0'
+do:
+  - collectResults:
+      listen:
+        to:
+          all:
+            - with:
+                type: com.example.inventory.checked
+            - with:
+                type: com.example.shipping.quoted
+      timeout:
+        after: PT5M
+  - recordResults:
+      set:
+        checks: ${ . }
+</div><p id="-due9s8_63">Save it as <code class="code" id="-due9s8_68">listen-for-all-results.yaml</code>:</p><div class="code-block" data-lang="bash">
+bin/lemline definition post -f listen-for-all-results.yaml
+bin/lemline instance start examples listen-for-all-results
+</div><p id="-due9s8_65">Publish both results while it waits:</p><div class="code-block" data-lang="bash">
+bin/lemline instance start examples tutorial-publisher --input '{&quot;type&quot;:&quot;com.example.inventory.checked&quot;,&quot;data&quot;:{&quot;stock&quot;:2}}'
+bin/lemline instance start examples tutorial-publisher --input '{&quot;type&quot;:&quot;com.example.shipping.quoted&quot;,&quot;data&quot;:{&quot;price&quot;:15}}'
+</div><p id="-due9s8_67">Expect <code class="code" id="-due9s8_69">{&quot;checks&quot;:[{&quot;stock&quot;:2},{&quot;price&quot;:15}]}</code>. Without both events, the listener would fault with a <code class="code" id="-due9s8_70">timeout</code> error after five minutes.</p></section></section><section class="chapter"><h2 id="workflow-level-timeouts" data-toc="workflow-level-timeouts">Workflow-Level Timeouts</h2><section class="chapter"><h3 id="deadline-between-tasks" data-toc="deadline-between-tasks">Deadline Between Tasks</h3><p id="-due9s8_72">This example checks a deadline before starting the final task. A task already in progress continues until it returns or reaches its own timeout.</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: deadline-between-tasks
+  version: '1.0.0'
+do:
+  - recordDeadline:
+      set:
+        deadline: ${ now + ($workflow.input.deadlineSeconds // 1800) }
+      export:
+        as: '${ $context + { deadline: .deadline } }'
+  - prepareResults:
+      call: http
+      with:
+        method: get
+        endpoint: http://127.0.0.1:8787/stock
+        query:
+          delayMs: '2000'
+  - checkDeadline:
+      switch:
+        - expired:
+            when: ${ now &gt;= $context.deadline }
+            then: returnExpired
+        - timeRemaining:
+            then: finish
+  - returnExpired:
+      set:
+        success: false
+        reason: Deadline reached before the final step
+      then: end
+  - finish:
+      call: http
+      with:
+        method: post
+        endpoint: http://127.0.0.1:8787/audit
+        body:
+          reference: ${ $workflow.input.orderId }
+          message: '${ &quot;Finished with \(.available) units available&quot; }'
+</div><p id="-due9s8_74">Save it as <code class="code" id="-due9s8_77">global-workflow-timeout.yaml</code>:</p><div class="code-block" data-lang="bash">
+bin/lemline definition post -f global-workflow-timeout.yaml
+bin/lemline instance start examples deadline-between-tasks --input '{&quot;orderId&quot;:&quot;ORD-1403&quot;}'
+bin/lemline instance start examples deadline-between-tasks --input '{&quot;orderId&quot;:&quot;ORD-1404&quot;,&quot;deadlineSeconds&quot;:1}'
+</div><p id="-due9s8_76">The first instance has 30 minutes and finishes: the shop's audit list shows <code class="code" id="-due9s8_78">Finished with 99 units available</code> for ORD-1403: the ORD-1402 reservation above holds one unit. The second gives itself one second; the 2-second preparation uses it up, so the workflow returns <code class="code" id="-due9s8_79">{&quot;success&quot;:false,&quot;reason&quot;:&quot;Deadline reached before the final step&quot;}</code> without calling the final step.</p></section></section><section class="chapter"><h2 id="timeout-strategies-for-different-services" data-toc="timeout-strategies-for-different-services">Timeout Strategies for Different Services</h2><section class="chapter"><h3 id="database-query-timeouts" data-toc="database-query-timeouts">Database Query Timeouts</h3><p id="-due9s8_82">This example shows timeout settings for database-style queries, here the shop's catalog. Lemline accepts them but does not apply them.</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: database-timeouts
+  version: '1.0.0'
+do:
+  - simpleQuery:
+      try:
+        - executeQuery:
+            call: http
+            with:
+              method: get
+              endpoint: http://127.0.0.1:8787/products
+              query:
+                size: '10'
+            timeout:
+              after:
+                seconds: 3
+            export:
+              as: '${ $context + { queryResult: .total } }'
+      catch:
+        errors:
+          with:
+            type: https://open-workflow-specification.org/spec/1.0.0/errors/timeout
+        retry:
+          delay:
+            milliseconds: 500
+          limit:
+            attempt:
+              count: 2
+  - complexQuery:
+      try:
+        - executeComplexQuery:
+            call: http
+            with:
+              method: get
+              endpoint: http://127.0.0.1:8787/products
+              query:
+                category: garden
+                search: hose
+                delayMs: ${ $workflow.input.slowQueryMs // 0 | tostring }
+            timeout:
+              after:
+                seconds: 1
+            export:
+              as: '${ $context + { complexResult: [.items[].id] } }'
+      catch:
+        errors:
+          with:
+            type: https://open-workflow-specification.org/spec/1.0.0/errors/timeout
+        do:
+          - simplifyAndRetry:
+              call: http
+              with:
+                method: get
+                endpoint: http://127.0.0.1:8787/products
+                query:
+                  category: garden
+              export:
+                as: '${ $context + { usedSimplifiedQuery: true, simplifiedResult: [.items[].id] } }'
+  - summarize:
+      set:
+        results: ${ $context }
+</div><p id="-due9s8_84">Save it as <code class="code" id="-due9s8_87">database-query-timeouts.yaml</code>:</p><div class="code-block" data-lang="bash">
+bin/lemline definition post -f database-query-timeouts.yaml
+bin/lemline instance start examples database-timeouts --input '{}'
+bin/lemline instance start examples database-timeouts --input '{&quot;slowQueryMs&quot;:2000}'
+</div><p id="-due9s8_86">Both instances complete with <code class="code" id="-due9s8_88">queryResult: 7</code> and <code class="code" id="-due9s8_89">complexResult: [&quot;SKU-1&quot;]</code>. In the second, the complex query takes 2 seconds: its 1-second timeout is not applied, so the fallback query does not run.</p></section><section class="chapter"><h3 id="external-api-timeouts" data-toc="external-api-timeouts">External API Timeouts</h3><p id="-due9s8_90">This example declares different timeouts for different types of external APIs. Lemline accepts them but does not apply them.</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: api-timeouts
+  version: '1.0.0'
+do:
+  - callReliableApi:
+      call: http
+      with:
+        method: get
+        endpoint: http://127.0.0.1:8787/stock
+      timeout:
+        after:
+          seconds: 2
+      export:
+        as: '${ $context + { stock: .available } }'
+  - callThirdPartyApi:
+      try:
+        - getProduct:
+            call: http
+            with:
+              method: get
+              endpoint: http://127.0.0.1:8787/products/SKU-4
+              query:
+                delayMs: ${ $workflow.input.thirdPartyDelayMs // 0 | tostring }
+            timeout:
+              after:
+                seconds: 5
+            export:
+              as: '${ $context + { product: .name, source: &quot;live&quot; } }'
+      catch:
+        do:
+          - useCachedProduct:
+              set:
+                cached: true
+              export:
+                as: '${ $context + { product: &quot;Desk lamp&quot;, source: &quot;cache&quot; } }'
+  - summarize:
+      set:
+        results: ${ $context }
+</div><p id="-due9s8_92">Save it as <code class="code" id="-due9s8_96">external-api-timeouts.yaml</code>:</p><div class="code-block" data-lang="bash">
+bin/lemline definition post -f external-api-timeouts.yaml
+bin/lemline instance start examples api-timeouts --input '{}'
+bin/lemline instance start examples api-timeouts --input '{&quot;thirdPartyDelayMs&quot;:6000}'
+</div><p id="-due9s8_94">Both instances complete with the live product <code class="code" id="-due9s8_97">Desk lamp</code> and <code class="code" id="-due9s8_98">source: live</code>: the second waits 6 seconds for the shop, beyond its 5-second timeout. The cached fallback only runs if the call fails, for example after the 30-second client limit. Stop the shop when you are done:</p><div class="code-block" data-lang="bash">
+docker compose -f examples/tutorial-services/compose.yaml down
+</div></section></section><section class="chapter"><h2 id="best-practices-for-timeout-handling" data-toc="best-practices-for-timeout-handling">Best Practices for Timeout Handling</h2><p id="-due9s8_99">When implementing timeout strategies in Lemline workflows, consider these best practices:</p><ol class="list _decimal" id="-due9s8_100" type="1"><li class="list__item" id="-due9s8_101"><p id="-due9s8_111"><span class="control" id="-due9s8_112">Appropriate Duration</span>: Set timeout durations appropriate to the operation being performed (Lemline only enforces timeouts on <code class="code" id="-due9s8_113">listen</code> tasks; HTTP calls use fixed limits of 15 s to connect and 30 s per request)</p></li><li class="list__item" id="-due9s8_102"><p id="-due9s8_114"><span class="control" id="-due9s8_115">Graduated Timeouts</span>: Use shorter timeouts for quick operations, longer for complex ones (Lemline only enforces timeouts on <code class="code" id="-due9s8_116">listen</code> tasks; HTTP calls use fixed limits of 15 s to connect and 30 s per request)</p></li><li class="list__item" id="-due9s8_103"><p id="-due9s8_117"><span class="control" id="-due9s8_118">Retry Strategy</span>: Combine timeouts with appropriate retry strategies</p></li><li class="list__item" id="-due9s8_104"><p id="-due9s8_119"><span class="control" id="-due9s8_120">Fallback Logic</span>: Implement fallback mechanisms when operations timeout</p></li><li class="list__item" id="-due9s8_105"><p id="-due9s8_121"><span class="control" id="-due9s8_122">Monitoring</span>: Log and monitor timeout occurrences to identify patterns</p></li><li class="list__item" id="-due9s8_106"><p id="-due9s8_123"><span class="control" id="-due9s8_124">Circuit Breaking</span>: Consider implementing circuit breakers for frequently timing out services</p></li><li class="list__item" id="-due9s8_107"><p id="-due9s8_125"><span class="control" id="-due9s8_126">Global Limits</span>: Set workflow-level timeouts to prevent indefinite execution (Lemline only enforces timeouts on <code class="code" id="-due9s8_127">listen</code> tasks; HTTP calls use fixed limits of 15 s to connect and 30 s per request)</p></li><li class="list__item" id="-due9s8_108"><p id="-due9s8_128"><span class="control" id="-due9s8_129">Compensating Actions</span>: Implement cleanup actions when timeouts occur mid-process</p></li><li class="list__item" id="-due9s8_109"><p id="-due9s8_130"><span class="control" id="-due9s8_131">Timeout Prediction</span>: Monitor remaining time and adjust behavior as deadlines approach</p></li><li class="list__item" id="-due9s8_110"><p id="-due9s8_132"><span class="control" id="-due9s8_133">Documentation</span>: Document expected timeouts for each integration point</p></li></ol></section><section class="chapter"><h2 id="conclusion" data-toc="conclusion">Conclusion</h2><p id="-due9s8_134">These examples demonstrate various approaches to implementing effective timeout handling in Lemline workflows. By combining appropriate timeout durations with retry strategies, fallback mechanisms, and cleanup actions, you can build resilient workflows that handle external service failures gracefully.</p><p id="-due9s8_135">Proper timeout handling ensures that workflows remain responsive even when dependent services are slow or unresponsive, improving overall system reliability and user experience.</p><p id="-due9s8_136">For more examples of error handling and resilience patterns, see the <a href="lemline-examples-error-handling.html" id="-due9s8_137" data-tooltip="This document provides examples of error handling and resilience patterns in Lemline workflows. Robust error handling is essential for building reliable workflows that can gracefully recover from failures when interacting with external systems, processing data, or executing business…">Error Handling Examples</a> document.</p></section><div class="last-modified">25 November 2026</div><div data-feedback-placeholder="true"></div><div class="navigation-links _bottom"><a href="lemline-examples-api.html" class="navigation-links__prev">API Integration Examples</a><a href="lemline-example-compensation.html" class="navigation-links__next">Compensation Pattern Examples</a></div></article><div id="disqus_thread"></div></div></section></main></div><script src="https://resources.jetbrains.com/writerside/apidoc/6.22.0-b776/app.js"></script></body></html>

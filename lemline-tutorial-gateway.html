@@ -1,0 +1,64 @@
+<!DOCTYPE html SYSTEM "about:legacy-compat">
+<html lang="en-US" data-preset="contrast" data-primary-color="#2E6F7E"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="robots" content="noindex"><meta name="built-on" content="2026-11-26T17:17:49.028848214"><title>Start and follow an order through the gRPC gateway | Lemline documentation</title><script type="application/json" id="virtual-toc-data">[{"id":"run-the-examples","level":0,"title":"Run the Examples","anchor":"#run-the-examples"}]</script><script type="application/json" id="topic-shortcuts"></script><link href="https://resources.jetbrains.com/writerside/apidoc/6.22.0-b776/app.css" rel="stylesheet"><link href="static/custom.css" rel="stylesheet"><meta name="description" content="Start an order workflow over gRPC and read its acknowledgement from the event history."><link rel="icon" type="image/png" sizes="16x16" href="images/lemly.png"><meta name="image" content="https://docs.lemline.com/social-preview.png"><!-- Open Graph --><meta property="og:title" content="Start and follow an order through the gRPC gateway | Lemline documentation"><meta property="og:description" content="Start an order workflow over gRPC and read its acknowledgement from the event history."><meta property="og:image" content="https://docs.lemline.com/social-preview.png"><meta property="og:site_name" content="Lemline documentation Help"><meta property="og:type" content="website"><meta property="og:locale" content="en_US"><meta property="og:url" content="https://docs.lemline.com/lemline-tutorial-gateway.html"><!-- End Open Graph --><!-- Twitter Card --><meta name="twitter:card" content="summary_large_image"><meta name="twitter:site" content=""><meta name="twitter:title" content="Start and follow an order through the gRPC gateway | Lemline documentation"><meta name="twitter:description" content="Start an order workflow over gRPC and read its acknowledgement from the event history."><meta name="twitter:creator" content=""><meta name="twitter:image:src" content="https://docs.lemline.com/social-preview.png"><!-- End Twitter Card --><!-- Schema.org WebPage --><script type="application/ld+json">{
+    "@context": "http://schema.org",
+    "@type": "WebPage",
+    "@id": "https://docs.lemline.com/lemline-tutorial-gateway.html#webpage",
+    "url": "https://docs.lemline.com/lemline-tutorial-gateway.html",
+    "name": "Start and follow an order through the gRPC gateway | Lemline documentation",
+    "description": "",
+    "image": "https://docs.lemline.com/social-preview.png",
+    "inLanguage":"en-US"
+}</script><!-- End Schema.org --><!-- Schema.org WebSite --><script type="application/ld+json">{
+    "@type": "WebSite",
+    "@id": "https://docs.lemline.com/#website",
+    "url": "https://docs.lemline.com/",
+    "name": "Lemline documentation Help"
+}</script><!-- End Schema.org --></head><body data-id="lemline-tutorial-gateway" data-main-title="Start and follow an order through the gRPC gateway" data-article-props="{&quot;seeAlsoStyle&quot;:&quot;links&quot;}" data-template="article" data-breadcrumbs="Tutorials: Run a shop with Lemline"><div class="wrapper"><main class="panel _main"><header class="panel__header"><div class="container"><h3>Lemline documentation  Help</h3><div class="panel-trigger"></div></div></header><section class="panel__content"><div class="container"><article class="article" data-shortcut-switcher="inactive"><h1 data-toc="lemline-tutorial-gateway" id="lemline-tutorial-gateway.md">Start and follow an order through the gRPC gateway</h1><p id="-k3vjp5_4">Send an order ID to Lemline over gRPC and read the workflow's acknowledgement from its event history.</p><p id="-k3vjp5_5">Complete <a href="lemline-tutorial-setup.html" id="-k3vjp5_7" data-tooltip="Run Lemline on one machine with SQLite. Lemline stores workflow definitions, queued messages, and workflow history in local files. Use a writable directory on a local filesystem.">the SQLite setup</a> and keep the worker running. Install <a href="https://github.com/fullstorydev/grpcurl/releases" id="-k3vjp5_8" data-external="true" rel="noopener noreferrer" target="_blank">grpcurl</a> and <code class="code" id="-k3vjp5_9">jq</code>, and have a Lemline source checkout matching the version you run. The checkout provides the gateway service definition. Use a Bash-compatible shell for the commands below.</p><section class="chapter"><h2 id="run-the-examples" data-toc="run-the-examples">Run the Examples</h2><p id="-k3vjp5_10">In the setup directory, save this version of the <a href="lemline-tutorial-hello.html" id="-k3vjp5_20" data-tooltip="Complete the SQLite setup. Keep the worker running and use a second terminal in the setup directory. Substitute java -jar lemline.jar for bin/lemline if using the JAR. Each definition below is a new version of the same workflow. Save each in turn as acknowledge-order.yaml.">order acknowledgement workflow</a> as <code class="code" id="-k3vjp5_21">acknowledge-order.yaml</code>. If you already registered version <code class="code" id="-k3vjp5_22">0.1.2</code>, skip the publish command. With the JAR, substitute <code class="code" id="-k3vjp5_23">java -jar lemline.jar</code> for <code class="code" id="-k3vjp5_24">bin/lemline</code> in the commands below.</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: 1.0.3
+  namespace: tutorial
+  name: acknowledge-order
+  version: '0.1.2'
+input:
+  schema:
+    document:
+      type: object
+      required: [orderId]
+      properties:
+        orderId:
+          type: string
+do:
+  - acknowledge:
+      set:
+        message: ${ &quot;Order received for &quot; + .orderId + &quot;!&quot; }
+</div><div class="code-block" data-lang="bash">
+bin/lemline definition post -f acknowledge-order.yaml
+</div><p id="-k3vjp5_13">Add this block under the existing <code class="code" id="-k3vjp5_25">lemline:</code> key in <code class="code" id="-k3vjp5_26">.lemline.yaml</code>. This example uses a plaintext endpoint without authentication on the local loopback interface. For a shared installation, follow <a href="lemline-howto-deploy-gateway.html" id="-k3vjp5_27" data-tooltip="Run the gateway as a separate Lemline process to let applications start workflows and read their history. The process uses the same Lemline binary as the workers. It takes its own listen ports and can run on a separate host when the configured backends are reachable from both.">Deploy the gRPC gateway</a>.</p><div class="code-block" data-lang="yaml">
+  gateway:
+    grpc:
+      host: 127.0.0.1
+    tls:
+      enabled: false
+    authentication:
+      enabled: false
+</div><p id="-k3vjp5_15">Start the gateway from the setup directory in another terminal. Use a metrics port distinct from the worker's.</p><div class="code-block" data-lang="bash">
+bin/lemline gateway start --grpc-port 9000 --metrics-port 8082
+</div><p id="-k3vjp5_17">You should see <code class="code" id="-k3vjp5_28">Started gRPC server on 127.0.0.1:9000</code>.</p><section class="chapter"><h3 id="submit-the-order" data-toc="submit-the-order">Submit the order</h3><p id="-k3vjp5_29">In the terminal you used to publish the workflow, set <code class="code" id="-k3vjp5_31">LEMLINE_SOURCE</code> to the absolute path to your source checkout and define a helper that uses its service definition:</p><div class="code-block" data-lang="bash">
+export LEMLINE_SOURCE=/path/to/lemline
+
+gateway_rpc() {
+  grpcurl -plaintext -max-time 5 \
+    -import-path &quot;$LEMLINE_SOURCE/lemline-runner-gateway/src/main/proto&quot; \
+    -proto lemline/gateway/v1/gateway.proto -d &quot;$2&quot; \
+    127.0.0.1:9000 &quot;lemline.gateway.v1.GatewayService/$1&quot;
+}
+
+start_reply=$(gateway_rpc StartInstance \
+  '{&quot;namespace&quot;:&quot;tutorial&quot;,&quot;name&quot;:&quot;acknowledge-order&quot;,&quot;version&quot;:&quot;0.1.2&quot;,&quot;input&quot;:{&quot;orderId&quot;:&quot;ORD-101&quot;}}')
+printf '%s\n' &quot;$start_reply&quot;
+instance_id=$(printf '%s\n' &quot;$start_reply&quot; | jq -er '.instanceId')
+</div></section><section class="chapter"><h3 id="read-the-acknowledgement" data-toc="read-the-acknowledgement">Read the acknowledgement</h3><p id="-k3vjp5_32">Use the returned instance ID to read its history. The worker executes the workflow and writes lifecycle events to analytics asynchronously. If you get <code class="code" id="-k3vjp5_36">NotFound</code> or the history has no <code class="code" id="-k3vjp5_37">workflow.completed</code> event yet, wait a moment and rerun this command:</p><div class="code-block" data-lang="bash">
+gateway_rpc ListInstanceEvents &quot;{\&quot;instanceId\&quot;:\&quot;$instance_id\&quot;}&quot; |
+  jq -c '.events[]?.cloudEventJson | fromjson
+    | select(.type == &quot;org.open-workflow-specification.workflow.completed.v1&quot;)
+    | .data.output'
+</div><div class="table-wrapper"><table class="wide" id="-k3vjp5_34"><thead><tr class="ijRowHead" id="-k3vjp5_38"><th id="-k3vjp5_41"><p>Call</p></th><th id="-k3vjp5_42"><p>Expected result</p></th></tr></thead><tbody><tr id="-k3vjp5_39"><td id="-k3vjp5_43"><p><code class="code" id="-k3vjp5_45">StartInstance</code></p></td><td id="-k3vjp5_44"><p><code class="code" id="-k3vjp5_46">START_INSTANCE_RESULT_ACCEPTED_NEW</code> with a new <code class="code" id="-k3vjp5_47">instanceId</code></p></td></tr><tr id="-k3vjp5_40"><td id="-k3vjp5_48"><p><code class="code" id="-k3vjp5_50">ListInstanceEvents</code></p></td><td id="-k3vjp5_49"><p>The completed event contains <code class="code" id="-k3vjp5_51">{&quot;message&quot;:&quot;Order received for ORD-101!&quot;}</code></p></td></tr></tbody></table></div><p id="-k3vjp5_35">Press Ctrl+C in the gateway terminal when you finish. Continue with <a href="lemline-howto-publish-run.html#retry-a-gateway-start-safely" id="-k3vjp5_52" data-tooltip="Before the first call, generate and save a UUIDv7 as instance_id for the logical request. Set an explicit workflow version so a deployment between attempts cannot change which version the request resolves to.">safe start retries</a> or <a href="lemline-howto-monitor.html#resume-an-instance-event-stream" id="-k3vjp5_53" data-tooltip="Open WatchInstanceEvents with the instance ID. Omit after_cursor to replay the history before following live events. If the instance was just accepted and the gateway returns NOT_FOUND, retry after the first lifecycle event reaches analytics.">following a live timeline</a>.</p></section></section><div class="last-modified">26 November 2026</div><div data-feedback-placeholder="true"></div><div class="navigation-links _bottom"><a href="lemline-tutorial-hello.html" class="navigation-links__prev">Acknowledge the first order</a><a href="lemline-tutorial-order-processing.html" class="navigation-links__next">Reserve, charge and ship an order</a></div></article><div id="disqus_thread"></div></div></section></main></div><script src="https://resources.jetbrains.com/writerside/apidoc/6.22.0-b776/app.js"></script></body></html>

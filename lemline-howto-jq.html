@@ -1,0 +1,52 @@
+<!DOCTYPE html SYSTEM "about:legacy-compat">
+<html lang="en-US" data-preset="contrast" data-primary-color="#2E6F7E"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="robots" content="noindex"><meta name="built-on" content="2026-11-26T17:17:48.82974642"><title>How to write jq runtime expressions | Lemline documentation</title><script type="application/json" id="virtual-toc-data">[{"id":"read-and-transform-input","level":0,"title":"Read and transform input","anchor":"#read-and-transform-input"},{"id":"keep-data-between-tasks","level":0,"title":"Keep data between tasks","anchor":"#keep-data-between-tasks"},{"id":"check-an-expression-with-local-data","level":0,"title":"Check an expression with local data","anchor":"#check-an-expression-with-local-data"}]</script><script type="application/json" id="topic-shortcuts"></script><link href="https://resources.jetbrains.com/writerside/apidoc/6.22.0-b776/app.css" rel="stylesheet"><link href="static/custom.css" rel="stylesheet"><link rel="icon" type="image/png" sizes="16x16" href="images/lemly.png"><meta name="image" content="https://docs.lemline.com/social-preview.png"><!-- Open Graph --><meta property="og:title" content="How to write jq runtime expressions | Lemline documentation"><meta property="og:description" content=""><meta property="og:image" content="https://docs.lemline.com/social-preview.png"><meta property="og:site_name" content="Lemline documentation Help"><meta property="og:type" content="website"><meta property="og:locale" content="en_US"><meta property="og:url" content="https://docs.lemline.com/lemline-howto-jq.html"><!-- End Open Graph --><!-- Twitter Card --><meta name="twitter:card" content="summary_large_image"><meta name="twitter:site" content=""><meta name="twitter:title" content="How to write jq runtime expressions | Lemline documentation"><meta name="twitter:description" content=""><meta name="twitter:creator" content=""><meta name="twitter:image:src" content="https://docs.lemline.com/social-preview.png"><!-- End Twitter Card --><!-- Schema.org WebPage --><script type="application/ld+json">{
+    "@context": "http://schema.org",
+    "@type": "WebPage",
+    "@id": "https://docs.lemline.com/lemline-howto-jq.html#webpage",
+    "url": "https://docs.lemline.com/lemline-howto-jq.html",
+    "name": "How to write jq runtime expressions | Lemline documentation",
+    "description": "",
+    "image": "https://docs.lemline.com/social-preview.png",
+    "inLanguage":"en-US"
+}</script><!-- End Schema.org --><!-- Schema.org WebSite --><script type="application/ld+json">{
+    "@type": "WebSite",
+    "@id": "https://docs.lemline.com/#website",
+    "url": "https://docs.lemline.com/",
+    "name": "Lemline documentation Help"
+}</script><!-- End Schema.org --></head><body data-id="lemline-howto-jq" data-main-title="How to write jq runtime expressions" data-article-props="{&quot;seeAlsoStyle&quot;:&quot;links&quot;}" data-template="article" data-breadcrumbs="How-to Guides///Data Management"><div class="wrapper"><main class="panel _main"><header class="panel__header"><div class="container"><h3>Lemline documentation  Help</h3><div class="panel-trigger"></div></div></header><section class="panel__content"><div class="container"><article class="article" data-shortcut-switcher="inactive"><h1 data-toc="lemline-howto-jq" id="lemline-howto-jq.md">How to write jq runtime expressions</h1><p id="-m9gjal_3">Write expressions as <code class="code" id="-m9gjal_7">${ ... }</code>. Start with current task input <code class="code" id="-m9gjal_8">.</code>, move through fields with jq, and use pipes to break a transformation into steps.</p><section class="chapter"><h2 id="read-and-transform-input" data-toc="read-and-transform-input">Read and transform input</h2><p id="-m9gjal_9">The following workflow builds an output from an array of order lines. The fallback after <code class="code" id="-m9gjal_14">add</code> handles an empty array.</p><p id="-m9gjal_10">To run the examples, complete <a href="lemline-tutorial-setup.html" id="-m9gjal_15" data-tooltip="Run Lemline on one machine with SQLite. Lemline stores workflow definitions, queued messages, and workflow history in local files. Use a writable directory on a local filesystem.">the SQLite setup</a> and keep its worker running. Run the commands from a second terminal in the setup directory. With the JAR, substitute <code class="code" id="-m9gjal_16">java -jar lemline.jar</code> for <code class="code" id="-m9gjal_17">bin/lemline</code>. Save the definition as <code class="code" id="-m9gjal_18">aggregate-order-data.yaml</code>:</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: aggregate-order-data
+  version: '1.0.0'
+do:
+  - summarizeOrder:
+      set:
+        orderId: ${ .orderId }
+        total: ${ [.items[] | .quantity * .price] | add // 0 }
+        itemCount: ${ .items | length }
+</div><div class="code-block" data-lang="bash">
+bin/lemline definition post -f aggregate-order-data.yaml
+bin/lemline instance start examples aggregate-order-data --input '{&quot;orderId&quot;:&quot;ORD-801&quot;,&quot;items&quot;:[{&quot;quantity&quot;:2,&quot;price&quot;:12.5},{&quot;quantity&quot;:1,&quot;price&quot;:5}]}'
+bin/lemline instance start examples aggregate-order-data --input '{&quot;orderId&quot;:&quot;ORD-802&quot;,&quot;items&quot;:[]}'
+</div><p id="-m9gjal_13">Expect <code class="code" id="-m9gjal_19">{&quot;orderId&quot;:&quot;ORD-801&quot;,&quot;total&quot;:30,&quot;itemCount&quot;:2}</code>, then <code class="code" id="-m9gjal_20">{&quot;orderId&quot;:&quot;ORD-802&quot;,&quot;total&quot;:0,&quot;itemCount&quot;:0}</code> for the empty order.</p></section><section class="chapter"><h2 id="keep-data-between-tasks" data-toc="keep-data-between-tasks">Keep data between tasks</h2><p id="-m9gjal_21">Use <code class="code" id="-m9gjal_26">$context</code> for earlier values exported by a task and <code class="code" id="-m9gjal_27">$workflow.input</code> for the input supplied when the instance started.</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: share-order-context
+  version: '1.0.0'
+do:
+  - identifyCustomer:
+      set:
+        customerId: ${ .customer.id }
+      export:
+        as: '${ $context + { customerId: .customerId } }'
+  - prepareOrder:
+      set:
+        orderId: ${ $workflow.input.orderId }
+        customerId: ${ $context.customerId }
+</div><p id="-m9gjal_23">Save it as <code class="code" id="-m9gjal_28">share-order-context.yaml</code>:</p><div class="code-block" data-lang="bash">
+bin/lemline definition post -f share-order-context.yaml
+bin/lemline instance start examples share-order-context --input '{&quot;orderId&quot;:&quot;ORD-803&quot;,&quot;customer&quot;:{&quot;id&quot;:&quot;C-100&quot;}}'
+</div><p id="-m9gjal_25">The second task no longer sees the customer in its input, but reads it from <code class="code" id="-m9gjal_29">$context</code>: expect <code class="code" id="-m9gjal_30">{&quot;orderId&quot;:&quot;ORD-803&quot;,&quot;customerId&quot;:&quot;C-100&quot;}</code>.</p></section><section class="chapter"><h2 id="check-an-expression-with-local-data" data-toc="check-an-expression-with-local-data">Check an expression with local data</h2><p id="-m9gjal_31">Use the <a href="https://jqlang.org" id="-m9gjal_35" data-external="true" rel="noopener noreferrer" target="_blank">jq command-line tool</a> on a small sample with the shape you expect the task to receive. Pass the expression inside <code class="code" id="-m9gjal_36">${ ... }</code> to jq as its filter.</p><div class="code-block" data-lang="bash">
+printf '%s\n' '{&quot;items&quot;:[{&quot;quantity&quot;:2,&quot;price&quot;:12.5}]}' |
+  jq '[.items[] | .quantity * .price] | add // 0'
+</div><p id="-m9gjal_33">It prints <code class="code" id="-m9gjal_37">25</code>. Lemline evaluates expressions with a Java implementation of jq, so check functions that are new in recent jq versions in a workflow too.</p><p id="-m9gjal_34">See <a href="https://github.com/open-workflow-specification/specification/blob/v1.0.3/dsl.md#runtime-expressions" id="-m9gjal_38" data-external="true" rel="noopener noreferrer" target="_blank">Runtime Expressions</a> for evaluation scopes and <a href="lemline-howto-debug.html" id="-m9gjal_39" data-tooltip="This guide provides techniques and best practices for debugging workflows when they don't behave as expected.">Debugging Workflows</a> for logging task input.</p></section><div class="last-modified">25 November 2026</div><div data-feedback-placeholder="true"></div><div class="navigation-links _bottom"><a href="lemline-howto-io.html" class="navigation-links__prev">How to use input, output, and export</a><a href="lemline-howto-schemas.html" class="navigation-links__next">How to validate inputs and outputs with schemas</a></div></article><div id="disqus_thread"></div></div></section></main></div><script src="https://resources.jetbrains.com/writerside/apidoc/6.22.0-b776/app.js"></script></body></html>

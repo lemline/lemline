@@ -1,0 +1,76 @@
+<!DOCTYPE html SYSTEM "about:legacy-compat">
+<html lang="en-US" data-preset="contrast" data-primary-color="#2E6F7E"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="robots" content="noindex"><meta name="built-on" content="2026-11-26T17:17:50.159131439"><title>How to Configure Scaling | Lemline documentation</title><script type="application/json" id="virtual-toc-data">[{"id":"when-to-scale","level":0,"title":"When to Scale","anchor":"#when-to-scale"},{"id":"add-runners","level":0,"title":"Add Runners","anchor":"#add-runners"},{"id":"tune-concurrency-per-runner","level":0,"title":"Tune Concurrency per Runner","anchor":"#tune-concurrency-per-runner"},{"id":"tune-background-processing","level":0,"title":"Tune Background Processing","anchor":"#tune-background-processing"},{"id":"split-work-by-namespace","level":0,"title":"Split Work by Namespace","anchor":"#split-work-by-namespace"},{"id":"scale-the-gateway","level":0,"title":"Scale the Gateway","anchor":"#scale-the-gateway"},{"id":"kubernetes","level":0,"title":"Kubernetes","anchor":"#kubernetes"},{"id":"common-issues","level":0,"title":"Common Issues","anchor":"#common-issues"},{"id":"related-resources","level":0,"title":"Related Resources","anchor":"#related-resources"}]</script><script type="application/json" id="topic-shortcuts"></script><link href="https://resources.jetbrains.com/writerside/apidoc/6.22.0-b776/app.css" rel="stylesheet"><link href="static/custom.css" rel="stylesheet"><link rel="icon" type="image/png" sizes="16x16" href="images/lemly.png"><meta name="image" content="https://docs.lemline.com/social-preview.png"><!-- Open Graph --><meta property="og:title" content="How to Configure Scaling | Lemline documentation"><meta property="og:description" content=""><meta property="og:image" content="https://docs.lemline.com/social-preview.png"><meta property="og:site_name" content="Lemline documentation Help"><meta property="og:type" content="website"><meta property="og:locale" content="en_US"><meta property="og:url" content="https://docs.lemline.com/lemline-howto-scaling.html"><!-- End Open Graph --><!-- Twitter Card --><meta name="twitter:card" content="summary_large_image"><meta name="twitter:site" content=""><meta name="twitter:title" content="How to Configure Scaling | Lemline documentation"><meta name="twitter:description" content=""><meta name="twitter:creator" content=""><meta name="twitter:image:src" content="https://docs.lemline.com/social-preview.png"><!-- End Twitter Card --><!-- Schema.org WebPage --><script type="application/ld+json">{
+    "@context": "http://schema.org",
+    "@type": "WebPage",
+    "@id": "https://docs.lemline.com/lemline-howto-scaling.html#webpage",
+    "url": "https://docs.lemline.com/lemline-howto-scaling.html",
+    "name": "How to Configure Scaling | Lemline documentation",
+    "description": "",
+    "image": "https://docs.lemline.com/social-preview.png",
+    "inLanguage":"en-US"
+}</script><!-- End Schema.org --><!-- Schema.org WebSite --><script type="application/ld+json">{
+    "@type": "WebSite",
+    "@id": "https://docs.lemline.com/#website",
+    "url": "https://docs.lemline.com/",
+    "name": "Lemline documentation Help"
+}</script><!-- End Schema.org --></head><body data-id="lemline-howto-scaling" data-main-title="How to Configure Scaling" data-article-props="{&quot;seeAlsoStyle&quot;:&quot;links&quot;}" data-template="article" data-breadcrumbs="How-to Guides///Runner Configuration"><div class="wrapper"><main class="panel _main"><header class="panel__header"><div class="container"><h3>Lemline documentation  Help</h3><div class="panel-trigger"></div></div></header><section class="panel__content"><div class="container"><article class="article" data-shortcut-switcher="inactive"><h1 data-toc="lemline-howto-scaling" id="lemline-howto-scaling.md">How to Configure Scaling</h1><p id="-hk7xvb_3">This guide shows how to add capacity to a Lemline deployment. For the reasoning behind it, see <a href="lemline-explain-scaling.html" id="-hk7xvb_13" data-tooltip="This document explains how a Lemline deployment grows with the load: what runs where, what can be multiplied, and which settings matter.">Understanding Scaling in Lemline</a>.</p><section class="chapter"><h2 id="when-to-scale" data-toc="when-to-scale">When to Scale</h2><p id="-hk7xvb_14">Add capacity when:</p><ul class="list _bullet" id="-hk7xvb_15"><li class="list__item" id="-hk7xvb_16"><p id="-hk7xvb_19">broker lag or queue depth keeps growing</p></li><li class="list__item" id="-hk7xvb_17"><p id="-hk7xvb_20"><code class="code" id="-hk7xvb_21">lemline_messaging_commands_active</code> stays close to the configured concurrency</p></li><li class="list__item" id="-hk7xvb_18"><p id="-hk7xvb_22">step processing time (<code class="code" id="-hk7xvb_23">lemline_messaging_commands_processing_duration_seconds</code>) grows with load</p></li></ul></section><section class="chapter"><h2 id="add-runners" data-toc="add-runners">Add Runners</h2><p id="-hk7xvb_24">Runners are stateless. Start more of them with the same configuration:</p><div class="code-block" data-lang="bash">
+# Terminal 1
+LEMLINE_CONFIG=/etc/lemline/lemline.yaml lemline listen
+
+# Terminal 2 (another port for metrics if on the same machine)
+LEMLINE_CONFIG=/etc/lemline/lemline.yaml lemline listen --metrics-port 8081
+</div><p id="-hk7xvb_26">Stopping a runner is safe: messages it did not acknowledge are delivered to another runner.</p><section class="chapter"><h3 id="try-it-on-one-machine" data-toc="try-it-on-one-machine">Try it on one machine</h3><p id="-hk7xvb_30">On <a href="lemline-tutorial-setup.html" id="-hk7xvb_35" data-tooltip="Run Lemline on one machine with SQLite. Lemline stores workflow definitions, queued messages, and workflow history in local files. Use a writable directory on a local filesystem.">the SQLite setup</a>, two workers started from the same directory share the same files and the same work. Stop the setup worker, then start two workers with their own metrics ports, each in its own terminal in the setup directory (with the JAR, substitute <code class="code" id="-hk7xvb_36">java -jar lemline.jar</code> for <code class="code" id="-hk7xvb_37">bin/lemline</code>):</p><div class="code-block" data-lang="none">
+bin/lemline listen --debug --metrics-port 8081
+bin/lemline listen --debug --metrics-port 8082
+</div><p id="-hk7xvb_32">From a third terminal, register <a href="lemline-getting-started.html#creating-your-first-workflow" id="-hk7xvb_38" data-tooltip="Create a file named hello.yaml with the following content:">the first workflow</a> and start it a dozen times:</p><div class="code-block" data-lang="none">
+bin/lemline definition post -f hello.yaml
+for i in $(seq 1 12); do bin/lemline instance start examples shop-receipt; done
+</div><p id="-hk7xvb_34">Each instance completes once, and both worker terminals show <code class="code" id="-hk7xvb_39">Workflow completed with output</code> lines: in one run, one worker completed 8 instances and the other 4. SQLite keeps everything on one host; to spread workers over several machines, use a shared database and broker.</p></section><section class="chapter"><h3 id="with-kafka" data-toc="with-kafka">With Kafka</h3><p id="-hk7xvb_40">Runners in the same consumer group share a topic's partitions, so a topic needs at least as many partitions as runners. Keep the same group id on every runner:</p><div class="code-block" data-lang="yaml">
+lemline:
+  messaging:
+    type: kafka
+    kafka:
+      brokers: kafka-1:9092,kafka-2:9092
+      commands:
+        consumer:
+          group-id: lemline-group
+</div></section><section class="chapter"><h3 id="with-rabbitmq-or-pgmq" data-toc="with-rabbitmq-or-pgmq">With RabbitMQ or PGMQ</h3><p id="-hk7xvb_42">Runners reading the same queue compete for its messages; no extra setting is needed.</p></section></section><section class="chapter"><h2 id="tune-concurrency-per-runner" data-toc="tune-concurrency-per-runner">Tune Concurrency per Runner</h2><p id="-hk7xvb_43">Each channel processes up to 64 messages in parallel. Raise the limit when steps mostly wait on remote calls, lower it when a runner runs short of memory:</p><div class="code-block" data-lang="yaml">
+lemline:
+  messaging:
+    kafka:          # or rabbitmq, pgmq
+      commands:
+        consumer:
+          concurrency: 128
+      events:
+        consumer:
+          concurrency: 32
+</div><p id="-hk7xvb_45">Set the limit under the broker you use (<code class="code" id="-hk7xvb_46">lemline.messaging.&lt;broker&gt;.&lt;channel&gt;.consumer.concurrency</code>). The broker-independent <code class="code" id="-hk7xvb_47">lemline.messaging.&lt;channel&gt;.consumer.concurrency</code> only applies to in-memory messaging: with Kafka, RabbitMQ or PGMQ it is overwritten by the broker setting.</p></section><section class="chapter"><h2 id="tune-background-processing" data-toc="tune-background-processing">Tune Background Processing</h2><p id="-hk7xvb_48">Waits, retries, schedules, listeners and gateway starts are processed from the database by every runner. For a large backlog, process bigger batches or run more often:</p><div class="code-block" data-lang="yaml">
+lemline:
+  outbox:
+    retry:
+      outbox:
+        every: 5s
+        batch-size: 2000
+</div><p id="-hk7xvb_50">See the outbox properties in the <a href="lemline-ref-config.html" id="-hk7xvb_51" data-tooltip="This reference lists every lemline.* configuration property the Lemline runner reads. Properties that are not listed here are not recognized by Lemline.">Runner Configuration Reference</a>.</p></section><section class="chapter"><h2 id="split-work-by-namespace" data-toc="split-work-by-namespace">Split Work by Namespace</h2><p id="-hk7xvb_52">Give a workload its own runners by putting it in its own namespace and starting runners that serve only that namespace:</p><div class="code-block" data-lang="yaml">
+lemline:
+  namespaces: orders
+</div><p id="-hk7xvb_54">Runners without <code class="code" id="-hk7xvb_55">lemline.namespaces</code> serve the <code class="code" id="-hk7xvb_56">default</code> namespace only.</p></section><section class="chapter"><h2 id="scale-the-gateway" data-toc="scale-the-gateway">Scale the Gateway</h2><p id="-hk7xvb_57">Run several <code class="code" id="-hk7xvb_58">lemline gateway start</code> processes behind a load balancer that supports gRPC (HTTP/2). They share the database and need no coordination.</p></section><section class="chapter"><h2 id="kubernetes" data-toc="kubernetes">Kubernetes</h2><p id="-hk7xvb_59">Run runners as a Deployment and scale its replicas. A CPU-based Horizontal Pod Autoscaler is a reasonable starting point:</p><div class="code-block" data-lang="yaml">
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: lemline-runner
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: lemline-runner
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+</div><p id="-hk7xvb_61">With Kafka, keep <code class="code" id="-hk7xvb_62">maxReplicas</code> at or below the number of partitions. Use <code class="code" id="-hk7xvb_63">/q/health/live</code> and <code class="code" id="-hk7xvb_64">/q/health/ready</code> on the metrics port as liveness and readiness probes.</p></section><section class="chapter"><h2 id="common-issues" data-toc="common-issues">Common Issues</h2><div class="table-wrapper"><table class="wide" id="-hk7xvb_65"><thead><tr class="ijRowHead" id="-hk7xvb_66"><th id="-hk7xvb_70"><p>Symptom</p></th><th id="-hk7xvb_71"><p>Likely cause</p></th><th id="-hk7xvb_72"><p>What to do</p></th></tr></thead><tbody><tr id="-hk7xvb_67"><td id="-hk7xvb_73"><p>New runners stay idle (Kafka)</p></td><td id="-hk7xvb_74"><p>More runners than partitions</p></td><td id="-hk7xvb_75"><p>Add partitions to the topics</p></td></tr><tr id="-hk7xvb_68"><td id="-hk7xvb_76"><p>Runners receive messages they do not process (<code class="code" id="-hk7xvb_79">foreign_namespace</code> metric grows)</p></td><td id="-hk7xvb_77"><p>Runner not configured for the message's namespace</p></td><td id="-hk7xvb_78"><p>Fix <code class="code" id="-hk7xvb_80">lemline.namespaces</code>, then <code class="code" id="-hk7xvb_81">lemline failures replay</code></p></td></tr><tr id="-hk7xvb_69"><td id="-hk7xvb_82"><p>Database CPU saturates as runners are added</p></td><td id="-hk7xvb_83"><p>Shared database is the bottleneck</p></td><td id="-hk7xvb_84"><p>Scale the database; reduce outbox batch frequency</p></td></tr></tbody></table></div></section><section class="chapter"><h2 id="related-resources" data-toc="related-resources">Related Resources</h2><ul class="list _bullet" id="-hk7xvb_85"><li class="list__item" id="-hk7xvb_86"><p id="-hk7xvb_89"><a href="lemline-explain-scaling.html" id="-hk7xvb_90" data-tooltip="This document explains how a Lemline deployment grows with the load: what runs where, what can be multiplied, and which settings matter.">Understanding Scaling in Lemline</a></p></li><li class="list__item" id="-hk7xvb_87"><p id="-hk7xvb_91"><a href="lemline-ref-metrics.html" id="-hk7xvb_92" data-tooltip="This reference lists the metrics Lemline exposes and where to read them.">Metrics Reference</a></p></li><li class="list__item" id="-hk7xvb_88"><p id="-hk7xvb_93"><a href="lemline-ref-config.html" id="-hk7xvb_94" data-tooltip="This reference lists every lemline.* configuration property the Lemline runner reads. Properties that are not listed here are not recognized by Lemline.">Runner Configuration Reference</a></p></li></ul></section><div class="last-modified">25 November 2026</div><div data-feedback-placeholder="true"></div><div class="navigation-links _bottom"><a href="lemline-howto-observability.html" class="navigation-links__prev">How to Configure Observability</a><a href="lemline-ref-dsl-syntax.html" class="navigation-links__next">DSL Syntax Reference</a></div></article><div id="disqus_thread"></div></div></section></main></div><script src="https://resources.jetbrains.com/writerside/apidoc/6.22.0-b776/app.js"></script></body></html>

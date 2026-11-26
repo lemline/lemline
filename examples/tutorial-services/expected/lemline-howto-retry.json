@@ -1,4 +1,0 @@
-{ "settleSeconds": 90, "instances": [
-  { "type": "workflowCompleted", "output": { "sku": "SKU-1", "available": 100 } },
-  { "type": "workflowCompleted", "output": { "inventory": [], "stale": true } }
-], "state": { "failures": [ { "failed": 2, "passed": 1 }, { "failed": 4, "passed": 0 } ] } }

@@ -1,0 +1,54 @@
+<!DOCTYPE html SYSTEM "about:legacy-compat">
+<html lang="en-US" data-preset="contrast" data-primary-color="#2E6F7E"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="robots" content="noindex"><meta name="built-on" content="2026-11-26T17:17:49.966883176"><title>How to use OpenAPI-defined services | Lemline documentation</title><script type="application/json" id="virtual-toc-data">[{"id":"prepare-the-example","level":0,"title":"Prepare the example","anchor":"#prepare-the-example"},{"id":"choose-an-operation","level":0,"title":"Choose an operation","anchor":"#choose-an-operation"},{"id":"call-the-same-operation-over-http","level":0,"title":"Call the same operation over HTTP","anchor":"#call-the-same-operation-over-http"}]</script><script type="application/json" id="topic-shortcuts"></script><link href="https://resources.jetbrains.com/writerside/apidoc/6.22.0-b776/app.css" rel="stylesheet"><link href="static/custom.css" rel="stylesheet"><link rel="icon" type="image/png" sizes="16x16" href="images/lemly.png"><meta name="image" content="https://docs.lemline.com/social-preview.png"><!-- Open Graph --><meta property="og:title" content="How to use OpenAPI-defined services | Lemline documentation"><meta property="og:description" content=""><meta property="og:image" content="https://docs.lemline.com/social-preview.png"><meta property="og:site_name" content="Lemline documentation Help"><meta property="og:type" content="website"><meta property="og:locale" content="en_US"><meta property="og:url" content="https://docs.lemline.com/lemline-howto-openapi.html"><!-- End Open Graph --><!-- Twitter Card --><meta name="twitter:card" content="summary_large_image"><meta name="twitter:site" content=""><meta name="twitter:title" content="How to use OpenAPI-defined services | Lemline documentation"><meta name="twitter:description" content=""><meta name="twitter:creator" content=""><meta name="twitter:image:src" content="https://docs.lemline.com/social-preview.png"><!-- End Twitter Card --><!-- Schema.org WebPage --><script type="application/ld+json">{
+    "@context": "http://schema.org",
+    "@type": "WebPage",
+    "@id": "https://docs.lemline.com/lemline-howto-openapi.html#webpage",
+    "url": "https://docs.lemline.com/lemline-howto-openapi.html",
+    "name": "How to use OpenAPI-defined services | Lemline documentation",
+    "description": "",
+    "image": "https://docs.lemline.com/social-preview.png",
+    "inLanguage":"en-US"
+}</script><!-- End Schema.org --><!-- Schema.org WebSite --><script type="application/ld+json">{
+    "@type": "WebSite",
+    "@id": "https://docs.lemline.com/#website",
+    "url": "https://docs.lemline.com/",
+    "name": "Lemline documentation Help"
+}</script><!-- End Schema.org --></head><body data-id="lemline-howto-openapi" data-main-title="How to use OpenAPI-defined services" data-article-props="{&quot;seeAlsoStyle&quot;:&quot;links&quot;}" data-template="article" data-breadcrumbs="How-to Guides///Working with Tasks"><div class="wrapper"><main class="panel _main"><header class="panel__header"><div class="container"><h3>Lemline documentation  Help</h3><div class="panel-trigger"></div></div></header><section class="panel__content"><div class="container"><article class="article" data-shortcut-switcher="inactive"><h1 data-toc="lemline-howto-openapi" id="lemline-howto-openapi.md">How to use OpenAPI-defined services</h1><p id="vuu7mo_3">Open Workflow defines <code class="code" id="vuu7mo_7">call: openapi</code>. Lemline registers such a definition, but it has no OpenAPI executor yet: an instance faults at the OpenAPI task with <code class="code" id="vuu7mo_8">Unknown task type: CallOpenAPI</code>. Until it does, call the operation with <a href="lemline-howto-http.html" id="vuu7mo_9" data-tooltip="Set call: http and configure the HTTP method and endpoint under with.">an HTTP task</a>, as shown at the end of this page. See <a href="lemline-ref-supported-features.html" id="vuu7mo_10" data-tooltip="This reference documents which features of the Open Workflow DSL v1.0 are currently supported in Lemline, and any implementation-specific details or limitations.">Supported Features</a>.</p><section class="chapter"><h2 id="prepare-the-example" data-toc="prepare-the-example">Prepare the example</h2><p id="vuu7mo_11">Complete <a href="lemline-tutorial-setup.html" id="vuu7mo_13" data-tooltip="Run Lemline on one machine with SQLite. Lemline stores workflow definitions, queued messages, and workflow history in local files. Use a writable directory on a local filesystem.">the SQLite setup</a> and keep its worker running. Start the <a href="lemline-tutorial-order-processing.html#start-the-tutorial-shop" id="vuu7mo_14" data-tooltip="Complete the SQLite setup and keep the worker running on the host. In a separate terminal, open the root of the Lemline source checkout matching these docs (the directory containing examples/tutorial-services). With Docker Compose running, start the single shop container:">tutorial shop</a> from the root of the Lemline source checkout; it publishes an OpenAPI document of its catalog at <code class="code" id="vuu7mo_15">http://127.0.0.1:8787/openapi.json</code>. Run the other commands from a second terminal in the setup directory. With the JAR, substitute <code class="code" id="vuu7mo_16">java -jar lemline.jar</code> for <code class="code" id="vuu7mo_17">bin/lemline</code>.</p><div class="code-block" data-lang="bash">
+docker compose -f examples/tutorial-services/compose.yaml up -d
+</div></section><section class="chapter"><h2 id="choose-an-operation" data-toc="choose-an-operation">Choose an operation</h2><p id="vuu7mo_18">Set <code class="code" id="vuu7mo_23">with.document.endpoint</code> to the OpenAPI document, select an operation using <code class="code" id="vuu7mo_24">operationId</code>, and pass its parameters in <code class="code" id="vuu7mo_25">parameters</code>.</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: openapi-list-products
+  version: '0.1.0'
+do:
+  - findGardenProducts:
+      call: openapi
+      with:
+        document:
+          endpoint: http://127.0.0.1:8787/openapi.json
+        operationId: listProducts
+        parameters:
+          category: garden
+</div><p id="vuu7mo_20">Save it as <code class="code" id="vuu7mo_26">basic-openapi-call.yaml</code>:</p><div class="code-block" data-lang="bash">
+bin/lemline definition post -f basic-openapi-call.yaml
+bin/lemline instance start examples openapi-list-products
+</div><p id="vuu7mo_22">The definition registers. The instance faults with a <code class="code" id="vuu7mo_27">runtime</code> error titled <code class="code" id="vuu7mo_28">Unknown task type: CallOpenAPI</code>.</p></section><section class="chapter"><h2 id="call-the-same-operation-over-http" data-toc="call-the-same-operation-over-http">Call the same operation over HTTP</h2><p id="vuu7mo_29">The <code class="code" id="vuu7mo_36">listProducts</code> operation is <code class="code" id="vuu7mo_37">GET /products</code> with a <code class="code" id="vuu7mo_38">category</code> query parameter. This HTTP task sends the same request:</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: openapi-alternative
+  version: '1.0.0'
+do:
+  - findGardenProducts:
+      call: http
+      with:
+        method: get
+        endpoint: http://127.0.0.1:8787/products
+        query:
+          category: garden
+        output: content
+</div><p id="vuu7mo_31">Save it as <code class="code" id="vuu7mo_39">alternative.yaml</code>:</p><div class="code-block" data-lang="bash">
+bin/lemline definition post -f alternative.yaml
+bin/lemline instance start examples openapi-alternative
+</div><p id="vuu7mo_33">The instance completes with the first page of garden products: <code class="code" id="vuu7mo_40">items</code> lists SKU-1, SKU-2 and SKU-3, and <code class="code" id="vuu7mo_41">hasMore</code> is <code class="code" id="vuu7mo_42">false</code>. Stop the shop when you are done:</p><div class="code-block" data-lang="bash">
+docker compose -f examples/tutorial-services/compose.yaml down
+</div><p id="vuu7mo_35">See the <a href="https://github.com/open-workflow-specification/specification/blob/v1.0.3/dsl-reference.md#openapi-call" id="vuu7mo_43" data-external="true" rel="noopener noreferrer" target="_blank">OpenAPI Task</a> for configuration options.</p></section><div class="last-modified">25 November 2026</div><div data-feedback-placeholder="true"></div><div class="navigation-links _bottom"><a href="lemline-howto-http.html" class="navigation-links__prev">How to make an HTTP call</a><a href="lemline-howto-run.html" class="navigation-links__next">How to run scripts or containers</a></div></article><div id="disqus_thread"></div></div></section></main></div><script src="https://resources.jetbrains.com/writerside/apidoc/6.22.0-b776/app.js"></script></body></html>

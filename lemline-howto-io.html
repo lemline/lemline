@@ -1,0 +1,458 @@
+<!DOCTYPE html SYSTEM "about:legacy-compat">
+<html lang="en-US" data-preset="contrast" data-primary-color="#2E6F7E"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="robots" content="noindex"><meta name="built-on" content="2026-11-26T17:17:48.637274465"><title>How to use input, output, and export | Lemline documentation</title><script type="application/json" id="virtual-toc-data">[{"id":"understanding-data-flow-in-lemline","level":0,"title":"Understanding Data Flow in Lemline","anchor":"#understanding-data-flow-in-lemline"},{"id":"run-the-examples","level":0,"title":"Run the Examples","anchor":"#run-the-examples"},{"id":"working-with-workflow-input","level":0,"title":"Working with Workflow Input","anchor":"#working-with-workflow-input"},{"id":"task-input-processing","level":0,"title":"Task Input Processing","anchor":"#task-input-processing"},{"id":"task-output-processing","level":0,"title":"Task Output Processing","anchor":"#task-output-processing"},{"id":"exporting-data-to-global-context","level":0,"title":"Exporting Data to Global Context","anchor":"#exporting-data-to-global-context"},{"id":"comprehensive-example-order-processing","level":0,"title":"Comprehensive Example: Order Processing","anchor":"#comprehensive-example-order-processing"},{"id":"advanced-patterns","level":0,"title":"Advanced Patterns","anchor":"#advanced-patterns"},{"id":"best-practices","level":0,"title":"Best Practices","anchor":"#best-practices"},{"id":"common-errors-and-solutions","level":0,"title":"Common Errors and Solutions","anchor":"#common-errors-and-solutions"},{"id":"next-steps","level":0,"title":"Next Steps","anchor":"#next-steps"}]</script><script type="application/json" id="topic-shortcuts"></script><link href="https://resources.jetbrains.com/writerside/apidoc/6.22.0-b776/app.css" rel="stylesheet"><link href="static/custom.css" rel="stylesheet"><link rel="icon" type="image/png" sizes="16x16" href="images/lemly.png"><meta name="image" content="https://docs.lemline.com/social-preview.png"><!-- Open Graph --><meta property="og:title" content="How to use input, output, and export | Lemline documentation"><meta property="og:description" content=""><meta property="og:image" content="https://docs.lemline.com/social-preview.png"><meta property="og:site_name" content="Lemline documentation Help"><meta property="og:type" content="website"><meta property="og:locale" content="en_US"><meta property="og:url" content="https://docs.lemline.com/lemline-howto-io.html"><!-- End Open Graph --><!-- Twitter Card --><meta name="twitter:card" content="summary_large_image"><meta name="twitter:site" content=""><meta name="twitter:title" content="How to use input, output, and export | Lemline documentation"><meta name="twitter:description" content=""><meta name="twitter:creator" content=""><meta name="twitter:image:src" content="https://docs.lemline.com/social-preview.png"><!-- End Twitter Card --><!-- Schema.org WebPage --><script type="application/ld+json">{
+    "@context": "http://schema.org",
+    "@type": "WebPage",
+    "@id": "https://docs.lemline.com/lemline-howto-io.html#webpage",
+    "url": "https://docs.lemline.com/lemline-howto-io.html",
+    "name": "How to use input, output, and export | Lemline documentation",
+    "description": "",
+    "image": "https://docs.lemline.com/social-preview.png",
+    "inLanguage":"en-US"
+}</script><!-- End Schema.org --><!-- Schema.org WebSite --><script type="application/ld+json">{
+    "@type": "WebSite",
+    "@id": "https://docs.lemline.com/#website",
+    "url": "https://docs.lemline.com/",
+    "name": "Lemline documentation Help"
+}</script><!-- End Schema.org --></head><body data-id="lemline-howto-io" data-main-title="How to use input, output, and export" data-article-props="{&quot;seeAlsoStyle&quot;:&quot;links&quot;}" data-template="article" data-breadcrumbs="How-to Guides///Data Management"><div class="wrapper"><main class="panel _main"><header class="panel__header"><div class="container"><h3>Lemline documentation  Help</h3><div class="panel-trigger"></div></div></header><section class="panel__content"><div class="container"><article class="article" data-shortcut-switcher="inactive"><h1 data-toc="lemline-howto-io" id="lemline-howto-io.md">How to use input, output, and export</h1><p id="-ma1lv0_3">This guide explains how to work with data flow in Lemline workflows, focusing on input validation, output transformation, and exporting data to the global context. You'll learn how to control data as it flows through your workflow.</p><section class="chapter"><h2 id="understanding-data-flow-in-lemline" data-toc="understanding-data-flow-in-lemline">Understanding Data Flow in Lemline</h2><p id="-ma1lv0_15">Lemline's data flow model consists of three main components:</p><ol class="list _decimal" id="-ma1lv0_16" type="1"><li class="list__item" id="-ma1lv0_18"><p id="-ma1lv0_21"><span class="control" id="-ma1lv0_22">Input</span>: Data coming into a task, including validation and transformation</p></li><li class="list__item" id="-ma1lv0_19"><p id="-ma1lv0_23"><span class="control" id="-ma1lv0_24">Output</span>: Data produced by a task, including transformation and validation</p></li><li class="list__item" id="-ma1lv0_20"><p id="-ma1lv0_25"><span class="control" id="-ma1lv0_26">Export</span>: Data promoted to the global workflow context for use across the workflow</p></li></ol><p id="-ma1lv0_17">Understanding how to use these components effectively is key to building robust workflows.</p></section><section class="chapter"><h2 id="run-the-examples" data-toc="run-the-examples">Run the Examples</h2><p id="-ma1lv0_27">Each example below is a complete workflow. Complete <a href="lemline-tutorial-setup.html" id="-ma1lv0_29" data-tooltip="Run Lemline on one machine with SQLite. Lemline stores workflow definitions, queued messages, and workflow history in local files. Use a writable directory on a local filesystem.">the SQLite setup</a> and keep its worker running. Run the commands from a second terminal in the setup directory. With the JAR, substitute <code class="code" id="-ma1lv0_30">java -jar lemline.jar</code> for <code class="code" id="-ma1lv0_31">bin/lemline</code>. The worker logs <code class="code" id="-ma1lv0_32">Workflow completed with output</code> with each result. The examples that call HTTP services use the <a href="lemline-tutorial-order-processing.html#start-the-tutorial-shop" id="-ma1lv0_33" data-tooltip="Complete the SQLite setup and keep the worker running on the host. In a separate terminal, open the root of the Lemline source checkout matching these docs (the directory containing examples/tutorial-services). With Docker Compose running, start the single shop container:">tutorial shop</a>; start it from the root of the Lemline source checkout:</p><div class="code-block" data-lang="bash">
+docker compose -f examples/tutorial-services/compose.yaml up -d
+</div></section><section class="chapter"><h2 id="working-with-workflow-input" data-toc="working-with-workflow-input">Working with Workflow Input</h2><section class="chapter"><h3 id="defining-workflow-input-schema" data-toc="defining-workflow-input-schema">Defining Workflow Input Schema</h3><p id="-ma1lv0_37">You can define an input schema at the workflow level to validate incoming data:</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: io-input-schema
+  version: '1.0.0'
+  title: Order Processing Workflow
+input:
+  schema:
+    document:
+      type: object
+      required:
+        - orderId
+        - customerId
+        - items
+      properties:
+        orderId:
+          type: string
+          pattern: ^ORD-[0-9]{6}$
+        customerId:
+          type: string
+        items:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            required:
+              - productId
+              - quantity
+            properties:
+              productId:
+                type: string
+              quantity:
+                type: integer
+                minimum: 1
+do:
+  - acceptOrder:
+      set:
+        accepted: ${ .orderId }
+</div><p id="-ma1lv0_39">Save it as <code class="code" id="-ma1lv0_43">defining-workflow-input-schema.yaml</code>:</p><div class="code-block" data-lang="bash">
+bin/lemline definition post -f defining-workflow-input-schema.yaml
+bin/lemline instance start examples io-input-schema --input '{&quot;orderId&quot;:&quot;ORD-000123&quot;,&quot;customerId&quot;:&quot;C-100&quot;,&quot;items&quot;:[{&quot;productId&quot;:&quot;SKU-1&quot;,&quot;quantity&quot;:2}]}'
+bin/lemline instance start examples io-input-schema --input '{&quot;orderId&quot;:&quot;ORD-1&quot;,&quot;customerId&quot;:&quot;C-100&quot;,&quot;items&quot;:[{&quot;productId&quot;:&quot;SKU-1&quot;,&quot;quantity&quot;:2}]}'
+</div><p id="-ma1lv0_41">The first instance completes with <code class="code" id="-ma1lv0_44">{&quot;accepted&quot;:&quot;ORD-000123&quot;}</code>. The second is refused before any instance exists: the CLI prints <code class="code" id="-ma1lv0_45">Input validation failed against workflow schema</code>, because <code class="code" id="-ma1lv0_46">ORD-1</code> does not match the pattern.</p><p id="-ma1lv0_42">This schema ensures that workflow input contains the required fields with the correct data types and formats.</p></section><section class="chapter"><h3 id="accessing-workflow-input" data-toc="accessing-workflow-input">Accessing Workflow Input</h3><p id="-ma1lv0_47">You can access the original workflow input in any task using <code class="code" id="-ma1lv0_52">$workflow.input</code>:</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: accessing-workflow-input
+  version: '1.0.0'
+do:
+  - summarize:
+      set:
+        itemCount: ${ .items | length }
+  - processOrder:
+      set:
+        orderId: ${ $workflow.input.orderId }
+        customerId: ${ $workflow.input.customerId }
+        itemCount: ${ .itemCount }
+</div><p id="-ma1lv0_49">Save it as <code class="code" id="-ma1lv0_53">accessing-workflow-input.yaml</code>:</p><div class="code-block" data-lang="bash">
+bin/lemline definition post -f accessing-workflow-input.yaml
+bin/lemline instance start examples accessing-workflow-input --input '{&quot;orderId&quot;:&quot;ORD-1&quot;,&quot;customerId&quot;:&quot;C-100&quot;,&quot;items&quot;:[{&quot;productId&quot;:&quot;SKU-1&quot;},{&quot;productId&quot;:&quot;SKU-2&quot;}]}'
+</div><p id="-ma1lv0_51">The second task only receives <code class="code" id="-ma1lv0_54">{&quot;itemCount&quot;:2}</code> from the first, but reads the IDs from <code class="code" id="-ma1lv0_55">$workflow.input</code>: expect <code class="code" id="-ma1lv0_56">{&quot;orderId&quot;:&quot;ORD-1&quot;,&quot;customerId&quot;:&quot;C-100&quot;,&quot;itemCount&quot;:2}</code>.</p></section><section class="chapter"><h3 id="default-input-values" data-toc="default-input-values">Default Input Values</h3><p id="-ma1lv0_57">You can provide default values for workflow input fields:</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: default-workflow-input
+  version: '1.0.0'
+input:
+  from: '${ { priority: &quot;NORMAL&quot;, currency: &quot;USD&quot; } + . }'
+do:
+  - recordOrder:
+      set:
+        orderId: ${ .orderId }
+        priority: ${ .priority }
+        currency: ${ .currency }
+</div><p id="-ma1lv0_59">Save it as <code class="code" id="-ma1lv0_62">default-workflow-input.yaml</code>:</p><div class="code-block" data-lang="bash">
+bin/lemline definition post -f default-workflow-input.yaml
+bin/lemline instance start examples default-workflow-input --input '{&quot;orderId&quot;:&quot;ORD-2&quot;}'
+bin/lemline instance start examples default-workflow-input --input '{&quot;orderId&quot;:&quot;ORD-3&quot;,&quot;currency&quot;:&quot;EUR&quot;}'
+</div><p id="-ma1lv0_61">Expect <code class="code" id="-ma1lv0_63">{&quot;orderId&quot;:&quot;ORD-2&quot;,&quot;priority&quot;:&quot;NORMAL&quot;,&quot;currency&quot;:&quot;USD&quot;}</code>, then <code class="code" id="-ma1lv0_64">{&quot;orderId&quot;:&quot;ORD-3&quot;,&quot;priority&quot;:&quot;NORMAL&quot;,&quot;currency&quot;:&quot;EUR&quot;}</code>. The workflow-level <code class="code" id="-ma1lv0_65">input.from</code> expression merges defaults with the input before the first task runs. Values supplied by the caller take precedence. <code class="code" id="-ma1lv0_66">$workflow.input</code> still holds the input as the caller supplied it.</p></section></section><section class="chapter"><h2 id="task-input-processing" data-toc="task-input-processing">Task Input Processing</h2><section class="chapter"><h3 id="implicit-input" data-toc="implicit-input">Implicit Input</h3><p id="-ma1lv0_70">By default, each task receives the output of the previous task as its input:</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: implicit-input
+  version: '1.0.0'
+do:
+  - taskA:
+      set:
+        value: 42
+        message: Hello
+  - taskB:
+      set:
+        originalValue: ${ .value }
+        newMessage: ${ .message + &quot;, World!&quot; }
+</div><p id="-ma1lv0_72">Save it as <code class="code" id="-ma1lv0_75">implicit-input.yaml</code>:</p><div class="code-block" data-lang="bash">
+bin/lemline definition post -f implicit-input.yaml
+bin/lemline instance start examples implicit-input
+</div><p id="-ma1lv0_74">Expect <code class="code" id="-ma1lv0_76">{&quot;originalValue&quot;:42,&quot;newMessage&quot;:&quot;Hello, World!&quot;}</code>.</p></section><section class="chapter"><h3 id="input-transformation" data-toc="input-transformation">Input Transformation</h3><p id="-ma1lv0_77">You can transform the input data before task execution:</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: input-transformation
+  version: '1.0.0'
+do:
+  - formatData:
+      input:
+        from:
+          user: ${ .userProfile }
+          contactInfo:
+            email: ${ .userProfile.email | ascii_downcase }
+            phone: ${ .userProfile.phone | gsub(&quot;[^0-9]&quot;; &quot;&quot;) }
+      set:
+        formattedUser:
+          id: ${ .user.id }
+          name: ${ .user.name }
+          email: ${ .contactInfo.email }
+          phone: ${ .contactInfo.phone }
+</div><p id="-ma1lv0_79">Save it as <code class="code" id="-ma1lv0_83">input-transformation.yaml</code>:</p><div class="code-block" data-lang="bash">
+bin/lemline definition post -f input-transformation.yaml
+bin/lemline instance start examples input-transformation --input '{&quot;userProfile&quot;:{&quot;id&quot;:&quot;C-100&quot;,&quot;name&quot;:&quot;Ada Lovelace&quot;,&quot;email&quot;:&quot;Ada@Example.com&quot;,&quot;phone&quot;:&quot;+44 (20) 7946-0000&quot;}}'
+</div><p id="-ma1lv0_81">Expect <code class="code" id="-ma1lv0_84">{&quot;formattedUser&quot;:{&quot;id&quot;:&quot;C-100&quot;,&quot;name&quot;:&quot;Ada Lovelace&quot;,&quot;email&quot;:&quot;ada@example.com&quot;,&quot;phone&quot;:&quot;442079460000&quot;}}</code>.</p><p id="-ma1lv0_82">The <code class="code" id="-ma1lv0_85">input.from</code> field lets you reshape the incoming data before it's used in the task.</p></section><section class="chapter"><h3 id="input-schema-validation" data-toc="input-schema-validation">Input Schema Validation</h3><p id="-ma1lv0_86">You can validate task input against a schema:</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: input-schema-validation
+  version: '1.0.0'
+do:
+  - ValidatePaymentInfo:
+      set:
+        validPayment: true
+        formattedAmount: '${ &quot;$&quot; + (.amount | tostring) }'
+      input:
+        schema:
+          document:
+            type: object
+            required:
+              - amount
+              - currency
+              - paymentMethod
+            properties:
+              amount:
+                type: number
+                minimum: 0.01
+              currency:
+                type: string
+                enum:
+                  - USD
+                  - EUR
+                  - GBP
+              paymentMethod:
+                type: object
+                required:
+                  - type
+                properties:
+                  type:
+                    type: string
+                    enum:
+                      - CREDIT
+                      - DEBIT
+                      - PAYPAL
+</div><p id="-ma1lv0_88">Save it as <code class="code" id="-ma1lv0_92">input-schema-validation.yaml</code>:</p><div class="code-block" data-lang="bash">
+bin/lemline definition post -f input-schema-validation.yaml
+bin/lemline instance start examples input-schema-validation --input '{&quot;amount&quot;:25,&quot;currency&quot;:&quot;EUR&quot;,&quot;paymentMethod&quot;:{&quot;type&quot;:&quot;CREDIT&quot;}}'
+bin/lemline instance start examples input-schema-validation --input '{&quot;amount&quot;:25,&quot;currency&quot;:&quot;JPY&quot;,&quot;paymentMethod&quot;:{&quot;type&quot;:&quot;CREDIT&quot;}}'
+</div><p id="-ma1lv0_90">The first instance completes with <code class="code" id="-ma1lv0_93">{&quot;validPayment&quot;:true,&quot;formattedAmount&quot;:&quot;$25&quot;}</code>. The second faults at the task with a <code class="code" id="-ma1lv0_94">validation</code> error, because <code class="code" id="-ma1lv0_95">JPY</code> is not one of the allowed currencies.</p><p id="-ma1lv0_91">If the input doesn't match the schema, a validation error is raised.</p></section></section><section class="chapter"><h2 id="task-output-processing" data-toc="task-output-processing">Task Output Processing</h2><section class="chapter"><h3 id="basic-output" data-toc="basic-output">Basic Output</h3><p id="-ma1lv0_99">The output of a <code class="code" id="-ma1lv0_105">set</code> task is the object defined under <code class="code" id="-ma1lv0_106">set</code>:</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: basic-output
+  version: '1.0.0'
+do:
+  - generateOutput:
+      set:
+        status: SUCCESS
+        result: 42
+</div><p id="-ma1lv0_101">Save it as <code class="code" id="-ma1lv0_107">basic-output.yaml</code>:</p><div class="code-block" data-lang="bash">
+bin/lemline definition post -f basic-output.yaml
+bin/lemline instance start examples basic-output
+</div><p id="-ma1lv0_103">Expect <code class="code" id="-ma1lv0_108">{&quot;status&quot;:&quot;SUCCESS&quot;,&quot;result&quot;:42}</code>.</p><p id="-ma1lv0_104">This task produces an output object with <code class="code" id="-ma1lv0_109">status</code>, <code class="code" id="-ma1lv0_110">result</code>, and <code class="code" id="-ma1lv0_111">timestamp</code> fields.</p></section><section class="chapter"><h3 id="output-transformation" data-toc="output-transformation">Output Transformation</h3><p id="-ma1lv0_112">You can transform the output data before passing it to the next task:</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: output-transformation
+  version: '1.0.0'
+do:
+  - getCustomer:
+      call: http
+      with:
+        method: get
+        endpoint: ${ &quot;http://127.0.0.1:8787/customers/&quot; + .customerId }
+      output:
+        as:
+          customer: ${ .name }
+          tier: ${ .tier }
+          isGold: ${ .tier == &quot;gold&quot; }
+</div><p id="-ma1lv0_114">Save it as <code class="code" id="-ma1lv0_118">output-transformation.yaml</code>:</p><div class="code-block" data-lang="bash">
+bin/lemline definition post -f output-transformation.yaml
+bin/lemline instance start examples output-transformation --input '{&quot;customerId&quot;:&quot;C-100&quot;}'
+</div><p id="-ma1lv0_116">The shop returns the whole customer; <code class="code" id="-ma1lv0_119">output.as</code> keeps three fields: <code class="code" id="-ma1lv0_120">{&quot;customer&quot;:&quot;Ada Lovelace&quot;,&quot;tier&quot;:&quot;gold&quot;,&quot;isGold&quot;:true}</code>.</p><p id="-ma1lv0_117">The <code class="code" id="-ma1lv0_121">output.as</code> field reshapes the task result before it's passed to the next task.</p></section><section class="chapter"><h3 id="output-schema-validation" data-toc="output-schema-validation">Output Schema Validation</h3><p id="-ma1lv0_122">You can validate task output against a schema:</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: output-schema-validation
+  version: '1.0.0'
+do:
+  - GenerateUserProfile:
+      set:
+        profile:
+          id: ${ .userId }
+          name: ${ .firstName + &quot; &quot; + .lastName }
+          email: ${ .emailAddress }
+          memberSince: ${ .joinDate }
+      output:
+        schema:
+          document:
+            type: object
+            required:
+              - profile
+            properties:
+              profile:
+                type: object
+                required:
+                  - id
+                  - name
+                  - email
+                properties:
+                  id:
+                    type: string
+                  name:
+                    type: string
+                  email:
+                    type: string
+                    format: email
+</div><p id="-ma1lv0_124">Save it as <code class="code" id="-ma1lv0_128">output-schema-validation.yaml</code>:</p><div class="code-block" data-lang="bash">
+bin/lemline definition post -f output-schema-validation.yaml
+bin/lemline instance start examples output-schema-validation --input '{&quot;userId&quot;:&quot;C-100&quot;,&quot;firstName&quot;:&quot;Ada&quot;,&quot;lastName&quot;:&quot;Lovelace&quot;,&quot;emailAddress&quot;:&quot;ada@example.com&quot;,&quot;joinDate&quot;:&quot;2020-01-01&quot;}'
+bin/lemline instance start examples output-schema-validation --input '{&quot;userId&quot;:&quot;C-100&quot;,&quot;firstName&quot;:&quot;Ada&quot;,&quot;lastName&quot;:&quot;Lovelace&quot;,&quot;joinDate&quot;:&quot;2020-01-01&quot;}'
+</div><p id="-ma1lv0_126">The first instance returns the profile. In the second, <code class="code" id="-ma1lv0_129">email</code> is <code class="code" id="-ma1lv0_130">null</code>, which is not a string: the task faults with a <code class="code" id="-ma1lv0_131">validation</code> error.</p><p id="-ma1lv0_127">If the output doesn't match the schema, a validation error is raised.</p></section></section><section class="chapter"><h2 id="exporting-data-to-global-context" data-toc="exporting-data-to-global-context">Exporting Data to Global Context</h2><section class="chapter"><h3 id="basic-export" data-toc="basic-export">Basic Export</h3><p id="-ma1lv0_136">The <code class="code" id="-ma1lv0_142">export</code> field lets you promote data to the global workflow context:</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: basic-export
+  version: '1.0.0'
+do:
+  - fetchCustomerData:
+      call: http
+      with:
+        method: get
+        endpoint: ${ &quot;http://127.0.0.1:8787/customers/&quot; + .customerId }
+      export:
+        as:
+          customer: ${ . }
+  - greetCustomer:
+      set:
+        greeting: ${ &quot;Hello &quot; + $context.customer.name }
+</div><p id="-ma1lv0_138">Save it as <code class="code" id="-ma1lv0_143">basic-export.yaml</code>:</p><div class="code-block" data-lang="bash">
+bin/lemline definition post -f basic-export.yaml
+bin/lemline instance start examples basic-export --input '{&quot;customerId&quot;:&quot;C-100&quot;}'
+</div><p id="-ma1lv0_140">The second task reads the exported customer: expect <code class="code" id="-ma1lv0_144">{&quot;greeting&quot;:&quot;Hello Ada Lovelace&quot;}</code>.</p><p id="-ma1lv0_141">Later tasks can read the exported customer data from <code class="code" id="-ma1lv0_145">$context.customer</code>.</p></section><section class="chapter"><h3 id="exporting-selected-fields" data-toc="exporting-selected-fields">Exporting Selected Fields</h3><p id="-ma1lv0_146">You can export specific fields rather than the entire output:</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: exporting-selected-fields
+  version: '1.0.0'
+do:
+  - getProduct:
+      call: http
+      with:
+        method: get
+        endpoint: ${ &quot;http://127.0.0.1:8787/products/&quot; + .productId }
+      export:
+        as:
+          productName: ${ .name }
+          unitPrice: ${ .price }
+  - showContext:
+      set:
+        context: ${ $context }
+</div><p id="-ma1lv0_148">Save it as <code class="code" id="-ma1lv0_152">exporting-selected-fields.yaml</code>:</p><div class="code-block" data-lang="bash">
+bin/lemline definition post -f exporting-selected-fields.yaml
+bin/lemline instance start examples exporting-selected-fields --input '{&quot;productId&quot;:&quot;SKU-2&quot;}'
+</div><p id="-ma1lv0_150">The last task shows the context: <code class="code" id="-ma1lv0_153">{&quot;context&quot;:{&quot;productName&quot;:&quot;Watering can&quot;,&quot;unitPrice&quot;:12}}</code>.</p><p id="-ma1lv0_151">This exports only the selected fields to the global context.</p></section><section class="chapter"><h3 id="export-with-transformation" data-toc="export-with-transformation">Export with Transformation</h3><p id="-ma1lv0_154">You can transform data during export:</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: export-with-transformation
+  version: '1.0.0'
+do:
+  - fetchProductData:
+      call: http
+      with:
+        method: get
+        endpoint: http://127.0.0.1:8787/products
+        query:
+          size: '10'
+      export:
+        as:
+          products: ${ .items }
+          productMap: '${ .items | map({key: .id, value: .name}) | from_entries }'
+          categories: ${ .items | map(.category) | unique }
+  - showContext:
+      set:
+        context: ${ $context }
+</div><p id="-ma1lv0_156">Save it as <code class="code" id="-ma1lv0_160">export-with-transformation.yaml</code>:</p><div class="code-block" data-lang="bash">
+bin/lemline definition post -f export-with-transformation.yaml
+bin/lemline instance start examples export-with-transformation
+</div><p id="-ma1lv0_158">The context holds the seven products, a <code class="code" id="-ma1lv0_161">productMap</code> from ID to name, and <code class="code" id="-ma1lv0_162">categories</code>: <code class="code" id="-ma1lv0_163">[&quot;clothing&quot;,&quot;garden&quot;,&quot;home&quot;]</code>.</p><p id="-ma1lv0_159">This exports the original products array plus derived data structures.</p></section><section class="chapter"><h3 id="export-schema-validation" data-toc="export-schema-validation">Export Schema Validation</h3><p id="-ma1lv0_164">You can validate exported data against a schema:</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: io-export-schema-validation
+  version: '1.0.0'
+do:
+  - validateExportedData:
+      call: http
+      with:
+        method: get
+        endpoint: ${ &quot;http://127.0.0.1:8787/products/&quot; + .productId }
+      export:
+        as:
+          validatedProduct: ${ . }
+        schema:
+          document:
+            type: object
+            required:
+              - validatedProduct
+            properties:
+              validatedProduct:
+                type: object
+                required:
+                  - id
+                  - name
+                  - category
+                properties:
+                  id:
+                    type: string
+                  name:
+                    type: string
+                  category:
+                    type: string
+                    enum:
+                      - garden
+                      - home
+  - showContext:
+      set:
+        context: ${ $context }
+</div><p id="-ma1lv0_166">Save it as <code class="code" id="-ma1lv0_170">export-schema-validation.yaml</code>:</p><div class="code-block" data-lang="bash">
+bin/lemline definition post -f export-schema-validation.yaml
+bin/lemline instance start examples io-export-schema-validation --input '{&quot;productId&quot;:&quot;SKU-1&quot;}'
+bin/lemline instance start examples io-export-schema-validation --input '{&quot;productId&quot;:&quot;SKU-6&quot;}'
+</div><p id="-ma1lv0_168">SKU-1 is a garden product: the context holds it. SKU-6 is clothing, which the schema does not allow: the task faults with a <code class="code" id="-ma1lv0_171">validation</code> error.</p><p id="-ma1lv0_169">This ensures the exported data meets the specified schema requirements.</p></section></section><section class="chapter"><h2 id="comprehensive-example-order-processing" data-toc="comprehensive-example-order-processing">Comprehensive Example: Order Processing</h2><p id="-ma1lv0_172">This workflow validates the input, routes the order based on its total, and returns the order ID and processing status.</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: validate-and-route-order
+  version: '1.0.0'
+input:
+  schema:
+    format: json
+    document:
+      type: object
+      required: [orderId, total]
+      properties:
+        orderId:
+          type: string
+        total:
+          type: number
+          minimum: 0
+do:
+  - routeOrder:
+      switch:
+        - largeOrder:
+            when: ${ .total &gt;= 1000 }
+            then: requestReview
+        - automatic:
+            then: acceptOrder
+  - requestReview:
+      set:
+        status: needs-review
+      then: exit
+  - acceptOrder:
+      set:
+        status: accepted
+output:
+  as: '${ { orderId: $workflow.input.orderId, status: .status } }'
+</div><p id="-ma1lv0_174">Save it as <code class="code" id="-ma1lv0_177">validate-and-route-order.yaml</code>:</p><div class="code-block" data-lang="bash">
+bin/lemline definition post -f validate-and-route-order.yaml
+bin/lemline instance start examples validate-and-route-order --input '{&quot;orderId&quot;:&quot;ORD-301&quot;,&quot;total&quot;:250}'
+bin/lemline instance start examples validate-and-route-order --input '{&quot;orderId&quot;:&quot;ORD-302&quot;,&quot;total&quot;:1500}'
+</div><p id="-ma1lv0_176">Expect <code class="code" id="-ma1lv0_178">{&quot;orderId&quot;:&quot;ORD-301&quot;,&quot;status&quot;:&quot;accepted&quot;}</code> and <code class="code" id="-ma1lv0_179">{&quot;orderId&quot;:&quot;ORD-302&quot;,&quot;status&quot;:&quot;needs-review&quot;}</code>.</p></section><section class="chapter"><h2 id="advanced-patterns" data-toc="advanced-patterns">Advanced Patterns</h2><section class="chapter"><h3 id="chain-of-responsibility" data-toc="chain-of-responsibility">Chain of Responsibility</h3><p id="-ma1lv0_183">Chain multiple data transformations for complex processing:</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: chain-of-responsibility
+  version: '1.0.0'
+do:
+  - step1:
+      set:
+        intermediateResult: ${ .rawData | fromjson }
+  - step2:
+      set:
+        processedData: ${ .intermediateResult | map(.value) }
+  - step3:
+      set:
+        finalResult: ${ .processedData | add }
+      export:
+        as:
+          result: ${ .finalResult }
+  - showContext:
+      set:
+        context: ${ $context }
+</div><p id="-ma1lv0_185">Save it as <code class="code" id="-ma1lv0_188">chain-of-responsibility.yaml</code>:</p><div class="code-block" data-lang="bash">
+bin/lemline definition post -f chain-of-responsibility.yaml
+bin/lemline instance start examples chain-of-responsibility --input '{&quot;rawData&quot;:&quot;[{\&quot;value\&quot;:1},{\&quot;value\&quot;:2},{\&quot;value\&quot;:3}]&quot;}'
+</div><p id="-ma1lv0_187">Expect <code class="code" id="-ma1lv0_189">{&quot;context&quot;:{&quot;result&quot;:6}}</code>.</p></section><section class="chapter"><h3 id="selective-processing-with-condition-based-export" data-toc="selective-processing-with-condition-based-export">Selective Processing with Condition-Based Export</h3><p id="-ma1lv0_190">Export different data based on conditions:</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: selective-processing-with-condition-based-export
+  version: '1.0.0'
+do:
+  - conditionalExport:
+      set:
+        status: '${ if .code == 200 then &quot;SUCCESS&quot; else &quot;ERROR&quot; end }'
+        successData: ${ if .code == 200 then .data else null end }
+        errorData: ${ if .code != 200 then .error else null end }
+      export:
+        as:
+          result: '${ if .status == &quot;SUCCESS&quot; then .successData else .errorData end }'
+          isError: ${ .status == &quot;ERROR&quot; }
+  - showContext:
+      set:
+        context: ${ $context }
+</div><p id="-ma1lv0_192">Save it as <code class="code" id="-ma1lv0_195">selective-processing-with-condition-based-export.yaml</code>:</p><div class="code-block" data-lang="bash">
+bin/lemline definition post -f selective-processing-with-condition-based-export.yaml
+bin/lemline instance start examples selective-processing-with-condition-based-export --input '{&quot;code&quot;:200,&quot;data&quot;:{&quot;orderId&quot;:&quot;ORD-1&quot;}}'
+bin/lemline instance start examples selective-processing-with-condition-based-export --input '{&quot;code&quot;:500,&quot;error&quot;:&quot;Payment service unavailable&quot;}'
+</div><p id="-ma1lv0_194">Expect <code class="code" id="-ma1lv0_196">{&quot;context&quot;:{&quot;result&quot;:{&quot;orderId&quot;:&quot;ORD-1&quot;},&quot;isError&quot;:false}}</code>, then <code class="code" id="-ma1lv0_197">{&quot;context&quot;:{&quot;result&quot;:&quot;Payment service unavailable&quot;,&quot;isError&quot;:true}}</code>.</p></section><section class="chapter"><h3 id="parameterized-tasks" data-toc="parameterized-tasks">Parameterized Tasks</h3><p id="-ma1lv0_198">Use exported data as task parameters:</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: share-order-context
+  version: '1.0.0'
+do:
+  - identifyCustomer:
+      set:
+        customerId: ${ .customer.id }
+      export:
+        as: '${ $context + { customerId: .customerId } }'
+  - prepareOrder:
+      set:
+        orderId: ${ $workflow.input.orderId }
+        customerId: ${ $context.customerId }
+</div><p id="-ma1lv0_200">Save it as <code class="code" id="-ma1lv0_205">share-order-context.yaml</code>:</p><div class="code-block" data-lang="bash">
+bin/lemline definition post -f share-order-context.yaml
+bin/lemline instance start examples share-order-context --input '{&quot;orderId&quot;:&quot;ORD-803&quot;,&quot;customer&quot;:{&quot;id&quot;:&quot;C-100&quot;}}'
+</div><p id="-ma1lv0_202">Expect <code class="code" id="-ma1lv0_206">{&quot;orderId&quot;:&quot;ORD-803&quot;,&quot;customerId&quot;:&quot;C-100&quot;}</code>.</p><p id="-ma1lv0_203">Stop the shop when you are done:</p><div class="code-block" data-lang="bash">
+docker compose -f examples/tutorial-services/compose.yaml down
+</div></section></section><section class="chapter"><h2 id="best-practices" data-toc="best-practices">Best Practices</h2><ol class="list _decimal" id="-ma1lv0_207" type="1"><li class="list__item" id="-ma1lv0_208"><p id="-ma1lv0_218"><span class="control" id="-ma1lv0_219">Validate Early</span>: Add schema validation as early as possible in the workflow</p></li><li class="list__item" id="-ma1lv0_209"><p id="-ma1lv0_220"><span class="control" id="-ma1lv0_221">Use Specific Schemas</span>: Create detailed, specific schemas for validation</p></li><li class="list__item" id="-ma1lv0_210"><p id="-ma1lv0_222"><span class="control" id="-ma1lv0_223">Transform Near Use</span>: Do data transformations close to where the data is used</p></li><li class="list__item" id="-ma1lv0_211"><p id="-ma1lv0_224"><span class="control" id="-ma1lv0_225">Export Judiciously</span>: Only export data needed by multiple tasks</p></li><li class="list__item" id="-ma1lv0_212"><p id="-ma1lv0_226"><span class="control" id="-ma1lv0_227">Document the Data Flow</span>: Add comments to explain complex transformations</p></li><li class="list__item" id="-ma1lv0_213"><p id="-ma1lv0_228"><span class="control" id="-ma1lv0_229">Use Meaningful Names</span>: Name exported data with clear, descriptive identifiers</p></li><li class="list__item" id="-ma1lv0_214"><p id="-ma1lv0_230"><span class="control" id="-ma1lv0_231">Prefer Task Chaining</span>: Pass data through task chains rather than global context when possible</p></li><li class="list__item" id="-ma1lv0_215"><p id="-ma1lv0_232"><span class="control" id="-ma1lv0_233">Validate Exported Data</span>: Add schemas to exported data for integrity</p></li><li class="list__item" id="-ma1lv0_216"><p id="-ma1lv0_234"><span class="control" id="-ma1lv0_235">Minimize Global State</span>: Avoid exporting too much to the global context</p></li><li class="list__item" id="-ma1lv0_217"><p id="-ma1lv0_236"><span class="control" id="-ma1lv0_237">Clean Structure</span>: Structure data consistently across the workflow</p></li></ol></section><section class="chapter"><h2 id="common-errors-and-solutions" data-toc="common-errors-and-solutions">Common Errors and Solutions</h2><section class="chapter"><h3 id="schema-validation-errors" data-toc="schema-validation-errors">Schema Validation Errors</h3><p id="-ma1lv0_241"><span class="control" id="-ma1lv0_243">Problem</span>: Input data doesn't match the schema. <span class="control" id="-ma1lv0_244">Solution</span>:</p><ul class="list _bullet" id="-ma1lv0_242"><li class="list__item" id="-ma1lv0_245"><p id="-ma1lv0_249">Verify data structure matches schema requirements</p></li><li class="list__item" id="-ma1lv0_246"><p id="-ma1lv0_250">Check for missing required fields</p></li><li class="list__item" id="-ma1lv0_247"><p id="-ma1lv0_251">Ensure data types are correct</p></li><li class="list__item" id="-ma1lv0_248"><p id="-ma1lv0_252">Use default values for optional fields</p></li></ul></section><section class="chapter"><h3 id="missing-context-variables" data-toc="missing-context-variables">Missing Context Variables</h3><p id="-ma1lv0_253"><span class="control" id="-ma1lv0_255">Problem</span>: Accessing a field in <code class="code" id="-ma1lv0_256">$context</code> that has not been exported. <span class="control" id="-ma1lv0_257">Solution</span>:</p><ul class="list _bullet" id="-ma1lv0_254"><li class="list__item" id="-ma1lv0_258"><p id="-ma1lv0_261">Ensure the variable is exported before use</p></li><li class="list__item" id="-ma1lv0_259"><p id="-ma1lv0_262">Check for typos in variable names</p></li><li class="list__item" id="-ma1lv0_260"><p id="-ma1lv0_263">Add a fallback such as <code class="code" id="-ma1lv0_264">$context.variable // defaultValue</code>.</p></li></ul></section><section class="chapter"><h3 id="transformation-errors" data-toc="transformation-errors">Transformation Errors</h3><p id="-ma1lv0_265"><span class="control" id="-ma1lv0_267">Problem</span>: jq transformation expressions fail. <span class="control" id="-ma1lv0_268">Solution</span>:</p><ul class="list _bullet" id="-ma1lv0_266"><li class="list__item" id="-ma1lv0_269"><p id="-ma1lv0_273">Break complex transformations into simpler steps</p></li><li class="list__item" id="-ma1lv0_270"><p id="-ma1lv0_274">Use <code class="code" id="-ma1lv0_275">try/catch</code> in expressions for error handling</p></li><li class="list__item" id="-ma1lv0_271"><p id="-ma1lv0_276">Add explicit type handling</p></li><li class="list__item" id="-ma1lv0_272"><p id="-ma1lv0_277">Debug with a separate diagnostic task</p></li></ul></section></section><section class="chapter"><h2 id="next-steps" data-toc="next-steps">Next Steps</h2><ul class="list _bullet" id="-ma1lv0_278"><li class="list__item" id="-ma1lv0_279"><p id="-ma1lv0_283">Learn about <a href="lemline-howto-jq.html" id="-ma1lv0_284" data-tooltip="Write expressions as ${ ... }. Start with current task input ., move through fields with jq, and use pipes to break a transformation into steps.">writing jq runtime expressions</a></p></li><li class="list__item" id="-ma1lv0_280"><p id="-ma1lv0_285">Explore <a href="lemline-howto-schemas.html" id="-ma1lv0_286" data-tooltip="This guide explains how to implement data validation in Lemline workflows using JSON Schema. You'll learn how to validate workflow inputs, task inputs and outputs, and exported data to ensure data quality and prevent errors.">validating inputs and outputs with schemas</a></p></li><li class="list__item" id="-ma1lv0_281"><p id="-ma1lv0_287">Understand <a href="lemline-howto-data-passing.html" id="-ma1lv0_288" data-tooltip="By default, the transformed output of one task becomes the input of the next task. Use input.from when a task needs to select or reshape its input, and output.as when a task needs to adapt its result for the following step.">passing data between tasks</a></p></li><li class="list__item" id="-ma1lv0_282"><p id="-ma1lv0_289">Dive deeper into <a href="lemline-explain-jq.html" id="-ma1lv0_290" data-tooltip="Write a workflow expression as ${ ... }. Lemline evaluates expressions using jq. The current input is .. Use $workflow.input for the original input and $context for values exported by earlier tasks.">runtime expressions and data flow</a></p></li></ul></section><div class="last-modified">25 November 2026</div><div data-feedback-placeholder="true"></div><div class="navigation-links _bottom"><a href="lemline-howto-data-passing.html" class="navigation-links__prev">How to pass data between tasks</a><a href="lemline-howto-jq.html" class="navigation-links__next">How to write jq runtime expressions</a></div></article><div id="disqus_thread"></div></div></section></main></div><script src="https://resources.jetbrains.com/writerside/apidoc/6.22.0-b776/app.js"></script></body></html>

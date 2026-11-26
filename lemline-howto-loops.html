@@ -1,0 +1,55 @@
+<!DOCTYPE html SYSTEM "about:legacy-compat">
+<html lang="en-US" data-preset="contrast" data-primary-color="#2E6F7E"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="robots" content="noindex"><meta name="built-on" content="2026-11-26T17:17:49.818319564"><title>How to run loops (for, while) | Lemline documentation</title><script type="application/json" id="virtual-toc-data">[{"id":"collect-a-result-across-iterations","level":0,"title":"Collect a result across iterations","anchor":"#collect-a-result-across-iterations"},{"id":"stop-a-loop-early","level":0,"title":"Stop a loop early","anchor":"#stop-a-loop-early"}]</script><script type="application/json" id="topic-shortcuts"></script><link href="https://resources.jetbrains.com/writerside/apidoc/6.22.0-b776/app.css" rel="stylesheet"><link href="static/custom.css" rel="stylesheet"><link rel="icon" type="image/png" sizes="16x16" href="images/lemly.png"><meta name="image" content="https://docs.lemline.com/social-preview.png"><!-- Open Graph --><meta property="og:title" content="How to run loops (for, while) | Lemline documentation"><meta property="og:description" content=""><meta property="og:image" content="https://docs.lemline.com/social-preview.png"><meta property="og:site_name" content="Lemline documentation Help"><meta property="og:type" content="website"><meta property="og:locale" content="en_US"><meta property="og:url" content="https://docs.lemline.com/lemline-howto-loops.html"><!-- End Open Graph --><!-- Twitter Card --><meta name="twitter:card" content="summary_large_image"><meta name="twitter:site" content=""><meta name="twitter:title" content="How to run loops (for, while) | Lemline documentation"><meta name="twitter:description" content=""><meta name="twitter:creator" content=""><meta name="twitter:image:src" content="https://docs.lemline.com/social-preview.png"><!-- End Twitter Card --><!-- Schema.org WebPage --><script type="application/ld+json">{
+    "@context": "http://schema.org",
+    "@type": "WebPage",
+    "@id": "https://docs.lemline.com/lemline-howto-loops.html#webpage",
+    "url": "https://docs.lemline.com/lemline-howto-loops.html",
+    "name": "How to run loops (for, while) | Lemline documentation",
+    "description": "",
+    "image": "https://docs.lemline.com/social-preview.png",
+    "inLanguage":"en-US"
+}</script><!-- End Schema.org --><!-- Schema.org WebSite --><script type="application/ld+json">{
+    "@type": "WebSite",
+    "@id": "https://docs.lemline.com/#website",
+    "url": "https://docs.lemline.com/",
+    "name": "Lemline documentation Help"
+}</script><!-- End Schema.org --></head><body data-id="lemline-howto-loops" data-main-title="How to run loops (for, while)" data-article-props="{&quot;seeAlsoStyle&quot;:&quot;links&quot;}" data-template="article" data-breadcrumbs="How-to Guides///Flow Control"><div class="wrapper"><main class="panel _main"><header class="panel__header"><div class="container"><h3>Lemline documentation  Help</h3><div class="panel-trigger"></div></div></header><section class="panel__content"><div class="container"><article class="article" data-shortcut-switcher="inactive"><h1 data-toc="lemline-howto-loops" id="lemline-howto-loops.md">How to run loops (for, while)</h1><p id="-q728u7_3">Use a <code class="code" id="-q728u7_10">for</code> task to iterate over an array. The <code class="code" id="-q728u7_11">in</code> expression selects the collection, <code class="code" id="-q728u7_12">each</code> binds an item and <code class="code" id="-q728u7_13">at</code> binds its index. The body is a nested <code class="code" id="-q728u7_14">do</code> list.</p><p id="-q728u7_4">Complete <a href="lemline-tutorial-setup.html" id="-q728u7_15" data-tooltip="Run Lemline on one machine with SQLite. Lemline stores workflow definitions, queued messages, and workflow history in local files. Use a writable directory on a local filesystem.">the SQLite setup</a> and keep its worker running. Run the commands from a second terminal in the setup directory. With the JAR, substitute <code class="code" id="-q728u7_16">java -jar lemline.jar</code> for <code class="code" id="-q728u7_17">bin/lemline</code>. The worker logs <code class="code" id="-q728u7_18">Workflow completed with output</code> with each result. Save each definition under the file name used in its <code class="code" id="-q728u7_19">definition post</code> command.</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: map-order-items
+  version: '1.0.0'
+do:
+  - calculateTotals:
+      for:
+        each: item
+        in: ${ .items }
+        at: index
+      do:
+        - calculateLine:
+            set:
+              itemId: ${ $item.id }
+              index: ${ $index }
+              lineTotal: ${ $item.quantity * $item.price }
+</div><div class="code-block" data-lang="bash">
+bin/lemline definition post -f map-order-items.yaml
+bin/lemline instance start examples map-order-items --input '{&quot;items&quot;:[{&quot;id&quot;:&quot;SKU-1&quot;,&quot;quantity&quot;:2,&quot;price&quot;:25},{&quot;id&quot;:&quot;SKU-2&quot;,&quot;quantity&quot;:1,&quot;price&quot;:12}]}'
+</div><p id="-q728u7_7">The body runs once per item, but the <code class="code" id="-q728u7_20">for</code> task returns only the last iteration's result: <code class="code" id="-q728u7_21">{&quot;itemId&quot;:&quot;SKU-2&quot;,&quot;index&quot;:1,&quot;lineTotal&quot;:12}</code>. To keep every line, collect them as shown next.</p><section class="chapter"><h2 id="collect-a-result-across-iterations" data-toc="collect-a-result-across-iterations">Collect a result across iterations</h2><p id="-q728u7_22">Lemline passes one iteration's result into the next iteration. Initialize an accumulator, then update it in the body. The last iteration's result becomes the loop result. Here the body adds a line total for each input item.</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: collect-order-lines
+  version: '1.0.0'
+input:
+  from: '${ { lines: [] } }'
+do:
+  - calculateLines:
+      for:
+        each: item
+        in: ${ $workflow.input.items }
+      do:
+        - appendLine:
+            set:
+              lines: '${ .lines + [{ id: $item.id, amount: ($item.price * $item.quantity) }] }'
+</div><p id="-q728u7_24">The workflow's <code class="code" id="-q728u7_27">input.from</code> starts the loop with an empty <code class="code" id="-q728u7_28">lines</code> array. Each iteration receives the previous one's result and appends a line.</p><div class="code-block" data-lang="bash">
+bin/lemline definition post -f collect-order-lines.yaml
+bin/lemline instance start examples collect-order-lines --input '{&quot;items&quot;:[{&quot;id&quot;:&quot;SKU-1&quot;,&quot;quantity&quot;:2,&quot;price&quot;:25},{&quot;id&quot;:&quot;SKU-2&quot;,&quot;quantity&quot;:1,&quot;price&quot;:12}]}'
+</div><p id="-q728u7_26">Expect <code class="code" id="-q728u7_29">{&quot;lines&quot;:[{&quot;id&quot;:&quot;SKU-1&quot;,&quot;amount&quot;:50},{&quot;id&quot;:&quot;SKU-2&quot;,&quot;amount&quot;:12}]}</code>.</p></section><section class="chapter"><h2 id="stop-a-loop-early" data-toc="stop-a-loop-early">Stop a loop early</h2><p id="-q728u7_30">Add a <code class="code" id="-q728u7_31">while</code> condition to the same task when the loop should stop before the collection is exhausted. See the <a href="https://github.com/open-workflow-specification/specification/blob/v1.0.3/dsl-reference.md#for" id="-q728u7_32" data-external="true" rel="noopener noreferrer" target="_blank">For Task</a> for the condition and its scope. Use a <a href="lemline-howto-parallel.html" id="-q728u7_33" data-tooltip="Use fork.branches to run independent branches concurrently. Each branch has its own task input. By default, a fork waits for all branches.">fork</a> for independent concurrent branches.</p></section><div class="last-modified">25 November 2026</div><div data-feedback-placeholder="true"></div><div class="navigation-links _bottom"><a href="lemline-howto-parallel.html" class="navigation-links__prev">How to execute tasks in parallel (fork)</a><a href="lemline-howto-jumps.html" class="navigation-links__next">How to jump between tasks (then, exit, end)</a></div></article><div id="disqus_thread"></div></div></section></main></div><script src="https://resources.jetbrains.com/writerside/apidoc/6.22.0-b776/app.js"></script></body></html>

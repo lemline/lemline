@@ -1,0 +1,61 @@
+<!DOCTYPE html SYSTEM "about:legacy-compat">
+<html lang="en-US" data-preset="contrast" data-primary-color="#2E6F7E"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="robots" content="noindex"><meta name="built-on" content="2026-11-26T17:17:49.206865712"><title>Retrying failed workflow tasks | Lemline documentation</title><script type="application/json" id="virtual-toc-data">[{"id":"reuse-a-retry-policy","level":0,"title":"Reuse a retry policy","anchor":"#reuse-a-retry-policy"}]</script><script type="application/json" id="topic-shortcuts"></script><link href="https://resources.jetbrains.com/writerside/apidoc/6.22.0-b776/app.css" rel="stylesheet"><link href="static/custom.css" rel="stylesheet"><link rel="icon" type="image/png" sizes="16x16" href="images/lemly.png"><meta name="image" content="https://docs.lemline.com/social-preview.png"><!-- Open Graph --><meta property="og:title" content="Retrying failed workflow tasks | Lemline documentation"><meta property="og:description" content=""><meta property="og:image" content="https://docs.lemline.com/social-preview.png"><meta property="og:site_name" content="Lemline documentation Help"><meta property="og:type" content="website"><meta property="og:locale" content="en_US"><meta property="og:url" content="https://docs.lemline.com/lemline-howto-retry.html"><!-- End Open Graph --><!-- Twitter Card --><meta name="twitter:card" content="summary_large_image"><meta name="twitter:site" content=""><meta name="twitter:title" content="Retrying failed workflow tasks | Lemline documentation"><meta name="twitter:description" content=""><meta name="twitter:creator" content=""><meta name="twitter:image:src" content="https://docs.lemline.com/social-preview.png"><!-- End Twitter Card --><!-- Schema.org WebPage --><script type="application/ld+json">{
+    "@context": "http://schema.org",
+    "@type": "WebPage",
+    "@id": "https://docs.lemline.com/lemline-howto-retry.html#webpage",
+    "url": "https://docs.lemline.com/lemline-howto-retry.html",
+    "name": "Retrying failed workflow tasks | Lemline documentation",
+    "description": "",
+    "image": "https://docs.lemline.com/social-preview.png",
+    "inLanguage":"en-US"
+}</script><!-- End Schema.org --><!-- Schema.org WebSite --><script type="application/ld+json">{
+    "@type": "WebSite",
+    "@id": "https://docs.lemline.com/#website",
+    "url": "https://docs.lemline.com/",
+    "name": "Lemline documentation Help"
+}</script><!-- End Schema.org --></head><body data-id="lemline-howto-retry" data-main-title="Retrying failed workflow tasks" data-article-props="{&quot;seeAlsoStyle&quot;:&quot;links&quot;}" data-template="article" data-breadcrumbs="How-to Guides///Resilience and Error Handling"><div class="wrapper"><main class="panel _main"><header class="panel__header"><div class="container"><h3>Lemline documentation  Help</h3><div class="panel-trigger"></div></div></header><section class="panel__content"><div class="container"><article class="article" data-shortcut-switcher="inactive"><h1 data-toc="lemline-howto-retry" id="lemline-howto-retry.md">Retrying failed workflow tasks</h1><p id="z2d5adk_3">Configure retries under <code class="code" id="z2d5adk_5">catch.retry</code> on a <code class="code" id="z2d5adk_6">try</code> task. Use <code class="code" id="z2d5adk_7">delay</code> for the initial interval and <code class="code" id="z2d5adk_8">limit.attempt.count</code> to bound attempts. With a backoff configured, the runner derives subsequent intervals from the configured strategy.</p><section class="chapter"><h2 id="reuse-a-retry-policy" data-toc="reuse-a-retry-policy">Reuse a retry policy</h2><p id="z2d5adk_9">Put a named policy under <code class="code" id="z2d5adk_12">use.retries</code> and reference it from <code class="code" id="z2d5adk_13">catch.retry</code>. In this example, the catch block handles the HTTP 503 response. Lemline reports a failed HTTP call as a <code class="code" id="z2d5adk_14">communication</code> error whose <code class="code" id="z2d5adk_15">status</code> is the HTTP status, so the catch filters on that type and status. If retries are exhausted, the catch task list returns a fallback result.</p><div class="code-block" data-lang="yaml" data-disable-link-processing="true">document:
+  dsl: '1.0.3'
+  namespace: examples
+  name: retry-and-fallback
+  version: '1.0.0'
+use:
+  retries:
+    transient:
+      delay: PT2S
+      backoff:
+        exponential: {}
+      limit:
+        attempt:
+          count: 3
+do:
+  - fetchInventory:
+      try:
+        - requestInventory:
+            call: http
+            with:
+              method: get
+              endpoint: http://127.0.0.1:8787/stock
+              query:
+                fail: '503'
+                failTimes: ${ .failures // 0 | tostring }
+                key: ${ $workflow.id }
+      catch:
+        errors:
+          with:
+            type: https://open-workflow-specification.org/spec/1.0.0/errors/communication
+            status: 503
+        retry: transient
+        do:
+          - useCachedInventory:
+              set:
+                inventory: []
+                stale: true
+</div><section class="chapter"><h3 id="run-the-example" data-toc="run-the-example">Run the example</h3><p id="z2d5adk_16">Complete <a href="lemline-tutorial-setup.html" id="z2d5adk_24" data-tooltip="Run Lemline on one machine with SQLite. Lemline stores workflow definitions, queued messages, and workflow history in local files. Use a writable directory on a local filesystem.">the SQLite setup</a> and keep its worker running. Run the commands from a second terminal in the setup directory. With the JAR, substitute <code class="code" id="z2d5adk_25">java -jar lemline.jar</code> for <code class="code" id="z2d5adk_26">bin/lemline</code>. The HTTP examples call the <a href="lemline-tutorial-order-processing.html#start-the-tutorial-shop" id="z2d5adk_27" data-tooltip="Complete the SQLite setup and keep the worker running on the host. In a separate terminal, open the root of the Lemline source checkout matching these docs (the directory containing examples/tutorial-services). With Docker Compose running, start the single shop container:">tutorial shop</a>; start it from the root of the Lemline source checkout:</p><div class="code-block" data-lang="bash">
+docker compose -f examples/tutorial-services/compose.yaml up -d
+</div><p id="z2d5adk_18">Save the definition as <code class="code" id="z2d5adk_28">retry-and-fallback.yaml</code>. The <code class="code" id="z2d5adk_29">failures</code> input makes the shop answer HTTP 503 that many times before it returns the stock; <code class="code" id="z2d5adk_30">key</code> counts the failures per instance.</p><div class="code-block" data-lang="bash">
+bin/lemline definition post -f retry-and-fallback.yaml
+bin/lemline instance start examples retry-and-fallback --input '{&quot;failures&quot;:2}'
+bin/lemline instance start examples retry-and-fallback --input '{&quot;failures&quot;:5}'
+</div><p id="z2d5adk_20">The first instance fails twice, is retried after about 2 and then 4 seconds, and returns the stock. The second fails on its call and on its three retries, then returns <code class="code" id="z2d5adk_31">{&quot;inventory&quot;:[],&quot;stale&quot;:true}</code>. The worker picks up delayed retries every 10 seconds, so each retry can take up to 10 seconds longer than its delay; allow about a minute. The shop's <code class="code" id="z2d5adk_32">failures</code> list shows <code class="code" id="z2d5adk_33">failed: 2, passed: 1</code> and <code class="code" id="z2d5adk_34">failed: 4, passed: 0</code> for the two instances.</p><p id="z2d5adk_21">Stop the shop when you are done:</p><div class="code-block" data-lang="bash">
+docker compose -f examples/tutorial-services/compose.yaml down
+</div><p id="z2d5adk_23">To use the same policy in one place, put the policy object directly under <code class="code" id="z2d5adk_35">catch.retry</code>. Use the <code class="code" id="z2d5adk_36">when</code> or <code class="code" id="z2d5adk_37">exceptWhen</code> predicates to limit retries further. See the <a href="https://github.com/open-workflow-specification/specification/blob/v1.0.3/dsl-reference.md#try" id="z2d5adk_38" data-external="true" rel="noopener noreferrer" target="_blank">Try Task reference</a> for error matching and fallback behavior.</p></section></section><div class="last-modified">25 November 2026</div><div data-feedback-placeholder="true"></div><div class="navigation-links _bottom"><a href="lemline-howto-try-catch.html" class="navigation-links__prev">Error Handling with Try-Catch</a><a href="lemline-howto-custom-errors.html" class="navigation-links__next">Defining and using custom errors</a></div></article><div id="disqus_thread"></div></div></section></main></div><script src="https://resources.jetbrains.com/writerside/apidoc/6.22.0-b776/app.js"></script></body></html>
