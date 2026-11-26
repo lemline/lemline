@@ -13,6 +13,8 @@ enabling the execution of complex workflows defined in YAML or JSON **on top of 
 leverages
 modern best practices for performance, reliability, and extensibility.
 
+[Read the Lemline documentation](https://docs.lemline.com/).
+
 See [supported features and SDK differences](lemline-docs/topics/lemline-ref-supported-features.md) for runtime coverage.
 
 ## 🎯 Objectives
@@ -91,7 +93,7 @@ Other databases and brokers (e.g. Pulsar, SQS, Pub/Sub, Service Bus) are on the 
 * **`lemline-core`:** Contains the core implementation of the Open Workflow DSL types and logic.
 * **`lemline-runner`:** Quarkus-based runtime. Handles message I/O, workflow state management, and integration with
   databases/brokers.
-* **`lemline-docs`:** (WIP) Documentation for the project.
+* **`lemline-docs`:** Source files for the Lemline documentation.
 
 ## 🚀 Getting Started
 
@@ -194,6 +196,7 @@ gradlew.bat -p lemline-runner quarkusBuild -Dquarkus.native.enabled=true -Dquark
 
 ## 📚 Documentation
 
+* [Lemline documentation](https://docs.lemline.com/)
 * **Open Workflow Specification:**
   See the [official specification](https://github.com/open-workflow-specification/specification)
 * **Runner Configuration:** See [lemline-runner/README.md](./lemline-runner/README.md)
