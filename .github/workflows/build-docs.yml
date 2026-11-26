@@ -57,7 +57,7 @@ jobs:
           unzip -O UTF-8 -qq "$DOCS_ARCHIVE" -d dir
           cp lemline-docs/images/social-preview.png dir/
           python3 lemline-docs/validation/prepare_social_preview.py dir
-          (cd dir && zip -q "../$DOCS_ARCHIVE" index.html social-preview.png)
+          (cd dir && zip -q "../$DOCS_ARCHIVE" *.html social-preview.png)
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v6

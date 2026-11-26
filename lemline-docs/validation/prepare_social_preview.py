@@ -42,6 +42,28 @@ def check_card(site, page):
     return tags
 
 
+def apply_web_summaries(site):
+    # The pinned Writerside builder can emit empty social descriptions even
+    # for Markdown topics with an explicit web-summary.
+    topics = Path(__file__).resolve().parents[1] / "topics"
+    for page in site.glob("*.html"):
+        topic = topics / page.with_suffix(".md").name
+        if not topic.exists():
+            continue
+        summary = re.search(r"^<web-summary>([^<]+)</web-summary>$", topic.read_text(), re.M)
+        if not summary:
+            continue
+        description = escape(" ".join(summary[1].split()))
+        html = page.read_text()
+        for attr, key in (("property", "og:description"), ("name", "twitter:description")):
+            tag = f'<meta {attr}="{key}" content="{description}">'
+            pattern = rf'<meta {attr}="{key}"[^>]*>'
+            html, count = re.subn(pattern, lambda _: tag, html, count=1)
+            if not count:
+                html = html.replace("</head>", tag + "</head>", 1)
+        page.write_text(html)
+
+
 def prepare(site):
     index = site / "index.html"
     redirect = index.read_text()
@@ -49,6 +71,7 @@ def prepare(site):
     if not match:
         raise ValueError("Expected Writerside's index.html to redirect to a topic")
 
+    apply_web_summaries(site)
     tags = check_card(site, site / match[1])
     check_card(site, site / "lemline-tutorial-hello.html")
     # Writerside emits an implicit head. Insert before the refresh and retain
