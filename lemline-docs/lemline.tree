@@ -18,6 +18,7 @@
         <toc-element toc-title="Tutorials: Run a shop with Lemline">
             <toc-element topic="lemline-tutorial-setup.md"/>
             <toc-element topic="lemline-tutorial-hello.md"/>
+            <toc-element topic="lemline-tutorial-gateway.md"/>
             <toc-element topic="lemline-tutorial-order-processing.md"/>
             <toc-element topic="lemline-tutorial-waits.md"/>
             <toc-element topic="lemline-tutorial-iot.md"/>
@@ -65,6 +66,8 @@
             </toc-element>
             <toc-element toc-title="Runner Configuration">
                 <toc-element topic="lemline-howto-config.md"/>
+                <toc-element topic="lemline-howto-deploy-gateway.md"/>
+                <toc-element topic="lemline-howto-connect-dashboard.md"/>
                 <toc-element topic="lemline-howto-docker.md"/>
                 <toc-element topic="lemline-howto-brokers.md"/>
                 <toc-element topic="lemline-howto-observability.md"/>

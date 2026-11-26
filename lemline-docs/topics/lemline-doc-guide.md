@@ -74,6 +74,10 @@ documentation paths for:
     - See how-to guides for [HTTP calls](lemline-howto-http.md), [OpenAPI](lemline-howto-openapi.md),
       and [gRPC](lemline-howto-grpc.md)
 
+* **Need to call Lemline from an application?**
+    - [Start and follow a workflow through the gRPC gateway](lemline-tutorial-gateway.md)
+    - [Deploy the gRPC gateway](lemline-howto-deploy-gateway.md)
+
 * **Concerned about error handling?**
     - Check out guides for [try/catch](lemline-howto-try-catch.md), [retries](lemline-howto-retry.md), and
       the [Error Propagation Model](lemline-explain-errors.md)

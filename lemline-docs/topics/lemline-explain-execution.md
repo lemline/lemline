@@ -2,6 +2,14 @@
 
 This document explains how Lemline executes workflows, from parsing the definition to completion.
 
+## Starting and observing an instance through the gateway
+
+An application can submit a start request to the gRPC gateway. The gateway records the accepted request in its outbox in the orchestration database. The outbox publishes a command to the broker for a runner to execute.
+
+As the instance runs, the runner emits lifecycle events. Lifecycle Analytics consumes them and stores the history that the gateway reads. Acceptance and visibility are separate moments: a successful `StartInstance` reply gives you the instance ID, and gateway history reads can return `NOT_FOUND` until the first lifecycle events reach analytics. The outbox preserves the accepted request while its command awaits delivery.
+
+Follow a request from acceptance to completion in the [gateway tutorial](lemline-tutorial-gateway.md).
+
 ## Execution Model Overview
 
 Lemline implements a node-based execution model for Open Workflow DSL:
