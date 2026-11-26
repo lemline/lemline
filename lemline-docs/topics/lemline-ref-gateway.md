@@ -1,8 +1,8 @@
 ---
-title: gRPC Gateway Reference
+title: Gateway Reference
 ---
 
-# gRPC Gateway Reference
+# Gateway Reference
 
 This reference documents the current public `lemline-runner-gateway` API: RPC surface, cursor and watch semantics, start idempotency, security rules, and configuration required to run the gateway.
 
