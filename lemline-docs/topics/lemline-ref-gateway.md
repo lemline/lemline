@@ -29,6 +29,8 @@ It shares the same `.lemline.yaml` configuration model as the runner and depends
 
 For a first request, follow [Start and follow an order through the gRPC gateway](lemline-tutorial-gateway.md). For a shared installation, see [Deploy the gRPC gateway](lemline-howto-deploy-gateway.md).
 
+The dashboard is an optional web client. See [Connect the dashboard to the gateway](lemline-howto-connect-dashboard.md) for browser transport and authentication.
+
 ## Service Contract
 
 Service: `lemline.gateway.v1.GatewayService`

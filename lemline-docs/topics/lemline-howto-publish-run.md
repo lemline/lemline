@@ -102,7 +102,7 @@ Use the returned ID to [follow the instance events](lemline-howto-monitor.md#res
 
 The CLI has no command to read instances. Use:
 
-- the dashboard, connected to the gateway
+- the [dashboard connected to the gateway](lemline-howto-connect-dashboard.md)
 - the gateway RPCs `GetInstance`, `ListInstances` and `ListInstanceEvents`
 - the worker log (`bin/lemline listen --debug` logs each workflow output)
 - on the SQLite setup, the `lemline_lifecycle_events` table of `analytics.db`

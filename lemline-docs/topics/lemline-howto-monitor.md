@@ -28,7 +28,7 @@ Instances are observed through the gRPC gateway (`lemline gateway start`) and th
 - list and follow the lifecycle events of an instance (`ListInstanceEvents`, `WatchInstanceEvents`)
 - read per-definition counters (`ListDefinitionStats`, `WatchDefinitionStats`)
 
-See [gRPC Gateway Reference](lemline-ref-gateway.md).
+See [Connect the dashboard to the gateway](lemline-howto-connect-dashboard.md) for browser access and [gRPC Gateway Reference](lemline-ref-gateway.md) for API calls.
 
 The CLI has no command to list or inspect instances. `lemline instance start` prints the id of the instance it starts, which you can then look up in the dashboard.
 

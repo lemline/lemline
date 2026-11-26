@@ -119,7 +119,7 @@ To keep a queryable history, enable lifecycle analytics. A runner consumes the l
 
 ## Dashboard
 
-The dashboard reads definitions, instances, lifecycle events and per-definition counters through the gRPC gateway. Start the gateway with `lemline gateway start`; see [gRPC Gateway Reference](lemline-ref-gateway.md).
+The dashboard reads definitions, instances, lifecycle events and per-definition counters through the gRPC gateway. Follow [Connect the dashboard to the gateway](lemline-howto-connect-dashboard.md) to deploy it and verify that the browser can start and observe a workflow.
 
 ## Common Issues and Solutions
 

@@ -49,32 +49,22 @@ one is picked in the menu.
 
 ## Configure Gateway Access
 
-The dashboard reads the gateway endpoint at runtime from `window.__CONFIG__.gatewayBaseUrl` in `public/config.js`.
+The dashboard reads its browser-facing gRPC-Web endpoint from `window.__CONFIG__.gatewayBaseUrl` in `config.js`.
+For a same-origin deployment, route `/lemline.gateway.v1.GatewayService/` through a gRPC-Web proxy that forwards
+native gRPC to the gateway, and serve the following configuration with the dashboard:
 
 ```js
 window.__CONFIG__ = {
-  gatewayBaseUrl: "https://localhost:9000",
+  gatewayBaseUrl: window.location.origin,
 };
 ```
 
-Notes:
-- Use a full origin URL (`https://host:port`).
-- If `window.__CONFIG__.gatewayBaseUrl` is missing, the default is `https://localhost:9443`.
-- For container deployments, override `config.js` in the served static files.
+For a separate proxy origin, set `gatewayBaseUrl` to its full origin URL and allow the dashboard origin in the
+proxy's CORS policy. For container deployments, override `config.js` in the served static files.
 
-Gateway-side requirements:
-- `lemline.gateway.enabled=true`
-- `lemline.gateway.grpc.host` / `lemline.gateway.grpc.port` reachable from browser clients
-- TLS configured under `lemline.gateway.tls.*` (for example `lemline.gateway.tls.enabled=true`, `lemline.gateway.tls.certificate`, `lemline.gateway.tls.private-key`)
-- gRPC-Web and CORS are enabled by the gateway config source when gateway mode is enabled
-- Allow dashboard origin with `lemline.gateway.cors.origins` (default: `http://localhost:5173`)
-
-Security behavior:
-- The dashboard client does not currently attach an `Authorization` header.
-- For direct browser access, run gateway with `lemline.gateway.authentication.enabled=false`.
-- If security stays enabled, place an auth-aware edge/proxy in front that injects auth metadata for gateway calls.
-- Scopes checked by the gateway: `lemline.watch` (live lists), `lemline.start` (start an instance),
-  `lemline.config` (Settings page: read the gateway configuration).
+When gateway authentication is enabled, use a proxy that authenticates dashboard users and supplies the bearer
+token for each gateway call. See [Connect the dashboard to the gateway](../lemline-docs/topics/lemline-howto-connect-dashboard.md)
+for deployment steps, scopes and a smoke test.
 
 ## Protobuf Sync
 

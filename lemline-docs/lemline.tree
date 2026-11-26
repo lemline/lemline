@@ -67,6 +67,7 @@
             <toc-element toc-title="Runner Configuration">
                 <toc-element topic="lemline-howto-config.md"/>
                 <toc-element topic="lemline-howto-deploy-gateway.md"/>
+                <toc-element topic="lemline-howto-connect-dashboard.md"/>
                 <toc-element topic="lemline-howto-docker.md"/>
                 <toc-element topic="lemline-howto-brokers.md"/>
                 <toc-element topic="lemline-howto-observability.md"/>
