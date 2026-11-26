@@ -1,5 +1,7 @@
 # Start and follow an order through the gRPC gateway
 
+<web-summary>Start an order workflow over gRPC and read its acknowledgement from the event history.</web-summary>
+
 Send an order ID to Lemline over gRPC and read the workflow's acknowledgement from its event history.
 
 Complete [the SQLite setup](lemline-tutorial-setup.md) and keep the worker running. Install [grpcurl](https://github.com/fullstorydev/grpcurl/releases) and `jq`, and have a Lemline source checkout matching the version you run. The checkout provides the gateway service definition. Use a Bash-compatible shell for the commands below.

@@ -4,6 +4,8 @@ title: Setting Up A Local Environment
 
 # Setting Up A Local Environment
 
+<web-summary>Run Lemline locally with SQLite and start a worker for the shop tutorials.</web-summary>
+
 Run Lemline on one machine with SQLite. Lemline stores workflow definitions, queued messages, and workflow history in local files. Use a writable directory on a local filesystem.
 
 ## 1. Install Lemline
