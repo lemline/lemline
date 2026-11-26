@@ -27,6 +27,8 @@ It shares the same `.lemline.yaml` configuration model as the runner and depends
 2. runner messaging configuration to publish workflow start commands
 3. analytics configuration for read-side queries and watch streams
 
+For a first request, follow [Start and follow an order through the gRPC gateway](lemline-tutorial-gateway.md). For a shared installation, see [Deploy the gRPC gateway](lemline-howto-deploy-gateway.md).
+
 ## Service Contract
 
 Service: `lemline.gateway.v1.GatewayService`
@@ -150,7 +152,7 @@ Validation and runtime rules:
 - when client auth is `request` or `required`, `trust-store` is required
 - when authentication is enabled, `jwt.issuer` and `jwt.jwks-url` are required
 - when authentication is enabled and no authenticated principal is available, the RPC fails with `UNAUTHENTICATED`
-- when authentication is disabled, the gateway uses an anonymous wildcard principal and bypasses scope and namespace checks
+- when authentication is disabled, the gateway allows all scopes. It serves the namespaces configured for the process, or all namespaces when none are configured.
 
 Current scope requirements:
 
@@ -172,11 +174,7 @@ Default claim names:
 - scopes claim: `scope`
 - namespaces claim: `lemline_namespaces`
 
-Accepted claim formats for scopes and namespaces:
-
-1. space-separated string
-2. comma-separated string
-3. array or collection values
+Supply the scope and namespace claims as strings. Separate multiple values with spaces or commas.
 
 ## Error Mapping
 

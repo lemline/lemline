@@ -88,7 +88,15 @@ it does not wait for the workflow to finish. The running worker executes the ins
 
 ### Using the gRPC Gateway
 
-Programs start instances through the gateway's `StartInstance` RPC (`lemline.gateway.v1.GatewayService`). Supply your own `instance_id` (a UUIDv7) to make retries idempotent. See [gRPC Gateway Reference](lemline-ref-gateway.md).
+Programs start instances through the gateway's `StartInstance` RPC (`lemline.gateway.v1.GatewayService`). Follow the [gateway tutorial](lemline-tutorial-gateway.md) for a complete request and a way to read the resulting output.
+
+#### Retry a gateway start safely
+
+1. Before the first call, generate and save a UUIDv7 as `instance_id` for the logical request. Set an explicit workflow version so a deployment between attempts cannot change which version the request resolves to.
+2. If the response is lost or the request times out, repeat the same request with the same ID, namespace, name, version, input and time zone.
+3. Treat `START_INSTANCE_RESULT_ACCEPTED_NEW` and `START_INSTANCE_RESULT_ACCEPTED_EXISTING` as acceptance of the same instance. If you receive `ALREADY_EXISTS`, compare the original parameters with the retry. Reusing an ID with different effective parameters is a conflict.
+
+Use the returned ID to [follow the instance events](lemline-howto-monitor.md#resume-an-instance-event-stream). See [Start Idempotency](lemline-ref-gateway.md#start-idempotency) for the comparison rules.
 
 ## Checking Instance Status
 

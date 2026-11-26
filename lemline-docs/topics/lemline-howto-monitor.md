@@ -32,6 +32,14 @@ See [gRPC Gateway Reference](lemline-ref-gateway.md).
 
 The CLI has no command to list or inspect instances. `lemline instance start` prints the id of the instance it starts, which you can then look up in the dashboard.
 
+### Resume an instance event stream
+
+1. Open `WatchInstanceEvents` with the instance ID. Omit `after_cursor` to replay the history before following live events. If the instance was just accepted and the gateway returns `NOT_FOUND`, retry after the first lifecycle event reaches analytics.
+2. Save the event's `cursor` after handling each event. If the connection drops, reopen the stream for the same instance with that value in `after_cursor`. The first response after reconnection contains the next event, when available.
+3. Close the stream when you have the event you were waiting for. For a finite history query, call `ListInstanceEvents` and follow `next_cursor` until it is absent.
+
+See the [gateway tutorial](lemline-tutorial-gateway.md) for a first history query and the [gateway reference](lemline-ref-gateway.md#list-and-watch-pairing) for cursor behavior across RPCs.
+
 ### Following an instance on the SQLite setup
 
 On [the SQLite setup](lemline-tutorial-setup.md), the worker stores every lifecycle event in `analytics.db`. Keep the
