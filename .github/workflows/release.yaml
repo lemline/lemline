@@ -1,251 +1,88 @@
-name: Build & Release Lemline
+name: Build the Lemline v7.1.0 Windows package
 
-# Triggers: version tags, nightly schedule, or manual dispatch
 on:
-  push:
-    tags: [ 'v*.*.*' ]
-  schedule:
-    - cron: '0 0 * * *'
-  workflow_dispatch: { }
-
-env:
-  # If this run is a tag build, use the tag name; otherwise 'nightly'
-  VERSION_NAME: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || 'nightly' }}
+  workflow_dispatch:
 
 permissions:
   contents: write
 
 jobs:
-
-  #################################
-  # 1) Check Changes
-  #################################
-  check-changes:
-    runs-on: ubuntu-22.04
-    permissions:
-      contents: read  # For actions/checkout
-      actions: read   # For gh api to read workflow runs
-    outputs:
-      changed: ${{ steps.diff.outputs.changed }}
+  windows:
+    runs-on: windows-2022
     steps:
-      - name: Check out source
-        uses: actions/checkout@v5
+      - uses: actions/checkout@v5
         with:
-          fetch-depth: 0 # Needed for comparing against older commits
-
-      - name: Determine if build is needed
-        id: diff
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        shell: bash
+          ref: refs/tags/v7.1.0
+          persist-credentials: false
+      - name: Verify release source
+        shell: pwsh
         run: |
-          # Check GitHub CLI authentication
-          gh auth status || { echo "❌ GitHub CLI is not authenticated"; exit 1; }
-          
-          # Default to requiring a build
-          BUILD_REQUIRED="true"
-          
-          # Resolve workflow id
-          WORKFLOW_ID=$(gh api repos/${{ github.repository }}/actions/workflows \
-            --jq '.workflows[] | select(.name=="${{ github.workflow }}") | .id')
-          echo "Workflow name: ${{ github.workflow }}, Workflow Id: $WORKFLOW_ID"
-          
-          echo "Checking for changes on branch '${{ github.ref_name }}'..."
-          
-          LAST_SUCCESSFUL_SHA=$(gh api \
-            "repos/${{ github.repository }}/actions/workflows/$WORKFLOW_ID/runs?branch=${{ github.ref_name }}&status=success&per_page=1" \
-            --jq '.workflow_runs[0].head_sha // empty' 2>/dev/null || true)
-          echo "Last successful SHA: $LAST_SUCCESSFUL_SHA, current commit SHA: ${{ github.sha }}"
-          
-          if [[ -z "$LAST_SUCCESSFUL_SHA" ]]; then
-            echo "No previous successful scheduled run found or failed to retrieve SHA. Build will proceed."
-          elif [[ "${{ github.sha }}" == "$LAST_SUCCESSFUL_SHA" ]]; then
-            echo "Current commit SHA matches last successful scheduled run SHA. No build needed."
-            BUILD_REQUIRED="false"
-          elif ! git rev-parse --quiet --verify "$LAST_SUCCESSFUL_SHA^{commit}" >/dev/null 2>&1; then
-            echo "Last successful run SHA not found in history. Build will proceed."
-          elif git diff --quiet "$LAST_SUCCESSFUL_SHA"..HEAD; then
-            echo "No code changes since last successful scheduled run. No build needed."
-            BUILD_REQUIRED="false"
-          else
-            echo "Code changes detected. Build will proceed."
-          fi
-          
-          echo "changed=$BUILD_REQUIRED" >> "$GITHUB_OUTPUT"
-
-  build:
-    needs: check-changes
-    if: ${{ needs.check-changes.outputs.changed == 'true' }}
-    runs-on: ${{ matrix.runner }}
-    strategy:
-      matrix:
-        include:
-          - runner: ubuntu-22.04
-            platform: linux-x86_64
-          - runner: windows-2022
-            platform: windows-x86_64
-          # No macOS entry: the native build needs about 6.5 GB of memory and GitHub's free macOS
-          # runners have 7 GB in all, so native-image runs out of heap and aborts. The macOS arm64
-          # archive (lemline-<tag>-macos-arm64.tar.gz + .sha256, same layout as Linux) is built on
-          # a Mac and attached to the release by hand.
-
-    steps:
-      #################################
-      # 2) Checkout
-      #################################
-
-      - name: Check out source
-        uses: actions/checkout@v5
-
-      #################################
-      # 3) Graalvm setup
-      #################################
-
-      - name: Set up Graalvm Native Image
-        uses: graalvm/setup-graalvm@v1
-        with:
-          distribution: graalvm-community
-          java-version: 25
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-
-      #################################
-      # 4) 🪟 Windows-specific configuration
-      #################################
-
-      - name: Setup MSBuild
-        if: ${{ runner.os == 'Windows' }}
-        uses: microsoft/setup-msbuild@v3
-        with:
-          msbuild-architecture: x64
-
-      - name: Setup MSVC (Windows)
-        if: ${{ runner.os == 'Windows' }}
-        uses: ilammy/msvc-dev-cmd@v1
-        with:
-          arch: x64
-
-      - name: Set up Java 17 for Gradle toolchain
-        if: ${{ runner.os == 'Windows' }}
-        uses: actions/setup-java@v5
+          $commit = git rev-parse HEAD
+          if ($commit -cne '4b1716a4f70cd82dc62f7a736fb04cb26532b585') {
+            throw "Unexpected release commit $commit"
+          }
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
-          java-version: 17
-
-      #################################
-      # 5) Native build step
-      #################################
-
-      # **☕ Build Uber-JAR**
-      - name: Build uber-jar (Linux)
-        if: ${{ matrix.platform == 'linux-x86_64' }}
-        run: |
-          ./gradlew --no-daemon \
-          -Dorg.gradle.jvmargs="-Xmx2g -XX:MaxMetaspaceSize=768m -Dfile.encoding=UTF-8" \
-          -p lemline-runner quarkusBuild \
-          -Dquarkus.package.jar.type=uber-jar
-
-      # **🐧 Linux**
-      - name: Build native image (Unix)
-        if: ${{ matrix.platform == 'linux-x86_64' }}
-        run: |
-          ./gradlew --no-daemon \
-            -Dorg.gradle.jvmargs="-Xmx2g -XX:MaxMetaspaceSize=768m -Dfile.encoding=UTF-8" \
-            -p lemline-runner quarkusBuild \
-            -Dquarkus.native.enabled=true \
-            -Dquarkus.package.jar.enabled=false \
-            -Dquarkus.native.native-image-xmx=8g
-
-      # **🪟 Windows**
-      - name: Build native image (Windows)
-        if: ${{ runner.os == 'Windows' }}
-        shell: cmd
-        run: |
-          gradlew.bat --no-daemon ^
-            -Dorg.gradle.jvmargs="-Xmx2g -XX:MaxMetaspaceSize=768m -Dfile.encoding=UTF-8" ^
-            -p lemline-runner quarkusBuild ^
-            -Dquarkus.native.enabled=true ^
-            -Dquarkus.package.jar.enabled=false ^
-            -Dquarkus.native.native-image-xmx=5g
-
-      #################################
-      # 6) Packaging
-      #################################
-
-      # **🐧 Linux**
-      - name: Package distribution (macOS/Linux)
-        if: ${{ runner.os != 'Windows' }}
-        shell: bash
-        run: |
-          mkdir -p dist/bin
-          cp lemline-runner/build/*-runner dist/bin/lemline
-          chmod +x dist/bin/lemline
-          cp LICENSE.md README.md dist/
-          tar -C dist -czf "lemline-${VERSION_NAME}-${{ matrix.platform }}.tar.gz" .
-
-      # **🪟 Windows**
-      - name: Package distribution (Windows)
-        if: ${{ runner.os == 'Windows' }}
-        shell: pwsh
-        run: |
-          New-Item -ItemType Directory -Force -Path dist\bin
-          Copy-Item lemline-runner/build\*-runner.exe dist\bin\lemline.exe
-          Copy-Item LICENSE.md, README.md dist\
-          Compress-Archive -Path dist\* -DestinationPath "lemline-${env:VERSION_NAME}-${{ matrix.platform }}.zip"
-
-      # **☕ Uber-JAR**
-      - name: Package distribution (Uber JAR)
-        if: ${{ matrix.platform == 'linux-x86_64' }}
-        shell: bash
-        run: |
-          JAR=$(ls lemline-runner/build/*-runner.jar)
-          # ① plain jar
-          cp "$JAR" "lemline-${VERSION_NAME}.jar"
-          # ② jar + docs zipped
-          mkdir -p dist_jar
-          cp "$JAR" dist_jar/lemline.jar
-          cp LICENSE.md README.md dist_jar/
-          (cd dist_jar && zip -r "../lemline-${VERSION_NAME}-jar.zip" .)
-
-      #################################
-      # 7) Checksums
-      #################################
-
-      # **🐧 Linux & 🍎 MacOS**
-      - name: Compute checksum (macOS/Linux)
-        if: ${{ runner.os != 'Windows' }}
-        shell: bash
-        run: |
-          artifact=$(ls lemline-${VERSION_NAME}-${{ matrix.platform }}.*)
-          shasum -a 256 "$artifact" > "$artifact.sha256"
-
-      # **🪟 Windows**
-      - name: Compute checksum (Windows)
-        if: ${{ runner.os == 'Windows' }}
-        shell: pwsh
-        run: |
-          $artifact = Get-ChildItem "lemline-${env:VERSION_NAME}-${{ matrix.platform }}.*"
-          $hash = Get-FileHash $artifact -Algorithm SHA256
-          $hash.Hash | Out-File -Encoding ASCII "$($artifact.Name).sha256"
-
-      # **☕ Uber-JAR**
-      - name: Compute checksum (Uber‑JAR)
-        if: ${{ matrix.platform == 'linux-x86_64' }}
-        shell: bash
-        run: |
-          shasum -a 256 "lemline-${VERSION_NAME}.jar"      > "lemline-${VERSION_NAME}.jar.sha256"
-          shasum -a 256 "lemline-${VERSION_NAME}-jar.zip"  > "lemline-${VERSION_NAME}-jar.zip.sha256"
-
-      #################################
-      # 8) Release (nightly or versioned)
-      #################################
-      - name: 📦 Publish to GitHub Releases
-        uses: svenstaro/upload-release-action@v2
+          java-version: '17'
+      - uses: graalvm/setup-graalvm@v1
         with:
-          repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: lemline-${{ env.VERSION_NAME }}*.*   # grabs tar.gz, zip, jar, sha256
-          file_glob: true
-          tag: ${{ github.event_name == 'push' && github.ref_name || 'nightly' }}
-          release_name: ${{ github.event_name == 'push' && format('Lemline {0}', github.ref_name) || 'Nightly Build' }}
-          prerelease: ${{ github.event_name != 'push' }}
-          overwrite: true
-          make_latest: ${{ github.event_name == 'push' }}
+          distribution: graalvm-community
+          java-version: '25'
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: microsoft/setup-msbuild@v3
+        with:
+          msbuild-architecture: x64
+      - uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+      - uses: gradle/actions/setup-gradle@v5
+      - name: Build and test the Windows executable
+        shell: pwsh
+        run: |
+          $env:GITHUB_REF = 'refs/tags/v7.1.0'
+          $env:GITHUB_REF_NAME = 'v7.1.0'
+          $gradleArgs = @(
+            '--no-daemon'
+            '--max-workers=2'
+            '-Dorg.gradle.jvmargs=-Xmx2g -XX:MaxMetaspaceSize=768m -Dfile.encoding=UTF-8'
+            ':lemline-runner:testNative'
+            '-Dquarkus.native.native-image-xmx=8g'
+            '--tests'
+            '*PackagedCliIT.prints*'
+            '--tests'
+            '*SingleHostSQLiteIT'
+          )
+          & .\gradlew.bat @gradleArgs 2>&1 | Tee-Object -FilePath windows-tests.log
+          exit $LASTEXITCODE
+      - name: Package the tested Windows executable
+        shell: pwsh
+        run: |
+          $binary = Get-Item 'lemline-runner/build/lemline-runner-7.1.0-runner.exe'
+          $version = & $binary.FullName --version
+          if ($LASTEXITCODE -ne 0 -or $version -cne 'Lemline Runner 7.1.0') {
+            throw "Unexpected executable version $version"
+          }
+          New-Item -ItemType Directory -Force -Path 'dist/bin'
+          Copy-Item $binary.FullName 'dist/bin/lemline.exe'
+          Copy-Item LICENSE.md, README.md 'dist/'
+          $archive = 'lemline-v7.1.0-windows-x86_64.zip'
+          Compress-Archive -Path 'dist/*' -DestinationPath $archive
+          (Get-FileHash $archive -Algorithm SHA256).Hash | Out-File -Encoding ASCII "$archive.sha256"
+      - name: Attach the Windows package and checksum
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release upload v7.1.0 lemline-v7.1.0-windows-x86_64.zip lemline-v7.1.0-windows-x86_64.zip.sha256 --repo lemline/lemline
+          exit $LASTEXITCODE
+      - name: Save Windows test evidence
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: windows-v7.1.0-test-evidence
+          path: |
+            windows-tests.log
+            **/build/test-results/**/TEST-*.xml
+            **/build/packaged-process-logs/**
+          if-no-files-found: ignore
