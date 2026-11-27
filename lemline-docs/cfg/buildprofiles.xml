@@ -21,6 +21,8 @@
     </footer>
     <build-profile instance="lemline">
         <variables>
+            <web-root>https://docs.lemline.com</web-root>
+            <og-image>https://docs.lemline.com/social-preview.png</og-image>
             <noindex-content>true</noindex-content>
         </variables>
         <llms-txt single-file="true"/>

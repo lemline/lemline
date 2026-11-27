@@ -1,5 +1,7 @@
 # Reserve, charge and ship an order
 
+<web-summary>Reserve items, charge a payment, compare shipping quotes, and release the reservation if payment fails.</web-summary>
+
 ## Start the tutorial shop
 
 Complete [the SQLite setup](lemline-tutorial-setup.md) and keep the worker running on the host. In a separate terminal, open the root of the [Lemline source checkout](https://github.com/lemline/lemline) matching these docs (the directory containing `examples/tutorial-services`). With Docker Compose running, start the single shop container:

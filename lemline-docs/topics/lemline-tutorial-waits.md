@@ -4,6 +4,8 @@ title: "Wait for payments and collect order checks"
 
 # Wait for payments and collect order checks
 
+<web-summary>Wait for a payment event, collect order checks, and resume a workflow when its conditions are met.</web-summary>
+
 A wait pauses an existing instance for a duration. A listen pauses it until matching
 events arrive. The runner persists pending operations so it can resume an instance
 after a restart.

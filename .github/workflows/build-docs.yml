@@ -50,23 +50,30 @@ jobs:
           instance: ${{ env.INSTANCE }}
           docker-version: ${{ env.DOCKER_VERSION }}
 
+      - name: Prepare and verify social previews
+        env:
+          DOCS_ARCHIVE: artifacts/${{ steps.define-ids.outputs.artifact }}
+        run: |
+          unzip -O UTF-8 -qq "$DOCS_ARCHIVE" -d dir
+          cp lemline-docs/images/social-preview.png dir/
+          python3 lemline-docs/validation/prepare_social_preview.py dir
+          mkdir -p packaged
+          (cd dir && zip -qr "../packaged/${DOCS_ARCHIVE##*/}" .)
+          cp artifacts/report.json packaged/
+
       - name: Upload Artifact
         uses: actions/upload-artifact@v6
         with:
           name: docs
           path: |
-            artifacts/${{ steps.define-ids.outputs.artifact }}
-            artifacts/report.json
+            packaged/${{ steps.define-ids.outputs.artifact }}
+            packaged/report.json
           retention-days: 7
 
       - name: Check Writerside build report
         uses: JetBrains/writerside-checker-action@v1
         with:
           instance: ${{ env.INSTANCE }}
-
-      - name: Unzip Artifact
-        if: github.ref == 'refs/heads/main'
-        run: unzip -O UTF-8 -qq "artifacts/${{ steps.define-ids.outputs.artifact }}" -d dir
 
       - name: Upload Pages Artifact
         if: github.ref == 'refs/heads/main'

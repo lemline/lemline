@@ -1,5 +1,7 @@
 # Monitor the warehouse temperature
 
+<web-summary>Monitor warehouse temperature events and trigger a workflow when the warehouse overheats.</web-summary>
+
 ## Start the tutorial shop
 
 Complete [the SQLite setup](lemline-tutorial-setup.md) and stop the worker with Ctrl+C before registering the event schedules. In a separate terminal, open the root of the [Lemline source checkout](https://github.com/lemline/lemline) matching these docs (the directory containing `examples/tutorial-services`). With Docker Compose running, start the single shop container:

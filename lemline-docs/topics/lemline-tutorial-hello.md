@@ -1,5 +1,7 @@
 # Acknowledge the first order
 
+<web-summary>Build an order acknowledgement workflow, pass data between tasks, and run it with the Lemline CLI.</web-summary>
+
 Complete [the SQLite setup](lemline-tutorial-setup.md). Keep the worker running and use a second terminal in the setup directory. Substitute `java -jar lemline.jar` for `bin/lemline` if using the JAR. Each definition below is a new version of the same workflow. Save each in turn as `acknowledge-order.yaml`.
 
 ## Return an acknowledgement

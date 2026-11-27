@@ -4,6 +4,8 @@ title: Lemline Documentation
 
 # Lemline Documentation
 
+<web-summary>Learn to build, run, and monitor event-driven workflows with Lemline and the Open Workflow DSL.</web-summary>
+
 Welcome to the official documentation for Lemline, the modern runtime for Open Workflow DSL.
 
 ## 🏠 Home
